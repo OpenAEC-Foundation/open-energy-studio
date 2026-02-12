@@ -1,0 +1,121 @@
+.ribbon {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.ribbon-tabs {
+  display: flex;
+  background: var(--bg-primary);
+  padding: 0 8px;
+  gap: 2px;
+}
+
+.ribbon-tab {
+  padding: 6px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  transition: all 0.15s ease;
+}
+
+.ribbon-tab:hover {
+  color: var(--text-primary);
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.ribbon-tab.active {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-bottom-color: var(--accent);
+}
+
+.ribbon-content {
+  display: flex;
+  padding: 6px 10px;
+  min-height: 90px;
+  overflow: visible;
+  gap: 4px;
+}
+
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 8px;
+  min-width: 60px;
+}
+
+.ribbon-group-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: auto;
+  padding-top: 2px;
+  padding-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: 1px solid var(--border);
+}
+
+.ribbon-group-content {
+  display: flex;
+  gap: 1px;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.ribbon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.15s;
+  min-width: 56px;
+}
+
+.ribbon-btn:hover {
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.ribbon-btn:active {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.ribbon-btn-accent {
+  color: var(--accent);
+}
+
+.ribbon-btn-accent:hover {
+  color: var(--accent-hover);
+  background: var(--accent-subtle);
+  border-color: var(--border-accent);
+}
+
+.ribbon-btn span {
+  white-space: nowrap;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ribbon-btn-text-icon {
+  font-size: 14px;
+  font-weight: 700;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}

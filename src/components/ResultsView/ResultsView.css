@@ -1,0 +1,33 @@
+.results-view {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.results-view h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.results-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.results-empty p {
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.beng-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .beng-cards {
+    grid-template-columns: 1fr;
+  }
+}

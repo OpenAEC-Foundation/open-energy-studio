@@ -1,0 +1,102 @@
+.beng-indicator {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  transition: border-color 0.15s;
+}
+
+.beng-indicator.beng-pass {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.beng-indicator.beng-fail {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.beng-indicator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.beng-indicator-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.beng-indicator-badge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.beng-indicator-badge.pass {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--energy-green);
+}
+
+.beng-indicator-badge.fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--energy-red);
+}
+
+.beng-indicator-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.beng-indicator-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 12px;
+}
+
+.beng-indicator-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.beng-indicator-bar-container {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.beng-indicator-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.beng-indicator-bar.bar-pass {
+  background: var(--energy-green);
+}
+
+.beng-indicator-bar.bar-fail {
+  background: var(--energy-red);
+}
+
+.beng-indicator-limit-line {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-secondary);
+  border-radius: 1px;
+}
+
+.beng-indicator-limit {
+  font-size: 11px;
+  color: var(--text-muted);
+}

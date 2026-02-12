@@ -1,0 +1,43 @@
+.title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  height: 34px;
+  min-height: 34px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.title-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-bar-icon {
+  color: var(--accent);
+}
+
+.title-bar-app {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.title-bar-separator {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.title-bar-project {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.title-bar-dirty {
+  color: var(--warning);
+  font-weight: bold;
+}
