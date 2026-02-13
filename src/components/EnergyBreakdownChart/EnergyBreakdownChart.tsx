@@ -26,6 +26,7 @@ export function EnergyBreakdownChart({ breakdown }: EnergyBreakdownChartProps) {
     { key: 'ventilationEnergy', label: t('results.ventilationEnergy'), value: breakdown.ventilationEnergy, color: '#8b5cf6' },
     { key: 'hotWaterEnergy', label: t('results.hotWaterEnergy'), value: breakdown.hotWaterEnergy, color: '#06b6d4' },
     { key: 'lightingEnergy', label: t('results.lightingEnergy'), value: breakdown.lightingEnergy, color: '#f59e0b' },
+    { key: 'auxiliaryEnergy', label: t('results.auxiliaryEnergy'), value: breakdown.auxiliaryEnergy, color: '#a855f7' },
   ];
 
   const production = [

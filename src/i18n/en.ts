@@ -285,6 +285,7 @@ export const en: Record<string, string> = {
   'results.ventilationEnergy': 'Fans',
   'results.hotWaterEnergy': 'Hot Water',
   'results.lightingEnergy': 'Lighting',
+  'results.auxiliaryEnergy': 'Auxiliary Energy',
   'results.pvProduction': 'PV Production',
   'results.solarThermalProduction': 'Solar Thermal Production',
 
@@ -299,6 +300,39 @@ export const en: Record<string, string> = {
   'report.export': 'Export Report',
   'report.print': 'Print Report',
   'report.exportIFC': 'Export IFC',
+
+  // Results - TO-juli
+  'results.toJuli': 'TO-juli (Summer Comfort)',
+
+  // Preview panel
+  'preview.title': 'Live Preview',
+  'preview.noData': 'Add a zone to see the preview',
+  'preview.toJuli': 'TO-juli (GTO)',
+  'preview.monthlyDemand': 'Monthly Demand',
+  'preview.keyFigures': 'Key Figures',
+  'preview.energyLabel': 'Energy Label',
+  'preview.monthlyProfile': 'Monthly Energy Profile',
+  'preview.month': 'Month',
+  'preview.total': 'Total',
+  'ribbon.preview': 'Preview',
+
+  // Months
+  'month.jan': 'January',
+  'month.feb': 'February',
+  'month.mar': 'March',
+  'month.apr': 'April',
+  'month.may': 'May',
+  'month.jun': 'June',
+  'month.jul': 'July',
+  'month.aug': 'August',
+  'month.sep': 'September',
+  'month.oct': 'October',
+  'month.nov': 'November',
+  'month.dec': 'December',
+
+  // Report
+  'report.monthlyOverview': 'Monthly Overview',
+  'report.value': 'Value',
 
   // Status bar
   'status.ready': 'Ready',

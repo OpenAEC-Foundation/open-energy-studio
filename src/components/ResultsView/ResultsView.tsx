@@ -2,6 +2,8 @@ import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { BENGIndicator } from '../BENGIndicator/BENGIndicator';
 import { EnergyBreakdownChart } from '../EnergyBreakdownChart/EnergyBreakdownChart';
+import { MonthlyBreakdownChart } from '../MonthlyBreakdownChart/MonthlyBreakdownChart';
+import type { IBENGResultMonthly } from '../../core/energy/types';
 import './ResultsView.css';
 
 export function ResultsView() {
@@ -19,6 +21,9 @@ export function ResultsView() {
       </div>
     );
   }
+
+  // Check if result has monthly data (IBENGResultMonthly)
+  const monthlyResult = 'monthly' in result ? result as IBENGResultMonthly : null;
 
   return (
     <div className="results-view">
@@ -52,7 +57,30 @@ export function ResultsView() {
         />
       </div>
 
+      {/* TO-juli indicator */}
+      {monthlyResult && (
+        <div className={`to-juli-card ${monthlyResult.toJuli.pass ? 'to-juli-pass' : 'to-juli-fail'}`}>
+          <div className="to-juli-header">
+            <h3>{t('results.toJuli')}</h3>
+            <span className={`to-juli-badge ${monthlyResult.toJuli.pass ? 'pass' : 'fail'}`}>
+              {monthlyResult.toJuli.pass ? t('results.pass') : t('results.fail')}
+            </span>
+          </div>
+          <div className="to-juli-value">
+            GTO: {monthlyResult.toJuli.gto.toFixed(2)}
+            <span className="to-juli-limit">
+              {' '}/ {t('results.limit')}: {'\u2264'} {monthlyResult.toJuli.limit}
+            </span>
+          </div>
+        </div>
+      )}
+
       <EnergyBreakdownChart breakdown={result.breakdown} />
+
+      {/* Monthly breakdown chart */}
+      {monthlyResult && (
+        <MonthlyBreakdownChart monthly={monthlyResult.monthly} />
+      )}
     </div>
   );
 }

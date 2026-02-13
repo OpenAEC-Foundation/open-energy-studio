@@ -92,9 +92,9 @@ export const USAGE_HOURS_PER_YEAR = 8760;
 // Hot water demand (forfaitair)
 // ------------------------------------------------------------
 
-/** Hot water demand per building function in kWh/year */
+/** Hot water demand per building function in kWh/year (non-residential) */
 export const HOT_WATER_DEMAND: Record<BuildingFunction, number> = {
-  residential: 2100,
+  residential: 2100,  // Not used directly; see getHotWaterDemand()
   office:      500,
   education:   300,
   healthcare:  3000,
@@ -103,13 +103,37 @@ export const HOT_WATER_DEMAND: Record<BuildingFunction, number> = {
   other:       500,
 };
 
+/**
+ * Calculate hot water demand based on building function and floor area.
+ *
+ * For residential, NTA 8800 Ch 13 scales demand with number of tap points
+ * (which correlates with Ag). Approximation:
+ *   Q_W = max(1800, 25 × Ag + 200) kWh/year
+ *
+ * This gives ~1875 kWh for 67 m² (vs Uniec ~1750) and
+ * ~3525 kWh for 133 m² (vs Uniec ~4060).
+ *
+ * For non-residential: fixed values from HOT_WATER_DEMAND table.
+ */
+export function getHotWaterDemand(
+  buildingFunction: BuildingFunction,
+  totalFloorArea: number
+): number {
+  if (buildingFunction === 'residential') {
+    return Math.max(1800, 25 * totalFloorArea + 200);
+  }
+  return HOT_WATER_DEMAND[buildingFunction] ?? HOT_WATER_DEMAND.other;
+}
+
 // ------------------------------------------------------------
 // Lighting energy demand
 // ------------------------------------------------------------
 
-/** Lighting energy per building function in kWh/(m2·year) */
+/** Lighting energy per building function in kWh/(m2·year)
+ * NTA 8800 §14.3: W_L;spec = 0 for residential BENG calculations
+ * Utility functions use Table 14.1/14.3/14.6 (simplified here) */
 export const LIGHTING_ENERGY: Record<BuildingFunction, number> = {
-  residential: 4,
+  residential: 0,   // NTA 8800 §14.3: 0 for BENG
   office:      12,
   education:   10,
   healthcare:  15,
@@ -138,11 +162,20 @@ export const SURFACE_RESISTANCE: Record<SurfaceType, SurfaceResistance> = {
 // Ventilation constants
 // ------------------------------------------------------------
 
-/** Design flow rate for residential in dm3/(s·m2) */
+/** Design flow rate for residential in dm³/(s·m²) – used for heat loss calculation */
 export const VENTILATION_DESIGN_FLOW_RATE_RESIDENTIAL = 0.9;
+
+/** Time-average factor for fan energy (NTA 8800: demand-controlled ≈ 0.67)
+ *  Fan energy = SFP × q_v;design × f_time × 8760 / 1000 */
+export const VENTILATION_FAN_TIME_FACTOR = 0.67;
 
 /** Correction factor for qv10 to average infiltration rate */
 export const QV10_CORRECTION_FACTOR = 0.067;
+
+/** Distribution loss factors (NTA 8800 §10/§13 simplified)
+ *  Accounts for pipe/duct losses not captured in net demand */
+export const DISTRIBUTION_LOSS_FACTOR_HEATING = 0.10;
+export const DISTRIBUTION_LOSS_FACTOR_HOT_WATER = 0.15;
 
 // ------------------------------------------------------------
 // Frame factor for windows (fraction of glass area vs total)
@@ -156,3 +189,32 @@ export const FRAME_FACTOR = 0.9;
 
 /** Standard performance ratio for PV panels */
 export const PV_PERFORMANCE_RATIO = 0.85;
+
+// ------------------------------------------------------------
+// Ventilation type defaults
+// ------------------------------------------------------------
+
+import type { VentilationType } from '../energy/types';
+
+export interface VentilationTypeDefaults {
+  hasFan: boolean;
+  hasHeatRecovery: boolean;
+  defaultSfp: number;         // W/(dm³/s)
+  defaultHeatRecovery: number; // 0-1
+}
+
+export const VENTILATION_TYPE_DEFAULTS: Record<VentilationType, VentilationTypeDefaults> = {
+  natural: { hasFan: false, hasHeatRecovery: false, defaultSfp: 0, defaultHeatRecovery: 0 },
+  type_c:  { hasFan: true,  hasHeatRecovery: false, defaultSfp: 0.5, defaultHeatRecovery: 0 },
+  type_d:  { hasFan: true,  hasHeatRecovery: true,  defaultSfp: 0.8, defaultHeatRecovery: 0.85 },
+};
+
+// ------------------------------------------------------------
+// TO-juli (summer comfort) constants
+// ------------------------------------------------------------
+
+/** GTO limit for residential buildings */
+export const TO_JULI_LIMIT = 1.20;
+
+/** Base temperature for overheating calculation (°C) */
+export const TO_JULI_BASE_TEMP = 25;

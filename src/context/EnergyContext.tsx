@@ -33,6 +33,7 @@ export interface EnergyState {
   selectedItemId: string | null;
   selectedItemType: string | null;
   isDirty: boolean;
+  previewVisible: boolean;
 }
 
 // ============================================================
@@ -98,7 +99,8 @@ export type EnergyAction =
   | { type: 'CLOSE_DIALOG' }
   | { type: 'SELECT_ITEM'; payload: { id: string; itemType: string } }
   | { type: 'DESELECT_ITEM' }
-  | { type: 'SET_DIRTY'; payload: boolean };
+  | { type: 'SET_DIRTY'; payload: boolean }
+  | { type: 'TOGGLE_PREVIEW' };
 
 // ============================================================
 // Default project factory
@@ -106,20 +108,138 @@ export type EnergyAction =
 
 export function createDefaultProject(): IProject {
   return {
-    id: crypto.randomUUID(),
-    name: '',
-    description: '',
+    id: '2467-goejanverwelledijk',
+    name: '2467 Goejanverwelledijk 85 Gouda',
+    description: 'Nieuwbouw vrijstaande woning met kap, 2 bouwlagen + zolder',
     buildingFunction: 'residential',
-    address: '',
-    city: '',
-    zones: [],
-    heatingSystems: [],
-    ventilationSystems: [],
-    coolingSystems: [],
-    hotWaterSystems: [],
-    solarPV: [],
+    address: 'Goejanverwelledijk 85',
+    city: 'Gouda',
+    zones: [
+      {
+        id: 'zone-main',
+        name: 'Woonfunctie',
+        floorArea: 133.06,
+        volume: 345.96,
+        height: 2.6,
+        surfaces: [
+          {
+            id: 'surf-wall-n',
+            name: 'Gevel Noord',
+            type: 'wall',
+            area: 28.6,
+            orientation: 'N',
+            constructionId: 'con-wall',
+            zoneId: 'zone-main',
+            windows: [
+              { id: 'win-n1', name: 'Raam Noord 1', area: 1.8, uValue: 1.1, gValue: 0.40, orientation: 'N', surfaceId: 'surf-wall-n' },
+              { id: 'win-n2', name: 'Raam Noord 2', area: 1.2, uValue: 1.2, gValue: 0.40, orientation: 'N', surfaceId: 'surf-wall-n' },
+            ],
+          },
+          {
+            id: 'surf-wall-e',
+            name: 'Gevel Oost',
+            type: 'wall',
+            area: 36.4,
+            orientation: 'E',
+            constructionId: 'con-wall',
+            zoneId: 'zone-main',
+            windows: [
+              { id: 'win-e1', name: 'Raam Oost 1', area: 2.4, uValue: 1.1, gValue: 0.40, orientation: 'E', surfaceId: 'surf-wall-e' },
+              { id: 'win-e2', name: 'Raam Oost 2', area: 1.6, uValue: 1.2, gValue: 0.40, orientation: 'E', surfaceId: 'surf-wall-e' },
+            ],
+          },
+          {
+            id: 'surf-wall-s',
+            name: 'Gevel Zuid',
+            type: 'wall',
+            area: 28.6,
+            orientation: 'S',
+            constructionId: 'con-wall',
+            zoneId: 'zone-main',
+            windows: [
+              { id: 'win-s1', name: 'Raam Zuid groot', area: 4.8, uValue: 1.1, gValue: 0.40, orientation: 'S', surfaceId: 'surf-wall-s' },
+              { id: 'win-s2', name: 'Raam Zuid 2', area: 2.4, uValue: 1.1, gValue: 0.40, orientation: 'S', surfaceId: 'surf-wall-s' },
+              { id: 'win-s3', name: 'Deur Zuid', area: 2.1, uValue: 2.0, gValue: 0.00, orientation: 'S', surfaceId: 'surf-wall-s' },
+            ],
+          },
+          {
+            id: 'surf-wall-w',
+            name: 'Gevel West',
+            type: 'wall',
+            area: 36.4,
+            orientation: 'W',
+            constructionId: 'con-wall',
+            zoneId: 'zone-main',
+            windows: [
+              { id: 'win-w1', name: 'Raam West 1', area: 2.4, uValue: 1.1, gValue: 0.40, orientation: 'W', surfaceId: 'surf-wall-w' },
+              { id: 'win-w2', name: 'Deur West', area: 2.1, uValue: 2.0, gValue: 0.00, orientation: 'W', surfaceId: 'surf-wall-w' },
+            ],
+          },
+          {
+            id: 'surf-roof-e',
+            name: 'Dak Oost',
+            type: 'roof',
+            area: 42,
+            orientation: 'E',
+            constructionId: 'con-roof',
+            zoneId: 'zone-main',
+            windows: [
+              { id: 'win-dakraam-e', name: 'Dakraam Oost', area: 1.2, uValue: 1.2, gValue: 0.40, orientation: 'E', surfaceId: 'surf-roof-e' },
+            ],
+          },
+          {
+            id: 'surf-roof-w',
+            name: 'Dak West',
+            type: 'roof',
+            area: 42,
+            orientation: 'W',
+            constructionId: 'con-roof',
+            zoneId: 'zone-main',
+            windows: [
+              { id: 'win-dakraam-w', name: 'Dakraam West', area: 1.2, uValue: 1.2, gValue: 0.40, orientation: 'W', surfaceId: 'surf-roof-w' },
+            ],
+          },
+          {
+            id: 'surf-floor',
+            name: 'Vloer begane grond',
+            type: 'floor',
+            area: 72,
+            orientation: 'horizontal',
+            constructionId: 'con-floor',
+            zoneId: 'zone-main',
+            windows: [],
+          },
+        ],
+        thermalBridges: [
+          { id: 'tb-1', name: 'Gevel-vloer', psiValue: 0.05, length: 34, zoneId: 'zone-main' },
+          { id: 'tb-2', name: 'Gevel-dak', psiValue: 0.05, length: 34, zoneId: 'zone-main' },
+          { id: 'tb-3', name: 'Raamkozijnen', psiValue: 0.03, length: 65, zoneId: 'zone-main' },
+        ],
+        airTightness: { qv10: 0.98 },
+      },
+    ],
+    heatingSystems: [
+      { id: 'heat-1', name: 'Warmtepomp lucht (vloerverwarming)', type: 'heat_pump_air', cop: 3.00, coverageFraction: 1.0 },
+    ],
+    ventilationSystems: [
+      { id: 'vent-1', name: 'Type D centraal', type: 'type_d', heatRecoveryEfficiency: 0.0, sfp: 0.8 },
+    ],
+    coolingSystems: [
+      { id: 'cool-1', name: 'Compressiekoeling', type: 'split_unit', eer: 3.00 },
+    ],
+    hotWaterSystems: [
+      { id: 'hw-1', name: 'Warmtepompboiler', type: 'heat_pump', efficiency: 1.40, hasSolarBoiler: false, solarBoilerFraction: 0 },
+    ],
+    solarPV: [
+      { id: 'pv-west', name: 'PV West (18 panelen)', peakPower: 7.2, orientation: 'W', tilt: 30, area: 30.6 },
+      { id: 'pv-east', name: 'PV Oost (3 panelen)', peakPower: 1.2, orientation: 'E', tilt: 30, area: 5.1 },
+    ],
     solarThermal: [],
-    constructions: [],
+    constructions: [
+      { id: 'con-wall', name: 'Gevel Rc=6.76', layers: [{ material: 'Isolatie PUR/PIR', thickness: 0.170, lambda: 0.025 }], rcValue: 6.76, uValue: 0.145 },
+      { id: 'con-roof', name: 'Dak Rc=6.30', layers: [{ material: 'Isolatie', thickness: 0.189, lambda: 0.03 }], rcValue: 6.30, uValue: 0.155 },
+      { id: 'con-floor', name: 'Vloer Rc=5.09', layers: [{ material: 'Isolatie EPS', thickness: 0.153, lambda: 0.03 }], rcValue: 5.09, uValue: 0.190 },
+    ],
   };
 }
 
@@ -136,6 +256,7 @@ const initialState: EnergyState = {
   selectedItemId: null,
   selectedItemType: null,
   isDirty: false,
+  previewVisible: true,
 };
 
 // ============================================================
@@ -671,6 +792,9 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
 
     case 'SET_DIRTY':
       return { ...state, isDirty: action.payload };
+
+    case 'TOGGLE_PREVIEW':
+      return { ...state, previewVisible: !state.previewVisible };
 
     default:
       return state;

@@ -1,5 +1,6 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
+import type { IBENGResultMonthly } from '../../core/energy/types';
 import './ReportView.css';
 
 export function ReportView() {
@@ -93,47 +94,97 @@ export function ReportView() {
         </div>
 
         {/* BENG Results */}
-        {result && (
-          <div className="report-section">
-            <h2>{t('report.bengResults')}</h2>
-            <table className="report-table report-table-results">
-              <thead>
-                <tr>
-                  <th>Indicator</th>
-                  <th>Waarde</th>
-                  <th>Eis</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{t('results.beng1.title')} — {t('results.beng1.subtitle')}</td>
-                  <td>{result.beng1.toFixed(1)} {t('results.beng1.unit')}</td>
-                  <td>≤ {result.beng1Limit}</td>
-                  <td className={result.beng1Pass ? 'report-pass' : 'report-fail'}>
-                    {result.beng1Pass ? t('results.pass') : t('results.fail')}
-                  </td>
-                </tr>
-                <tr>
-                  <td>{t('results.beng2.title')} — {t('results.beng2.subtitle')}</td>
-                  <td>{result.beng2.toFixed(1)} {t('results.beng2.unit')}</td>
-                  <td>≤ {result.beng2Limit}</td>
-                  <td className={result.beng2Pass ? 'report-pass' : 'report-fail'}>
-                    {result.beng2Pass ? t('results.pass') : t('results.fail')}
-                  </td>
-                </tr>
-                <tr>
-                  <td>{t('results.beng3.title')} — {t('results.beng3.subtitle')}</td>
-                  <td>{result.beng3.toFixed(1)} {t('results.beng3.unit')}</td>
-                  <td>≥ {result.beng3Limit}%</td>
-                  <td className={result.beng3Pass ? 'report-pass' : 'report-fail'}>
-                    {result.beng3Pass ? t('results.pass') : t('results.fail')}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+        {result && (() => {
+          const monthlyResult = 'monthly' in result ? result as IBENGResultMonthly : null;
+          const monthKeys = [
+            'month.jan', 'month.feb', 'month.mar', 'month.apr',
+            'month.may', 'month.jun', 'month.jul', 'month.aug',
+            'month.sep', 'month.oct', 'month.nov', 'month.dec',
+          ];
+
+          return (
+            <>
+              <div className="report-section">
+                <h2>{t('report.bengResults')}</h2>
+                <table className="report-table report-table-results">
+                  <thead>
+                    <tr>
+                      <th>Indicator</th>
+                      <th>{t('report.value')}</th>
+                      <th>{t('results.limit')}</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{t('results.beng1.title')} — {t('results.beng1.subtitle')}</td>
+                      <td>{result.beng1.toFixed(1)} {t('results.beng1.unit')}</td>
+                      <td>{'\u2264'} {result.beng1Limit}</td>
+                      <td className={result.beng1Pass ? 'report-pass' : 'report-fail'}>
+                        {result.beng1Pass ? t('results.pass') : t('results.fail')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>{t('results.beng2.title')} — {t('results.beng2.subtitle')}</td>
+                      <td>{result.beng2.toFixed(1)} {t('results.beng2.unit')}</td>
+                      <td>{'\u2264'} {result.beng2Limit}</td>
+                      <td className={result.beng2Pass ? 'report-pass' : 'report-fail'}>
+                        {result.beng2Pass ? t('results.pass') : t('results.fail')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>{t('results.beng3.title')} — {t('results.beng3.subtitle')}</td>
+                      <td>{result.beng3.toFixed(1)} {t('results.beng3.unit')}</td>
+                      <td>{'\u2265'} {result.beng3Limit}%</td>
+                      <td className={result.beng3Pass ? 'report-pass' : 'report-fail'}>
+                        {result.beng3Pass ? t('results.pass') : t('results.fail')}
+                      </td>
+                    </tr>
+                    {monthlyResult && (
+                      <tr>
+                        <td>{t('results.toJuli')} — GTO</td>
+                        <td>{monthlyResult.toJuli.gto.toFixed(2)}</td>
+                        <td>{'\u2264'} {monthlyResult.toJuli.limit}</td>
+                        <td className={monthlyResult.toJuli.pass ? 'report-pass' : 'report-fail'}>
+                          {monthlyResult.toJuli.pass ? t('results.pass') : t('results.fail')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Monthly overview */}
+              {monthlyResult && (
+                <div className="report-section">
+                  <h2>{t('report.monthlyOverview')}</h2>
+                  <table className="report-table report-table-results">
+                    <thead>
+                      <tr>
+                        <th>{t('preview.month')}</th>
+                        <th>{t('results.heatingDemand')}</th>
+                        <th>{t('results.coolingDemand')}</th>
+                        <th>{t('results.solarGain')}</th>
+                        <th>{t('results.transmissionLoss')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyResult.monthly.map((m, i) => (
+                        <tr key={i}>
+                          <td>{t(monthKeys[i])}</td>
+                          <td>{m.heatingDemand.toFixed(0)} kWh</td>
+                          <td>{m.coolingDemand.toFixed(0)} kWh</td>
+                          <td>{m.solarGain.toFixed(0)} kWh</td>
+                          <td>{m.transmissionLoss.toFixed(0)} kWh</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

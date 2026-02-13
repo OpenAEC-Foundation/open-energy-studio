@@ -209,7 +209,8 @@ export interface IEnergyBreakdown {
   ventilationEnergy: number;      // kWh/year  (fan energy)
   hotWaterEnergy: number;         // kWh/year  (delivered)
   lightingEnergy: number;         // kWh/year
-  totalPrimaryEnergy: number;     // kWh/year
+  auxiliaryEnergy: number;        // kWh/year  (pumps, standby, controls)
+  totalPrimaryEnergy: number;     // kWh/year  (gross fossil, incl. auxiliary)
   renewableEnergy: number;        // kWh/year
   pvProduction: number;           // kWh/year
   solarThermalProduction: number; // kWh/year
@@ -255,4 +256,42 @@ export type DialogType =
 export interface IDialogState {
   type: DialogType;
   editId: string | null;       // null = new, string = editing existing
+}
+
+// ------------------------------------------------------------
+// Monthly calculation types
+// ------------------------------------------------------------
+
+/** Tuple of 12 monthly values (Jan..Dec) */
+export type MonthlyValues = [number, number, number, number, number, number,
+                              number, number, number, number, number, number];
+
+/** Monthly energy breakdown for a single month */
+export interface IMonthlyBreakdown {
+  month: number;                    // 0-11
+  transmissionLoss: number;         // kWh
+  ventilationLoss: number;          // kWh
+  infiltrationLoss: number;         // kWh
+  solarGain: number;                // kWh
+  internalGain: number;             // kWh
+  heatingDemand: number;            // kWh
+  coolingDemand: number;            // kWh
+  utilizationFactorHeating: number; // 0..1
+  utilizationFactorCooling: number; // 0..1
+}
+
+/** TO-juli (summer comfort / overheating) result */
+export interface ITOJuliResult {
+  gto: number;                      // Gewogen Temperatuur Overschrijding
+  limit: number;                    // 1.20 (residential)
+  pass: boolean;
+  monthlyRisk: number[];            // 12 monthly values
+}
+
+/** Extended BENG result with monthly breakdown */
+export interface IBENGResultMonthly extends IBENGResult {
+  monthly: IMonthlyBreakdown[];
+  toJuli: ITOJuliResult;
+  monthlyPVProduction: MonthlyValues;
+  monthlySolarThermalProduction: MonthlyValues;
 }

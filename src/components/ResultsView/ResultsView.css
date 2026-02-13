@@ -31,3 +31,66 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* TO-juli card */
+.to-juli-card {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-left: 4px solid var(--border);
+}
+
+.to-juli-card.to-juli-pass {
+  border-left-color: var(--energy-green, #22c55e);
+}
+
+.to-juli-card.to-juli-fail {
+  border-left-color: var(--energy-red, #ef4444);
+}
+
+.to-juli-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.to-juli-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.to-juli-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.to-juli-badge.pass {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--energy-green, #22c55e);
+}
+
+.to-juli-badge.fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--energy-red, #ef4444);
+}
+
+.to-juli-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+}
+
+.to-juli-limit {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}

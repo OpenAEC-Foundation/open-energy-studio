@@ -13,7 +13,7 @@
  * @param gainLossRatio - Ratio of total gains to total losses
  * @returns Utilization factor (0..1)
  */
-function calculateUtilizationFactor(gainLossRatio: number): number {
+export function calculateUtilizationFactor(gainLossRatio: number): number {
   const a = 5; // NTA 8800 time constant parameter
 
   if (gainLossRatio < 0) {

@@ -194,6 +194,7 @@ export function calculateBENG(project: IProject): IBENGResult {
     ventilationEnergy: primaryResult.ventilationEnergy,
     hotWaterEnergy: primaryResult.hotWaterEnergy,
     lightingEnergy: primaryResult.lightingEnergy,
+    auxiliaryEnergy: 0,
     totalPrimaryEnergy: primaryResult.totalPrimaryEnergy,
     renewableEnergy: totalRenewableEnergy,
     pvProduction,

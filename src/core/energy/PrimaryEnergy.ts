@@ -15,6 +15,8 @@ import {
   PRIMARY_ENERGY_FACTOR_ELECTRICITY_FOSSIL,
   PRIMARY_ENERGY_FACTOR_DISTRICT_HEATING,
   PRIMARY_ENERGY_FACTOR_BIOMASS,
+  DISTRIBUTION_LOSS_FACTOR_HEATING,
+  DISTRIBUTION_LOSS_FACTOR_HOT_WATER,
 } from './Constants';
 
 export interface PrimaryEnergyResult {
@@ -92,6 +94,9 @@ export function calculatePrimaryEnergy(
   let heatingDelivered = 0;
   let heatingPrimary = 0;
 
+  // Include distribution losses (NTA 8800 §10: pipe/duct losses)
+  const heatingWithDistribution = heatingDemand * (1 + DISTRIBUTION_LOSS_FACTOR_HEATING);
+
   if (heatingSystems.length > 0) {
     // Normalize coverage fractions
     const totalCoverage = heatingSystems.reduce((s, h) => s + h.coverageFraction, 0);
@@ -99,13 +104,13 @@ export function calculatePrimaryEnergy(
     for (const system of heatingSystems) {
       const fraction = totalCoverage > 0 ? system.coverageFraction / totalCoverage : 1 / heatingSystems.length;
       const cop = Math.max(system.cop, 0.1); // prevent division by zero
-      const delivered = (heatingDemand * fraction) / cop;
+      const delivered = (heatingWithDistribution * fraction) / cop;
       heatingDelivered += delivered;
       heatingPrimary += delivered * getHeatingPrimaryFactor(system.type);
     }
   } else {
     // Default: assume gas HR boiler with COP 0.95
-    heatingDelivered = heatingDemand / 0.95;
+    heatingDelivered = heatingWithDistribution / 0.95;
     heatingPrimary = heatingDelivered * PRIMARY_ENERGY_FACTOR_GAS;
   }
 
@@ -127,18 +132,23 @@ export function calculatePrimaryEnergy(
   let hotWaterDelivered = 0;
   let hotWaterPrimary = 0;
 
+  // Include hot water distribution losses (NTA 8800 §13.3: pipe losses)
+  const hotWaterWithDistribution = hotWaterDemand * (1 + DISTRIBUTION_LOSS_FACTOR_HOT_WATER);
+
   if (hotWaterSystems.length > 0) {
+    // Each system covers an equal share of the hot water demand
+    const sharePerSystem = 1 / hotWaterSystems.length;
     for (const system of hotWaterSystems) {
       const efficiency = Math.max(system.efficiency, 0.1);
       // Reduce demand by solar boiler fraction
-      const effectiveDemand = hotWaterDemand * (1 - system.solarBoilerFraction);
-      const delivered = effectiveDemand / efficiency / hotWaterSystems.length;
+      const systemDemand = hotWaterWithDistribution * sharePerSystem * (1 - system.solarBoilerFraction);
+      const delivered = systemDemand / efficiency;
       hotWaterDelivered += delivered;
       hotWaterPrimary += delivered * getHotWaterPrimaryFactor(system.type);
     }
   } else {
     // Default: gas HR combi with efficiency 0.85
-    hotWaterDelivered = hotWaterDemand / 0.85;
+    hotWaterDelivered = hotWaterWithDistribution / 0.85;
     hotWaterPrimary = hotWaterDelivered * PRIMARY_ENERGY_FACTOR_GAS;
   }
 

@@ -1,0 +1,289 @@
+{
+  "meta": {
+    "version": "1.0",
+    "source": "Uniec 3.3.7.0 / BengCert",
+    "projectNumber": "2786",
+    "description": "Reddingspost Kijkduin, Den Haag - Utiliteitsgebouw (bijeenkomstfunctie)",
+    "uniecReference": {
+      "beng1": 115.90,
+      "beng1Limit": 128.85,
+      "beng2": 57.98,
+      "beng2Limit": 60.00,
+      "beng3": 62.6,
+      "beng3Limit": 30,
+      "energyLabel": "A+++"
+    }
+  },
+  "project": {
+    "id": "2786-reddingspost",
+    "name": "2786 Reddingspost Kijkduin",
+    "description": "Reddingspost / EHBO-post op het strand van Kijkduin, Den Haag",
+    "buildingFunction": "other",
+    "address": "Deltaplein",
+    "city": "Den Haag",
+    "zones": [
+      {
+        "id": "zone-bg",
+        "name": "Begane grond",
+        "floorArea": 250,
+        "volume": 875,
+        "height": 3.5,
+        "surfaces": [
+          {
+            "id": "surf-wall-n",
+            "name": "Buitenwand Noord",
+            "type": "wall",
+            "area": 56,
+            "orientation": "N",
+            "constructionId": "con-wall",
+            "zoneId": "zone-bg",
+            "windows": [
+              {
+                "id": "win-n1",
+                "name": "Raam Noord 1",
+                "area": 3.6,
+                "uValue": 0.71,
+                "gValue": 0.40,
+                "orientation": "N",
+                "surfaceId": "surf-wall-n"
+              }
+            ]
+          },
+          {
+            "id": "surf-wall-e",
+            "name": "Buitenwand Oost",
+            "type": "wall",
+            "area": 50,
+            "orientation": "E",
+            "constructionId": "con-wall",
+            "zoneId": "zone-bg",
+            "windows": [
+              {
+                "id": "win-e1",
+                "name": "Raam Oost",
+                "area": 5.4,
+                "uValue": 0.71,
+                "gValue": 0.40,
+                "orientation": "E",
+                "surfaceId": "surf-wall-e"
+              }
+            ]
+          },
+          {
+            "id": "surf-wall-s",
+            "name": "Buitenwand Zuid",
+            "type": "wall",
+            "area": 56,
+            "orientation": "S",
+            "constructionId": "con-wall",
+            "zoneId": "zone-bg",
+            "windows": [
+              {
+                "id": "win-s1",
+                "name": "Raam Zuid 1",
+                "area": 8.1,
+                "uValue": 0.71,
+                "gValue": 0.40,
+                "orientation": "S",
+                "surfaceId": "surf-wall-s"
+              },
+              {
+                "id": "win-s2",
+                "name": "Deur Zuid",
+                "area": 4.2,
+                "uValue": 2.0,
+                "gValue": 0.00,
+                "orientation": "S",
+                "surfaceId": "surf-wall-s"
+              }
+            ]
+          },
+          {
+            "id": "surf-wall-w",
+            "name": "Buitenwand West",
+            "type": "wall",
+            "area": 50,
+            "orientation": "W",
+            "constructionId": "con-wall",
+            "zoneId": "zone-bg",
+            "windows": [
+              {
+                "id": "win-w1",
+                "name": "Raam West",
+                "area": 5.4,
+                "uValue": 0.71,
+                "gValue": 0.40,
+                "orientation": "W",
+                "surfaceId": "surf-wall-w"
+              },
+              {
+                "id": "win-w2",
+                "name": "Deur West",
+                "area": 2.1,
+                "uValue": 2.0,
+                "gValue": 0.00,
+                "orientation": "W",
+                "surfaceId": "surf-wall-w"
+              }
+            ]
+          },
+          {
+            "id": "surf-roof",
+            "name": "Dak",
+            "type": "roof",
+            "area": 260,
+            "orientation": "horizontal",
+            "constructionId": "con-roof",
+            "zoneId": "zone-bg",
+            "windows": []
+          },
+          {
+            "id": "surf-floor",
+            "name": "Vloer",
+            "type": "floor",
+            "area": 260,
+            "orientation": "horizontal",
+            "constructionId": "con-floor",
+            "zoneId": "zone-bg",
+            "windows": []
+          }
+        ],
+        "thermalBridges": [
+          {
+            "id": "tb-1",
+            "name": "Gevel-vloer",
+            "psiValue": 0.05,
+            "length": 63,
+            "zoneId": "zone-bg"
+          },
+          {
+            "id": "tb-2",
+            "name": "Gevel-dak",
+            "psiValue": 0.05,
+            "length": 63,
+            "zoneId": "zone-bg"
+          },
+          {
+            "id": "tb-3",
+            "name": "Raamkozijnen",
+            "psiValue": 0.03,
+            "length": 80,
+            "zoneId": "zone-bg"
+          }
+        ],
+        "airTightness": {
+          "qv10": 0.84
+        }
+      },
+      {
+        "id": "zone-1v",
+        "name": "1e Verdieping",
+        "floorArea": 10,
+        "volume": 28,
+        "height": 2.8,
+        "surfaces": [
+          {
+            "id": "surf-wall-1v",
+            "name": "Buitenwand 1V",
+            "type": "wall",
+            "area": 36,
+            "orientation": "S",
+            "constructionId": "con-wall",
+            "zoneId": "zone-1v",
+            "windows": [
+              {
+                "id": "win-1v-s",
+                "name": "Raam 1V Zuid",
+                "area": 2.0,
+                "uValue": 0.71,
+                "gValue": 0.40,
+                "orientation": "S",
+                "surfaceId": "surf-wall-1v"
+              }
+            ]
+          }
+        ],
+        "thermalBridges": [],
+        "airTightness": {
+          "qv10": 0.84
+        }
+      }
+    ],
+    "heatingSystems": [
+      {
+        "id": "heat-1",
+        "name": "Warmtepomp lucht",
+        "type": "heat_pump_air",
+        "cop": 4.50,
+        "coverageFraction": 1.0
+      }
+    ],
+    "ventilationSystems": [
+      {
+        "id": "vent-1",
+        "name": "Type D decentraal",
+        "type": "type_d",
+        "heatRecoveryEfficiency": 0.0,
+        "sfp": 0.8
+      }
+    ],
+    "coolingSystems": [
+      {
+        "id": "cool-1",
+        "name": "Geen koeling",
+        "type": "none",
+        "eer": 0
+      }
+    ],
+    "hotWaterSystems": [
+      {
+        "id": "hw-1",
+        "name": "Warmtepompboiler",
+        "type": "heat_pump",
+        "efficiency": 2.00,
+        "hasSolarBoiler": false,
+        "solarBoilerFraction": 0
+      }
+    ],
+    "solarPV": [
+      {
+        "id": "pv-1",
+        "name": "PV Dak Zuidwest",
+        "peakPower": 5.0,
+        "orientation": "SW",
+        "tilt": 2,
+        "area": 20
+      }
+    ],
+    "solarThermal": [],
+    "constructions": [
+      {
+        "id": "con-wall",
+        "name": "Buitenwand Rc=4.70",
+        "layers": [
+          { "material": "Isolatie", "thickness": 0.141, "lambda": 0.03 }
+        ],
+        "rcValue": 4.70,
+        "uValue": 0.208
+      },
+      {
+        "id": "con-roof",
+        "name": "Dak Rc=6.30",
+        "layers": [
+          { "material": "Isolatie", "thickness": 0.189, "lambda": 0.03 }
+        ],
+        "rcValue": 6.30,
+        "uValue": 0.155
+      },
+      {
+        "id": "con-floor",
+        "name": "Vloer Rc=6.30",
+        "layers": [
+          { "material": "Isolatie", "thickness": 0.189, "lambda": 0.03 }
+        ],
+        "rcValue": 6.30,
+        "uValue": 0.151
+      }
+    ]
+  }
+}

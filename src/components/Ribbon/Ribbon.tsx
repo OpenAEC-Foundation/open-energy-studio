@@ -5,7 +5,7 @@ import type { RibbonTab, ViewMode } from '../../core/energy/types';
 import type { Locale } from '../../i18n/i18n';
 import {
   FilePlus, FolderOpen, Save,
-  Info, Calculator, Sun, Moon,
+  Info, Calculator, Sun, Moon, Eye,
   Layers, Square, PanelTop, Grid3X3,
   Thermometer, Wind, Snowflake, Droplets,
   Zap, SunMedium,
@@ -23,6 +23,7 @@ interface RibbonProps {
   onExportReport: () => void;
   onExportIFC: () => void;
   onPrintReport: () => void;
+  onTogglePreview: () => void;
 }
 
 export function Ribbon({
@@ -34,6 +35,7 @@ export function Ribbon({
   onExportReport,
   onExportIFC,
   onPrintReport,
+  onTogglePreview,
 }: RibbonProps) {
   const { t, locale, setLocale } = useI18n();
   const { state, dispatch } = useEnergy();
@@ -135,6 +137,14 @@ export function Ribbon({
                 >
                   <span className="ribbon-btn-text-icon">{locale.toUpperCase()}</span>
                   <span>{t('ribbon.language')}</span>
+                </button>
+                <button
+                  className={`ribbon-btn ${state.previewVisible ? 'ribbon-btn-active' : ''}`}
+                  onClick={onTogglePreview}
+                  title={t('ribbon.preview')}
+                >
+                  <Eye size={20} />
+                  <span>{t('ribbon.preview')}</span>
                 </button>
               </div>
               <div className="ribbon-group-title">{t('ribbon.settings')}</div>

@@ -20,7 +20,8 @@ import { CoolingSystemDialog } from './components/dialogs/CoolingSystemDialog/Co
 import { HotWaterSystemDialog } from './components/dialogs/HotWaterSystemDialog/HotWaterSystemDialog';
 import { SolarPVDialog } from './components/dialogs/SolarPVDialog/SolarPVDialog';
 import { SolarThermalDialog } from './components/dialogs/SolarThermalDialog/SolarThermalDialog';
-import { calculateBENG } from './core/energy/BENGCalculator';
+import { calculateBENGMonthly } from './core/energy/BENGCalculatorMonthly';
+import { PreviewPanel } from './components/PreviewPanel/PreviewPanel';
 import { downloadReportHTML, printReport } from './core/report/ReportGenerator';
 import { downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
 import { serializeProject, deserializeProject } from './core/io/ProjectSerializer';
@@ -39,11 +40,15 @@ function AppContent() {
   }, [dispatch]);
 
   const handleCalculate = useCallback(() => {
-    const bengResult = calculateBENG(project);
+    const bengResult = calculateBENGMonthly(project);
     dispatch({ type: 'SET_RESULT', payload: bengResult });
     dispatch({ type: 'SET_VIEW_MODE', payload: 'results' });
     dispatch({ type: 'SET_RIBBON_TAB', payload: 'results' });
   }, [project, dispatch]);
+
+  const handleTogglePreview = useCallback(() => {
+    dispatch({ type: 'TOGGLE_PREVIEW' });
+  }, [dispatch]);
 
   const handleNewProject = useCallback(() => {
     dispatch({ type: 'SET_PROJECT', payload: {
@@ -121,11 +126,12 @@ function AppContent() {
         onExportReport={handleExportReport}
         onExportIFC={handleExportIFC}
         onPrintReport={handlePrintReport}
+        onTogglePreview={handleTogglePreview}
       />
       <div className="main-content">
         <ProjectBrowser />
         <MainView />
-        <PropertiesPanel />
+        {state.previewVisible ? <PreviewPanel /> : <PropertiesPanel />}
       </div>
       <StatusBar />
 

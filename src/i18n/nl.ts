@@ -285,6 +285,7 @@ export const nl: Record<string, string> = {
   'results.ventilationEnergy': 'Ventilatoren',
   'results.hotWaterEnergy': 'Warm water',
   'results.lightingEnergy': 'Verlichting',
+  'results.auxiliaryEnergy': 'Hulpenergie',
   'results.pvProduction': 'PV opwek',
   'results.solarThermalProduction': 'Zonneboiler opwek',
 
@@ -299,6 +300,39 @@ export const nl: Record<string, string> = {
   'report.export': 'Exporteer rapport',
   'report.print': 'Rapport afdrukken',
   'report.exportIFC': 'IFC exporteren',
+
+  // Results - TO-juli
+  'results.toJuli': 'TO-juli (Zomercomfort)',
+
+  // Preview panel
+  'preview.title': 'Live Preview',
+  'preview.noData': 'Voeg een zone toe om preview te zien',
+  'preview.toJuli': 'TO-juli (GTO)',
+  'preview.monthlyDemand': 'Maandelijkse behoefte',
+  'preview.keyFigures': 'Kerngetallen',
+  'preview.energyLabel': 'Energielabel',
+  'preview.monthlyProfile': 'Maandelijks energieprofiel',
+  'preview.month': 'Maand',
+  'preview.total': 'Totaal',
+  'ribbon.preview': 'Preview',
+
+  // Months
+  'month.jan': 'Januari',
+  'month.feb': 'Februari',
+  'month.mar': 'Maart',
+  'month.apr': 'April',
+  'month.may': 'Mei',
+  'month.jun': 'Juni',
+  'month.jul': 'Juli',
+  'month.aug': 'Augustus',
+  'month.sep': 'September',
+  'month.oct': 'Oktober',
+  'month.nov': 'November',
+  'month.dec': 'December',
+
+  // Report
+  'report.monthlyOverview': 'Maandelijks overzicht',
+  'report.value': 'Waarde',
 
   // Status bar
   'status.ready': 'Gereed',
