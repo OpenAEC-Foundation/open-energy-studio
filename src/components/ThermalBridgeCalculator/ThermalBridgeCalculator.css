@@ -1,0 +1,313 @@
+/* ============================================================
+   Thermal Bridge Calculator — Styling
+   ============================================================ */
+
+.tb-calc {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.tb-calc-header {
+  margin-bottom: 20px;
+}
+
+.tb-calc-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.tb-calc-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* --- Layout --- */
+
+.tb-calc-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr 260px;
+  gap: 16px;
+  min-height: 500px;
+}
+
+@media (max-width: 1100px) {
+  .tb-calc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Input Panel --- */
+
+.tb-calc-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tb-calc-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.tb-calc-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 10px 0;
+}
+
+/* Detail type grid */
+
+.tb-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tb-detail-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.tb-detail-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.tb-detail-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tb-detail-icon {
+  font-size: 16px;
+  line-height: 1;
+  width: 20px;
+  text-align: center;
+  font-family: monospace;
+}
+
+.tb-detail-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Input fields */
+
+.tb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.tb-field:last-child {
+  margin-bottom: 0;
+}
+
+.tb-field > span {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.tb-field input[type="number"],
+.tb-field select {
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.tb-field input[type="number"]:focus,
+.tb-field select:focus {
+  border-color: var(--accent);
+}
+
+.tb-field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.tb-field-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* --- Canvas --- */
+
+.tb-calc-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tb-calc-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 400px;
+}
+
+.tb-canvas-legend {
+  display: flex;
+  gap: 14px;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.tb-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.tb-legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* --- Results Panel --- */
+
+.tb-calc-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tb-result-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.tb-result-main {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.tb-result-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.tb-result-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-result-unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.tb-result-forfait {
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+.tb-result-good {
+  color: var(--energy-green, #22c55e);
+}
+
+.tb-result-bad {
+  color: var(--energy-red, #ef4444);
+}
+
+.tb-result-note {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Comparison bars */
+
+.tb-result-comparison {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tb-comparison-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tb-comparison-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tb-comparison-bar-bg {
+  height: 12px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tb-comparison-bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.tb-comparison-bar-calc {
+  background: linear-gradient(90deg, var(--accent), var(--energy-green, #22c55e));
+}
+
+.tb-comparison-bar-forfait {
+  background: rgba(239, 68, 68, 0.5);
+}

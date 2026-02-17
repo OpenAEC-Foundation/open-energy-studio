@@ -334,6 +334,21 @@ export const en: Record<string, string> = {
   'report.monthlyOverview': 'Monthly Overview',
   'report.value': 'Value',
 
+  // Ribbon - Model 3D
+  'ribbon.model3d': '3D Model',
+  'ribbon.exportModelIFC': 'IFC 3D Model',
+
+  // Ribbon - Tools
+  'ribbon.tools': 'Tools',
+  'ribbon.uvalueCalc': 'U-value Calculator',
+  'ribbon.thermalBridgeCalc': 'Thermal Bridge Calculator',
+
+  // Ribbon - Import/Export
+  'ribbon.exportUNIEC3': 'UNIEC3 Export',
+  'ribbon.importUNIEC3': 'UNIEC3 Import',
+  'ribbon.exportVABI': 'VABI Export',
+  'ribbon.importVABI': 'VABI Import',
+
   // Status bar
   'status.ready': 'Ready',
   'status.calculating': 'Calculating...',

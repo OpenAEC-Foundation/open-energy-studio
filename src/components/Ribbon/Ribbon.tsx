@@ -10,7 +10,7 @@ import {
   Thermometer, Wind, Snowflake, Droplets,
   Zap, SunMedium,
   BarChart3, FileText, Printer, Box,
-  Plus,
+  Plus, Download, Upload, Ruler, Box as Box3D,
 } from 'lucide-react';
 import './Ribbon.css';
 
@@ -22,8 +22,13 @@ interface RibbonProps {
   onOpenProject: () => void;
   onExportReport: () => void;
   onExportIFC: () => void;
+  onExportModelIFC: () => void;
   onPrintReport: () => void;
   onTogglePreview: () => void;
+  onExportUNIEC3: () => void;
+  onImportUNIEC3: () => void;
+  onExportVABI: () => void;
+  onImportVABI: () => void;
 }
 
 export function Ribbon({
@@ -34,8 +39,13 @@ export function Ribbon({
   onOpenProject,
   onExportReport,
   onExportIFC,
+  onExportModelIFC,
   onPrintReport,
   onTogglePreview,
+  onExportUNIEC3,
+  onImportUNIEC3,
+  onExportVABI,
+  onImportVABI,
 }: RibbonProps) {
   const { t, locale, setLocale } = useI18n();
   const { state, dispatch } = useEnergy();
@@ -62,6 +72,8 @@ export function Ribbon({
       renewables: 'renewables',
       results: 'results',
       report: 'report',
+      model3d: 'model3d',
+      tools: 'uvalue-calc',
     };
     dispatch({ type: 'SET_VIEW_MODE', payload: viewMap[tab] });
   };
@@ -73,6 +85,8 @@ export function Ribbon({
     { id: 'renewables', label: t('ribbon.renewables') },
     { id: 'results', label: t('ribbon.results') },
     { id: 'report', label: t('ribbon.report') },
+    { id: 'model3d', label: t('ribbon.model3d') },
+    { id: 'tools', label: t('ribbon.tools') },
   ];
 
   return (
@@ -319,6 +333,74 @@ export function Ribbon({
                 </button>
               </div>
               <div className="ribbon-group-title">{t('ribbon.report')}</div>
+            </div>
+
+            <div className="ribbon-group">
+              <div className="ribbon-group-content">
+                <button className="ribbon-btn" onClick={onExportUNIEC3} title={t('ribbon.exportUNIEC3')}>
+                  <Download size={20} />
+                  <span>{t('ribbon.exportUNIEC3')}</span>
+                </button>
+                <button className="ribbon-btn" onClick={onImportUNIEC3} title={t('ribbon.importUNIEC3')}>
+                  <Upload size={20} />
+                  <span>{t('ribbon.importUNIEC3')}</span>
+                </button>
+              </div>
+              <div className="ribbon-group-title">UNIEC3</div>
+            </div>
+
+            <div className="ribbon-group">
+              <div className="ribbon-group-content">
+                <button className="ribbon-btn" onClick={onExportVABI} title={t('ribbon.exportVABI')}>
+                  <Download size={20} />
+                  <span>{t('ribbon.exportVABI')}</span>
+                </button>
+                <button className="ribbon-btn" onClick={onImportVABI} title={t('ribbon.importVABI')}>
+                  <Upload size={20} />
+                  <span>{t('ribbon.importVABI')}</span>
+                </button>
+              </div>
+              <div className="ribbon-group-title">VABI Elements</div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'model3d' && (
+          <>
+            <div className="ribbon-group">
+              <div className="ribbon-group-content">
+                <button className="ribbon-btn" onClick={onExportModelIFC} title={t('ribbon.exportModelIFC')}>
+                  <Box3D size={20} />
+                  <span>{t('ribbon.exportModelIFC')}</span>
+                </button>
+              </div>
+              <div className="ribbon-group-title">{t('ribbon.model3d')}</div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'tools' && (
+          <>
+            <div className="ribbon-group">
+              <div className="ribbon-group-content">
+                <button
+                  className={`ribbon-btn ${state.viewMode === 'uvalue-calc' ? 'ribbon-btn-active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'uvalue-calc' })}
+                  title={t('ribbon.uvalueCalc')}
+                >
+                  <Ruler size={20} />
+                  <span>{t('ribbon.uvalueCalc')}</span>
+                </button>
+                <button
+                  className={`ribbon-btn ${state.viewMode === 'thermal-bridge-calc' ? 'ribbon-btn-active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'thermal-bridge-calc' })}
+                  title={t('ribbon.thermalBridgeCalc')}
+                >
+                  <Thermometer size={20} />
+                  <span>{t('ribbon.thermalBridgeCalc')}</span>
+                </button>
+              </div>
+              <div className="ribbon-group-title">{t('ribbon.tools')}</div>
             </div>
           </>
         )}

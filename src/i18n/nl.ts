@@ -334,6 +334,21 @@ export const nl: Record<string, string> = {
   'report.monthlyOverview': 'Maandelijks overzicht',
   'report.value': 'Waarde',
 
+  // Ribbon - Model 3D
+  'ribbon.model3d': '3D Model',
+  'ribbon.exportModelIFC': 'IFC 3D Model',
+
+  // Ribbon - Tools
+  'ribbon.tools': 'Gereedschap',
+  'ribbon.uvalueCalc': 'U-waarde calculator',
+  'ribbon.thermalBridgeCalc': 'Koudebrug calculator',
+
+  // Ribbon - Import/Export
+  'ribbon.exportUNIEC3': 'UNIEC3 export',
+  'ribbon.importUNIEC3': 'UNIEC3 import',
+  'ribbon.exportVABI': 'VABI export',
+  'ribbon.importVABI': 'VABI import',
+
   // Status bar
   'status.ready': 'Gereed',
   'status.calculating': 'Berekening loopt...',

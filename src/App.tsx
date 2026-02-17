@@ -24,6 +24,9 @@ import { calculateBENGMonthly } from './core/energy/BENGCalculatorMonthly';
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel';
 import { downloadReportHTML, printReport } from './core/report/ReportGenerator';
 import { downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
+import { downloadModelIFC } from './core/ifc/IFCModelExporter';
+import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
+import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { serializeProject, deserializeProject } from './core/io/ProjectSerializer';
 import type { DialogType } from './core/energy/types';
 
@@ -114,6 +117,36 @@ function AppContent() {
     if (result) downloadBENGIFC(project, result);
   }, [project, result]);
 
+  const handleExportModelIFC = useCallback(() => {
+    downloadModelIFC(project);
+  }, [project]);
+
+  const handleExportUNIEC3 = useCallback(() => {
+    if (result) downloadUNIEC3(project, result);
+  }, [project, result]);
+
+  const handleImportUNIEC3 = useCallback(async () => {
+    try {
+      const loaded = await openUNIEC3FileDialog();
+      dispatch({ type: 'SET_PROJECT', payload: loaded });
+    } catch (err) {
+      alert('UNIEC3 import mislukt: ' + (err as Error).message);
+    }
+  }, [dispatch]);
+
+  const handleExportVABI = useCallback(() => {
+    downloadVABI(project);
+  }, [project]);
+
+  const handleImportVABI = useCallback(async () => {
+    try {
+      const loaded = await openVABIFileDialog();
+      dispatch({ type: 'SET_PROJECT', payload: loaded });
+    } catch (err) {
+      alert('VABI import mislukt: ' + (err as Error).message);
+    }
+  }, [dispatch]);
+
   return (
     <div className="app">
       <TitleBar />
@@ -125,8 +158,13 @@ function AppContent() {
         onOpenProject={handleOpenProject}
         onExportReport={handleExportReport}
         onExportIFC={handleExportIFC}
+        onExportModelIFC={handleExportModelIFC}
         onPrintReport={handlePrintReport}
         onTogglePreview={handleTogglePreview}
+        onExportUNIEC3={handleExportUNIEC3}
+        onImportUNIEC3={handleImportUNIEC3}
+        onExportVABI={handleExportVABI}
+        onImportVABI={handleImportVABI}
       />
       <div className="main-content">
         <ProjectBrowser />
