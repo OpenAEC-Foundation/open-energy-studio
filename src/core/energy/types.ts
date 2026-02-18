@@ -233,7 +233,7 @@ export interface IBENGResult {
 // ------------------------------------------------------------
 // UI State
 // ------------------------------------------------------------
-export type ViewMode = 'project' | 'envelope' | 'installations' | 'renewables' | 'results' | 'report' | 'model3d' | 'uvalue-calc' | 'thermal-bridge-calc';
+export type ViewMode = 'project' | 'envelope' | 'installations' | 'renewables' | 'results' | 'report' | 'model3d' | 'uvalue-calc' | 'thermal-bridge-calc' | 'heat-pump-sizing';
 
 export type RibbonTab = 'start' | 'envelope' | 'installations' | 'renewables' | 'results' | 'report' | 'model3d' | 'tools';
 

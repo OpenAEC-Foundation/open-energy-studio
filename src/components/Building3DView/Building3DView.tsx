@@ -588,8 +588,8 @@ export function Building3DView() {
     if (isDragging.current) {
       const dx = e.clientX - lastMouse.current.x;
       const dy = e.clientY - lastMouse.current.y;
-      setRotY(prev => prev + dx * 0.005);
-      setRotX(prev => Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, prev + dy * 0.005)));
+      setRotY(prev => prev - dx * 0.005);
+      setRotX(prev => Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, prev - dy * 0.005)));
       lastMouse.current = { x: e.clientX, y: e.clientY };
     } else {
       // Hit test for hover

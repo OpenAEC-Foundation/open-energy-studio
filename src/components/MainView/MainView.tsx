@@ -6,6 +6,7 @@ import { ReportView } from '../ReportView/ReportView';
 import { Building3DView } from '../Building3DView/Building3DView';
 import { UValueCalculator } from '../UValueCalculator/UValueCalculator';
 import { ThermalBridgeCalculator } from '../ThermalBridgeCalculator/ThermalBridgeCalculator';
+import { HeatPumpSizingCalculator } from '../HeatPumpSizingCalculator/HeatPumpSizingCalculator';
 import './MainView.css';
 
 export function MainView() {
@@ -21,6 +22,7 @@ export function MainView() {
       {state.viewMode === 'model3d' && <Building3DView />}
       {state.viewMode === 'uvalue-calc' && <UValueCalculator />}
       {state.viewMode === 'thermal-bridge-calc' && <ThermalBridgeCalculator />}
+      {state.viewMode === 'heat-pump-sizing' && <HeatPumpSizingCalculator />}
     </div>
   );
 }

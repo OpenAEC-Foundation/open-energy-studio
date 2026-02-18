@@ -1,11 +1,15 @@
 import { createContext, useContext } from 'react';
 import { en } from './en';
 import { nl } from './nl';
+import { fr } from './fr';
+import { es } from './es';
+import { zh } from './zh';
+import { it } from './it';
 
-export type Locale = 'en' | 'nl';
+export type Locale = 'en' | 'nl' | 'fr' | 'es' | 'zh' | 'it';
 export type TranslationKeys = typeof en;
 
-const translations: Record<Locale, TranslationKeys> = { en, nl };
+const translations: Record<Locale, TranslationKeys> = { en, nl, fr, es, zh, it };
 
 export interface I18nContextType {
   locale: Locale;
@@ -30,6 +34,6 @@ export function getTranslation(locale: Locale, key: string): string {
 
 export function getStoredLocale(): Locale {
   const stored = localStorage.getItem('energy-locale');
-  if (stored === 'en' || stored === 'nl') return stored;
+  if (stored === 'en' || stored === 'nl' || stored === 'fr' || stored === 'es' || stored === 'zh' || stored === 'it') return stored;
   return 'nl';
 }

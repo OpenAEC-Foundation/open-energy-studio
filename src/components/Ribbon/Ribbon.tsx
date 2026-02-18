@@ -3,6 +3,8 @@ import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { RibbonTab, ViewMode } from '../../core/energy/types';
 import type { Locale } from '../../i18n/i18n';
+
+const LOCALES: Locale[] = ['nl', 'en', 'fr', 'es', 'it', 'zh'];
 import {
   FilePlus, FolderOpen, Save,
   Info, Calculator, Sun, Moon, Eye,
@@ -146,7 +148,10 @@ export function Ribbon({
                 </button>
                 <button
                   className="ribbon-btn"
-                  onClick={() => setLocale(locale === 'nl' ? 'en' : 'nl' as Locale)}
+                  onClick={() => {
+                    const idx = LOCALES.indexOf(locale);
+                    setLocale(LOCALES[(idx + 1) % LOCALES.length]);
+                  }}
                   title={t('ribbon.language')}
                 >
                   <span className="ribbon-btn-text-icon">{locale.toUpperCase()}</span>
@@ -398,6 +403,14 @@ export function Ribbon({
                 >
                   <Thermometer size={20} />
                   <span>{t('ribbon.thermalBridgeCalc')}</span>
+                </button>
+                <button
+                  className={`ribbon-btn ${state.viewMode === 'heat-pump-sizing' ? 'ribbon-btn-active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'heat-pump-sizing' })}
+                  title={t('ribbon.heatPumpSizing')}
+                >
+                  <Zap size={20} />
+                  <span>{t('ribbon.heatPumpSizing')}</span>
                 </button>
               </div>
               <div className="ribbon-group-title">{t('ribbon.tools')}</div>
