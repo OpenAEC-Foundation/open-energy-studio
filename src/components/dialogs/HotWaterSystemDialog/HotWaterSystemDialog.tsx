@@ -69,7 +69,11 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-title">{t('dialog.hotWater.title')}</div>
+        <div className="dialog-header">
+          <span className="dialog-header-title">{t('dialog.hotWater.title')}</span>
+          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+        </div>
+        <div className="dialog-body">
 
         <div className="dialog-field">
           <label>{t('dialog.hotWater.name')}</label>
@@ -129,7 +133,8 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
           </div>
         )}
 
-        <div className="dialog-actions">
+        </div>
+        <div className="dialog-footer">
           <button className="btn" onClick={onClose}>
             {t('dialog.cancel')}
           </button>

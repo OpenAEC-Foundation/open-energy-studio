@@ -42,7 +42,7 @@
   color: var(--text-secondary);
   width: 160px;
   flex-shrink: 0;
-  text-align: right;
+  text-align: end;
 }
 
 .breakdown-bar-track {

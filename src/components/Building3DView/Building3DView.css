@@ -44,7 +44,7 @@
 .building-3d-toolbar .toolbar-label {
   font-size: 11px;
   color: var(--text-secondary);
-  margin-right: 4px;
+  margin-inline-end: 4px;
 }
 
 .building-3d-canvas-container {
@@ -67,7 +67,7 @@
 .building-3d-legend {
   position: absolute;
   bottom: 12px;
-  left: 12px;
+  inset-inline-start: 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -95,7 +95,7 @@
 .building-3d-info {
   position: absolute;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;

@@ -3,7 +3,7 @@
   min-width: 200px;
   max-width: 360px;
   background: var(--bg-primary);
-  border-right: 1px solid var(--border);
+  border-inline-end: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -65,5 +65,5 @@
 }
 
 .tree-node-children {
-  padding-left: 16px;
+  padding-inline-start: 16px;
 }

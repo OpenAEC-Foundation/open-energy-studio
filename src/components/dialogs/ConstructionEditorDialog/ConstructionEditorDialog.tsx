@@ -77,7 +77,11 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ minWidth: 500 }}>
-        <div className="dialog-title">{t('dialog.construction.title')}</div>
+        <div className="dialog-header">
+          <span className="dialog-header-title">{t('dialog.construction.title')}</span>
+          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+        </div>
+        <div className="dialog-body">
 
         <div className="dialog-field">
           <label>{t('dialog.construction.name')}</label>
@@ -167,7 +171,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
           </div>
         </div>
 
-        <div className="dialog-actions">
+        </div>
+        <div className="dialog-footer">
           <button className="btn" onClick={onClose}>
             {t('dialog.cancel')}
           </button>

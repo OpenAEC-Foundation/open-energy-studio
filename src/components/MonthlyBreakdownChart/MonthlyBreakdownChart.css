@@ -93,7 +93,7 @@
 
 .monthly-table th {
   padding: 6px 8px;
-  text-align: right;
+  text-align: end;
   background: var(--bg-secondary);
   color: var(--text-secondary);
   font-weight: 500;
@@ -102,12 +102,12 @@
 }
 
 .monthly-table th:first-child {
-  text-align: left;
+  text-align: start;
 }
 
 .monthly-table td {
   padding: 4px 8px;
-  text-align: right;
+  text-align: end;
   color: var(--text-primary);
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
@@ -115,7 +115,7 @@
 }
 
 .monthly-table td:first-child {
-  text-align: left;
+  text-align: start;
   font-family: inherit;
   font-size: 11px;
   color: var(--text-secondary);

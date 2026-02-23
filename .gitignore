@@ -1,5 +1,30 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Vite
 .vite/
+
+# Tauri (Rust build artifacts)
+src-tauri/target/
+
+# Environment / local overrides
 *.local
+.env
+.env.*
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*

@@ -3,7 +3,7 @@
   min-width: 280px;
   max-width: 400px;
   background: var(--bg-primary);
-  border-left: 1px solid var(--border);
+  border-inline-start: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -46,17 +46,22 @@
   min-width: 80px;
 }
 
+[dir="rtl"] .preview-energy-label-arrow {
+  padding: 8px 20px 8px 28px;
+  border-radius: 0 4px 4px 0;
+}
+
 .preview-energy-label-arrow::after {
   content: '';
   position: absolute;
-  right: -16px;
+  inset-inline-end: -16px;
   top: 0;
   width: 0;
   height: 0;
   border-top: 18px solid transparent;
   border-bottom: 18px solid transparent;
-  border-left: 16px solid;
-  border-left-color: inherit;
+  border-inline-start: 16px solid;
+  border-inline-start-color: inherit;
 }
 
 .preview-energy-label-text {
@@ -74,15 +79,15 @@
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 6px;
-  border-left: 3px solid var(--border);
+  border-inline-start: 3px solid var(--border);
 }
 
 .preview-beng-card.pass {
-  border-left-color: var(--energy-green, #22c55e);
+  border-inline-start-color: var(--energy-green, #22c55e);
 }
 
 .preview-beng-card.fail {
-  border-left-color: var(--energy-red, #ef4444);
+  border-inline-start-color: var(--energy-red, #ef4444);
 }
 
 .preview-beng-header {
@@ -143,15 +148,15 @@
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 6px;
-  border-left: 3px solid var(--border);
+  border-inline-start: 3px solid var(--border);
 }
 
 .preview-to-juli.pass {
-  border-left-color: var(--energy-green, #22c55e);
+  border-inline-start-color: var(--energy-green, #22c55e);
 }
 
 .preview-to-juli.fail {
-  border-left-color: var(--energy-red, #ef4444);
+  border-inline-start-color: var(--energy-red, #ef4444);
 }
 
 .preview-to-juli-header {

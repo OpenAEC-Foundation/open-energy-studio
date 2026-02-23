@@ -84,7 +84,7 @@
   font-size: 10px;
   cursor: pointer;
   transition: all 0.15s ease;
-  text-align: left;
+  text-align: start;
 }
 
 .tb-detail-btn:hover {
@@ -244,7 +244,7 @@
   font-size: 12px;
   font-weight: 400;
   color: var(--text-muted);
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 
 .tb-result-forfait {

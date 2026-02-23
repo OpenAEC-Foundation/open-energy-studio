@@ -149,7 +149,11 @@ function AppContent() {
 
   return (
     <div className="app">
-      <TitleBar />
+      <TitleBar
+        onNewProject={handleNewProject}
+        onOpenProject={handleOpenProject}
+        onSaveProject={handleSaveProject}
+      />
       <Ribbon
         onOpenDialog={openDialog}
         onCalculate={handleCalculate}

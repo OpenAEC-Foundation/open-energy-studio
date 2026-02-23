@@ -57,7 +57,11 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-title">{t('dialog.ventilation.title')}</div>
+        <div className="dialog-header">
+          <span className="dialog-header-title">{t('dialog.ventilation.title')}</span>
+          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+        </div>
+        <div className="dialog-body">
 
         <div className="dialog-field">
           <label>{t('dialog.ventilation.name')}</label>
@@ -102,7 +106,8 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
           />
         </div>
 
-        <div className="dialog-actions">
+        </div>
+        <div className="dialog-footer">
           <button className="btn" onClick={onClose}>
             {t('dialog.cancel')}
           </button>

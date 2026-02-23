@@ -4,7 +4,7 @@
   box-sizing: border-box;
 }
 
-:root {
+:root, [data-theme="dark"] {
   --bg-dark: #0d1117;
   --bg-primary: #161b22;
   --bg-secondary: #1c2333;
@@ -26,6 +26,47 @@
   --energy-green: #22c55e;
   --energy-orange: #f59e0b;
   --energy-red: #ef4444;
+
+  /* Ribbon-specific */
+  --ribbon-bg-start: #1e293b;
+  --ribbon-bg-end: #172033;
+  --ribbon-border: #0f3460;
+  --ribbon-tabs-bg-start: #1e293b;
+  --ribbon-tabs-bg-end: #1a2436;
+  --ribbon-content-bg: #172033;
+  --ribbon-text: #8b949e;
+  --ribbon-text-hover: #e6edf3;
+  --ribbon-tab-hover: #334155;
+  --ribbon-tab-active-bg: #172033;
+  --ribbon-tab-active-border: #0f3460;
+  --ribbon-btn-hover: #334155;
+  --ribbon-btn-hover-border: #475569;
+  --ribbon-btn-active-bg: #1e3a5f;
+  --ribbon-btn-active-border: #60a5fa;
+  --ribbon-btn-active-text: #93c5fd;
+  --ribbon-icon-stroke: #8b949e;
+  --ribbon-group-label: #64748b;
+  --ribbon-group-border: #0f3460;
+  --ribbon-input-bg: #0f172a;
+  --ribbon-input-border: #0f3460;
+  --ribbon-input-text: #e6edf3;
+  --ribbon-dropdown-arrow: #8b949e;
+  --ribbon-file-tab-bg: #3b82f6;
+  --ribbon-file-tab-hover: #2563eb;
+  --ribbon-file-tab-text: #ffffff;
+
+  /* Title bar */
+  --titlebar-bg-start: #16213e;
+  --titlebar-bg-end: #1a1a2e;
+  --titlebar-border: #0f3460;
+  --titlebar-text: #e6edf3;
+  --titlebar-text-secondary: #8b949e;
+  --titlebar-btn-color: #e6edf3;
+  --titlebar-btn-hover: #334155;
+  --titlebar-btn-active: #475569;
+  --titlebar-btn-disabled: #64748b;
+  --window-btn-color: #e6edf3;
+  --window-btn-hover: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="light"] {
@@ -50,6 +91,177 @@
   --energy-green: #16a34a;
   --energy-orange: #d97706;
   --energy-red: #dc2626;
+
+  /* Ribbon-specific */
+  --ribbon-bg-start: #ffffff;
+  --ribbon-bg-end: #f5f5f5;
+  --ribbon-border: #d1d5db;
+  --ribbon-tabs-bg-start: #f5f5f5;
+  --ribbon-tabs-bg-end: #eeeeee;
+  --ribbon-content-bg: #ffffff;
+  --ribbon-text: #6b7280;
+  --ribbon-text-hover: #1f2937;
+  --ribbon-tab-hover: #e5e7eb;
+  --ribbon-tab-active-bg: #ffffff;
+  --ribbon-tab-active-border: #d1d5db;
+  --ribbon-btn-hover: #e5e7eb;
+  --ribbon-btn-hover-border: #d1d5db;
+  --ribbon-btn-active-bg: #dbeafe;
+  --ribbon-btn-active-border: #93c5fd;
+  --ribbon-btn-active-text: #1d4ed8;
+  --ribbon-icon-stroke: #6b7280;
+  --ribbon-group-label: #9ca3af;
+  --ribbon-group-border: #d1d5db;
+  --ribbon-input-bg: #ffffff;
+  --ribbon-input-border: #d1d5db;
+  --ribbon-input-text: #1f2937;
+  --ribbon-dropdown-arrow: #9ca3af;
+  --ribbon-file-tab-bg: #3b82f6;
+  --ribbon-file-tab-hover: #2563eb;
+  --ribbon-file-tab-text: #ffffff;
+
+  /* Title bar */
+  --titlebar-bg-start: #ffffff;
+  --titlebar-bg-end: #f5f5f5;
+  --titlebar-border: #d1d5db;
+  --titlebar-text: #1f2937;
+  --titlebar-text-secondary: #6b7280;
+  --titlebar-btn-color: #1f2937;
+  --titlebar-btn-hover: #e5e7eb;
+  --titlebar-btn-active: #d1d5db;
+  --titlebar-btn-disabled: #9ca3af;
+  --window-btn-color: #1f2937;
+  --window-btn-hover: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="blue"] {
+  --bg-dark: #0d1b2a;
+  --bg-primary: #1b263b;
+  --bg-secondary: #1f2f47;
+  --bg-tertiary: #2c4a6b;
+  --bg-elevated: #3d5a80;
+  --text-primary: #e0e1dd;
+  --text-secondary: #98c1d9;
+  --text-muted: #6b8fb3;
+  --accent: #00b4d8;
+  --accent-hover: #0096c7;
+  --accent-subtle: rgba(0, 180, 216, 0.15);
+  --success: #52b788;
+  --success-hover: #40916c;
+  --warning: #e9c46a;
+  --danger: #e76f51;
+  --border: rgba(108, 165, 210, 0.12);
+  --border-light: rgba(108, 165, 210, 0.18);
+  --border-accent: rgba(0, 180, 216, 0.3);
+  --energy-green: #52b788;
+  --energy-orange: #e9c46a;
+  --energy-red: #e76f51;
+
+  /* Ribbon-specific */
+  --ribbon-bg-start: #1b263b;
+  --ribbon-bg-end: #162032;
+  --ribbon-border: #2c4a6b;
+  --ribbon-tabs-bg-start: #1b263b;
+  --ribbon-tabs-bg-end: #172236;
+  --ribbon-content-bg: #162032;
+  --ribbon-text: #98c1d9;
+  --ribbon-text-hover: #e0e1dd;
+  --ribbon-tab-hover: #3d5a80;
+  --ribbon-tab-active-bg: #162032;
+  --ribbon-tab-active-border: #2c4a6b;
+  --ribbon-btn-hover: #3d5a80;
+  --ribbon-btn-hover-border: #4d7399;
+  --ribbon-btn-active-bg: #264e70;
+  --ribbon-btn-active-border: #00b4d8;
+  --ribbon-btn-active-text: #48cae4;
+  --ribbon-icon-stroke: #98c1d9;
+  --ribbon-group-label: #6b8fb3;
+  --ribbon-group-border: #2c4a6b;
+  --ribbon-input-bg: #0d1b2a;
+  --ribbon-input-border: #2c4a6b;
+  --ribbon-input-text: #e0e1dd;
+  --ribbon-dropdown-arrow: #98c1d9;
+  --ribbon-file-tab-bg: #0077b6;
+  --ribbon-file-tab-hover: #005f8e;
+  --ribbon-file-tab-text: #ffffff;
+
+  /* Title bar */
+  --titlebar-bg-start: #1b263b;
+  --titlebar-bg-end: #0d1b2a;
+  --titlebar-border: #2c4a6b;
+  --titlebar-text: #e0e1dd;
+  --titlebar-text-secondary: #98c1d9;
+  --titlebar-btn-color: #e0e1dd;
+  --titlebar-btn-hover: #3d5a80;
+  --titlebar-btn-active: #2c4a6b;
+  --titlebar-btn-disabled: #778da9;
+  --window-btn-color: #e0e1dd;
+  --window-btn-hover: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="highContrast"] {
+  --bg-dark: #000000;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-tertiary: #222222;
+  --bg-elevated: #333333;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted: #999999;
+  --accent: #ffff00;
+  --accent-hover: #ffcc00;
+  --accent-subtle: rgba(255, 255, 0, 0.15);
+  --success: #00ff00;
+  --success-hover: #00cc00;
+  --warning: #ffaa00;
+  --danger: #ff0000;
+  --border: #ffffff;
+  --border-light: #ffffff;
+  --border-accent: #ffff00;
+  --energy-green: #00ff00;
+  --energy-orange: #ffaa00;
+  --energy-red: #ff0000;
+
+  /* Ribbon-specific */
+  --ribbon-bg-start: #111111;
+  --ribbon-bg-end: #0a0a0a;
+  --ribbon-border: #ffffff;
+  --ribbon-tabs-bg-start: #111111;
+  --ribbon-tabs-bg-end: #0a0a0a;
+  --ribbon-content-bg: #0a0a0a;
+  --ribbon-text: #cccccc;
+  --ribbon-text-hover: #ffffff;
+  --ribbon-tab-hover: #333333;
+  --ribbon-tab-active-bg: #0a0a0a;
+  --ribbon-tab-active-border: #ffffff;
+  --ribbon-btn-hover: #333333;
+  --ribbon-btn-hover-border: #ffffff;
+  --ribbon-btn-active-bg: #333300;
+  --ribbon-btn-active-border: #ffff00;
+  --ribbon-btn-active-text: #ffff00;
+  --ribbon-icon-stroke: #cccccc;
+  --ribbon-group-label: #999999;
+  --ribbon-group-border: #666666;
+  --ribbon-input-bg: #000000;
+  --ribbon-input-border: #ffffff;
+  --ribbon-input-text: #ffffff;
+  --ribbon-dropdown-arrow: #cccccc;
+  --ribbon-file-tab-bg: #ffff00;
+  --ribbon-file-tab-hover: #cccc00;
+  --ribbon-file-tab-text: #000000;
+
+  /* Title bar */
+  --titlebar-bg-start: #141414;
+  --titlebar-bg-end: #0a0a0a;
+  --titlebar-border: #ffffff;
+  --titlebar-text: #ffffff;
+  --titlebar-text-secondary: #cccccc;
+  --titlebar-btn-color: #ffffff;
+  --titlebar-btn-hover: #333333;
+  --titlebar-btn-active: #444444;
+  --titlebar-btn-disabled: #999999;
+  --window-btn-color: #ffffff;
+  --window-btn-hover: #333333;
 }
 
 body {
@@ -106,7 +318,7 @@ body {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,17 +328,65 @@ body {
 .dialog {
   background: var(--bg-primary);
   border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 24px;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
   min-width: 400px;
   max-width: 600px;
   max-height: 80vh;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  user-select: none;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+  padding-inline-start: 10px;
+  border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(to bottom, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.dialog-header-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dialog-close-btn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  width: 30px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  transition: background 0.1s;
+}
+
+.dialog-close-btn:hover {
+  background: #e81123;
+  color: white;
+}
+
+.dialog-body {
+  padding: 15px;
+  flex: 1;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .dialog-title {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 16px;
   color: var(--text-primary);
@@ -138,7 +398,7 @@ body {
 
 .dialog-field label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   margin-bottom: 4px;
 }
@@ -147,12 +407,13 @@ body {
 .dialog-field select,
 .dialog-field textarea {
   width: 100%;
-  padding: 8px 12px;
+  padding: 3px 6px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
-  border-radius: 4px;
+  border-radius: 0;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 11px;
+  font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -167,20 +428,33 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   margin-top: 20px;
 }
 
 .btn {
-  padding: 8px 16px;
+  padding: 5px 20px;
   border: 1px solid var(--border-light);
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 400;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.1s, border-color 0.1s;
+  min-width: 75px;
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }
@@ -190,13 +464,12 @@ body {
 }
 
 .btn-primary {
-  background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-tertiary));
 }
 
 .btn-danger {
@@ -211,5 +484,5 @@ body {
 
 .btn-sm {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 11px;
 }

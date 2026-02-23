@@ -39,15 +39,15 @@
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-secondary);
-  border-left: 4px solid var(--border);
+  border-inline-start: 4px solid var(--border);
 }
 
 .to-juli-card.to-juli-pass {
-  border-left-color: var(--energy-green, #22c55e);
+  border-inline-start-color: var(--energy-green, #22c55e);
 }
 
 .to-juli-card.to-juli-fail {
-  border-left-color: var(--energy-red, #ef4444);
+  border-inline-start-color: var(--energy-red, #ef4444);
 }
 
 .to-juli-header {

@@ -67,7 +67,7 @@
 }
 
 .report-table th {
-  text-align: left;
+  text-align: start;
   padding: 8px 12px;
   background: var(--bg-secondary);
   color: var(--text-secondary);

@@ -42,7 +42,11 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-title">{t('dialog.airTightness.title')}</div>
+        <div className="dialog-header">
+          <span className="dialog-header-title">{t('dialog.airTightness.title')}</span>
+          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+        </div>
+        <div className="dialog-body">
 
         <div className="dialog-field">
           <label>{t('dialog.surface.zone')}</label>
@@ -67,7 +71,8 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
           />
         </div>
 
-        <div className="dialog-actions">
+        </div>
+        <div className="dialog-footer">
           <button className="btn" onClick={onClose}>
             {t('dialog.cancel')}
           </button>

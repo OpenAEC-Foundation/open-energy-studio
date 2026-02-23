@@ -77,7 +77,7 @@
 }
 
 .envelope-table th {
-  text-align: left;
+  text-align: start;
   padding: 6px 10px;
   color: var(--text-secondary);
   font-weight: 500;

@@ -1,13 +1,9 @@
-import { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { RibbonTab, ViewMode } from '../../core/energy/types';
-import type { Locale } from '../../i18n/i18n';
-
-const LOCALES: Locale[] = ['nl', 'en', 'fr', 'es', 'it', 'zh'];
 import {
   FilePlus, FolderOpen, Save,
-  Info, Calculator, Sun, Moon, Eye,
+  Info, Calculator, Eye,
   Layers, Square, PanelTop, Grid3X3,
   Thermometer, Wind, Snowflake, Droplets,
   Zap, SunMedium,
@@ -33,6 +29,41 @@ interface RibbonProps {
   onImportVABI: () => void;
 }
 
+/* ── Reusable sub-components ── */
+
+function RibbonGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="ribbon-group">
+      <div className="ribbon-group-content">{children}</div>
+      <div className="ribbon-group-label">{label}</div>
+    </div>
+  );
+}
+
+function RibbonButton({
+  icon, label, onClick, title, active, accent, disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  title?: string;
+  active?: boolean;
+  accent?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      className={`ribbon-btn${active ? ' active' : ''}${accent ? ' ribbon-btn-accent' : ''}`}
+      onClick={onClick}
+      title={title || label}
+      disabled={disabled}
+    >
+      <div className="ribbon-btn-icon">{icon}</div>
+      <span className="ribbon-btn-label">{label}</span>
+    </button>
+  );
+}
+
 export function Ribbon({
   onOpenDialog,
   onCalculate,
@@ -49,20 +80,8 @@ export function Ribbon({
   onExportVABI,
   onImportVABI,
 }: RibbonProps) {
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
   const { state, dispatch } = useEnergy();
-
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const stored = localStorage.getItem('energy-theme');
-    return (stored === 'light' || stored === 'dark') ? stored : 'dark';
-  });
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('energy-theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   const activeTab = state.activeRibbonTab;
   const setActiveTab = (tab: RibbonTab) => {
@@ -92,12 +111,13 @@ export function Ribbon({
   ];
 
   return (
-    <div className="ribbon">
+    <div className="ribbon-container">
+      {/* ── Tab bar ── */}
       <div className="ribbon-tabs">
         {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`ribbon-tab ${activeTab === tab.id ? 'active' : ''}`}
+            className={`ribbon-tab${activeTab === tab.id ? ' active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -105,318 +125,143 @@ export function Ribbon({
         ))}
       </div>
 
+      {/* ── Content area ── */}
       <div className="ribbon-content">
-        {activeTab === 'start' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={onNewProject} title={t('ribbon.new')}>
-                  <FilePlus size={20} />
-                  <span>{t('ribbon.new')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={onOpenProject} title={t('ribbon.open')}>
-                  <FolderOpen size={20} />
-                  <span>{t('ribbon.open')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={onSaveProject} title={t('ribbon.save')}>
-                  <Save size={20} />
-                  <span>{t('ribbon.save')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.file')}</div>
-            </div>
+        <div className="ribbon-groups">
+          {activeTab === 'start' && (
+            <>
+              <RibbonGroup label={t('ribbon.file')}>
+                <RibbonButton icon={<FilePlus size={24} />} label={t('ribbon.new')} onClick={onNewProject} />
+                <RibbonButton icon={<FolderOpen size={24} />} label={t('ribbon.open')} onClick={onOpenProject} />
+                <RibbonButton icon={<Save size={24} />} label={t('ribbon.save')} onClick={onSaveProject} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('project-info')} title={t('ribbon.projectInfo')}>
-                  <Info size={20} />
-                  <span>{t('ribbon.projectInfo')}</span>
-                </button>
-                <button className="ribbon-btn ribbon-btn-accent" onClick={onCalculate} title={t('ribbon.calculate')}>
-                  <Calculator size={20} />
-                  <span>{t('ribbon.calculate')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.project')}</div>
-            </div>
+              <RibbonGroup label={t('ribbon.project')}>
+                <RibbonButton icon={<Info size={24} />} label={t('ribbon.projectInfo')} onClick={() => onOpenDialog('project-info')} />
+                <RibbonButton icon={<Calculator size={24} />} label={t('ribbon.calculate')} onClick={onCalculate} accent />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={toggleTheme} title={t('ribbon.theme')}>
-                  {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                  <span>{t('ribbon.theme')}</span>
-                </button>
-                <button
-                  className="ribbon-btn"
-                  onClick={() => {
-                    const idx = LOCALES.indexOf(locale);
-                    setLocale(LOCALES[(idx + 1) % LOCALES.length]);
-                  }}
-                  title={t('ribbon.language')}
-                >
-                  <span className="ribbon-btn-text-icon">{locale.toUpperCase()}</span>
-                  <span>{t('ribbon.language')}</span>
-                </button>
-                <button
-                  className={`ribbon-btn ${state.previewVisible ? 'ribbon-btn-active' : ''}`}
+              <RibbonGroup label={t('ribbon.settings')}>
+                <RibbonButton
+                  icon={<Eye size={24} />}
+                  label={t('ribbon.preview')}
                   onClick={onTogglePreview}
-                  title={t('ribbon.preview')}
-                >
-                  <Eye size={20} />
-                  <span>{t('ribbon.preview')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.settings')}</div>
-            </div>
-          </>
-        )}
+                  active={state.previewVisible}
+                />
+              </RibbonGroup>
+            </>
+          )}
 
-        {activeTab === 'envelope' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('zone-editor')} title={t('ribbon.addZone')}>
-                  <Plus size={16} />
-                  <Layers size={20} />
-                  <span>{t('ribbon.addZone')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.zones')}</div>
-            </div>
+          {activeTab === 'envelope' && (
+            <>
+              <RibbonGroup label={t('ribbon.zones')}>
+                <RibbonButton icon={<><Plus size={12} /><Layers size={24} /></>} label={t('ribbon.addZone')} onClick={() => onOpenDialog('zone-editor')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('construction-editor')} title={t('ribbon.addConstruction')}>
-                  <Plus size={16} />
-                  <Grid3X3 size={20} />
-                  <span>{t('ribbon.addConstruction')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.constructions')}</div>
-            </div>
+              <RibbonGroup label={t('ribbon.constructions')}>
+                <RibbonButton icon={<><Plus size={12} /><Grid3X3 size={24} /></>} label={t('ribbon.addConstruction')} onClick={() => onOpenDialog('construction-editor')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('surface-editor')} title={t('ribbon.addSurface')}>
-                  <Plus size={16} />
-                  <Square size={20} />
-                  <span>{t('ribbon.addSurface')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={() => onOpenDialog('window-editor')} title={t('ribbon.addWindow')}>
-                  <Plus size={16} />
-                  <PanelTop size={20} />
-                  <span>{t('ribbon.addWindow')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.surfaces')}</div>
-            </div>
+              <RibbonGroup label={t('ribbon.surfaces')}>
+                <RibbonButton icon={<><Plus size={12} /><Square size={24} /></>} label={t('ribbon.addSurface')} onClick={() => onOpenDialog('surface-editor')} />
+                <RibbonButton icon={<><Plus size={12} /><PanelTop size={24} /></>} label={t('ribbon.addWindow')} onClick={() => onOpenDialog('window-editor')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('thermal-bridge')} title={t('ribbon.addThermalBridge')}>
-                  <Plus size={16} />
-                  <Thermometer size={20} />
-                  <span>{t('ribbon.addThermalBridge')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={() => onOpenDialog('air-tightness')} title={t('ribbon.setAirTightness')}>
-                  <Wind size={20} />
-                  <span>{t('ribbon.airTightness')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.thermalBridges')}</div>
-            </div>
-          </>
-        )}
+              <RibbonGroup label={t('ribbon.thermalBridges')}>
+                <RibbonButton icon={<><Plus size={12} /><Thermometer size={24} /></>} label={t('ribbon.addThermalBridge')} onClick={() => onOpenDialog('thermal-bridge')} />
+                <RibbonButton icon={<Wind size={24} />} label={t('ribbon.airTightness')} onClick={() => onOpenDialog('air-tightness')} />
+              </RibbonGroup>
+            </>
+          )}
 
-        {activeTab === 'installations' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('heating-system')} title={t('ribbon.addHeating')}>
-                  <Plus size={16} />
-                  <Thermometer size={20} />
-                  <span>{t('ribbon.addHeating')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.heating')}</div>
-            </div>
+          {activeTab === 'installations' && (
+            <>
+              <RibbonGroup label={t('ribbon.heating')}>
+                <RibbonButton icon={<><Plus size={12} /><Thermometer size={24} /></>} label={t('ribbon.addHeating')} onClick={() => onOpenDialog('heating-system')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('ventilation-system')} title={t('ribbon.addVentilation')}>
-                  <Plus size={16} />
-                  <Wind size={20} />
-                  <span>{t('ribbon.addVentilation')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.ventilation')}</div>
-            </div>
+              <RibbonGroup label={t('ribbon.ventilation')}>
+                <RibbonButton icon={<><Plus size={12} /><Wind size={24} /></>} label={t('ribbon.addVentilation')} onClick={() => onOpenDialog('ventilation-system')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('cooling-system')} title={t('ribbon.addCooling')}>
-                  <Plus size={16} />
-                  <Snowflake size={20} />
-                  <span>{t('ribbon.addCooling')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.cooling')}</div>
-            </div>
+              <RibbonGroup label={t('ribbon.cooling')}>
+                <RibbonButton icon={<><Plus size={12} /><Snowflake size={24} /></>} label={t('ribbon.addCooling')} onClick={() => onOpenDialog('cooling-system')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('hot-water-system')} title={t('ribbon.addHotWater')}>
-                  <Plus size={16} />
-                  <Droplets size={20} />
-                  <span>{t('ribbon.addHotWater')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.hotWater')}</div>
-            </div>
-          </>
-        )}
+              <RibbonGroup label={t('ribbon.hotWater')}>
+                <RibbonButton icon={<><Plus size={12} /><Droplets size={24} /></>} label={t('ribbon.addHotWater')} onClick={() => onOpenDialog('hot-water-system')} />
+              </RibbonGroup>
+            </>
+          )}
 
-        {activeTab === 'renewables' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('solar-pv')} title={t('ribbon.addSolarPV')}>
-                  <Plus size={16} />
-                  <Zap size={20} />
-                  <span>{t('ribbon.addSolarPV')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.solarPV')}</div>
-            </div>
+          {activeTab === 'renewables' && (
+            <>
+              <RibbonGroup label={t('ribbon.solarPV')}>
+                <RibbonButton icon={<><Plus size={12} /><Zap size={24} /></>} label={t('ribbon.addSolarPV')} onClick={() => onOpenDialog('solar-pv')} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={() => onOpenDialog('solar-thermal')} title={t('ribbon.addSolarThermal')}>
-                  <Plus size={16} />
-                  <SunMedium size={20} />
-                  <span>{t('ribbon.addSolarThermal')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.solarThermal')}</div>
-            </div>
-          </>
-        )}
+              <RibbonGroup label={t('ribbon.solarThermal')}>
+                <RibbonButton icon={<><Plus size={12} /><SunMedium size={24} /></>} label={t('ribbon.addSolarThermal')} onClick={() => onOpenDialog('solar-thermal')} />
+              </RibbonGroup>
+            </>
+          )}
 
-        {activeTab === 'results' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn ribbon-btn-accent" onClick={onCalculate} title={t('results.calculate')}>
-                  <Calculator size={20} />
-                  <span>{t('results.calculate')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={() => setActiveTab('results')} title={t('ribbon.bengResults')}>
-                  <BarChart3 size={20} />
-                  <span>{t('ribbon.bengResults')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.bengResults')}</div>
-            </div>
-          </>
-        )}
+          {activeTab === 'results' && (
+            <RibbonGroup label={t('ribbon.bengResults')}>
+              <RibbonButton icon={<Calculator size={24} />} label={t('results.calculate')} onClick={onCalculate} accent />
+              <RibbonButton icon={<BarChart3 size={24} />} label={t('ribbon.bengResults')} onClick={() => setActiveTab('results')} />
+            </RibbonGroup>
+          )}
 
-        {activeTab === 'report' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={onExportReport} title={t('report.export')}>
-                  <FileText size={20} />
-                  <span>{t('report.export')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={onPrintReport} title={t('report.print')}>
-                  <Printer size={20} />
-                  <span>{t('report.print')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={onExportIFC} title={t('report.exportIFC')}>
-                  <Box size={20} />
-                  <span>IFC Export</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.report')}</div>
-            </div>
+          {activeTab === 'report' && (
+            <>
+              <RibbonGroup label={t('ribbon.report')}>
+                <RibbonButton icon={<FileText size={24} />} label={t('report.export')} onClick={onExportReport} />
+                <RibbonButton icon={<Printer size={24} />} label={t('report.print')} onClick={onPrintReport} />
+                <RibbonButton icon={<Box size={24} />} label="IFC Export" onClick={onExportIFC} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={onExportUNIEC3} title={t('ribbon.exportUNIEC3')}>
-                  <Download size={20} />
-                  <span>{t('ribbon.exportUNIEC3')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={onImportUNIEC3} title={t('ribbon.importUNIEC3')}>
-                  <Upload size={20} />
-                  <span>{t('ribbon.importUNIEC3')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">UNIEC3</div>
-            </div>
+              <RibbonGroup label="UNIEC3">
+                <RibbonButton icon={<Download size={24} />} label={t('ribbon.exportUNIEC3')} onClick={onExportUNIEC3} />
+                <RibbonButton icon={<Upload size={24} />} label={t('ribbon.importUNIEC3')} onClick={onImportUNIEC3} />
+              </RibbonGroup>
 
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={onExportVABI} title={t('ribbon.exportVABI')}>
-                  <Download size={20} />
-                  <span>{t('ribbon.exportVABI')}</span>
-                </button>
-                <button className="ribbon-btn" onClick={onImportVABI} title={t('ribbon.importVABI')}>
-                  <Upload size={20} />
-                  <span>{t('ribbon.importVABI')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">VABI Elements</div>
-            </div>
-          </>
-        )}
+              <RibbonGroup label="VABI Elements">
+                <RibbonButton icon={<Download size={24} />} label={t('ribbon.exportVABI')} onClick={onExportVABI} />
+                <RibbonButton icon={<Upload size={24} />} label={t('ribbon.importVABI')} onClick={onImportVABI} />
+              </RibbonGroup>
+            </>
+          )}
 
-        {activeTab === 'model3d' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button className="ribbon-btn" onClick={onExportModelIFC} title={t('ribbon.exportModelIFC')}>
-                  <Box3D size={20} />
-                  <span>{t('ribbon.exportModelIFC')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.model3d')}</div>
-            </div>
-          </>
-        )}
+          {activeTab === 'model3d' && (
+            <RibbonGroup label={t('ribbon.model3d')}>
+              <RibbonButton icon={<Box3D size={24} />} label={t('ribbon.exportModelIFC')} onClick={onExportModelIFC} />
+            </RibbonGroup>
+          )}
 
-        {activeTab === 'tools' && (
-          <>
-            <div className="ribbon-group">
-              <div className="ribbon-group-content">
-                <button
-                  className={`ribbon-btn ${state.viewMode === 'uvalue-calc' ? 'ribbon-btn-active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'uvalue-calc' })}
-                  title={t('ribbon.uvalueCalc')}
-                >
-                  <Ruler size={20} />
-                  <span>{t('ribbon.uvalueCalc')}</span>
-                </button>
-                <button
-                  className={`ribbon-btn ${state.viewMode === 'thermal-bridge-calc' ? 'ribbon-btn-active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'thermal-bridge-calc' })}
-                  title={t('ribbon.thermalBridgeCalc')}
-                >
-                  <Thermometer size={20} />
-                  <span>{t('ribbon.thermalBridgeCalc')}</span>
-                </button>
-                <button
-                  className={`ribbon-btn ${state.viewMode === 'heat-pump-sizing' ? 'ribbon-btn-active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'heat-pump-sizing' })}
-                  title={t('ribbon.heatPumpSizing')}
-                >
-                  <Zap size={20} />
-                  <span>{t('ribbon.heatPumpSizing')}</span>
-                </button>
-              </div>
-              <div className="ribbon-group-title">{t('ribbon.tools')}</div>
-            </div>
-          </>
-        )}
+          {activeTab === 'tools' && (
+            <RibbonGroup label={t('ribbon.tools')}>
+              <RibbonButton
+                icon={<Ruler size={24} />}
+                label={t('ribbon.uvalueCalc')}
+                onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'uvalue-calc' })}
+                active={state.viewMode === 'uvalue-calc'}
+              />
+              <RibbonButton
+                icon={<Thermometer size={24} />}
+                label={t('ribbon.thermalBridgeCalc')}
+                onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'thermal-bridge-calc' })}
+                active={state.viewMode === 'thermal-bridge-calc'}
+              />
+              <RibbonButton
+                icon={<Zap size={24} />}
+                label={t('ribbon.heatPumpSizing')}
+                onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'heat-pump-sizing' })}
+                active={state.viewMode === 'heat-pump-sizing'}
+              />
+            </RibbonGroup>
+          )}
+        </div>
       </div>
     </div>
   );

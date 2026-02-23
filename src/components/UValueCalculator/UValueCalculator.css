@@ -124,7 +124,7 @@
 }
 
 .uvalue-copy-btn {
-  margin-left: auto;
+  margin-inline-start: auto;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -199,7 +199,7 @@
 }
 
 .uvalue-table th {
-  text-align: left;
+  text-align: start;
   padding: 6px 10px;
   color: var(--text-secondary);
   font-weight: 500;

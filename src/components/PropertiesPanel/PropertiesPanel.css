@@ -3,7 +3,7 @@
   min-width: 220px;
   max-width: 400px;
   background: var(--bg-primary);
-  border-left: 1px solid var(--border);
+  border-inline-start: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;

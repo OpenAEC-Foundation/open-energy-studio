@@ -51,7 +51,11 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-title">{t('dialog.cooling.title')}</div>
+        <div className="dialog-header">
+          <span className="dialog-header-title">{t('dialog.cooling.title')}</span>
+          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+        </div>
+        <div className="dialog-body">
 
         <div className="dialog-field">
           <label>{t('dialog.cooling.name')}</label>
@@ -84,7 +88,8 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
           />
         </div>
 
-        <div className="dialog-actions">
+        </div>
+        <div className="dialog-footer">
           <button className="btn" onClick={onClose}>
             {t('dialog.cancel')}
           </button>
