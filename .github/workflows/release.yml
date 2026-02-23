@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 0.1.0)'
+        description: 'Release version (e.g. 2026.2.0)'
         required: true
-        default: '0.1.0'
+        default: '2026.2.0'
 
 jobs:
   create-release:
