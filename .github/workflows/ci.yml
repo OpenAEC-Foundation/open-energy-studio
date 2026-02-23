@@ -72,7 +72,6 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
           retention-days: 30
 
       - name: Upload Linux artifacts
