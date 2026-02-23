@@ -11,6 +11,9 @@ on:
         required: true
         default: '2026.2.0'
 
+permissions:
+  contents: write
+
 jobs:
   create-release:
     runs-on: ubuntu-latest
