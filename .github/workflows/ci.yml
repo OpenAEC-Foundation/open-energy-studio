@@ -70,7 +70,7 @@ jobs:
       - name: Build Tauri app
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
-        run: npm run tauri build -- --no-bundle
+        run: npm run tauri build
 
       - name: Upload artifacts (Windows)
         if: matrix.platform == 'windows-latest'
