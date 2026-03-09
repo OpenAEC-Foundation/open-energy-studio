@@ -4,6 +4,9 @@ export const zh: Record<string, string> = {
   'app.untitledProject': '未命名项目',
   'app.newProject': '新建项目',
 
+  // Welcome
+  'welcome.subtitle': '创建或打开项目以开始使用',
+
   // Ribbon tabs
   'ribbon.start': '首页',
   'ribbon.envelope': '围护结构',
@@ -55,6 +58,9 @@ export const zh: Record<string, string> = {
   'ribbon.solarThermal': '太阳能热水',
   'ribbon.addSolarThermal': '添加太阳能热水',
 
+  'ribbon.export': '导出',
+  'ribbon.import': '导入',
+  'ribbon.about': '关于',
   // Ribbon groups - Results
   'ribbon.bengResults': 'BENG 结果',
   'ribbon.energyBalance': '能量平衡',
@@ -230,6 +236,9 @@ export const zh: Record<string, string> = {
   'dialog.solarThermal.orientation': '朝向',
   'dialog.solarThermal.tilt': '倾角 (°)',
 
+  // Validation
+  'dialog.validation.required': '此字段为必填项',
+
   // Building functions
   'function.residential': '住宅',
   'function.office': '办公',
@@ -298,7 +307,19 @@ export const zh: Record<string, string> = {
   'report.bengResults': 'BENG 结果',
   'report.energyBalance': '能量平衡',
   'report.export': '导出报告',
-  'report.print': '打印报告',
+  'report.print': '打印',
+  'report.printPreview': '打印预览',
+  'report.page': '页面',
+  'report.printer': '打印机',
+  'report.zoom': '缩放',
+  'report.noPrinters': '未找到打印机',
+  'report.default': '默认',
+  'report.pageSize': '页面大小',
+  'report.printerProperties': '打印机属性',
+  'report.orientation': '方向',
+  'report.portrait': '纵向',
+  'report.landscape': '横向',
+  'report.keepTables': '保持表格完整',
   'report.exportIFC': '导出 IFC',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const zh: Record<string, string> = {
   'settings.general': '\u5e38\u89c4',
   'settings.language': '\u8bed\u8a00',
   'settings.general.theme': '\u4e3b\u9898',
-  'theme.system': '系统',
+  'theme.system': '系统 (自动检测)',
   'theme.dark': '深色',
   'theme.light': '浅色',
   'theme.blue': '蓝色',

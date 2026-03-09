@@ -4,6 +4,9 @@ export const en: Record<string, string> = {
   'app.untitledProject': 'Untitled Project',
   'app.newProject': 'New Project',
 
+  // Welcome
+  'welcome.subtitle': 'Create or open a project to get started',
+
   // Ribbon tabs
   'ribbon.start': 'Home',
   'ribbon.envelope': 'Building Envelope',
@@ -56,6 +59,9 @@ export const en: Record<string, string> = {
   'ribbon.addSolarThermal': 'Add Solar Thermal',
 
   // Ribbon groups - Results
+  'ribbon.export': 'Export',
+  'ribbon.import': 'Import',
+  'ribbon.about': 'About',
   'ribbon.bengResults': 'BENG Results',
   'ribbon.energyBalance': 'Energy Balance',
   'ribbon.exportReport': 'Export Report',
@@ -230,6 +236,9 @@ export const en: Record<string, string> = {
   'dialog.solarThermal.orientation': 'Orientation',
   'dialog.solarThermal.tilt': 'Tilt (\u00b0)',
 
+  // Validation
+  'dialog.validation.required': 'This field is required',
+
   // Building functions
   'function.residential': 'Residential',
   'function.office': 'Office',
@@ -298,7 +307,19 @@ export const en: Record<string, string> = {
   'report.bengResults': 'BENG Results',
   'report.energyBalance': 'Energy Balance',
   'report.export': 'Export Report',
-  'report.print': 'Print Report',
+  'report.print': 'Print',
+  'report.printPreview': 'Print Preview',
+  'report.page': 'Page',
+  'report.printer': 'Printer',
+  'report.zoom': 'Zoom',
+  'report.noPrinters': 'No printers found',
+  'report.default': 'default',
+  'report.pageSize': 'Page Size',
+  'report.printerProperties': 'Printer Properties',
+  'report.orientation': 'Orientation',
+  'report.portrait': 'Portrait',
+  'report.landscape': 'Landscape',
+  'report.keepTables': 'Keep tables together',
   'report.exportIFC': 'Export IFC',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const en: Record<string, string> = {
   'settings.general': 'General',
   'settings.language': 'Language',
   'settings.general.theme': 'Theme',
-  'theme.system': 'System',
+  'theme.system': 'System (Auto Detect)',
   'theme.dark': 'Dark',
   'theme.light': 'Light',
   'theme.blue': 'Blue',

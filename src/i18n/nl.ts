@@ -4,6 +4,9 @@ export const nl: Record<string, string> = {
   'app.untitledProject': 'Naamloos Project',
   'app.newProject': 'Nieuw Project',
 
+  // Welcome
+  'welcome.subtitle': 'Maak een nieuw project of open een bestaand project',
+
   // Ribbon tabs
   'ribbon.start': 'Start',
   'ribbon.envelope': 'Gebouwschil',
@@ -55,6 +58,9 @@ export const nl: Record<string, string> = {
   'ribbon.solarThermal': 'Zonneboiler',
   'ribbon.addSolarThermal': 'Zonneboiler toevoegen',
 
+  'ribbon.export': 'Exporteren',
+  'ribbon.import': 'Importeren',
+  'ribbon.about': 'Over',
   // Ribbon groups - Results
   'ribbon.bengResults': 'BENG Resultaten',
   'ribbon.energyBalance': 'Energiebalans',
@@ -230,6 +236,9 @@ export const nl: Record<string, string> = {
   'dialog.solarThermal.orientation': 'Ori\u00ebntatie',
   'dialog.solarThermal.tilt': 'Helling (\u00b0)',
 
+  // Validation
+  'dialog.validation.required': 'Dit veld is verplicht',
+
   // Building functions
   'function.residential': 'Woonfunctie',
   'function.office': 'Kantoorfunctie',
@@ -298,7 +307,19 @@ export const nl: Record<string, string> = {
   'report.bengResults': 'BENG Resultaten',
   'report.energyBalance': 'Energiebalans',
   'report.export': 'Exporteer rapport',
-  'report.print': 'Rapport afdrukken',
+  'report.print': 'Afdrukken',
+  'report.printPreview': 'Afdrukvoorbeeld',
+  'report.page': 'Pagina',
+  'report.printer': 'Printer',
+  'report.zoom': 'Zoom',
+  'report.noPrinters': 'Geen printers gevonden',
+  'report.default': 'standaard',
+  'report.pageSize': 'Papierformaat',
+  'report.printerProperties': 'Printereigenschappen',
+  'report.orientation': 'Richting',
+  'report.portrait': 'Staand',
+  'report.landscape': 'Liggend',
+  'report.keepTables': 'Tabellen bij elkaar houden',
   'report.exportIFC': 'IFC exporteren',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const nl: Record<string, string> = {
   'settings.general': 'Algemeen',
   'settings.language': 'Taal',
   'settings.general.theme': 'Thema',
-  'theme.system': 'Systeem',
+  'theme.system': 'Systeem (Automatische detectie)',
   'theme.dark': 'Donker',
   'theme.light': 'Licht',
   'theme.blue': 'Blauw',

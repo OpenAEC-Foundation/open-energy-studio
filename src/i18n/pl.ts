@@ -4,6 +4,9 @@ export const pl: Record<string, string> = {
   'app.untitledProject': 'Projekt bez nazwy',
   'app.newProject': 'Nowy projekt',
 
+  // Welcome
+  'welcome.subtitle': 'Utwórz lub otwórz projekt, aby rozpocząć',
+
   // Ribbon tabs
   'ribbon.start': 'Start',
   'ribbon.envelope': 'Obudowa budynku',
@@ -55,6 +58,9 @@ export const pl: Record<string, string> = {
   'ribbon.solarThermal': 'Kolektory słoneczne',
   'ribbon.addSolarThermal': 'Dodaj kolektory',
 
+  'ribbon.export': 'Eksportuj',
+  'ribbon.import': 'Importuj',
+  'ribbon.about': 'O programie',
   // Ribbon groups - Results
   'ribbon.bengResults': 'Wyniki BENG',
   'ribbon.energyBalance': 'Bilans energetyczny',
@@ -230,6 +236,9 @@ export const pl: Record<string, string> = {
   'dialog.solarThermal.orientation': 'Orientacja',
   'dialog.solarThermal.tilt': 'Nachylenie (°)',
 
+  // Validation
+  'dialog.validation.required': 'To pole jest wymagane',
+
   // Building functions
   'function.residential': 'Mieszkalny',
   'function.office': 'Biurowy',
@@ -298,7 +307,19 @@ export const pl: Record<string, string> = {
   'report.bengResults': 'Wyniki BENG',
   'report.energyBalance': 'Bilans energetyczny',
   'report.export': 'Eksportuj raport',
-  'report.print': 'Drukuj raport',
+  'report.print': 'Drukuj',
+  'report.printPreview': 'Podgląd wydruku',
+  'report.page': 'Strona',
+  'report.printer': 'Drukarka',
+  'report.zoom': 'Zoom',
+  'report.noPrinters': 'Nie znaleziono drukarek',
+  'report.default': 'domyślna',
+  'report.pageSize': 'Rozmiar strony',
+  'report.printerProperties': 'Właściwości drukarki',
+  'report.orientation': 'Orientacja',
+  'report.portrait': 'Pionowa',
+  'report.landscape': 'Pozioma',
+  'report.keepTables': 'Zachowaj tabele razem',
   'report.exportIFC': 'Eksportuj IFC',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const pl: Record<string, string> = {
   'settings.general': 'Ogólne',
   'settings.language': 'Język',
   'settings.general.theme': 'Motyw',
-  'theme.system': 'Systemowy',
+  'theme.system': 'Systemowy (Automatyczne wykrywanie)',
   'theme.dark': 'Ciemny',
   'theme.light': 'Jasny',
   'theme.blue': 'Niebieski',

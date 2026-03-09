@@ -4,6 +4,9 @@ export const ar: Record<string, string> = {
   'app.untitledProject': 'مشروع بدون عنوان',
   'app.newProject': 'مشروع جديد',
 
+  // Welcome
+  'welcome.subtitle': 'أنشئ أو افتح مشروعًا للبدء',
+
   // Ribbon tabs
   'ribbon.start': 'الرئيسية',
   'ribbon.envelope': 'غلاف المبنى',
@@ -55,6 +58,9 @@ export const ar: Record<string, string> = {
   'ribbon.solarThermal': 'الحرارة الشمسية',
   'ribbon.addSolarThermal': 'إضافة حرارة شمسية',
 
+  'ribbon.export': 'تصدير',
+  'ribbon.import': 'استيراد',
+  'ribbon.about': 'حول',
   // Ribbon groups - Results
   'ribbon.bengResults': 'نتائج BENG',
   'ribbon.energyBalance': 'ميزان الطاقة',
@@ -230,6 +236,9 @@ export const ar: Record<string, string> = {
   'dialog.solarThermal.orientation': 'الاتجاه',
   'dialog.solarThermal.tilt': 'الميل (°)',
 
+  // Validation
+  'dialog.validation.required': 'هذا الحقل مطلوب',
+
   // Building functions
   'function.residential': 'سكني',
   'function.office': 'مكتبي',
@@ -298,7 +307,19 @@ export const ar: Record<string, string> = {
   'report.bengResults': 'نتائج BENG',
   'report.energyBalance': 'ميزان الطاقة',
   'report.export': 'تصدير التقرير',
-  'report.print': 'طباعة التقرير',
+  'report.print': 'طباعة',
+  'report.printPreview': 'معاينة الطباعة',
+  'report.page': 'صفحة',
+  'report.printer': 'الطابعة',
+  'report.zoom': 'تكبير',
+  'report.noPrinters': 'لم يتم العثور على طابعات',
+  'report.default': 'افتراضي',
+  'report.pageSize': 'حجم الصفحة',
+  'report.printerProperties': 'خصائص الطابعة',
+  'report.orientation': 'الاتجاه',
+  'report.portrait': 'عمودي',
+  'report.landscape': 'أفقي',
+  'report.keepTables': 'إبقاء الجداول معاً',
   'report.exportIFC': 'تصدير IFC',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const ar: Record<string, string> = {
   'settings.general': 'عام',
   'settings.language': 'اللغة',
   'settings.general.theme': 'السمة',
-  'theme.system': 'النظام',
+  'theme.system': 'النظام (كشف تلقائي)',
   'theme.dark': 'داكن',
   'theme.light': 'فاتح',
   'theme.blue': 'أزرق',

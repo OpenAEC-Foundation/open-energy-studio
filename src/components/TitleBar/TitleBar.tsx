@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '../../i18n/i18n';
-import { useEnergy } from '../../context/EnergyContext';
+import { useDocumentManager } from '../../context/EnergyContext';
 import { SettingsDialog } from '../SettingsDialog/SettingsDialog';
 import { version } from '../../../package.json';
 import './TitleBar.css';
+
+function isModalOpen() {
+  return !!document.querySelector('.dialog-overlay');
+}
 
 async function minimizeWindow() {
   try {
@@ -26,6 +30,13 @@ async function closeWindow() {
   } catch { /* not in Tauri */ }
 }
 
+async function startDragging() {
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().startDragging();
+  } catch { /* not in Tauri */ }
+}
+
 interface TitleBarProps {
   onNewProject?: () => void;
   onOpenProject?: () => void;
@@ -34,8 +45,10 @@ interface TitleBarProps {
 
 export function TitleBar({ onNewProject, onOpenProject, onSaveProject }: TitleBarProps) {
   const { t } = useI18n();
-  const { state } = useEnergy();
-  const projectName = state.project.name || t('app.untitledProject');
+  const { docState } = useDocumentManager();
+  const activeDoc = docState.documents.find(d => d.id === docState.activeDocumentId);
+  const projectName = activeDoc ? (activeDoc.state.project.name || t('app.untitledProject')) : null;
+  const isDirty = activeDoc?.state.isDirty ?? false;
   const [maximized, setMaximized] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -56,9 +69,22 @@ export function TitleBar({ onNewProject, onOpenProject, onSaveProject }: TitleBa
     return () => { unlisten?.(); };
   }, []);
 
+  const handleTitleBarMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't drag if clicking on interactive elements or if a modal is open
+    if ((e.target as HTMLElement).closest('.title-bar-left, .window-controls')) return;
+    if (isModalOpen()) return;
+    startDragging();
+  }, []);
+
+  const handleTitleBarDoubleClick = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.title-bar-left, .window-controls')) return;
+    if (isModalOpen()) return;
+    toggleMaximize();
+  }, []);
+
   return (
     <>
-      <div className="title-bar" data-tauri-drag-region>
+      <div className="title-bar" onMouseDown={handleTitleBarMouseDown} onDoubleClick={handleTitleBarDoubleClick}>
         <div className="title-bar-left">
           <img src="/icon.png" alt="" className="title-bar-icon" />
 
@@ -95,11 +121,15 @@ export function TitleBar({ onNewProject, onOpenProject, onSaveProject }: TitleBa
           </div>
         </div>
 
-        <div className="title-bar-center" data-tauri-drag-region>
-          {state.isDirty && <span className="title-bar-dirty">*</span>}
+        <div className="title-bar-center">
+          {isDirty && <span className="title-bar-dirty">*</span>}
           <span className="title-bar-app-name">{t('app.title')} v{version}</span>
-          <span className="title-bar-separator">&ndash;</span>
-          <span className="title-bar-project">{projectName}</span>
+          {projectName !== null && (
+            <>
+              <span className="title-bar-separator">&ndash;</span>
+              <span className="title-bar-project">{projectName}</span>
+            </>
+          )}
         </div>
 
         <div className="window-controls">

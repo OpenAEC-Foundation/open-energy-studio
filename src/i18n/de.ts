@@ -4,6 +4,9 @@ export const de: Record<string, string> = {
   'app.untitledProject': 'Unbenanntes Projekt',
   'app.newProject': 'Neues Projekt',
 
+  // Welcome
+  'welcome.subtitle': 'Erstellen oder öffnen Sie ein Projekt, um zu beginnen',
+
   // Ribbon tabs
   'ribbon.start': 'Start',
   'ribbon.envelope': 'Gebäudehülle',
@@ -55,6 +58,9 @@ export const de: Record<string, string> = {
   'ribbon.solarThermal': 'Solarthermie',
   'ribbon.addSolarThermal': 'Solarthermie hinzufügen',
 
+  'ribbon.export': 'Exportieren',
+  'ribbon.import': 'Importieren',
+  'ribbon.about': 'Über',
   // Ribbon groups - Results
   'ribbon.bengResults': 'BENG Ergebnisse',
   'ribbon.energyBalance': 'Energiebilanz',
@@ -230,6 +236,9 @@ export const de: Record<string, string> = {
   'dialog.solarThermal.orientation': 'Ausrichtung',
   'dialog.solarThermal.tilt': 'Neigung (°)',
 
+  // Validation
+  'dialog.validation.required': 'Dieses Feld ist erforderlich',
+
   // Building functions
   'function.residential': 'Wohnen',
   'function.office': 'Büro',
@@ -298,7 +307,19 @@ export const de: Record<string, string> = {
   'report.bengResults': 'BENG Ergebnisse',
   'report.energyBalance': 'Energiebilanz',
   'report.export': 'Bericht exportieren',
-  'report.print': 'Bericht drucken',
+  'report.print': 'Drucken',
+  'report.printPreview': 'Druckvorschau',
+  'report.page': 'Seite',
+  'report.printer': 'Drucker',
+  'report.zoom': 'Zoom',
+  'report.noPrinters': 'Keine Drucker gefunden',
+  'report.default': 'Standard',
+  'report.pageSize': 'Seitengröße',
+  'report.printerProperties': 'Druckereigenschaften',
+  'report.orientation': 'Ausrichtung',
+  'report.portrait': 'Hochformat',
+  'report.landscape': 'Querformat',
+  'report.keepTables': 'Tabellen zusammenhalten',
   'report.exportIFC': 'IFC exportieren',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const de: Record<string, string> = {
   'settings.general': 'Allgemein',
   'settings.language': 'Sprache',
   'settings.general.theme': 'Design',
-  'theme.system': 'System',
+  'theme.system': 'System (Automatische Erkennung)',
   'theme.dark': 'Dunkel',
   'theme.light': 'Hell',
   'theme.blue': 'Blau',

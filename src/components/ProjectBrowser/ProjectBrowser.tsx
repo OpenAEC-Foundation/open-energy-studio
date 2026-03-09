@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import {
   ChevronRight, ChevronDown,
   Layers, Square, PanelTop, Thermometer,
   Wind, Snowflake, Droplets, Zap, SunMedium,
-  Building2, Grid3X3,
+  Building2, Grid3X3, PanelLeftClose,
 } from 'lucide-react';
 import './ProjectBrowser.css';
 
@@ -50,16 +50,55 @@ export function ProjectBrowser() {
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
   const { project, selectedItemId } = state;
+  const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(260);
+  const resizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+  }, [width]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!resizing.current) return;
+      const newWidth = Math.min(500, Math.max(160, startWidth.current + (e.clientX - startX.current)));
+      setWidth(newWidth);
+    };
+    const onMouseUp = () => { resizing.current = false; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   const select = (id: string, type: string) => {
     dispatch({ type: 'SELECT_ITEM', payload: { id, itemType: type } });
   };
 
+  if (collapsed) {
+    return (
+      <div className="project-browser collapsed" onClick={() => setCollapsed(false)}>
+        <div className="panel-collapsed-label">
+          <Building2 size={14} />
+          <span>{t('browser.project')}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="project-browser">
+    <div className="project-browser" style={{ width }}>
       <div className="project-browser-header">
         <Building2 size={14} />
         <span>{t('browser.project')}</span>
+        <button className="panel-collapse-btn" onClick={() => setCollapsed(true)}><PanelLeftClose size={14} /></button>
       </div>
       <div className="project-browser-tree">
         {/* Zones */}
@@ -206,6 +245,7 @@ export function ProjectBrowser() {
           </TreeNode>
         </TreeNode>
       </div>
+      <div className="panel-resize-handle panel-resize-handle-right" onMouseDown={onResizeStart} />
     </div>
   );
 }

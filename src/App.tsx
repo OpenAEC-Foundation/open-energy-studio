@@ -1,7 +1,9 @@
-import { useCallback } from 'react';
-import { EnergyProvider, useEnergy } from './context/EnergyContext';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { EnergyProvider, useEnergy, useDocumentManager, useHasActiveDocument } from './context/EnergyContext';
 import { I18nProvider } from './i18n/I18nProvider';
 import { TitleBar } from './components/TitleBar/TitleBar';
+import { DocumentTabs } from './components/DocumentTabs/DocumentTabs';
+import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen';
 import { Ribbon } from './components/Ribbon/Ribbon';
 import { ProjectBrowser } from './components/ProjectBrowser/ProjectBrowser';
 import { PropertiesPanel } from './components/PropertiesPanel/PropertiesPanel';
@@ -20,19 +22,37 @@ import { CoolingSystemDialog } from './components/dialogs/CoolingSystemDialog/Co
 import { HotWaterSystemDialog } from './components/dialogs/HotWaterSystemDialog/HotWaterSystemDialog';
 import { SolarPVDialog } from './components/dialogs/SolarPVDialog/SolarPVDialog';
 import { SolarThermalDialog } from './components/dialogs/SolarThermalDialog/SolarThermalDialog';
+import { PrintPreviewDialog } from './components/dialogs/PrintPreviewDialog/PrintPreviewDialog';
 import { calculateBENGMonthly } from './core/energy/BENGCalculatorMonthly';
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel';
-import { downloadReportHTML, printReport } from './core/report/ReportGenerator';
+import { downloadReportHTML } from './core/report/ReportGenerator';
 import { downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
 import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { serializeProject, deserializeProject } from './core/io/ProjectSerializer';
-import type { DialogType } from './core/energy/types';
+import { AppMenu } from './components/AppMenu/AppMenu';
+import type { DialogType, IProject } from './core/energy/types';
 
-function AppContent() {
+// ── Active document workspace (only rendered when a document is open) ──
+
+function ActiveDocumentContent({
+  onNewProject,
+  onOpenProject,
+  onSaveProject,
+  onSaveAsProject,
+  onCloseTab,
+}: {
+  onNewProject: () => void;
+  onOpenProject: () => void;
+  onSaveProject: () => void;
+  onSaveAsProject: () => void;
+  onCloseTab: (id: string) => void;
+}) {
   const { state, dispatch } = useEnergy();
   const { dialog, project, result } = state;
+  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
 
   const openDialog = useCallback((type: string) => {
     dispatch({ type: 'OPEN_DIALOG', payload: { type: type as DialogType } });
@@ -53,65 +73,13 @@ function AppContent() {
     dispatch({ type: 'TOGGLE_PREVIEW' });
   }, [dispatch]);
 
-  const handleNewProject = useCallback(() => {
-    dispatch({ type: 'SET_PROJECT', payload: {
-      id: crypto.randomUUID(),
-      name: '',
-      description: '',
-      buildingFunction: 'residential',
-      address: '',
-      city: '',
-      zones: [],
-      heatingSystems: [],
-      ventilationSystems: [],
-      coolingSystems: [],
-      hotWaterSystems: [],
-      solarPV: [],
-      solarThermal: [],
-      constructions: [],
-    }});
-  }, [dispatch]);
-
-  const handleSaveProject = useCallback(() => {
-    const json = serializeProject(project);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${project.name || 'project'}.oes.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    dispatch({ type: 'SET_DIRTY', payload: false });
-  }, [project, dispatch]);
-
-  const handleOpenProject = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.oes.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const loaded = deserializeProject(reader.result as string);
-          dispatch({ type: 'SET_PROJECT', payload: loaded });
-        } catch (err) {
-          alert('Ongeldig projectbestand: ' + (err as Error).message);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  }, [dispatch]);
-
   const handleExportReport = useCallback(() => {
     if (result) downloadReportHTML(project, result);
   }, [project, result]);
 
   const handlePrintReport = useCallback(() => {
-    if (result) printReport(project, result);
-  }, [project, result]);
+    setPrintPreviewOpen(true);
+  }, []);
 
   const handleExportIFC = useCallback(() => {
     if (result) downloadBENGIFC(project, result);
@@ -125,14 +93,16 @@ function AppContent() {
     if (result) downloadUNIEC3(project, result);
   }, [project, result]);
 
+  const { docDispatch } = useDocumentManager();
+
   const handleImportUNIEC3 = useCallback(async () => {
     try {
       const loaded = await openUNIEC3FileDialog();
-      dispatch({ type: 'SET_PROJECT', payload: loaded });
+      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
       alert('UNIEC3 import mislukt: ' + (err as Error).message);
     }
-  }, [dispatch]);
+  }, [docDispatch]);
 
   const handleExportVABI = useCallback(() => {
     downloadVABI(project);
@@ -141,25 +111,20 @@ function AppContent() {
   const handleImportVABI = useCallback(async () => {
     try {
       const loaded = await openVABIFileDialog();
-      dispatch({ type: 'SET_PROJECT', payload: loaded });
+      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
       alert('VABI import mislukt: ' + (err as Error).message);
     }
-  }, [dispatch]);
+  }, [docDispatch]);
 
   return (
-    <div className="app">
-      <TitleBar
-        onNewProject={handleNewProject}
-        onOpenProject={handleOpenProject}
-        onSaveProject={handleSaveProject}
-      />
+    <>
       <Ribbon
         onOpenDialog={openDialog}
         onCalculate={handleCalculate}
-        onNewProject={handleNewProject}
-        onSaveProject={handleSaveProject}
-        onOpenProject={handleOpenProject}
+        onNewProject={onNewProject}
+        onSaveProject={onSaveProject}
+        onOpenProject={onOpenProject}
         onExportReport={handleExportReport}
         onExportIFC={handleExportIFC}
         onExportModelIFC={handleExportModelIFC}
@@ -169,7 +134,28 @@ function AppContent() {
         onImportUNIEC3={handleImportUNIEC3}
         onExportVABI={handleExportVABI}
         onImportVABI={handleImportVABI}
+        onOpenAppMenu={() => setAppMenuOpen(true)}
       />
+      <DocumentTabs onCloseTab={onCloseTab} onNewProject={onNewProject} onOpenProject={onOpenProject} />
+      {appMenuOpen && (
+        <AppMenu
+          isOpen={appMenuOpen}
+          onClose={() => setAppMenuOpen(false)}
+          onNewProject={onNewProject}
+          onOpenProject={onOpenProject}
+          onSaveProject={onSaveProject}
+          onSaveAsProject={onSaveAsProject}
+          onExportReport={handleExportReport}
+          onExportIFC={handleExportIFC}
+          onExportModelIFC={handleExportModelIFC}
+          onPrintReport={handlePrintReport}
+          onExportUNIEC3={handleExportUNIEC3}
+          onImportUNIEC3={handleImportUNIEC3}
+          onExportVABI={handleExportVABI}
+          onImportVABI={handleImportVABI}
+          onOpenDialog={openDialog}
+        />
+      )}
       <div className="main-content">
         <ProjectBrowser />
         <MainView />
@@ -216,6 +202,236 @@ function AppContent() {
       )}
       {dialog.type === 'solar-thermal' && (
         <SolarThermalDialog editId={dialog.editId} onClose={closeDialog} />
+      )}
+      {printPreviewOpen && (
+        <PrintPreviewDialog onClose={() => setPrintPreviewOpen(false)} />
+      )}
+    </>
+  );
+}
+
+// ── Minimal status bar when no document is open ──
+
+function EmptyStatusBar() {
+  return (
+    <div className="status-bar">
+      <div className="status-section">
+        <span className="status-hint">Ready</span>
+      </div>
+      <div className="status-section" />
+    </div>
+  );
+}
+
+// ── Main app shell ──
+
+function AppContent() {
+  const { docState, docDispatch } = useDocumentManager();
+  const hasActiveDoc = useHasActiveDocument();
+  const untitledCounter = useRef(0);
+
+  const createEmptyProject = useCallback((): IProject => {
+    untitledCounter.current += 1;
+    return {
+      id: crypto.randomUUID(),
+      name: `Untitled ${untitledCounter.current}`,
+      description: '',
+      buildingFunction: 'residential',
+      address: '',
+      city: '',
+      zones: [],
+      heatingSystems: [],
+      ventilationSystems: [],
+      coolingSystems: [],
+      hotWaterSystems: [],
+      solarPV: [],
+      solarThermal: [],
+      constructions: [],
+    };
+  }, []);
+
+  // ── Helper: write project to disk (returns filePath or null if cancelled) ──
+  const writeProjectToDisk = useCallback(async (
+    project: IProject,
+    existingPath: string | null,
+    forcePrompt: boolean,
+  ): Promise<string | null> => {
+    const json = serializeProject(project);
+
+    // Save directly if we have a path and aren't forcing a prompt
+    if (existingPath && !forcePrompt) {
+      try {
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        await writeTextFile(existingPath, json);
+        return existingPath;
+      } catch { /* fall through to Save As dialog */ }
+    }
+
+    // Show Save As dialog
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      const filePath = await save({
+        defaultPath: existingPath || `${project.name || 'project'}.oes.json`,
+        filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }],
+      });
+      if (!filePath) return null; // User cancelled
+      await writeTextFile(filePath, json);
+      return filePath;
+    } catch {
+      // Browser fallback (non-Tauri)
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.name || 'project'}.oes.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return 'browser-download';
+    }
+  }, []);
+
+  // ── New ──
+  const handleNewProject = useCallback(() => {
+    docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: createEmptyProject() } });
+  }, [docDispatch, createEmptyProject]);
+
+  // ── Open ──
+  const handleOpenProject = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
+      const filePath = await open({
+        filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }],
+        multiple: false,
+      });
+      if (!filePath) return;
+      const json = await readTextFile(filePath as string);
+      const loaded = deserializeProject(json);
+      docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath: filePath as string } });
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg && !msg.includes('cancelled')) {
+        alert('Failed to open project: ' + msg);
+      }
+    }
+  }, [docDispatch]);
+
+  // ── Save (Ctrl+S) — save to existing path, or prompt Save As if new ──
+  const handleSaveProject = useCallback(async () => {
+    const activeDoc = docState.documents.find(d => d.id === docState.activeDocumentId);
+    if (!activeDoc) return;
+
+    const savedPath = await writeProjectToDisk(activeDoc.state.project, activeDoc.filePath, false);
+    if (savedPath === null) return; // Cancelled
+
+    if (savedPath !== 'browser-download' && savedPath !== activeDoc.filePath) {
+      docDispatch({ type: 'DOC_SET_FILE_PATH', payload: { id: activeDoc.id, filePath: savedPath } });
+    }
+    docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'SET_DIRTY', payload: false } } });
+  }, [docState, docDispatch, writeProjectToDisk]);
+
+  // ── Save As (always prompts for new path) ──
+  const handleSaveAsProject = useCallback(async () => {
+    const activeDoc = docState.documents.find(d => d.id === docState.activeDocumentId);
+    if (!activeDoc) return;
+
+    const savedPath = await writeProjectToDisk(activeDoc.state.project, activeDoc.filePath, true);
+    if (savedPath === null) return; // Cancelled
+
+    if (savedPath !== 'browser-download') {
+      docDispatch({ type: 'DOC_SET_FILE_PATH', payload: { id: activeDoc.id, filePath: savedPath } });
+    }
+    docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'SET_DIRTY', payload: false } } });
+  }, [docState, docDispatch, writeProjectToDisk]);
+
+  // ── Close tab (with unsaved-changes check) ──
+  const handleCloseTab = useCallback(async (id: string) => {
+    const doc = docState.documents.find(d => d.id === id);
+    if (!doc) return;
+
+    if (doc.state.isDirty) {
+      try {
+        const { ask } = await import('@tauri-apps/plugin-dialog');
+        const shouldSave = await ask(
+          `"${doc.state.project.name || 'Untitled'}" has unsaved changes. Save before closing?`,
+          { title: 'Unsaved Changes', kind: 'warning', okLabel: 'Save', cancelLabel: 'Discard' },
+        );
+        if (shouldSave) {
+          const savedPath = await writeProjectToDisk(doc.state.project, doc.filePath, false);
+          if (savedPath === null) return; // User cancelled Save As — don't close
+        }
+      } catch {
+        const shouldDiscard = confirm(
+          `"${doc.state.project.name || 'Untitled'}" has unsaved changes. Discard and close?`
+        );
+        if (!shouldDiscard) return;
+      }
+    }
+
+    docDispatch({ type: 'DOC_CLOSE', payload: id });
+  }, [docState.documents, docDispatch, writeProjectToDisk]);
+
+  // ── Keyboard shortcuts ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'n':
+          e.preventDefault();
+          handleNewProject();
+          break;
+        case 'o':
+          e.preventDefault();
+          handleOpenProject();
+          break;
+        case 's':
+          e.preventDefault();
+          if (e.shiftKey) {
+            handleSaveAsProject();
+          } else {
+            handleSaveProject();
+          }
+          break;
+        case 'w':
+          e.preventDefault();
+          if (docState.activeDocumentId) {
+            handleCloseTab(docState.activeDocumentId);
+          }
+          break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleNewProject, handleOpenProject, handleSaveProject, handleSaveAsProject, handleCloseTab, docState.activeDocumentId]);
+
+  return (
+    <div className="app">
+      <TitleBar
+        onNewProject={handleNewProject}
+        onOpenProject={handleOpenProject}
+        onSaveProject={handleSaveProject}
+      />
+      {hasActiveDoc ? (
+        <ActiveDocumentContent
+          onNewProject={handleNewProject}
+          onOpenProject={handleOpenProject}
+          onSaveProject={handleSaveProject}
+          onSaveAsProject={handleSaveAsProject}
+          onCloseTab={handleCloseTab}
+        />
+      ) : (
+        <>
+          <WelcomeScreen
+            onNewProject={handleNewProject}
+            onOpenProject={handleOpenProject}
+          />
+          <EmptyStatusBar />
+        </>
       )}
     </div>
   );

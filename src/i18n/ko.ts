@@ -4,6 +4,9 @@ export const ko: Record<string, string> = {
   'app.untitledProject': '제목 없는 프로젝트',
   'app.newProject': '새 프로젝트',
 
+  // Welcome
+  'welcome.subtitle': '시작하려면 프로젝트를 만들거나 여세요',
+
   // Ribbon tabs
   'ribbon.start': '홈',
   'ribbon.envelope': '건물 외피',
@@ -55,6 +58,9 @@ export const ko: Record<string, string> = {
   'ribbon.solarThermal': '태양열',
   'ribbon.addSolarThermal': '태양열 추가',
 
+  'ribbon.export': '내보내기',
+  'ribbon.import': '가져오기',
+  'ribbon.about': '정보',
   // Ribbon groups - Results
   'ribbon.bengResults': 'BENG 결과',
   'ribbon.energyBalance': '에너지 수지',
@@ -230,6 +236,9 @@ export const ko: Record<string, string> = {
   'dialog.solarThermal.orientation': '방위',
   'dialog.solarThermal.tilt': '경사각 (°)',
 
+  // Validation
+  'dialog.validation.required': '이 필드는 필수입니다',
+
   // Building functions
   'function.residential': '주거',
   'function.office': '사무소',
@@ -298,7 +307,19 @@ export const ko: Record<string, string> = {
   'report.bengResults': 'BENG 결과',
   'report.energyBalance': '에너지 수지',
   'report.export': '보고서 내보내기',
-  'report.print': '보고서 인쇄',
+  'report.print': '인쇄',
+  'report.printPreview': '인쇄 미리보기',
+  'report.page': '페이지',
+  'report.printer': '프린터',
+  'report.zoom': '확대/축소',
+  'report.noPrinters': '프린터를 찾을 수 없습니다',
+  'report.default': '기본',
+  'report.pageSize': '페이지 크기',
+  'report.printerProperties': '프린터 속성',
+  'report.orientation': '방향',
+  'report.portrait': '세로',
+  'report.landscape': '가로',
+  'report.keepTables': '표를 함께 유지',
   'report.exportIFC': 'IFC 내보내기',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const ko: Record<string, string> = {
   'settings.general': '일반',
   'settings.language': '언어',
   'settings.general.theme': '테마',
-  'theme.system': '시스템',
+  'theme.system': '시스템 (자동 감지)',
   'theme.dark': '다크',
   'theme.light': '라이트',
   'theme.blue': '블루',

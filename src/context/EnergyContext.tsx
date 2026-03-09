@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
 import {
   IProject,
   IZone,
@@ -244,19 +244,122 @@ export function createDefaultProject(): IProject {
 }
 
 // ============================================================
-// Initial state
+// Per-document state factory
 // ============================================================
 
-const initialState: EnergyState = {
-  project: createDefaultProject(),
-  result: null,
-  viewMode: 'project',
-  activeRibbonTab: 'start',
-  dialog: { type: null, editId: null },
-  selectedItemId: null,
-  selectedItemType: null,
-  isDirty: false,
-  previewVisible: true,
+function createDocumentState(project: IProject): EnergyState {
+  return {
+    project,
+    result: null,
+    viewMode: 'project',
+    activeRibbonTab: 'start',
+    dialog: { type: null, editId: null },
+    selectedItemId: null,
+    selectedItemType: null,
+    isDirty: false,
+    previewVisible: true,
+  };
+}
+
+// ============================================================
+// Document manager (multi-document layer)
+// ============================================================
+
+export interface DocumentEntry {
+  id: string;
+  filePath: string | null;
+  state: EnergyState;
+}
+
+export interface DocumentManagerState {
+  documents: DocumentEntry[];
+  activeDocumentId: string | null;
+}
+
+export type DocumentManagerAction =
+  | { type: 'DOC_NEW'; payload: { id: string; project: IProject } }
+  | { type: 'DOC_OPEN'; payload: { id: string; project: IProject; filePath: string } }
+  | { type: 'DOC_CLOSE'; payload: string }
+  | { type: 'DOC_SET_ACTIVE'; payload: string }
+  | { type: 'DOC_SET_FILE_PATH'; payload: { id: string; filePath: string } }
+  | { type: 'DOC_DISPATCH'; payload: { id: string; action: EnergyAction } };
+
+function documentManagerReducer(
+  state: DocumentManagerState,
+  action: DocumentManagerAction,
+): DocumentManagerState {
+  switch (action.type) {
+    case 'DOC_NEW': {
+      const newDoc: DocumentEntry = {
+        id: action.payload.id,
+        filePath: null,
+        state: createDocumentState(action.payload.project),
+      };
+      return {
+        documents: [...state.documents, newDoc],
+        activeDocumentId: newDoc.id,
+      };
+    }
+    case 'DOC_OPEN': {
+      const existing = state.documents.find(d => d.filePath === action.payload.filePath);
+      if (existing) {
+        return { ...state, activeDocumentId: existing.id };
+      }
+      const newDoc: DocumentEntry = {
+        id: action.payload.id,
+        filePath: action.payload.filePath,
+        state: createDocumentState(action.payload.project),
+      };
+      return {
+        documents: [...state.documents, newDoc],
+        activeDocumentId: newDoc.id,
+      };
+    }
+    case 'DOC_CLOSE': {
+      const remaining = state.documents.filter(d => d.id !== action.payload);
+      let newActiveId: string | null = null;
+      if (remaining.length > 0) {
+        if (state.activeDocumentId === action.payload) {
+          const closedIndex = state.documents.findIndex(d => d.id === action.payload);
+          newActiveId = remaining[Math.min(closedIndex, remaining.length - 1)].id;
+        } else {
+          newActiveId = state.activeDocumentId;
+        }
+      }
+      return { documents: remaining, activeDocumentId: newActiveId };
+    }
+    case 'DOC_SET_ACTIVE':
+      return { ...state, activeDocumentId: action.payload };
+    case 'DOC_SET_FILE_PATH':
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === action.payload.id
+            ? { ...d, filePath: action.payload.filePath }
+            : d
+        ),
+      };
+    case 'DOC_DISPATCH':
+      return {
+        ...state,
+        documents: state.documents.map(d =>
+          d.id === action.payload.id
+            ? { ...d, state: energyReducer(d.state, action.payload.action) }
+            : d
+        ),
+      };
+    default:
+      return state;
+  }
+}
+
+const initialDocManagerState: DocumentManagerState = {
+  documents: [{
+    id: 'default',
+    filePath: null,
+    state: createDocumentState(createDefaultProject()),
+  }],
+  activeDocumentId: 'default',
 };
 
 // ============================================================
@@ -802,7 +905,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
 }
 
 // ============================================================
-// Context
+// Contexts
 // ============================================================
 
 interface EnergyContextType {
@@ -812,28 +915,73 @@ interface EnergyContextType {
 
 const EnergyContext = createContext<EnergyContextType | null>(null);
 
+interface DocumentManagerContextType {
+  docState: DocumentManagerState;
+  docDispatch: React.Dispatch<DocumentManagerAction>;
+}
+
+const DocumentManagerContext = createContext<DocumentManagerContextType | null>(null);
+
 // ============================================================
 // Provider
 // ============================================================
 
-export function EnergyProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(energyReducer, initialState);
+function ActiveDocumentBridge({ children }: { children: ReactNode }) {
+  const { docState, docDispatch } = useDocumentManager();
+  const activeDoc = docState.documents.find(d => d.id === docState.activeDocumentId);
+
+  const dispatch = useCallback((action: EnergyAction) => {
+    if (docState.activeDocumentId) {
+      docDispatch({
+        type: 'DOC_DISPATCH',
+        payload: { id: docState.activeDocumentId, action },
+      });
+    }
+  }, [docState.activeDocumentId, docDispatch]);
+
+  const value = activeDoc
+    ? { state: activeDoc.state, dispatch }
+    : null;
 
   return (
-    <EnergyContext.Provider value={{ state, dispatch }}>
+    <EnergyContext.Provider value={value}>
       {children}
     </EnergyContext.Provider>
   );
 }
 
+export function EnergyProvider({ children }: { children: ReactNode }) {
+  const [docState, docDispatch] = useReducer(documentManagerReducer, initialDocManagerState);
+
+  return (
+    <DocumentManagerContext.Provider value={{ docState, docDispatch }}>
+      <ActiveDocumentBridge>
+        {children}
+      </ActiveDocumentBridge>
+    </DocumentManagerContext.Provider>
+  );
+}
+
 // ============================================================
-// Hook
+// Hooks
 // ============================================================
 
 export function useEnergy() {
   const context = useContext(EnergyContext);
   if (!context) {
-    throw new Error('useEnergy must be used within an EnergyProvider');
+    throw new Error('useEnergy must be used within an EnergyProvider with an active document');
   }
   return context;
+}
+
+export function useDocumentManager() {
+  const context = useContext(DocumentManagerContext);
+  if (!context) {
+    throw new Error('useDocumentManager must be used within an EnergyProvider');
+  }
+  return context;
+}
+
+export function useHasActiveDocument() {
+  return useContext(EnergyContext) !== null;
 }

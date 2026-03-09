@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import type { Locale } from '../../i18n/i18n';
+import { DialogShell } from '../dialogs/DialogShell';
 import './SettingsDialog.css';
 
 type SettingsTab = 'general' | 'language';
@@ -94,87 +95,83 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
     },
   ];
 
-  return (
-    <div className="dialog-overlay" onClick={handleCancel}>
-      <div className="settings-dialog" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="settings-header">
-          <h2 className="settings-title">{t('settings.title')}</h2>
-          <button className="settings-close" onClick={handleCancel}>&times;</button>
-        </div>
-
-        {/* Body: sidebar + content */}
-        <div className="settings-body">
-          <div className="settings-sidebar">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                className={`settings-tab${activeTab === tab.id ? ' active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="settings-content">
-            {activeTab === 'general' && (
-              <div className="settings-section">
-                <h3 className="settings-section-title">{t('settings.general.theme')}</h3>
-                <div className="theme-table">
-                  {THEMES.map(theme => (
-                    <button
-                      key={theme.value}
-                      className={`theme-row${draftTheme === theme.value ? ' active' : ''}`}
-                      onClick={() => handleThemeChange(theme.value)}
-                    >
-                      <span className="theme-row-swatches">
-                        {theme.swatches.map((color, i) => (
-                          <span key={i} className="theme-row-swatch" style={{ background: color }} />
-                        ))}
-                      </span>
-                      <span className="theme-row-name">{t(theme.labelKey)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'language' && (
-              <div className="settings-section">
-                <h3 className="settings-section-title">{t('settings.language.select')}</h3>
-                <div className="language-table">
-                  <div className="language-table-header">
-                    <span className="language-col-code">{t('properties.type')}</span>
-                    <span className="language-col-name">{t('settings.language')}</span>
-                  </div>
-                  {LANGUAGES.map(lang => (
-                    <button
-                      key={lang.code}
-                      className={`language-row${draftLocale === lang.code ? ' active' : ''}`}
-                      onClick={() => setDraftLocale(lang.code)}
-                    >
-                      <span className="language-col-code">{lang.code.toUpperCase()}</span>
-                      <span className="language-col-name">{t(`language.${lang.code}`)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="settings-footer">
-          <button className="settings-btn" onClick={handleCancel}>
-            {t('dialog.cancel')}
-          </button>
-          <button className="settings-btn settings-btn-primary" onClick={handleOk}>
-            OK
-          </button>
-        </div>
-      </div>
+  const settingsFooter = (
+    <div className="dialog-footer">
+      <button className="btn" onClick={handleCancel}>
+        {t('dialog.cancel')}
+      </button>
+      <button className="btn btn-primary" onClick={handleOk}>
+        OK
+      </button>
     </div>
+  );
+
+  return (
+    <DialogShell
+      title={t('settings.title')}
+      onClose={handleCancel}
+      className="settings-dialog"
+      bodyClassName="settings-body"
+      footer={settingsFooter}
+    >
+      <div className="settings-sidebar">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`settings-tab${activeTab === tab.id ? ' active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.icon}
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="settings-content">
+        {activeTab === 'general' && (
+          <div className="settings-section">
+            <h3 className="settings-section-title">{t('settings.general.theme')}</h3>
+            <div className="theme-table">
+              {THEMES.map(theme => (
+                <button
+                  key={theme.value}
+                  className={`theme-row${draftTheme === theme.value ? ' active' : ''}`}
+                  onClick={() => handleThemeChange(theme.value)}
+                >
+                  <span className="theme-row-swatches">
+                    {theme.swatches.map((color, i) => (
+                      <span key={i} className="theme-row-swatch" style={{ background: color }} />
+                    ))}
+                  </span>
+                  <span className="theme-row-name">{t(theme.labelKey)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'language' && (
+          <div className="settings-section">
+            <h3 className="settings-section-title">{t('settings.language.select')}</h3>
+            <div className="language-table">
+              <div className="language-table-header">
+                <span className="language-col-code">{t('properties.type')}</span>
+                <span className="language-col-name">{t('settings.language')}</span>
+              </div>
+              {LANGUAGES.map(lang => (
+                <button
+                  key={lang.code}
+                  className={`language-row${draftLocale === lang.code ? ' active' : ''}`}
+                  onClick={() => setDraftLocale(lang.code)}
+                >
+                  <span className="language-col-code">{lang.code.toUpperCase()}</span>
+                  <span className="language-col-name">{t(`language.${lang.code}`)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </DialogShell>
   );
 }

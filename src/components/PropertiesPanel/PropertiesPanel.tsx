@@ -1,5 +1,7 @@
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
+import { PanelRightClose } from 'lucide-react';
 import type { IZone, ISurface, IWindow, IThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
 import './PropertiesPanel.css';
 
@@ -58,10 +60,49 @@ export function PropertiesPanel() {
   const { t } = useI18n();
   const { state } = useEnergy();
   const { item, type } = findItem(state);
+  const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(280);
+  const resizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+  }, [width]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!resizing.current) return;
+      const newWidth = Math.min(500, Math.max(160, startWidth.current - (e.clientX - startX.current)));
+      setWidth(newWidth);
+    };
+    const onMouseUp = () => { resizing.current = false; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  if (collapsed) {
+    return (
+      <div className="properties-panel collapsed" onClick={() => setCollapsed(false)}>
+        <div className="panel-collapsed-label-right">
+          <span>{t('properties.title')}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="properties-panel">
+    <div className="properties-panel" style={{ width }}>
+      <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
       <div className="properties-panel-header">
+        <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
         <span>{t('properties.title')}</span>
       </div>
       <div className="properties-panel-content">

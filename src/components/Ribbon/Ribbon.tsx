@@ -27,6 +27,7 @@ interface RibbonProps {
   onImportUNIEC3: () => void;
   onExportVABI: () => void;
   onImportVABI: () => void;
+  onOpenAppMenu: () => void;
 }
 
 /* ── Reusable sub-components ── */
@@ -79,6 +80,7 @@ export function Ribbon({
   onImportUNIEC3,
   onExportVABI,
   onImportVABI,
+  onOpenAppMenu,
 }: RibbonProps) {
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
@@ -114,6 +116,9 @@ export function Ribbon({
     <div className="ribbon-container">
       {/* ── Tab bar ── */}
       <div className="ribbon-tabs">
+        <button className="ribbon-tab file-tab" onClick={onOpenAppMenu}>
+          {t('ribbon.file')}
+        </button>
         {tabs.map(tab => (
           <button
             key={tab.id}

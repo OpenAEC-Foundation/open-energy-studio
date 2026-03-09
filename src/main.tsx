@@ -12,6 +12,11 @@ import './index.css';
   document.documentElement.dataset.theme = effective;
 }
 
+// Disable browser context menu in production
+if (!import.meta.env.DEV) {
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

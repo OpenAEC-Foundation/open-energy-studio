@@ -1,7 +1,5 @@
 .properties-panel {
-  width: 280px;
-  min-width: 220px;
-  max-width: 400px;
+  position: relative;
   background: var(--bg-primary);
   border-inline-start: 1px solid var(--border);
   display: flex;
@@ -10,9 +8,22 @@
   flex-shrink: 0;
 }
 
+.properties-panel.collapsed {
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.properties-panel.collapsed:hover {
+  background: var(--bg-hover);
+}
+
 .properties-panel-header {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -21,6 +32,37 @@
   border-bottom: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.panel-collapse-btn-right {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.panel-collapse-btn-right:hover {
+  color: var(--text-primary);
+}
+
+.panel-collapsed-label-right {
+  writing-mode: vertical-rl;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 
 .properties-panel-content {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IThermalBridge } from '../../../core/energy/types';
+import { DialogShell } from '../DialogShell';
 
 interface ThermalBridgeDialogProps {
   editId?: string | null;
@@ -31,9 +32,17 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
   const [psiValue, setPsiValue] = useState(existingBridge?.psiValue ?? 0.05);
   const [length, setLength] = useState(existingBridge?.length ?? 0);
   const [zoneId, setZoneId] = useState(existingZoneId ?? (project.zones[0]?.id ?? ''));
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
-    if (!zoneId) return;
+    const newErrors: Record<string, string> = {};
+    if (!name.trim()) newErrors.name = t('dialog.validation.required');
+    if (!zoneId) newErrors.zoneId = t('dialog.validation.required');
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
 
     if (existingBridge && existingZoneId) {
       dispatch({
@@ -58,21 +67,22 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
   };
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <span className="dialog-header-title">{t('dialog.thermalBridge.title')}</span>
-          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        <div className="dialog-body">
-
+    <DialogShell
+      title={t('dialog.thermalBridge.title')}
+      onClose={onClose}
+      onSubmit={handleSave}
+      submitLabel={t('dialog.save')}
+      cancelLabel={t('dialog.cancel')}
+    >
         <div className="dialog-field">
           <label>{t('dialog.thermalBridge.name')}</label>
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: '' })); }}
+            className={errors.name ? 'field-error' : ''}
           />
+          {errors.name && <span className="field-error-text">{errors.name}</span>}
         </div>
 
         <div className="dialog-field">
@@ -101,8 +111,9 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
           <label>{t('dialog.thermalBridge.zone')}</label>
           <select
             value={zoneId}
-            onChange={(e) => setZoneId(e.target.value)}
+            onChange={(e) => { setZoneId(e.target.value); setErrors(prev => ({ ...prev, zoneId: '' })); }}
             disabled={!!existingBridge}
+            className={errors.zoneId ? 'field-error' : ''}
           >
             <option value="">--</option>
             {project.zones.map((z) => (
@@ -111,18 +122,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
               </option>
             ))}
           </select>
+          {errors.zoneId && <span className="field-error-text">{errors.zoneId}</span>}
         </div>
-
-        </div>
-        <div className="dialog-footer">
-          <button className="btn" onClick={onClose}>
-            {t('dialog.cancel')}
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {t('dialog.save')}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

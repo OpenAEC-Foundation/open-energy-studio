@@ -4,6 +4,9 @@ export const tr: Record<string, string> = {
   'app.untitledProject': 'Adsız Proje',
   'app.newProject': 'Yeni Proje',
 
+  // Welcome
+  'welcome.subtitle': 'Başlamak için bir proje oluşturun veya açın',
+
   // Ribbon tabs
   'ribbon.start': 'Ana Sayfa',
   'ribbon.envelope': 'Bina Kabuğu',
@@ -55,6 +58,9 @@ export const tr: Record<string, string> = {
   'ribbon.solarThermal': 'Güneş termal',
   'ribbon.addSolarThermal': 'Güneş termal ekle',
 
+  'ribbon.export': 'Dışa Aktar',
+  'ribbon.import': 'İçe Aktar',
+  'ribbon.about': 'Hakkında',
   // Ribbon groups - Results
   'ribbon.bengResults': 'BENG Sonuçları',
   'ribbon.energyBalance': 'Enerji dengesi',
@@ -230,6 +236,9 @@ export const tr: Record<string, string> = {
   'dialog.solarThermal.orientation': 'Yönelim',
   'dialog.solarThermal.tilt': 'Eğim (°)',
 
+  // Validation
+  'dialog.validation.required': 'Bu alan zorunludur',
+
   // Building functions
   'function.residential': 'Konut',
   'function.office': 'Ofis',
@@ -298,7 +307,19 @@ export const tr: Record<string, string> = {
   'report.bengResults': 'BENG Sonuçları',
   'report.energyBalance': 'Enerji dengesi',
   'report.export': 'Rapor dışa aktar',
-  'report.print': 'Rapor yazdır',
+  'report.print': 'Yazdır',
+  'report.printPreview': 'Baskı önizleme',
+  'report.page': 'Sayfa',
+  'report.printer': 'Yazıcı',
+  'report.zoom': 'Yakınlaştırma',
+  'report.noPrinters': 'Yazıcı bulunamadı',
+  'report.default': 'varsayılan',
+  'report.pageSize': 'Sayfa boyutu',
+  'report.printerProperties': 'Yazıcı özellikleri',
+  'report.orientation': 'Yönlendirme',
+  'report.portrait': 'Dikey',
+  'report.landscape': 'Yatay',
+  'report.keepTables': 'Tabloları bir arada tut',
   'report.exportIFC': 'IFC dışa aktar',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const tr: Record<string, string> = {
   'settings.general': 'Genel',
   'settings.language': 'Dil',
   'settings.general.theme': 'Tema',
-  'theme.system': 'Sistem',
+  'theme.system': 'Sistem (Otomatik algılama)',
   'theme.dark': 'Koyu',
   'theme.light': 'Açık',
   'theme.blue': 'Mavi',

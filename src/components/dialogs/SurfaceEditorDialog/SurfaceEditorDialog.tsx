@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISurface, SurfaceType, Orientation } from '../../../core/energy/types';
+import { DialogShell } from '../DialogShell';
 
 interface SurfaceEditorDialogProps {
   editId?: string | null;
@@ -36,9 +37,17 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
   const [orientation, setOrientation] = useState<Orientation>(existingSurface?.orientation ?? 'N');
   const [constructionId, setConstructionId] = useState(existingSurface?.constructionId ?? '');
   const [zoneId, setZoneId] = useState(existingZoneId ?? (project.zones[0]?.id ?? ''));
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
-    if (!zoneId) return;
+    const newErrors: Record<string, string> = {};
+    if (!zoneId) newErrors.zoneId = t('dialog.validation.required');
+    if (!name.trim()) newErrors.name = t('dialog.validation.required');
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
 
     if (existingSurface && existingZoneId) {
       dispatch({
@@ -66,21 +75,22 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
   };
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <span className="dialog-header-title">{t('dialog.surface.title')}</span>
-          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        <div className="dialog-body">
-
+    <DialogShell
+      title={t('dialog.surface.title')}
+      onClose={onClose}
+      onSubmit={handleSave}
+      submitLabel={t('dialog.save')}
+      cancelLabel={t('dialog.cancel')}
+    >
         <div className="dialog-field">
           <label>{t('dialog.surface.name')}</label>
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: '' })); }}
+            className={errors.name ? 'field-error' : ''}
           />
+          {errors.name && <span className="field-error-text">{errors.name}</span>}
         </div>
 
         <div className="dialog-field">
@@ -132,8 +142,9 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
           <label>{t('dialog.surface.zone')}</label>
           <select
             value={zoneId}
-            onChange={(e) => setZoneId(e.target.value)}
+            onChange={(e) => { setZoneId(e.target.value); setErrors(prev => ({ ...prev, zoneId: '' })); }}
             disabled={!!existingSurface}
+            className={errors.zoneId ? 'field-error' : ''}
           >
             <option value="">--</option>
             {project.zones.map((z) => (
@@ -142,18 +153,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
               </option>
             ))}
           </select>
+          {errors.zoneId && <span className="field-error-text">{errors.zoneId}</span>}
         </div>
-
-        </div>
-        <div className="dialog-footer">
-          <button className="btn" onClick={onClose}>
-            {t('dialog.cancel')}
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {t('dialog.save')}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

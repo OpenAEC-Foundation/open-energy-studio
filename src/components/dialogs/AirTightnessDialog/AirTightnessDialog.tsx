@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
+import { DialogShell } from '../DialogShell';
 
 interface AirTightnessDialogProps {
   editId?: string | null;
@@ -20,6 +21,7 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
   const [zoneId, setZoneId] = useState(existingZone?.id ?? (project.zones[0]?.id ?? ''));
   const selectedZone = project.zones.find((z) => z.id === zoneId);
   const [qv10, setQv10] = useState(selectedZone?.airTightness.qv10 ?? 0.4);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleZoneChange = (newZoneId: string) => {
     setZoneId(newZoneId);
@@ -30,7 +32,13 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
   };
 
   const handleSave = () => {
-    if (!zoneId) return;
+    const newErrors: Record<string, string> = {};
+    if (!zoneId) newErrors.zoneId = t('dialog.validation.required');
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
 
     dispatch({
       type: 'UPDATE_AIR_TIGHTNESS',
@@ -40,17 +48,20 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
   };
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <span className="dialog-header-title">{t('dialog.airTightness.title')}</span>
-          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        <div className="dialog-body">
-
+    <DialogShell
+      title={t('dialog.airTightness.title')}
+      onClose={onClose}
+      onSubmit={handleSave}
+      submitLabel={t('dialog.save')}
+      cancelLabel={t('dialog.cancel')}
+    >
         <div className="dialog-field">
           <label>{t('dialog.surface.zone')}</label>
-          <select value={zoneId} onChange={(e) => handleZoneChange(e.target.value)}>
+          <select
+            value={zoneId}
+            onChange={(e) => { handleZoneChange(e.target.value); setErrors(prev => ({ ...prev, zoneId: '' })); }}
+            className={errors.zoneId ? 'field-error' : ''}
+          >
             <option value="">--</option>
             {project.zones.map((z) => (
               <option key={z.id} value={z.id}>
@@ -58,6 +69,7 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
               </option>
             ))}
           </select>
+          {errors.zoneId && <span className="field-error-text">{errors.zoneId}</span>}
         </div>
 
         <div className="dialog-field">
@@ -70,17 +82,6 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
             onChange={(e) => setQv10(parseFloat(e.target.value) || 0)}
           />
         </div>
-
-        </div>
-        <div className="dialog-footer">
-          <button className="btn" onClick={onClose}>
-            {t('dialog.cancel')}
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {t('dialog.save')}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

@@ -1,13 +1,23 @@
 .project-browser {
-  width: 260px;
-  min-width: 200px;
-  max-width: 360px;
+  position: relative;
   background: var(--bg-primary);
   border-inline-end: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
+}
+
+.project-browser.collapsed {
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.project-browser.collapsed:hover {
+  background: var(--bg-hover);
 }
 
 .project-browser-header {
@@ -22,6 +32,40 @@
   border-bottom: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.panel-collapse-btn {
+  margin-inline-start: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.panel-collapse-btn:hover {
+  color: var(--text-primary);
+}
+
+.panel-collapsed-label {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 
 .project-browser-tree {

@@ -4,6 +4,9 @@ export const es: Record<string, string> = {
   'app.untitledProject': 'Proyecto sin título',
   'app.newProject': 'Nuevo proyecto',
 
+  // Welcome
+  'welcome.subtitle': 'Cree o abra un proyecto para comenzar',
+
   // Ribbon tabs
   'ribbon.start': 'Inicio',
   'ribbon.envelope': 'Envolvente',
@@ -55,6 +58,9 @@ export const es: Record<string, string> = {
   'ribbon.solarThermal': 'Solar térmica',
   'ribbon.addSolarThermal': 'Añadir solar térmica',
 
+  'ribbon.export': 'Exportar',
+  'ribbon.import': 'Importar',
+  'ribbon.about': 'Acerca de',
   // Ribbon groups - Results
   'ribbon.bengResults': 'Resultados BENG',
   'ribbon.energyBalance': 'Balance energético',
@@ -230,6 +236,9 @@ export const es: Record<string, string> = {
   'dialog.solarThermal.orientation': 'Orientación',
   'dialog.solarThermal.tilt': 'Inclinación (°)',
 
+  // Validation
+  'dialog.validation.required': 'Este campo es obligatorio',
+
   // Building functions
   'function.residential': 'Residencial',
   'function.office': 'Oficina',
@@ -298,7 +307,19 @@ export const es: Record<string, string> = {
   'report.bengResults': 'Resultados BENG',
   'report.energyBalance': 'Balance energético',
   'report.export': 'Exportar informe',
-  'report.print': 'Imprimir informe',
+  'report.print': 'Imprimir',
+  'report.printPreview': 'Vista previa de impresión',
+  'report.page': 'Página',
+  'report.printer': 'Impresora',
+  'report.zoom': 'Zoom',
+  'report.noPrinters': 'No se encontraron impresoras',
+  'report.default': 'predeterminada',
+  'report.pageSize': 'Tamaño de página',
+  'report.printerProperties': 'Propiedades de impresora',
+  'report.orientation': 'Orientación',
+  'report.portrait': 'Vertical',
+  'report.landscape': 'Horizontal',
+  'report.keepTables': 'Mantener tablas juntas',
   'report.exportIFC': 'Exportar IFC',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const es: Record<string, string> = {
   'settings.general': 'General',
   'settings.language': 'Idioma',
   'settings.general.theme': 'Tema',
-  'theme.system': 'Sistema',
+  'theme.system': 'Sistema (Detección automática)',
   'theme.dark': 'Oscuro',
   'theme.light': 'Claro',
   'theme.blue': 'Azul',

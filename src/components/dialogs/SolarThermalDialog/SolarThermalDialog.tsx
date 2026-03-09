@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISolarThermal, SolarThermalType, Orientation } from '../../../core/energy/types';
+import { DialogShell } from '../DialogShell';
 
 interface SolarThermalDialogProps {
   editId?: string | null;
@@ -53,13 +54,13 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
   };
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <span className="dialog-header-title">{t('dialog.solarThermal.title')}</span>
-          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        <div className="dialog-body">
+    <DialogShell
+      title={t('dialog.solarThermal.title')}
+      onClose={onClose}
+      onSubmit={handleSave}
+      submitLabel={t('dialog.save')}
+      cancelLabel={t('dialog.cancel')}
+    >
 
         <div className="dialog-field">
           <label>{t('dialog.solarThermal.name')}</label>
@@ -115,16 +116,6 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
           />
         </div>
 
-        </div>
-        <div className="dialog-footer">
-          <button className="btn" onClick={onClose}>
-            {t('dialog.cancel')}
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {t('dialog.save')}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

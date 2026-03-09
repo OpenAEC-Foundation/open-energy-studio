@@ -4,6 +4,9 @@ export const ja: Record<string, string> = {
   'app.untitledProject': '無題のプロジェクト',
   'app.newProject': '新規プロジェクト',
 
+  // Welcome
+  'welcome.subtitle': 'プロジェクトを作成または開いて開始してください',
+
   // Ribbon tabs
   'ribbon.start': 'ホーム',
   'ribbon.envelope': '建物外皮',
@@ -55,6 +58,9 @@ export const ja: Record<string, string> = {
   'ribbon.solarThermal': '太陽熱',
   'ribbon.addSolarThermal': '太陽熱追加',
 
+  'ribbon.export': 'エクスポート',
+  'ribbon.import': 'インポート',
+  'ribbon.about': 'バージョン情報',
   // Ribbon groups - Results
   'ribbon.bengResults': 'BENG結果',
   'ribbon.energyBalance': 'エネルギー収支',
@@ -230,6 +236,9 @@ export const ja: Record<string, string> = {
   'dialog.solarThermal.orientation': '方位',
   'dialog.solarThermal.tilt': '傾斜角 (°)',
 
+  // Validation
+  'dialog.validation.required': 'この項目は必須です',
+
   // Building functions
   'function.residential': '住宅',
   'function.office': 'オフィス',
@@ -298,7 +307,19 @@ export const ja: Record<string, string> = {
   'report.bengResults': 'BENG結果',
   'report.energyBalance': 'エネルギー収支',
   'report.export': 'レポート出力',
-  'report.print': 'レポート印刷',
+  'report.print': '印刷',
+  'report.printPreview': '印刷プレビュー',
+  'report.page': 'ページ',
+  'report.printer': 'プリンター',
+  'report.zoom': 'ズーム',
+  'report.noPrinters': 'プリンターが見つかりません',
+  'report.default': 'デフォルト',
+  'report.pageSize': 'ページサイズ',
+  'report.printerProperties': 'プリンターのプロパティ',
+  'report.orientation': '向き',
+  'report.portrait': '縦',
+  'report.landscape': '横',
+  'report.keepTables': '表をまとめて表示',
   'report.exportIFC': 'IFC出力',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const ja: Record<string, string> = {
   'settings.general': '一般',
   'settings.language': '言語',
   'settings.general.theme': 'テーマ',
-  'theme.system': 'システム',
+  'theme.system': 'システム (自動検出)',
   'theme.dark': 'ダーク',
   'theme.light': 'ライト',
   'theme.blue': 'ブルー',

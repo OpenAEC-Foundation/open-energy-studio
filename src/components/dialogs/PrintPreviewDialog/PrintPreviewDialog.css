@@ -1,0 +1,201 @@
+/* ── Print Preview Dialog ── */
+.dialog.print-preview-dialog {
+  width: 85vw;
+  height: 85vh;
+  max-width: 1100px;
+  max-height: 85vh;
+  min-width: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Body is a horizontal two-column layout */
+.print-preview-body {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+}
+
+/* ── Left sidebar ── */
+.pp-sidebar {
+  width: 240px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border-inline-end: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.pp-sidebar-content {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.pp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pp-select {
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-input, var(--bg-medium));
+  color: var(--text-primary);
+  width: 100%;
+  cursor: pointer;
+}
+
+.pp-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pp-select option,
+.pp-select optgroup {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Printer row: dropdown + properties button */
+.pp-printer-row {
+  display: flex;
+  gap: 4px;
+}
+
+.pp-printer-row .pp-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-props-btn {
+  padding: 4px 6px;
+  min-width: unset;
+  flex-shrink: 0;
+}
+
+.pp-props-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Checkbox label */
+.pp-checkbox-label {
+  font-size: 12px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.pp-checkbox-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Zoom row */
+.pp-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-zoom-btn {
+  padding: 4px 6px;
+  min-width: unset;
+  flex-shrink: 0;
+}
+
+.pp-zoom-value {
+  font-size: 12px;
+  color: var(--text-primary);
+  min-width: 40px;
+  text-align: center;
+  flex: 1;
+}
+
+/* Page info */
+.pp-page-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Sidebar action buttons */
+.pp-sidebar-actions {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-print-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.pp-close-btn {
+  width: 100%;
+}
+
+/* ── Right preview area ── */
+.pp-preview {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: var(--bg-dark, #1a1a2e);
+  position: relative;
+}
+
+.pp-pages-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.pp-page {
+  background: white;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.pp-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Empty state */
+.print-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}

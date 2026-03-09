@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { calculateBENGMonthly } from '../../core/energy/BENGCalculatorMonthly';
 import { calculateEnergyLabel } from '../../core/energy/EnergyLabel';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
 import { MonthlyBarChart } from './MonthlyBarChart';
+import { PanelRightClose } from 'lucide-react';
 import './PreviewPanel.css';
 
 export function PreviewPanel() {
@@ -19,9 +20,49 @@ export function PreviewPanel() {
     return calculateBENGMonthly(project);
   }, [project]);
 
+  const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(320);
+  const resizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+  }, [width]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!resizing.current) return;
+      const newWidth = Math.min(500, Math.max(160, startWidth.current - (e.clientX - startX.current)));
+      setWidth(newWidth);
+    };
+    const onMouseUp = () => { resizing.current = false; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  if (collapsed) {
+    return (
+      <div className="preview-panel collapsed" onClick={() => setCollapsed(false)}>
+        <div className="panel-collapsed-label-right">
+          <span>{t('preview.title')}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="preview-panel">
+    <div className="preview-panel" style={{ width }}>
+      <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
       <div className="preview-panel-header">
+        <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
         <span>{t('preview.title')}</span>
       </div>
       <div className="preview-panel-content">

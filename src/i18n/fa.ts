@@ -4,6 +4,9 @@ export const fa: Record<string, string> = {
   'app.untitledProject': 'پروژه بدون عنوان',
   'app.newProject': 'پروژه جدید',
 
+  // Welcome
+  'welcome.subtitle': 'برای شروع یک پروژه ایجاد یا باز کنید',
+
   // Ribbon tabs
   'ribbon.start': 'خانه',
   'ribbon.envelope': 'پوسته ساختمان',
@@ -55,6 +58,9 @@ export const fa: Record<string, string> = {
   'ribbon.solarThermal': 'حرارت خورشیدی',
   'ribbon.addSolarThermal': 'افزودن حرارت خورشیدی',
 
+  'ribbon.export': 'خروجی',
+  'ribbon.import': 'ورودی',
+  'ribbon.about': 'درباره',
   // Ribbon groups - Results
   'ribbon.bengResults': 'نتایج BENG',
   'ribbon.energyBalance': 'تراز انرژی',
@@ -230,6 +236,9 @@ export const fa: Record<string, string> = {
   'dialog.solarThermal.orientation': 'جهت‌گیری',
   'dialog.solarThermal.tilt': 'شیب (°)',
 
+  // Validation
+  'dialog.validation.required': 'این فیلد الزامی است',
+
   // Building functions
   'function.residential': 'مسکونی',
   'function.office': 'اداری',
@@ -298,7 +307,19 @@ export const fa: Record<string, string> = {
   'report.bengResults': 'نتایج BENG',
   'report.energyBalance': 'تراز انرژی',
   'report.export': 'صدور گزارش',
-  'report.print': 'چاپ گزارش',
+  'report.print': 'چاپ',
+  'report.printPreview': 'پیش‌نمایش چاپ',
+  'report.page': 'صفحه',
+  'report.printer': 'چاپگر',
+  'report.zoom': 'بزرگ‌نمایی',
+  'report.noPrinters': 'چاپگری یافت نشد',
+  'report.default': 'پیش‌فرض',
+  'report.pageSize': 'اندازه صفحه',
+  'report.printerProperties': 'ویژگی‌های چاپگر',
+  'report.orientation': 'جهت',
+  'report.portrait': 'عمودی',
+  'report.landscape': 'افقی',
+  'report.keepTables': 'نگه داشتن جداول در کنار هم',
   'report.exportIFC': 'صدور IFC',
 
   // Results - TO-juli
@@ -393,7 +414,7 @@ export const fa: Record<string, string> = {
   'settings.general': 'عمومی',
   'settings.language': 'زبان',
   'settings.general.theme': 'قالب',
-  'theme.system': 'سیستم',
+  'theme.system': 'سیستم (تشخیص خودکار)',
   'theme.dark': 'تیره',
   'theme.light': 'روشن',
   'theme.blue': 'آبی',
