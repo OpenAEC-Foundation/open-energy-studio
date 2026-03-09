@@ -1,6 +1,6 @@
 {
   "name": "open-energy-studio",
-  "version": "0.1.3-alpha",
+  "version": "0.1.4-alpha",
   "description": "BENG calculator for building energy performance according to NTA 8800",
   "type": "module",
   "scripts": {
