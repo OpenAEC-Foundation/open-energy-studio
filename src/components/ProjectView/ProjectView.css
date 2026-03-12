@@ -16,7 +16,9 @@
 
 .project-view-header h2 {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
   margin: 0;
 }

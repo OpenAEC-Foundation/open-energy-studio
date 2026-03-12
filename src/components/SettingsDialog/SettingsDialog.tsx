@@ -6,13 +6,12 @@ import './SettingsDialog.css';
 
 type SettingsTab = 'general' | 'language';
 
-type Theme = 'system' | 'light' | 'dark' | 'blue' | 'highContrast';
+type Theme = 'system' | 'light' | 'dark' | 'highContrast';
 
 const THEMES: { value: Theme; labelKey: string; swatches: string[] }[] = [
-  { value: 'system', labelKey: 'theme.system', swatches: ['#161b22', '#1c2333', '#3b82f6', '#e6edf3'] },
-  { value: 'dark', labelKey: 'theme.dark', swatches: ['#0d1117', '#161b22', '#3b82f6', '#e6edf3'] },
-  { value: 'light', labelKey: 'theme.light', swatches: ['#f5f5f7', '#ffffff', '#3b82f6', '#1a1a2e'] },
-  { value: 'blue', labelKey: 'theme.blue', swatches: ['#0d1b2a', '#1b263b', '#00b4d8', '#e0e1dd'] },
+  { value: 'system', labelKey: 'theme.system', swatches: ['#36363E', '#2A2A32', '#D97706', '#FAFAF9'] },
+  { value: 'dark', labelKey: 'theme.dark', swatches: ['#2A2A32', '#36363E', '#D97706', '#FAFAF9'] },
+  { value: 'light', labelKey: 'theme.light', swatches: ['#FAFAF9', '#F5F5F4', '#D97706', '#36363E'] },
   { value: 'highContrast', labelKey: 'theme.highContrast', swatches: ['#000000', '#0a0a0a', '#ffff00', '#ffffff'] },
 ];
 

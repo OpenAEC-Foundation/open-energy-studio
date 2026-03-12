@@ -120,8 +120,10 @@
 
 .app-menu-panel-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
   margin: 0 0 12px 0;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);

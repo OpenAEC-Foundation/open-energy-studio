@@ -7,6 +7,8 @@
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 12px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .monthly-chart-container {

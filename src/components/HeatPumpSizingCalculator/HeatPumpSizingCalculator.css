@@ -12,6 +12,8 @@
   font-weight: 600;
   margin-bottom: 16px;
   color: var(--text-primary);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* ---- Results bar ---- */
@@ -87,6 +89,8 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .hp-card-body {
@@ -287,9 +291,10 @@
 .hp-section-title {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.1em;
   padding: 8px 10px 4px;
 }
 

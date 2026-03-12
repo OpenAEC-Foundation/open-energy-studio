@@ -5,7 +5,9 @@
 
 .results-view h2 {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
   margin-bottom: 16px;
   color: var(--text-primary);
 }
@@ -65,11 +67,12 @@
 }
 
 .to-juli-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 2px 10px;
+  border-radius: 9999px;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .to-juli-badge.pass {

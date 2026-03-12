@@ -23,8 +23,10 @@
 
 .welcome-title {
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
   margin: 0;
 }
 

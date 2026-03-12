@@ -36,7 +36,7 @@
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 0;
+  border-radius: 4px;
   border-inline-start: 3px solid transparent;
   transition: all 0.15s ease;
   text-align: start;
@@ -72,8 +72,11 @@
 
 .settings-section-title {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   margin: 0 0 8px 0;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border-light);
@@ -100,7 +103,7 @@
   width: 140px;
   padding: 3px 6px;
   border: 1px solid var(--border-light);
-  border-radius: 0;
+  border-radius: 4px;
   font-size: 11px;
   font-family: inherit;
   background: var(--bg-secondary);
@@ -116,7 +119,7 @@
 /* ── Language table ── */
 .language-table {
   border: 1px solid var(--border-light);
-  border-radius: 0;
+  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -181,7 +184,7 @@
 /* ── Theme table ── */
 .theme-table {
   border: 1px solid var(--border-light);
-  border-radius: 0;
+  border-radius: 4px;
   overflow: hidden;
 }
 

@@ -12,6 +12,8 @@
   font-weight: 600;
   margin-bottom: 16px;
   color: var(--text-primary);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* ---- Cards ---- */
@@ -38,6 +40,8 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* ---- Surface position selector ---- */
