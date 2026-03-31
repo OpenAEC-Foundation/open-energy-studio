@@ -4,7 +4,7 @@
  * Tests tab switching, button clicks, dialog opening, and calculate action.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithProviders, userEvent } from './test-utils';
 import { Ribbon } from '../components/Ribbon/Ribbon';
 

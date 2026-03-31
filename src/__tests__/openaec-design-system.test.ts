@@ -8,12 +8,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 // ── Helper: parse CSS and extract custom properties for a selector ──
 
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
 function loadCSS(): string {
-  // We read the raw CSS source so we can verify token values without rendering
-  // This is a static analysis approach
-  const fs = require('fs');
-  const path = require('path');
-  return fs.readFileSync(path.resolve(__dirname, '../index.css'), 'utf-8');
+  return readFileSync(resolve(__dirname, '../index.css'), 'utf-8');
 }
 
 let css: string;

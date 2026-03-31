@@ -3,7 +3,7 @@
  *
  * Tests tree rendering, node expansion/collapse, selection, and panel collapse.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders, userEvent } from './test-utils';
 import { ProjectBrowser } from '../components/ProjectBrowser/ProjectBrowser';

@@ -4,7 +4,6 @@
  * Tests tab rendering, tab switching, close button, and + menu.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
 import { renderWithProviders, userEvent } from './test-utils';
 import { DocumentTabs } from '../components/DocumentTabs/DocumentTabs';
 
