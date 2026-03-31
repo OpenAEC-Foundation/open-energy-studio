@@ -154,8 +154,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          FILES=$(find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \))
-          gh release create "v${VERSION}" \
-            --title "v${VERSION}" \
-            --prerelease \
-            $FILES
+          gh release create "v${VERSION}" --title "v${VERSION}" --prerelease
+          find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \) \
+            -exec gh release upload "v${VERSION}" {} +
