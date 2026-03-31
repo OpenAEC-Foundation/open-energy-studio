@@ -9,9 +9,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -81,7 +78,7 @@ jobs:
 
       - name: Sign Windows exe and installer with Azure Trusted Signing
         if: matrix.platform == 'windows-latest'
-        uses: azure/trusted-signing-action@v0.5.0
+        uses: azure/trusted-signing-action@v1
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -145,14 +142,14 @@ jobs:
         run: find artifacts -type f
 
       - name: Create release and upload assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
-          draft: false
-          prerelease: true
-          files: |
-            artifacts/**/*.exe
-            artifacts/**/*.deb
-            artifacts/**/*.AppImage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --prerelease \
+            artifacts/**/*.exe \
+            artifacts/**/*.deb \
+            artifacts/**/*.AppImage \
             artifacts/**/*.dmg
