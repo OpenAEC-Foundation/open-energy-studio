@@ -96,6 +96,7 @@ jobs:
           files-folder: src-tauri/target/release
           files-folder-filter: exe
           files-folder-depth: 4
+          cache-dependencies: false
 
       - name: Upload artifacts (Windows)
         if: matrix.platform == 'windows-latest'
