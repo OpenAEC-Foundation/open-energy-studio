@@ -1,6 +1,6 @@
 [package]
 name = "open-energy-studio"
-version = "0.1.5-alpha"
+version = "0.1.6-alpha"
 description = "BENG calculator for building energy performance according to NTA 8800"
 authors = ["Open Energy Studio Contributors"]
 license = "LGPL-3.0-or-later"
