@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useDocumentManager } from '../../context/EnergyContext';
 import { SettingsDialog } from '../SettingsDialog/SettingsDialog';
+import { FeedbackDialog } from '../dialogs/FeedbackDialog/FeedbackDialog';
 import { version } from '../../../package.json';
 import './TitleBar.css';
 
@@ -51,6 +52,7 @@ export function TitleBar({ onNewProject, onOpenProject, onSaveProject }: TitleBa
   const isDirty = activeDoc?.state.isDirty ?? false;
   const [maximized, setMaximized] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -133,6 +135,9 @@ export function TitleBar({ onNewProject, onOpenProject, onSaveProject }: TitleBa
         </div>
 
         <div className="window-controls">
+          <button className="send-feedback-btn" onClick={() => setFeedbackOpen(true)}>
+            {t('feedback.sendFeedback')}
+          </button>
           <button className="window-btn" title="Minimize" onClick={minimizeWindow}>
             <svg width="10" height="1" viewBox="0 0 10 1">
               <rect width="10" height="1" fill="currentColor" />
@@ -160,6 +165,7 @@ export function TitleBar({ onNewProject, onOpenProject, onSaveProject }: TitleBa
       </div>
 
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {feedbackOpen && <FeedbackDialog onClose={() => setFeedbackOpen(false)} />}
     </>
   );
 }

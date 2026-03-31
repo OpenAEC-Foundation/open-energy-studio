@@ -113,6 +113,27 @@
   font-size: 13px;
 }
 
+/* ── Send Feedback ── */
+.send-feedback-btn {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--titlebar-text-secondary, #A1A1AA);
+  cursor: pointer;
+  padding: 0 8px;
+  margin-inline-end: 4px;
+  font-family: inherit;
+  -webkit-app-region: no-drag;
+  transition: color 0.15s;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.send-feedback-btn:hover {
+  color: var(--accent, #D97706);
+}
+
 /* ── Window Controls ── */
 .window-controls {
   display: flex;
