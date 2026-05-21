@@ -98,6 +98,13 @@ Verification:
 
 ### Step 7 — Delete `src/core/` and `EnergyContext`; verify build
 
+**Update 2026-05-21:** Step 7 is deferred to the END of Phase B. Reasoning:
+deleting `src/core/` + `EnergyContext` mid-Phase-A would break the `/legacy`
+route, which is the only place users can still do real work until Phase B
+builds the real input UI on the new substrate. By keeping legacy reachable
+through Phase B we always have a working app at HEAD. Step 7's actual cleanup
+(below) executes after Phase B success criteria are met.
+
 Deliverables:
 - All `src/core/energy/*` deleted
 - `src/core/io/ProjectSerializer.ts` deleted (replaced by Rust commands)
