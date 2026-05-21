@@ -45,13 +45,20 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": [
+      "WebView2Loader.dll"
+    ],
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico"
       },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      }
     }
   }
 }

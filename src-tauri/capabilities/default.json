@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the main window",
+  "description": "Default capabilities for the Open Energy Studio main window: window controls, dialogs (open/save/message), filesystem access for project files, and structured logging.",
   "windows": [
     "main"
   ],
@@ -18,11 +18,24 @@
     "core:window:allow-start-dragging",
     "core:window:allow-set-focus",
     "core:webview:default",
+    "core:event:default",
+    "core:path:default",
+    "core:app:default",
+
     "dialog:default",
     "dialog:allow-save",
     "dialog:allow-open",
+    "dialog:allow-message",
+
     "fs:default",
     "fs:allow-write-text-file",
-    "fs:allow-read-text-file"
+    "fs:allow-read-text-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
+    "fs:scope-app",
+    "fs:scope-document",
+
+    "log:default"
   ]
 }
