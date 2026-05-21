@@ -11,6 +11,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "bump": "node scripts/bump-version.js",
+    "generate-types": "node scripts/generate-types.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
