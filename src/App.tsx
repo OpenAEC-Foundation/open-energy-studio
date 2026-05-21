@@ -437,11 +437,20 @@ function AppContent() {
   );
 }
 
+// React Router is wired here in Step A.4 as a non-invasive wrapper: every
+// route still renders the existing AppContent. Step A.6 will split this into
+// per-page routes (ProjectSetup, Zones, Constructions, Systems, Results, …).
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
 export default function App() {
   return (
     <I18nProvider>
       <EnergyProvider>
-        <AppContent />
+        <BrowserRouter>
+          <Routes>
+            <Route path="*" element={<AppContent />} />
+          </Routes>
+        </BrowserRouter>
       </EnergyProvider>
     </I18nProvider>
   );
