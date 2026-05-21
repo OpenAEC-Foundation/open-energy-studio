@@ -1,0 +1,4 @@
+[submodule "vendor/crates-warehouse"]
+	path = vendor/crates-warehouse
+	url = https://github.com/OpenAEC-Foundation/crates-warehouse.git
+	branch = main

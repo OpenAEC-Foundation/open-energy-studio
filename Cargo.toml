@@ -1,0 +1,27 @@
+# Root Cargo workspace for open-energy-studio.
+#
+# Only `src-tauri` is a member here. The `vendor/crates-warehouse` git submodule
+# carries its own workspace declaration; we explicitly exclude it so cargo does
+# not try to merge the two. Path dependencies from `src-tauri/Cargo.toml` reach
+# into the submodule directly.
+
+[workspace]
+resolver = "2"
+members = ["src-tauri"]
+exclude = ["vendor/crates-warehouse"]
+
+[workspace.package]
+edition = "2021"
+license = "LGPL-3.0-or-later"
+repository = "https://github.com/OpenAEC-Foundation/open-energy-studio"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[profile.dev]
+# Faster incremental builds while developing across the workspace.
+codegen-units = 256

@@ -7,8 +7,10 @@ dist/
 # Vite
 .vite/
 
-# Tauri (Rust build artifacts)
+# Rust / Cargo build artifacts
+target/
 src-tauri/target/
+vendor/crates-warehouse/target/
 
 # Environment / local overrides
 *.local
@@ -34,3 +36,4 @@ temp/
 # Logs
 *.log
 npm-debug.log*
+PROMPTS.md
