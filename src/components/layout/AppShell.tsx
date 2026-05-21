@@ -8,6 +8,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { HeaderBar } from './HeaderBar';
 import './AppShell.css';
 
 const NAV_ITEMS: Array<{ to: string; key: string; label: string }> = [
@@ -49,9 +50,12 @@ export function AppShell() {
           </NavLink>
         </footer>
       </aside>
-      <main className="oes-shell__main">
-        <Outlet />
-      </main>
+      <div className="oes-shell__content">
+        <HeaderBar />
+        <main className="oes-shell__main">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

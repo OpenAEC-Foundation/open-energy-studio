@@ -41,6 +41,7 @@ interface ProjectState {
   reset: () => void;
 
   // ── async ───────────────────────────────────────────────────────────
+  newProject: (name?: string) => Promise<void>;
   loadProject: (path: string) => Promise<void>;
   saveProject: (path?: string) => Promise<void>;
   calculate: () => Promise<void>;
@@ -128,6 +129,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }),
 
   reset: () => set({ ...initial }),
+
+  newProject: async (name = 'Nieuw project') => {
+    set({ isLoading: true, error: null });
+    try {
+      const project = await backend.newProject(name);
+      set({
+        project,
+        result: null,
+        filePath: null,
+        isDirty: true,
+        past: [],
+        future: [],
+        isLoading: false,
+      });
+    } catch (err) {
+      set({ error: backend.toAppError(err), isLoading: false });
+    }
+  },
 
   loadProject: async (path) => {
     set({ isLoading: true, error: null });

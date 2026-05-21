@@ -63,6 +63,13 @@ impl ProjectEnvelope {
     }
 }
 
+/// Create an empty `ProjectV2` with the given name. Phase B's "New project"
+/// action calls this so the default shape lives in Rust alongside the schema.
+#[tauri::command]
+pub fn new_project(name: String) -> ProjectV2 {
+    ProjectV2::new(name)
+}
+
 /// Load a project from disk.
 ///
 /// If `schema_version` is missing or starts with `"1"`, the file is treated as

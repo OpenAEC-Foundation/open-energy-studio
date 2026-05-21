@@ -80,9 +80,16 @@
   color: var(--oes-fg, #e6e9ee);
 }
 
+.oes-shell__content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 .oes-shell__main {
   overflow: auto;
   padding: 24px 32px;
+  flex: 1;
 }
 
 [data-theme='light'] .oes-shell {

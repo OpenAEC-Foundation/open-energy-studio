@@ -40,6 +40,10 @@ export async function calculate(project: ProjectV2): Promise<ProjectResult> {
 
 // ── project I/O ──────────────────────────────────────────────────────────
 
+export async function newProject(name: string): Promise<ProjectV2> {
+  return invoke<ProjectV2>('new_project', { name });
+}
+
 export async function loadProject(path: string): Promise<ProjectV2> {
   return invoke<ProjectV2>('load_project', { path });
 }

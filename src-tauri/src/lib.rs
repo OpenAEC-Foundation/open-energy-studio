@@ -19,6 +19,7 @@ pub fn run() {
             // calculation
             commands::calculate::calculate,
             // project I/O
+            commands::project::new_project,
             commands::project::load_project,
             commands::project::save_project,
             commands::project::migrate_legacy,
