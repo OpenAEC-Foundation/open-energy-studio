@@ -1,5 +1,6 @@
 /* Ribbon Container */
 .ribbon-container {
+  position: relative;
   background: var(--theme-bg);
   border-bottom: none;
   flex-shrink: 0;
@@ -10,6 +11,19 @@
   -moz-osx-font-smoothing: grayscale;
   text-rendering: geometricPrecision;
   transform: translateZ(0);
+}
+
+/* Brand accent strip — 2px gradient between titlebar and tabs.
+   Mirrors the OpenAEC v2 wordmark's top edge. */
+.ribbon-container::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #D97706 0%, #F59E0B 40%, #EA580C 100%);
+  pointer-events: none;
 }
 
 /* Ribbon Tabs */

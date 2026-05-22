@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isTauri } from "../lib/backend";
+import { BrandSymbol } from "./BrandSymbol";
 import "./TitleBar.css";
 
 interface TitleBarProps {
@@ -95,18 +96,7 @@ function TitleBar({ onSettingsClick }: TitleBarProps) {
 
       <div className="titlebar-left">
         <div className="titlebar-icon">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--theme-accent)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" />
-          </svg>
+          <BrandSymbol size={18} />
         </div>
 
         <div className="titlebar-quick-access">

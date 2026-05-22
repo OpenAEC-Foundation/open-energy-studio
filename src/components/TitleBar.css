@@ -36,15 +36,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   color: var(--theme-accent);
 }
 
 .titlebar-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: auto;
 }
 
 .titlebar-title {
