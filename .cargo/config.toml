@@ -1,0 +1,11 @@
+# Cargo build configuration.
+#
+# Only the GNU Windows target is overridden: the default `ld.exe` (binutils)
+# overflows on the `windows` crate's auto-generated bindings ("export ordinal
+# too large"). LLD handles them fine. WinLibs LLVM ships `ld.lld.exe`.
+#
+# Untouched on the MSVC target (CI default) — release builds keep using
+# `link.exe` exactly as before.
+
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]

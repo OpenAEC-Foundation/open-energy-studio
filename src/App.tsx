@@ -437,41 +437,12 @@ function AppContent() {
   );
 }
 
-// Phase A.6 — split into router-driven page flow. Legacy AppContent is still
-// reachable at /legacy for transitional QA; Step A.7 deletes it.
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AppShell } from './components/layout/AppShell';
-import ProjectSetup from './pages/ProjectSetup';
-import Zones from './pages/Zones';
-import Constructions from './pages/Constructions';
-import Systems from './pages/Systems';
-import Results from './pages/Results';
-import Verify from './pages/Verify';
-
 export default function App() {
   return (
     <I18nProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<Navigate to="/project" replace />} />
-            <Route path="project" element={<ProjectSetup />} />
-            <Route path="zones" element={<Zones />} />
-            <Route path="constructions" element={<Constructions />} />
-            <Route path="systems" element={<Systems />} />
-            <Route path="results" element={<Results />} />
-            <Route path="verify" element={<Verify />} />
-          </Route>
-          <Route
-            path="/legacy/*"
-            element={
-              <EnergyProvider>
-                <AppContent />
-              </EnergyProvider>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+      <EnergyProvider>
+        <AppContent />
+      </EnergyProvider>
     </I18nProvider>
   );
 }

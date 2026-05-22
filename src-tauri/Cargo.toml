@@ -11,7 +11,10 @@ default-run = "open-energy-studio"
 
 [lib]
 name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# LOCAL EDIT (not for commit): cdylib + staticlib drop us into the 64k PE
+# export-table limit on the GNU/lld toolchain (the `windows` crate generates
+# 116k symbols). MSVC release builds need them restored for mobile/C interop.
+crate-type = ["rlib"]
 
 [[bin]]
 name = "open-energy-studio"
