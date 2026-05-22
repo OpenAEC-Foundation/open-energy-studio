@@ -1,104 +1,173 @@
-/* ── Ribbon Container ── */
+/* Ribbon Container */
 .ribbon-container {
-  background: linear-gradient(to bottom, var(--ribbon-bg-start) 0%, var(--ribbon-bg-end) 100%);
-  border-bottom: 1px solid var(--ribbon-border);
+  background: var(--theme-bg);
+  border-bottom: none;
   flex-shrink: 0;
   user-select: none;
   cursor: default;
+  margin-top: 32px; /* titlebar height */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  transform: translateZ(0);
 }
 
-/* ── Tabs Bar ── */
+/* Ribbon Tabs */
 .ribbon-tabs {
-  background: linear-gradient(to bottom, var(--ribbon-tabs-bg-start) 0%, var(--ribbon-tabs-bg-end) 100%);
-  border-bottom: 1px solid var(--ribbon-border);
+  background: var(--theme-bg-lighter);
+  border-bottom: 1px solid var(--theme-accent);
   display: flex;
   padding: 0 8px;
   gap: 2px;
   height: 28px;
   align-items: flex-end;
+  position: relative;
+  overflow: visible;
+}
+
+/* Animated border that slides between tabs */
+.ribbon-tab-border {
+  position: absolute;
+  border: 1px solid var(--theme-accent);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Gap that covers the amber bottom line under the active tab */
+.ribbon-tab-gap {
+  position: absolute;
+  bottom: -1px;
+  height: 2px;
+  background: var(--theme-bg);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .ribbon-tab {
-  padding: 5px 16px;
+  padding: 6px 16px;
   font-size: 12px;
   background: transparent;
   border: 1px solid transparent;
-  border-bottom: none;
-  color: var(--ribbon-text);
+  border-bottom: 1px solid transparent;
+  color: var(--theme-text);
   font-weight: 500;
   border-radius: 4px 4px 0 0;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-}
-
-.ribbon-tab:hover {
-  background: var(--ribbon-tab-hover);
-  color: var(--ribbon-text-hover);
-}
-
-.ribbon-tab.active {
-  background: var(--ribbon-tab-active-bg);
-  color: var(--ribbon-text-hover);
-  border-color: var(--ribbon-tab-active-border);
-  border-bottom: 1px solid var(--ribbon-tab-active-bg);
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+  box-shadow: none;
   margin-bottom: -1px;
 }
 
+.ribbon-tab:hover {
+  background: var(--theme-ribbon-btn-hover);
+  color: var(--theme-accent);
+}
+
+.ribbon-tab.active {
+  background: var(--theme-bg);
+  color: var(--theme-accent);
+  border-color: transparent;
+}
+
 .ribbon-tab.file-tab {
-  background: var(--ribbon-file-tab-bg);
-  color: var(--ribbon-file-tab-text);
+  background: var(--theme-file-tab-bg);
+  color: var(--theme-file-tab-text);
   font-weight: 600;
-  border-color: var(--ribbon-file-tab-bg);
+  border-color: var(--theme-file-tab-bg);
 }
 
 .ribbon-tab.file-tab:hover {
-  background: var(--ribbon-file-tab-hover);
-  color: var(--ribbon-file-tab-text);
+  background: var(--theme-file-tab-hover);
+  color: var(--theme-file-tab-text);
+  border-color: var(--theme-file-tab-hover);
 }
 
-/* ── Ribbon Content Area ── */
-.ribbon-content {
-  background: var(--ribbon-content-bg);
+/* Ribbon Content */
+.ribbon-content-wrapper {
+  position: relative;
+  height: 94px;
+  overflow: hidden;
+  background: var(--theme-bg);
+}
+
+.ribbon-content-panel {
+  position: absolute;
+  inset: 0;
   padding: 4px 8px 0 2px;
   display: flex;
   align-items: stretch;
-  height: 94px;
+}
+
+.ribbon-content-panel .ribbon-content {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  width: 100%;
+}
+
+/* Enter from right */
+.ribbon-panel-enter-right {
+  animation: slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Enter from left */
+.ribbon-panel-enter-left {
+  animation: slideInLeft 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Exit to left */
+.ribbon-panel-exit-right {
+  animation: slideOutLeft 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Exit to right */
+.ribbon-panel-exit-left {
+  animation: slideOutRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-40px); opacity: 0; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(40px); opacity: 0; }
 }
 
 .ribbon-groups {
   display: flex;
-  gap: 2px;
+  gap: 0;
   align-items: stretch;
   height: 100%;
 }
 
-/* ── Groups ── */
+/* Ribbon Group */
 .ribbon-group {
   display: flex;
   flex-direction: column;
   padding: 0 8px;
-  border-inline-end: 1px solid var(--ribbon-group-border);
+  border-right: 1px solid var(--theme-ribbon-group-separator);
   min-width: 50px;
   height: 100%;
-  margin-inline-end: 8px;
 }
 
 .ribbon-group:last-child {
-  border-inline-end: none;
-  margin-inline-end: 0;
-}
-
-.ribbon-group-label {
-  font-size: 9px;
-  color: var(--ribbon-group-label);
-  text-align: center;
-  font-weight: 500;
-  padding: 2px 0;
-  margin-top: auto;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  border-right: none;
 }
 
 .ribbon-group-content {
@@ -109,7 +178,29 @@
   padding: 1px 0;
 }
 
-/* ── Buttons ── */
+.ribbon-group-label {
+  font-size: 9px;
+  color: var(--theme-ribbon-group-label);
+  text-align: center;
+  font-weight: 500;
+  padding: 2px 0;
+  margin-top: auto;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-top: 1px solid var(--theme-border-subtle);
+}
+
+/* Button Stack */
+.ribbon-btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: 100%;
+  justify-content: flex-start;
+}
+
+/* Ribbon Buttons - Large (default) */
 .ribbon-btn {
   display: flex;
   flex-direction: column;
@@ -119,34 +210,32 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
-  cursor: pointer;
+  cursor: default;
   transition: all 0.15s ease;
   min-width: 44px;
   gap: 1px;
   height: 66px;
-  color: var(--ribbon-text);
+  box-shadow: none;
+  color: var(--theme-text);
 }
 
 .ribbon-btn:hover {
-  background: var(--ribbon-btn-hover);
-  border-color: var(--ribbon-btn-hover-border);
-  color: var(--ribbon-text-hover);
+  background: var(--theme-ribbon-btn-hover);
+  border-color: var(--theme-ribbon-btn-hover-border);
+}
+
+.ribbon-btn.active {
+  background: var(--theme-ribbon-btn-active-bg);
+  border-color: var(--theme-ribbon-btn-active-border);
 }
 
 .ribbon-btn:active {
-  background: var(--ribbon-btn-active-bg);
+  background: var(--theme-ribbon-btn-hover);
 }
 
 .ribbon-btn:disabled {
   opacity: 0.4;
   pointer-events: none;
-}
-
-.ribbon-btn.active,
-.ribbon-btn-active {
-  background: var(--ribbon-btn-active-bg);
-  border-color: var(--ribbon-btn-active-border);
-  color: var(--ribbon-btn-active-text);
 }
 
 .ribbon-btn-icon {
@@ -159,20 +248,23 @@
 }
 
 .ribbon-btn-icon svg {
-  stroke: var(--ribbon-icon-stroke);
+  width: 24px;
+  height: 24px;
+  stroke: var(--theme-text);
+  shape-rendering: geometricPrecision;
 }
 
 .ribbon-btn:hover .ribbon-btn-icon svg {
-  stroke: var(--ribbon-text-hover);
+  stroke: var(--theme-accent);
 }
 
 .ribbon-btn.active .ribbon-btn-icon svg {
-  stroke: var(--ribbon-btn-active-text);
+  stroke: var(--theme-ribbon-icon-active);
 }
 
 .ribbon-btn-label {
   font-size: 10px;
-  color: inherit;
+  color: var(--theme-text);
   text-align: center;
   line-height: 1.15;
   max-width: 58px;
@@ -183,12 +275,21 @@
   word-break: break-word;
 }
 
-/* Small buttons (stacked) */
+.ribbon-btn:hover .ribbon-btn-label {
+  color: var(--theme-accent);
+}
+
+.ribbon-btn.active .ribbon-btn-label {
+  color: var(--theme-ribbon-btn-active-text);
+  font-weight: 500;
+}
+
+/* Small ribbon buttons */
 .ribbon-btn.small {
   flex-direction: row;
   min-width: 70px;
   height: 22px;
-  padding: 2px 8px 2px 4px;
+  padding: 2px 6px;
   gap: 6px;
   justify-content: flex-start;
   border-radius: 1px;
@@ -199,151 +300,42 @@
   height: 16px;
 }
 
+.ribbon-btn.small .ribbon-btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .ribbon-btn.small .ribbon-btn-label {
+  font-size: 11px;
+  text-align: left;
   max-width: none;
-  -webkit-line-clamp: 1;
+  white-space: nowrap;
 }
 
-/* Button stack */
-.ribbon-btn-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  height: 100%;
-  justify-content: flex-start;
-}
-
-/* ── Accent button ── */
-.ribbon-btn-accent {
-  color: var(--accent);
-}
-
-.ribbon-btn-accent:hover {
-  color: var(--accent-hover);
-  background: var(--accent-subtle);
-  border-color: var(--border-accent);
-}
-
-.ribbon-btn-accent .ribbon-btn-icon svg {
-  stroke: var(--accent);
-}
-
-.ribbon-btn-accent:hover .ribbon-btn-icon svg {
-  stroke: var(--accent-hover);
-}
-
-/* ── Text icon (language selector) ── */
-.ribbon-btn-text-icon {
-  font-size: 14px;
-  font-weight: 700;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ── Theme Picker ── */
-.ribbon-input-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-}
-
-.ribbon-input-label {
-  font-size: 9px;
-  color: var(--ribbon-group-label);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 2px;
-}
-
-.theme-picker {
-  position: relative;
-  display: inline-block;
-}
-
-.theme-picker-toggle {
-  display: flex;
-  align-items: center;
+/* Medium ribbon buttons */
+.ribbon-btn.medium {
+  flex-direction: row;
+  min-width: 70px;
+  height: 33px;
+  padding: 2px 6px;
   gap: 6px;
-  padding: 3px 8px;
-  border: 1px solid var(--ribbon-input-border);
-  background: var(--ribbon-input-bg);
-  color: var(--ribbon-input-text);
+  justify-content: flex-start;
+  border-radius: 1px;
+}
+
+.ribbon-btn.medium .ribbon-btn-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ribbon-btn.medium .ribbon-btn-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ribbon-btn.medium .ribbon-btn-label {
   font-size: 11px;
-  cursor: pointer;
-  min-width: 130px;
-  border-radius: 2px;
-  transition: border-color 0.15s ease;
-}
-
-.theme-picker-toggle:hover {
-  border-color: var(--ribbon-btn-hover-border);
-}
-
-.theme-picker-toggle svg {
-  margin-inline-start: auto;
-  opacity: 0.6;
-}
-
-.theme-picker-swatches,
-.theme-picker-option-swatches {
-  display: flex;
-  gap: 2px;
-}
-
-.theme-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-}
-
-.theme-picker-label {
-  flex: 1;
-}
-
-.theme-picker-dropdown {
-  display: none;
-  position: absolute;
-  top: 100%;
-  inset-inline-start: 0;
-  z-index: 1000;
-  min-width: 170px;
-  border: 1px solid var(--ribbon-input-border);
-  background: var(--ribbon-input-bg);
-  padding: 2px 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border-radius: 2px;
-}
-
-.theme-picker-dropdown.open {
-  display: block;
-}
-
-.theme-picker-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  cursor: pointer;
-  color: var(--ribbon-input-text);
-  font-size: 11px;
-  transition: background 0.1s ease;
-}
-
-.theme-picker-option:hover {
-  background: var(--ribbon-btn-hover);
-}
-
-.theme-picker-option.selected {
-  background: var(--ribbon-btn-active-bg);
-  color: var(--ribbon-btn-active-text);
-}
-
-.theme-picker-option-label {
-  flex: 1;
+  text-align: left;
+  max-width: none;
+  white-space: nowrap;
 }

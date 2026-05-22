@@ -3,18 +3,11 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Apply stored theme before first render to prevent flash
+// Apply stored theme before first render to prevent flash. `themes.css` exposes
+// "light" (Construction Amber on Deep Forge) and "openaec" (Dark Surface).
 {
-  let stored = localStorage.getItem('energy-theme') || 'dark';
-  // Migrate removed themes to dark
-  if (stored === 'blue' || stored === 'openaec') {
-    stored = 'dark';
-    localStorage.setItem('energy-theme', 'dark');
-  }
-  const effective = stored === 'system'
-    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : stored;
-  document.documentElement.dataset.theme = effective;
+  const stored = localStorage.getItem('oes-theme') || 'openaec';
+  document.documentElement.dataset.theme = stored === 'light' ? 'light' : 'openaec';
 }
 
 // Disable browser context menu in production
