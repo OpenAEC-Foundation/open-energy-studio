@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -128,32 +128,3 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
           retention-days: 30
           if-no-files-found: ignore
-
-  release:
-    needs: [test, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Get version from package.json
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-
-      - name: List downloaded files
-        run: find artifacts -type f
-
-      - name: Create release and upload assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          gh release create "v${VERSION}" --title "v${VERSION}" --prerelease
-          find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \) \
-            -exec gh release upload "v${VERSION}" {} +
