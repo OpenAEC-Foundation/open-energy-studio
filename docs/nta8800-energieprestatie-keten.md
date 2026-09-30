@@ -73,3 +73,39 @@ Dit is een rekenkundige consistentiecontrole, geen referentiegeval.
 ## Aanroep
 
 HTTP: `POST /v1/nta8800/performance/calculate`. MCP en desktop: `calculate_building_performance`. TS: `calculateBuildingPerformanceWithRust`.
+
+## Projectadapter en UI
+
+Module `project_performance` leidt de volledige invoer af uit een `.oes`-project met één rekenzone:
+
+- Uit het project zelf komen:
+  - vlakken met thermische begrenzing en oriëntatie;
+  - ramen (oppervlakte, U, g);
+  - constructie-U;
+  - lineaire en puntkoudebruggen;
+  - onverwarmde ruimtes met b-factor.
+- Uit het strikte blok `ntaCalculation` (onbekende velden worden geweigerd) komen alle gegevens die het oude model niet bevat, elk met bron:
+  - rekenscope en oppervlaktebron, setpoints, massaklassen en interne winst;
+  - hellingen van dakvlakken, kozijnfractie en belemmering;
+  - perimeter en `R_si+R_c` van grondvloeren;
+  - maandelijkse ventilatiegeleiding;
+  - afgifte, distributie en opwekker;
+  - `f_BACS`, overige diensten, PV en de C1-bevestiging.
+
+Wat ontbreekt, verschijnt als invoergat (`gaps`) met code en pad. Een ongeldig blok geeft het exacte veldpad, bijvoorbeeld `ventilationFlows[0].months[3].conductanceWPerK`. Status `incomplete` (HTTP 422), `invalid` (422) of `calculated_unverified` (200). De afgeleide invoer wordt meegeleverd als `derivedInput`, zodat elke waarde herleidbaar is.
+
+Regels van de adapter:
+
+- Een gevel krijgt helling 90°. Een vlak met oriëntatie `horizontal` krijgt 0°. Voor een dakvlak met oriëntatie is een expliciete helling verplicht.
+- Iedere grondvloer moet een vermelding in `groundFloors` hebben.
+
+HTTP: `POST /v1/nta8800/project/performance` met `{ "project": ... }`. MCP en desktop: `calculate_project_performance`. TS: `calculateProjectPerformanceWithRust`.
+
+Het paneel **NTA 8800-berekening (Rust-kern)** staat op het project- en resultatenscherm. Het toont:
+
+- invoergaten of afwijzingen;
+- bij een volledige berekening BENG 1/2/3 met het label "Onverifieerd";
+- BENG 1 alleen met bevestigde C1-ventilatie;
+- jaartotalen, een maandtabel, de weggelaten correcties en de invoervingerafdruk.
+
+Via **NTA-invoer starten** opent een sjabloon. Daarin zijn alleen normvaste waarden ingevuld, zoals 20/24 °C voor woningbouw en de kolom van tabel 7.10. Projectspecifieke waarden staan op `null` en alle bronvermeldingen zijn leeg, zodat de rekenkern een invoergat blijft melden tot alles is ingevuld en onderbouwd. `training-data/nta8800-project-performance-synthetic.json` is een volledig synthetisch project. Het levert via de devserverproxy BENG 2 = 11,09 en BENG 3 = 77,7% op; dat is een consistentiecontrole, geen referentiegeval.

@@ -2,6 +2,7 @@ import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { Building2, Layers, Thermometer, Wind, Zap } from 'lucide-react';
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
+import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInventoryPanel';
 import { UnheatedSpacesPanel } from '../UnheatedSpacesPanel/UnheatedSpacesPanel';
 import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainReferencePanel';
@@ -28,6 +29,7 @@ export function ProjectView() {
       </div>
 
       <KernelAuditPanel project={project} />
+      <NtaPerformancePanel />
       <UnheatedSpacesPanel />
       <HeatPumpInventoryPanel />
       <GasChainReferencePanel />

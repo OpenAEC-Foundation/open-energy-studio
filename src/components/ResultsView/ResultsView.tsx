@@ -5,6 +5,7 @@ import { EnergyBreakdownChart } from '../EnergyBreakdownChart/EnergyBreakdownCha
 import { MonthlyBreakdownChart } from '../MonthlyBreakdownChart/MonthlyBreakdownChart';
 import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
+import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import type { IBENGResultMonthly } from '../../core/energy/types';
 import './ResultsView.css';
 
@@ -59,6 +60,7 @@ export function ResultsView() {
 
       <CalculationNotice />
       <KernelAuditPanel project={project} />
+      <NtaPerformancePanel />
 
       <div className="beng-cards">
         <BENGIndicator

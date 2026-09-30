@@ -90,6 +90,8 @@ pub struct GroundFloorData {
 pub struct InputGap {
     pub code: &'static str,
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -109,6 +111,7 @@ fn gap(code: &'static str, path: impl Into<String>) -> InputGap {
     InputGap {
         code,
         path: path.into(),
+        detail: None,
     }
 }
 
@@ -167,13 +170,18 @@ fn derive_input(
             gaps.push(gap("nta_calculation_block_missing", "ntaCalculation"));
             None
         }
-        Some(value) => match serde_json::from_value(value.clone()) {
-            Ok(block) => Some(block),
-            Err(_) => {
-                gaps.push(gap("nta_calculation_block_invalid", "ntaCalculation"));
-                None
+        Some(value) => {
+            match serde_path_to_error::deserialize::<_, NtaCalculationInput>(value.clone()) {
+                Ok(block) => Some(block),
+                Err(error) => {
+                    gaps.push(InputGap {
+                        detail: Some(error.to_string()),
+                        ..gap("nta_calculation_block_invalid", "ntaCalculation")
+                    });
+                    None
+                }
             }
-        },
+        }
     };
     if project.zones.len() != 1 {
         gaps.push(gap("single_zone_required", "zones"));
@@ -466,9 +474,24 @@ mod tests {
         let mut value = project();
         value["ntaCalculation"]["heatingSetpoint"] = serde_json::json!(21.0);
         let result = assess_project_performance(&value);
-        assert!(result
+        let gap = result
             .gaps
             .iter()
-            .any(|item| item.code == "nta_calculation_block_invalid"));
+            .find(|item| item.code == "nta_calculation_block_invalid")
+            .unwrap();
+        assert!(gap.detail.as_deref().unwrap().contains("heatingSetpoint"));
+    }
+
+    #[test]
+    fn block_errors_name_the_exact_field() {
+        let mut value = project();
+        value["ntaCalculation"]["ventilationFlows"][0]["months"][3]["conductanceWPerK"] =
+            Value::Null;
+        let result = assess_project_performance(&value);
+        let detail = result.gaps[0].detail.as_deref().unwrap();
+        assert!(
+            detail.contains("ventilationFlows[0].months[3].conductanceWPerK"),
+            "{detail}"
+        );
     }
 }

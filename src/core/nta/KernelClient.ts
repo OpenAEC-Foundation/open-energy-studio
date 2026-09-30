@@ -1405,7 +1405,7 @@ export interface ProjectPerformanceAssessment {
   status: 'calculated_unverified' | 'incomplete' | 'invalid';
   inputFingerprint: string;
   attestStatus: 'unattested';
-  gaps: Array<{ code: string; path: string }>;
+  gaps: Array<{ code: string; path: string; detail?: string }>;
   derivedInput: BuildingPerformanceInput | null;
   performance: BuildingPerformanceAssessment | null;
 }
