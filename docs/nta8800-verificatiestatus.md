@@ -1,5 +1,33 @@
 # NTA 8800 verificatiestatus — 29 september 2026
 
+## Stand 1 oktober 2026: rekenruggengraat
+
+Er is nu een doorgaande, **onverifieerde** Rust-keten voor één rekenzone, van project tot BENG 2/3. De onderdelen:
+
+- [maandbehoefte H7](nta8800-maandbehoefte.md), met transmissie uit H8 inclusief het P/A-grondmodel en klimaat volgens de volledige tabel 17.2;
+- [keten ruimteverwarming](nta8800-verwarmingsketen.md): afgifte 9.9–9.16, distributie via de nulroute of opgave, één ketel of forfaitaire warmtepomp;
+- PV volgens 16.2/16.3;
+- [primaire en hernieuwbare energie](nta8800-energieprestatie-keten.md) (5.9–5.39, tabellen 5.2/5.4);
+- een projectadapter met invoergaten en het UI-paneel "NTA 8800-berekening (Rust-kern)".
+
+Status bij de commit van 1 oktober: 182 kerntests, 45 servicetests en 215 UI-tests groen; clippy schoon. De projectroute is via de Vite-proxy tegen de draaiende API gecontroleerd.
+
+**Bronnen.** Hoofdstukken 7, 8, 16 en 17 zijn gebouwd op de transcripties van NTA 8800:2025+C1:2026 in de normanalyses van Open Heatloss Studio (de gelicentieerde pdf staat op netwerkshare `Z:`, die hier niet gemount is). Hoofdstukken 5 en 9 komen uit het openbare consultatieconcept 2026.
+
+**Open punten die certificering blokkeren:**
+
+1. Review van alle transcripties tegen de normtekst.
+2. Hoofdstuk 11: ventilatie en infiltratie, het C1-systeem voor BENG 1, tabellen 11.5/11.6.
+3. Hoofdstuk 13: tapwater.
+4. Hoofdstuk 10: koeling.
+5. Distributie volgens 9.26, knooppunt 9.2.3 en terugwinbare verliezen 9.2.5.
+6. Correcties `a_H;red` en 7.78.
+7. Meerdere zones en opwekkers.
+8. Labelgrenzen.
+9. EDR-testset met de uitkomsten uit bijlage 2.
+10. BRL 9501-attest.
+
+
 De [officiële wijzigingsregeling voor 2026](https://zoek.officielebekendmakingen.nl/stcrt-2026-18113.html) bevestigt ook open werk voor opslag, GACS, nieuwe labelindicatoren en zeer lage temperatuur bronnetten. Zij beschrijft extra rekentesten en een EDR-run bij iedere softwareversie. De [wijzigingsimpact](nta8800-2026-wijzigingen.md) voegt deze ontbrekende routes toe aan de vrijgaveplanning; de regeling zelf levert geen normformules of verwachte testwaarden.
 
 ## Huidige grens
