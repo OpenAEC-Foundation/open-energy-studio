@@ -37,6 +37,7 @@ pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
+pub mod pv;
 pub mod reference;
 pub mod space_heating_chain;
 pub mod unheated_transmission;
@@ -276,6 +277,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_chapter_7_monthly_heating_cooling_need_single_zone",
             "unverified_space_heating_chain_emission_distribution_single_generator",
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
+            "unverified_pv_yield_chapter_16",
         ],
     }
 }

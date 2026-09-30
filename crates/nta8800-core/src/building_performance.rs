@@ -18,6 +18,7 @@ use crate::indicators_draft::{
     assess_indicators_draft, AnnualScenario, CalculationScope, IndicatorsDraftAssessment,
     IndicatorsDraftInput, ScenarioKind,
 };
+use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_heating_chain::{
     assess_space_heating_chain, Generator, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
@@ -150,6 +151,9 @@ pub struct BuildingPerformanceInput {
     pub declared_renewable_heat: Vec<DeclaredRenewableHeat>,
     pub production_inventory_complete: bool,
     pub on_site_production: Vec<OnSiteProduction>,
+    /// PV systems calculated here with 16.2/16.3.
+    #[serde(default)]
+    pub pv_systems: Vec<PvSystem>,
     /// Confirms the demand input uses the fixed C1 ventilation system and
     /// fixed internal loads of §5.4.3; only then the need indicator is shown.
     pub demand_uses_fixed_c1_ventilation: bool,
@@ -306,6 +310,17 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 format!("{path}.sourceReference"),
             ));
         }
+    }
+    for (index, system) in input.pv_systems.iter().enumerate() {
+        let path = format!("pvSystems[{index}]");
+        if !ids.insert(system.id.as_str()) {
+            issues.push(issue("id_invalid", format!("{path}.id")));
+        }
+        issues.extend(
+            validate_pv(system, &path)
+                .into_iter()
+                .map(|item| issue(item.code, item.path)),
+        );
     }
     for (index, item) in input.on_site_production.iter().enumerate() {
         let path = format!("onSiteProduction[{index}]");
@@ -477,6 +492,7 @@ fn compute(
                 .as_ref()
                 .is_some_and(|evidence| evidence.source_below_20_c && !evidence.exhaust_air_source);
     let cop = heating.generation_efficiency.unwrap_or(0.0);
+    let pv_yields: Vec<[f64; 12]> = input.pv_systems.iter().map(monthly_yield_kwh).collect();
     for index in 0..12 {
         let month = (index + 1) as u8;
         let row = &heating.monthly[index];
@@ -503,7 +519,8 @@ fn compute(
             .on_site_production
             .iter()
             .map(|item| item.monthly_kwh[index])
-            .sum();
+            .sum::<f64>()
+            + pv_yields.iter().map(|yields| yields[index]).sum::<f64>();
         let self_used = produced.min(used_el);
         // 5.26 summed over producers.
         let exported = produced - self_used;
@@ -741,5 +758,34 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn calculated_pv_adds_to_declared_production() {
+        let mut sample = input();
+        let base = assess_building_performance(&sample);
+        sample.pv_systems.push(PvSystem {
+            id: "roof-pv".into(),
+            peak_power_kw: 3.0,
+            azimuth_deg: 180.0,
+            tilt_deg: 35.0,
+            performance_factor: 0.80,
+            shading_correction: 1.0,
+            obstruction_factor: 1.0,
+            source_reference: "datasheet".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let pv: f64 = monthly_yield_kwh(&sample.pv_systems[0]).iter().sum();
+        let delta = result.annual_renewable_primary_kwh.unwrap()
+            - base.annual_renewable_primary_kwh.unwrap();
+        assert!((delta - pv * 1.45).abs() < 1e-6);
+        let fossil_delta =
+            base.annual_primary_fossil_kwh.unwrap() - result.annual_primary_fossil_kwh.unwrap();
+        assert!((fossil_delta - pv * 1.45).abs() < 1e-6);
     }
 }

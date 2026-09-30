@@ -1319,6 +1319,16 @@ export interface BuildingPerformanceInput {
   declaredRenewableHeat?: Array<{ id: string; monthlyKwh: number[]; sourceReference: string }>;
   productionInventoryComplete: boolean;
   onSiteProduction: Array<{ id: string; kind: 'pv' | 'pvt' | 'wind'; monthlyKwh: number[]; sourceReference: string }>;
+  pvSystems?: Array<{
+    id: string;
+    peakPowerKw: number;
+    azimuthDeg: number;
+    tiltDeg: number;
+    performanceFactor: 0.76 | 0.8 | 0.82;
+    shadingCorrection: number;
+    obstructionFactor: number;
+    sourceReference: string;
+  }>;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }

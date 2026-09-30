@@ -25,6 +25,10 @@ Bron is het [openbare consultatieconcept van hoofdstuk 5](https://www.internetco
 
 Omdat de drie elektriciteitsfactoren gelijk zijn, is het netto resultaat maandonafhankelijk: `(E_EPus;el − E_PV)·1,45`. De test controleert zowel de maandroute als deze identiteit. `EPTot` mag negatief worden; er wordt niet afgekapt.
 
+## PV (hoofdstuk 16)
+
+Module `pv` rekent 16.3 `E_sol = I_sol·t·F_sh;obst/1000` en 16.2 `E_PV = E_sol·P_pk·f_perf·c_sh;PV·0,95/1`. Helling en oriëntatie werken alleen via `I_sol` uit tabel 17.2 (volledig, met interpolatie). De tabellen 16.1–16.3 zijn niet als waarden getranscribeerd. Daarom zijn `P_pk` (kW) en `c_sh;PV` (0,75–1) bronverplichte invoer, en is `f_perf` beperkt tot de in de analyse genoemde 0,76/0,80/0,82. PV kan via `pvSystems` worden berekend of via `onSiteProduction` worden opgegeven; beide tellen op. Een zuiddak van 30° geeft circa 900 kWh/kWp per jaar.
+
 ## Warmtepomp als hernieuwbare bron
 
 `Q_H;hp;in = Q_H;gen;out·(1 − 1/COP)` (5.31) telt alleen mee bij COP ≥ 1, een brontemperatuur onder 20 °C en geen afvoerlucht als bron. De aanroeper levert `heatPumpRenewable` met bron. Die opgave moet kloppen met de forfaitaire bronklasse:
