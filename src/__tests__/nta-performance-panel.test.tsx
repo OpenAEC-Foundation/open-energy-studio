@@ -46,7 +46,7 @@ describe('NTA performance panel', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/nta8800/project/performance', expect.anything());
     expect(panel.getByText('Unverified')).toBeInTheDocument();
 
-    await user.click(panel.getByRole('button', { name: 'Start NTA input' }));
+    await user.click(panel.getByRole('button', { name: 'Advanced (JSON)' }));
     const editor = panel.getByLabelText('NTA input block (JSON)') as HTMLTextAreaElement;
     const template = JSON.parse(editor.value);
     expect(template.calculationScope).toBe('residential');
@@ -122,5 +122,34 @@ describe('NTA performance panel', () => {
     expect(tojuli.queryByText('North-east')).not.toBeInTheDocument();
     expect(tojuli.getByText('does not meet')).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(13);
+  });
+  it('edits the NTA block through the structured form', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ status: 'incomplete', inputFingerprint: 'sha256:x', attestStatus: 'unattested',
+        gaps: [{ code: 'nta_calculation_block_missing', path: 'ntaCalculation' }], derivedInput: null, performance: null }),
+    }));
+    renderWithProviders(<Harness />);
+    const panel = within(await screen.findByRole('region', { name: 'NTA 8800 calculation (Rust kernel)' }));
+    await user.click(await panel.findByRole('button', { name: 'Start NTA input' }));
+    const form = within(panel.getByRole('form', { name: 'NTA input' }));
+    expect(form.getByLabelText('Heating setpoint °C')).toHaveValue(20);
+    await user.type(form.getByLabelText('Source of usable floor area'), 'floor plan A-01');
+    await user.type(form.getAllByLabelText('Source')[0], 'table 7.13');
+    await user.selectOptions(form.getByLabelText('Floors'), 'very_heavy');
+    await user.type(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'), '42');
+    await user.selectOptions(form.getByLabelText('Emission system'), 'floor_heating');
+    await user.click(form.getByLabelText('All energy uses are included'));
+    await user.click(form.getByRole('button', { name: 'Save' }));
+    const block = JSON.parse(screen.getByTestId('block').textContent ?? 'null');
+    expect(block.areaSourceReference).toBe('floor plan A-01');
+    expect(block.thermalMass.floor).toBe('very_heavy');
+    expect(block.ventilationFlows[0].months).toHaveLength(12);
+    expect(block.ventilationFlows[0].months.every((month: { conductanceWPerK: number }) => month.conductanceWPerK === 42)).toBe(true);
+    expect(block.emission.system).toBe('floor_heating');
+    expect(block.useInventoryComplete).toBe(true);
+    expect(block.setpoints.sourceReference).toBe('table 7.13');
+    expect(block.thermalMass.sourceReference).toBe('');
   });
 });

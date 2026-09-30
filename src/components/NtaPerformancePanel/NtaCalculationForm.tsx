@@ -1,0 +1,218 @@
+import { useState, type ReactNode } from 'react';
+import type { IProject } from '../../core/energy/types';
+import { useI18n } from '../../i18n/i18n';
+
+// The block is edited as plain JSON data; the Rust kernel is the validator.
+type Draft = Record<string, unknown>;
+type Path = Array<string | number>;
+
+function read(source: unknown, path: Path): unknown {
+  return path.reduce<unknown>((value, key) => (value == null ? undefined : (value as Record<string | number, unknown>)[key]), source);
+}
+
+function write(source: Draft, path: Path, value: unknown): Draft {
+  const clone = structuredClone(source) as Record<string | number, unknown>;
+  let cursor = clone;
+  path.slice(0, -1).forEach((key, index) => {
+    const next = cursor[key];
+    if (next == null || typeof next !== 'object') {
+      cursor[key] = typeof path[index + 1] === 'number' ? [] : {};
+    }
+    cursor = cursor[key] as Record<string | number, unknown>;
+  });
+  cursor[path[path.length - 1]] = value;
+  return clone as Draft;
+}
+
+interface FieldProps {
+  draft: Draft;
+  path: Path;
+  label: string;
+  onChange: (path: Path, value: unknown) => void;
+}
+
+function NumberField({ draft, path, label, onChange, step = 'any' }: FieldProps & { step?: string }) {
+  const value = read(draft, path);
+  return <label>{label}
+    <input type="number" step={step} value={typeof value === 'number' ? value : ''}
+      onChange={(event) => onChange(path, event.target.value === '' ? null : Number(event.target.value))} />
+  </label>;
+}
+
+function TextField({ draft, path, label, onChange }: FieldProps) {
+  const value = read(draft, path);
+  return <label>{label}
+    <input value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(path, event.target.value)} />
+  </label>;
+}
+
+function SelectField({ draft, path, label, onChange, options }: FieldProps & { options: Array<[string, string]> }) {
+  const value = read(draft, path);
+  return <label>{label}
+    <select value={value == null ? '' : String(value)} onChange={(event) => onChange(path, event.target.value || null)}>
+      <option value="">—</option>
+      {options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}
+    </select>
+  </label>;
+}
+
+function CheckField({ draft, path, label, onChange }: FieldProps) {
+  return <label className="nta-form-check">
+    <input type="checkbox" checked={read(draft, path) === true} onChange={(event) => onChange(path, event.target.checked)} />
+    {label}
+  </label>;
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return <fieldset className="nta-form-section"><legend>{title}</legend><div className="nta-form-grid">{children}</div></fieldset>;
+}
+
+export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
+  project: IProject;
+  initial: Draft;
+  onSave: (block: Draft) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState<Draft>(initial);
+  const change = (path: Path, value: unknown) => setDraft((current) => write(current, path, value));
+  const field = { draft, onChange: change };
+  const residential = read(draft, ['calculationScope']) === 'residential';
+  const surfaces = project.zones.flatMap((zone) => zone.surfaces);
+  const tilts = (read(draft, ['surfaceTilts']) as Draft[] | undefined) ?? [];
+  const ground = (read(draft, ['groundFloors']) as Draft[] | undefined) ?? [];
+  const pv = (read(draft, ['pvSystems']) as Draft[] | undefined) ?? [];
+  const generatorKind = read(draft, ['generator', 'kind']);
+  const months = (read(draft, ['ventilationFlows', 0, 'months']) as Draft[] | undefined) ?? [];
+  const constantConductance = months.length === 12 && months.every((month) => month.conductanceWPerK === months[0].conductanceWPerK)
+    ? months[0].conductanceWPerK : null;
+  const surfaceName = (id: unknown) => surfaces.find((surface) => surface.id === id)?.name || String(id);
+  const setConstantVentilation = (value: number | null) => change(['ventilationFlows', 0, 'months'],
+    Array.from({ length: 12 }, (_, index) => ({ ...(months[index] ?? {}), month: index + 1, conductanceWPerK: value })));
+
+  return <form className="nta-form" aria-label={t('nta.form.title')} onSubmit={(event) => { event.preventDefault(); onSave(draft); }}>
+    <p>{t('nta.form.help')}</p>
+    <Section title={t('nta.form.general')}>
+      <SelectField {...field} path={['calculationScope']} label={t('nta.form.scope')}
+        options={[['residential', t('nta.form.scope.residential')], ['utility', t('nta.form.scope.utility')]]} />
+      <TextField {...field} path={['areaSourceReference']} label={t('nta.form.areaSource')} />
+      <SelectField {...field} path={['bblFunction']} label={t('nta.form.bblFunction')} options={[
+        ['other_residential', t('nta.form.bbl.other_residential')], ['residential_building', t('nta.form.bbl.residential_building')],
+        ['office', t('nta.form.bbl.office')], ['education', t('nta.form.bbl.education')], ['retail', t('nta.form.bbl.retail')],
+        ['other_assembly', t('nta.form.bbl.other_assembly')], ['other_healthcare', t('nta.form.bbl.other_healthcare')],
+        ['sport', t('nta.form.bbl.sport')], ['other_lodging', t('nta.form.bbl.other_lodging')],
+      ]} />
+      <CheckField {...field} path={['activeCoolingPresent']} label={t('nta.form.activeCooling')} />
+    </Section>
+    <Section title={t('nta.form.setpoints')}>
+      <NumberField {...field} path={['setpoints', 'heatingC']} label={t('nta.form.heatingSetpoint')} />
+      <NumberField {...field} path={['setpoints', 'coolingC']} label={t('nta.form.coolingSetpoint')} />
+      <TextField {...field} path={['setpoints', 'sourceReference']} label={t('nta.form.source')} />
+    </Section>
+    <Section title={t('nta.form.mass')}>
+      {(['floor', 'wall'] as const).map((part) => <SelectField key={part} {...field} path={['thermalMass', part]}
+        label={t(`nta.form.mass.${part}`)} options={[['light', t('nta.form.mass.light')], ['heavy', t('nta.form.mass.heavy')], ['very_heavy', t('nta.form.mass.veryHeavy')]]} />)}
+      <SelectField {...field} path={['thermalMass', 'ceiling']} label={t('nta.form.mass.ceiling')}
+        options={[['open_or_none', t('nta.form.mass.open')], ['closed_or_suspended', t('nta.form.mass.closed')]]} />
+      <TextField {...field} path={['thermalMass', 'sourceReference']} label={t('nta.form.source')} />
+    </Section>
+    <Section title={t('nta.form.internalGains')}>
+      {residential
+        ? <NumberField {...field} path={['internalGains', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
+        : <NumberField {...field} path={['internalGains', 'heatFluxWPerM2']} label={t('nta.form.heatFlux')} />}
+      <TextField {...field} path={['internalGains', 'sourceReference']} label={t('nta.form.source')} />
+    </Section>
+    <Section title={t('nta.form.windows')}>
+      <NumberField {...field} path={['windowSolar', 'frameFraction']} label={t('nta.form.frameFraction')} />
+      <NumberField {...field} path={['windowSolar', 'obstructionFactor']} label={t('nta.form.obstruction')} />
+      <TextField {...field} path={['windowSolar', 'sourceReference']} label={t('nta.form.source')} />
+    </Section>
+    {tilts.length > 0 && <Section title={t('nta.form.roofTilts')}>
+      {tilts.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">
+        <NumberField {...field} path={['surfaceTilts', index, 'tiltDeg']} label={`${surfaceName(item.surfaceId)} — ${t('nta.form.tilt')}`} />
+        <TextField {...field} path={['surfaceTilts', index, 'sourceReference']} label={t('nta.form.source')} />
+      </div>)}
+    </Section>}
+    {ground.length > 0 && <Section title={t('nta.form.groundFloors')}>
+      {ground.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">
+        <NumberField {...field} path={['groundFloors', index, 'exposedPerimeterM']} label={`${surfaceName(item.surfaceId)} — ${t('nta.form.perimeter')}`} />
+        <NumberField {...field} path={['groundFloors', index, 'constructionResistanceM2kPerW']} label={t('nta.form.floorResistance')} />
+        <TextField {...field} path={['groundFloors', index, 'sourceReference']} label={t('nta.form.source')} />
+      </div>)}
+    </Section>}
+    <Section title={t('nta.form.ventilation')}>
+      <label>{t('nta.form.ventilationConstant')}
+        <input type="number" step="any" value={typeof constantConductance === 'number' ? constantConductance : ''}
+          onChange={(event) => setConstantVentilation(event.target.value === '' ? null : Number(event.target.value))} />
+      </label>
+      <TextField {...field} path={['ventilationFlows', 0, 'sourceReference']} label={t('nta.form.source')} />
+      <p className="nta-form-note">{t('nta.form.ventilationNote')}</p>
+    </Section>
+    <Section title={t('nta.form.emission')}>
+      <SelectField {...field} path={['emission', 'system']} label={t('nta.form.emissionSystem')} options={[
+        ['radiators_or_convectors', t('nta.form.emission.radiators')], ['floor_heating', t('nta.form.emission.floor')],
+        ['air_heating', t('nta.form.emission.air')], ['other_or_unknown', t('nta.form.unknown')]]} />
+      <SelectField {...field} path={['emission', 'balancing']} label={t('nta.form.balancing')} options={[
+        ['none_or_unknown', t('nta.form.unknown')], ['static', t('nta.form.balancing.static')],
+        ['dynamic', t('nta.form.balancing.dynamic')], ['not_applicable', t('nta.form.balancing.na')]]} />
+      <SelectField {...field} path={['emission', 'control']} label={t('nta.form.control')} options={[
+        ['main_room_thermostat', t('nta.form.control.main')], ['central_with_room_valves', t('nta.form.control.central')],
+        ['individual_room_thermostats', t('nta.form.control.individual')], ['other_or_unknown', t('nta.form.unknown')]]} />
+      <TextField {...field} path={['emission', 'sourceReference']} label={t('nta.form.source')} />
+      <TextField {...field} path={['distribution', 'sourceReference']} label={t('nta.form.distributionSource')} />
+    </Section>
+    <Section title={t('nta.form.generator')}>
+      {generatorKind === 'gas_boiler' ? <>
+        <SelectField {...field} path={['generator', 'boiler', 'kind']} label={t('nta.form.boilerKind')} options={[
+          ['hr107', 'HR107'], ['hr104', 'HR104'], ['hr100', 'HR100'], ['vr', 'VR'], ['conventional', t('nta.form.boiler.conventional')]]} />
+        <SelectField {...field} path={['generator', 'boiler', 'location']} label={t('nta.form.boilerLocation')} options={[
+          ['inside_thermal_boundary', t('nta.form.boiler.inside')], ['outside_thermal_boundary', t('nta.form.boiler.outside')]]} />
+        <NumberField {...field} path={['generator', 'boiler', 'averageDesignEmissionTemperatureC']} label={t('nta.form.boilerTemperature')} />
+        <SelectField {...field} path={['generator', 'boiler', 'emissionCircuit']} label={t('nta.form.boilerCircuit')} options={[
+          ['direct', t('nta.form.boiler.direct')], ['mixing_with_return_limit', t('nta.form.boiler.mixingLimit')],
+          ['mixing_without_return_limit', t('nta.form.boiler.mixingNoLimit')]]} />
+        <TextField {...field} path={['generator', 'boiler', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+        <TextField {...field} path={['generator', 'boiler', 'locationReference']} label={t('nta.form.boilerLocationSource')} />
+        <TextField {...field} path={['generator', 'boiler', 'temperatureAndCircuitReference']} label={t('nta.form.boilerTemperatureSource')} />
+      </> : <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
+    </Section>
+    {read(draft, ['hotWater']) != null && <Section title={t('nta.form.hotWater')}>
+      {residential
+        ? <NumberField {...field} path={['hotWater', 'need', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
+        : <NumberField {...field} path={['hotWater', 'need', 'specificNeedKwhPerM2Year']} label={t('nta.form.hotWaterNeed')} />}
+      <TextField {...field} path={['hotWater', 'need', 'sourceReference']} label={t('nta.form.source')} />
+      <NumberField {...field} path={['hotWater', 'emissionEfficiency']} label={t('nta.form.hotWaterEmission')} />
+      <NumberField {...field} path={['hotWater', 'distributionEfficiency']} label={t('nta.form.hotWaterDistribution')} />
+      <NumberField {...field} path={['hotWater', 'generationEfficiency']} label={t('nta.form.hotWaterGeneration')} />
+      <SelectField {...field} path={['hotWater', 'carrier']} label={t('nta.form.carrier')}
+        options={[['gas', t('nta.performance.gas')], ['el', t('nta.performance.electricity')], ['oil', t('nta.form.oil')]]} />
+      <CheckField {...field} path={['hotWater', 'renewableHeatPump']} label={t('nta.form.hotWaterHeatPump')} />
+      <TextField {...field} path={['hotWater', 'efficiencySourceReference']} label={t('nta.form.source')} />
+    </Section>}
+    {pv.length > 0 && <Section title={t('nta.form.pv')}>
+      {pv.map((item, index) => <div key={String(item.id)} className="nta-form-row">
+        <NumberField {...field} path={['pvSystems', index, 'peakPowerKw']} label={`${String(item.id)} — ${t('nta.form.pvPeak')}`} />
+        <NumberField {...field} path={['pvSystems', index, 'azimuthDeg']} label={t('nta.form.pvAzimuth')} />
+        <NumberField {...field} path={['pvSystems', index, 'tiltDeg']} label={t('nta.form.tilt')} />
+        <SelectField {...field} path={['pvSystems', index, 'performanceFactor']} label={t('nta.form.pvPerformance')}
+          options={[['0.76', '0,76'], ['0.8', '0,80'], ['0.82', '0,82']]}
+          onChange={(path, value) => change(path, value == null ? null : Number(value))} />
+        <NumberField {...field} path={['pvSystems', index, 'shadingCorrection']} label={t('nta.form.pvShading')} />
+        <NumberField {...field} path={['pvSystems', index, 'obstructionFactor']} label={t('nta.form.obstruction')} />
+        <TextField {...field} path={['pvSystems', index, 'sourceReference']} label={t('nta.form.source')} />
+      </div>)}
+    </Section>}
+    <Section title={t('nta.form.inventory')}>
+      <NumberField {...field} path={['bacsFactor']} label={t('nta.form.bacs')} />
+      <TextField {...field} path={['bacsSourceReference']} label={t('nta.form.source')} />
+      <CheckField {...field} path={['useInventoryComplete']} label={t('nta.form.useInventory')} />
+      <CheckField {...field} path={['productionInventoryComplete']} label={t('nta.form.productionInventory')} />
+      <CheckField {...field} path={['demandUsesFixedC1Ventilation']} label={t('nta.form.c1')} />
+      <CheckField {...field} path={['batteryStoragePresent']} label={t('nta.form.battery')} />
+    </Section>
+    <div className="nta-form-actions">
+      <button type="button" onClick={onCancel}>{t('dialog.cancel')}</button>
+      <button type="submit">{t('dialog.save')}</button>
+    </div>
+  </form>;
+}

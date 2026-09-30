@@ -36,3 +36,14 @@
 .nta-performance-bbl ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
 .nta-performance-bbl li { display: flex; justify-content: space-between; gap: 12px; }
 .nta-performance-bbl em { font-style: normal; font-weight: 600; }
+.nta-form { display: grid; gap: 12px; margin-top: 12px; }
+.nta-form-section { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.nta-form-section legend { font-weight: 700; padding: 0 4px; }
+.nta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; }
+.nta-form-row { display: contents; }
+.nta-form label { display: grid; gap: 3px; }
+.nta-form input:not([type="checkbox"]), .nta-form select { padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-width: 0; }
+.nta-form-check { display: flex !important; gap: 6px; align-items: center; }
+.nta-form-note { grid-column: 1 / -1; margin: 0; }
+.nta-form-actions { display: flex; gap: 8px; }
+.nta-performance-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -8,6 +8,7 @@ import {
   type ProjectPerformanceAssessment,
 } from '../../core/nta/KernelClient';
 import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTemplate';
+import { NtaCalculationForm } from './NtaCalculationForm';
 import './NtaPerformancePanel.css';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -24,6 +25,7 @@ export function NtaPerformancePanel() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [parseError, setParseError] = useState(false);
 
@@ -218,10 +220,20 @@ export function NtaPerformancePanel() {
       </>}
 
       <div className="nta-performance-actions">
-        {!editing && <button type="button" onClick={openEditor}>
-          {project.ntaCalculation ? t('nta.performance.edit') : t('nta.performance.start')}
-        </button>}
+        {!editing && !formOpen && <>
+          <button type="button" onClick={() => { setFormOpen(true); }}>
+            {project.ntaCalculation ? t('nta.performance.edit') : t('nta.performance.start')}
+          </button>
+          <button type="button" onClick={openEditor}>{t('nta.performance.advanced')}</button>
+        </>}
       </div>
+      {formOpen && <NtaCalculationForm project={project}
+        initial={(project.ntaCalculation as unknown as Record<string, unknown> | undefined) ?? buildNtaCalculationTemplate(project)}
+        onCancel={() => setFormOpen(false)}
+        onSave={(block) => {
+          dispatch({ type: 'SET_NTA_CALCULATION', payload: block as unknown as NtaCalculationInput });
+          setFormOpen(false);
+        }} />}
       {editing && <div className="nta-performance-editor">
         <label>{t('nta.performance.blockLabel')}
           <textarea value={draft} spellCheck={false} rows={18} onChange={(event) => setDraft(event.target.value)} />
