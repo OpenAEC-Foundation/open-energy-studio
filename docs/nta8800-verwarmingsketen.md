@@ -29,13 +29,13 @@ De volledige formule 9.26 (Ψ, leidinglengtes, temperaturen, bedrijfstijd 9.32a,
 Bij één opwekker geeft tabel 9.1 `β = 1`, dus 100% dekking van `Q_H;gen;out = Q_H;em;in + Q_H;dis;ls` (knooppuntverliezen weggelaten).
 
 - `gas_boiler`: bestaande [ketelmodule](nta8800-ketel-forfait-concept.md) (tabel 9.25, 9.61, hulpenergie 9.85).
-- `heat_pump_forfait`: bestaande [forfaitaire warmtepompmodule](nta8800-warmtepomp-maandinvoer-concept.md) (tabellen 9.27/9.29, 9.62, collectieve-broncorrectie). Hulpenergie van de warmtepomp ontbreekt.
+- `heat_pump_forfait`: bestaande [forfaitaire warmtepompmodule](nta8800-warmtepomp-maandinvoer-concept.md) (tabellen 9.27/9.29, 9.62, collectieve-broncorrectie). Met optionele `auxiliaryMeasurements`, alleen voor een individueel toestel, volgt de gemeten hulpenergie uit 9.85–9.88 op de maandelijkse elektriciteit van deze keten. Zonder metingen ontbreekt de hulpenergie van de warmtepomp.
 
 - `hybrid_heat_pump`: warmtepomp met individuele bijverwarmingsketel. De bestaande [generatorverdeling](nta8800-generatorverdeling-concept.md) splitst de knooppuntvraag van de keten volgens tabel 9.1/9.23 (alleen nieuwbouw, installatievermogens). Daarna volgen de forfaitaire COP-route voor het warmtepompdeel en tabel 9.25/9.61/9.85 voor het ketelaandeel. Gemeten hulpenergie van de warmtepomp (9.85–9.88) is optioneel en telt op bij de hulpenergie van de ketel. Weigering volgt, net als in de onderliggende module, bij een ontwerpaanvoer boven 55 °C (bijlage Q), bij productgebonden afschakelgrenzen en bij een afwijkende ketelrol. `heatPumpOutputKwh` per maand geeft het warmtepompdeel; alleen daarover telt omgevingswarmte als hernieuwbaar (5.31).
 
 ## Niet meegenomen (`omittedTerms`)
 
-Knooppuntverliezen en -winst (9.2.3), terugwinbare systeemverliezen (9.2.5), ventilatorenergie van de afgifte (9.21), hulpenergie van een enkele warmtepomp en bronpomp/-ventilator, meer dan twee opwekkers, productgebonden hybride schakeling en tapwaterprioriteit.
+Knooppuntverliezen en -winst (9.2.3), terugwinbare systeemverliezen (9.2.5), ventilatorenergie van de afgifte (9.21), bronpomp/-ventilator en hulpenergie van een warmtepomp zonder gemeten vermogens, meer dan twee opwekkers, productgebonden hybride schakeling en tapwaterprioriteit.
 
 ## Aanroep
 

@@ -20,6 +20,9 @@ use crate::forfait_heat_pump_monthly_draft::{
 use crate::generator_dispatch_draft::{
     Generator as DispatchGenerator, GeneratorDispatchDraftInput,
 };
+use crate::heating_aux_draft::{
+    assess_heating_aux_measured_draft, GeneratorElectricityMonth, HeatingAuxMeasuredDraftInput,
+};
 use crate::heating_emission::{
     balancing_consistent, monthly_loss_kwh, temperature_increment_k, EmissionInput, EmissionSystem,
     DRAFT_SOURCE,
@@ -36,7 +39,7 @@ pub const OMITTED_TERMS: &[&str] = &[
     "9.2.3 node losses and node gains (including solar thermal)",
     "9.2.5 recoverable system losses fed back to the zone",
     "9.21 emission fan energy for fan-assisted emitters",
-    "heat pump auxiliary energy of a single heat pump and source pump/fan energy",
+    "source pump/fan energy and heat pump auxiliaries without measured powers",
     "more than two generators, product-specific hybrid switching and domestic hot water priority",
 ];
 
@@ -78,6 +81,8 @@ pub enum Distribution {
     },
 }
 
+// Input data read once per calculation; variant size does not matter here.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Generator {
@@ -127,6 +132,9 @@ pub struct HeatPumpGenerator {
     pub forfait: ForfaitHeatPumpDraftInput,
     pub source_system: SourceSystem,
     pub source_system_reference: String,
+    /// Measured auxiliary powers of an individual heat pump (9.85–9.88).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auxiliary_measurements: Option<HybridHeatPumpAuxMeasurements>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -406,6 +414,63 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                     row.collective_source_heat_kwh = pump.collective_source_heat_kwh;
                     row.heat_pump_output_kwh = pump.generator_output_kwh;
                 }
+                if let (Some(aux), true) = (
+                    &generator.auxiliary_measurements,
+                    result.monthly.len() == 12,
+                ) {
+                    if aux.generator_id != generator.forfait.generator_id {
+                        issues.push(issue(
+                            "heat_pump_auxiliary_generator_mismatch",
+                            "generator.auxiliaryMeasurements.generatorId",
+                        ));
+                    } else if generator.forfait.collective_building_installation == Some(true) {
+                        issues.push(issue(
+                            "heat_pump_auxiliary_individual_only",
+                            "generator.auxiliaryMeasurements",
+                        ));
+                    } else {
+                        let assessed =
+                            assess_heating_aux_measured_draft(&HeatingAuxMeasuredDraftInput {
+                                generator_id: aux.generator_id.clone(),
+                                generator_source_reference: aux.generator_source_reference.clone(),
+                                measurements: aux.measurements.clone(),
+                                input_energy_source_reference: format!(
+                                    "heat_pump_monthly_sha256:{}",
+                                    result.input_fingerprint
+                                ),
+                                months: result
+                                    .monthly
+                                    .iter()
+                                    .map(|month| GeneratorElectricityMonth {
+                                        month: month.month,
+                                        generator_input_electricity_kwh: month
+                                            .generator_input_electricity_kwh,
+                                    })
+                                    .collect(),
+                            });
+                        match assessed
+                            .auxiliary
+                            .as_ref()
+                            .filter(|_| assessed.status != "invalid")
+                        {
+                            None => issues.extend(assessed.issues.iter().map(|item| {
+                                issue(
+                                    item.code,
+                                    format!("generator.auxiliaryMeasurements.{}", item.path),
+                                )
+                            })),
+                            Some(aux) => {
+                                for row in monthly.iter_mut() {
+                                    row.auxiliary_electricity_kwh = aux
+                                        .monthly_auxiliary_electricity_kwh
+                                        .iter()
+                                        .find(|item| item.month == row.month)
+                                        .map(|item| item.electricity_kwh);
+                                }
+                            }
+                        }
+                    }
+                }
                 if result.monthly.len() != 12 && issues.is_empty() {
                     issues.push(issue("generator_result_incomplete", "generator"));
                 }
@@ -602,6 +667,7 @@ mod tests {
             forfait: heat_pump(),
             source_system: SourceSystem::Individual,
             source_system_reference: "own outdoor unit".into(),
+            auxiliary_measurements: None,
         });
         let result = assess_space_heating_chain(&input);
         assert_eq!(
@@ -754,5 +820,52 @@ mod tests {
         assert!((jan.generator_electricity_kwh - jan.heat_pump_output_kwh / cop).abs() < 1e-6);
         assert_eq!(result.generation_efficiency, Some(cop));
         assert!(input.generator.heat_pump().is_some());
+    }
+
+    #[test]
+    fn single_heat_pump_can_add_measured_auxiliary_energy() {
+        use crate::heating_aux_draft::ElectricHeatPumpAuxMeasurements;
+        let mut input = boiler_chain();
+        input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            forfait: heat_pump(),
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own unit".into(),
+            auxiliary_measurements: Some(HybridHeatPumpAuxMeasurements {
+                generator_id: "hp".into(),
+                generator_source_reference: "plate".into(),
+                measurements: ElectricHeatPumpAuxMeasurements {
+                    standby_electronics_w: 10.0,
+                    delivery_pump_during_compressor_w: 200.0,
+                    delivery_pump_pre_post_w: 90.0,
+                    pump_pre_run_seconds: 300.0,
+                    pump_post_run_seconds: 300.0,
+                    average_compressor_on_seconds: 600.0,
+                    mean_compressor_modulation: 0.5,
+                    nominal_electric_drive_kw: 2.0,
+                    measurement_source_reference: "measured".into(),
+                    timing_source_reference: "measured".into(),
+                },
+            }),
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(result.annual_auxiliary_electricity_kwh.unwrap() > 0.0);
+        let Generator::HeatPumpForfait(generator) = &mut input.generator else {
+            unreachable!()
+        };
+        generator
+            .auxiliary_measurements
+            .as_mut()
+            .unwrap()
+            .generator_id = "other".into();
+        let result = assess_space_heating_chain(&input);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "heat_pump_auxiliary_generator_mismatch"));
     }
 }

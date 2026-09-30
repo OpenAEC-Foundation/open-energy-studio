@@ -1256,6 +1256,7 @@ export interface SpaceHeatingChainInput {
         forfait: ForfaitHeatPumpDraftInput;
         sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
         sourceSystemReference: string;
+        auxiliaryMeasurements?: Record<string, unknown> | null;
       }
     | {
         kind: 'hybrid_heat_pump';

@@ -874,6 +874,7 @@ mod tests {
             forfait,
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
+            auxiliary_measurements: None,
         });
         let missing = assess_building_performance(&sample);
         assert!(missing
