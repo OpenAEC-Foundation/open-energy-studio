@@ -1098,4 +1098,6 @@ export const nl: Record<string, string> = {
   'nta.performance.tojuliScope': 'Per oriëntatie met julibalans; zomerventilatie (H11) moet in de opgegeven ventilatiestromen zitten.',
   'nta.performance.tojuliCooled': 'Actieve koeling (§5.7.1)',
   'nta.performance.tojuliMax': 'Hoogste waarde (Bbl 4.149b)',
+  'report.exportNtaCalculation': 'NTA-rekenrapport exporteren',
+  'report.ntaCalculationScope': 'Rapport van de Rust-rekenkern met indicatoren, labelklasse, Bbl-toets, TO-juli, maandwaarden, weggelaten correcties en bronnen. Onverifieerd: geen officieel label.',
 };

@@ -1098,4 +1098,6 @@ export const en: Record<string, string> = {
   'nta.performance.tojuliScope': 'Per orientation with a July balance; summer ventilation (ch. 11) must be in the supplied ventilation flows.',
   'nta.performance.tojuliCooled': 'Active cooling (§5.7.1)',
   'nta.performance.tojuliMax': 'Highest value (Bbl 4.149b)',
+  'report.exportNtaCalculation': 'Export NTA calculation report',
+  'report.ntaCalculationScope': 'Report of the Rust kernel with indicators, label class, Bbl check, TOjuli, monthly values, omitted corrections and sources. Unverified: no official label.',
 };

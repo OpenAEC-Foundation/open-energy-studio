@@ -1,13 +1,20 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { IBENGResultMonthly } from '../../core/energy/types';
-import { downloadNtaInputDossierHTML } from '../../core/report/ReportGenerator';
+import { useState } from 'react';
+import { downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML } from '../../core/report/ReportGenerator';
 import './ReportView.css';
 
 export function ReportView() {
   const { t } = useI18n();
   const { state } = useEnergy();
   const { project, result } = state;
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+  const exportCalculation = () => {
+    setCalculationError(null);
+    downloadNtaCalculationReportHTML(project).catch((reason: unknown) =>
+      setCalculationError(reason instanceof Error ? reason.message : String(reason)));
+  };
 
   return (
     <div className="report-view">
@@ -23,6 +30,9 @@ export function ReportView() {
         <div className="report-input-dossier">
           <button type="button" onClick={() => downloadNtaInputDossierHTML(project)}>{t('report.exportInputDossier')}</button>
           <p>{t('report.inputDossierScope')}</p>
+          <button type="button" onClick={exportCalculation}>{t('report.exportNtaCalculation')}</button>
+          <p>{t('report.ntaCalculationScope')}</p>
+          {calculationError && <p role="alert">{calculationError}</p>}
         </div>
 
         {/* Project info */}

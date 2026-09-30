@@ -345,6 +345,7 @@
       }
     ],
     "demandUsesFixedC1Ventilation": false,
-    "batteryStoragePresent": false
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential"
   }
 }

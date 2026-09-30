@@ -1489,6 +1489,8 @@ export interface NtaCalculationInput {
 
 export interface ProjectPerformanceAssessment {
   status: 'calculated_unverified' | 'incomplete' | 'invalid';
+  targetNormVersion: string;
+  kernelVersion: string;
   inputFingerprint: string;
   attestStatus: 'unattested';
   gaps: Array<{ code: string; path: string; detail?: string }>;
