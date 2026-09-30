@@ -179,6 +179,10 @@ pub fn app() -> Router {
             post(calculate_space_heating_chain),
         )
         .route(
+            "/v1/nta8800/project/performance",
+            post(calculate_project_performance),
+        )
+        .route(
             "/v1/nta8800/performance/calculate",
             post(calculate_building_performance),
         )
@@ -390,6 +394,18 @@ async fn calculate_space_heating_chain(
         StatusCode::UNPROCESSABLE_ENTITY
     } else {
         StatusCode::OK
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn calculate_project_performance(
+    Json(request): Json<ProjectRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment =
+        nta8800_core::project_performance::assess_project_performance(&request.project);
+    let status = match assessment.status {
+        "calculated_unverified" => StatusCode::OK,
+        _ => StatusCode::UNPROCESSABLE_ENTITY,
     };
     (status, Json(json!(assessment)))
 }
@@ -1218,6 +1234,32 @@ mod tests {
         assert!(result["annualNaturalGasKwh"].as_f64().unwrap() > 0.0);
         assert_eq!(result["demand"]["status"], "calculated_unverified");
         assert_eq!(result["bengCalculationAvailable"], false);
+    }
+
+    #[tokio::test]
+    async fn project_performance_route_reports_gaps_or_results() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/project/performance",
+            json!({ "project": project.clone() }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["status"], "calculated_unverified");
+        assert!(result["performance"]["primaryFossilIndicatorKwhPerM2Year"].is_number());
+        let mut incomplete = project;
+        incomplete.as_object_mut().unwrap().remove("ntaCalculation");
+        let (status, result) = post_json(
+            "/v1/nta8800/project/performance",
+            json!({ "project": incomplete }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(result["status"], "incomplete");
+        assert_eq!(result["gaps"][0]["code"], "nta_calculation_block_missing");
     }
 
     #[tokio::test]

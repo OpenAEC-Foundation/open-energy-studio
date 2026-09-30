@@ -1369,3 +1369,58 @@ export async function calculateBuildingPerformanceWithRust(input: BuildingPerfor
   }
   throw new Error('Rust performance calculation is available in the desktop app and local development server.');
 }
+
+export interface NtaCalculationInput {
+  calculationScope: 'residential' | 'utility';
+  areaSourceReference: string;
+  setpoints: MonthlyDemandInput['setpoints'];
+  thermalMass: MonthlyDemandInput['thermalMass'];
+  internalGains: MonthlyDemandInput['internalGains'];
+  surfaceTilts: Array<{ surfaceId: string; tiltDeg: number; sourceReference: string }>;
+  windowSolar: { frameFraction: number; obstructionFactor: number; sourceReference: string };
+  groundFloors: Array<{
+    surfaceId: string;
+    exposedPerimeterM: number;
+    constructionResistanceM2kPerW: number;
+    sourceReference: string;
+  }>;
+  ventilationFlows: MonthlyDemandInput['ventilationFlows'];
+  emission: SpaceHeatingChainInput['emission'];
+  distribution: SpaceHeatingChainInput['distribution'];
+  generator: SpaceHeatingChainInput['generator'];
+  heatPumpRenewable?: BuildingPerformanceInput['heatPumpRenewable'];
+  bacsFactor: 1 | 1.05;
+  bacsSourceReference: string;
+  useInventoryComplete: boolean;
+  declaredUses: BuildingPerformanceInput['declaredUses'];
+  declaredRenewableHeat?: BuildingPerformanceInput['declaredRenewableHeat'];
+  productionInventoryComplete: boolean;
+  onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
+  pvSystems?: BuildingPerformanceInput['pvSystems'];
+  demandUsesFixedC1Ventilation: boolean;
+  batteryStoragePresent: boolean;
+}
+
+export interface ProjectPerformanceAssessment {
+  status: 'calculated_unverified' | 'incomplete' | 'invalid';
+  inputFingerprint: string;
+  attestStatus: 'unattested';
+  gaps: Array<{ code: string; path: string }>;
+  derivedInput: BuildingPerformanceInput | null;
+  performance: BuildingPerformanceAssessment | null;
+}
+
+export async function calculateProjectPerformanceWithRust(project: IProject): Promise<ProjectPerformanceAssessment> {
+  if (isTauri()) {
+    return invoke<ProjectPerformanceAssessment>('calculate_project_performance', { project });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/project/performance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ project }),
+    });
+    return response.json() as Promise<ProjectPerformanceAssessment>;
+  }
+  throw new Error('Rust project calculation is available in the desktop app and local development server.');
+}

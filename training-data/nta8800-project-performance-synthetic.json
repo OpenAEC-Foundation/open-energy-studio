@@ -1,0 +1,350 @@
+{
+  "id": "p-synth",
+  "name": "Synthetische tussenwoning",
+  "description": "synthetic; not an EDR case",
+  "buildingFunction": "residential",
+  "address": "",
+  "city": "",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Woning",
+      "floorArea": 100.0,
+      "volume": 260.0,
+      "height": 2.6,
+      "surfaces": [
+        {
+          "id": "wall-N",
+          "name": "Gevel N",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 30.0,
+          "orientation": "N",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-N",
+              "name": "Raam N",
+              "area": 4.0,
+              "uValue": 1.1,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "wall-N"
+            }
+          ]
+        },
+        {
+          "id": "wall-E",
+          "name": "Gevel E",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 25.0,
+          "orientation": "E",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "wall-S",
+          "name": "Gevel S",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 30.0,
+          "orientation": "S",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-S",
+              "name": "Raam S",
+              "area": 8.0,
+              "uValue": 1.1,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "wall-S"
+            }
+          ]
+        },
+        {
+          "id": "wall-W",
+          "name": "Gevel W",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 25.0,
+          "orientation": "W",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "roof",
+          "name": "Dak",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 52.0,
+          "orientation": "S",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "floor",
+          "name": "Vloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 50.0,
+          "orientation": "horizontal",
+          "constructionId": "c-floor",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb1",
+          "name": "Aansluiting vloer-gevel",
+          "psiValue": 0.05,
+          "length": 30.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor"
+        }
+      ],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.4
+      }
+    }
+  ],
+  "heatingSystems": [
+    {
+      "id": "h1",
+      "name": "HR107",
+      "type": "hr107",
+      "cop": 0.975,
+      "coverageFraction": 1.0
+    }
+  ],
+  "ventilationSystems": [
+    {
+      "id": "v1",
+      "name": "C",
+      "type": "type_c",
+      "heatRecoveryEfficiency": 0,
+      "sfp": 0.2
+    }
+  ],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-wall",
+      "name": "Gevel Rc 4,7",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.21
+    },
+    {
+      "id": "c-roof",
+      "name": "Dak Rc 6,3",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.16
+    },
+    {
+      "id": "c-floor",
+      "name": "Vloer Rc 3,7",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.26
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "residential",
+    "areaSourceReference": "synthetic floor plan",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13 residential (transcribed)"
+    },
+    "thermalMass": {
+      "floor": "very_heavy",
+      "wall": "heavy",
+      "ceiling": "open_or_none",
+      "sourceReference": "synthetic: concrete floors, masonry"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "one dwelling"
+    },
+    "surfaceTilts": [
+      {
+        "surfaceId": "roof",
+        "tiltDeg": 45.0,
+        "sourceReference": "synthetic section drawing"
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstructionFactor": 1.0,
+      "sourceReference": "synthetic: no obstruction"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "floor",
+        "exposedPerimeterM": 20.0,
+        "constructionResistanceM2kPerW": 3.87,
+        "sourceReference": "synthetic: Rc 3,7 + Rsi 0,17"
+      }
+    ],
+    "ventilationFlows": [
+      {
+        "id": "mech-c",
+        "sourceReference": "synthetic chapter 11 value",
+        "months": [
+          {
+            "month": 1,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 2,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 3,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 4,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 5,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 6,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 7,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 8,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 9,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 10,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 11,
+            "conductanceWPerK": 35.0
+          },
+          {
+            "month": 12,
+            "conductanceWPerK": 35.0
+          }
+        ]
+      }
+    ],
+    "emission": {
+      "system": "radiators_or_convectors",
+      "balancing": "none_or_unknown",
+      "control": "main_room_thermostat",
+      "sourceReference": "synthetic survey"
+    },
+    "distribution": {
+      "method": "heated_zone_only_space_heating",
+      "sourceReference": "synthetic: pipes inside envelope, space heating only"
+    },
+    "generator": {
+      "kind": "gas_boiler",
+      "boiler": {
+        "generatorId": "boiler",
+        "role": "individual_main",
+        "location": "inside_thermal_boundary",
+        "kind": "hr107",
+        "fuel": "natural_gas",
+        "averageDesignEmissionTemperatureC": 45.0,
+        "emissionCircuit": "direct",
+        "equipmentReference": "synthetic type plate",
+        "locationReference": "synthetic plan",
+        "temperatureAndCircuitReference": "synthetic design",
+        "pilotFlamePresent": false,
+        "installationYear": 2020,
+        "installationYearReference": "synthetic invoice"
+      }
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "residential without BACS",
+    "useInventoryComplete": true,
+    "declaredUses": [
+      {
+        "id": "dhw",
+        "service": "domestic_hot_water",
+        "carrier": "gas",
+        "monthlyKwh": [
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0,
+          150.0
+        ],
+        "sourceReference": "synthetic chapter 13 value"
+      },
+      {
+        "id": "fans",
+        "service": "ventilation_fans",
+        "carrier": "el",
+        "monthlyKwh": [
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0,
+          15.0
+        ],
+        "sourceReference": "synthetic chapter 11 value"
+      }
+    ],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPowerKw": 3.0,
+        "azimuthDeg": 180.0,
+        "tiltDeg": 45.0,
+        "performanceFactor": 0.8,
+        "shadingCorrection": 1.0,
+        "obstructionFactor": 1.0,
+        "sourceReference": "synthetic datasheet"
+      }
+    ],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false
+  }
+}

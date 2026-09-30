@@ -135,6 +135,13 @@ fn calculate_building_performance(
 }
 
 #[tauri::command]
+fn calculate_project_performance(
+    project: serde_json::Value,
+) -> nta8800_core::project_performance::ProjectPerformanceAssessment {
+    nta8800_core::project_performance::assess_project_performance(&project)
+}
+
+#[tauri::command]
 fn diagnose_epus_draft(
     input: nta8800_core::epus_draft::EpusDraftInput,
 ) -> nta8800_core::epus_draft::EpusDraftAssessment {
@@ -480,6 +487,7 @@ pub fn run() {
             calculate_monthly_demand,
             calculate_space_heating_chain,
             calculate_building_performance,
+            calculate_project_performance,
             diagnose_bacs_draft,
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,

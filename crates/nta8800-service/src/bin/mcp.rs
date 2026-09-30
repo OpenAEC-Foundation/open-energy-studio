@@ -598,6 +598,22 @@ impl EnergyMcp {
     }
 
     #[tool(
+        description = "Derive the unverified single-zone energy performance of a saved .oes project with its ntaCalculation block; returns input gaps when data is missing; no label, no attest"
+    )]
+    fn calculate_project_performance(
+        &self,
+        Parameters(args): Parameters<ProjectArgs>,
+    ) -> CallToolResult {
+        let result = nta8800_core::project_performance::assess_project_performance(&args.project);
+        let content = ContentBlock::text(json!(result).to_string());
+        if result.status == "calculated_unverified" {
+            CallToolResult::success(vec![content])
+        } else {
+            CallToolResult::error(vec![content])
+        }
+    }
+
+    #[tool(
         description = "Interpolate a supplied space-heating product declaration table within its bounds; does not calculate annual building performance, BENG or a label"
     )]
     fn diagnose_declared_heating_table(

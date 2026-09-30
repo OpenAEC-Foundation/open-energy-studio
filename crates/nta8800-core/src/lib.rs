@@ -37,6 +37,7 @@ pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
+pub mod project_performance;
 pub mod pv;
 pub mod reference;
 pub mod space_heating_chain;
@@ -278,6 +279,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_space_heating_chain_emission_distribution_single_generator",
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
             "unverified_pv_yield_chapter_16",
+            "unverified_project_performance_adapter_single_zone",
         ],
     }
 }
@@ -1550,7 +1552,7 @@ fn direct_outdoor_input(project: &ProjectInput) -> Option<DirectTransmissionInpu
     direct_boundary_input(project, ThermalBoundary::Outdoor, None)
 }
 
-fn unheated_project_input(project: &ProjectInput) -> Option<UnheatedTransmissionInput> {
+pub(crate) fn unheated_project_input(project: &ProjectInput) -> Option<UnheatedTransmissionInput> {
     let spaces = project
         .unheated_spaces
         .iter()
@@ -1570,7 +1572,7 @@ fn unheated_project_input(project: &ProjectInput) -> Option<UnheatedTransmission
     Some(UnheatedTransmissionInput { spaces })
 }
 
-fn direct_boundary_input(
+pub(crate) fn direct_boundary_input(
     project: &ProjectInput,
     target: ThermalBoundary,
     space_id: Option<&str>,

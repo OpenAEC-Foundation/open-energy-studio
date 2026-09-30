@@ -1,3 +1,4 @@
+import type { NtaCalculationInput } from '../nta/KernelClient';
 // ============================================================
 // Open Energy Studio – BENG Data Model (NTA 8800)
 // ============================================================
@@ -312,6 +313,8 @@ export interface IProject {
   solarPV: ISolarPV[];
   solarThermal: ISolarThermal[];
   constructions: IConstruction[];
+  /** NTA 8800 inputs the legacy model does not hold, each with a source reference. */
+  ntaCalculation?: NtaCalculationInput;
 }
 
 // ------------------------------------------------------------
