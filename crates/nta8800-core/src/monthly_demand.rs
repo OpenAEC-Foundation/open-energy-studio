@@ -15,6 +15,9 @@
 //! [`OMITTED_CORRECTIONS`] and returned with every result.
 
 use crate::climate::{self, Orientation, CLIMATE_SOURCE, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
+use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
+use crate::ground::{slab_on_ground_conductance, SlabOnGround};
+use crate::unheated_transmission::{assess_unheated_transmission, UnheatedTransmissionInput};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -74,8 +77,29 @@ pub struct Setpoints {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum Transmission {
+    /// Coefficients determined elsewhere and supplied as totals.
+    Explicit(ExplicitTransmission),
+    /// Coefficients composed here from chapter 8 components.
+    Components(ComponentTransmission),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Transmission {
+pub struct ComponentTransmission {
+    /// Direct to outdoor air: 8.1 `Σ A·U + Σ L·ψ + Σ χ`.
+    pub direct: DirectTransmissionInput,
+    /// Via unheated spaces with supplied reduction factors `b`.
+    pub unheated: Option<UnheatedTransmissionInput>,
+    /// Slab-on-ground floors, §8.3.
+    pub ground_floors: Vec<SlabOnGround>,
+    pub ground_inventory_confirmed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExplicitTransmission {
     /// `H_tr` excluding ground floors: direct, via unheated spaces (b applied)
     /// and thermal bridges, in W/K.
     pub conductance_w_per_k: f64,
@@ -201,6 +225,7 @@ pub struct MonthlyDemandAssessment {
     pub beng_calculation_available: bool,
     pub omitted_corrections: &'static [&'static str],
     pub specific_heat_capacity_kj_per_m2k: Option<f64>,
+    pub transmission: Option<TransmissionSummary>,
     pub monthly: Vec<MonthResult>,
     pub annual_heating_need_kwh: Option<f64>,
     pub annual_cooling_need_kwh: Option<f64>,
@@ -349,49 +374,6 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         "setpoints.sourceReference".into(),
         issues,
     );
-
-    let transmission = &input.transmission;
-    if !finite_nonneg(transmission.conductance_w_per_k) {
-        issues.push(issue(
-            "transmission_conductance_invalid",
-            "transmission.conductanceWPerK",
-        ));
-    }
-    check_reference(
-        &transmission.source_reference,
-        "transmission.sourceReference".into(),
-        issues,
-    );
-    if !transmission.ground_inventory_confirmed {
-        issues.push(issue(
-            "ground_inventory_unconfirmed",
-            "transmission.groundInventoryConfirmed",
-        ));
-    }
-    if let Some(ground) = &transmission.ground {
-        if !finite_nonneg(ground.adjusted_conductance_w_per_k) {
-            issues.push(issue(
-                "ground_conductance_invalid",
-                "transmission.ground.adjustedConductanceWPerK",
-            ));
-        }
-        for (name, values) in [
-            ("heatingKwh", &ground.heating_kwh),
-            ("coolingKwh", &ground.cooling_kwh),
-        ] {
-            if values.len() != 12 || values.iter().any(|value| !value.is_finite()) {
-                issues.push(issue(
-                    "ground_monthly_invalid",
-                    format!("transmission.ground.{name}"),
-                ));
-            }
-        }
-        check_reference(
-            &ground.source_reference,
-            "transmission.ground.sourceReference".into(),
-            issues,
-        );
-    }
 
     if input.ventilation_flows.is_empty() {
         issues.push(issue("ventilation_flow_required", "ventilationFlows"));
@@ -552,17 +534,181 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
     }
 }
 
+/// Coefficients and ground terms after resolving either transmission route.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransmissionSummary {
+    pub method: &'static str,
+    /// `H_tr` excluding ground, W/K.
+    pub conductance_w_per_k: f64,
+    pub direct_conductance_w_per_k: Option<f64>,
+    pub unheated_conductance_w_per_k: Option<f64>,
+    /// `H_g;an` (components) or supplied `H_g;adj` (explicit), W/K.
+    pub ground_conductance_w_per_k: f64,
+    /// Unweighted mean of table 17.1 used in 7.14 for ground transfer.
+    pub annual_mean_outdoor_temperature_c: Option<f64>,
+    #[serde(skip)]
+    ground_heating_kwh: [f64; 12],
+    #[serde(skip)]
+    ground_cooling_kwh: [f64; 12],
+}
+
+pub fn annual_mean_outdoor_temperature_c() -> f64 {
+    OUTDOOR_TEMPERATURE_C.iter().sum::<f64>() / 12.0
+}
+
+fn resolve_transmission(
+    input: &MonthlyDemandInput,
+    issues: &mut Vec<DemandIssue>,
+) -> Option<TransmissionSummary> {
+    let prior = issues.len();
+    match &input.transmission {
+        Transmission::Explicit(transmission) => {
+            if !finite_nonneg(transmission.conductance_w_per_k) {
+                issues.push(issue(
+                    "transmission_conductance_invalid",
+                    "transmission.conductanceWPerK",
+                ));
+            }
+            check_reference(
+                &transmission.source_reference,
+                "transmission.sourceReference".into(),
+                issues,
+            );
+            if !transmission.ground_inventory_confirmed {
+                issues.push(issue(
+                    "ground_inventory_unconfirmed",
+                    "transmission.groundInventoryConfirmed",
+                ));
+            }
+            let mut heating = [0.0; 12];
+            let mut cooling = [0.0; 12];
+            let mut ground_conductance = 0.0;
+            if let Some(ground) = &transmission.ground {
+                if !finite_nonneg(ground.adjusted_conductance_w_per_k) {
+                    issues.push(issue(
+                        "ground_conductance_invalid",
+                        "transmission.ground.adjustedConductanceWPerK",
+                    ));
+                }
+                for (name, values, target) in [
+                    ("heatingKwh", &ground.heating_kwh, &mut heating),
+                    ("coolingKwh", &ground.cooling_kwh, &mut cooling),
+                ] {
+                    if values.len() != 12 || values.iter().any(|value| !value.is_finite()) {
+                        issues.push(issue(
+                            "ground_monthly_invalid",
+                            format!("transmission.ground.{name}"),
+                        ));
+                    } else {
+                        target.copy_from_slice(values);
+                    }
+                }
+                check_reference(
+                    &ground.source_reference,
+                    "transmission.ground.sourceReference".into(),
+                    issues,
+                );
+                ground_conductance = ground.adjusted_conductance_w_per_k;
+            }
+            (issues.len() == prior).then_some(TransmissionSummary {
+                method: "explicit",
+                conductance_w_per_k: transmission.conductance_w_per_k,
+                direct_conductance_w_per_k: None,
+                unheated_conductance_w_per_k: None,
+                ground_conductance_w_per_k: ground_conductance,
+                annual_mean_outdoor_temperature_c: None,
+                ground_heating_kwh: heating,
+                ground_cooling_kwh: cooling,
+            })
+        }
+        Transmission::Components(components) => {
+            let direct = assess_direct_transmission(&components.direct);
+            issues.extend(
+                direct
+                    .issues
+                    .iter()
+                    .map(|item| issue(item.code, format!("transmission.direct.{}", item.path))),
+            );
+            let unheated = components
+                .unheated
+                .as_ref()
+                .map(assess_unheated_transmission);
+            if let Some(unheated) = &unheated {
+                issues.extend(
+                    unheated.issues.iter().map(|item| {
+                        issue(item.code, format!("transmission.unheated.{}", item.path))
+                    }),
+                );
+            }
+            if !components.ground_inventory_confirmed {
+                issues.push(issue(
+                    "ground_inventory_unconfirmed",
+                    "transmission.groundInventoryConfirmed",
+                ));
+            }
+            let mut ground_conductance = 0.0;
+            let mut ids = HashSet::new();
+            for (index, slab) in components.ground_floors.iter().enumerate() {
+                let path = format!("transmission.groundFloors[{index}]");
+                if slab.id.trim().is_empty() || !ids.insert(slab.id.as_str()) {
+                    issues.push(issue("ground_floor_id_invalid", format!("{path}.id")));
+                }
+                check_reference(
+                    &slab.source_reference,
+                    format!("{path}.sourceReference"),
+                    issues,
+                );
+                match slab_on_ground_conductance(slab) {
+                    Some(value) => ground_conductance += value,
+                    None => issues.push(issue("ground_floor_invalid", path)),
+                }
+            }
+            if issues.len() != prior {
+                return None;
+            }
+            let direct_conductance = direct.total_direct_conductance_w_per_k?;
+            let unheated_conductance = match &unheated {
+                Some(result) => Some(result.total_reduced_conductance_w_per_k?),
+                None => None,
+            };
+            // 7.14: ground transfer against the annual mean outdoor temperature.
+            let annual_mean = annual_mean_outdoor_temperature_c();
+            let mut heating = [0.0; 12];
+            let mut cooling = [0.0; 12];
+            for index in 0..12 {
+                let hours = MONTH_HOURS[index];
+                heating[index] =
+                    ground_conductance * (input.setpoints.heating_c - annual_mean) * hours / 1000.0;
+                cooling[index] =
+                    ground_conductance * (input.setpoints.cooling_c - annual_mean) * hours / 1000.0;
+            }
+            Some(TransmissionSummary {
+                method: "components",
+                conductance_w_per_k: direct_conductance + unheated_conductance.unwrap_or(0.0),
+                direct_conductance_w_per_k: Some(direct_conductance),
+                unheated_conductance_w_per_k: unheated_conductance,
+                ground_conductance_w_per_k: ground_conductance,
+                annual_mean_outdoor_temperature_c: Some(annual_mean),
+                ground_heating_kwh: heating,
+                ground_cooling_kwh: cooling,
+            })
+        }
+    }
+}
+
 pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     let mut issues = Vec::new();
     validate(input, &mut issues);
+    let transmission = resolve_transmission(input, &mut issues);
 
     let mass = &input.thermal_mass;
     let d_m = specific_heat_capacity(mass.floor, mass.wall, mass.ceiling);
     let mut monthly = Vec::with_capacity(12);
-    if issues.is_empty() {
-        monthly = compute(input, d_m, &mut issues);
+    if let (true, Some(transmission)) = (issues.is_empty(), &transmission) {
+        monthly = compute(input, transmission, d_m, &mut issues);
     }
     let valid = issues.is_empty();
     if !valid {
@@ -586,6 +732,7 @@ pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessm
         beng_calculation_available: false,
         omitted_corrections: OMITTED_CORRECTIONS,
         specific_heat_capacity_kj_per_m2k: valid.then_some(d_m),
+        transmission: transmission.filter(|_| valid),
         monthly,
         annual_heating_need_kwh: annual_heating,
         annual_cooling_need_kwh: annual_cooling,
@@ -595,17 +742,14 @@ pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessm
 
 fn compute(
     input: &MonthlyDemandInput,
+    transmission: &TransmissionSummary,
     d_m: f64,
     issues: &mut Vec<DemandIssue>,
 ) -> Vec<MonthResult> {
     let area = input.usable_floor_area_m2;
     // 7.45: C_m;int;eff in J/K.
     let capacity_j_per_k = d_m * 1000.0 * area;
-    let transmission = &input.transmission;
-    let ground_adjusted = transmission
-        .ground
-        .as_ref()
-        .map_or(0.0, |ground| ground.adjusted_conductance_w_per_k);
+    let ground_adjusted = transmission.ground_conductance_w_per_k;
     let mut results = Vec::with_capacity(12);
     for month in 1..=12u8 {
         let index = usize::from(month - 1);
@@ -628,10 +772,8 @@ fn compute(
             ventilation_cooling +=
                 row.conductance_w_per_k * (input.setpoints.cooling_c - supply) * hours / 1000.0;
         }
-        let (ground_heating, ground_cooling) =
-            transmission.ground.as_ref().map_or((0.0, 0.0), |ground| {
-                (ground.heating_kwh[index], ground.cooling_kwh[index])
-            });
+        let ground_heating = transmission.ground_heating_kwh[index];
+        let ground_cooling = transmission.ground_cooling_kwh[index];
         let transmission_heating =
             transmission.conductance_w_per_k * (input.setpoints.heating_c - outdoor) * hours
                 / 1000.0
@@ -810,6 +952,7 @@ mod tests {
             "areaSourceReference": "synthetic plan",
             "setpoints": {"heatingC": 20.0, "coolingC": 24.0, "sourceReference": "table 7.13 residential"},
             "transmission": {
+                "method": "explicit",
                 "conductanceWPerK": 80.0,
                 "sourceReference": "synthetic envelope",
                 "ground": null,
@@ -960,7 +1103,9 @@ mod tests {
         let mut input = sample();
         input.windows[0].tilt_deg = 45.0;
         input.window_inventory_complete = false;
-        input.transmission.ground_inventory_confirmed = false;
+        if let Transmission::Explicit(transmission) = &mut input.transmission {
+            transmission.ground_inventory_confirmed = false;
+        }
         input.ventilation_flows[0].months.pop();
         input.opaque_elements[0].id = "w-south".into();
         let result = assess_monthly_demand(&input);
@@ -989,7 +1134,10 @@ mod tests {
     #[test]
     fn ground_terms_enter_transfer_and_time_constant() {
         let mut input = sample();
-        input.transmission.ground = Some(GroundTransfer {
+        let Transmission::Explicit(transmission) = &mut input.transmission else {
+            unreachable!()
+        };
+        transmission.ground = Some(GroundTransfer {
             adjusted_conductance_w_per_k: 30.0,
             heating_kwh: vec![100.0; 12],
             cooling_kwh: vec![150.0; 12],
@@ -1003,5 +1151,71 @@ mod tests {
                 < 1e-9
         );
         assert!((jan.time_constant_h - 180.0 * 1000.0 * 100.0 / 3600.0 / 150.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn composes_transmission_from_chapter_8_components() {
+        let mut value = serde_json::to_value(sample()).unwrap();
+        value["transmission"] = json!({
+            "method": "components",
+            "direct": {
+                "elements": [{"id": "wall", "areaM2": 100.0, "uValueWPerM2k": 0.2, "sourceReference": "Rc 4.7"}],
+                "linearBridges": [{"id": "lb", "lengthM": 20.0, "psiWPerMk": 0.05, "sourceReference": "detail"}]
+            },
+            "unheated": {"spaces": [{
+                "id": "crawl", "reductionFactor": 0.5, "factorSourceReference": "8.4",
+                "boundary": {"elements": [{"id": "floor-crawl", "areaM2": 40.0, "uValueWPerM2k": 0.25, "sourceReference": "Rc 3.7"}]}
+            }]},
+            "groundFloors": [{
+                "id": "slab", "areaM2": 67.0, "exposedPerimeterM": 32.92,
+                "constructionResistanceM2kPerW": 1.0 / 0.258398, "sourceReference": "C1 example"
+            }],
+            "groundInventoryConfirmed": true
+        });
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        let result = assess_monthly_demand(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let summary = result.transmission.as_ref().unwrap();
+        assert!((summary.direct_conductance_w_per_k.unwrap() - 21.0).abs() < 1e-12);
+        assert!((summary.unheated_conductance_w_per_k.unwrap() - 5.0).abs() < 1e-12);
+        assert!((summary.conductance_w_per_k - 26.0).abs() < 1e-12);
+        assert!((summary.ground_conductance_w_per_k - 13.163).abs() < 1e-3);
+        let mean = annual_mean_outdoor_temperature_c();
+        let jan = &result.monthly[0];
+        let expected = 26.0 * (20.0 - 2.61) * 0.744
+            + summary.ground_conductance_w_per_k * (20.0 - mean) * 0.744;
+        assert!((jan.heating.transmission_kwh - expected).abs() < 1e-9);
+        let tau =
+            180.0 * 1000.0 * 100.0 / 3600.0 / (26.0 + summary.ground_conductance_w_per_k + 40.0);
+        assert!((jan.time_constant_h - tau).abs() < 1e-9);
+    }
+
+    #[test]
+    fn component_errors_are_prefixed_and_block_numbers() {
+        let mut value = serde_json::to_value(sample()).unwrap();
+        value["transmission"] = json!({
+            "method": "components",
+            "direct": {"elements": [{"id": "wall", "areaM2": -1.0, "uValueWPerM2k": 0.2, "sourceReference": ""}]},
+            "unheated": null,
+            "groundFloors": [{"id": "slab", "areaM2": 50.0, "exposedPerimeterM": 0.0,
+                "constructionResistanceM2kPerW": 3.0, "sourceReference": "x"}],
+            "groundInventoryConfirmed": true
+        });
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        let result = assess_monthly_demand(&input);
+        assert_eq!(result.status, "invalid");
+        assert!(result.transmission.is_none());
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.path.starts_with("transmission.direct.")));
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "ground_floor_invalid"));
     }
 }

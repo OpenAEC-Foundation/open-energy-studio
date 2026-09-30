@@ -28,6 +28,7 @@ pub mod gas_heat_pump_chain_reference;
 pub mod gas_heat_pump_forfait_draft;
 pub mod gas_heat_pump_monthly_draft;
 pub mod generator_dispatch_draft;
+pub mod ground;
 pub mod heat_pumps;
 pub mod heating_aux_draft;
 pub mod hybrid_heat_pump_monthly_draft;

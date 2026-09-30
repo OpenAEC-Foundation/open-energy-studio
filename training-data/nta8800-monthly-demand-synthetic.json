@@ -8,6 +8,7 @@
     "sourceReference": "NTA 8800 table 7.13 residential (transcribed)"
   },
   "transmission": {
+    "method": "explicit",
     "conductanceWPerK": 80.0,
     "sourceReference": "synthetic envelope",
     "ground": null,

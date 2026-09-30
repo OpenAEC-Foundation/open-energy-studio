@@ -305,22 +305,52 @@ export type NtaOrientation =
   | 'south' | 'south_west' | 'west' | 'north_west';
 export type NtaMassClass = 'light' | 'heavy' | 'very_heavy';
 
+export interface NtaDirectTransmissionInput {
+  elements: Array<{ id: string; areaM2: number; uValueWPerM2k: number; sourceReference: string }>;
+  linearBridges?: Array<{ id: string; lengthM: number; psiWPerMk: number; sourceReference: string }>;
+  pointBridges?: Array<{ id: string; chiWPerK: number; sourceReference: string }>;
+}
+
+export type MonthlyDemandTransmission =
+  | {
+      method: 'explicit';
+      conductanceWPerK: number;
+      sourceReference: string;
+      ground: null | {
+        adjustedConductanceWPerK: number;
+        heatingKwh: number[];
+        coolingKwh: number[];
+        sourceReference: string;
+      };
+      groundInventoryConfirmed: boolean;
+    }
+  | {
+      method: 'components';
+      direct: NtaDirectTransmissionInput;
+      unheated: null | {
+        spaces: Array<{
+          id: string;
+          reductionFactor: number;
+          factorSourceReference: string;
+          boundary: NtaDirectTransmissionInput;
+        }>;
+      };
+      groundFloors: Array<{
+        id: string;
+        areaM2: number;
+        exposedPerimeterM: number;
+        constructionResistanceM2kPerW: number;
+        sourceReference: string;
+      }>;
+      groundInventoryConfirmed: boolean;
+    };
+
 export interface MonthlyDemandInput {
   zoneId: string;
   usableFloorAreaM2: number;
   areaSourceReference: string;
   setpoints: { heatingC: number; coolingC: number; sourceReference: string };
-  transmission: {
-    conductanceWPerK: number;
-    sourceReference: string;
-    ground: null | {
-      adjustedConductanceWPerK: number;
-      heatingKwh: number[];
-      coolingKwh: number[];
-      sourceReference: string;
-    };
-    groundInventoryConfirmed: boolean;
-  };
+  transmission: MonthlyDemandTransmission;
   ventilationFlows: Array<{
     id: string;
     sourceReference: string;
@@ -378,6 +408,14 @@ export interface MonthlyDemandAssessment {
   bengCalculationAvailable: false;
   omittedCorrections: string[];
   specificHeatCapacityKjPerM2k: number | null;
+  transmission: null | {
+    method: 'explicit' | 'components';
+    conductanceWPerK: number;
+    directConductanceWPerK: number | null;
+    unheatedConductanceWPerK: number | null;
+    groundConductanceWPerK: number;
+    annualMeanOutdoorTemperatureC: number | null;
+  };
   monthly: Array<{
     month: number;
     hours: number;

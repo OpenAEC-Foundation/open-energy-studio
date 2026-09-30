@@ -23,7 +23,12 @@ De formules en constanten komen uit de normanalyses C1–C5 van Open Heatloss St
 
 ## Invoer
 
-De aanroeper levert expliciet: `A_g` met bron, setpoints, `H_tr` exclusief grond (W/K), optioneel een grondroute (`H_g;adj` en twaalf maandwaarden voor verwarming en koeling), ventilatiestromen met twaalf maandelijkse `H_ve` en optionele toevoertemperatuur, de massaklassen van vloer en wand plus de kolomkeuze van het plafond, de methode voor interne winst en de volledige lijsten met ramen en opake buitenvlakken. Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldige waarde, een onbekend veld of een niet ondersteunde helling geeft `invalid` zonder getallen.
+De transmissie kent twee routes (`transmission.method`):
+
+- `explicit`: `H_tr` exclusief grond (W/K) met bron, plus optioneel een grondroute (`H_g;adj` en twaalf maandwaarden voor verwarming en koeling);
+- `components`: de module stelt `H_tr` zelf samen uit directe buitenelementen en koudebruggen (8.1, via `direct_transmission`) en onverwarmde ruimtes met opgegeven `b` (via `unheated_transmission`). Vloeren op grond gaan via het P/A-model van §8.3 (module `ground`: 8.30 `B' = A/(0,5·P)`, 8.32 `d = 0,5 + λ(R_si+R_c+0,04)`, λ = 2,0 (8.35), 8.40/8.41, 8.36 `H_g = A·U_fl`). Het grondverlies per maand is `H_g·(θ_int − θ_e;avg;an)·t` (7.14). Het jaargemiddelde is het ongewogen gemiddelde van tabel 17.1 (10,67 °C). De uitkomst geeft `transmission` met de deelcoëfficiënten.
+
+Verder levert de aanroeper expliciet: `A_g` met bron, setpoints, ventilatiestromen met twaalf maandelijkse `H_ve` en optionele toevoertemperatuur, de massaklassen van vloer en wand plus de kolomkeuze van het plafond, de methode voor interne winst en de volledige lijsten met ramen en opake buitenvlakken. Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldige waarde, een onbekend veld of een niet ondersteunde helling geeft `invalid` zonder getallen.
 
 ## Niet toegepast (altijd meegeleverd als `omittedCorrections`)
 
@@ -40,7 +45,7 @@ Een koelmaand waarin de warmteoverdracht voor koeling ≤ 0 is, wordt geweigerd 
 
 1. `τ` wordt per maand bepaald met de `H_ve` van die maand.
 2. `H_tr` bevat de onverwarmde-ruimteroute met toegepaste b-factor; de exacte samenstelling uit §8 moet de aanroeper leveren.
-3. De grondroute (§8.3) wordt aangeleverd en hier niet berekend.
+3. Grond: alleen vloer op staal (z = 0); kruipruimte, kelder en randisolatie vallen buiten de module. Er is geen periodieke term (bijlage D). `H_g;an` wordt ook als `H_g;adj` in `τ` gebruikt. `θ_e;avg;an` is het ongewogen maandgemiddelde.
 
 ## Toetsing
 
