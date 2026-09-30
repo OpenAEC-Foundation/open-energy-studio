@@ -1081,4 +1081,6 @@ export const en: Record<string, string> = {
   'nta.gap.direct_transmission_unresolved': 'Outdoor transmission cannot be derived (boundary, bridge classification or point bridge inventory)',
   'nta.gap.unheated_transmission_unresolved': 'Transmission via unheated space cannot be derived',
   'nta.gap.project_shape_invalid': 'Project structure invalid',
+  'nta.performance.labelClass': 'Label class',
+  'nta.performance.labelIndicative': 'indicative, not registered (Omgevingsregeling annex IX/X)',
 };

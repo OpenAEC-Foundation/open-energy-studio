@@ -79,7 +79,7 @@ describe('NTA performance panel', () => {
         performance: {
           status: 'calculated_unverified', issues: [],
           needIndicatorKwhPerM2Year: null, primaryFossilIndicatorKwhPerM2Year: 66.24,
-          renewableSharePercent: 17.6, annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
+          renewableSharePercent: 17.6, indicativeLabelClass: 'A+', labelSource: 'annex IX', annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
           spaceHeating: {
             omittedTerms: ['9.2.3 node losses and node gains (including solar thermal)'],
             monthly: need.map(month),
@@ -96,6 +96,8 @@ describe('NTA performance panel', () => {
     const indicators = within(await screen.findByRole('group', { name: 'Indicators' }));
     expect(indicators.getByText('66.24')).toBeInTheDocument();
     expect(indicators.getByText('17.6')).toBeInTheDocument();
+    expect(indicators.getByText('A+')).toBeInTheDocument();
+    expect(indicators.getByText('indicative, not registered (Omgevingsregeling annex IX/X)')).toBeInTheDocument();
     expect(indicators.getByText('requires fixed ventilation system C1 (§5.4)')).toBeInTheDocument();
     expect(screen.getByText('7.9.2 intermittent heating reduction a_H;red')).toBeInTheDocument();
     expect(screen.getByText('sha256:abc')).toBeInTheDocument();

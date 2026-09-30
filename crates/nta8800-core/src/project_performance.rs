@@ -13,6 +13,7 @@ use crate::domestic_hot_water::HotWaterSystem;
 use crate::ground::SlabOnGround;
 use crate::heating_emission::EmissionInput;
 use crate::indicators_draft::CalculationScope;
+use crate::label_class::LabelFunction;
 use crate::monthly_demand::{
     ComponentTransmission, InternalGains, MonthlyDemandInput, OpaqueElement, Setpoints,
     ThermalMass, Transmission, VentilationFlow, Window,
@@ -60,6 +61,8 @@ pub struct NtaCalculationInput {
     pub pv_systems: Vec<PvSystem>,
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
+    #[serde(default)]
+    pub label_function: Option<LabelFunction>,
     pub demand_uses_fixed_c1_ventilation: bool,
     pub battery_storage_present: bool,
 }
@@ -394,6 +397,7 @@ fn derive_input(
         on_site_production: nta.on_site_production,
         pv_systems: nta.pv_systems,
         hot_water: nta.hot_water,
+        label_function: nta.label_function,
         demand_uses_fixed_c1_ventilation: nta.demand_uses_fixed_c1_ventilation,
         battery_storage_present: nta.battery_storage_present,
     })

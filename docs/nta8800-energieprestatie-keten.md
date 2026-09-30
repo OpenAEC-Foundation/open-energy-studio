@@ -47,6 +47,17 @@ Een optionele maandelijkse douche-WTW-bijdrage (13.51) wordt afgetrokken. De mod
 
 Als `COP_prac` wordt de door de forfaitaire module gecorrigeerde COP gebruikt; of daar de juiste `f_prac` in zit, moet de normreview nog bevestigen. Omgevingswarmte van een tapwaterwarmtepomp (5.35/5.36) is een aparte gedeclareerde post.
 
+## Indicatieve labelklasse
+
+Module `label_class` zet de naar boven afgeronde BENG 2 om met de tabellen uit de Omgevingsregeling (art. 5.11/5.12 lid 4, [BWBR0045528](https://wetten.overheid.nl/BWBR0045528/2026-01-01), versie 1 januari 2026, opgehaald 1 oktober 2026):
+
+- **Woningen, bijlage IX:** A++++ ≤ 0, A+++ ≤ 50, A++ ≤ 75, A+ ≤ 105, A ≤ 160, B ≤ 190, C ≤ 250, D ≤ 290, E ≤ 335, F ≤ 380, G > 380 kWh/m²·jr.
+- **Utiliteit, bijlage X:** tien kolommen per gebruiksfunctie, met A+++++ tot en met G. Bij utiliteit is `labelFunction` nodig; zonder die opgave ontbreekt de klasse.
+
+De uitkomst heet `indicativeLabelClass`; `labelAvailable` blijft `false`. Het echte energielabel wordt volgens art. 5.11/5.12 lid 3 pas na registratie door een gecertificeerde adviseur (BRL 9500) vastgesteld, met een rekenprogramma dat volgens BRL 9501 is geattesteerd.
+
+De oude TypeScript-labelfunctie gebruikte onjuiste grenzen (A+++ ≤ 20, F ≤ 340). Die zijn gecorrigeerd naar bijlage IX. De wijzigingsregeling van 24 april 2026 ([Stcrt. 2026, 18123](https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html)) voegt onder meer een A0-aanduiding (bijlagen IXa/Xa) en nieuwe labelgegevens toe. Die zijn nog niet verwerkt; de datum van inwerkingtreding moet worden gecontroleerd.
+
 ## BENG 1
 
 Volgens §5.4 moet de energiebehoefte voor BENG 1 worden berekend met een vast ventilatiesysteem C1 (tabellen 11.5/11.6) en vaste interne warmtelasten. Hoofdstuk 11 zit nog niet in Rust. Daarom verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de ventilatie-invoer het C1-systeem voorstelt. De jaarlijkse behoefte met de opgegeven ventilatie staat altijd in `annualHeatingAndCoolingNeedKwh`.

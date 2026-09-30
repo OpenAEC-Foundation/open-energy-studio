@@ -132,6 +132,11 @@ export function NtaPerformancePanel() {
             <small>kWh/m²·jr</small>
           </div>
           <div>
+            <span>{t('nta.performance.labelClass')}</span>
+            <strong>{performance.indicativeLabelClass ?? '–'}</strong>
+            <small>{t('nta.performance.labelIndicative')}</small>
+          </div>
+          <div>
             <span>BENG 3</span>
             <strong>{performance.renewableSharePercent?.toFixed(1) ?? '–'}</strong>
             <small>%</small>

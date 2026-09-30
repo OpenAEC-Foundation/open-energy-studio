@@ -1334,6 +1334,11 @@ export interface BuildingPerformanceInput {
   batteryStoragePresent: boolean;
 }
 
+export type NtaLabelFunction =
+  | 'residential' | 'office' | 'assembly_without_day_care' | 'assembly_with_day_care'
+  | 'education' | 'healthcare_without_beds' | 'healthcare_with_beds' | 'retail'
+  | 'sport' | 'lodging' | 'cell';
+
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
@@ -1366,6 +1371,8 @@ export interface BuildingPerformanceAssessment {
   needIndicatorKwhPerM2Year: number | null;
   primaryFossilIndicatorKwhPerM2Year: number | null;
   renewableSharePercent: number | null;
+  indicativeLabelClass: string | null;
+  labelSource: string;
   spaceHeating: SpaceHeatingChainAssessment;
   issues: Array<{ code: string; path: string }>;
 }
@@ -1413,6 +1420,7 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  labelFunction?: NtaLabelFunction | null;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }

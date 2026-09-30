@@ -36,6 +36,7 @@ pub mod heating_emission;
 pub mod heating_aux_draft;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
+pub mod label_class;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
 pub mod project_performance;
@@ -280,6 +281,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_space_heating_chain_emission_distribution_single_generator",
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
             "unverified_pv_yield_chapter_16",
+            "indicative_label_class_omgevingsregeling_annex_ix_x",
             "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
             "unverified_project_performance_adapter_single_zone",
         ],

@@ -29,3 +29,8 @@ Uit dezelfde openbare hoofdstuk-9-PDF zijn §9.6.8.2.2–9.6.8.2.3 en vergelijki
 Een codepad krijgt pas de status `intern gevalideerd` wanneer de toepasselijke normeditie en paragraaf, invoerregels, coëfficiënten/tabellen, eenheden, afronding, onafhankelijke verwachte deeluitkomsten en testtoleranties zijn vastgelegd en gereviewd. `Extern gevalideerd` vereist een onafhankelijke toets; `geattesteerd` vereist een positief besluit voor de exacte release en scope. Een overeenkomende handberekening of zelf opgegeven W/K-verwachting voldoet hier niet aan.
 
 Voor warmtepompen ontbreken hierdoor nog de normatieve prestatie- en hulpenergieroutes per configuratie. Voor BENG, TO-juli en labels ontbreekt de geverifieerde volledige rekenketen. De huidige Rust-directe-transmissiesom is alleen diagnostisch en blijft buiten de BENG-route. Zie [dekkingsregister](nta8800-dekkingsregister.md) en [verificatiestatus](nta8800-verificatiestatus.md).
+
+## Labelklassen (toegevoegd 1 oktober 2026)
+
+- Omgevingsregeling, art. 5.11–5.13 en bijlagen IX en X, geconsolideerde tekst geldig vanaf 1 januari 2026: https://wetten.overheid.nl/BWBR0045528/2026-01-01. De grenswaarden zijn letterlijk overgenomen in `crates/nta8800-core/src/label_class.rs`.
+- Wijzigingsregeling van 24 april 2026 (EPBD IV, eerste tranche), met onder meer bijlagen IXa/Xa (A0) en art. 5.13a: https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html. Nog niet verwerkt.

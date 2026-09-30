@@ -19,6 +19,7 @@ use crate::indicators_draft::{
     assess_indicators_draft, AnnualScenario, CalculationScope, IndicatorsDraftAssessment,
     IndicatorsDraftInput, ScenarioKind,
 };
+use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_heating_chain::{
     assess_space_heating_chain, Generator, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
@@ -155,6 +156,10 @@ pub struct BuildingPerformanceInput {
     /// PV systems calculated here with 16.2/16.3.
     #[serde(default)]
     pub pv_systems: Vec<PvSystem>,
+    /// Use function for the indicative label table (annex X); residential
+    /// buildings use annex IX and may omit it.
+    #[serde(default)]
+    pub label_function: Option<LabelFunction>,
     /// Domestic hot water calculated here (chapter 13, partial).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
@@ -215,6 +220,9 @@ pub struct BuildingPerformanceAssessment {
     pub primary_fossil_indicator_kwh_per_m2_year: Option<f64>,
     /// BENG 3.
     pub renewable_share_percent: Option<f64>,
+    /// Class from annex IX/X for the rounded BENG 2; not a registered label.
+    pub indicative_label_class: Option<&'static str>,
+    pub label_source: &'static str,
     pub space_heating: SpaceHeatingChainAssessment,
     pub indicators: Option<IndicatorsDraftAssessment>,
     pub issues: Vec<PerformanceIssue>,
@@ -243,6 +251,16 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
     }
     if input.bacs_factor != 1.0 && input.bacs_factor != 1.05 {
         issues.push(issue("bacs_factor_invalid", "bacsFactor"));
+    }
+    let residential = matches!(input.calculation_scope, CalculationScope::Residential);
+    match input.label_function {
+        Some(LabelFunction::Residential) if !residential => {
+            issues.push(issue("label_function_scope_mismatch", "labelFunction"));
+        }
+        Some(function) if residential && function != LabelFunction::Residential => {
+            issues.push(issue("label_function_scope_mismatch", "labelFunction"));
+        }
+        _ => {}
     }
     if input.bacs_source_reference.trim().is_empty() {
         issues.push(issue("source_reference_required", "bacsSourceReference"));
@@ -487,6 +505,14 @@ pub fn assess_building_performance(
         primary_fossil_indicator_kwh_per_m2_year: scenario
             .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
         renewable_share_percent: scenario.map(|item| item.renewable_share_percent),
+        indicative_label_class: scenario.and_then(|item| {
+            let function = match input.calculation_scope {
+                CalculationScope::Residential => Some(LabelFunction::Residential),
+                CalculationScope::Utility => input.label_function,
+            };
+            indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
+        }),
+        label_source: LABEL_SOURCE,
         space_heating: heating,
         indicators: indicators.filter(|_| valid),
         issues,
@@ -689,6 +715,9 @@ mod tests {
         let share = 100.0 * renewable / (fossil + renewable);
         let beng3 = result.renewable_share_percent.unwrap();
         assert!(beng3 <= share && share - beng3 < 0.1);
+        // Annex IX on the rounded BENG 2.
+        let expected_class = indicative_label_class(LabelFunction::Residential, beng2).unwrap();
+        assert_eq!(result.indicative_label_class, Some(expected_class));
         // Without confirmed C1 ventilation no need indicator is reported.
         assert!(result.need_indicator_kwh_per_m2_year.is_none());
         assert!(!result.label_available);

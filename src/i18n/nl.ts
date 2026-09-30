@@ -1081,4 +1081,6 @@ export const nl: Record<string, string> = {
   'nta.gap.direct_transmission_unresolved': 'Transmissie naar buiten niet af te leiden (begrenzing, koudebrugclassificatie of puntbruginventaris)',
   'nta.gap.unheated_transmission_unresolved': 'Transmissie via onverwarmde ruimte niet af te leiden',
   'nta.gap.project_shape_invalid': 'Projectstructuur ongeldig',
+  'nta.performance.labelClass': 'Labelklasse',
+  'nta.performance.labelIndicative': 'indicatief, niet geregistreerd (Omgevingsregeling bijlage IX/X)',
 };
