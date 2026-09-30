@@ -1275,7 +1275,8 @@ export interface SpaceHeatingChainInput {
         sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
         sourceSystemReference: string;
         declaredOperatingLimitsPresent?: boolean;
-      };
+      }
+    | { kind: 'external_heat'; supplierReference: string; qualityDeclarationPresent: boolean };
 }
 
 export interface SpaceHeatingChainAssessment {
@@ -1298,6 +1299,7 @@ export interface SpaceHeatingChainAssessment {
     generatorOutputKwh: number;
     heatPumpOutputKwh: number;
     naturalGasKwh: number;
+    districtHeatKwh: number;
     generatorElectricityKwh: number;
     auxiliaryElectricityKwh: number | null;
     collectiveSourceHeatKwh: number;
@@ -1306,6 +1308,7 @@ export interface SpaceHeatingChainAssessment {
   annualGeneratorElectricityKwh: number | null;
   annualAuxiliaryElectricityKwh: number | null;
   annualCollectiveSourceHeatKwh: number | null;
+  annualDistrictHeatKwh: number | null;
   demand: MonthlyDemandAssessment;
   additionalZoneDemands: MonthlyDemandAssessment[];
   issues: Array<{ code: string; path: string }>;
@@ -1429,7 +1432,7 @@ export interface BuildingPerformanceAssessment {
   referenceVerified: false;
   attestStatus: 'unattested';
   labelAvailable: false;
-  carriers: Array<{ carrier: 'el' | 'gas' | 'oil'; month: number; usedKwh: number; deliveredKwh: number }>;
+  carriers: Array<{ carrier: 'el' | 'gas' | 'oil' | 'dh'; month: number; usedKwh: number; deliveredKwh: number }>;
   electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; selfUsedKwh: number; exportedKwh: number }>;
   annualPrimaryFossilKwh: number | null;
   annualRenewablePrimaryKwh: number | null;

@@ -41,6 +41,7 @@ pub const OMITTED_TERMS: &[&str] = &[
     "9.21 emission fan energy for fan-assisted emitters",
     "source pump/fan energy and heat pump auxiliaries without measured powers",
     "more than two generators, product-specific hybrid switching and domestic hot water priority",
+    "9.6.8.2 auxiliary energy of external heat supply and other generators",
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -90,6 +91,18 @@ pub enum Generator {
     HeatPumpForfait(HeatPumpGenerator),
     /// Heat pump with a supplementary boiler, split by table 9.1/9.23 (new build).
     HybridHeatPump(Box<HybridGenerator>),
+    /// External heat supply (9.6.7): heat is the energy carrier `dh`.
+    ExternalHeat(ExternalHeatGenerator),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExternalHeatGenerator {
+    /// Invoice, contract or other proof of external supply (9.6.7.1).
+    pub supplier_reference: String,
+    /// A quality declaration (annex P) needs a paired forfait scenario and is
+    /// not supported yet; only the fixed factor route is calculated.
+    pub quality_declaration_present: bool,
 }
 
 impl Generator {
@@ -99,6 +112,7 @@ impl Generator {
             Self::GasBoiler(_) => None,
             Self::HeatPumpForfait(generator) => Some((&generator.forfait, generator.source_system)),
             Self::HybridHeatPump(generator) => Some((&generator.forfait, generator.source_system)),
+            Self::ExternalHeat(_) => None,
         }
     }
 }
@@ -149,6 +163,8 @@ pub struct ChainMonth {
     /// Part of the generator output delivered by an electric heat pump.
     pub heat_pump_output_kwh: f64,
     pub natural_gas_kwh: f64,
+    /// Delivered external heat, carrier `dh` (9.84).
+    pub district_heat_kwh: f64,
     pub generator_electricity_kwh: f64,
     pub auxiliary_electricity_kwh: Option<f64>,
     pub collective_source_heat_kwh: f64,
@@ -181,6 +197,7 @@ pub struct SpaceHeatingChainAssessment {
     pub annual_generator_electricity_kwh: Option<f64>,
     pub annual_auxiliary_electricity_kwh: Option<f64>,
     pub annual_collective_source_heat_kwh: Option<f64>,
+    pub annual_district_heat_kwh: Option<f64>,
     pub demand: MonthlyDemandAssessment,
     pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
@@ -366,6 +383,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 generator_output_kwh: generator_output,
                 heat_pump_output_kwh: 0.0,
                 natural_gas_kwh: 0.0,
+                district_heat_kwh: 0.0,
                 generator_electricity_kwh: 0.0,
                 auxiliary_electricity_kwh: None,
                 collective_source_heat_kwh: 0.0,
@@ -525,6 +543,25 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                     issues.push(issue("generator_result_incomplete", "generator"));
                 }
             }
+            Generator::ExternalHeat(generator) => {
+                if generator.supplier_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "source_reference_required",
+                        "generator.supplierReference",
+                    ));
+                }
+                if generator.quality_declaration_present {
+                    issues.push(issue(
+                        "external_heat_declaration_unsupported",
+                        "generator.qualityDeclarationPresent",
+                    ));
+                }
+                // 9.84 with η = 1,0 and f_prac = 1 for the fixed factor 0,9.
+                generation_efficiency = Some(1.0);
+                for row in monthly.iter_mut() {
+                    row.district_heat_kwh = row.generator_output_kwh;
+                }
+            }
         }
     }
     let valid = issues.is_empty();
@@ -567,6 +604,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         annual_generator_electricity_kwh: sum(|row| row.generator_electricity_kwh),
         annual_auxiliary_electricity_kwh: auxiliary,
         annual_collective_source_heat_kwh: sum(|row| row.collective_source_heat_kwh),
+        annual_district_heat_kwh: sum(|row| row.district_heat_kwh),
         monthly,
         demand,
         additional_zone_demands,
@@ -867,5 +905,35 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "heat_pump_auxiliary_generator_mismatch"));
+    }
+
+    #[test]
+    fn external_heat_delivers_generator_output_as_dh() {
+        let mut input = boiler_chain();
+        input.generator = Generator::ExternalHeat(ExternalHeatGenerator {
+            supplier_reference: "heat supply contract".into(),
+            quality_declaration_present: false,
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert_eq!(jan.district_heat_kwh, jan.generator_output_kwh);
+        assert_eq!(jan.natural_gas_kwh, 0.0);
+        assert_eq!(result.generation_efficiency, Some(1.0));
+        input.generator = Generator::ExternalHeat(ExternalHeatGenerator {
+            supplier_reference: String::new(),
+            quality_declaration_present: true,
+        });
+        let codes: Vec<_> = assess_space_heating_chain(&input)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert!(codes.contains(&"external_heat_declaration_unsupported"));
+        assert!(codes.contains(&"source_reference_required"));
     }
 }

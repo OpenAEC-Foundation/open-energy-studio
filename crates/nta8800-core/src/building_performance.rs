@@ -35,6 +35,8 @@ pub const F_P_ELECTRICITY: f64 = 1.45;
 /// Table 5.2 `f_P;del` for natural gas and fuel oil.
 pub const F_P_GAS: f64 = 1.0;
 pub const F_P_OIL: f64 = 1.0;
+/// Table 5.2: external heat without a quality declaration (annex P).
+pub const F_P_DISTRICT_HEAT_FORFAIT: f64 = 0.9;
 /// Table 5.4.
 pub const F_PREN_RENELECT: f64 = 1.45;
 pub const F_PREN_RENHEAT: f64 = 1.0;
@@ -663,6 +665,8 @@ fn compute(
             bacs * (row.generator_electricity_kwh + row.auxiliary_electricity_kwh.unwrap_or(0.0));
         let mut used_gas = bacs * row.natural_gas_kwh;
         let mut used_oil = 0.0;
+        // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
+        let used_dh = row.district_heat_kwh;
         for item in &input.declared_uses {
             let factor = if item.service.bacs_weighted() {
                 bacs
@@ -710,6 +714,15 @@ fn compute(
                 month,
                 used_kwh: used,
                 delivered_kwh: delivered,
+            });
+        }
+        fossil += used_dh * F_P_DISTRICT_HEAT_FORFAIT;
+        if used_dh > 0.0 {
+            carriers.push(CarrierMonth {
+                carrier: "dh",
+                month,
+                used_kwh: used_dh,
+                delivered_kwh: used_dh,
             });
         }
         // 5.10 and 5.13: exported electricity is subtracted at f_P;exp;el.
@@ -1047,5 +1060,33 @@ mod tests {
         assert_eq!(tojuli.status, "invalid");
         assert!(result.tojuli_max_k.is_none());
         assert_eq!(tojuli.issues[0].code, "tojuli_components_required");
+    }
+
+    #[test]
+    fn external_heat_uses_forfait_primary_factor() {
+        use crate::space_heating_chain::ExternalHeatGenerator;
+        let mut sample = input();
+        let base = assess_building_performance(&sample);
+        sample.space_heating.generator = Generator::ExternalHeat(ExternalHeatGenerator {
+            supplier_reference: "contract".into(),
+            quality_declaration_present: false,
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let heat: f64 = result.space_heating.annual_district_heat_kwh.unwrap();
+        let base_gas = base.space_heating.annual_natural_gas_kwh.unwrap();
+        let base_aux = base.space_heating.annual_auxiliary_electricity_kwh.unwrap();
+        let expected =
+            base.annual_primary_fossil_kwh.unwrap() - base_gas - base_aux * 1.45 + heat * 0.9;
+        assert!((result.annual_primary_fossil_kwh.unwrap() - expected).abs() < 1e-6);
+        assert!(result.carriers.iter().any(|item| item.carrier == "dh"));
+        assert_eq!(
+            result.annual_renewable_primary_kwh,
+            base.annual_renewable_primary_kwh
+        );
     }
 }

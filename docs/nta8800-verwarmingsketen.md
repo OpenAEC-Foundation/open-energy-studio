@@ -33,6 +33,8 @@ Bij één opwekker geeft tabel 9.1 `β = 1`, dus 100% dekking van `Q_H;gen;out =
 
 - `hybrid_heat_pump`: warmtepomp met individuele bijverwarmingsketel. De bestaande [generatorverdeling](nta8800-generatorverdeling-concept.md) splitst de knooppuntvraag van de keten volgens tabel 9.1/9.23 (alleen nieuwbouw, installatievermogens). Daarna volgen de forfaitaire COP-route voor het warmtepompdeel en tabel 9.25/9.61/9.85 voor het ketelaandeel. Gemeten hulpenergie van de warmtepomp (9.85–9.88) is optioneel en telt op bij de hulpenergie van de ketel. Weigering volgt, net als in de onderliggende module, bij een ontwerpaanvoer boven 55 °C (bijlage Q), bij productgebonden afschakelgrenzen en bij een afwijkende ketelrol. `heatPumpOutputKwh` per maand geeft het warmtepompdeel; alleen daarover telt omgevingswarmte als hernieuwbaar (5.31).
 
+- `external_heat`: externe warmtelevering (§9.6.7) met `η = 1,0` en `f_prac = 1` (9.84). De opwekkeroutput wordt geleverde warmte op drager `dh`, met bewijs van levering (`supplierReference`, 9.6.7.1). In de prestatieketen telt `dh` met de vaste factor `f_P` = 0,9 (tabel 5.2) en `f_Pren` = 0 (tabel 5.4). Een kwaliteitsverklaring volgens bijlage P wordt geweigerd (`external_heat_declaration_unsupported`), omdat die volgens §5.3 een gepaard forfaitair scenario vergt. Hulpenergie van de afleverset (9.6.8.2) is niet meegenomen.
+
 ## Niet meegenomen (`omittedTerms`)
 
 Knooppuntverliezen en -winst (9.2.3), terugwinbare systeemverliezen (9.2.5), ventilatorenergie van de afgifte (9.21), bronpomp/-ventilator en hulpenergie van een warmtepomp zonder gemeten vermogens, meer dan twee opwekkers, productgebonden hybride schakeling en tapwaterprioriteit.
