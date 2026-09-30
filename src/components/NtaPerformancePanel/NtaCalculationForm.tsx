@@ -103,6 +103,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         ['sport', t('nta.form.bbl.sport')], ['other_lodging', t('nta.form.bbl.other_lodging')],
       ]} />
       <CheckField {...field} path={['activeCoolingPresent']} label={t('nta.form.activeCooling')} />
+      <CheckField {...field} path={['permitApplicationAfter20260529']} label={t('nta.form.permitAfter')} />
     </Section>
     <Section title={t('nta.form.setpoints')}>
       <NumberField {...field} path={['setpoints', 'heatingC']} label={t('nta.form.heatingSetpoint')} />

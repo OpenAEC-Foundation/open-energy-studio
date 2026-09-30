@@ -178,6 +178,17 @@ export function NtaPerformancePanel() {
             </li>
           </ul>
         </div>}
+        {performance.a0Check && <div className="nta-performance-bbl" role="group" aria-label="A0">
+          <strong>{t('nta.performance.a0')}</strong>
+          <ul>
+            <li><span>BENG 2 ≤ {performance.a0Check.primaryFossilMaxKwhPerM2.toFixed(0)} (IXa/Xa)</span>
+              <em>{performance.a0Check.primaryFossilMeets == null ? t('nta.performance.bblUnknown') : performance.a0Check.primaryFossilMeets ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em></li>
+            <li><span>{t('nta.performance.a0Fossil')}</span>
+              <em>{performance.a0Check.noOnSiteFossilCombustion ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em></li>
+            <li><span>A0</span>
+              <em>{performance.a0Check.eligible == null ? t('nta.performance.bblUnknown') : performance.a0Check.eligible ? t('nta.performance.a0Yes') : t('nta.performance.a0No')}</em></li>
+          </ul>
+        </div>}
         {performance.bblCheck && <div className="nta-performance-bbl" role="group" aria-label={t('nta.performance.bbl')}>
           <strong>{t('nta.performance.bbl')}</strong>
           <small>A<sub>ls</sub>/A<sub>g</sub> = {performance.bblCheck.lossAreaRatio.toFixed(2)}</small>

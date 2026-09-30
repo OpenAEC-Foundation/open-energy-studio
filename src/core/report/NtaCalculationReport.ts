@@ -88,6 +88,11 @@ export function generateNtaCalculationReportHTML(
       <tr><th>BENG 3 ≥ ${num(bbl.limits.renewableShareMinPercent)}%</th>${cell(meets(bbl.renewableShareMeets))}<th>Toeslag lichte bouw (lid 4)</th>${cell(bbl.limits.lightConstructionAllowanceApplied ? 'toegepast' : 'niet van toepassing')}</tr>
       <tr><th>Bron</th><td colspan="3">${escapeHtml(bbl.source)}</td></tr>
     </tbody></table>` : ''}
+    ${performance.a0Check ? `<h2>Aanduiding A0 (Omgevingsregeling art. 5.11/5.12 lid 5)</h2><table><tbody>
+      <tr><th>BENG 2 ≤ ${num(performance.a0Check.primaryFossilMaxKwhPerM2)} (bijlage IXa/Xa)</th>${cell(meets(performance.a0Check.primaryFossilMeets))}<th>Geen fossiele verbranding ter plaatse</th>${cell(meets(performance.a0Check.noOnSiteFossilCombustion))}</tr>
+      <tr><th>BENG 1 / BENG 3 (tabel 4.148A)</th>${cell(`${meets(performance.a0Check.energyNeedMeets)} / ${meets(performance.a0Check.renewableShareMeets)}`)}<th>A0 mogelijk</th>${cell(performance.a0Check.eligible == null ? 'niet te toetsen' : performance.a0Check.eligible ? 'ja (onverifieerd)' : 'nee')}</tr>
+      <tr><th>Bron</th><td colspan="3">${escapeHtml(performance.a0Check.source)}</td></tr>
+    </tbody></table>` : ''}
     <h2>TO<sub>juli</sub> (§5.7)</h2>
     ${tojuliRows ? `<table><thead><tr><th>Zone</th><th>Oriëntatie</th><th>TO<sub>juli</sub> [K]</th></tr></thead><tbody>${tojuliRows}</tbody></table>
       <p>Hoogste waarde: ${num(performance.tojuliMaxK, 2)} K — Bbl 4.149b (≤ 1,20): ${meets(performance.tojuliMeetsBblLimit)}.</p>` : '<p>Niet bepaald.</p>'}

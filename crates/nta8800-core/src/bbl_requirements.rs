@@ -146,6 +146,72 @@ pub fn bbl_limits(
     })
 }
 
+pub const A0_SOURCE: &str = "Omgevingsregeling art. 5.11/5.12 lid 5, bijlagen IXa/Xa (Stcrt. 2026, 18123; in werking mei 2026)";
+
+/// Annexes IXa/Xa: maximum primary fossil energy for the A0 designation.
+pub fn a0_primary_fossil_max(function: BblFunction) -> f64 {
+    use BblFunction::*;
+    match function {
+        ResidentialBuilding => 45.0,
+        Caravan => 54.0,
+        FloatingBuildingAfter2018Berth => 45.0,
+        FloatingBuildingOtherBerth => 63.0,
+        OtherResidential => 27.0,
+        OtherLodging => 36.0,
+        AssemblyChildCare => 63.0,
+        OtherAssembly => 54.0,
+        Cell => 108.0,
+        HealthcareWithBeds => 117.0,
+        OtherHealthcare => 45.0,
+        Office => 36.0,
+        LodgingInLodgingBuilding => 117.0,
+        Education => 64.0,
+        Sport => 81.0,
+        Retail => 54.0,
+    }
+}
+
+/// A0 designation for emission-free new buildings with a permit application
+/// after 29 May 2026 (Omgevingsregeling art. 5.11/5.12 lid 5).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct A0Check {
+    pub source: &'static str,
+    pub primary_fossil_max_kwh_per_m2: f64,
+    /// a: energy need within the table 4.148A limit.
+    pub energy_need_meets: Option<bool>,
+    /// b: primary fossil energy within annex IXa/Xa.
+    pub primary_fossil_meets: Option<bool>,
+    /// c: renewable share at least the table 4.148A value.
+    pub renewable_share_meets: Option<bool>,
+    /// d: no on-site carbon emissions from fossil fuels.
+    pub no_on_site_fossil_combustion: bool,
+    /// All four conditions; `None` when one of them cannot be checked.
+    pub eligible: Option<bool>,
+}
+
+pub fn a0_check(check: &BblCheck, beng2: Option<f64>, on_site_fossil_use: bool) -> A0Check {
+    let max = a0_primary_fossil_max(check.function);
+    let fossil = beng2.map(|value| value <= max);
+    let parts = [check.energy_need_meets, fossil, check.renewable_share_meets];
+    let eligible = if on_site_fossil_use || parts.contains(&Some(false)) {
+        Some(false)
+    } else if parts.iter().all(Option::is_some) {
+        Some(true)
+    } else {
+        None
+    };
+    A0Check {
+        source: A0_SOURCE,
+        primary_fossil_max_kwh_per_m2: max,
+        energy_need_meets: check.energy_need_meets,
+        primary_fossil_meets: fossil,
+        renewable_share_meets: check.renewable_share_meets,
+        no_on_site_fossil_combustion: !on_site_fossil_use,
+        eligible,
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BblCheck {
@@ -232,5 +298,38 @@ mod tests {
         assert_eq!(result.energy_need_meets, None);
         assert_eq!(result.primary_fossil_meets, Some(true));
         assert_eq!(result.renewable_share_meets, Some(false));
+    }
+
+    #[test]
+    fn a0_requires_all_four_conditions() {
+        let base = check(
+            BblFunction::OtherResidential,
+            2.0,
+            250.0,
+            Some(60.0),
+            Some(20.0),
+            Some(80.0),
+        )
+        .unwrap();
+        let a0 = a0_check(&base, Some(20.0), false);
+        assert_eq!(a0.primary_fossil_max_kwh_per_m2, 27.0);
+        assert_eq!(a0.eligible, Some(true));
+        assert_eq!(a0_check(&base, Some(27.01), false).eligible, Some(false));
+        assert_eq!(a0_check(&base, Some(20.0), true).eligible, Some(false));
+        let no_need = check(
+            BblFunction::OtherResidential,
+            2.0,
+            250.0,
+            None,
+            Some(20.0),
+            Some(80.0),
+        )
+        .unwrap();
+        assert_eq!(a0_check(&no_need, Some(20.0), false).eligible, None);
+        assert_eq!(a0_primary_fossil_max(BblFunction::Education), 64.0);
+        assert_eq!(
+            a0_primary_fossil_max(BblFunction::HealthcareWithBeds),
+            117.0
+        );
     }
 }

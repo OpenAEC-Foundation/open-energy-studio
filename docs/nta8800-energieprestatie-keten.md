@@ -56,7 +56,16 @@ Module `label_class` zet de naar boven afgeronde BENG 2 om met de tabellen uit d
 
 De uitkomst heet `indicativeLabelClass`; `labelAvailable` blijft `false`. Het echte energielabel wordt volgens art. 5.11/5.12 lid 3 pas na registratie door een gecertificeerde adviseur (BRL 9500) vastgesteld, met een rekenprogramma dat volgens BRL 9501 is geattesteerd.
 
-De oude TypeScript-labelfunctie gebruikte onjuiste grenzen (A+++ ≤ 20, F ≤ 340). Die zijn gecorrigeerd naar bijlage IX. De wijzigingsregeling van 24 april 2026 ([Stcrt. 2026, 18123](https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html)) voegt onder meer een A0-aanduiding (bijlagen IXa/Xa) en nieuwe labelgegevens toe. Die zijn nog niet verwerkt; de datum van inwerkingtreding moet worden gecontroleerd.
+**Aanduiding A0.** Sinds de wijzigingsregeling van 24 april 2026 ([Stcrt. 2026, 18123](https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html), in werking in mei 2026; bijlage IX zelf is niet gewijzigd) mag bij een vergunningaanvraag na 29 mei 2026 de aanduiding A0 naast de labelklasse staan. Voorwaarden (art. 5.11/5.12 lid 5):
+
+- a) BENG 1 voldoet aan tabel 4.148A;
+- b) BENG 2 ≤ bijlage IXa/Xa, bijvoorbeeld andere woonfunctie 27, woongebouw 45, kantoor 36;
+- c) BENG 3 voldoet aan tabel 4.148A;
+- d) geen koolstofemissie uit fossiele brandstoffen ter plaatse.
+
+Module `bbl_requirements::a0_check` toetst die voorwaarden, bij `permitApplicationAfter20260529 = true`. Voorwaarde d is afgeleid als "geen gas- of oliegebruik". Zonder BENG 1 (geen C1) is de uitkomst "niet te toetsen".
+
+De oude TypeScript-labelfunctie gebruikte onjuiste grenzen (A+++ ≤ 20, F ≤ 340). Die zijn gecorrigeerd naar bijlage IX. De verplichte nieuwe labelgegevens van art. 5.13a (onder meer operationele broeikasgasemissies) zijn nog niet uitgewerkt.
 
 ## Toets Bbl art. 4.149
 

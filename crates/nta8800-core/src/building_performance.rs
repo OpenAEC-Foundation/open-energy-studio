@@ -11,7 +11,7 @@
 //! because their draft rules are incomplete or not wired. Non-EP electricity
 //! is fixed at 0 as required for the indicators (5.27).
 
-use crate::bbl_requirements::{check as bbl_check, BblCheck, BblFunction};
+use crate::bbl_requirements::{a0_check, check as bbl_check, A0Check, BblCheck, BblFunction};
 use crate::domestic_hot_water::{monthly_hot_water, validate_hot_water, HotWaterSystem};
 use crate::final_energy_draft::DRAFT_SOURCE;
 use crate::forfait_heat_pump_draft::TableSource;
@@ -167,6 +167,9 @@ pub struct BuildingPerformanceInput {
     /// §5.7.1: a zone with sufficient active cooling may use TOjuli = 0.
     #[serde(default)]
     pub active_cooling_present: bool,
+    /// Permit application after 29 May 2026: the A0 designation may apply.
+    #[serde(default, rename = "permitApplicationAfter20260529")]
+    pub permit_application_after_2026_05_29: bool,
     /// Row of Bbl table 4.148A for the requirement check.
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
@@ -245,6 +248,8 @@ pub struct BuildingPerformanceAssessment {
     pub tojuli_meets_bbl_limit: Option<bool>,
     /// Bbl 4.149 check; only with a function and a loss area.
     pub bbl_check: Option<BblCheck>,
+    /// A0 designation check; only with a Bbl check and a qualifying permit date.
+    pub a0_check: Option<A0Check>,
     pub space_heating: SpaceHeatingChainAssessment,
     pub indicators: Option<IndicatorsDraftAssessment>,
     pub issues: Vec<PerformanceIssue>,
@@ -580,6 +585,21 @@ pub fn assess_building_performance(
             .filter_map(|item| item.max_tojuli_k)
             .fold(0.0_f64, f64::max)
     });
+    let bbl = match (input.bbl_function, input.loss_area_m2, scenario) {
+        (Some(function), Some(area), Some(item)) => bbl_check(
+            function,
+            area / input.total_usable_floor_area_m2,
+            heating_capacity,
+            need_indicator,
+            Some(item.primary_fossil_indicator_kwh_per_m2_year),
+            Some(item.renewable_share_percent),
+        ),
+        _ => None,
+    };
+    // Condition d of the A0 designation: no gas or oil burnt on site.
+    let on_site_fossil_use = carriers
+        .iter()
+        .any(|item| matches!(item.carrier, "gas" | "oil") && item.used_kwh > 0.0);
     BuildingPerformanceAssessment {
         status: if valid {
             "calculated_unverified"
@@ -616,17 +636,17 @@ pub fn assess_building_performance(
         tojuli_max_k: tojuli_max,
         tojuli_meets_bbl_limit: tojuli_max.map(|value| value <= crate::tojuli::TOJULI_LIMIT_K),
         tojuli,
-        bbl_check: match (input.bbl_function, input.loss_area_m2, scenario) {
-            (Some(function), Some(area), Some(item)) => bbl_check(
-                function,
-                area / input.total_usable_floor_area_m2,
-                heating_capacity,
-                need_indicator,
-                Some(item.primary_fossil_indicator_kwh_per_m2_year),
-                Some(item.renewable_share_percent),
-            ),
-            _ => None,
-        },
+        a0_check: bbl
+            .as_ref()
+            .filter(|_| input.permit_application_after_2026_05_29)
+            .map(|check| {
+                a0_check(
+                    check,
+                    scenario.map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
+                    on_site_fossil_use,
+                )
+            }),
+        bbl_check: bbl,
         space_heating: heating,
         indicators: indicators.filter(|_| valid),
         issues,
@@ -1088,5 +1108,19 @@ mod tests {
             result.annual_renewable_primary_kwh,
             base.annual_renewable_primary_kwh
         );
+    }
+
+    #[test]
+    fn a0_check_only_with_permit_date_and_fails_with_gas() {
+        let mut sample = input();
+        sample.bbl_function = Some(BblFunction::OtherResidential);
+        sample.loss_area_m2 = Some(200.0);
+        sample.loss_area_source_reference = Some("envelope".into());
+        assert!(assess_building_performance(&sample).a0_check.is_none());
+        sample.permit_application_after_2026_05_29 = true;
+        let result = assess_building_performance(&sample);
+        let a0 = result.a0_check.as_ref().unwrap();
+        assert!(!a0.no_on_site_fossil_combustion);
+        assert_eq!(a0.eligible, Some(false));
     }
 }

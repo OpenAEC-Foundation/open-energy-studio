@@ -71,6 +71,8 @@ pub struct NtaCalculationInput {
     pub bbl_function: Option<BblFunction>,
     #[serde(default)]
     pub active_cooling_present: bool,
+    #[serde(default, rename = "permitApplicationAfter20260529")]
+    pub permit_application_after_2026_05_29: bool,
     pub demand_uses_fixed_c1_ventilation: bool,
     pub battery_storage_present: bool,
 }
@@ -525,6 +527,7 @@ fn derive_input(
         label_function: nta.label_function,
         bbl_function: nta.bbl_function,
         active_cooling_present: nta.active_cooling_present,
+        permit_application_after_2026_05_29: nta.permit_application_after_2026_05_29,
         loss_area_m2: Some(loss_area),
         loss_area_source_reference: Some(
             "derived: gross project surfaces bordering outdoor air, ground or unheated space"

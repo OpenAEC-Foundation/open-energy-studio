@@ -1203,4 +1203,9 @@ export const nl: Record<string, string> = {
   'nta.form.externalSource': 'Bewijs levering (factuur/contract)',
   'nta.form.externalNote': 'Vaste primaire factor 0,9 zonder kwaliteitsverklaring (tabel 5.2).',
   'nta.performance.unclassified': 'vlakken zonder begrenzing',
+  'nta.performance.a0': 'Aanduiding A0 (emissievrij, art. 5.11/5.12 lid 5)',
+  'nta.performance.a0Fossil': 'Geen fossiele verbranding ter plaatse',
+  'nta.performance.a0Yes': 'mogelijk (onverifieerd)',
+  'nta.performance.a0No': 'niet mogelijk',
+  'nta.form.permitAfter': 'Vergunningaanvraag na 29 mei 2026 (A0 mogelijk)',
 };

@@ -1444,6 +1444,15 @@ export interface BuildingPerformanceAssessment {
   indicativeLabelClass: string | null;
   labelSource: string;
   bblCheck: NtaBblCheck | null;
+  a0Check: null | {
+    source: string;
+    primaryFossilMaxKwhPerM2: number;
+    energyNeedMeets: boolean | null;
+    primaryFossilMeets: boolean | null;
+    renewableShareMeets: boolean | null;
+    noOnSiteFossilCombustion: boolean;
+    eligible: boolean | null;
+  };
   tojuli: NtaTojuliAssessment[];
   tojuliMaxK: number | null;
   tojuliMeetsBblLimit: boolean | null;
@@ -1506,6 +1515,7 @@ export interface NtaCalculationInput {
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
   activeCoolingPresent?: boolean;
+  permitApplicationAfter20260529?: boolean;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }

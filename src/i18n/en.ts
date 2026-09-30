@@ -1203,4 +1203,9 @@ export const en: Record<string, string> = {
   'nta.form.externalSource': 'Proof of supply (invoice/contract)',
   'nta.form.externalNote': 'Fixed primary factor 0.9 without a quality declaration (table 5.2).',
   'nta.performance.unclassified': 'surfaces without boundary',
+  'nta.performance.a0': 'A0 designation (emission-free, art. 5.11/5.12 para. 5)',
+  'nta.performance.a0Fossil': 'No on-site fossil combustion',
+  'nta.performance.a0Yes': 'possible (unverified)',
+  'nta.performance.a0No': 'not possible',
+  'nta.form.permitAfter': 'Permit application after 29 May 2026 (A0 possible)',
 };
