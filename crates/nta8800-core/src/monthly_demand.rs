@@ -1242,4 +1242,75 @@ mod tests {
         assert!((result.monthly[0].opaque_solar_gains_kwh - roof).abs() < 1e-9);
         assert_eq!(sky_view_factor(120.0), 0.0);
     }
+
+    /// Balance invariants over a grid of envelope, glazing and mass variants.
+    #[test]
+    fn balance_invariants_hold_over_variants() {
+        let masses = [
+            (
+                MassClass::Light,
+                MassClass::Light,
+                CeilingColumn::ClosedOrSuspended,
+            ),
+            (
+                MassClass::VeryHeavy,
+                MassClass::Heavy,
+                CeilingColumn::OpenOrNone,
+            ),
+        ];
+        let mut previous_heating: Option<f64> = None;
+        for conductance in [20.0, 60.0, 120.0, 240.0] {
+            for window_area in [0.5, 10.0, 40.0] {
+                for (floor, wall, ceiling) in masses {
+                    let mut input = sample();
+                    if let Transmission::Explicit(transmission) = &mut input.transmission {
+                        transmission.conductance_w_per_k = conductance;
+                    }
+                    input.windows[0].area_m2 = window_area;
+                    input.thermal_mass.floor = floor;
+                    input.thermal_mass.wall = wall;
+                    input.thermal_mass.ceiling = ceiling;
+                    let result = assess_monthly_demand(&input);
+                    assert_eq!(
+                        result.status, "calculated_unverified",
+                        "{:?}",
+                        result.issues
+                    );
+                    for row in &result.monthly {
+                        for balance in [&row.heating, &row.cooling] {
+                            assert!(balance.need_kwh >= 0.0);
+                            assert!((0.0..=1.0 + 1e-12).contains(&balance.utilization));
+                        }
+                        assert!(
+                            row.heating.need_kwh <= row.heating.heat_transfer_kwh.max(0.0) + 1e-9
+                        );
+                        assert!(row.cooling.need_kwh <= row.cooling.gains_kwh + 1e-9);
+                    }
+                }
+            }
+            // More conductance never lowers the heating need (same glazing and mass).
+            let mut input = sample();
+            if let Transmission::Explicit(transmission) = &mut input.transmission {
+                transmission.conductance_w_per_k = conductance;
+            }
+            let heating = assess_monthly_demand(&input)
+                .annual_heating_need_kwh
+                .unwrap();
+            if let Some(previous) = previous_heating {
+                assert!(heating >= previous - 1e-9);
+            }
+            previous_heating = Some(heating);
+        }
+        // More south glazing never lowers the cooling need.
+        let mut last = 0.0;
+        for window_area in [0.5, 5.0, 10.0, 20.0, 40.0] {
+            let mut input = sample();
+            input.windows[0].area_m2 = window_area;
+            let cooling = assess_monthly_demand(&input)
+                .annual_cooling_need_kwh
+                .unwrap();
+            assert!(cooling >= last - 1e-9, "{window_area}: {cooling} < {last}");
+            last = cooling;
+        }
+    }
 }
