@@ -1231,8 +1231,15 @@ export async function assessProjectWithRust(project: IProject): Promise<KernelAs
   throw new Error('Rust validation is available in the desktop app and local development server.');
 }
 
+export interface SpaceHeatingChainZone {
+  demand: MonthlyDemandInput;
+  emission: SpaceHeatingChainInput['emission'];
+  distribution: SpaceHeatingChainInput['distribution'];
+}
+
 export interface SpaceHeatingChainInput {
   demand: MonthlyDemandInput;
+  additionalZones?: SpaceHeatingChainZone[];
   emission: {
     system: 'radiators_or_convectors' | 'floor_heating' | 'fan_assisted_radiators_or_convectors' | 'air_heating' | 'other_or_unknown';
     balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
@@ -1280,6 +1287,7 @@ export interface SpaceHeatingChainAssessment {
   annualAuxiliaryElectricityKwh: number | null;
   annualCollectiveSourceHeatKwh: number | null;
   demand: MonthlyDemandAssessment;
+  additionalZoneDemands: MonthlyDemandAssessment[];
   issues: Array<{ code: string; path: string }>;
 }
 
@@ -1361,6 +1369,7 @@ export interface NtaBblCheck {
 }
 
 export interface NtaTojuliAssessment {
+  zoneId: string;
   status: 'calculated_unverified' | 'invalid';
   activeCooling: boolean;
   orientations: Array<{
@@ -1412,7 +1421,9 @@ export interface BuildingPerformanceAssessment {
   indicativeLabelClass: string | null;
   labelSource: string;
   bblCheck: NtaBblCheck | null;
-  tojuli: NtaTojuliAssessment | null;
+  tojuli: NtaTojuliAssessment[];
+  tojuliMaxK: number | null;
+  tojuliMeetsBblLimit: boolean | null;
   spaceHeating: SpaceHeatingChainAssessment;
   issues: Array<{ code: string; path: string }>;
 }
@@ -1447,6 +1458,15 @@ export interface NtaCalculationInput {
     sourceReference: string;
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
+  zoneData?: Array<{
+    zoneId: string;
+    ventilationFlows: MonthlyDemandInput['ventilationFlows'];
+    internalGains: MonthlyDemandInput['internalGains'];
+    setpoints?: MonthlyDemandInput['setpoints'];
+    thermalMass?: MonthlyDemandInput['thermalMass'];
+    emission?: SpaceHeatingChainInput['emission'];
+    distribution?: SpaceHeatingChainInput['distribution'];
+  }>;
   emission: SpaceHeatingChainInput['emission'];
   distribution: SpaceHeatingChainInput['distribution'];
   generator: SpaceHeatingChainInput['generator'];

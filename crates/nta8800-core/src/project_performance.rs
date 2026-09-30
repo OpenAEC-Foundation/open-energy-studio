@@ -20,9 +20,9 @@ use crate::monthly_demand::{
     ThermalMass, Transmission, VentilationFlow, Window,
 };
 use crate::pv::PvSystem;
-use crate::space_heating_chain::{Distribution, Generator, SpaceHeatingChainInput};
+use crate::space_heating_chain::{ChainZone, Distribution, Generator, SpaceHeatingChainInput};
 use crate::{
-    direct_boundary_input, input_fingerprint, unheated_project_input, ProjectInput,
+    direct_boundary_input_zone, input_fingerprint, unheated_zone_input, ProjectInput,
     ThermalBoundary, KERNEL_VERSION, TARGET_NORM_VERSION,
 };
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,9 @@ pub struct NtaCalculationInput {
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
     pub ventilation_flows: Vec<VentilationFlow>,
+    /// Required for every zone when the project has more than one zone.
+    #[serde(default)]
+    pub zone_data: Vec<ZoneNtaData>,
     pub emission: EmissionInput,
     pub distribution: Distribution,
     pub generator: Generator,
@@ -70,6 +73,24 @@ pub struct NtaCalculationInput {
     pub active_cooling_present: bool,
     pub demand_uses_fixed_c1_ventilation: bool,
     pub battery_storage_present: bool,
+}
+
+/// Per-zone data for projects with more than one calculation zone. Omitted
+/// optional fields fall back to the block-level values.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ZoneNtaData {
+    pub zone_id: String,
+    pub ventilation_flows: Vec<VentilationFlow>,
+    pub internal_gains: InternalGains,
+    #[serde(default)]
+    pub setpoints: Option<Setpoints>,
+    #[serde(default)]
+    pub thermal_mass: Option<ThermalMass>,
+    #[serde(default)]
+    pub emission: Option<EmissionInput>,
+    #[serde(default)]
+    pub distribution: Option<Distribution>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -194,12 +215,24 @@ fn derive_input(
             }
         }
     };
-    if project.zones.len() != 1 {
-        gaps.push(gap("single_zone_required", "zones"));
+    if project.zones.is_empty() {
+        gaps.push(gap("zone_required", "zones"));
     }
     let nta = nta?;
-    let zone = project.zones.first()?;
-
+    let multi_zone = project.zones.len() > 1;
+    let zone_data: HashMap<&str, &ZoneNtaData> = nta
+        .zone_data
+        .iter()
+        .map(|item| (item.zone_id.as_str(), item))
+        .collect();
+    for (index, item) in nta.zone_data.iter().enumerate() {
+        if !project.zones.iter().any(|zone| zone.id == item.zone_id) {
+            gaps.push(gap(
+                "zone_data_without_zone",
+                format!("ntaCalculation.zoneData[{index}].zoneId"),
+            ));
+        }
+    }
     let constructions: HashMap<&str, &Value> = project
         .constructions
         .iter()
@@ -217,134 +250,195 @@ fn derive_input(
         .collect();
     let mut used_ground = HashSet::new();
     let mut loss_area = 0.0;
-    let mut windows = Vec::new();
-    let mut opaque = Vec::new();
-    let mut ground_floors = Vec::new();
+    let mut total_area = 0.0;
+    let mut zones = Vec::new();
 
-    for (index, surface) in zone.surfaces.iter().enumerate() {
-        let path = format!("zones[0].surfaces[{index}]");
-        let id = surface.get("id").and_then(Value::as_str).unwrap_or("");
-        let boundary = surface
-            .get("thermalBoundary")
-            .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok());
-        let Some(boundary) = boundary else {
-            gaps.push(gap(
-                "surface_boundary_missing",
-                format!("{path}.thermalBoundary"),
-            ));
-            continue;
-        };
-        let surface_type = surface.get("type").and_then(Value::as_str).unwrap_or("");
-        if matches!(
-            boundary,
-            ThermalBoundary::Outdoor | ThermalBoundary::Ground | ThermalBoundary::UnheatedSpace
-        ) {
-            loss_area += surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+    for (zone_index, zone) in project.zones.iter().enumerate() {
+        let zone_path = format!("zones[{zone_index}]");
+        total_area += zone.floor_area;
+        let data = zone_data.get(zone.id.as_str()).copied();
+        if multi_zone && data.is_none() {
+            gaps.push(gap("zone_data_missing", format!("{zone_path}.id")));
         }
-        match boundary {
-            ThermalBoundary::Ground => {
-                match ground_data.get(id) {
-                    Some(data) => {
-                        used_ground.insert(id.to_owned());
-                        ground_floors.push(SlabOnGround {
-                            id: id.to_owned(),
-                            area_m2: surface.get("area").and_then(Value::as_f64).unwrap_or(0.0),
-                            exposed_perimeter_m: data.exposed_perimeter_m,
-                            construction_resistance_m2k_per_w: data
-                                .construction_resistance_m2k_per_w,
-                            source_reference: data.source_reference.clone(),
-                        });
-                    }
-                    None => gaps.push(gap("ground_floor_data_missing", format!("{path}.id"))),
-                }
-                continue;
-            }
-            ThermalBoundary::Outdoor => {}
-            _ => continue,
-        }
-        // Outdoor surface: solar gains for windows and the opaque rest.
-        let orientation_value = surface
-            .get("orientation")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let Some(surface_orientation) = orientation(orientation_value) else {
-            gaps.push(gap(
-                "surface_orientation_invalid",
-                format!("{path}.orientation"),
-            ));
-            continue;
-        };
-        let tilt = match (tilts.get(id), surface_orientation, surface_type) {
-            (Some(tilt), _, _) => *tilt,
-            (None, None, _) => 0.0,
-            (None, Some(_), "wall") => 90.0,
-            (None, Some(_), _) => {
-                gaps.push(gap("surface_tilt_missing", format!("{path}.id")));
-                continue;
-            }
-        };
-        let azimuth_orientation = surface_orientation.unwrap_or(Orientation::South);
-        let mut window_area = 0.0;
-        for (window_index, window) in surface
-            .get("windows")
-            .and_then(Value::as_array)
-            .map(Vec::as_slice)
-            .unwrap_or_default()
-            .iter()
-            .enumerate()
-        {
-            let window_path = format!("{path}.windows[{window_index}]");
-            let (Some(window_id), Some(area), Some(u_value), Some(g_value)) = (
-                window.get("id").and_then(Value::as_str),
-                window.get("area").and_then(Value::as_f64),
-                window.get("uValue").and_then(Value::as_f64),
-                window.get("gValue").and_then(Value::as_f64),
-            ) else {
-                gaps.push(gap("window_data_missing", window_path));
+        let mut windows = Vec::new();
+        let mut opaque = Vec::new();
+        let mut ground_floors = Vec::new();
+        for (index, surface) in zone.surfaces.iter().enumerate() {
+            let path = format!("{zone_path}.surfaces[{index}]");
+            let id = surface.get("id").and_then(Value::as_str).unwrap_or("");
+            let boundary = surface
+                .get("thermalBoundary")
+                .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok());
+            let Some(boundary) = boundary else {
+                gaps.push(gap(
+                    "surface_boundary_missing",
+                    format!("{path}.thermalBoundary"),
+                ));
                 continue;
             };
-            window_area += area;
-            windows.push(Window {
-                id: format!("window:{window_id}"),
-                area_m2: area,
-                orientation: azimuth_orientation,
-                tilt_deg: tilt,
-                g_perpendicular: g_value,
-                frame_fraction: nta.window_solar.frame_fraction,
-                u_value_w_per_m2k: u_value,
-                obstruction_factor: nta.window_solar.obstruction_factor,
-                source_reference: format!(
-                    "project:window:{window_id}; {}",
-                    nta.window_solar.source_reference
-                ),
-            });
-        }
-        let gross = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
-        let opaque_area = gross - window_area;
-        if opaque_area > 1e-9 {
-            let construction_id = surface
-                .get("constructionId")
+            let surface_type = surface.get("type").and_then(Value::as_str).unwrap_or("");
+            if matches!(
+                boundary,
+                ThermalBoundary::Outdoor | ThermalBoundary::Ground | ThermalBoundary::UnheatedSpace
+            ) {
+                loss_area += surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+            }
+            match boundary {
+                ThermalBoundary::Ground => {
+                    match ground_data.get(id) {
+                        Some(data) => {
+                            used_ground.insert(id.to_owned());
+                            ground_floors.push(SlabOnGround {
+                                id: id.to_owned(),
+                                area_m2: surface.get("area").and_then(Value::as_f64).unwrap_or(0.0),
+                                exposed_perimeter_m: data.exposed_perimeter_m,
+                                construction_resistance_m2k_per_w: data
+                                    .construction_resistance_m2k_per_w,
+                                source_reference: data.source_reference.clone(),
+                            });
+                        }
+                        None => gaps.push(gap("ground_floor_data_missing", format!("{path}.id"))),
+                    }
+                    continue;
+                }
+                ThermalBoundary::Outdoor => {}
+                _ => continue,
+            }
+            // Outdoor surface: solar gains for windows and the opaque rest.
+            let orientation_value = surface
+                .get("orientation")
                 .and_then(Value::as_str)
                 .unwrap_or("");
-            let u_value = constructions
-                .get(construction_id)
-                .and_then(|item| item.get("uValue"))
-                .and_then(Value::as_f64);
-            match u_value {
-                Some(u_value) => opaque.push(OpaqueElement {
-                    id: format!("surface:{id}:opaque"),
-                    area_m2: opaque_area,
+            let Some(surface_orientation) = orientation(orientation_value) else {
+                gaps.push(gap(
+                    "surface_orientation_invalid",
+                    format!("{path}.orientation"),
+                ));
+                continue;
+            };
+            let tilt = match (tilts.get(id), surface_orientation, surface_type) {
+                (Some(tilt), _, _) => *tilt,
+                (None, None, _) => 0.0,
+                (None, Some(_), "wall") => 90.0,
+                (None, Some(_), _) => {
+                    gaps.push(gap("surface_tilt_missing", format!("{path}.id")));
+                    continue;
+                }
+            };
+            let azimuth_orientation = surface_orientation.unwrap_or(Orientation::South);
+            let mut window_area = 0.0;
+            for (window_index, window) in surface
+                .get("windows")
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .enumerate()
+            {
+                let window_path = format!("{path}.windows[{window_index}]");
+                let (Some(window_id), Some(area), Some(u_value), Some(g_value)) = (
+                    window.get("id").and_then(Value::as_str),
+                    window.get("area").and_then(Value::as_f64),
+                    window.get("uValue").and_then(Value::as_f64),
+                    window.get("gValue").and_then(Value::as_f64),
+                ) else {
+                    gaps.push(gap("window_data_missing", window_path));
+                    continue;
+                };
+                window_area += area;
+                windows.push(Window {
+                    id: format!("window:{window_id}"),
+                    area_m2: area,
                     orientation: azimuth_orientation,
                     tilt_deg: tilt,
+                    g_perpendicular: g_value,
+                    frame_fraction: nta.window_solar.frame_fraction,
                     u_value_w_per_m2k: u_value,
-                    source_reference: format!("project:construction:{construction_id}.uValue"),
-                }),
-                None => gaps.push(gap(
-                    "construction_u_value_missing",
-                    format!("{path}.constructionId"),
-                )),
+                    obstruction_factor: nta.window_solar.obstruction_factor,
+                    source_reference: format!(
+                        "project:window:{window_id}; {}",
+                        nta.window_solar.source_reference
+                    ),
+                });
+            }
+            let gross = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+            let opaque_area = gross - window_area;
+            if opaque_area > 1e-9 {
+                let construction_id = surface
+                    .get("constructionId")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let u_value = constructions
+                    .get(construction_id)
+                    .and_then(|item| item.get("uValue"))
+                    .and_then(Value::as_f64);
+                match u_value {
+                    Some(u_value) => opaque.push(OpaqueElement {
+                        id: format!("surface:{id}:opaque"),
+                        area_m2: opaque_area,
+                        orientation: azimuth_orientation,
+                        tilt_deg: tilt,
+                        u_value_w_per_m2k: u_value,
+                        source_reference: format!("project:construction:{construction_id}.uValue"),
+                    }),
+                    None => gaps.push(gap(
+                        "construction_u_value_missing",
+                        format!("{path}.constructionId"),
+                    )),
+                }
             }
         }
+        let direct =
+            direct_boundary_input_zone(&project, ThermalBoundary::Outdoor, None, Some(&zone.id));
+        if direct.is_none() {
+            gaps.push(gap("direct_transmission_unresolved", zone_path.clone()));
+        }
+        let unheated = if project.unheated_spaces.is_empty() {
+            None
+        } else {
+            let resolved = unheated_zone_input(&project, Some(&zone.id));
+            if resolved.is_none() {
+                gaps.push(gap("unheated_transmission_unresolved", zone_path.clone()));
+            }
+            resolved.filter(|input| !input.spaces.is_empty())
+        };
+        let Some(direct) = direct else { continue };
+        let demand = MonthlyDemandInput {
+            zone_id: zone.id.clone(),
+            usable_floor_area_m2: zone.floor_area,
+            area_source_reference: nta.area_source_reference.clone(),
+            setpoints: data
+                .and_then(|item| item.setpoints.clone())
+                .unwrap_or_else(|| nta.setpoints.clone()),
+            transmission: Transmission::Components(ComponentTransmission {
+                direct,
+                unheated,
+                ground_floors,
+                ground_inventory_confirmed: true,
+            }),
+            ventilation_flows: data
+                .map(|item| item.ventilation_flows.clone())
+                .unwrap_or_else(|| nta.ventilation_flows.clone()),
+            thermal_mass: data
+                .and_then(|item| item.thermal_mass.clone())
+                .unwrap_or_else(|| nta.thermal_mass.clone()),
+            internal_gains: data
+                .map(|item| item.internal_gains.clone())
+                .unwrap_or_else(|| nta.internal_gains.clone()),
+            window_inventory_complete: true,
+            windows,
+            opaque_inventory_complete: true,
+            opaque_elements: opaque,
+        };
+        zones.push(ChainZone {
+            demand,
+            emission: data
+                .and_then(|item| item.emission.clone())
+                .unwrap_or_else(|| nta.emission.clone()),
+            distribution: data
+                .and_then(|item| item.distribution.clone())
+                .unwrap_or_else(|| nta.distribution.clone()),
+        });
     }
     for (index, item) in nta.ground_floors.iter().enumerate() {
         if !used_ground.contains(&item.surface_id) {
@@ -354,49 +448,19 @@ fn derive_input(
             ));
         }
     }
-    let direct = direct_boundary_input(&project, ThermalBoundary::Outdoor, None);
-    if direct.is_none() {
-        gaps.push(gap("direct_transmission_unresolved", "zones[0]"));
-    }
-    let unheated = if project.unheated_spaces.is_empty() {
-        None
-    } else {
-        let resolved = unheated_project_input(&project);
-        if resolved.is_none() {
-            gaps.push(gap("unheated_transmission_unresolved", "unheatedSpaces"));
-        }
-        resolved
-    };
-    if !gaps.is_empty() {
+    if !gaps.is_empty() || zones.is_empty() {
         return None;
     }
-    let demand = MonthlyDemandInput {
-        zone_id: zone.id.clone(),
-        usable_floor_area_m2: zone.floor_area,
-        area_source_reference: nta.area_source_reference.clone(),
-        setpoints: nta.setpoints,
-        transmission: Transmission::Components(ComponentTransmission {
-            direct: direct?,
-            unheated,
-            ground_floors,
-            ground_inventory_confirmed: true,
-        }),
-        ventilation_flows: nta.ventilation_flows,
-        thermal_mass: nta.thermal_mass,
-        internal_gains: nta.internal_gains,
-        window_inventory_complete: true,
-        windows,
-        opaque_inventory_complete: true,
-        opaque_elements: opaque,
-    };
+    let primary = zones.remove(0);
     Some(BuildingPerformanceInput {
         calculation_scope: nta.calculation_scope,
-        total_usable_floor_area_m2: zone.floor_area,
+        total_usable_floor_area_m2: total_area,
         area_source_reference: nta.area_source_reference,
         space_heating: SpaceHeatingChainInput {
-            demand,
-            emission: nta.emission,
-            distribution: nta.distribution,
+            demand: primary.demand,
+            emission: primary.emission,
+            distribution: primary.distribution,
+            additional_zones: zones,
             generator: nta.generator,
         },
         heat_pump_renewable: nta.heat_pump_renewable,
@@ -464,10 +528,9 @@ mod tests {
             .is_some());
         // Walls 110 + roof 52 + ground floor 50 m².
         assert_eq!(derived.loss_area_m2, Some(212.0));
-        let tojuli = performance.tojuli.as_ref().unwrap();
-        assert_eq!(tojuli.status, "calculated_unverified");
-        assert!(tojuli.max_tojuli_k.is_some());
-        println!("synthetic TOjuli max {:?}", tojuli.max_tojuli_k);
+        assert_eq!(performance.tojuli.len(), 1);
+        assert_eq!(performance.tojuli[0].status, "calculated_unverified");
+        assert!(performance.tojuli_max_k.is_some());
         assert_eq!(result.attest_status, "unattested");
     }
 
@@ -526,5 +589,68 @@ mod tests {
             detail.contains("ventilationFlows[0].months[3].conductanceWPerK"),
             "{detail}"
         );
+    }
+
+    #[test]
+    fn two_zones_need_zone_data_and_sum_areas() {
+        let mut value = project();
+        let mut second = value["zones"][0].clone();
+        second["id"] = Value::from("z2");
+        second["floorArea"] = Value::from(50.0);
+        for surface in second["surfaces"].as_array_mut().unwrap() {
+            let id = surface["id"].as_str().unwrap().to_owned();
+            surface["id"] = Value::from(format!("{id}-2"));
+            surface["zoneId"] = Value::from("z2");
+            for window in surface["windows"].as_array_mut().unwrap() {
+                let window_id = window["id"].as_str().unwrap().to_owned();
+                window["id"] = Value::from(format!("{window_id}-2"));
+            }
+        }
+        for bridge in second["thermalBridges"].as_array_mut().unwrap() {
+            bridge["id"] = Value::from("tb1-2");
+            bridge["zoneId"] = Value::from("z2");
+        }
+        value["zones"].as_array_mut().unwrap().push(second);
+        let missing = assess_project_performance(&value);
+        let codes: Vec<_> = missing.gaps.iter().map(|item| item.code).collect();
+        assert!(codes.contains(&"zone_data_missing"), "{codes:?}");
+        // Supply per-zone data, tilt and ground data for the copied surfaces.
+        let block = &mut value["ntaCalculation"];
+        let zone_entry = |id: &str| {
+            serde_json::json!({
+                "zoneId": id,
+                "ventilationFlows": block["ventilationFlows"].clone(),
+                "internalGains": block["internalGains"].clone()
+            })
+        };
+        let entries = vec![zone_entry("z1"), zone_entry("z2")];
+        block["zoneData"] = Value::from(entries);
+        block["surfaceTilts"].as_array_mut().unwrap().push(
+            serde_json::json!({"surfaceId": "roof-2", "tiltDeg": 45.0, "sourceReference": "copy"}),
+        );
+        block["groundFloors"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "surfaceId": "floor-2", "exposedPerimeterM": 20.0,
+                "constructionResistanceM2kPerW": 3.87, "sourceReference": "copy"
+            }));
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let derived = result.derived_input.as_ref().unwrap();
+        assert_eq!(derived.total_usable_floor_area_m2, 150.0);
+        assert_eq!(derived.space_heating.additional_zones.len(), 1);
+        let performance = result.performance.as_ref().unwrap();
+        assert_eq!(performance.tojuli.len(), 2);
+        // Each zone keeps only its own envelope.
+        let zone_two = &performance.space_heating.additional_zone_demands[0];
+        let first = performance
+            .space_heating
+            .demand
+            .transmission
+            .as_ref()
+            .unwrap();
+        let second = zone_two.transmission.as_ref().unwrap();
+        assert!((first.conductance_w_per_k - second.conductance_w_per_k).abs() < 1e-9);
     }
 }

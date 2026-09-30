@@ -33,8 +33,8 @@ pub mod gas_heat_pump_monthly_draft;
 pub mod generator_dispatch_draft;
 pub mod ground;
 pub mod heat_pumps;
-pub mod heating_emission;
 pub mod heating_aux_draft;
+pub mod heating_emission;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod label_class;
@@ -1561,18 +1561,42 @@ fn direct_outdoor_input(project: &ProjectInput) -> Option<DirectTransmissionInpu
 }
 
 pub(crate) fn unheated_project_input(project: &ProjectInput) -> Option<UnheatedTransmissionInput> {
+    unheated_zone_input(project, None)
+}
+
+/// Unheated-space transmission, optionally limited to one zone; spaces without
+/// a bordering surface in that zone are left out.
+pub(crate) fn unheated_zone_input(
+    project: &ProjectInput,
+    zone_id: Option<&str>,
+) -> Option<UnheatedTransmissionInput> {
     let spaces = project
         .unheated_spaces
         .iter()
+        .filter(|space| {
+            zone_id.map_or(true, |zone_id| {
+                project
+                    .zones
+                    .iter()
+                    .filter(|zone| zone.id == zone_id)
+                    .any(|zone| {
+                        zone.surfaces.iter().any(|surface| {
+                            surface.get("unheatedSpaceId").and_then(Value::as_str)
+                                == Some(space.id.as_str())
+                        })
+                    })
+            })
+        })
         .map(|space| {
             Some(UnheatedSpaceInput {
                 id: space.id.clone(),
                 reduction_factor: space.reduction_factor,
                 factor_source_reference: space.factor_source_reference.clone(),
-                boundary: direct_boundary_input(
+                boundary: direct_boundary_input_zone(
                     project,
                     ThermalBoundary::UnheatedSpace,
                     Some(&space.id),
+                    zone_id,
                 )?,
             })
         })
@@ -1585,6 +1609,15 @@ pub(crate) fn direct_boundary_input(
     target: ThermalBoundary,
     space_id: Option<&str>,
 ) -> Option<DirectTransmissionInput> {
+    direct_boundary_input_zone(project, target, space_id, None)
+}
+
+pub(crate) fn direct_boundary_input_zone(
+    project: &ProjectInput,
+    target: ThermalBoundary,
+    space_id: Option<&str>,
+    zone_id: Option<&str>,
+) -> Option<DirectTransmissionInput> {
     let constructions: HashMap<&str, &Value> = project
         .constructions
         .iter()
@@ -1593,7 +1626,11 @@ pub(crate) fn direct_boundary_input(
     let mut elements = Vec::new();
     let mut linear_bridges = Vec::new();
     let mut point_bridges = Vec::new();
-    for zone in &project.zones {
+    for zone in project
+        .zones
+        .iter()
+        .filter(|zone| zone_id.map_or(true, |id| zone.id == id))
+    {
         for surface in &zone.surfaces {
             let boundary: ThermalBoundary =
                 serde_json::from_value(surface.get("thermalBoundary")?.clone()).ok()?;

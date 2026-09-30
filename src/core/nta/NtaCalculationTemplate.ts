@@ -44,6 +44,19 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
       sourceReference: '',
       months: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, conductanceWPerK: null })),
     }],
+    ...(project.zones.length > 1 ? {
+      zoneData: project.zones.map((zone) => ({
+        zoneId: zone.id,
+        ventilationFlows: [{
+          id: `ventilation-${zone.id}`,
+          sourceReference: '',
+          months: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, conductanceWPerK: null })),
+        }],
+        internalGains: residential
+          ? { method: 'residential', dwellingCount: null, sourceReference: '' }
+          : { method: 'declared', heatFluxWPerM2: null, sourceReference: '' },
+      })),
+    } : {}),
     emission: {
       system: 'other_or_unknown',
       balancing: 'none_or_unknown',

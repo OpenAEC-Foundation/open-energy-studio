@@ -236,8 +236,11 @@ pub struct BuildingPerformanceAssessment {
     /// Class from annex IX/X for the rounded BENG 2; not a registered label.
     pub indicative_label_class: Option<&'static str>,
     pub label_source: &'static str,
-    /// TOjuli per orientation (§5.7); requires the component transmission route.
-    pub tojuli: Option<TojuliAssessment>,
+    /// TOjuli per zone and orientation (§5.7); requires the component route.
+    pub tojuli: Vec<TojuliAssessment>,
+    /// Highest TOjuli over all zones and orientations.
+    pub tojuli_max_k: Option<f64>,
+    pub tojuli_meets_bbl_limit: Option<bool>,
     /// Bbl 4.149 check; only with a function and a loss area.
     pub bbl_check: Option<BblCheck>,
     pub space_heating: SpaceHeatingChainAssessment,
@@ -268,6 +271,21 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
     }
     if input.bacs_factor != 1.0 && input.bacs_factor != 1.05 {
         issues.push(issue("bacs_factor_invalid", "bacsFactor"));
+    }
+    let zone_area: f64 = std::iter::once(&input.space_heating.demand)
+        .chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+        .map(|zone| zone.usable_floor_area_m2)
+        .sum();
+    if (zone_area - input.total_usable_floor_area_m2).abs()
+        > 1e-6 * input.total_usable_floor_area_m2.abs().max(1.0)
+    {
+        issues.push(issue("zone_area_sum_mismatch", "totalUsableFloorAreaM2"));
     }
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
     if let Some(area) = input.loss_area_m2 {
@@ -513,10 +531,50 @@ pub fn assess_building_performance(
         .as_ref()
         .filter(|_| valid && input.demand_uses_fixed_c1_ventilation)
         .and_then(|result| result.need_indicator_kwh_per_m2_year);
-    let heating_capacity = heating
-        .demand
-        .specific_heat_capacity_kj_per_m2k
-        .unwrap_or(f64::INFINITY);
+    // Bbl 4.149 paragraph 4: capacity weighted by usable floor area.
+    let zone_demands = || {
+        std::iter::once(&input.space_heating.demand).chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+    };
+    let heating_capacity = {
+        let assessed = std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
+        let mut weighted = 0.0;
+        let mut area = 0.0;
+        for (demand, zone) in assessed.zip(zone_demands()) {
+            weighted += demand
+                .specific_heat_capacity_kj_per_m2k
+                .unwrap_or(f64::INFINITY)
+                * zone.usable_floor_area_m2;
+            area += zone.usable_floor_area_m2;
+        }
+        if area > 0.0 {
+            weighted / area
+        } else {
+            f64::INFINITY
+        }
+    };
+    let tojuli: Vec<TojuliAssessment> = if valid {
+        zone_demands()
+            .map(|zone| assess_tojuli(zone, input.active_cooling_present))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let tojuli_complete = !tojuli.is_empty()
+        && tojuli
+            .iter()
+            .all(|item| item.status == "calculated_unverified" && item.max_tojuli_k.is_some());
+    let tojuli_max = tojuli_complete.then(|| {
+        tojuli
+            .iter()
+            .filter_map(|item| item.max_tojuli_k)
+            .fold(0.0_f64, f64::max)
+    });
     BuildingPerformanceAssessment {
         status: if valid {
             "calculated_unverified"
@@ -550,8 +608,9 @@ pub fn assess_building_performance(
             indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
         }),
         label_source: LABEL_SOURCE,
-        tojuli: valid
-            .then(|| assess_tojuli(&input.space_heating.demand, input.active_cooling_present)),
+        tojuli_max_k: tojuli_max,
+        tojuli_meets_bbl_limit: tojuli_max.map(|value| value <= crate::tojuli::TOJULI_LIMIT_K),
+        tojuli,
         bbl_check: match (input.bbl_function, input.loss_area_m2, scenario) {
             (Some(function), Some(area), Some(item)) => bbl_check(
                 function,
@@ -677,8 +736,13 @@ fn compute(
         renewable += (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT
             + produced * F_PREN_RENELECT;
     }
-    let need = heating.demand.annual_heating_need_kwh.unwrap_or(0.0)
-        + heating.demand.annual_cooling_need_kwh.unwrap_or(0.0);
+    let need = std::iter::once(&heating.demand)
+        .chain(&heating.additional_zone_demands)
+        .map(|demand| {
+            demand.annual_heating_need_kwh.unwrap_or(0.0)
+                + demand.annual_cooling_need_kwh.unwrap_or(0.0)
+        })
+        .sum();
     (fossil, renewable, ambient_total, need)
 }
 
@@ -976,8 +1040,9 @@ mod tests {
     #[test]
     fn tojuli_needs_component_transmission() {
         let result = assess_building_performance(&input());
-        let tojuli = result.tojuli.as_ref().unwrap();
+        let tojuli = &result.tojuli[0];
         assert_eq!(tojuli.status, "invalid");
+        assert!(result.tojuli_max_k.is_none());
         assert_eq!(tojuli.issues[0].code, "tojuli_components_required");
     }
 }

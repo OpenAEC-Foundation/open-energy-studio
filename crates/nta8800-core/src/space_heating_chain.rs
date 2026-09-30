@@ -39,7 +39,18 @@ pub struct SpaceHeatingChainInput {
     pub demand: MonthlyDemandInput,
     pub emission: EmissionInput,
     pub distribution: Distribution,
+    /// Further calculation zones served by the same generator (9.2, sum over zones).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_zones: Vec<ChainZone>,
     pub generator: Generator,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChainZone {
+    pub demand: MonthlyDemandInput,
+    pub emission: EmissionInput,
+    pub distribution: Distribution,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -124,6 +135,7 @@ pub struct SpaceHeatingChainAssessment {
     pub annual_auxiliary_electricity_kwh: Option<f64>,
     pub annual_collective_source_heat_kwh: Option<f64>,
     pub demand: MonthlyDemandAssessment,
+    pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
 }
 
@@ -134,41 +146,51 @@ fn issue(code: &'static str, path: impl Into<String>) -> ChainIssue {
     }
 }
 
-pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessment {
-    let fingerprint =
-        input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
-    let demand = assess_monthly_demand(&input.demand);
-    let mut issues: Vec<ChainIssue> = demand
-        .issues
-        .iter()
-        .map(|item| issue(item.code, format!("demand.{}", item.path)))
-        .collect();
-
-    if input.emission.source_reference.trim().is_empty() {
+/// Validates one zone and returns its monthly (need, emission loss,
+/// emission input, distribution loss) terms, or `None` when invalid.
+fn zone_terms(
+    demand_input: &MonthlyDemandInput,
+    demand: &MonthlyDemandAssessment,
+    emission: &EmissionInput,
+    distribution: &Distribution,
+    prefix: &str,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<Vec<[f64; 4]>> {
+    let prior = issues.len();
+    issues.extend(
+        demand
+            .issues
+            .iter()
+            .map(|item| issue(item.code, format!("{prefix}demand.{}", item.path))),
+    );
+    if emission.source_reference.trim().is_empty() {
         issues.push(issue(
             "source_reference_required",
-            "emission.sourceReference",
+            format!("{prefix}emission.sourceReference"),
         ));
     }
-    if !balancing_consistent(&input.emission) {
+    if !balancing_consistent(emission) {
         issues.push(issue(
             "emission_balancing_inconsistent",
-            "emission.balancing",
+            format!("{prefix}emission.balancing"),
         ));
     }
-    if input.emission.system == EmissionSystem::FanAssistedRadiatorsOrConvectors {
+    if emission.system == EmissionSystem::FanAssistedRadiatorsOrConvectors {
         // 9.21 fan energy is required for this emitter and is not modelled.
-        issues.push(issue("emission_fan_energy_unsupported", "emission.system"));
+        issues.push(issue(
+            "emission_fan_energy_unsupported",
+            format!("{prefix}emission.system"),
+        ));
     }
-    let distribution_losses = match &input.distribution {
+    let losses = match distribution {
         Distribution::HeatedZoneOnlySpaceHeating { source_reference } => {
             if source_reference.trim().is_empty() {
                 issues.push(issue(
                     "source_reference_required",
-                    "distribution.sourceReference",
+                    format!("{prefix}distribution.sourceReference"),
                 ));
             }
-            Some(vec![0.0; 12])
+            vec![0.0; 12]
         }
         Distribution::Declared {
             monthly_loss_kwh,
@@ -177,7 +199,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
             if source_reference.trim().is_empty() {
                 issues.push(issue(
                     "source_reference_required",
-                    "distribution.sourceReference",
+                    format!("{prefix}distribution.sourceReference"),
                 ));
             }
             if monthly_loss_kwh.len() != 12
@@ -187,38 +209,109 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
             {
                 issues.push(issue(
                     "distribution_monthly_loss_invalid",
-                    "distribution.monthlyLossKwh",
+                    format!("{prefix}distribution.monthlyLossKwh"),
                 ));
-                None
-            } else {
-                Some(monthly_loss_kwh.clone())
             }
+            monthly_loss_kwh.clone()
         }
     };
+    if issues.len() != prior {
+        return None;
+    }
+    let increment = temperature_increment_k(emission);
+    let setpoint = demand_input.setpoints.heating_c;
+    Some(
+        demand
+            .monthly
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                let need = row.heating.need_kwh;
+                // 9.10 and 9.16.
+                let loss =
+                    monthly_loss_kwh(need, setpoint, OUTDOOR_TEMPERATURE_C[index], increment);
+                // 9.24/9.25: no recoverable auxiliary energy; only in heating months.
+                let distribution_loss = if need > 0.0 { losses[index] } else { 0.0 };
+                // 9.9
+                [need, loss, need + loss, distribution_loss]
+            })
+            .collect(),
+    )
+}
 
-    let increment = temperature_increment_k(&input.emission);
+pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessment {
+    let fingerprint =
+        input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
+    let mut issues: Vec<ChainIssue> = Vec::new();
+    let demand = assess_monthly_demand(&input.demand);
+    let primary = zone_terms(
+        &input.demand,
+        &demand,
+        &input.emission,
+        &input.distribution,
+        "",
+        &mut issues,
+    );
+    let additional_zone_demands: Vec<MonthlyDemandAssessment> = input
+        .additional_zones
+        .iter()
+        .map(|zone| assess_monthly_demand(&zone.demand))
+        .collect();
+    let mut zones = vec![primary];
+    for (index, (zone, assessed)) in input
+        .additional_zones
+        .iter()
+        .zip(&additional_zone_demands)
+        .enumerate()
+    {
+        zones.push(zone_terms(
+            &zone.demand,
+            assessed,
+            &zone.emission,
+            &zone.distribution,
+            &format!("additionalZones[{index}]."),
+            &mut issues,
+        ));
+    }
+    let mut zone_ids = std::collections::HashSet::new();
+    for (index, id) in std::iter::once(&input.demand.zone_id)
+        .chain(
+            input
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand.zone_id),
+        )
+        .enumerate()
+    {
+        if !zone_ids.insert(id.as_str()) {
+            issues.push(issue("zone_id_duplicate", format!("zones[{index}].zoneId")));
+        }
+    }
+
+    // A single increment is only meaningful for one zone.
+    let increment =
+        (input.additional_zones.is_empty()).then(|| temperature_increment_k(&input.emission));
     let mut monthly = Vec::with_capacity(12);
     let mut generation_efficiency = None;
     if issues.is_empty() {
-        let losses = distribution_losses.expect("validated distribution");
-        let setpoint = input.demand.setpoints.heating_c;
         let mut outputs = Vec::with_capacity(12);
-        for (index, row) in demand.monthly.iter().enumerate() {
-            let need = row.heating.need_kwh;
-            // 9.10 and 9.16.
-            let emission_loss =
-                monthly_loss_kwh(need, setpoint, OUTDOOR_TEMPERATURE_C[index], increment);
-            // 9.9
-            let emission_input = need + emission_loss;
-            // 9.24 and 9.25, clamped at 0; no recoverable auxiliary energy.
-            let distribution_loss = if need > 0.0 { losses[index] } else { 0.0 };
+        for index in 0..12 {
+            let mut totals = [0.0; 4];
+            for zone in zones.iter().flatten() {
+                for (total, value) in totals.iter_mut().zip(zone[index]) {
+                    *total += value;
+                }
+            }
+            let [need, emission_loss, emission_input, distribution_loss] = totals;
+            // 9.2 node: generator output covers all zones, clamped at 0.
             let generator_output = (emission_input + distribution_loss).max(0.0);
+            let month = index as u8 + 1;
             outputs.push(MonthlyEnergy {
-                month: row.month,
+                month,
                 energy_kwh: generator_output,
             });
             monthly.push(ChainMonth {
-                month: row.month,
+                month,
                 heating_need_kwh: need,
                 emission_loss_kwh: emission_loss,
                 emission_input_kwh: emission_input,
@@ -303,7 +396,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         } else {
             "invalid"
         },
-        scope: "nta8800_space_heating_single_zone_single_generator_unverified",
+        scope: "nta8800_space_heating_zones_single_generator_unverified",
         chapter_9_source: DRAFT_SOURCE,
         target_norm_version: TARGET_NORM_VERSION,
         kernel_version: KERNEL_VERSION,
@@ -312,7 +405,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         reference_verified: false,
         beng_calculation_available: false,
         omitted_terms: OMITTED_TERMS,
-        emission_temperature_increment_k: valid.then_some(increment),
+        emission_temperature_increment_k: increment.filter(|_| valid),
         generation_efficiency: generation_efficiency.filter(|_| valid),
         annual_natural_gas_kwh: sum(|row| row.natural_gas_kwh),
         annual_generator_electricity_kwh: sum(|row| row.generator_electricity_kwh),
@@ -320,6 +413,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         annual_collective_source_heat_kwh: sum(|row| row.collective_source_heat_kwh),
         monthly,
         demand,
+        additional_zone_demands,
         issues,
     }
 }
@@ -352,6 +446,7 @@ mod tests {
             distribution: Distribution::HeatedZoneOnlySpaceHeating {
                 source_reference: "pipes inside envelope".into(),
             },
+            additional_zones: Vec::new(),
             generator: serde_json::from_value(json!({
                 "kind": "gas_boiler",
                 "boiler": {
@@ -473,5 +568,51 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.path == "demand.usableFloorAreaM2"));
+    }
+
+    #[test]
+    fn second_zone_adds_to_generator_output_with_its_own_emission() {
+        let single = assess_space_heating_chain(&boiler_chain());
+        let mut input = boiler_chain();
+        let mut second = demand();
+        second.zone_id = "rz-2".into();
+        let mut floor = emission();
+        floor.system = EmissionSystem::FloorHeating;
+        input.additional_zones.push(ChainZone {
+            demand: second,
+            emission: floor,
+            distribution: Distribution::HeatedZoneOnlySpaceHeating {
+                source_reference: "inside".into(),
+            },
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert_eq!(result.additional_zone_demands.len(), 1);
+        assert!(result.emission_temperature_increment_k.is_none());
+        let jan = &result.monthly[0];
+        let need = single.monthly[0].heating_need_kwh;
+        assert!((jan.heating_need_kwh - 2.0 * need).abs() < 1e-9);
+        // Floor heating (3,5 K) is capped as well in January: 0,15 · need.
+        assert!((jan.emission_loss_kwh - 2.0 * 0.15 * need).abs() < 1e-9);
+        let duplicate = {
+            let mut copy = input.clone();
+            copy.additional_zones[0].demand.zone_id = "rz-1".into();
+            assess_space_heating_chain(&copy)
+        };
+        assert!(duplicate
+            .issues
+            .iter()
+            .any(|item| item.code == "zone_id_duplicate"));
+        let mut broken = input;
+        broken.additional_zones[0].emission.source_reference.clear();
+        let result = assess_space_heating_chain(&broken);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.path == "additionalZones[0].emission.sourceReference"));
     }
 }

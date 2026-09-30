@@ -143,27 +143,29 @@ export function NtaPerformancePanel() {
           </div>
         </div>
         <dl className="nta-performance-totals">
-          <div><dt>{t('nta.performance.heatingNeed')}</dt><dd>{kwh(heating.demand.annualHeatingNeedKwh)} kWh</dd></div>
-          <div><dt>{t('nta.performance.coolingNeed')}</dt><dd>{kwh(heating.demand.annualCoolingNeedKwh)} kWh</dd></div>
+          <div><dt>{t('nta.performance.heatingNeed')}</dt><dd>{kwh(heating.monthly.reduce((sum, row) => sum + row.heatingNeedKwh, 0))} kWh</dd></div>
+          <div><dt>{t('nta.performance.coolingNeed')}</dt><dd>{kwh([heating.demand, ...(heating.additionalZoneDemands ?? [])].reduce((sum, zone) => sum + (zone.annualCoolingNeedKwh ?? 0), 0))} kWh</dd></div>
           <div><dt>{t('nta.performance.primaryFossil')}</dt><dd>{kwh(performance.annualPrimaryFossilKwh)} kWh</dd></div>
           <div><dt>{t('nta.performance.renewable')}</dt><dd>{kwh(performance.annualRenewablePrimaryKwh)} kWh</dd></div>
         </dl>
-        {performance.tojuli?.status === 'calculated_unverified' && <div className="nta-performance-bbl" role="group" aria-label="TOjuli">
+        {performance.tojuli.length > 0 && <div className="nta-performance-bbl" role="group" aria-label="TOjuli">
           <strong>TO<sub>juli</sub> (§5.7)</strong>
           <small>{t('nta.performance.tojuliScope')}</small>
           <ul>
-            {performance.tojuli.activeCooling
-              ? <li><span>{t('nta.performance.tojuliCooled')}</span><em>0,00</em></li>
-              : performance.tojuli.orientations.filter((item) => item.assessed).map((item) => (
-                <li key={item.orientation}>
-                  <span>{t(`nta.orientation.${item.orientation}`)}</span>
-                  <em>{item.tojuliK?.toFixed(2)} K</em>
-                </li>
-              ))}
+            {performance.tojuli.flatMap((zone) => zone.activeCooling
+              ? [<li key={zone.zoneId}><span>{zone.zoneId}: {t('nta.performance.tojuliCooled')}</span><em>0.00 K</em></li>]
+              : zone.status !== 'calculated_unverified'
+                ? [<li key={zone.zoneId}><span>{zone.zoneId}</span><em>{zone.issues[0]?.code}</em></li>]
+                : zone.orientations.filter((item) => item.assessed).map((item) => (
+                  <li key={`${zone.zoneId}-${item.orientation}`}>
+                    <span>{performance.tojuli.length > 1 ? `${zone.zoneId} · ` : ''}{t(`nta.orientation.${item.orientation}`)}</span>
+                    <em>{item.tojuliK?.toFixed(2)} K</em>
+                  </li>
+                )))}
             <li>
               <span>{t('nta.performance.tojuliMax')} ≤ 1,20</span>
-              <em>{performance.tojuli.meetsBblLimit == null ? t('nta.performance.bblUnknown')
-                : performance.tojuli.meetsBblLimit ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em>
+              <em>{performance.tojuliMeetsBblLimit == null ? t('nta.performance.bblUnknown')
+                : performance.tojuliMeetsBblLimit ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em>
             </li>
           </ul>
         </div>}
@@ -198,7 +200,7 @@ export function NtaPerformancePanel() {
               <tr key={row.month}>
                 <th scope="row">{MONTHS[row.month - 1]}</th>
                 <td>{kwh(row.heatingNeedKwh)}</td>
-                <td>{kwh(heating.demand.monthly[index]?.cooling.needKwh)}</td>
+                <td>{kwh([heating.demand, ...(heating.additionalZoneDemands ?? [])].reduce((sum, zone) => sum + (zone.monthly[index]?.cooling.needKwh ?? 0), 0))}</td>
                 <td>{kwh(row.emissionLossKwh)}</td>
                 <td>{kwh(row.naturalGasKwh)}</td>
                 <td>{kwh(row.generatorElectricityKwh + (row.auxiliaryElectricityKwh ?? 0))}</td>

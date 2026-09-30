@@ -53,6 +53,7 @@ pub struct OrientationResult {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TojuliAssessment {
+    pub zone_id: String,
     pub status: &'static str,
     pub active_cooling: bool,
     pub orientations: Vec<OrientationResult>,
@@ -78,8 +79,9 @@ fn round_up(value: f64) -> f64 {
     (value * 100.0 - 1e-9).ceil().max(0.0) / 100.0
 }
 
-fn invalid(active_cooling: bool, issues: Vec<TojuliIssue>) -> TojuliAssessment {
+fn invalid(zone_id: &str, active_cooling: bool, issues: Vec<TojuliIssue>) -> TojuliAssessment {
     TojuliAssessment {
+        zone_id: zone_id.to_owned(),
         status: "invalid",
         active_cooling,
         orientations: Vec::new(),
@@ -93,12 +95,14 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
     let demand = assess_monthly_demand(input);
     if demand.status != "calculated_unverified" {
         return invalid(
+            &input.zone_id,
             active_cooling,
             vec![issue("tojuli_demand_invalid", "demand")],
         );
     }
     let Transmission::Components(components) = &input.transmission else {
         return invalid(
+            &input.zone_id,
             active_cooling,
             vec![issue("tojuli_components_required", "transmission")],
         );
@@ -106,6 +110,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
     if active_cooling {
         // §5.7.1: sufficient active cooling allows TOjuli = 0 for all orientations.
         return TojuliAssessment {
+            zone_id: input.zone_id.clone(),
             status: "calculated_unverified",
             active_cooling,
             orientations: Vec::new(),
@@ -166,6 +171,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
     if (listed_conductance - element_conductance).abs() > 1e-6 * element_conductance.max(1.0) {
         // The oriented split must cover exactly the direct element conductance.
         return invalid(
+            &input.zone_id,
             active_cooling,
             vec![issue(
                 "tojuli_envelope_inconsistent",
@@ -176,6 +182,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
     let total_area: f64 = area.iter().sum();
     if total_area <= 0.0 {
         return invalid(
+            &input.zone_id,
             active_cooling,
             vec![issue(
                 "tojuli_no_oriented_elements",
@@ -261,6 +268,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
             Some(current.map_or(value, |max| max.max(value)))
         });
     TojuliAssessment {
+        zone_id: input.zone_id.clone(),
         status: "calculated_unverified",
         active_cooling,
         orientations: results,

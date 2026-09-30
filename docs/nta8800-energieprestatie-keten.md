@@ -147,6 +147,8 @@ Module `project_performance` leidt de volledige invoer af uit een `.oes`-project
 
 Wat ontbreekt, verschijnt als invoergat (`gaps`) met code en pad. Een ongeldig blok geeft het exacte veldpad, bijvoorbeeld `ventilationFlows[0].months[3].conductanceWPerK`. Status `incomplete` (HTTP 422), `invalid` (422) of `calculated_unverified` (200). De afgeleide invoer wordt meegeleverd als `derivedInput`, zodat elke waarde herleidbaar is.
 
+**Meerdere rekenzones.** Elke zone krijgt een eigen maandbehoefte met alleen de eigen vlakken, ramen, koudebruggen en onverwarmde-ruimtegrenzen, en een eigen afgifte en distributie. De opwekker voorziet de som (9.2), en de behoefte voor BENG 1 is de som over de zones (5.6/5.8). Bij meer dan één zone is voor iedere zone een `zoneData`-regel verplicht. Die bevat ventilatiestromen en interne winst, en optioneel setpoints, massaklassen, afgifte en distributie. Wat niet is opgegeven, valt terug op de waarden op blokniveau. `A_g;tot` is de som van de zone-oppervlaktes. TO-juli wordt per zone en oriëntatie bepaald; de toets gebruikt de hoogste waarde. `D_m` voor Bbl lid 4 wordt naar gebruiksoppervlak gewogen.
+
 Regels van de adapter:
 
 - Een gevel krijgt helling 90°. Een vlak met oriëntatie `horizontal` krijgt 0°. Voor een dakvlak met oriëntatie is een expliciete helling verplicht.
