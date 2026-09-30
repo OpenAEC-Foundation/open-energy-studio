@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 
 pub mod bacs_draft;
 pub mod boiler_forfait_draft;
+pub mod building_performance;
 pub mod climate;
 pub mod declared_dhw;
 pub mod declared_heating_table;
@@ -274,6 +275,7 @@ pub fn capabilities() -> KernelCapabilities {
             "diagnostic_direct_transmission_reference_comparison",
             "unverified_chapter_7_monthly_heating_cooling_need_single_zone",
             "unverified_space_heating_chain_emission_distribution_single_generator",
+            "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
         ],
     }
 }

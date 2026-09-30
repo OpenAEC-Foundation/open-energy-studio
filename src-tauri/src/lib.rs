@@ -128,6 +128,13 @@ fn calculate_space_heating_chain(
 }
 
 #[tauri::command]
+fn calculate_building_performance(
+    input: nta8800_core::building_performance::BuildingPerformanceInput,
+) -> nta8800_core::building_performance::BuildingPerformanceAssessment {
+    nta8800_core::building_performance::assess_building_performance(&input)
+}
+
+#[tauri::command]
 fn diagnose_epus_draft(
     input: nta8800_core::epus_draft::EpusDraftInput,
 ) -> nta8800_core::epus_draft::EpusDraftAssessment {
@@ -472,6 +479,7 @@ pub fn run() {
             diagnose_epus_draft,
             calculate_monthly_demand,
             calculate_space_heating_chain,
+            calculate_building_performance,
             diagnose_bacs_draft,
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,

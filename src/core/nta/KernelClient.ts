@@ -1297,3 +1297,65 @@ export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChai
   }
   throw new Error('Rust heating chain calculation is available in the desktop app and local development server.');
 }
+
+export interface BuildingPerformanceInput {
+  calculationScope: 'residential' | 'utility';
+  totalUsableFloorAreaM2: number;
+  areaSourceReference: string;
+  spaceHeating: SpaceHeatingChainInput;
+  heatPumpRenewable?: { sourceBelow20C: boolean; exhaustAirSource: boolean; sourceReference: string } | null;
+  bacsFactor: 1 | 1.05;
+  bacsSourceReference: string;
+  useInventoryComplete: boolean;
+  declaredUses: Array<{
+    id: string;
+    service:
+      | 'domestic_hot_water' | 'domestic_hot_water_auxiliary' | 'ventilation_fans'
+      | 'space_cooling' | 'space_cooling_auxiliary' | 'lighting' | 'pv_auxiliary';
+    carrier: 'el' | 'gas' | 'oil';
+    monthlyKwh: number[];
+    sourceReference: string;
+  }>;
+  declaredRenewableHeat?: Array<{ id: string; monthlyKwh: number[]; sourceReference: string }>;
+  productionInventoryComplete: boolean;
+  onSiteProduction: Array<{ id: string; kind: 'pv' | 'pvt' | 'wind'; monthlyKwh: number[]; sourceReference: string }>;
+  demandUsesFixedC1Ventilation: boolean;
+  batteryStoragePresent: boolean;
+}
+
+export interface BuildingPerformanceAssessment {
+  status: 'calculated_unverified' | 'invalid';
+  scope: string;
+  chapter5Source: string;
+  inputFingerprint: string;
+  finalEditionVerified: false;
+  referenceVerified: false;
+  attestStatus: 'unattested';
+  labelAvailable: false;
+  carriers: Array<{ carrier: 'el' | 'gas' | 'oil'; month: number; usedKwh: number; deliveredKwh: number }>;
+  electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; selfUsedKwh: number; exportedKwh: number }>;
+  annualPrimaryFossilKwh: number | null;
+  annualRenewablePrimaryKwh: number | null;
+  annualHeatPumpAmbientHeatKwh: number | null;
+  annualHeatingAndCoolingNeedKwh: number | null;
+  needIndicatorKwhPerM2Year: number | null;
+  primaryFossilIndicatorKwhPerM2Year: number | null;
+  renewableSharePercent: number | null;
+  spaceHeating: SpaceHeatingChainAssessment;
+  issues: Array<{ code: string; path: string }>;
+}
+
+export async function calculateBuildingPerformanceWithRust(input: BuildingPerformanceInput): Promise<BuildingPerformanceAssessment> {
+  if (isTauri()) {
+    return invoke<BuildingPerformanceAssessment>('calculate_building_performance', { input });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/performance/calculate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    });
+    return response.json() as Promise<BuildingPerformanceAssessment>;
+  }
+  throw new Error('Rust performance calculation is available in the desktop app and local development server.');
+}

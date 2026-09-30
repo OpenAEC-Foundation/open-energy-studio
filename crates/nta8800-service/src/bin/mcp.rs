@@ -45,6 +45,12 @@ struct SpaceHeatingChainArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct BuildingPerformanceArgs {
+    /// Space-heating chain, declared other services, on-site production, BACS factor and floor area.
+    input: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct UnheatedTransmissionArgs {
     /// Named unheated spaces, explicit boundary terms and caller-supplied reduction factors.
     input: Value,
@@ -554,6 +560,33 @@ impl EnergyMcp {
             )]),
             Ok(input) => {
                 let result = nta8800_core::space_heating_chain::assess_space_heating_chain(&input);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "invalid" {
+                    CallToolResult::error(vec![content])
+                } else {
+                    CallToolResult::success(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Calculate unverified single-zone primary fossil and renewable energy and the BENG 2/3 indicators (BENG 1 only with confirmed C1 ventilation); no label, no attest"
+    )]
+    fn calculate_building_performance(
+        &self,
+        Parameters(args): Parameters<BuildingPerformanceArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::building_performance::BuildingPerformanceInput>(
+            args.input,
+        ) {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_building_performance_shape", "message":message.to_string()})
+                    .to_string(),
+            )]),
+            Ok(input) => {
+                let result =
+                    nta8800_core::building_performance::assess_building_performance(&input);
                 let content = ContentBlock::text(json!(result).to_string());
                 if result.status == "invalid" {
                     CallToolResult::error(vec![content])

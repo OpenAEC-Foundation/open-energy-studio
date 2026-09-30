@@ -42,6 +42,11 @@ pub struct SpaceHeatingChainRequest {
 }
 
 #[derive(Deserialize)]
+pub struct BuildingPerformanceRequest {
+    pub input: nta8800_core::building_performance::BuildingPerformanceInput,
+}
+
+#[derive(Deserialize)]
 pub struct UnheatedTransmissionRequest {
     pub input: nta8800_core::unheated_transmission::UnheatedTransmissionInput,
 }
@@ -172,6 +177,10 @@ pub fn app() -> Router {
         .route(
             "/v1/nta8800/heating/space-heating-chain/calculate",
             post(calculate_space_heating_chain),
+        )
+        .route(
+            "/v1/nta8800/performance/calculate",
+            post(calculate_building_performance),
         )
         .route(
             "/v1/nta8800/transmission/unheated/diagnose",
@@ -377,6 +386,19 @@ async fn calculate_space_heating_chain(
     Json(request): Json<SpaceHeatingChainRequest>,
 ) -> (StatusCode, Json<Value>) {
     let assessment = nta8800_core::space_heating_chain::assess_space_heating_chain(&request.input);
+    let status = if assessment.status == "invalid" {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn calculate_building_performance(
+    Json(request): Json<BuildingPerformanceRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment =
+        nta8800_core::building_performance::assess_building_performance(&request.input);
     let status = if assessment.status == "invalid" {
         StatusCode::UNPROCESSABLE_ENTITY
     } else {
@@ -1196,6 +1218,26 @@ mod tests {
         assert!(result["annualNaturalGasKwh"].as_f64().unwrap() > 0.0);
         assert_eq!(result["demand"]["status"], "calculated_unverified");
         assert_eq!(result["bengCalculationAvailable"], false);
+    }
+
+    #[tokio::test]
+    async fn performance_route_returns_unverified_indicators_without_label() {
+        let input: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-building-performance-synthetic.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/performance/calculate",
+            json!({ "input": input }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["status"], "calculated_unverified");
+        assert!(result["primaryFossilIndicatorKwhPerM2Year"].is_number());
+        assert!(result["renewableSharePercent"].is_number());
+        assert!(result["needIndicatorKwhPerM2Year"].is_null());
+        assert_eq!(result["labelAvailable"], false);
+        assert_eq!(result["attestStatus"], "unattested");
     }
 
     #[tokio::test]
