@@ -29,6 +29,15 @@ Omdat de drie elektriciteitsfactoren gelijk zijn, is het netto resultaat maandon
 
 Module `pv` rekent 16.3 `E_sol = I_sol·t·F_sh;obst/1000` en 16.2 `E_PV = E_sol·P_pk·f_perf·c_sh;PV·0,95/1`. Helling en oriëntatie werken alleen via `I_sol` uit tabel 17.2 (volledig, met interpolatie). De tabellen 16.1–16.3 zijn niet als waarden getranscribeerd. Daarom zijn `P_pk` (kW) en `c_sh;PV` (0,75–1) bronverplichte invoer, en is `f_perf` beperkt tot de in de analyse genoemde 0,76/0,80/0,82. PV kan via `pvSystems` worden berekend of via `onSiteProduction` worden opgegeven; beide tellen op. Een zuiddak van 30° geeft circa 900 kWh/kWp per jaar.
 
+## Tapwater (hoofdstuk 13, gedeeltelijk)
+
+Module `domestic_hot_water` rekent de netto behoefte uit:
+
+- woningbouw volgens 13.15: 856 kWh per bewoner per jaar (§13.2.3.1), met bewoners volgens 13.16–13.18 (dezelfde banden als 7.22–7.24), verdeeld naar `t_mi/8760`;
+- utiliteit: een opgegeven waarde uit tabel 13.1 met bron.
+
+Een optionele maandelijkse douche-WTW-bijdrage (13.51) wordt afgetrokken. De module deelt door de opgegeven `η_W;em` en `η_W;dis` en daarna door `η_W;gen` of de seizoens-COP. De tabellen voor afgifte, distributie en opwekking zijn niet getranscribeerd, dus die rendementen zijn bronverplichte invoer. Omgevingswarmte van een tapwaterwarmtepomp telt bij `renewableHeatPump=true` als hernieuwbaar (5.35/5.36). Dat mag alleen met elektriciteit en COP ≥ 1. `hotWater` en een gedeclareerde tapwaterpost tegelijk geeft `hot_water_double_count`. Bron van de getallen: de referenties van Open Heatloss Studio `nta8800-dhw`; review tegen de normtekst is nog nodig.
+
 ## Warmtepomp als hernieuwbare bron
 
 `Q_H;hp;in = Q_H;gen;out·(1 − 1/COP)` (5.31) telt alleen mee bij COP ≥ 1, een brontemperatuur onder 20 °C en geen afvoerlucht als bron. De aanroeper levert `heatPumpRenewable` met bron. Die opgave moet kloppen met de forfaitaire bronklasse:

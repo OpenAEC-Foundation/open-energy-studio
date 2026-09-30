@@ -1329,8 +1329,23 @@ export interface BuildingPerformanceInput {
     obstructionFactor: number;
     sourceReference: string;
   }>;
+  hotWater?: NtaHotWaterSystem | null;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
+}
+
+export interface NtaHotWaterSystem {
+  need:
+    | { method: 'residential'; dwellingCount: number; sourceReference: string }
+    | { method: 'declared'; specificNeedKwhPerM2Year: number; sourceReference: string };
+  emissionEfficiency: number;
+  distributionEfficiency: number;
+  generationEfficiency: number;
+  carrier: 'el' | 'gas' | 'oil';
+  showerHeatRecoveryKwh?: number[];
+  auxiliaryElectricityKwh?: number[];
+  renewableHeatPump: boolean;
+  efficiencySourceReference: string;
 }
 
 export interface BuildingPerformanceAssessment {
@@ -1397,6 +1412,7 @@ export interface NtaCalculationInput {
   productionInventoryComplete: boolean;
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
+  hotWater?: NtaHotWaterSystem | null;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }

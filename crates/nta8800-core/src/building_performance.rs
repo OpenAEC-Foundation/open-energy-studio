@@ -11,6 +11,7 @@
 //! because their draft rules are incomplete or not wired. Non-EP electricity
 //! is fixed at 0 as required for the indicators (5.27).
 
+use crate::domestic_hot_water::{monthly_hot_water, validate_hot_water, HotWaterSystem};
 use crate::final_energy_draft::DRAFT_SOURCE;
 use crate::forfait_heat_pump_draft::TableSource;
 use crate::forfait_heat_pump_monthly_draft::SourceSystem;
@@ -154,6 +155,9 @@ pub struct BuildingPerformanceInput {
     /// PV systems calculated here with 16.2/16.3.
     #[serde(default)]
     pub pv_systems: Vec<PvSystem>,
+    /// Domestic hot water calculated here (chapter 13, partial).
+    #[serde(default)]
+    pub hot_water: Option<HotWaterSystem>,
     /// Confirms the demand input uses the fixed C1 ventilation system and
     /// fixed internal loads of §5.4.3; only then the need indicator is shown.
     pub demand_uses_fixed_c1_ventilation: bool,
@@ -309,6 +313,21 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 "source_reference_required",
                 format!("{path}.sourceReference"),
             ));
+        }
+    }
+    if let Some(system) = &input.hot_water {
+        issues.extend(
+            validate_hot_water(system, "hotWater")
+                .into_iter()
+                .map(|item| issue(item.code, item.path)),
+        );
+        if input.declared_uses.iter().any(|item| {
+            matches!(
+                item.service,
+                Service::DomesticHotWater | Service::DomesticHotWaterAuxiliary
+            )
+        }) {
+            issues.push(issue("hot_water_double_count", "hotWater"));
         }
     }
     for (index, system) in input.pv_systems.iter().enumerate() {
@@ -493,6 +512,12 @@ fn compute(
                 .is_some_and(|evidence| evidence.source_below_20_c && !evidence.exhaust_air_source);
     let cop = heating.generation_efficiency.unwrap_or(0.0);
     let pv_yields: Vec<[f64; 12]> = input.pv_systems.iter().map(monthly_yield_kwh).collect();
+    let hot_water = input.hot_water.as_ref().map(|system| {
+        (
+            system.carrier,
+            monthly_hot_water(system, input.total_usable_floor_area_m2),
+        )
+    });
     for index in 0..12 {
         let month = (index + 1) as u8;
         let row = &heating.monthly[index];
@@ -513,6 +538,17 @@ fn compute(
                 Carrier::Gas => used_gas += value,
                 Carrier::Oil => used_oil += value,
             }
+        }
+        let mut hot_water_ambient = 0.0;
+        if let Some((carrier, months)) = &hot_water {
+            let row = &months[index];
+            match carrier {
+                Carrier::El => used_el += row.carrier_input_kwh,
+                Carrier::Gas => used_gas += row.carrier_input_kwh,
+                Carrier::Oil => used_oil += row.carrier_input_kwh,
+            }
+            used_el += row.auxiliary_electricity_kwh;
+            hot_water_ambient = row.ambient_heat_kwh;
         }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
         let produced: f64 = input
@@ -562,7 +598,8 @@ fn compute(
             .map(|item| item.monthly_kwh[index])
             .sum();
         // 5.29 and 5.39.
-        renewable += (ambient + declared_heat) * F_PREN_RENHEAT + produced * F_PREN_RENELECT;
+        renewable += (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT
+            + produced * F_PREN_RENELECT;
     }
     let need = heating.demand.annual_heating_need_kwh.unwrap_or(0.0)
         + heating.demand.annual_cooling_need_kwh.unwrap_or(0.0);
@@ -787,5 +824,49 @@ mod tests {
         let fossil_delta =
             base.annual_primary_fossil_kwh.unwrap() - result.annual_primary_fossil_kwh.unwrap();
         assert!((fossil_delta - pv * 1.45).abs() < 1e-6);
+    }
+
+    #[test]
+    fn calculated_hot_water_replaces_declared_use_and_blocks_double_count() {
+        use crate::domestic_hot_water::HotWaterNeed;
+        let mut sample = input();
+        let system = HotWaterSystem {
+            need: HotWaterNeed::Residential {
+                dwelling_count: 1,
+                source_reference: "one dwelling".into(),
+            },
+            emission_efficiency: 0.9,
+            distribution_efficiency: 1.0,
+            generation_efficiency: 0.8,
+            carrier: Carrier::Gas,
+            shower_heat_recovery_kwh: Vec::new(),
+            auxiliary_electricity_kwh: Vec::new(),
+            renewable_heat_pump: false,
+            efficiency_source_reference: "synthetic".into(),
+        };
+        sample.hot_water = Some(system.clone());
+        let doubled = assess_building_performance(&sample);
+        assert!(doubled
+            .issues
+            .iter()
+            .any(|item| item.code == "hot_water_double_count"));
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let gas: f64 = result
+            .carriers
+            .iter()
+            .filter(|item| item.carrier == "gas")
+            .map(|item| item.used_kwh)
+            .sum();
+        let expected =
+            result.space_heating.annual_natural_gas_kwh.unwrap() + 856.0 * 2.28 / 0.9 / 0.8;
+        assert!((gas - expected).abs() < 1e-6);
     }
 }

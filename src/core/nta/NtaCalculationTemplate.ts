@@ -90,6 +90,17 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
       obstructionFactor: null,
       sourceReference: '',
     })),
+    hotWater: {
+      need: residential
+        ? { method: 'residential', dwellingCount: 1, sourceReference: '' }
+        : { method: 'declared', specificNeedKwhPerM2Year: null, sourceReference: '' },
+      emissionEfficiency: null,
+      distributionEfficiency: null,
+      generationEfficiency: null,
+      carrier: null,
+      renewableHeatPump: false,
+      efficiencySourceReference: '',
+    },
     demandUsesFixedC1Ventilation: false,
     batteryStoragePresent: false,
   };

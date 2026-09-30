@@ -18,6 +18,7 @@ pub mod declared_dhw;
 pub mod declared_heating_table;
 pub mod diagnostic_reference;
 pub mod direct_transmission;
+pub mod domestic_hot_water;
 pub mod epus_draft;
 pub mod final_energy_draft;
 pub mod forfait_heat_pump_draft;
@@ -279,6 +280,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_space_heating_chain_emission_distribution_single_generator",
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
             "unverified_pv_yield_chapter_16",
+            "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
             "unverified_project_performance_adapter_single_zone",
         ],
     }
