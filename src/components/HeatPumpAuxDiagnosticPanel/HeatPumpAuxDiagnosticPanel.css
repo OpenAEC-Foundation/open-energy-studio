@@ -1,0 +1,16 @@
+.heat-pump-aux-draft { margin: 12px 0 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary); }
+.heat-pump-aux-draft h4 { margin: 0; font-size: 14px; }
+.heat-pump-aux-draft p { color: var(--text-secondary); font-size: 12px; }
+.heat-pump-aux-draft-grid, .heat-pump-aux-draft-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 9px 12px; }
+.heat-pump-aux-draft label { display: grid; gap: 4px; min-width: 0; font-size: 11px; }
+.heat-pump-aux-draft input { width: 100%; min-width: 0; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-secondary); color: var(--text-primary); }
+.heat-pump-aux-draft fieldset { margin: 14px 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
+.heat-pump-aux-draft legend { padding: 0 5px; font-size: 12px; }
+.heat-pump-aux-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.heat-pump-aux-draft button { padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; }
+.heat-pump-aux-draft button:disabled { cursor: wait; opacity: .6; }
+.heat-pump-aux-draft-error { color: #b91c1c !important; }
+.heat-pump-aux-draft-result { margin-top: 12px; padding: 12px; border-left: 3px solid var(--accent); background: var(--bg-secondary); font-size: 12px; }
+.heat-pump-aux-draft-result dl { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr; gap: 5px 10px; }
+.heat-pump-aux-draft-result dd { margin: 0; font-weight: 600; }
+.heat-pump-aux-draft-result code { overflow-wrap: anywhere; }

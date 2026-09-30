@@ -1,6 +1,153 @@
 use tauri::image::Image;
 use tauri::Manager;
 
+#[tauri::command]
+fn validate_nta_project(
+    project: serde_json::Value,
+) -> Result<nta8800_core::InputAssessment, String> {
+    nta8800_core::assess_json(project)
+}
+
+#[tauri::command]
+fn diagnose_declared_heating_table(
+    input: nta8800_core::declared_heating_table::DeclaredHeatingTableInput,
+) -> nta8800_core::declared_heating_table::DeclaredHeatingTableAssessment {
+    nta8800_core::declared_heating_table::assess_declared_heating_table(&input)
+}
+
+#[tauri::command]
+fn diagnose_forfait_heat_pump_draft(
+    input: nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput,
+) -> nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftAssessment {
+    nta8800_core::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_gas_heat_pump_forfait_draft(
+    input: nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftInput,
+) -> nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftAssessment {
+    nta8800_core::gas_heat_pump_forfait_draft::assess_gas_heat_pump_forfait_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_gas_heat_pump_aux_draft(
+    input: nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftInput,
+) -> nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftAssessment {
+    nta8800_core::gas_heat_pump_aux_draft::assess_gas_heat_pump_aux_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_gas_heat_pump_monthly_draft(
+    input: nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftInput,
+) -> nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftAssessment {
+    nta8800_core::gas_heat_pump_monthly_draft::assess_gas_heat_pump_monthly_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_gas_heat_pump_chain_draft(
+    input: nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftInput,
+) -> nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftAssessment {
+    nta8800_core::gas_heat_pump_chain_draft::assess_gas_heat_pump_chain_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_gas_collective_source_draft(
+    input: nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftInput,
+) -> nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftAssessment {
+    nta8800_core::gas_collective_source_draft::assess_gas_collective_source_draft(&input)
+}
+
+#[tauri::command]
+fn compare_gas_heat_pump_chain_diagnostic(
+    case: nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticCase,
+) -> nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticComparison {
+    nta8800_core::gas_heat_pump_chain_reference::compare_gas_heat_pump_chain_diagnostic(case)
+}
+
+#[tauri::command]
+fn diagnose_forfait_heat_pump_monthly_draft(
+    input: nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftInput,
+) -> nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftAssessment {
+    nta8800_core::forfait_heat_pump_monthly_draft::assess_forfait_heat_pump_monthly_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_generator_dispatch_draft(
+    input: nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftInput,
+) -> nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftAssessment {
+    nta8800_core::generator_dispatch_draft::assess_generator_dispatch_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_hybrid_heat_pump_monthly_draft(
+    input: nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftInput,
+) -> nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftAssessment {
+    nta8800_core::hybrid_heat_pump_monthly_draft::assess_hybrid_heat_pump_monthly_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_boiler_forfait_draft(
+    input: nta8800_core::boiler_forfait_draft::BoilerForfaitDraftInput,
+) -> nta8800_core::boiler_forfait_draft::BoilerForfaitDraftAssessment {
+    nta8800_core::boiler_forfait_draft::assess_boiler_forfait_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_boiler_forfait_monthly_draft(
+    input: nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftInput,
+) -> nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftAssessment {
+    nta8800_core::boiler_forfait_draft::assess_boiler_forfait_monthly_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_declared_dhw(
+    input: nta8800_core::heat_pumps::HeatPumpInput,
+) -> nta8800_core::declared_dhw::DeclaredDhwAssessment {
+    nta8800_core::declared_dhw::assess_declared_dhw(&input)
+}
+
+#[tauri::command]
+fn diagnose_final_energy_draft(
+    input: nta8800_core::final_energy_draft::FinalEnergyDraftInput,
+) -> nta8800_core::final_energy_draft::FinalEnergyDraftAssessment {
+    nta8800_core::final_energy_draft::assess_final_energy_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_epus_draft(
+    input: nta8800_core::epus_draft::EpusDraftInput,
+) -> nta8800_core::epus_draft::EpusDraftAssessment {
+    nta8800_core::epus_draft::assess_epus_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_bacs_draft(
+    input: nta8800_core::bacs_draft::BacsDraftInput,
+) -> nta8800_core::bacs_draft::BacsDraftAssessment {
+    nta8800_core::bacs_draft::assess_bacs_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_indicators_draft(
+    input: nta8800_core::indicators_draft::IndicatorsDraftInput,
+) -> nta8800_core::indicators_draft::IndicatorsDraftAssessment {
+    nta8800_core::indicators_draft::assess_indicators_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_heating_aux_draft(
+    input: nta8800_core::heating_aux_draft::HeatingAuxDraftInput,
+) -> nta8800_core::heating_aux_draft::HeatingAuxDraftAssessment {
+    nta8800_core::heating_aux_draft::assess_heating_aux_draft(&input)
+}
+
+#[tauri::command]
+fn diagnose_heating_aux_measured_draft(
+    input: nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftInput,
+) -> nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftAssessment {
+    nta8800_core::heating_aux_draft::assess_heating_aux_measured_draft(&input)
+}
+
 #[derive(serde::Serialize)]
 struct PrinterInfo {
     name: String,
@@ -112,20 +259,27 @@ fn list_printers() -> Vec<PrinterInfo> {
 }
 
 #[tauri::command]
-fn open_printer_properties(window: tauri::WebviewWindow, printer: String) -> Result<Option<PrinterSettings>, String> {
+fn open_printer_properties(
+    window: tauri::WebviewWindow,
+    printer: String,
+) -> Result<Option<PrinterSettings>, String> {
+    #[cfg(not(target_os = "windows"))]
+    let _ = &printer;
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::Graphics::Printing::{OpenPrinterW, ClosePrinter, DocumentPropertiesW};
-        use windows::Win32::Graphics::Gdi::DEVMODEW;
-        use windows::Win32::Foundation::HWND;
         use windows::core::PCWSTR;
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::Graphics::Gdi::DEVMODEW;
+        use windows::Win32::Graphics::Printing::{ClosePrinter, DocumentPropertiesW, OpenPrinterW};
 
         const DM_IN_PROMPT: u32 = 4;
         const DM_OUT_BUFFER: u32 = 2;
         const IDOK: i32 = 1;
 
         unsafe {
-            let hwnd = window.hwnd().map_err(|e| format!("Failed to get HWND: {e}"))?;
+            let hwnd = window
+                .hwnd()
+                .map_err(|e| format!("Failed to get HWND: {e}"))?;
             let hwnd = HWND(hwnd.0 as *mut _);
 
             let wide_name: Vec<u16> = printer.encode_utf16().chain(std::iter::once(0)).collect();
@@ -136,8 +290,12 @@ fn open_printer_properties(window: tauri::WebviewWindow, printer: String) -> Res
 
             // Get required DEVMODE buffer size
             let buf_size = DocumentPropertiesW(
-                Some(hwnd), h_printer, PCWSTR(wide_name.as_ptr()),
-                None, None, 0,
+                Some(hwnd),
+                h_printer,
+                PCWSTR(wide_name.as_ptr()),
+                None,
+                None,
+                0,
             );
             if buf_size < 0 {
                 let _ = ClosePrinter(h_printer);
@@ -149,8 +307,11 @@ fn open_printer_properties(window: tauri::WebviewWindow, printer: String) -> Res
             let devmode_ptr = buffer.as_mut_ptr() as *mut DEVMODEW;
 
             let result = DocumentPropertiesW(
-                Some(hwnd), h_printer, PCWSTR(wide_name.as_ptr()),
-                Some(devmode_ptr), None,
+                Some(hwnd),
+                h_printer,
+                PCWSTR(wide_name.as_ptr()),
+                Some(devmode_ptr),
+                None,
                 DM_IN_PROMPT | DM_OUT_BUFFER,
             );
 
@@ -165,7 +326,10 @@ fn open_printer_properties(window: tauri::WebviewWindow, printer: String) -> Res
             let landscape = devmode.Anonymous1.Anonymous1.dmOrientation == 2;
 
             // dmPaperWidth/dmPaperLength are in tenths of mm (portrait dimensions)
-            let (w_tenths, h_tenths) = (devmode.Anonymous1.Anonymous1.dmPaperWidth as f64, devmode.Anonymous1.Anonymous1.dmPaperLength as f64);
+            let (w_tenths, h_tenths) = (
+                devmode.Anonymous1.Anonymous1.dmPaperWidth as f64,
+                devmode.Anonymous1.Anonymous1.dmPaperLength as f64,
+            );
 
             let (paper_w, paper_h) = if w_tenths > 0.0 && h_tenths > 0.0 {
                 (w_tenths / 10.0, h_tenths / 10.0)
@@ -186,7 +350,11 @@ fn open_printer_properties(window: tauri::WebviewWindow, printer: String) -> Res
         let _ = window;
         use std::process::Command;
         let _ = Command::new("open")
-            .args(["-a", "System Preferences", "/System/Library/PreferencePanes/PrintAndScan.prefPane"])
+            .args([
+                "-a",
+                "System Preferences",
+                "/System/Library/PreferencePanes/PrintAndScan.prefPane",
+            ])
             .output();
         Ok(None)
     }
@@ -207,13 +375,13 @@ fn open_printer_properties(window: tauri::WebviewWindow, printer: String) -> Res
 #[cfg(target_os = "windows")]
 fn paper_size_from_id(id: i16) -> (f64, f64) {
     match id {
-        1  => (215.9, 279.4),   // Letter
-        3  => (279.4, 431.8),   // Tabloid
-        5  => (215.9, 355.6),   // Legal
-        6  => (139.7, 215.9),   // Statement
-        7  => (184.15, 266.7),  // Executive
-        8  => (297.0, 420.0),   // A3
-        9  => (210.0, 297.0),   // A4
+        1 => (215.9, 279.4),    // Letter
+        3 => (279.4, 431.8),    // Tabloid
+        5 => (215.9, 355.6),    // Legal
+        6 => (139.7, 215.9),    // Statement
+        7 => (184.15, 266.7),   // Executive
+        8 => (297.0, 420.0),    // A3
+        9 => (210.0, 297.0),    // A4
         10 => (210.0, 297.0),   // A4 Small
         11 => (148.0, 210.0),   // A5
         12 => (250.0, 353.0),   // B4 (JIS)
@@ -233,7 +401,7 @@ fn paper_size_from_id(id: i16) -> (f64, f64) {
         67 => (594.0, 841.0),   // A1
         68 => (420.0, 594.0),   // A2
         70 => (105.0, 148.0),   // A6
-        _  => (210.0, 297.0),   // Default to A4
+        _ => (210.0, 297.0),    // Default to A4
     }
 }
 
@@ -264,28 +432,53 @@ fn play_system_beep() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_dialog::init())
-    .plugin(tauri_plugin_fs::init())
-    .invoke_handler(tauri::generate_handler![play_system_beep, list_printers, open_printer_properties])
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .invoke_handler(tauri::generate_handler![
+            play_system_beep,
+            list_printers,
+            open_printer_properties,
+            validate_nta_project,
+            diagnose_declared_heating_table,
+            diagnose_forfait_heat_pump_draft,
+            diagnose_gas_heat_pump_forfait_draft,
+            diagnose_gas_heat_pump_aux_draft,
+            diagnose_gas_heat_pump_monthly_draft,
+            diagnose_gas_heat_pump_chain_draft,
+            diagnose_gas_collective_source_draft,
+            compare_gas_heat_pump_chain_diagnostic,
+            diagnose_forfait_heat_pump_monthly_draft,
+            diagnose_generator_dispatch_draft,
+            diagnose_hybrid_heat_pump_monthly_draft,
+            diagnose_boiler_forfait_draft,
+            diagnose_boiler_forfait_monthly_draft,
+            diagnose_declared_dhw,
+            diagnose_final_energy_draft,
+            diagnose_epus_draft,
+            diagnose_bacs_draft,
+            diagnose_indicators_draft,
+            diagnose_heating_aux_draft,
+            diagnose_heating_aux_measured_draft
+        ])
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
 
-      // Set window icon for taskbar
-      if let Some(window) = app.get_webview_window("main") {
-        let icon = Image::from_bytes(include_bytes!("../icons/icon.png"))
-          .expect("failed to load icon");
-        window.set_icon(icon).expect("failed to set window icon");
-      }
+            // Set window icon for taskbar
+            if let Some(window) = app.get_webview_window("main") {
+                let icon = Image::from_bytes(include_bytes!("../icons/icon.png"))
+                    .expect("failed to load icon");
+                window.set_icon(icon).expect("failed to set window icon");
+            }
 
-      Ok(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

@@ -1,0 +1,25 @@
+{
+  "id": "bcrg-20240234gk-xtend-5-se-example",
+  "source": "outdoor_air",
+  "sink": "hydronic",
+  "drive": "electric_compression",
+  "reversible": false,
+  "hybrid": true,
+  "booster": false,
+  "performanceEvidence": {
+    "kind": "controlled_quality_declaration",
+    "reference": "BCRG 20240234GK, Intergas Xtend 5 SE",
+    "registryRecord": {
+      "registrationNumber": "20240234GK",
+      "productName": "Xtend 5 SE",
+      "manufacturer": "Intergas Verwarming BV",
+      "sourceUrl": "https://mijn.bcrg.nl/media/documents/2024/GK/20240234GK.pdf"
+    }
+  },
+  "declaredOperatingLimits": {
+    "minimumOperatingCop": 2,
+    "maximumSupplyTemperatureC": 55,
+    "declarationNormVersion": "NTA 8800:2024",
+    "sourceReference": "BCRG 20240234GK, p. 2, shutoff rules; remaining demand to second appliance outside declaration"
+  }
+}

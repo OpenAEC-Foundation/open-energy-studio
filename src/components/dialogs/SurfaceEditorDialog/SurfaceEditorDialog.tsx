@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
-import { ISurface, SurfaceType, Orientation } from '../../../core/energy/types';
+import { ISurface, SurfaceType, Orientation, ThermalBoundary } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
 
 interface SurfaceEditorDialogProps {
@@ -11,6 +11,7 @@ interface SurfaceEditorDialogProps {
 
 const surfaceTypes: SurfaceType[] = ['wall', 'roof', 'floor'];
 const orientations: Orientation[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'horizontal'];
+const thermalBoundaries: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
 
 export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProps) {
   const { t } = useI18n();
@@ -33,6 +34,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
 
   const [name, setName] = useState(existingSurface?.name ?? '');
   const [type, setType] = useState<SurfaceType>(existingSurface?.type ?? 'wall');
+  const [thermalBoundary, setThermalBoundary] = useState<ThermalBoundary | ''>(existingSurface?.thermalBoundary ?? '');
+  const [unheatedSpaceId, setUnheatedSpaceId] = useState(existingSurface?.unheatedSpaceId ?? '');
   const [area, setArea] = useState(existingSurface?.area ?? 0);
   const [orientation, setOrientation] = useState<Orientation>(existingSurface?.orientation ?? 'N');
   const [constructionId, setConstructionId] = useState(existingSurface?.constructionId ?? '');
@@ -43,6 +46,7 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
     const newErrors: Record<string, string> = {};
     if (!zoneId) newErrors.zoneId = t('dialog.validation.required');
     if (!name.trim()) newErrors.name = t('dialog.validation.required');
+    if (thermalBoundary === 'unheated_space' && !unheatedSpaceId) newErrors.unheatedSpaceId = t('dialog.validation.required');
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -55,7 +59,9 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         payload: {
           zoneId: existingZoneId,
           surfaceId: existingSurface.id,
-          data: { name, type, area, orientation, constructionId },
+          data: { name, type, thermalBoundary: thermalBoundary || undefined,
+            unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined,
+            area, orientation, constructionId },
         },
       });
     } else {
@@ -63,6 +69,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         id: crypto.randomUUID(),
         name,
         type,
+        thermalBoundary: thermalBoundary || undefined,
+        unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined,
         area,
         orientation,
         constructionId,
@@ -93,6 +101,15 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
           {errors.name && <span className="field-error-text">{errors.name}</span>}
         </div>
 
+        {thermalBoundary === 'unheated_space' && <div className="dialog-field">
+          <label htmlFor="surface-unheated-space">{t('kernel.unheated.space')}</label>
+          <select id="surface-unheated-space" value={unheatedSpaceId} onChange={(event) => setUnheatedSpaceId(event.target.value)}>
+            <option value="">--</option>
+            {(project.unheatedSpaces ?? []).map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
+          </select>
+          {errors.unheatedSpaceId && <span className="field-error-text">{errors.unheatedSpaceId}</span>}
+        </div>}
+
         <div className="dialog-field">
           <label>{t('dialog.surface.type')}</label>
           <select value={type} onChange={(e) => setType(e.target.value as SurfaceType)}>
@@ -102,6 +119,18 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="dialog-field">
+          <label htmlFor="surface-thermal-boundary">{t('kernel.boundary.label')}</label>
+          <select id="surface-thermal-boundary" value={thermalBoundary}
+            onChange={(event) => setThermalBoundary(event.target.value as ThermalBoundary | '')}>
+            <option value="">{t('kernel.boundary.unknown')}</option>
+            {thermalBoundaries.map((boundary) => <option key={boundary} value={boundary}>
+              {t(`kernel.boundary.${boundary}`)}
+            </option>)}
+          </select>
+          <small>{t('kernel.boundary.scope')}</small>
         </div>
 
         <div className="dialog-field">

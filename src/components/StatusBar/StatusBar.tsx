@@ -25,11 +25,7 @@ export function StatusBar() {
           <strong>{t('status.surfaces')}:</strong> {surfaceCount}
         </span>
         {result && (
-          <>
-            <span className={result.beng1Pass && result.beng2Pass && result.beng3Pass ? 'status-pass' : 'status-fail'}>
-              BENG: {result.beng1Pass && result.beng2Pass && result.beng3Pass ? t('results.pass') : t('results.fail')}
-            </span>
-          </>
+          <span className="status-indicative">BENG: {t('results.indicative')}</span>
         )}
       </div>
     </div>

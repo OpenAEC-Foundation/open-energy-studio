@@ -1,0 +1,338 @@
+{
+  "caseId": "synthetic-gas-chain-2026-draft",
+  "normVersion": "NTA 8800:2025+C1:2026",
+  "source": {
+    "publisher": "Open Energy Studio internal arithmetic",
+    "documentId": "synthetic gas heat-pump hand calculation; not ISSO 54",
+    "edition": "public chapter 9 consultation draft 2026",
+    "usePermission": "repository test fixture",
+    "independentReviewer": "none; external verification pending"
+  },
+  "input": {
+    "monthly": {
+      "forfait": {
+        "generatorId": "ga-1",
+        "drive": "absorption",
+        "application": "utility",
+        "applicationReference": "synthetic office",
+        "collectiveBuildingInstallation": false,
+        "externalHeatSupply": false,
+        "thermalCapacityKw": 20.0,
+        "capacityReference": "synthetic plate",
+        "source": "outdoor_air",
+        "sourceReference": "synthetic source plan",
+        "designSupplyTemperatureC": 35.0,
+        "designSupplyReference": "synthetic design"
+      },
+      "generatorOutputKwh": [
+        {
+          "month": 1,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 2,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 3,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 4,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 5,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 6,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 7,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 8,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 9,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 10,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 11,
+          "energyKwh": 1000.0
+        },
+        {
+          "month": 12,
+          "energyKwh": 1000.0
+        }
+      ],
+      "generatorOutputReference": "synthetic heat ledger",
+      "sourceSystem": "individual",
+      "sourceSystemReference": "synthetic source plan"
+    },
+    "auxiliary": {
+      "generatorId": "ga-1",
+      "drive": "absorption",
+      "nominalThermalCapacityKw": 20.0,
+      "capacityReference": "synthetic plate",
+      "standbyElectronicsW": 10.0,
+      "burnerAuxiliaryWPerKw": 1.0,
+      "solutionPumpWPerKw": 0.0,
+      "coefficientsReference": "public draft 9.6.8.2.3",
+      "meanModulation": 1.0,
+      "modulationReference": "public draft 9.6.8.2.3",
+      "buildingShare": 1.0,
+      "buildingShareReference": "whole synthetic building",
+      "forfaitCopUsed": true,
+      "monthHoursReference": "synthetic 730 h per month",
+      "generatorOutputReference": "synthetic heat ledger",
+      "months": [
+        {
+          "month": 1,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 2,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 3,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 4,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 5,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 6,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 7,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 8,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 9,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 10,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 11,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        },
+        {
+          "month": 12,
+          "hours": 730.0,
+          "generatorOutputKwh": 1000.0
+        }
+      ]
+    }
+  },
+  "expected": [
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 1,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 1,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 2,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 2,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 3,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 3,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 4,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 4,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 5,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 5,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 6,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 6,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 7,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 7,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 8,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 8,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 9,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 9,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 10,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 10,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 11,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 11,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equation962_unallocated_input_term",
+      "month": 12,
+      "valueKwh": 625.0,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "equipment_auxiliary_electricity",
+      "month": 12,
+      "valueKwh": 8.4,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic hand calculation from public chapter 9 draft; not an EDR result"
+    },
+    {
+      "metric": "annual_equipment_auxiliary_electricity",
+      "month": null,
+      "valueKwh": 100.8,
+      "absoluteToleranceKwh": 1e-09,
+      "calculationBasis": "synthetic sum of twelve 8.4 kWh months; not an EDR result"
+    }
+  ]
+}

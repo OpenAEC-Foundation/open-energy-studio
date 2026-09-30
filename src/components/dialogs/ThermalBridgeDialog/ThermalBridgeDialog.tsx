@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
-import { IThermalBridge } from '../../../core/energy/types';
+import { IThermalBridge, ThermalBoundary } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
 
 interface ThermalBridgeDialogProps {
   editId?: string | null;
   onClose: () => void;
 }
+
+const thermalBoundaries: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
 
 export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProps) {
   const { t } = useI18n();
@@ -31,6 +33,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
   const [name, setName] = useState(existingBridge?.name ?? '');
   const [psiValue, setPsiValue] = useState(existingBridge?.psiValue ?? 0.05);
   const [length, setLength] = useState(existingBridge?.length ?? 0);
+  const [thermalBoundary, setThermalBoundary] = useState<ThermalBoundary | ''>(existingBridge?.thermalBoundary ?? '');
+  const [unheatedSpaceId, setUnheatedSpaceId] = useState(existingBridge?.unheatedSpaceId ?? '');
   const [zoneId, setZoneId] = useState(existingZoneId ?? (project.zones[0]?.id ?? ''));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -38,6 +42,7 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
     const newErrors: Record<string, string> = {};
     if (!name.trim()) newErrors.name = t('dialog.validation.required');
     if (!zoneId) newErrors.zoneId = t('dialog.validation.required');
+    if (thermalBoundary === 'unheated_space' && !unheatedSpaceId) newErrors.unheatedSpaceId = t('dialog.validation.required');
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -50,7 +55,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
         payload: {
           zoneId: existingZoneId,
           bridgeId: existingBridge.id,
-          data: { name, psiValue, length },
+          data: { name, psiValue, length, thermalBoundary: thermalBoundary || undefined,
+            unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined },
         },
       });
     } else {
@@ -59,6 +65,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
         name,
         psiValue,
         length,
+        thermalBoundary: thermalBoundary || undefined,
+        unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined,
         zoneId,
       };
       dispatch({ type: 'ADD_THERMAL_BRIDGE', payload: { zoneId, bridge } });
@@ -85,15 +93,35 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
           {errors.name && <span className="field-error-text">{errors.name}</span>}
         </div>
 
+        {thermalBoundary === 'unheated_space' && <div className="dialog-field">
+          <label htmlFor="bridge-unheated-space">{t('kernel.unheated.space')}</label>
+          <select id="bridge-unheated-space" value={unheatedSpaceId} onChange={(event) => setUnheatedSpaceId(event.target.value)}>
+            <option value="">--</option>
+            {(project.unheatedSpaces ?? []).map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
+          </select>
+          {errors.unheatedSpaceId && <span className="field-error-text">{errors.unheatedSpaceId}</span>}
+        </div>}
+
         <div className="dialog-field">
           <label>{t('dialog.thermalBridge.psiValue')}</label>
           <input
             type="number"
-            min={0}
             step={0.001}
             value={psiValue}
             onChange={(e) => setPsiValue(parseFloat(e.target.value) || 0)}
           />
+        </div>
+
+        <div className="dialog-field">
+          <label htmlFor="bridge-thermal-boundary">{t('kernel.boundary.label')}</label>
+          <select id="bridge-thermal-boundary" value={thermalBoundary}
+            onChange={(event) => setThermalBoundary(event.target.value as ThermalBoundary | '')}>
+            <option value="">{t('kernel.boundary.unknown')}</option>
+            {thermalBoundaries.map((boundary) => <option key={boundary} value={boundary}>
+              {t(`kernel.boundary.${boundary}`)}
+            </option>)}
+          </select>
+          <small>{t('kernel.boundary.scope')}</small>
         </div>
 
         <div className="dialog-field">

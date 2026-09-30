@@ -243,21 +243,22 @@ export function exportBENGToIFC(project: IProject, result: IBENGResult): IFCMode
   const bengProps = [
     addRealProperty(model, 'BENG1_EnergyDemand', result.beng1, 'kWh/m2.year'),
     addRealProperty(model, 'BENG1_Limit', result.beng1Limit, 'kWh/m2.year'),
-    addTextProperty(model, 'BENG1_Status', result.beng1Pass ? 'PASS' : 'FAIL'),
+    addTextProperty(model, 'BENG1_Status', 'INDICATIVE'),
     addRealProperty(model, 'BENG2_PrimaryFossilEnergy', result.beng2, 'kWh/m2.year'),
     addRealProperty(model, 'BENG2_Limit', result.beng2Limit, 'kWh/m2.year'),
-    addTextProperty(model, 'BENG2_Status', result.beng2Pass ? 'PASS' : 'FAIL'),
+    addTextProperty(model, 'BENG2_Status', 'INDICATIVE'),
     addRealProperty(model, 'BENG3_RenewableShare', result.beng3, '%'),
     addRealProperty(model, 'BENG3_Limit', result.beng3Limit, '%'),
-    addTextProperty(model, 'BENG3_Status', result.beng3Pass ? 'PASS' : 'FAIL'),
-    addTextProperty(model, 'CalculationMethod', 'NTA 8800'),
+    addTextProperty(model, 'BENG3_Status', 'INDICATIVE'),
+    addTextProperty(model, 'VerificationStatus', 'UNVERIFIED'),
+    addTextProperty(model, 'CalculationMethod', 'Legacy simplified monthly model; not attested NTA 8800'),
     addTextProperty(model, 'CalculationTool', 'Open-Energy-Studio'),
     addTextProperty(model, 'CalculationDate', new Date().toISOString().split('T')[0]),
   ];
 
   const psetBENG = addEntity(model, 'IFCPROPERTYSET', [
     generateGUID(), ownerHistory, 'Pset_BuildingEnergyPerformance',
-    'BENG calculation results according to NTA 8800', bengProps,
+    'Indicative energy estimates; not a verified NTA 8800 calculation', bengProps,
   ], 'Pset_BuildingEnergyPerformance');
 
   addEntity(model, 'IFCRELDEFINESBYPROPERTIES', [

@@ -7,11 +7,10 @@ interface BENGIndicatorProps {
   value: number;
   limit: number;
   unit: string;
-  pass: boolean;
   higherIsBetter?: boolean; // for BENG3
 }
 
-export function BENGIndicator({ title, subtitle, value, limit, unit, pass, higherIsBetter }: BENGIndicatorProps) {
+export function BENGIndicator({ title, subtitle, value, limit, unit, higherIsBetter }: BENGIndicatorProps) {
   const { t } = useI18n();
 
   const ratio = higherIsBetter
@@ -20,12 +19,10 @@ export function BENGIndicator({ title, subtitle, value, limit, unit, pass, highe
   const barWidth = Math.min(Math.abs(ratio) * 100, 200);
 
   return (
-    <div className={`beng-indicator ${pass ? 'beng-pass' : 'beng-fail'}`}>
+    <div className="beng-indicator beng-indicative">
       <div className="beng-indicator-header">
         <span className="beng-indicator-title">{title}</span>
-        <span className={`beng-indicator-badge ${pass ? 'pass' : 'fail'}`}>
-          {pass ? t('results.pass') : t('results.fail')}
-        </span>
+        <span className="beng-indicator-badge indicative">{t('results.indicativeBadge')}</span>
       </div>
       <div className="beng-indicator-subtitle">{subtitle}</div>
       <div className="beng-indicator-value">
@@ -33,7 +30,7 @@ export function BENGIndicator({ title, subtitle, value, limit, unit, pass, highe
       </div>
       <div className="beng-indicator-bar-container">
         <div
-          className={`beng-indicator-bar ${pass ? 'bar-pass' : 'bar-fail'}`}
+          className="beng-indicator-bar bar-indicative"
           style={{ width: `${Math.min(barWidth, 100)}%` }}
         />
         <div

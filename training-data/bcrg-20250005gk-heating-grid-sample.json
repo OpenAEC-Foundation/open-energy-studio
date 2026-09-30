@@ -1,0 +1,25 @@
+{
+  "declarationId": "BCRG 20250005GK / Pomp AO monoblock",
+  "declarationNormVersion": "NTA 8800:2024",
+  "sourceReference": "https://mijn.bcrg.nl/media/documents/2025/GK/20250005GK.pdf, p. 3, table 1",
+  "tableScope": "WLE <= 41.67 kWh/m2.year; two-by-two excerpt only; no full product lookup",
+  "grossHeatDemandKwhPerYear": 5556,
+  "designSupplyTemperatureC": 30,
+  "firstRowCoversLowerTemperatures": true,
+  "rows": [
+    {
+      "supplyTemperatureC": 30,
+      "points": [
+        {"grossHeatDemandKwhPerYear": 5556, "generationEfficiency": 6.155, "preferredEnergyFraction": 1, "auxiliaryElectricityKwhPerYear": 93},
+        {"grossHeatDemandKwhPerYear": 11111, "generationEfficiency": 5.549, "preferredEnergyFraction": 0.992, "auxiliaryElectricityKwhPerYear": 122}
+      ]
+    },
+    {
+      "supplyTemperatureC": 35,
+      "points": [
+        {"grossHeatDemandKwhPerYear": 5556, "generationEfficiency": 5.733, "preferredEnergyFraction": 1, "auxiliaryElectricityKwhPerYear": 95},
+        {"grossHeatDemandKwhPerYear": 11111, "generationEfficiency": 5.306, "preferredEnergyFraction": 0.992, "auxiliaryElectricityKwhPerYear": 124}
+      ]
+    }
+  ]
+}

@@ -253,6 +253,14 @@ body {
   overflow: hidden;
 }
 
+.calculation-input-error {
+  padding: 9px 16px;
+  border-left: 4px solid #d97706;
+  background: #fffbeb;
+  color: #713f12;
+  font-size: 12px;
+}
+
 .content-area {
   flex: 1;
   display: flex;

@@ -12,12 +12,12 @@
  *     entities.json     - All NTA entities with properties
  *     relations.json    - Parent-child relationships
  *     deltas.json       - Change tracking (empty on export)
- *     summary.json      - Calculation results summary
+ *     summary.json      - Empty until a verified calculation is available
  */
 
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import type {
-  IProject, IBENGResult, IBENGResultMonthly,
+  IProject,
   Orientation, SurfaceType, HeatingSystemType,
   VentilationType, CoolingSystemType, HotWaterSystemType,
   SolarThermalType, BuildingFunction,
@@ -76,14 +76,6 @@ interface UNIEC3Building {
   ChangeDate: string;
 }
 
-interface UNIEC3Summary {
-  BENG1?: number;
-  BENG2?: number;
-  BENG3?: number;
-  TOJuli?: number;
-  Energielabel?: string;
-}
-
 // ============================================================
 // GUID generator
 // ============================================================
@@ -119,7 +111,6 @@ const ENT = {
   PV: 'PV',               // PV system group
   'PV-VELD': 'PV-VELD',   // PV field/array
   ZONTHERM: 'ZONTHERM',   // Solar thermal
-  PRESTATIE: 'PRESTATIE',  // Performance/results
   SETTINGS: 'SETTINGS',    // Project settings
 } as const;
 
@@ -202,12 +193,6 @@ const PROP = {
   ZT_ORIENT: 'ZT_ORIENT',
   ZT_HELLING: 'ZT_HELLING',
 
-  // Performance/results
-  PREST_BENG1: 'PREST_BENG1',
-  PREST_BENG2: 'PREST_BENG2',
-  PREST_BENG3: 'PREST_BENG3',
-  PREST_TOJULI: 'PREST_TOJULI',
-  PREST_LABEL: 'PREST_LABEL',
 } as const;
 
 // ============================================================
@@ -357,10 +342,10 @@ function getEntityProp(entity: UNIEC3Entity, propId: string): string | undefined
 }
 
 // ============================================================
-// EXPORT: IProject + IBENGResult → UNIEC3 ZIP
+// EXPORT: IProject input only → UNIEC3 ZIP
 // ============================================================
 
-export function exportToUNIEC3(project: IProject, result: IBENGResult): Uint8Array {
+export function exportToUNIEC3(project: IProject): Uint8Array {
   const entities: UNIEC3Entity[] = [];
   const relations: UNIEC3Relation[] = [];
 
@@ -578,17 +563,6 @@ export function exportToUNIEC3(project: IProject, result: IBENGResult): Uint8Arr
     relations.push(makeRelation(installEntity.NTAEntityDataId, ztEntity.NTAEntityDataId, 'INST_ZONTHERM'));
   }
 
-  // --- Performance results ---
-  const monthly = result as IBENGResultMonthly;
-  const prestEntity = makeEntity(ENT.PRESTATIE, {
-    [PROP.PREST_BENG1]: nlNum(result.beng1),
-    [PROP.PREST_BENG2]: nlNum(result.beng2),
-    [PROP.PREST_BENG3]: nlNum(result.beng3, 1),
-    ...(monthly.toJuli ? { [PROP.PREST_TOJULI]: nlNum(monthly.toJuli.gto) } : {}),
-  });
-  entities.push(prestEntity);
-  relations.push(makeRelation(gebEntity.NTAEntityDataId, prestEntity.NTAEntityDataId, 'GEB_PRESTATIE'));
-
   // ============================================================
   // Build ZIP structure
   // ============================================================
@@ -598,7 +572,7 @@ export function exportToUNIEC3(project: IProject, result: IBENGResult): Uint8Arr
     NTAVersion: 'NTA8800 v3.4.0.3',
     ReleaseDate: '2024-07-01T00:00:00',
     ExportDate: now,
-    Generator: 'Open Energy Studio',
+    Generator: 'Open Energy Studio input draft - unverified, no calculated results',
   };
 
   const folders = [{ FolderId: 1, Name: 'Default', ParentFolderId: null }];
@@ -622,13 +596,6 @@ export function exportToUNIEC3(project: IProject, result: IBENGResult): Uint8Arr
     ChangeDate: now,
   }];
 
-  const summary: UNIEC3Summary = {
-    BENG1: result.beng1,
-    BENG2: result.beng2,
-    BENG3: result.beng3,
-    ...(monthly.toJuli ? { TOJuli: monthly.toJuli.gto } : {}),
-  };
-
   // Create JSON files as UTF-8 encoded buffers
   const files: Record<string, Uint8Array> = {
     'meta.json': strToU8(JSON.stringify(meta, null, 2)),
@@ -638,10 +605,15 @@ export function exportToUNIEC3(project: IProject, result: IBENGResult): Uint8Arr
     [`buildings/${buildingId}/entities.json`]: strToU8(JSON.stringify(entities)),
     [`buildings/${buildingId}/relations.json`]: strToU8(JSON.stringify(relations)),
     [`buildings/${buildingId}/deltas.json`]: strToU8('[]'),
-    [`buildings/${buildingId}/summary.json`]: strToU8(JSON.stringify(summary, null, 2)),
+    [`buildings/${buildingId}/summary.json`]: strToU8('{}'),
   };
 
-  return zipSync(files, { level: 6 });
+  // fflate's TextEncoder may return a typed array from another JS realm.
+  // Copy into this realm so zipSync treats each value as a file, not a directory.
+  const zipFiles = Object.fromEntries(
+    Object.entries(files).map(([path, data]) => [path, new Uint8Array(data)]),
+  );
+  return zipSync(zipFiles, { level: 6 });
 }
 
 // ============================================================
@@ -1000,13 +972,13 @@ export function importFromUNIEC3(zipData: Uint8Array): IProject {
 // Download helper (export)
 // ============================================================
 
-export function downloadUNIEC3(project: IProject, result: IBENGResult): void {
-  const zipData = exportToUNIEC3(project, result);
+export function downloadUNIEC3(project: IProject): void {
+  const zipData = exportToUNIEC3(project);
   const blob = new Blob([zipData.buffer as ArrayBuffer], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${project.name || 'project'}.uniec3`;
+  a.download = `${project.name || 'project'}.input-draft.uniec3`;
   a.click();
   URL.revokeObjectURL(url);
 }

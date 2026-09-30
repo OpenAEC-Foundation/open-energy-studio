@@ -5,12 +5,14 @@ import {
   ISurface,
   IWindow,
   IThermalBridge,
+  IPointThermalBridge,
   IAirTightness,
   IConstruction,
   IHeatingSystem,
   IVentilationSystem,
   ICoolingSystem,
   IHotWaterSystem,
+  INtaHeatPumpInput,
   ISolarPV,
   ISolarThermal,
   IBENGResult,
@@ -44,6 +46,7 @@ export type EnergyAction =
   // Project-level
   | { type: 'SET_PROJECT'; payload: IProject }
   | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city'>> }
+  | { type: 'SET_UNHEATED_SPACES'; payload: NonNullable<IProject['unheatedSpaces']> }
   // Zones
   | { type: 'ADD_ZONE'; payload: IZone }
   | { type: 'UPDATE_ZONE'; payload: { id: string; data: Partial<IZone> } }
@@ -60,6 +63,9 @@ export type EnergyAction =
   | { type: 'ADD_THERMAL_BRIDGE'; payload: { zoneId: string; bridge: IThermalBridge } }
   | { type: 'UPDATE_THERMAL_BRIDGE'; payload: { zoneId: string; bridgeId: string; data: Partial<IThermalBridge> } }
   | { type: 'DELETE_THERMAL_BRIDGE'; payload: { zoneId: string; bridgeId: string } }
+  | { type: 'ADD_POINT_BRIDGE'; payload: { zoneId: string; bridge: IPointThermalBridge } }
+  | { type: 'UPDATE_POINT_BRIDGE'; payload: { zoneId: string; bridgeId: string; data: Partial<IPointThermalBridge> } }
+  | { type: 'DELETE_POINT_BRIDGE'; payload: { zoneId: string; bridgeId: string } }
   // Air tightness (per zone)
   | { type: 'UPDATE_AIR_TIGHTNESS'; payload: { zoneId: string; airTightness: IAirTightness } }
   // Constructions
@@ -82,6 +88,9 @@ export type EnergyAction =
   | { type: 'ADD_HOT_WATER_SYSTEM'; payload: IHotWaterSystem }
   | { type: 'UPDATE_HOT_WATER_SYSTEM'; payload: { id: string; data: Partial<IHotWaterSystem> } }
   | { type: 'DELETE_HOT_WATER_SYSTEM'; payload: string }
+  | { type: 'ADD_NTA_HEAT_PUMP'; payload: INtaHeatPumpInput }
+  | { type: 'UPDATE_NTA_HEAT_PUMP'; payload: INtaHeatPumpInput }
+  | { type: 'DELETE_NTA_HEAT_PUMP'; payload: string }
   // Solar PV
   | { type: 'ADD_SOLAR_PV'; payload: ISolarPV }
   | { type: 'UPDATE_SOLAR_PV'; payload: { id: string; data: Partial<ISolarPV> } }
@@ -215,6 +224,8 @@ export function createDefaultProject(): IProject {
           { id: 'tb-2', name: 'Gevel-dak', psiValue: 0.05, length: 34, zoneId: 'zone-main' },
           { id: 'tb-3', name: 'Raamkozijnen', psiValue: 0.03, length: 65, zoneId: 'zone-main' },
         ],
+        pointThermalBridges: [],
+        pointBridgeInventoryComplete: false,
         airTightness: { qv10: 0.98 },
       },
     ],
@@ -230,6 +241,7 @@ export function createDefaultProject(): IProject {
     hotWaterSystems: [
       { id: 'hw-1', name: 'Warmtepompboiler', type: 'heat_pump', efficiency: 1.40, hasSolarBoiler: false, solarBoilerFraction: 0 },
     ],
+    ntaHeatPumps: [],
     solarPV: [
       { id: 'pv-west', name: 'PV West (18 panelen)', peakPower: 7.2, orientation: 'W', tilt: 30, area: 30.6 },
       { id: 'pv-east', name: 'PV Oost (3 panelen)', peakPower: 1.2, orientation: 'E', tilt: 30, area: 5.1 },
@@ -380,7 +392,7 @@ function mapSurface(surfaces: ISurface[], surfaceId: string, updater: (s: ISurfa
 // Reducer
 // ============================================================
 
-function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
+function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyState {
   switch (action.type) {
 
     // ----------------------------------------------------------
@@ -396,6 +408,9 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         project: { ...state.project, ...action.payload },
         isDirty: true,
       };
+
+    case 'SET_UNHEATED_SPACES':
+      return { ...state, project: { ...state.project, unheatedSpaces: action.payload }, isDirty: true };
 
     // ----------------------------------------------------------
     // Zones
@@ -584,6 +599,35 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         },
         isDirty: true,
       };
+    }
+
+    case 'ADD_POINT_BRIDGE': {
+      const { zoneId, bridge } = action.payload;
+      return { ...state, project: { ...state.project,
+        zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
+          pointThermalBridges: [...(z.pointThermalBridges ?? []), bridge],
+          pointBridgeInventoryComplete: false,
+        })),
+      }, isDirty: true };
+    }
+
+    case 'UPDATE_POINT_BRIDGE': {
+      const { zoneId, bridgeId, data } = action.payload;
+      return { ...state, project: { ...state.project,
+        zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
+          pointThermalBridges: (z.pointThermalBridges ?? []).map(b => b.id === bridgeId ? { ...b, ...data } : b),
+        })),
+      }, isDirty: true };
+    }
+
+    case 'DELETE_POINT_BRIDGE': {
+      const { zoneId, bridgeId } = action.payload;
+      return { ...state, project: { ...state.project,
+        zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
+          pointThermalBridges: (z.pointThermalBridges ?? []).filter(b => b.id !== bridgeId),
+          pointBridgeInventoryComplete: false,
+        })),
+      }, isDirty: true };
     }
 
     // ----------------------------------------------------------
@@ -785,6 +829,40 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         isDirty: true,
       };
 
+    case 'ADD_NTA_HEAT_PUMP':
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          ntaHeatPumps: [...(state.project.ntaHeatPumps ?? []), action.payload],
+        },
+        result: null,
+        isDirty: true,
+      };
+
+    case 'UPDATE_NTA_HEAT_PUMP':
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          ntaHeatPumps: (state.project.ntaHeatPumps ?? []).map((pump) =>
+            pump.id === action.payload.id ? action.payload : pump),
+        },
+        result: null,
+        isDirty: true,
+      };
+
+    case 'DELETE_NTA_HEAT_PUMP':
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          ntaHeatPumps: (state.project.ntaHeatPumps ?? []).filter((pump) => pump.id !== action.payload),
+        },
+        result: null,
+        isDirty: true,
+      };
+
     // ----------------------------------------------------------
     // Solar PV
     // ----------------------------------------------------------
@@ -902,6 +980,13 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
     default:
       return state;
   }
+}
+
+function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
+  const next = applyEnergyAction(state, action);
+  return next.project !== state.project && next.result !== null
+    ? { ...next, result: null }
+    : next;
 }
 
 // ============================================================

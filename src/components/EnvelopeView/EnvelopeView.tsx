@@ -93,6 +93,33 @@ export function EnvelopeView() {
             )}
           </div>
 
+          {/* Point thermal bridges */}
+          <div className="envelope-section">
+            <h4>{t('kernel.pointBridge.title')} ({zone.pointThermalBridges?.length ?? 0})</h4>
+            <p className="envelope-meta">{zone.pointBridgeInventoryComplete
+              ? t('kernel.pointBridge.inventoryComplete')
+              : t('kernel.pointBridge.inventoryUnknown')}</p>
+            {!zone.pointBridgeInventoryComplete && <button type="button" className="btn btn-sm"
+              onClick={() => dispatch({ type: 'UPDATE_ZONE', payload: { id: zone.id, data: {
+                pointThermalBridges: zone.pointThermalBridges ?? [], pointBridgeInventoryComplete: true,
+              } } })}>{t('kernel.pointBridge.confirmInventory')}</button>}
+            {(zone.pointThermalBridges?.length ?? 0) > 0 && <table className="envelope-table">
+              <thead><tr><th>{t('properties.name')}</th><th>{t('kernel.pointBridge.chi')}</th>
+                <th>{t('kernel.boundary.label')}</th><th>{t('kernel.pointBridge.source')}</th><th>{t('kernel.pointBridge.actions')}</th></tr></thead>
+              <tbody>{zone.pointThermalBridges?.map((bridge) => <tr key={bridge.id}>
+                <td>{bridge.name}</td><td>{bridge.chiValue} W/K</td>
+                <td>{bridge.thermalBoundary ? t(`kernel.boundary.${bridge.thermalBoundary}`) : t('kernel.boundary.unknown')}</td>
+                <td>{bridge.sourceReference}</td>
+                <td><button type="button" onClick={() => dispatch({ type: 'OPEN_DIALOG', payload: {
+                  type: 'point-bridge', editId: bridge.id,
+                } })}>{t('kernel.inventory.edit')}</button>
+                  <button type="button" onClick={() => dispatch({ type: 'DELETE_POINT_BRIDGE', payload: {
+                    zoneId: zone.id, bridgeId: bridge.id,
+                  } })}>{t('dialog.delete')}</button></td>
+              </tr>)}</tbody>
+            </table>}
+          </div>
+
           {/* Air tightness */}
           <div className="envelope-section">
             <h4>{t('browser.airTightness')}</h4>

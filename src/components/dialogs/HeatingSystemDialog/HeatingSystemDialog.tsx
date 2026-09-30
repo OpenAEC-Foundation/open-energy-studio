@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IHeatingSystem, HeatingSystemType } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { defaultHeatPumpDraft, hasDhwDeclarationMismatch, hasElectricCarrierMismatch, hasIncompleteRegistryRecord, hasOperatingLimitEvidenceMismatch, HeatPumpMetadataFields, type HeatPumpDraft } from '../HeatPumpMetadataFields/HeatPumpMetadataFields';
 
 interface HeatingSystemDialogProps {
   editId?: string | null;
@@ -32,6 +33,7 @@ const defaultCop: Record<HeatingSystemType, number> = {
   electric: 1.0,
   biomass: 0.85,
 };
+const isHeatPumpType = (value: HeatingSystemType) => value === 'heat_pump_air' || value === 'heat_pump_ground';
 
 export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProps) {
   const { t } = useI18n();
@@ -45,27 +47,61 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
   const [type, setType] = useState<HeatingSystemType>(existing?.type ?? 'hr107');
   const [cop, setCop] = useState(existing?.cop ?? defaultCop['hr107']);
   const [coveragePercent, setCoveragePercent] = useState((existing?.coverageFraction ?? 1) * 100);
+  const [classifyHeatPump, setClassifyHeatPump] = useState(Boolean(existing?.ntaHeatPump));
+  const [heatPumpError, setHeatPumpError] = useState<string | null>(null);
+  const [heatPumpDraft, setHeatPumpDraft] = useState<HeatPumpDraft>(existing?.ntaHeatPump
+    ? { source: existing.ntaHeatPump.source, sink: existing.ntaHeatPump.sink, drive: existing.ntaHeatPump.drive,
+        servedZoneIds: existing.ntaHeatPump.servedZoneIds,
+        reversible: existing.ntaHeatPump.reversible, hybrid: existing.ntaHeatPump.hybrid,
+        booster: existing.ntaHeatPump.booster, performanceEvidence: existing.ntaHeatPump.performanceEvidence,
+        performancePoints: existing.ntaHeatPump.performancePoints,
+        dhwTestPoints: existing.ntaHeatPump.dhwTestPoints,
+        declaredOperatingLimits: existing.ntaHeatPump.declaredOperatingLimits,
+        auxiliaryComponents: existing.ntaHeatPump.auxiliaryComponents,
+        systemLinks: existing.ntaHeatPump.systemLinks }
+    : defaultHeatPumpDraft(existing?.type === 'heat_pump_ground' ? 'ground' : 'outdoor_air', 'hydronic'));
 
   const handleTypeChange = (newType: HeatingSystemType) => {
     setType(newType);
+    if (isHeatPumpType(newType)) {
+      setHeatPumpDraft((draft) => ({ ...draft, source: newType === 'heat_pump_ground' ? 'ground' : 'outdoor_air' }));
+    }
     if (!existing) {
       setCop(defaultCop[newType]);
     }
   };
 
   const handleSave = () => {
+    if (isHeatPumpType(type) && classifyHeatPump && hasOperatingLimitEvidenceMismatch(heatPumpDraft)) {
+      setHeatPumpError(t('kernel.operatingLimits.invalid'));
+      return;
+    }
+    if (isHeatPumpType(type) && classifyHeatPump && hasDhwDeclarationMismatch(heatPumpDraft)) {
+      setHeatPumpError(t('kernel.dhwTest.invalid'));
+      return;
+    }
+    if (isHeatPumpType(type) && classifyHeatPump && hasElectricCarrierMismatch(heatPumpDraft)) {
+      setHeatPumpError(t('kernel.points.carrierMismatch'));
+      return;
+    }
+    if (isHeatPumpType(type) && classifyHeatPump && hasIncompleteRegistryRecord(heatPumpDraft)) {
+      setHeatPumpError(t('kernel.metadata.registryIncomplete'));
+      return;
+    }
+    const id = existing?.id ?? crypto.randomUUID();
     const system: IHeatingSystem = {
-      id: existing?.id ?? crypto.randomUUID(),
+      id,
       name,
       type,
       cop,
       coverageFraction: coveragePercent / 100,
+      ntaHeatPump: isHeatPumpType(type) && classifyHeatPump ? { id, ...heatPumpDraft } : undefined,
     };
 
     if (existing) {
       dispatch({
         type: 'UPDATE_HEATING_SYSTEM',
-        payload: { id: existing.id, data: { name, type, cop, coverageFraction: system.coverageFraction } },
+        payload: { id: existing.id, data: { name, type, cop, coverageFraction: system.coverageFraction, ntaHeatPump: system.ntaHeatPump } },
       });
     } else {
       dispatch({ type: 'ADD_HEATING_SYSTEM', payload: system });
@@ -123,6 +159,16 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
             onChange={(e) => setCoveragePercent(parseFloat(e.target.value) || 0)}
           />
         </div>
+        {isHeatPumpType(type) && <>
+          <div className="dialog-field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={classifyHeatPump} onChange={(event) => setClassifyHeatPump(event.target.checked)} style={{ width: 'auto' }} />
+              {t('kernel.metadata.enable')}
+            </label>
+          </div>
+          {classifyHeatPump && <HeatPumpMetadataFields value={heatPumpDraft} onChange={setHeatPumpDraft} selfId={existing?.id} />}
+          {classifyHeatPump && heatPumpError && <p role="alert">{heatPumpError}</p>}
+        </>}
     </DialogShell>
   );
 }

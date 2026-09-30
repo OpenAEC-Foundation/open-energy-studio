@@ -174,6 +174,7 @@ export function Ribbon({
 
               <RibbonGroup label={t('ribbon.thermalBridges')}>
                 <RibbonButton icon={<><Plus size={12} /><Thermometer size={24} /></>} label={t('ribbon.addThermalBridge')} onClick={() => onOpenDialog('thermal-bridge')} />
+                <RibbonButton icon={<><Plus size={12} /><Thermometer size={24} /></>} label={t('kernel.pointBridge.add')} onClick={() => onOpenDialog('point-bridge')} />
                 <RibbonButton icon={<Wind size={24} />} label={t('ribbon.airTightness')} onClick={() => onOpenDialog('air-tightness')} />
               </RibbonGroup>
             </>
@@ -227,7 +228,7 @@ export function Ribbon({
               </RibbonGroup>
 
               <RibbonGroup label="UNIEC3">
-                <RibbonButton icon={<Download size={24} />} label={t('ribbon.exportUNIEC3')} onClick={onExportUNIEC3} />
+                <RibbonButton icon={<Download size={24} />} label={t('ribbon.exportUNIEC3Draft')} onClick={onExportUNIEC3} />
                 <RibbonButton icon={<Upload size={24} />} label={t('ribbon.importUNIEC3')} onClick={onImportUNIEC3} />
               </RibbonGroup>
 

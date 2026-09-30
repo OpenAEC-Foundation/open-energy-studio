@@ -1,0 +1,7 @@
+# Verklaarde afschakelgrenzen voor hybride warmtepompen
+
+Een geclassificeerde warmtepomp kan nu optionele `declaredOperatingLimits` opslaan: minimale bedrijfs-COP, maximale aanvoertemperatuur, verklaringeditie en exacte bronverwijzing. Minstens één grens is verplicht; de waarden moeten eindig en positief zijn en bij een gecontroleerde kwaliteitsverklaring horen. De desktopeditor en het zelfstandige invoerdossier bewaren deze gegevens. De oude indicatieve TypeScript-calculator stopt zodra zulke details op een ingebed toestel voorkomen.
+
+De publieke [BCRG-verklaring 20240234GK, p. 2](https://mijn.bcrg.nl/media/documents/2024/GK/20240234GK.pdf) noemt voor de hybride buitenlucht/water-warmtepomp Intergas Xtend 5 SE afschakeling bij COP onder 2,0 of afgiftetemperatuur boven 55 °C. Resterende warmtevraag gaat volgens de verklaring naar een tweede toestel dat buiten die beoordeling valt. De [invoerfixture](../training-data/bcrg-20240234gk-hybrid-limit-input.json) bewaart uitsluitend deze productgebonden grenzen; het product noemt NTA 8800:2024.
+
+De Rust-projectaudit meldt `heat_pump_operating_limits_unimplemented` en bij afwijkende editie `operating_limits_norm_edition_unverified`. Er is geen COP-curve, buitentemperatuur-afhankelijke schakeling, warmtefractie, ketelprestatie, hulpenergie of jaarlijkse dispatch uit deze invoer afgeleid. Voor een normatieve hybride route moeten de volledige toepasselijke NTA-uitgave, exacte product/ketelcombinatie, bijstook- en distributiegrenzen en onafhankelijke EDR-deeluitkomsten worden gecontroleerd.

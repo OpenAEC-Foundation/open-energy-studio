@@ -1,7 +1,8 @@
 import type { IProject, IBENGResult } from '../energy/types';
+import { escapeHtml } from './HtmlEscaping';
 
 /**
- * Generates a complete standalone HTML report for a BENG calculation.
+ * Generates a standalone report of indicative legacy energy estimates.
  */
 export function generateReportHTML(project: IProject, result: IBENGResult): string {
   const date = new Date().toLocaleDateString('nl-NL', {
@@ -79,17 +80,9 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     return value.toFixed(decimals);
   }
 
-  function passFailClass(pass: boolean): string {
-    return pass ? 'pass' : 'fail';
-  }
-
-  function passFailText(pass: boolean): string {
-    return pass ? 'VOLDOET' : 'VOLDOET NIET';
-  }
-
   function findConstruction(id: string): string {
     const c = project.constructions.find((con) => con.id === id);
-    return c ? `${c.name} (U=${fmt(c.uValue, 2)} W/m\u00b2K)` : id;
+    return c ? `${escapeHtml(c.name)} (U=${fmt(c.uValue, 2)} W/m\u00b2K)` : escapeHtml(id);
   }
 
   function findConstructionU(id: string): string {
@@ -101,11 +94,11 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
   const projectInfoHTML = `
     <h2>Projectgegevens</h2>
     <table>
-      <tr><th style="width:200px">Projectnaam</th><td>${project.name}</td></tr>
-      <tr><th>Omschrijving</th><td>${project.description || '-'}</td></tr>
-      <tr><th>Adres</th><td>${project.address || '-'}</td></tr>
-      <tr><th>Plaats</th><td>${project.city || '-'}</td></tr>
-      <tr><th>Gebouwfunctie</th><td>${buildingFunctionLabels[project.buildingFunction] || project.buildingFunction}</td></tr>
+      <tr><th style="width:200px">Projectnaam</th><td>${escapeHtml(project.name)}</td></tr>
+      <tr><th>Omschrijving</th><td>${escapeHtml(project.description || '-')}</td></tr>
+      <tr><th>Adres</th><td>${escapeHtml(project.address || '-')}</td></tr>
+      <tr><th>Plaats</th><td>${escapeHtml(project.city || '-')}</td></tr>
+      <tr><th>Gebouwfunctie</th><td>${escapeHtml(buildingFunctionLabels[project.buildingFunction] || project.buildingFunction)}</td></tr>
       <tr><th>Totaal vloeroppervlak (Ag)</th><td>${fmt(result.totalFloorArea)} m\u00b2</td></tr>
       <tr><th>Aantal zones</th><td>${project.zones.length}</td></tr>
     </table>`;
@@ -119,9 +112,9 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
             .map(
               (w) => `
               <tr>
-                <td style="padding-left:32px">\u2514 ${w.name}</td>
+                <td style="padding-left:32px">\u2514 ${escapeHtml(w.name)}</td>
                 <td>Raam</td>
-                <td>${orientationLabels[w.orientation] || w.orientation}</td>
+                <td>${escapeHtml(orientationLabels[w.orientation] || w.orientation)}</td>
                 <td>${fmt(w.area)} m\u00b2</td>
                 <td>${fmt(w.uValue, 2)}</td>
                 <td>g=${fmt(w.gValue, 2)}</td>
@@ -131,9 +124,9 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
 
           return `
             <tr>
-              <td>${s.name}</td>
-              <td>${surfaceTypeLabels[s.type] || s.type}</td>
-              <td>${orientationLabels[s.orientation] || s.orientation}</td>
+              <td>${escapeHtml(s.name)}</td>
+              <td>${escapeHtml(surfaceTypeLabels[s.type] || s.type)}</td>
+              <td>${escapeHtml(orientationLabels[s.orientation] || s.orientation)}</td>
               <td>${fmt(s.area)} m\u00b2</td>
               <td>${findConstructionU(s.constructionId)}</td>
               <td>${findConstruction(s.constructionId)}</td>
@@ -146,7 +139,7 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
         .map(
           (tb) => `
           <tr>
-            <td>${tb.name}</td>
+            <td>${escapeHtml(tb.name)}</td>
             <td>${fmt(tb.psiValue, 3)} W/(m\u00b7K)</td>
             <td>${fmt(tb.length, 1)} m</td>
             <td>${fmt(tb.psiValue * tb.length, 2)} W/K</td>
@@ -155,7 +148,7 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
         .join('');
 
       return `
-        <h3>Zone: ${zone.name}</h3>
+        <h3>Zone: ${escapeHtml(zone.name)}</h3>
         <table>
           <tr><th style="width:200px">Vloeroppervlak (Ag)</th><td>${fmt(zone.floorArea)} m\u00b2</td></tr>
           <tr><th>Volume</th><td>${fmt(zone.volume)} m\u00b3</td></tr>
@@ -184,8 +177,8 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     .map(
       (h) => `
       <tr>
-        <td>${h.name}</td>
-        <td>${heatingTypeLabels[h.type] || h.type}</td>
+        <td>${escapeHtml(h.name)}</td>
+        <td>${escapeHtml(heatingTypeLabels[h.type] || h.type)}</td>
         <td>${fmt(h.cop, 2)}</td>
         <td>${fmt(h.coverageFraction * 100, 0)}%</td>
       </tr>`
@@ -196,8 +189,8 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     .map(
       (v) => `
       <tr>
-        <td>${v.name}</td>
-        <td>${ventilationTypeLabels[v.type] || v.type}</td>
+        <td>${escapeHtml(v.name)}</td>
+        <td>${escapeHtml(ventilationTypeLabels[v.type] || v.type)}</td>
         <td>${fmt(v.heatRecoveryEfficiency * 100, 0)}%</td>
         <td>${fmt(v.sfp, 1)} W/(dm\u00b3/s)</td>
       </tr>`
@@ -208,8 +201,8 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     .map(
       (c) => `
       <tr>
-        <td>${c.name}</td>
-        <td>${coolingTypeLabels[c.type] || c.type}</td>
+        <td>${escapeHtml(c.name)}</td>
+        <td>${escapeHtml(coolingTypeLabels[c.type] || c.type)}</td>
         <td>${fmt(c.eer, 2)}</td>
       </tr>`
     )
@@ -219,8 +212,8 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     .map(
       (hw) => `
       <tr>
-        <td>${hw.name}</td>
-        <td>${hotWaterTypeLabels[hw.type] || hw.type}</td>
+        <td>${escapeHtml(hw.name)}</td>
+        <td>${escapeHtml(hotWaterTypeLabels[hw.type] || hw.type)}</td>
         <td>${fmt(hw.efficiency * 100, 0)}%</td>
         <td>${hw.hasSolarBoiler ? `Ja (${fmt(hw.solarBoilerFraction * 100, 0)}%)` : 'Nee'}</td>
       </tr>`
@@ -255,10 +248,10 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     .map(
       (pv) => `
       <tr>
-        <td>${pv.name}</td>
+        <td>${escapeHtml(pv.name)}</td>
         <td>${fmt(pv.peakPower, 1)} kWp</td>
         <td>${fmt(pv.area, 1)} m\u00b2</td>
-        <td>${orientationLabels[pv.orientation] || pv.orientation}</td>
+        <td>${escapeHtml(orientationLabels[pv.orientation] || pv.orientation)}</td>
         <td>${fmt(pv.tilt, 0)}\u00b0</td>
       </tr>`
     )
@@ -268,10 +261,10 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
     .map(
       (st) => `
       <tr>
-        <td>${st.name}</td>
-        <td>${solarThermalTypeLabels[st.type] || st.type}</td>
+        <td>${escapeHtml(st.name)}</td>
+        <td>${escapeHtml(solarThermalTypeLabels[st.type] || st.type)}</td>
         <td>${fmt(st.collectorArea, 1)} m\u00b2</td>
-        <td>${orientationLabels[st.orientation] || st.orientation}</td>
+        <td>${escapeHtml(orientationLabels[st.orientation] || st.orientation)}</td>
         <td>${fmt(st.tilt, 0)}\u00b0</td>
       </tr>`
     )
@@ -292,35 +285,36 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
 
   // ---- BENG results section ----
   const bengResultsHTML = `
-    <h2>BENG Resultaten</h2>
+    <h2>Indicatieve BENG-waarden</h2>
+    <p class="verification-notice">Indicatieve uitkomsten uit het oude vereenvoudigde rekenmodel. Geen geverifieerde NTA 8800-berekening, officieel energielabel of wettelijke toetsing.</p>
     <table class="beng-table">
       <tr>
         <th>Indicator</th>
         <th>Berekend</th>
         <th>Eis</th>
         <th>Eenheid</th>
-        <th>Beoordeling</th>
+        <th>Status</th>
       </tr>
       <tr>
         <td>BENG 1 \u2013 Energiebehoefte</td>
         <td>${fmt(result.beng1)}</td>
         <td>\u2264 ${fmt(result.beng1Limit)}</td>
         <td>kWh/(m\u00b2\u00b7jaar)</td>
-        <td class="${passFailClass(result.beng1Pass)}">${passFailText(result.beng1Pass)}</td>
+        <td>Indicatief</td>
       </tr>
       <tr>
         <td>BENG 2 \u2013 Primair fossiel energiegebruik</td>
         <td>${fmt(result.beng2)}</td>
         <td>\u2264 ${fmt(result.beng2Limit)}</td>
         <td>kWh/(m\u00b2\u00b7jaar)</td>
-        <td class="${passFailClass(result.beng2Pass)}">${passFailText(result.beng2Pass)}</td>
+        <td>Indicatief</td>
       </tr>
       <tr>
         <td>BENG 3 \u2013 Aandeel hernieuwbare energie</td>
         <td>${fmt(result.beng3)}</td>
         <td>\u2265 ${fmt(result.beng3Limit)}</td>
         <td>%</td>
-        <td class="${passFailClass(result.beng3Pass)}">${passFailText(result.beng3Pass)}</td>
+        <td>Indicatief</td>
       </tr>
     </table>`;
 
@@ -370,7 +364,7 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>BENG Rapport - ${project.name}</title>
+<title>Indicatief energierapport - ${escapeHtml(project.name)}</title>
 <style>
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -428,13 +422,11 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
   tr:nth-child(even) td {
     background: #fafafa;
   }
-  .pass {
-    color: #16a34a;
-    font-weight: bold;
-  }
-  .fail {
-    color: #dc2626;
-    font-weight: bold;
+  .verification-notice {
+    padding: 10px 12px;
+    border-left: 4px solid #d97706;
+    background: #fffbeb;
+    color: #713f12;
   }
   .beng-table td:first-child {
     font-weight: 600;
@@ -461,7 +453,7 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
 </style>
 </head>
 <body>
-  <h1>BENG Rapport \u2013 ${project.name}</h1>
+  <h1>Indicatief energierapport \u2013 ${escapeHtml(project.name)}</h1>
   <div class="subtitle">Gegenereerd op ${date} | Open Energy Studio</div>
 
   ${projectInfoHTML}
@@ -478,7 +470,7 @@ export function generateReportHTML(project: IProject, result: IBENGResult): stri
   ${breakdownHTML}
 
   <div class="footer">
-    <span>BENG Rapport \u2013 ${project.name}</span>
+    <span>Indicatief energierapport \u2013 ${escapeHtml(project.name)}</span>
     <span>Gegenereerd op ${date} met Open Energy Studio</span>
   </div>
 </body>

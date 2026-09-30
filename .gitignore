@@ -9,6 +9,8 @@ dist/
 
 # Tauri (Rust build artifacts)
 src-tauri/target/
+crates/**/target/
+target/
 
 # Environment / local overrides
 *.local

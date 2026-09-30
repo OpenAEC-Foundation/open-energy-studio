@@ -92,12 +92,10 @@
   font-size: 13px;
 }
 
-.report-pass {
-  color: var(--energy-green) !important;
-  font-weight: 600;
-}
-
-.report-fail {
-  color: var(--energy-red) !important;
-  font-weight: 600;
-}
+.report-verification-notice { margin: 0 0 24px; padding: 13px 15px; border: 1px solid #c58c2b; border-radius: 7px; background: #fff6df; color: #624410; }
+.report-verification-notice strong { font-size: 13px; }
+.report-verification-notice p { margin: 4px 0 0; font-size: 11px; line-height: 1.45; }
+.report-input-dossier { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 24px; }
+.report-input-dossier button { border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: white; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+.report-input-dossier p { margin: 0; color: var(--text-secondary); font-size: 12px; }
+.report-indicative { color: var(--text-secondary) !important; font-weight: 600; }

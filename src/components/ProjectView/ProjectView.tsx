@@ -1,6 +1,10 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { Building2, Layers, Thermometer, Wind, Zap } from 'lucide-react';
+import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
+import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInventoryPanel';
+import { UnheatedSpacesPanel } from '../UnheatedSpacesPanel/UnheatedSpacesPanel';
+import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainReferencePanel';
 import './ProjectView.css';
 
 export function ProjectView() {
@@ -22,6 +26,11 @@ export function ProjectView() {
           <p>{project.description || t('function.' + project.buildingFunction)}</p>
         </div>
       </div>
+
+      <KernelAuditPanel project={project} />
+      <UnheatedSpacesPanel />
+      <HeatPumpInventoryPanel />
+      <GasChainReferencePanel />
 
       <div className="project-summary-grid">
         <div className="summary-card">

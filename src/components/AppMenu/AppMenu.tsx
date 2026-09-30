@@ -137,7 +137,7 @@ export function AppMenu({
               <MenuItem icon={<Box size={16} />} label="IFC (BENG)" onClick={action(onExportIFC)} />
               <MenuItem icon={<Box size={16} />} label="IFC (Model)" onClick={action(onExportModelIFC)} />
               <Separator />
-              <MenuItem icon={<Upload size={16} />} label="UNIEC3" onClick={action(onExportUNIEC3)} />
+              <MenuItem icon={<Upload size={16} />} label={t('ribbon.exportUNIEC3Draft')} onClick={action(onExportUNIEC3)} />
               <MenuItem icon={<Upload size={16} />} label="VABI Elements" onClick={action(onExportVABI)} />
             </div>
           )}

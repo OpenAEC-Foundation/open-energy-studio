@@ -36,20 +36,11 @@
   font-weight: 600;
 }
 
-.status-pass {
-  color: #166534 !important;
+.status-indicative {
+  color: #713f12 !important;
   font-weight: 600 !important;
   padding: 2px 8px;
-  background: rgba(22, 163, 74, 0.15);
-  border-radius: 9999px;
-  font-size: 10px;
-}
-
-.status-fail {
-  color: #991B1B !important;
-  font-weight: 600 !important;
-  padding: 2px 8px;
-  background: rgba(220, 38, 38, 0.15);
+  background: rgba(245, 158, 11, 0.2);
   border-radius: 9999px;
   font-size: 10px;
 }

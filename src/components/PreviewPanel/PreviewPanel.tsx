@@ -2,9 +2,11 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { calculateBENGMonthly } from '../../core/energy/BENGCalculatorMonthly';
+import { hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, legacyHeatPumpInputIssue, validProjectFloorArea } from '../../core/energy/ProjectArea';
 import { calculateEnergyLabel } from '../../core/energy/EnergyLabel';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
 import { MonthlyBarChart } from './MonthlyBarChart';
+import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
 import { PanelRightClose } from 'lucide-react';
 import './PreviewPanel.css';
 
@@ -12,11 +14,19 @@ export function PreviewPanel() {
   const { t } = useI18n();
   const { state } = useEnergy();
   const { project } = state;
+  const invalidArea = project.zones.length > 0 && validProjectFloorArea(project) === null;
+  const hasStandaloneHeatPumps = Boolean(project.ntaHeatPumps?.length);
+  const hasPerformancePoints = hasUnmodelledHeatPumpDetails(project);
+  const hasUnheatedTransmission = hasUnmodelledUnheatedTransmission(project);
+  const heatPumpIssue = legacyHeatPumpInputIssue(project);
 
   // Auto-recalculate when project changes
   const result = useMemo(() => {
     const hasZones = project.zones.length > 0;
-    if (!hasZones) return null;
+    if (!hasZones || validProjectFloorArea(project) === null
+      || project.ntaHeatPumps?.length || hasUnmodelledHeatPumpDetails(project)
+      || hasUnmodelledUnheatedTransmission(project)
+      || legacyHeatPumpInputIssue(project)) return null;
     return calculateBENGMonthly(project);
   }, [project]);
 
@@ -67,20 +77,31 @@ export function PreviewPanel() {
       </div>
       <div className="preview-panel-content">
         {!result ? (
-          <div className="preview-empty">{t('preview.noData')}</div>
+          <div className="preview-empty" role={invalidArea || hasStandaloneHeatPumps || hasPerformancePoints || hasUnheatedTransmission || heatPumpIssue ? 'alert' : undefined}>
+            {t(hasStandaloneHeatPumps ? 'calculation.standaloneHeatPumps'
+              : hasPerformancePoints ? 'calculation.performancePointsUnsupported'
+                : hasUnheatedTransmission ? 'calculation.unheatedUnsupported'
+                : invalidArea ? 'calculation.invalidFloorArea'
+                : heatPumpIssue === 'cop' ? 'calculation.invalidHeatPumpCop'
+                  : heatPumpIssue === 'coverage' ? 'calculation.invalidHeatPumpCoverage'
+                    : 'preview.noData')}
+          </div>
         ) : (
           <>
+            <CalculationNotice compact />
             {/* Energy label */}
-            {(() => {
+            {project.buildingFunction === 'residential' ? (() => {
               const labelResult = calculateEnergyLabel(result.beng2);
               return (
-                <div className="preview-energy-label">
+                <div className="preview-energy-label" aria-label={`${t('results.indicative')}: ${labelResult.label}`}>
                   <div className="preview-energy-label-arrow" style={{ backgroundColor: labelResult.color }}>
                     <span className="preview-energy-label-text">{labelResult.label}</span>
                   </div>
                 </div>
               );
-            })()}
+            })() : (
+              <p className="preview-label-unavailable">{t('results.labelUnavailable')}</p>
+            )}
 
             {/* BENG indicators */}
             <div className="preview-section-title">BENG</div>
@@ -89,31 +110,26 @@ export function PreviewPanel() {
               value={result.beng1}
               limit={result.beng1Limit}
               unit={t('results.beng1.unit')}
-              pass={result.beng1Pass}
             />
             <BENGIndicatorCompact
               label={`${t('results.beng2.title')} \u2014 ${t('results.beng2.subtitle')}`}
               value={result.beng2}
               limit={result.beng2Limit}
               unit={t('results.beng2.unit')}
-              pass={result.beng2Pass}
             />
             <BENGIndicatorCompact
               label={`${t('results.beng3.title')} \u2014 ${t('results.beng3.subtitle')}`}
               value={result.beng3}
               limit={result.beng3Limit}
               unit={t('results.beng3.unit')}
-              pass={result.beng3Pass}
               higherIsBetter
             />
 
             {/* TO-juli */}
-            <div className={`preview-to-juli ${result.toJuli.pass ? 'pass' : 'fail'}`}>
+            <div className="preview-to-juli indicative">
               <div className="preview-to-juli-header">
                 <span className="preview-to-juli-label">{t('preview.toJuli')}</span>
-                <span className={`preview-beng-badge ${result.toJuli.pass ? 'pass' : 'fail'}`}>
-                  {result.toJuli.pass ? t('results.pass') : t('results.fail')}
-                </span>
+                <span className="preview-beng-badge indicative">{t('results.indicativeBadge')}</span>
               </div>
               <div className="preview-to-juli-value">
                 GTO: {result.toJuli.gto.toFixed(2)} / {result.toJuli.limit}

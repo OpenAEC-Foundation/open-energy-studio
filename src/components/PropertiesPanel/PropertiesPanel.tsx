@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { PanelRightClose } from 'lucide-react';
-import type { IZone, ISurface, IWindow, IThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
+import type { IZone, ISurface, IWindow, IThermalBridge, IPointThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
 import './PropertiesPanel.css';
 
 function findItem(state: ReturnType<typeof useEnergy>['state']): { item: unknown; type: string | null } {
@@ -27,6 +27,11 @@ function findItem(state: ReturnType<typeof useEnergy>['state']): { item: unknown
       for (const z of project.zones)
         for (const tb of z.thermalBridges)
           if (tb.id === selectedItemId) return { item: tb, type: 'thermalBridge' };
+      return { item: null, type: null };
+    case 'pointBridge':
+      for (const z of project.zones)
+        for (const bridge of z.pointThermalBridges ?? [])
+          if (bridge.id === selectedItemId) return { item: bridge, type: 'pointBridge' };
       return { item: null, type: null };
     case 'construction':
       return { item: project.constructions.find(c => c.id === selectedItemId), type: 'construction' };
@@ -156,6 +161,15 @@ export function PropertiesPanel() {
               <PropertyRow label={t('properties.length')} value={`${tb.length} m`} />
             </>
           );
+        })()}
+
+        {type === 'pointBridge' && (() => {
+          const bridge = item as IPointThermalBridge;
+          return <>
+            <PropertyRow label={t('properties.name')} value={bridge.name} />
+            <PropertyRow label={t('kernel.pointBridge.chi')} value={`${bridge.chiValue} W/K`} />
+            <PropertyRow label={t('kernel.pointBridge.source')} value={bridge.sourceReference} />
+          </>;
         })()}
 
         {type === 'construction' && (() => {

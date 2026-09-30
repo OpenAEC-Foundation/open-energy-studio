@@ -1,0 +1,25 @@
+{
+  "declarationId": "BCRG 20260143GG / WPU 6G 18-E M / vergrote bodem-WW",
+  "declarationNormVersion": "NTA 8800:2025",
+  "sourceReference": "https://mijn.bcrg.nl/media/documents/2026/GG/20260143GG.pdf, p. 3, WLE table, enlarged ground-source water/water",
+  "tableScope": "WPU 6G 18-E M; enlarged ground-source water/water; WLE <= 41.67 kWh/m2; two-by-two excerpt only",
+  "grossHeatDemandKwhPerYear": 5556,
+  "designSupplyTemperatureC": 30,
+  "firstRowCoversLowerTemperatures": true,
+  "rows": [
+    {
+      "supplyTemperatureC": 30,
+      "points": [
+        {"grossHeatDemandKwhPerYear": 5556, "generationEfficiency": 7.507, "preferredEnergyFraction": 0.974, "auxiliaryElectricityKwhPerYear": 63},
+        {"grossHeatDemandKwhPerYear": 11111, "generationEfficiency": 7.313, "preferredEnergyFraction": 0.723, "auxiliaryElectricityKwhPerYear": 78}
+      ]
+    },
+    {
+      "supplyTemperatureC": 35,
+      "points": [
+        {"grossHeatDemandKwhPerYear": 5556, "generationEfficiency": 7.188, "preferredEnergyFraction": 0.974, "auxiliaryElectricityKwhPerYear": 64},
+        {"grossHeatDemandKwhPerYear": 11111, "generationEfficiency": 7.038, "preferredEnergyFraction": 0.723, "auxiliaryElectricityKwhPerYear": 80}
+      ]
+    }
+  ]
+}

@@ -43,13 +43,6 @@ describe('StatusBar', () => {
     expect(css).toMatch(/\.status-bar[^}]*color:\s*var\(--bg-dark\)/s);
   });
 
-  it('uses pill shape for pass badges', () => {
-    expect(css).toMatch(/\.status-pass[^}]*border-radius:\s*9999px/s);
-  });
-
-  it('uses pill shape for fail badges', () => {
-    expect(css).toMatch(/\.status-fail[^}]*border-radius:\s*9999px/s);
-  });
 });
 
 // ── WelcomeScreen ──

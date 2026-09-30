@@ -1,0 +1,16 @@
+.heat-pump-inventory { margin: 18px 0; padding: 17px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-secondary); }
+.heat-pump-inventory-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.heat-pump-inventory h3 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
+.heat-pump-inventory-header p, .heat-pump-inventory-empty { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; }
+.heat-pump-inventory button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; }
+.heat-pump-inventory button:hover { border-color: var(--accent); }
+.heat-pump-inventory-list { margin: 13px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.heat-pump-inventory-list li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: var(--bg-primary); font-size: 12px; }
+.heat-pump-inventory-list small { color: var(--text-secondary); overflow-wrap: anywhere; }
+.heat-pump-inventory-list li > div { display: flex; gap: 5px; }
+.heat-pump-inventory-editor > fieldset { margin: 12px 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; }
+.heat-pump-inventory-editor > fieldset legend { padding: 0 4px; font-size: 12px; }
+.heat-pump-inventory-editor > fieldset label { display: inline-flex; align-items: center; gap: 5px; margin: 5px 14px 5px 0; font-size: 12px; }
+.heat-pump-inventory-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.heat-pump-inventory-error { color: #b91c1c; font-size: 12px; }
+@media (max-width: 700px) { .heat-pump-inventory-header { flex-direction: column; } .heat-pump-inventory-list li { grid-template-columns: 1fr; } }

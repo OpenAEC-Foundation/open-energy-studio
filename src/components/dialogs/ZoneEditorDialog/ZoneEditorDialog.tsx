@@ -37,6 +37,8 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
         height,
         surfaces: [],
         thermalBridges: [],
+        pointThermalBridges: [],
+        pointBridgeInventoryComplete: false,
         airTightness: { qv10: 0.4 },
       };
       dispatch({ type: 'ADD_ZONE', payload: newZone });

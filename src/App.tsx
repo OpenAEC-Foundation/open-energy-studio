@@ -15,6 +15,7 @@ import { ConstructionEditorDialog } from './components/dialogs/ConstructionEdito
 import { SurfaceEditorDialog } from './components/dialogs/SurfaceEditorDialog/SurfaceEditorDialog';
 import { WindowEditorDialog } from './components/dialogs/WindowEditorDialog/WindowEditorDialog';
 import { ThermalBridgeDialog } from './components/dialogs/ThermalBridgeDialog/ThermalBridgeDialog';
+import { PointBridgeDialog } from './components/dialogs/PointBridgeDialog/PointBridgeDialog';
 import { AirTightnessDialog } from './components/dialogs/AirTightnessDialog/AirTightnessDialog';
 import { HeatingSystemDialog } from './components/dialogs/HeatingSystemDialog/HeatingSystemDialog';
 import { VentilationSystemDialog } from './components/dialogs/VentilationSystemDialog/VentilationSystemDialog';
@@ -24,6 +25,8 @@ import { SolarPVDialog } from './components/dialogs/SolarPVDialog/SolarPVDialog'
 import { SolarThermalDialog } from './components/dialogs/SolarThermalDialog/SolarThermalDialog';
 import { PrintPreviewDialog } from './components/dialogs/PrintPreviewDialog/PrintPreviewDialog';
 import { calculateBENGMonthly } from './core/energy/BENGCalculatorMonthly';
+import { hasUnmodelledHeatPumpDetails, legacyHeatPumpInputIssue, validProjectFloorArea } from './core/energy/ProjectArea';
+import { useI18n } from './i18n/i18n';
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel';
 import { downloadReportHTML } from './core/report/ReportGenerator';
 import { downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
@@ -50,9 +53,13 @@ function ActiveDocumentContent({
   onCloseTab: (id: string) => void;
 }) {
   const { state, dispatch } = useEnergy();
+  const { t } = useI18n();
   const { dialog, project, result } = state;
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+
+  useEffect(() => { setCalculationError(null); }, [project]);
 
   const openDialog = useCallback((type: string) => {
     dispatch({ type: 'OPEN_DIALOG', payload: { type: type as DialogType } });
@@ -63,11 +70,39 @@ function ActiveDocumentContent({
   }, [dispatch]);
 
   const handleCalculate = useCallback(() => {
-    const bengResult = calculateBENGMonthly(project);
-    dispatch({ type: 'SET_RESULT', payload: bengResult });
-    dispatch({ type: 'SET_VIEW_MODE', payload: 'results' });
-    dispatch({ type: 'SET_RIBBON_TAB', payload: 'results' });
-  }, [project, dispatch]);
+    if (project.ntaHeatPumps?.length) {
+      dispatch({ type: 'SET_RESULT', payload: null });
+      setCalculationError(t('calculation.standaloneHeatPumps'));
+      return;
+    }
+    if (hasUnmodelledHeatPumpDetails(project)) {
+      dispatch({ type: 'SET_RESULT', payload: null });
+      setCalculationError(t('calculation.performancePointsUnsupported'));
+      return;
+    }
+    if (validProjectFloorArea(project) === null) {
+      dispatch({ type: 'SET_RESULT', payload: null });
+      setCalculationError(t('calculation.invalidFloorArea'));
+      return;
+    }
+    const heatPumpIssue = legacyHeatPumpInputIssue(project);
+    if (heatPumpIssue) {
+      dispatch({ type: 'SET_RESULT', payload: null });
+      setCalculationError(t(heatPumpIssue === 'cop'
+        ? 'calculation.invalidHeatPumpCop' : 'calculation.invalidHeatPumpCoverage'));
+      return;
+    }
+    try {
+      const bengResult = calculateBENGMonthly(project);
+      dispatch({ type: 'SET_RESULT', payload: bengResult });
+      dispatch({ type: 'SET_VIEW_MODE', payload: 'results' });
+      dispatch({ type: 'SET_RIBBON_TAB', payload: 'results' });
+      setCalculationError(null);
+    } catch (error) {
+      dispatch({ type: 'SET_RESULT', payload: null });
+      setCalculationError(error instanceof Error ? error.message : String(error));
+    }
+  }, [project, dispatch, t]);
 
   const handleTogglePreview = useCallback(() => {
     dispatch({ type: 'TOGGLE_PREVIEW' });
@@ -90,8 +125,8 @@ function ActiveDocumentContent({
   }, [project]);
 
   const handleExportUNIEC3 = useCallback(() => {
-    if (result) downloadUNIEC3(project, result);
-  }, [project, result]);
+    downloadUNIEC3(project);
+  }, [project]);
 
   const { docDispatch } = useDocumentManager();
 
@@ -137,6 +172,7 @@ function ActiveDocumentContent({
         onOpenAppMenu={() => setAppMenuOpen(true)}
       />
       <DocumentTabs onCloseTab={onCloseTab} onNewProject={onNewProject} onOpenProject={onOpenProject} />
+      {calculationError && <div className="calculation-input-error" role="alert">{calculationError}</div>}
       {appMenuOpen && (
         <AppMenu
           isOpen={appMenuOpen}
@@ -181,6 +217,9 @@ function ActiveDocumentContent({
       )}
       {dialog.type === 'thermal-bridge' && (
         <ThermalBridgeDialog editId={dialog.editId} onClose={closeDialog} />
+      )}
+      {dialog.type === 'point-bridge' && (
+        <PointBridgeDialog editId={dialog.editId} onClose={closeDialog} />
       )}
       {dialog.type === 'air-tightness' && (
         <AirTightnessDialog editId={dialog.editId} onClose={closeDialog} />
@@ -244,6 +283,7 @@ function AppContent() {
       ventilationSystems: [],
       coolingSystems: [],
       hotWaterSystems: [],
+      ntaHeatPumps: [],
       solarPV: [],
       solarThermal: [],
       constructions: [],

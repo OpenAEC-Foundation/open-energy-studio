@@ -150,6 +150,12 @@ export function ProjectBrowser() {
                   />
                 ))}
               </TreeNode>
+              <TreeNode label={t('kernel.pointBridge.title')} icon={<Thermometer size={14} />}>
+                {(zone.pointThermalBridges ?? []).map((bridge) => <TreeNode
+                  key={bridge.id} label={bridge.name} icon={<Thermometer size={14} />}
+                  selected={selectedItemId === bridge.id}
+                  onClick={() => select(bridge.id, 'pointBridge')} />)}
+              </TreeNode>
             </TreeNode>
           ))}
         </TreeNode>

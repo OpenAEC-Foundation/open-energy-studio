@@ -1,0 +1,45 @@
+{
+  "id": "bcrg-20240123gk-historical-example",
+  "source": "outdoor_air",
+  "sink": "combined_hydronic_and_hot_water",
+  "drive": "electric_compression",
+  "reversible": true,
+  "hybrid": false,
+  "booster": false,
+  "performanceEvidence": {
+    "kind": "controlled_quality_declaration",
+    "reference": "BCRG 20240123GK, WPL 09 ICS classic + HSBC 300 L cool",
+    "registryRecord": {
+      "registrationNumber": "20240123GK",
+      "productName": "WPL-09 ICS classic + HSBC 300 L cool",
+      "manufacturer": "STIEBEL ELTRON Nederland B.V.",
+      "sourceUrl": "https://mijn.bcrg.nl/media/documents/2024/GK/20240123GK.pdf"
+    }
+  },
+  "dhwTestPoints": [
+    {
+      "id": "M",
+      "tapProfile": "M",
+      "usefulEnergyKwhPerDay": 5.865,
+      "inputEnergyKwhPerDay": 2.52,
+      "nominalCapacityKw": 4.71,
+      "practiceFactor": 0.9,
+      "testSetpointC": 49.1,
+      "designSetpointC": 55.0,
+      "declarationNormVersion": "NTA 8800:2020",
+      "sourceReference": "BCRG 20240123GK, p. 3, tapwater software-invoer, profiel M"
+    },
+    {
+      "id": "XL",
+      "tapProfile": "XL",
+      "usefulEnergyKwhPerDay": 19.1,
+      "inputEnergyKwhPerDay": 6.469,
+      "nominalCapacityKw": 4.71,
+      "practiceFactor": 0.9,
+      "testSetpointC": 50.9,
+      "designSetpointC": 55.0,
+      "declarationNormVersion": "NTA 8800:2020",
+      "sourceReference": "BCRG 20240123GK, p. 3, tapwater software-invoer, profiel XL"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+.gas-chain-reference {
+  margin: 18px 0;
+  padding: 17px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.gas-chain-reference summary { cursor: pointer; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
+.gas-chain-reference-content { display: grid; gap: 0.8rem; margin-top: 0.8rem; }
+.gas-chain-reference-content p { margin: 0; font-size: 12px; }
+.gas-chain-reference-content > p { color: var(--text-secondary); }
+.gas-chain-reference-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+.gas-chain-reference-content label { display: grid; gap: 0.3rem; font-size: 12px; }
+.gas-chain-reference textarea { width: 100%; min-height: 9rem; padding: 0.65rem; font-family: 'JetBrains Mono', monospace; resize: vertical; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); }
+.gas-chain-reference button { justify-self: start; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; }
+.gas-chain-reference button:hover:not(:disabled) { border-color: var(--accent); }
+.gas-chain-reference button:disabled { opacity: 0.55; cursor: default; }
+.gas-chain-reference-error, .gas-chain-reference .outside-tolerance { color: var(--danger); }
+.gas-chain-reference-result { display: grid; gap: 0.7rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
+.gas-chain-reference-result[data-status="compared_fail"] > p:first-child, .gas-chain-reference-result[data-status="invalid_case"] > p:first-child { color: var(--danger); }
+.gas-chain-reference-result[data-status="compared_pass"] > p:first-child { color: var(--accent); }
+.gas-chain-reference-table-wrap { overflow-x: auto; }
+.gas-chain-reference table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.gas-chain-reference th, .gas-chain-reference td { padding: 0.35rem 0.55rem; border-bottom: 1px solid var(--border); text-align: right; font-size: 11px; }
+.gas-chain-reference th:first-child { text-align: left; }
+.gas-chain-reference small { overflow-wrap: anywhere; }

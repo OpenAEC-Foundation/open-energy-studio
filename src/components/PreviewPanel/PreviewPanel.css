@@ -48,6 +48,13 @@
   padding: 12px 0 8px;
 }
 
+.preview-label-unavailable {
+  margin: 10px 2px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .preview-energy-label-arrow {
   display: inline-flex;
   align-items: center;
@@ -94,13 +101,7 @@
   border-inline-start: 3px solid var(--border);
 }
 
-.preview-beng-card.pass {
-  border-inline-start-color: var(--energy-green, #22c55e);
-}
-
-.preview-beng-card.fail {
-  border-inline-start-color: var(--energy-red, #ef4444);
-}
+.preview-beng-card.indicative { border-inline-start-color: var(--accent); }
 
 .preview-beng-header {
   display: flex;
@@ -124,15 +125,7 @@
   letter-spacing: 0.05em;
 }
 
-.preview-beng-badge.pass {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--energy-green, #22c55e);
-}
-
-.preview-beng-badge.fail {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--energy-red, #ef4444);
-}
+.preview-beng-badge.indicative { background: var(--bg-tertiary); color: var(--text-secondary); }
 
 .preview-beng-value {
   font-size: 18px;
@@ -164,13 +157,7 @@
   border-inline-start: 3px solid var(--border);
 }
 
-.preview-to-juli.pass {
-  border-inline-start-color: var(--energy-green, #22c55e);
-}
-
-.preview-to-juli.fail {
-  border-inline-start-color: var(--energy-red, #ef4444);
-}
+.preview-to-juli.indicative { border-inline-start-color: var(--accent); }
 
 .preview-to-juli-header {
   display: flex;
