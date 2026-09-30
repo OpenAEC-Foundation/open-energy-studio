@@ -35,7 +35,7 @@ Bij één opwekker geeft tabel 9.1 `β = 1`, dus 100% dekking van `Q_H;gen;out =
 
 ## Niet meegenomen (`omittedTerms`)
 
-Knooppuntverliezen en -winst (9.2.3), terugwinbare systeemverliezen (9.2.5), ventilatorenergie van de afgifte (9.21), hulpenergie van de warmtepomp, meerdere of hybride opwekkers en tapwaterprioriteit.
+Knooppuntverliezen en -winst (9.2.3), terugwinbare systeemverliezen (9.2.5), ventilatorenergie van de afgifte (9.21), hulpenergie van een enkele warmtepomp en bronpomp/-ventilator, meer dan twee opwekkers, productgebonden hybride schakeling en tapwaterprioriteit.
 
 ## Aanroep
 

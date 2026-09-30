@@ -36,8 +36,8 @@ pub const OMITTED_TERMS: &[&str] = &[
     "9.2.3 node losses and node gains (including solar thermal)",
     "9.2.5 recoverable system losses fed back to the zone",
     "9.21 emission fan energy for fan-assisted emitters",
-    "heat pump auxiliary energy (source pump/fan, standby)",
-    "multiple generators, hybrid operation and domestic hot water priority",
+    "heat pump auxiliary energy of a single heat pump and source pump/fan energy",
+    "more than two generators, product-specific hybrid switching and domestic hot water priority",
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
