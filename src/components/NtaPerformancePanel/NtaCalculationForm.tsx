@@ -162,6 +162,28 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <TextField {...field} path={['distribution', 'sourceReference']} label={t('nta.form.distributionSource')} />
     </Section>
     <Section title={t('nta.form.generator')}>
+      <label>{t('nta.form.generatorKind')}
+        <select value={typeof generatorKind === 'string' ? generatorKind : ''} onChange={(event) => {
+          const kind = event.target.value;
+          if (kind === 'external_heat') change(['generator'], { kind, supplierReference: '', qualityDeclarationPresent: false });
+          if (kind === 'gas_boiler') change(['generator'], { kind, boiler: {
+            generatorId: 'boiler', role: 'individual_main', location: null, kind: null, fuel: 'natural_gas',
+            averageDesignEmissionTemperatureC: null, emissionCircuit: null, equipmentReference: '',
+            locationReference: '', temperatureAndCircuitReference: '', pilotFlamePresent: false } });
+          if (kind === 'heat_pump_forfait') change(['generator'], {
+            kind, forfait: project.heatingSystems[0]?.ntaHeatPump?.forfaitHeatPumpDraft ?? null,
+            sourceSystem: 'individual', sourceSystemReference: '' });
+        }}>
+          <option value="gas_boiler">{t('nta.form.generator.boiler')}</option>
+          <option value="external_heat">{t('nta.form.generator.external')}</option>
+          <option value="heat_pump_forfait">{t('nta.form.generator.heatPump')}</option>
+          {generatorKind === 'hybrid_heat_pump' && <option value="hybrid_heat_pump">{t('nta.form.generator.hybrid')}</option>}
+        </select>
+      </label>
+      {generatorKind === 'external_heat' && <>
+        <TextField {...field} path={['generator', 'supplierReference']} label={t('nta.form.externalSource')} />
+        <p className="nta-form-note">{t('nta.form.externalNote')}</p>
+      </>}
       {generatorKind === 'gas_boiler' ? <>
         <SelectField {...field} path={['generator', 'boiler', 'kind']} label={t('nta.form.boilerKind')} options={[
           ['hr107', 'HR107'], ['hr104', 'HR104'], ['hr100', 'HR100'], ['vr', 'VR'], ['conventional', t('nta.form.boiler.conventional')]]} />
@@ -174,7 +196,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         <TextField {...field} path={['generator', 'boiler', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
         <TextField {...field} path={['generator', 'boiler', 'locationReference']} label={t('nta.form.boilerLocationSource')} />
         <TextField {...field} path={['generator', 'boiler', 'temperatureAndCircuitReference']} label={t('nta.form.boilerTemperatureSource')} />
-      </> : <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
+      </> : generatorKind === 'external_heat' ? null : <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
     </Section>
     {read(draft, ['hotWater']) != null && <Section title={t('nta.form.hotWater')}>
       {residential

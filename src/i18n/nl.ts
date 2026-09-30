@@ -1195,4 +1195,11 @@ export const nl: Record<string, string> = {
   'nta.form.productionInventory': 'Alle eigen opwekking is opgenomen',
   'nta.form.c1': 'Ventilatie-invoer is het vaste C1-systeem (BENG 1)',
   'nta.form.battery': 'Batterijopslag aanwezig',
+  'nta.form.generatorKind': 'Type opwekker',
+  'nta.form.generator.boiler': 'Gasketel',
+  'nta.form.generator.external': 'Externe warmtelevering (stadsverwarming)',
+  'nta.form.generator.heatPump': 'Elektrische warmtepomp (forfaitaire COP)',
+  'nta.form.generator.hybrid': 'Hybride warmtepomp',
+  'nta.form.externalSource': 'Bewijs levering (factuur/contract)',
+  'nta.form.externalNote': 'Vaste primaire factor 0,9 zonder kwaliteitsverklaring (tabel 5.2).',
 };

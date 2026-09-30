@@ -1195,4 +1195,11 @@ export const en: Record<string, string> = {
   'nta.form.productionInventory': 'All on-site production is included',
   'nta.form.c1': 'Ventilation input represents the fixed C1 system (BENG 1)',
   'nta.form.battery': 'Battery storage present',
+  'nta.form.generatorKind': 'Generator type',
+  'nta.form.generator.boiler': 'Gas boiler',
+  'nta.form.generator.external': 'External heat supply (district heating)',
+  'nta.form.generator.heatPump': 'Electric heat pump (forfait COP)',
+  'nta.form.generator.hybrid': 'Hybrid heat pump',
+  'nta.form.externalSource': 'Proof of supply (invoice/contract)',
+  'nta.form.externalNote': 'Fixed primary factor 0.9 without a quality declaration (table 5.2).',
 };

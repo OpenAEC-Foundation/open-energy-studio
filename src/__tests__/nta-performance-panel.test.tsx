@@ -140,6 +140,8 @@ describe('NTA performance panel', () => {
     await user.selectOptions(form.getByLabelText('Floors'), 'very_heavy');
     await user.type(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'), '42');
     await user.selectOptions(form.getByLabelText('Emission system'), 'floor_heating');
+    await user.selectOptions(form.getByLabelText('Generator type'), 'external_heat');
+    await user.type(form.getByLabelText('Proof of supply (invoice/contract)'), 'contract 42');
     await user.click(form.getByLabelText('All energy uses are included'));
     await user.click(form.getByRole('button', { name: 'Save' }));
     const block = JSON.parse(screen.getByTestId('block').textContent ?? 'null');
@@ -149,6 +151,7 @@ describe('NTA performance panel', () => {
     expect(block.ventilationFlows[0].months.every((month: { conductanceWPerK: number }) => month.conductanceWPerK === 42)).toBe(true);
     expect(block.emission.system).toBe('floor_heating');
     expect(block.useInventoryComplete).toBe(true);
+    expect(block.generator).toEqual({ kind: 'external_heat', supplierReference: 'contract 42', qualityDeclarationPresent: false });
     expect(block.setpoints.sourceReference).toBe('table 7.13');
     expect(block.thermalMass.sourceReference).toBe('');
   });
