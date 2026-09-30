@@ -1202,4 +1202,5 @@ export const en: Record<string, string> = {
   'nta.form.generator.hybrid': 'Hybrid heat pump',
   'nta.form.externalSource': 'Proof of supply (invoice/contract)',
   'nta.form.externalNote': 'Fixed primary factor 0.9 without a quality declaration (table 5.2).',
+  'nta.performance.unclassified': 'surfaces without boundary',
 };

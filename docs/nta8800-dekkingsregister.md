@@ -6,7 +6,7 @@ Doeluitgave: **NTA 8800:2025+C1:2026**. Dit register beschrijft implementatiedek
 
 | Onderdeel | Model | Audit | Rekenroute | Referentie | Attest | Volgende verificatie |
 | --- | --- | --- | --- | --- | --- | --- |
-| Gebouw, zones, Ag en volume | bestaand `.oes` + Rust-envelope | positief/uniciteit | nee | alleen historische EP-W001-invoersom, geen actuele normcase | nee | begrippen en meetregels tegen normtekst |
+| Gebouw, zones, Ag en volume | bestaand `.oes` + Rust-envelope | positief/uniciteit | nee | EP-W001 (ISSO 54 v2.0, 2022): A_g = 96 en A_ls = 247,2 m² exact gereproduceerd uit het `.oes`-project (p. 5, tolerantie 1 %); energie-uitkomsten geblokkeerd op bijlage 2 | nee | begrippen en meetregels tegen normtekst |
 | Schilvlakken, ramen en constructieverwijzingen | bestaand `.oes` + Rust-envelope | oppervlak, referenties, bruto/raam/restant-invoersommen en aanwezige Rc/U/g-/laagwaarden | nee | alleen historische EP-W001-invoersom Ao/ramen, geen NTA-rekenuitkomst | nee | NTA-meetregels, thermische-schilgrens, transmissie en actuele referentiegevallen |
 | Koudebruggen en luchtdichtheid | bestaand `.oes` + Rust-invoeraudit | ID/zone, lengte, eindige Ψ en niet-negatieve qv10 | nee | nee | nee | normatieve koudebrug- en infiltratieroutes met onafhankelijke cases |
 | Directe transmissie naar buiten | expliciete componentinvoer via Rust/API/MCP; grensclassificatie en puntbruginventaris in `.oes` en UI | eenheden, IDs, fysieke waarden, herkomstvelden, volledige grensclassificatie en expliciete bevestiging van puntbruginventaris vóór projectdiagnose | nee; alleen diagnostische `Σ(A·U)+Σ(L·Ψ)+Σχ` | nee | nee | normcorrecties, toepasselijkheid van χ en onafhankelijk verwacht deelresultaat |

@@ -99,6 +99,13 @@ export function NtaPerformancePanel() {
         </div>
       )}
 
+      {!loading && assessment?.geometry && (
+        <p className="nta-performance-geometry">
+          A<sub>g</sub> = {assessment.geometry.usableFloorAreaM2.toFixed(1)} m² · A<sub>ls</sub> = {assessment.geometry.lossAreaM2.toFixed(1)} m²
+          {assessment.geometry.lossAreaRatio != null && <> · A<sub>ls</sub>/A<sub>g</sub> = {assessment.geometry.lossAreaRatio.toFixed(3)}</>}
+          {assessment.geometry.unclassifiedSurfaceCount > 0 && <> · {assessment.geometry.unclassifiedSurfaceCount} {t('nta.performance.unclassified')}</>}
+        </p>
+      )}
       {!loading && assessment && assessment.status === 'incomplete' && (
         <div className="nta-performance-gaps">
           <p role="status"><AlertCircle size={16} /> {t('nta.performance.incomplete')}</p>

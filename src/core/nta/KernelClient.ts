@@ -1517,6 +1517,12 @@ export interface ProjectPerformanceAssessment {
   inputFingerprint: string;
   attestStatus: 'unattested';
   gaps: Array<{ code: string; path: string; detail?: string }>;
+  geometry: null | {
+    usableFloorAreaM2: number;
+    lossAreaM2: number;
+    lossAreaRatio: number | null;
+    unclassifiedSurfaceCount: number;
+  };
   derivedInput: BuildingPerformanceInput | null;
   performance: BuildingPerformanceAssessment | null;
 }

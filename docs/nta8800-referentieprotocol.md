@@ -46,3 +46,7 @@ Voor de [gekoppelde gaswarmtepomp-conceptdiagnose](nta8800-gaswarmtepomp-gekoppe
 ## Status
 
 Er zijn nog geen onafhankelijke officiële referentiegevallen of door een attesteringsinstelling bevestigde toleranties in de repository. De volledige normtekst is nog niet in het ontwikkelwerkdossier beschikbaar. De huidige Rust-kernel heeft daarom geen vrijgegeven BENG-, TO-juli- of labelberekening.
+
+## EDR EP-W001 (1 oktober 2026)
+
+`training-data/edr-2022-epw001-project.json` bevat de invoer van EP-W001 uit ISSO 54 v2.0 (2022, p. 4–6) als `.oes`-project, zonder NTA-blok. `training-data/edr-2022-epw001-expected.json` legt de enige in het document gepubliceerde waarden vast: A_g = 96 m² en A_ls = 247,2 m². De overige uitkomsten zijn gemarkeerd als geblokkeerd op bijlage 2. De Rust-test `edr_epw001_geometry_matches_published_areas` reproduceert beide oppervlaktes binnen de officiële tolerantie van 1 % (feitelijk exact). De testset rekent volgens NTA 8800 (januari 2022); voor de doeluitgave is de actuele testset nodig.

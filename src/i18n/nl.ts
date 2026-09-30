@@ -1202,4 +1202,5 @@ export const nl: Record<string, string> = {
   'nta.form.generator.hybrid': 'Hybride warmtepomp',
   'nta.form.externalSource': 'Bewijs levering (factuur/contract)',
   'nta.form.externalNote': 'Vaste primaire factor 0,9 zonder kwaliteitsverklaring (tabel 5.2).',
+  'nta.performance.unclassified': 'vlakken zonder begrenzing',
 };

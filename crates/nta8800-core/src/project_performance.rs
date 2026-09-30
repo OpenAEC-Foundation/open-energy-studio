@@ -135,8 +135,56 @@ pub struct ProjectPerformanceAssessment {
     pub input_fingerprint: String,
     pub attest_status: &'static str,
     pub gaps: Vec<InputGap>,
+    /// Envelope geometry derived from the project alone, available even when
+    /// the NTA block is incomplete.
+    pub geometry: Option<GeometrySummary>,
     pub derived_input: Option<BuildingPerformanceInput>,
     pub performance: Option<BuildingPerformanceAssessment>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometrySummary {
+    /// `A_g;tot`: sum of the zone usable floor areas, m².
+    pub usable_floor_area_m2: f64,
+    /// `A_ls`: gross surfaces bordering outdoor air, ground or unheated space, m².
+    pub loss_area_m2: f64,
+    pub loss_area_ratio: Option<f64>,
+    /// Surfaces without a thermal boundary are not counted.
+    pub unclassified_surface_count: usize,
+}
+
+/// Geometry of the project without any NTA block; `None` for an unreadable project.
+pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
+    let project: ProjectInput = serde_json::from_value(project_value.clone()).ok()?;
+    let mut floor = 0.0;
+    let mut loss = 0.0;
+    let mut unclassified = 0;
+    for zone in &project.zones {
+        floor += zone.floor_area;
+        for surface in &zone.surfaces {
+            match surface
+                .get("thermalBoundary")
+                .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
+            {
+                Some(
+                    ThermalBoundary::Outdoor
+                    | ThermalBoundary::Ground
+                    | ThermalBoundary::UnheatedSpace,
+                ) => {
+                    loss += surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+                }
+                Some(_) => {}
+                None => unclassified += 1,
+            }
+        }
+    }
+    Some(GeometrySummary {
+        usable_floor_area_m2: floor,
+        loss_area_m2: loss,
+        loss_area_ratio: (floor > 0.0).then(|| loss / floor),
+        unclassified_surface_count: unclassified,
+    })
 }
 
 fn gap(code: &'static str, path: impl Into<String>) -> InputGap {
@@ -181,6 +229,7 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         input_fingerprint: fingerprint,
         attest_status: "unattested",
         gaps,
+        geometry: project_geometry(project_value),
         derived_input: derived,
         performance,
     }
@@ -652,5 +701,23 @@ mod tests {
             .unwrap();
         let second = zone_two.transmission.as_ref().unwrap();
         assert!((first.conductance_w_per_k - second.conductance_w_per_k).abs() < 1e-9);
+    }
+
+    /// ISSO 54 v2.0 (2022), EP-W001, p. 5: A_g = 96 m² and A_ls = 247,2 m²
+    /// are the only values of the EDR test set published in the document
+    /// itself; the official tolerance is 1 %.
+    #[test]
+    fn edr_epw001_geometry_matches_published_areas() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/edr-2022-epw001-project.json"
+        ))
+        .unwrap();
+        let result = assess_project_performance(&project);
+        assert_eq!(result.status, "incomplete");
+        let geometry = result.geometry.unwrap();
+        assert!((geometry.usable_floor_area_m2 - 96.0).abs() <= 0.01 * 96.0);
+        assert!((geometry.loss_area_m2 - 247.2).abs() <= 0.01 * 247.2);
+        assert!((geometry.loss_area_ratio.unwrap() - 2.575).abs() < 1e-9);
+        assert_eq!(geometry.unclassified_surface_count, 0);
     }
 }
