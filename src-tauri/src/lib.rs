@@ -121,6 +121,13 @@ fn calculate_monthly_demand(
 }
 
 #[tauri::command]
+fn calculate_space_heating_chain(
+    input: nta8800_core::space_heating_chain::SpaceHeatingChainInput,
+) -> nta8800_core::space_heating_chain::SpaceHeatingChainAssessment {
+    nta8800_core::space_heating_chain::assess_space_heating_chain(&input)
+}
+
+#[tauri::command]
 fn diagnose_epus_draft(
     input: nta8800_core::epus_draft::EpusDraftInput,
 ) -> nta8800_core::epus_draft::EpusDraftAssessment {
@@ -464,6 +471,7 @@ pub fn run() {
             diagnose_final_energy_draft,
             diagnose_epus_draft,
             calculate_monthly_demand,
+            calculate_space_heating_chain,
             diagnose_bacs_draft,
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,

@@ -30,12 +30,14 @@ pub mod gas_heat_pump_monthly_draft;
 pub mod generator_dispatch_draft;
 pub mod ground;
 pub mod heat_pumps;
+pub mod heating_emission;
 pub mod heating_aux_draft;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
 pub mod reference;
+pub mod space_heating_chain;
 pub mod unheated_transmission;
 use direct_transmission::{DirectElement, DirectTransmissionInput, LinearBridge, PointBridge};
 use heat_pumps::{
@@ -271,6 +273,7 @@ pub fn capabilities() -> KernelCapabilities {
             "reference_manifest_field_audit",
             "diagnostic_direct_transmission_reference_comparison",
             "unverified_chapter_7_monthly_heating_cooling_need_single_zone",
+            "unverified_space_heating_chain_emission_distribution_single_generator",
         ],
     }
 }

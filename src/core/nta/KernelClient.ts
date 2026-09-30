@@ -1230,3 +1230,70 @@ export async function assessProjectWithRust(project: IProject): Promise<KernelAs
 
   throw new Error('Rust validation is available in the desktop app and local development server.');
 }
+
+export interface SpaceHeatingChainInput {
+  demand: MonthlyDemandInput;
+  emission: {
+    system: 'radiators_or_convectors' | 'floor_heating' | 'fan_assisted_radiators_or_convectors' | 'air_heating' | 'other_or_unknown';
+    balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
+    control: 'main_room_thermostat' | 'central_with_room_valves' | 'individual_room_thermostats' | 'other_or_unknown';
+    sourceReference: string;
+  };
+  distribution:
+    | { method: 'heated_zone_only_space_heating'; sourceReference: string }
+    | { method: 'declared'; monthlyLossKwh: number[]; sourceReference: string };
+  generator:
+    | { kind: 'gas_boiler'; boiler: BoilerForfaitDraftInput }
+    | {
+        kind: 'heat_pump_forfait';
+        forfait: ForfaitHeatPumpDraftInput;
+        sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
+        sourceSystemReference: string;
+      };
+}
+
+export interface SpaceHeatingChainAssessment {
+  status: 'calculated_unverified' | 'invalid';
+  scope: string;
+  chapter9Source: string;
+  inputFingerprint: string;
+  finalEditionVerified: false;
+  referenceVerified: false;
+  bengCalculationAvailable: false;
+  omittedTerms: string[];
+  emissionTemperatureIncrementK: number | null;
+  generationEfficiency: number | null;
+  monthly: Array<{
+    month: number;
+    heatingNeedKwh: number;
+    emissionLossKwh: number;
+    emissionInputKwh: number;
+    distributionLossKwh: number;
+    generatorOutputKwh: number;
+    naturalGasKwh: number;
+    generatorElectricityKwh: number;
+    auxiliaryElectricityKwh: number | null;
+    collectiveSourceHeatKwh: number;
+  }>;
+  annualNaturalGasKwh: number | null;
+  annualGeneratorElectricityKwh: number | null;
+  annualAuxiliaryElectricityKwh: number | null;
+  annualCollectiveSourceHeatKwh: number | null;
+  demand: MonthlyDemandAssessment;
+  issues: Array<{ code: string; path: string }>;
+}
+
+export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
+  if (isTauri()) {
+    return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/heating/space-heating-chain/calculate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    });
+    return response.json() as Promise<SpaceHeatingChainAssessment>;
+  }
+  throw new Error('Rust heating chain calculation is available in the desktop app and local development server.');
+}

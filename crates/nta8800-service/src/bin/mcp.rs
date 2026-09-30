@@ -39,6 +39,12 @@ struct MonthlyDemandArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct SpaceHeatingChainArgs {
+    /// Monthly demand input plus emission system, distribution route and one generator (gas boiler or forfait heat pump).
+    input: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct UnheatedTransmissionArgs {
     /// Named unheated spaces, explicit boundary terms and caller-supplied reduction factors.
     input: Value,
@@ -522,6 +528,32 @@ impl EnergyMcp {
             )]),
             Ok(input) => {
                 let result = nta8800_core::monthly_demand::assess_monthly_demand(&input);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "invalid" {
+                    CallToolResult::error(vec![content])
+                } else {
+                    CallToolResult::success(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Calculate the unverified monthly space-heating chain (need, emission, distribution, one generator) and energy per carrier; lists omitted terms; no BENG or label"
+    )]
+    fn calculate_space_heating_chain(
+        &self,
+        Parameters(args): Parameters<SpaceHeatingChainArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::space_heating_chain::SpaceHeatingChainInput>(
+            args.input,
+        ) {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_space_heating_chain_shape", "message":message.to_string()})
+                    .to_string(),
+            )]),
+            Ok(input) => {
+                let result = nta8800_core::space_heating_chain::assess_space_heating_chain(&input);
                 let content = ContentBlock::text(json!(result).to_string());
                 if result.status == "invalid" {
                     CallToolResult::error(vec![content])
