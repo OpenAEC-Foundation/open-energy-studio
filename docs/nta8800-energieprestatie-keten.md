@@ -58,6 +58,25 @@ De uitkomst heet `indicativeLabelClass`; `labelAvailable` blijft `false`. Het ec
 
 De oude TypeScript-labelfunctie gebruikte onjuiste grenzen (A+++ ≤ 20, F ≤ 340). Die zijn gecorrigeerd naar bijlage IX. De wijzigingsregeling van 24 april 2026 ([Stcrt. 2026, 18123](https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html)) voegt onder meer een A0-aanduiding (bijlagen IXa/Xa) en nieuwe labelgegevens toe. Die zijn nog niet verwerkt; de datum van inwerkingtreding moet worden gecontroleerd.
 
+## Toets Bbl art. 4.149
+
+Module `bbl_requirements` bevat tabel 4.148A van het Besluit bouwwerken leefomgeving ([BWBR0041297](https://wetten.overheid.nl/BWBR0041297/2026-01-01), versie 1 januari 2026, opgehaald 1 oktober 2026). De tabel geeft per gebruiksfunctie:
+
+- de maximale energiebehoefte (BENG 1), afhankelijk van `A_ls/A_g`;
+- het maximale primair fossiele energiegebruik (BENG 2);
+- het minimale aandeel hernieuwbare energie (BENG 3).
+
+Grondgebonden woning (1e): 55 bij ≤ 1,5; `55 + 30·(x − 1,5)` tot 3,0; `100 + 50·(x − 3,0)` daarboven; BENG 2 ≤ 30; BENG 3 ≥ 50%. Woongebouw (1a): 65 bij ≤ 1,83; BENG 2 ≤ 50; BENG 3 ≥ 40%.
+
+Lid 4 verhoogt de behoefte-eis met 5 kWh/m²·jr bij een gewogen `D_m` ≤ 180 kJ/m²K, maar alleen voor de rijen waar de tabel dat lid aanwijst: 1a, 1e en 7b. Een indicator die niet beschikbaar is, bijvoorbeeld BENG 1 zonder C1-ventilatie, geeft "niet te toetsen". Weging bij gemengde functies (lid 2) is niet geïmplementeerd.
+
+De projectadapter leidt `A_ls` af als som van de bruto vlakken die aan buitenlucht, grond of een onverwarmde ruimte grenzen. Of die definitie exact aansluit op de verliesoppervlakte van NTA 8800 moet de normreview nog bevestigen. De gebruiksfunctie (`bblFunction`) moet de gebruiker zelf kiezen; het sjabloon vult die niet in.
+
+Relevante bepalingen uit de Omgevingsregeling:
+
+- art. 5.31a/5.31b: de BENG-waarden voor nieuwbouw worden bepaald door een bedrijf met BRL 9500-detailopname, met een programma dat volgens BRL 9501 is geattesteerd;
+- art. 5.50 lid 2: de koelbehoefte van woningen gaat via de "Rekentool Koelbehoefte NTA 8800" in plaats van bijlage AA.
+
 ## BENG 1
 
 Volgens §5.4 moet de energiebehoefte voor BENG 1 worden berekend met een vast ventilatiesysteem C1 (tabellen 11.5/11.6) en vaste interne warmtelasten. Hoofdstuk 11 zit nog niet in Rust. Daarom verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de ventilatie-invoer het C1-systeem voorstelt. De jaarlijkse behoefte met de opgegeven ventilatie staat altijd in `annualHeatingAndCoolingNeedKwh`.

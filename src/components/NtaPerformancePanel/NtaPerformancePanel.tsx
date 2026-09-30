@@ -148,6 +148,22 @@ export function NtaPerformancePanel() {
           <div><dt>{t('nta.performance.primaryFossil')}</dt><dd>{kwh(performance.annualPrimaryFossilKwh)} kWh</dd></div>
           <div><dt>{t('nta.performance.renewable')}</dt><dd>{kwh(performance.annualRenewablePrimaryKwh)} kWh</dd></div>
         </dl>
+        {performance.bblCheck && <div className="nta-performance-bbl" role="group" aria-label={t('nta.performance.bbl')}>
+          <strong>{t('nta.performance.bbl')}</strong>
+          <small>A<sub>ls</sub>/A<sub>g</sub> = {performance.bblCheck.lossAreaRatio.toFixed(2)}</small>
+          <ul>
+            {([
+              ['BENG 1', performance.bblCheck.energyNeedMeets, `≤ ${performance.bblCheck.limits.energyNeedMaxKwhPerM2.toFixed(1)}`],
+              ['BENG 2', performance.bblCheck.primaryFossilMeets, `≤ ${performance.bblCheck.limits.primaryFossilMaxKwhPerM2.toFixed(1)}`],
+              ['BENG 3', performance.bblCheck.renewableShareMeets, `≥ ${performance.bblCheck.limits.renewableShareMinPercent.toFixed(0)}%`],
+            ] as const).map(([name, meets, limit]) => (
+              <li key={name}>
+                <span>{name} {limit}</span>
+                <em>{meets == null ? t('nta.performance.bblUnknown') : meets ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em>
+              </li>
+            ))}
+          </ul>
+        </div>}
         <details className="nta-performance-monthly">
           <summary>{t('nta.performance.monthly')}</summary>
           <div className="nta-performance-table"><table>

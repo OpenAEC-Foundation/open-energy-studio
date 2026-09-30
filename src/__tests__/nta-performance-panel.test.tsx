@@ -79,7 +79,11 @@ describe('NTA performance panel', () => {
         performance: {
           status: 'calculated_unverified', issues: [],
           needIndicatorKwhPerM2Year: null, primaryFossilIndicatorKwhPerM2Year: 66.24,
-          renewableSharePercent: 17.6, indicativeLabelClass: 'A+', labelSource: 'annex IX', annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
+          renewableSharePercent: 17.6, indicativeLabelClass: 'A+', labelSource: 'annex IX',
+          bblCheck: { source: 'Bbl', function: 'other_residential', lossAreaRatio: 2.12,
+            limits: { energyNeedMaxKwhPerM2: 78.6, primaryFossilMaxKwhPerM2: 30, renewableShareMinPercent: 50,
+              lightConstructionAllowanceApplied: true },
+            energyNeedMeets: null, primaryFossilMeets: false, renewableShareMeets: false }, annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
           spaceHeating: {
             omittedTerms: ['9.2.3 node losses and node gains (including solar thermal)'],
             monthly: need.map(month),
@@ -101,6 +105,10 @@ describe('NTA performance panel', () => {
     expect(indicators.getByText('requires fixed ventilation system C1 (§5.4)')).toBeInTheDocument();
     expect(screen.getByText('7.9.2 intermittent heating reduction a_H;red')).toBeInTheDocument();
     expect(screen.getByText('sha256:abc')).toBeInTheDocument();
+    const bbl = within(screen.getByRole('group', { name: 'Bbl article 4.149 check (table 4.148A)' }));
+    expect(bbl.getByText('cannot be checked')).toBeInTheDocument();
+    expect(bbl.getAllByText('does not meet')).toHaveLength(2);
+    expect(bbl.getByText('BENG 2 ≤ 30.0')).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(13);
   });
 });

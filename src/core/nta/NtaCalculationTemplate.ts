@@ -101,6 +101,8 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
       renewableHeatPump: false,
       efficiencySourceReference: '',
     },
+    labelFunction: residential ? 'residential' : null,
+    bblFunction: null,
     demandUsesFixedC1Ventilation: false,
     batteryStoragePresent: false,
   };

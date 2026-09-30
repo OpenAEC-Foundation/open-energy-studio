@@ -1083,4 +1083,8 @@ export const nl: Record<string, string> = {
   'nta.gap.project_shape_invalid': 'Projectstructuur ongeldig',
   'nta.performance.labelClass': 'Labelklasse',
   'nta.performance.labelIndicative': 'indicatief, niet geregistreerd (Omgevingsregeling bijlage IX/X)',
+  'nta.performance.bbl': 'Toets Bbl art. 4.149 (tabel 4.148A)',
+  'nta.performance.bblMeets': 'voldoet (onverifieerd)',
+  'nta.performance.bblFails': 'voldoet niet',
+  'nta.performance.bblUnknown': 'niet te toetsen',
 };

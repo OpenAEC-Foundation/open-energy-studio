@@ -1339,6 +1339,27 @@ export type NtaLabelFunction =
   | 'education' | 'healthcare_without_beds' | 'healthcare_with_beds' | 'retail'
   | 'sport' | 'lodging' | 'cell';
 
+export type NtaBblFunction =
+  | 'residential_building' | 'caravan' | 'floating_building_after2018_berth'
+  | 'floating_building_other_berth' | 'other_residential' | 'assembly_child_care'
+  | 'other_assembly' | 'cell' | 'healthcare_with_beds' | 'other_healthcare' | 'office'
+  | 'lodging_in_lodging_building' | 'other_lodging' | 'education' | 'sport' | 'retail';
+
+export interface NtaBblCheck {
+  source: string;
+  function: NtaBblFunction;
+  lossAreaRatio: number;
+  limits: {
+    energyNeedMaxKwhPerM2: number;
+    primaryFossilMaxKwhPerM2: number;
+    renewableShareMinPercent: number;
+    lightConstructionAllowanceApplied: boolean;
+  };
+  energyNeedMeets: boolean | null;
+  primaryFossilMeets: boolean | null;
+  renewableShareMeets: boolean | null;
+}
+
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
@@ -1373,6 +1394,7 @@ export interface BuildingPerformanceAssessment {
   renewableSharePercent: number | null;
   indicativeLabelClass: string | null;
   labelSource: string;
+  bblCheck: NtaBblCheck | null;
   spaceHeating: SpaceHeatingChainAssessment;
   issues: Array<{ code: string; path: string }>;
 }
@@ -1421,6 +1443,7 @@ export interface NtaCalculationInput {
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
   labelFunction?: NtaLabelFunction | null;
+  bblFunction?: NtaBblFunction | null;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }

@@ -11,6 +11,7 @@
 //! because their draft rules are incomplete or not wired. Non-EP electricity
 //! is fixed at 0 as required for the indicators (5.27).
 
+use crate::bbl_requirements::{check as bbl_check, BblCheck, BblFunction};
 use crate::domestic_hot_water::{monthly_hot_water, validate_hot_water, HotWaterSystem};
 use crate::final_energy_draft::DRAFT_SOURCE;
 use crate::forfait_heat_pump_draft::TableSource;
@@ -160,6 +161,14 @@ pub struct BuildingPerformanceInput {
     /// buildings use annex IX and may omit it.
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
+    /// Row of Bbl table 4.148A for the requirement check.
+    #[serde(default)]
+    pub bbl_function: Option<BblFunction>,
+    /// Loss area `A_ls` in m² for the `A_ls/A_g` ratio of table 4.148A.
+    #[serde(default)]
+    pub loss_area_m2: Option<f64>,
+    #[serde(default)]
+    pub loss_area_source_reference: Option<String>,
     /// Domestic hot water calculated here (chapter 13, partial).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
@@ -223,6 +232,8 @@ pub struct BuildingPerformanceAssessment {
     /// Class from annex IX/X for the rounded BENG 2; not a registered label.
     pub indicative_label_class: Option<&'static str>,
     pub label_source: &'static str,
+    /// Bbl 4.149 check; only with a function and a loss area.
+    pub bbl_check: Option<BblCheck>,
     pub space_heating: SpaceHeatingChainAssessment,
     pub indicators: Option<IndicatorsDraftAssessment>,
     pub issues: Vec<PerformanceIssue>,
@@ -253,6 +264,21 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         issues.push(issue("bacs_factor_invalid", "bacsFactor"));
     }
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
+    if let Some(area) = input.loss_area_m2 {
+        if !area.is_finite() || area <= 0.0 {
+            issues.push(issue("loss_area_invalid", "lossAreaM2"));
+        }
+        if input
+            .loss_area_source_reference
+            .as_deref()
+            .map_or(true, |value| value.trim().is_empty())
+        {
+            issues.push(issue(
+                "source_reference_required",
+                "lossAreaSourceReference",
+            ));
+        }
+    }
     match input.label_function {
         Some(LabelFunction::Residential) if !residential => {
             issues.push(issue("label_function_scope_mismatch", "labelFunction"));
@@ -477,6 +503,14 @@ pub fn assess_building_performance(
         .filter(|_| valid)
         .and_then(|result| result.scenarios.first());
     let totals = totals.filter(|_| valid);
+    let need_indicator = indicators
+        .as_ref()
+        .filter(|_| valid && input.demand_uses_fixed_c1_ventilation)
+        .and_then(|result| result.need_indicator_kwh_per_m2_year);
+    let heating_capacity = heating
+        .demand
+        .specific_heat_capacity_kj_per_m2k
+        .unwrap_or(f64::INFINITY);
     BuildingPerformanceAssessment {
         status: if valid {
             "calculated_unverified"
@@ -498,10 +532,7 @@ pub fn assess_building_performance(
         annual_renewable_primary_kwh: totals.map(|item| item.1),
         annual_heat_pump_ambient_heat_kwh: totals.map(|item| item.2),
         annual_heating_and_cooling_need_kwh: totals.map(|item| item.3),
-        need_indicator_kwh_per_m2_year: indicators
-            .as_ref()
-            .filter(|_| valid && input.demand_uses_fixed_c1_ventilation)
-            .and_then(|result| result.need_indicator_kwh_per_m2_year),
+        need_indicator_kwh_per_m2_year: need_indicator,
         primary_fossil_indicator_kwh_per_m2_year: scenario
             .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
         renewable_share_percent: scenario.map(|item| item.renewable_share_percent),
@@ -513,6 +544,17 @@ pub fn assess_building_performance(
             indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
         }),
         label_source: LABEL_SOURCE,
+        bbl_check: match (input.bbl_function, input.loss_area_m2, scenario) {
+            (Some(function), Some(area), Some(item)) => bbl_check(
+                function,
+                area / input.total_usable_floor_area_m2,
+                heating_capacity,
+                need_indicator,
+                Some(item.primary_fossil_indicator_kwh_per_m2_year),
+                Some(item.renewable_share_percent),
+            ),
+            _ => None,
+        },
         space_heating: heating,
         indicators: indicators.filter(|_| valid),
         issues,
@@ -897,5 +939,29 @@ mod tests {
         let expected =
             result.space_heating.annual_natural_gas_kwh.unwrap() + 856.0 * 2.28 / 0.9 / 0.8;
         assert!((gas - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn bbl_check_uses_loss_area_ratio_and_available_indicators() {
+        let mut sample = input();
+        sample.bbl_function = Some(BblFunction::OtherResidential);
+        sample.loss_area_m2 = Some(200.0);
+        sample.loss_area_source_reference = Some("envelope inventory".into());
+        let result = assess_building_performance(&sample);
+        let check = result.bbl_check.as_ref().unwrap();
+        assert!((check.loss_area_ratio - 2.0).abs() < 1e-12);
+        // Synthetic mass class very heavy/light with open ceiling: D_m 180,
+        // so paragraph 4 adds 5 kWh/m².
+        assert!((check.limits.energy_need_max_kwh_per_m2 - 75.0).abs() < 1e-12);
+        assert_eq!(check.energy_need_meets, None);
+        assert_eq!(
+            check.primary_fossil_meets,
+            Some(result.primary_fossil_indicator_kwh_per_m2_year.unwrap() <= 30.0)
+        );
+        sample.loss_area_source_reference = None;
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "source_reference_required"));
     }
 }

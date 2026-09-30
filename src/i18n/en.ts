@@ -1083,4 +1083,8 @@ export const en: Record<string, string> = {
   'nta.gap.project_shape_invalid': 'Project structure invalid',
   'nta.performance.labelClass': 'Label class',
   'nta.performance.labelIndicative': 'indicative, not registered (Omgevingsregeling annex IX/X)',
+  'nta.performance.bbl': 'Bbl article 4.149 check (table 4.148A)',
+  'nta.performance.bblMeets': 'meets (unverified)',
+  'nta.performance.bblFails': 'does not meet',
+  'nta.performance.bblUnknown': 'cannot be checked',
 };

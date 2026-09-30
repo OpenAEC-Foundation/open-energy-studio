@@ -4,6 +4,7 @@
 //! comes from the strict `ntaCalculation` block, each with a source
 //! reference. Missing data is reported as input gaps instead of defaults.
 
+use crate::bbl_requirements::BblFunction;
 use crate::building_performance::{
     assess_building_performance, BuildingPerformanceAssessment, BuildingPerformanceInput,
     DeclaredRenewableHeat, DeclaredUse, HeatPumpRenewableEvidence, OnSiteProduction,
@@ -63,6 +64,8 @@ pub struct NtaCalculationInput {
     pub hot_water: Option<HotWaterSystem>,
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
+    #[serde(default)]
+    pub bbl_function: Option<BblFunction>,
     pub demand_uses_fixed_c1_ventilation: bool,
     pub battery_storage_present: bool,
 }
@@ -211,6 +214,7 @@ fn derive_input(
         .map(|item| (item.surface_id.as_str(), item))
         .collect();
     let mut used_ground = HashSet::new();
+    let mut loss_area = 0.0;
     let mut windows = Vec::new();
     let mut opaque = Vec::new();
     let mut ground_floors = Vec::new();
@@ -229,6 +233,12 @@ fn derive_input(
             continue;
         };
         let surface_type = surface.get("type").and_then(Value::as_str).unwrap_or("");
+        if matches!(
+            boundary,
+            ThermalBoundary::Outdoor | ThermalBoundary::Ground | ThermalBoundary::UnheatedSpace
+        ) {
+            loss_area += surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+        }
         match boundary {
             ThermalBoundary::Ground => {
                 match ground_data.get(id) {
@@ -398,6 +408,12 @@ fn derive_input(
         pv_systems: nta.pv_systems,
         hot_water: nta.hot_water,
         label_function: nta.label_function,
+        bbl_function: nta.bbl_function,
+        loss_area_m2: Some(loss_area),
+        loss_area_source_reference: Some(
+            "derived: gross project surfaces bordering outdoor air, ground or unheated space"
+                .into(),
+        ),
         demand_uses_fixed_c1_ventilation: nta.demand_uses_fixed_c1_ventilation,
         battery_storage_present: nta.battery_storage_present,
     })

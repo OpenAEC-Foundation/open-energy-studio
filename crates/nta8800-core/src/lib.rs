@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
 pub mod bacs_draft;
+pub mod bbl_requirements;
 pub mod boiler_forfait_draft;
 pub mod building_performance;
 pub mod climate;
@@ -282,6 +283,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
             "unverified_pv_yield_chapter_16",
             "indicative_label_class_omgevingsregeling_annex_ix_x",
+            "bbl_4_149_beng_requirement_check_single_function",
             "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
             "unverified_project_performance_adapter_single_zone",
         ],
