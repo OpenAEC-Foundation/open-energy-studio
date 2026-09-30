@@ -17,9 +17,16 @@ use crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput;
 use crate::forfait_heat_pump_monthly_draft::{
     assess_forfait_heat_pump_monthly_draft, ForfaitHeatPumpMonthlyDraftInput, SourceSystem,
 };
+use crate::generator_dispatch_draft::{
+    Generator as DispatchGenerator, GeneratorDispatchDraftInput,
+};
 use crate::heating_emission::{
     balancing_consistent, monthly_loss_kwh, temperature_increment_k, EmissionInput, EmissionSystem,
     DRAFT_SOURCE,
+};
+use crate::hybrid_heat_pump_monthly_draft::{
+    assess_hybrid_heat_pump_monthly_draft, HybridHeatPumpAuxMeasurements,
+    HybridHeatPumpMonthlyDraftInput,
 };
 use crate::monthly_demand::{assess_monthly_demand, MonthlyDemandAssessment, MonthlyDemandInput};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -76,6 +83,36 @@ pub enum Distribution {
 pub enum Generator {
     GasBoiler(GasBoilerGenerator),
     HeatPumpForfait(HeatPumpGenerator),
+    /// Heat pump with a supplementary boiler, split by table 9.1/9.23 (new build).
+    HybridHeatPump(Box<HybridGenerator>),
+}
+
+impl Generator {
+    /// The electric heat pump of this generator, if any.
+    pub fn heat_pump(&self) -> Option<(&ForfaitHeatPumpDraftInput, SourceSystem)> {
+        match self {
+            Self::GasBoiler(_) => None,
+            Self::HeatPumpForfait(generator) => Some((&generator.forfait, generator.source_system)),
+            Self::HybridHeatPump(generator) => Some((&generator.forfait, generator.source_system)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HybridGenerator {
+    /// Only the new-build installed-power route of the draft is supported.
+    pub design_context: String,
+    /// Heat pump and boiler with class, power and priority efficiency (table 9.1).
+    pub generators: Vec<DispatchGenerator>,
+    pub forfait: ForfaitHeatPumpDraftInput,
+    pub boiler: BoilerForfaitDraftInput,
+    pub source_system: SourceSystem,
+    pub source_system_reference: String,
+    #[serde(default)]
+    pub declared_operating_limits_present: bool,
+    #[serde(default)]
+    pub heat_pump_auxiliary_measurements: Option<HybridHeatPumpAuxMeasurements>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -101,6 +138,8 @@ pub struct ChainMonth {
     pub emission_input_kwh: f64,
     pub distribution_loss_kwh: f64,
     pub generator_output_kwh: f64,
+    /// Part of the generator output delivered by an electric heat pump.
+    pub heat_pump_output_kwh: f64,
     pub natural_gas_kwh: f64,
     pub generator_electricity_kwh: f64,
     pub auxiliary_electricity_kwh: Option<f64>,
@@ -317,6 +356,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 emission_input_kwh: emission_input,
                 distribution_loss_kwh: distribution_loss,
                 generator_output_kwh: generator_output,
+                heat_pump_output_kwh: 0.0,
                 natural_gas_kwh: 0.0,
                 generator_electricity_kwh: 0.0,
                 auxiliary_electricity_kwh: None,
@@ -364,8 +404,59 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 for (row, pump) in monthly.iter_mut().zip(&result.monthly) {
                     row.generator_electricity_kwh = pump.generator_input_electricity_kwh;
                     row.collective_source_heat_kwh = pump.collective_source_heat_kwh;
+                    row.heat_pump_output_kwh = pump.generator_output_kwh;
                 }
                 if result.monthly.len() != 12 && issues.is_empty() {
+                    issues.push(issue("generator_result_incomplete", "generator"));
+                }
+            }
+            Generator::HybridHeatPump(generator) => {
+                let result =
+                    assess_hybrid_heat_pump_monthly_draft(&HybridHeatPumpMonthlyDraftInput {
+                        dispatch: GeneratorDispatchDraftInput {
+                            node_input_kwh: outputs,
+                            node_input_reference: "derived by space_heating_chain".into(),
+                            design_context: generator.design_context.clone(),
+                            generators: generator.generators.clone(),
+                        },
+                        forfait: generator.forfait.clone(),
+                        boiler: generator.boiler.clone(),
+                        source_system: generator.source_system,
+                        source_system_reference: generator.source_system_reference.clone(),
+                        declared_operating_limits_present: generator
+                            .declared_operating_limits_present,
+                        heat_pump_auxiliary_measurements: generator
+                            .heat_pump_auxiliary_measurements
+                            .clone(),
+                    });
+                issues.extend(
+                    result
+                        .issues
+                        .iter()
+                        .map(|item| issue(item.code, format!("generator.{}", item.path))),
+                );
+                if let (Some(pump), Some(boiler)) = (&result.heat_pump, &result.boiler) {
+                    generation_efficiency = pump.corrected_cop;
+                    let pump_aux = result
+                        .heat_pump_auxiliary
+                        .as_ref()
+                        .and_then(|aux| aux.auxiliary.as_ref())
+                        .map(|aux| &aux.monthly_auxiliary_electricity_kwh);
+                    for (index, row) in monthly.iter_mut().enumerate() {
+                        let pump_month = &pump.monthly[index];
+                        let boiler_month = &boiler.monthly[index];
+                        row.generator_electricity_kwh = pump_month.generator_input_electricity_kwh;
+                        row.collective_source_heat_kwh = pump_month.collective_source_heat_kwh;
+                        row.heat_pump_output_kwh = pump_month.generator_output_kwh;
+                        row.natural_gas_kwh = boiler_month.input_natural_gas_kwh;
+                        let pump_aux_month = pump_aux
+                            .and_then(|months| months.iter().find(|item| item.month == row.month))
+                            .map_or(0.0, |item| item.electricity_kwh);
+                        row.auxiliary_electricity_kwh = boiler_month
+                            .auxiliary_electricity_kwh
+                            .map(|value| value + pump_aux_month);
+                    }
+                } else if issues.is_empty() {
                     issues.push(issue("generator_result_incomplete", "generator"));
                 }
             }
@@ -614,5 +705,54 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.path == "additionalZones[0].emission.sourceReference"));
+    }
+
+    #[test]
+    fn hybrid_generator_splits_output_between_heat_pump_and_boiler() {
+        use crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft;
+        let mut pump = heat_pump();
+        pump.thermal_capacity_kw = Some(4.0);
+        let cop = assess_forfait_heat_pump_draft(&pump).corrected_cop.unwrap();
+        let mut input = boiler_chain();
+        let Generator::GasBoiler(boiler) = &input.generator else {
+            unreachable!()
+        };
+        let mut boiler = boiler.boiler.clone();
+        boiler.role = crate::boiler_forfait_draft::BoilerRole::IndividualSupplementary;
+        let boiler_efficiency = crate::boiler_forfait_draft::assess_boiler_forfait_draft(&boiler)
+            .generation_efficiency
+            .unwrap();
+        input.generator = serde_json::from_value(json!({
+            "kind": "hybrid_heat_pump",
+            "designContext": "new_build",
+            "generators": [
+                {"id": "hp", "class": "heat_pump", "classificationReference": "design",
+                 "nominalThermalPowerKw": 4.0, "powerReference": "plate",
+                 "priorityEfficiency": cop, "efficiencyReference": "table"},
+                {"id": "boiler", "class": "other_boiler", "classificationReference": "design",
+                 "nominalThermalPowerKw": 6.0, "powerReference": "plate",
+                 "priorityEfficiency": boiler_efficiency, "efficiencyReference": "table 9.25"}
+            ],
+            "forfait": pump,
+            "boiler": boiler,
+            "sourceSystem": "individual",
+            "sourceSystemReference": "own unit"
+        }))
+        .unwrap();
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!(
+            jan.heat_pump_output_kwh > 0.0 && jan.heat_pump_output_kwh < jan.generator_output_kwh
+        );
+        let boiler_heat = jan.generator_output_kwh - jan.heat_pump_output_kwh;
+        assert!((jan.natural_gas_kwh - boiler_heat / boiler_efficiency).abs() < 1e-6);
+        assert!((jan.generator_electricity_kwh - jan.heat_pump_output_kwh / cop).abs() < 1e-6);
+        assert_eq!(result.generation_efficiency, Some(cop));
+        assert!(input.generator.heat_pump().is_some());
     }
 }

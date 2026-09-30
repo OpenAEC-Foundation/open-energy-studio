@@ -23,7 +23,7 @@ use crate::indicators_draft::{
 use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_heating_chain::{
-    assess_space_heating_chain, Generator, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
+    assess_space_heating_chain, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
 use crate::tojuli::{assess_tojuli, TojuliAssessment};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -427,9 +427,12 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             ));
         }
     }
-    match (&input.space_heating.generator, &input.heat_pump_renewable) {
-        (Generator::HeatPumpForfait(generator), evidence) => {
-            if generator.source_system != SourceSystem::Individual {
+    match (
+        input.space_heating.generator.heat_pump(),
+        &input.heat_pump_renewable,
+    ) {
+        (Some((forfait, source_system)), evidence) => {
+            if source_system != SourceSystem::Individual {
                 // 5.20/5.30 collective source terms need the dh factor route.
                 issues.push(issue(
                     "collective_heat_pump_source_unsupported",
@@ -448,7 +451,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                             "heatPumpRenewable.sourceReference",
                         ));
                     }
-                    let source = generator.forfait.source;
+                    let source = forfait.source;
                     let exhaust_expected = source == TableSource::ExhaustAir;
                     let warm_source = matches!(
                         source,
@@ -465,13 +468,13 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 }
             }
         }
-        (Generator::GasBoiler(_), Some(_)) => {
+        (None, Some(_)) => {
             issues.push(issue(
                 "heat_pump_evidence_without_heat_pump",
                 "heatPumpRenewable",
             ));
         }
-        (Generator::GasBoiler(_), None) => {}
+        (None, None) => {}
     }
 }
 
@@ -639,12 +642,11 @@ fn compute(
     let mut fossil = 0.0;
     let mut renewable = 0.0;
     let mut ambient_total = 0.0;
-    let heat_pump_renewable =
-        matches!(input.space_heating.generator, Generator::HeatPumpForfait(_))
-            && input
-                .heat_pump_renewable
-                .as_ref()
-                .is_some_and(|evidence| evidence.source_below_20_c && !evidence.exhaust_air_source);
+    let heat_pump_renewable = input.space_heating.generator.heat_pump().is_some()
+        && input
+            .heat_pump_renewable
+            .as_ref()
+            .is_some_and(|evidence| evidence.source_below_20_c && !evidence.exhaust_air_source);
     let cop = heating.generation_efficiency.unwrap_or(0.0);
     let pv_yields: Vec<[f64; 12]> = input.pv_systems.iter().map(monthly_yield_kwh).collect();
     let hot_water = input.hot_water.as_ref().map(|system| {
@@ -722,7 +724,7 @@ fn compute(
 
         // 5.30/5.31: ambient heat of the space-heating heat pump.
         let ambient = if heat_pump_renewable && cop >= 1.0 {
-            row.generator_output_kwh * (1.0 - 1.0 / cop)
+            row.heat_pump_output_kwh * (1.0 - 1.0 / cop)
         } else {
             0.0
         };
@@ -749,7 +751,7 @@ fn compute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::space_heating_chain::HeatPumpGenerator;
+    use crate::space_heating_chain::{Generator, HeatPumpGenerator};
     use serde_json::json;
 
     fn chain() -> SpaceHeatingChainInput {

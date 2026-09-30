@@ -1256,6 +1256,24 @@ export interface SpaceHeatingChainInput {
         forfait: ForfaitHeatPumpDraftInput;
         sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
         sourceSystemReference: string;
+      }
+    | {
+        kind: 'hybrid_heat_pump';
+        designContext: 'new_build';
+        generators: Array<{
+          id: string;
+          class: 'heat_pump' | 'exhaust_air_heat_pump_without_overventilation' | 'other_boiler';
+          classificationReference: string;
+          nominalThermalPowerKw: number;
+          powerReference: string;
+          priorityEfficiency: number;
+          efficiencyReference: string;
+        }>;
+        forfait: ForfaitHeatPumpDraftInput;
+        boiler: BoilerForfaitDraftInput;
+        sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
+        sourceSystemReference: string;
+        declaredOperatingLimitsPresent?: boolean;
       };
 }
 
@@ -1277,6 +1295,7 @@ export interface SpaceHeatingChainAssessment {
     emissionInputKwh: number;
     distributionLossKwh: number;
     generatorOutputKwh: number;
+    heatPumpOutputKwh: number;
     naturalGasKwh: number;
     generatorElectricityKwh: number;
     auxiliaryElectricityKwh: number | null;
