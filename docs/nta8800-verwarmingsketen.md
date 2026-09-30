@@ -35,6 +35,9 @@ Bij één opwekker geeft tabel 9.1 `β = 1`, dus 100% dekking van `Q_H;gen;out =
 
 - `external_heat`: externe warmtelevering (§9.6.7) met `η = 1,0` en `f_prac = 1` (9.84). De opwekkeroutput wordt geleverde warmte op drager `dh`, met bewijs van levering (`supplierReference`, 9.6.7.1). In de prestatieketen telt `dh` met de vaste factor `f_P` = 0,9 (tabel 5.2) en `f_Pren` = 0 (tabel 5.4). Een kwaliteitsverklaring volgens bijlage P wordt geweigerd (`external_heat_declaration_unsupported`), omdat die volgens §5.3 een gepaard forfaitair scenario vergt. Hulpenergie van de afleverset (9.6.8.2) is niet meegenomen.
 
+- `electric_resistance`: lokale of centrale elektrische verwarming met COP 1,0 (tabel 9.27). Alle opwekkeroutput wordt elektriciteit.
+- `biomass`: kachel of ketel op vaste biomassa, 9.64 met forfaitair rendement uit tabel 9.30. Kachels (hout, inbouw, accumulerend) krijgen 0,600 en een pelletkachel 0,725, allebei alleen binnen de schil. Een centrale ketel krijgt 0,800 binnen en 0,750 buiten de schil. De tabel geldt voor toestellen die aan bijlage R voldoen. Alleen de klasse bmB (≤ 500 kW, bijlage R) wordt gerekend, met `f_P` = 0,5 (tabel 5.2) en `f_Pren` = 0,5 over de geleverde warmte (5.30, tabel 5.4). Andere klassen geven `biomass_class_unsupported`. De beperking van §9.6.5 dat een kachel alleen de ruimte verwarmt waarin hij staat, controleert de module niet. Die ligt bij de invoerder: de kachel moet de enige verwarming van de rekenzone zijn.
+
 ## Niet meegenomen (`omittedTerms`)
 
 Knooppuntverliezen en -winst (9.2.3), terugwinbare systeemverliezen (9.2.5), ventilatorenergie van de afgifte (9.21), bronpomp/-ventilator en hulpenergie van een warmtepomp zonder gemeten vermogens, meer dan twee opwekkers, productgebonden hybride schakeling en tapwaterprioriteit.

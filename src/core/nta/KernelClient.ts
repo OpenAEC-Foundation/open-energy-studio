@@ -1276,7 +1276,16 @@ export interface SpaceHeatingChainInput {
         sourceSystemReference: string;
         declaredOperatingLimitsPresent?: boolean;
       }
-    | { kind: 'external_heat'; supplierReference: string; qualityDeclarationPresent: boolean };
+    | { kind: 'external_heat'; supplierReference: string; qualityDeclarationPresent: boolean }
+    | { kind: 'electric_resistance'; equipmentReference: string }
+    | {
+        kind: 'biomass';
+        appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler';
+        location: 'inside_thermal_boundary' | 'outside_thermal_boundary';
+        annexRCompliantAtMost500Kw: boolean;
+        annexRReference: string;
+        equipmentReference: string;
+      };
 }
 
 export interface SpaceHeatingChainAssessment {
@@ -1300,6 +1309,7 @@ export interface SpaceHeatingChainAssessment {
     heatPumpOutputKwh: number;
     naturalGasKwh: number;
     districtHeatKwh: number;
+    biomassKwh: number;
     generatorElectricityKwh: number;
     auxiliaryElectricityKwh: number | null;
     collectiveSourceHeatKwh: number;
@@ -1309,6 +1319,7 @@ export interface SpaceHeatingChainAssessment {
   annualAuxiliaryElectricityKwh: number | null;
   annualCollectiveSourceHeatKwh: number | null;
   annualDistrictHeatKwh: number | null;
+  annualBiomassKwh: number | null;
   demand: MonthlyDemandAssessment;
   additionalZoneDemands: MonthlyDemandAssessment[];
   issues: Array<{ code: string; path: string }>;
@@ -1432,7 +1443,7 @@ export interface BuildingPerformanceAssessment {
   referenceVerified: false;
   attestStatus: 'unattested';
   labelAvailable: false;
-  carriers: Array<{ carrier: 'el' | 'gas' | 'oil' | 'dh'; month: number; usedKwh: number; deliveredKwh: number }>;
+  carriers: Array<{ carrier: 'el' | 'gas' | 'oil' | 'dh' | 'bm'; month: number; usedKwh: number; deliveredKwh: number }>;
   electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; selfUsedKwh: number; exportedKwh: number }>;
   annualPrimaryFossilKwh: number | null;
   annualRenewablePrimaryKwh: number | null;

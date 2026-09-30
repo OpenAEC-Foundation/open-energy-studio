@@ -37,6 +37,10 @@ pub const F_P_GAS: f64 = 1.0;
 pub const F_P_OIL: f64 = 1.0;
 /// Table 5.2: external heat without a quality declaration (annex P).
 pub const F_P_DISTRICT_HEAT_FORFAIT: f64 = 0.9;
+/// Table 5.2: biomass appliances of at most 500 kW meeting annex R (bmB).
+pub const F_P_BIOMASS_B: f64 = 0.5;
+/// Table 5.4: renewable factor for bmB.
+pub const F_PREN_BIOMASS_B: f64 = 0.5;
 /// Table 5.4.
 pub const F_PREN_RENELECT: f64 = 1.45;
 pub const F_PREN_RENHEAT: f64 = 1.0;
@@ -737,6 +741,16 @@ fn compute(
             });
         }
         fossil += used_dh * F_P_DISTRICT_HEAT_FORFAIT;
+        let used_bm = row.biomass_kwh;
+        fossil += used_bm * F_P_BIOMASS_B;
+        if used_bm > 0.0 {
+            carriers.push(CarrierMonth {
+                carrier: "bm",
+                month,
+                used_kwh: used_bm,
+                delivered_kwh: used_bm,
+            });
+        }
         if used_dh > 0.0 {
             carriers.push(CarrierMonth {
                 carrier: "dh",
@@ -768,7 +782,14 @@ fn compute(
             .map(|item| item.monthly_kwh[index])
             .sum();
         // 5.29 and 5.39.
+        // 5.30: biomass counts its delivered heat with f_Pren;bmB.
+        let biomass_heat = if row.biomass_kwh > 0.0 {
+            row.generator_output_kwh
+        } else {
+            0.0
+        };
         renewable += (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT
+            + biomass_heat * F_PREN_BIOMASS_B
             + produced * F_PREN_RENELECT;
     }
     let need = std::iter::once(&heating.demand)
@@ -1122,5 +1143,37 @@ mod tests {
         let a0 = result.a0_check.as_ref().unwrap();
         assert!(!a0.no_on_site_fossil_combustion);
         assert_eq!(a0.eligible, Some(false));
+    }
+
+    #[test]
+    fn biomass_uses_bm_b_factors() {
+        use crate::space_heating_chain::{BiomassAppliance, BiomassGenerator, BiomassLocation};
+        let mut sample = input();
+        let base = assess_building_performance(&sample);
+        sample.space_heating.generator = Generator::Biomass(BiomassGenerator {
+            appliance: BiomassAppliance::CentralBoiler,
+            location: BiomassLocation::InsideThermalBoundary,
+            annex_r_compliant_at_most_500_kw: true,
+            annex_r_reference: "type test".into(),
+            equipment_reference: "plate".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let bm = result.space_heating.annual_biomass_kwh.unwrap();
+        let heat: f64 = result
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| row.generator_output_kwh)
+            .sum();
+        assert!((bm - heat / 0.8).abs() < 1e-6);
+        let renewable_delta = result.annual_renewable_primary_kwh.unwrap()
+            - base.annual_renewable_primary_kwh.unwrap();
+        assert!((renewable_delta - heat * 0.5).abs() < 1e-6);
+        assert!(result.carriers.iter().any(|item| item.carrier == "bm"));
     }
 }

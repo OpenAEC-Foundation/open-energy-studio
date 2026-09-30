@@ -93,6 +93,60 @@ pub enum Generator {
     HybridHeatPump(Box<HybridGenerator>),
     /// External heat supply (9.6.7): heat is the energy carrier `dh`.
     ExternalHeat(ExternalHeatGenerator),
+    /// Local or central electric resistance heating, COP 1,0 (table 9.27).
+    ElectricResistance(ElectricResistanceGenerator),
+    /// Solid-biomass stove or boiler, forfait efficiency of table 9.30.
+    Biomass(BiomassGenerator),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElectricResistanceGenerator {
+    pub equipment_reference: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BiomassAppliance {
+    FreestandingWoodStove,
+    InsertStove,
+    PelletStove,
+    AccumulatingStove,
+    CentralBoiler,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BiomassLocation {
+    InsideThermalBoundary,
+    OutsideThermalBoundary,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BiomassGenerator {
+    pub appliance: BiomassAppliance,
+    pub location: BiomassLocation,
+    /// Table 9.30 and the bmB factors apply to appliances of at most 500 kW
+    /// that meet the combustion and emission limits of annex R.
+    pub annex_r_compliant_at_most_500_kw: bool,
+    pub annex_r_reference: String,
+    pub equipment_reference: String,
+}
+
+/// Table 9.30 forfait efficiency; `None` where the table has no value.
+pub fn biomass_efficiency(appliance: BiomassAppliance, location: BiomassLocation) -> Option<f64> {
+    use BiomassAppliance::*;
+    match (appliance, location) {
+        (
+            FreestandingWoodStove | InsertStove | AccumulatingStove,
+            BiomassLocation::InsideThermalBoundary,
+        ) => Some(0.600),
+        (PelletStove, BiomassLocation::InsideThermalBoundary) => Some(0.725),
+        (CentralBoiler, BiomassLocation::InsideThermalBoundary) => Some(0.800),
+        (CentralBoiler, BiomassLocation::OutsideThermalBoundary) => Some(0.750),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -112,7 +166,7 @@ impl Generator {
             Self::GasBoiler(_) => None,
             Self::HeatPumpForfait(generator) => Some((&generator.forfait, generator.source_system)),
             Self::HybridHeatPump(generator) => Some((&generator.forfait, generator.source_system)),
-            Self::ExternalHeat(_) => None,
+            Self::ExternalHeat(_) | Self::ElectricResistance(_) | Self::Biomass(_) => None,
         }
     }
 }
@@ -165,6 +219,8 @@ pub struct ChainMonth {
     pub natural_gas_kwh: f64,
     /// Delivered external heat, carrier `dh` (9.84).
     pub district_heat_kwh: f64,
+    /// Solid biomass input, carrier `bm` (9.64).
+    pub biomass_kwh: f64,
     pub generator_electricity_kwh: f64,
     pub auxiliary_electricity_kwh: Option<f64>,
     pub collective_source_heat_kwh: f64,
@@ -198,6 +254,7 @@ pub struct SpaceHeatingChainAssessment {
     pub annual_auxiliary_electricity_kwh: Option<f64>,
     pub annual_collective_source_heat_kwh: Option<f64>,
     pub annual_district_heat_kwh: Option<f64>,
+    pub annual_biomass_kwh: Option<f64>,
     pub demand: MonthlyDemandAssessment,
     pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
@@ -384,6 +441,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 heat_pump_output_kwh: 0.0,
                 natural_gas_kwh: 0.0,
                 district_heat_kwh: 0.0,
+                biomass_kwh: 0.0,
                 generator_electricity_kwh: 0.0,
                 auxiliary_electricity_kwh: None,
                 collective_source_heat_kwh: 0.0,
@@ -562,6 +620,51 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                     row.district_heat_kwh = row.generator_output_kwh;
                 }
             }
+            Generator::ElectricResistance(generator) => {
+                if generator.equipment_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "source_reference_required",
+                        "generator.equipmentReference",
+                    ));
+                }
+                // Table 9.27: electric heating COP 1,0.
+                generation_efficiency = Some(1.0);
+                for row in monthly.iter_mut() {
+                    row.generator_electricity_kwh = row.generator_output_kwh;
+                }
+            }
+            Generator::Biomass(generator) => {
+                for (value, field) in [
+                    (&generator.annex_r_reference, "generator.annexRReference"),
+                    (
+                        &generator.equipment_reference,
+                        "generator.equipmentReference",
+                    ),
+                ] {
+                    if value.trim().is_empty() {
+                        issues.push(issue("source_reference_required", field));
+                    }
+                }
+                if !generator.annex_r_compliant_at_most_500_kw {
+                    issues.push(issue(
+                        "biomass_class_unsupported",
+                        "generator.annexRCompliantAtMost500Kw",
+                    ));
+                }
+                match biomass_efficiency(generator.appliance, generator.location) {
+                    None => issues.push(issue(
+                        "biomass_efficiency_unavailable",
+                        "generator.location",
+                    )),
+                    Some(efficiency) => {
+                        // 9.64 with f_prac = 1,0.
+                        generation_efficiency = Some(efficiency);
+                        for row in monthly.iter_mut() {
+                            row.biomass_kwh = row.generator_output_kwh / efficiency;
+                        }
+                    }
+                }
+            }
         }
     }
     let valid = issues.is_empty();
@@ -605,6 +708,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         annual_auxiliary_electricity_kwh: auxiliary,
         annual_collective_source_heat_kwh: sum(|row| row.collective_source_heat_kwh),
         annual_district_heat_kwh: sum(|row| row.district_heat_kwh),
+        annual_biomass_kwh: sum(|row| row.biomass_kwh),
         monthly,
         demand,
         additional_zone_demands,
@@ -935,5 +1039,69 @@ mod tests {
             .collect();
         assert!(codes.contains(&"external_heat_declaration_unsupported"));
         assert!(codes.contains(&"source_reference_required"));
+    }
+
+    #[test]
+    fn electric_resistance_and_biomass_generators() {
+        let mut input = boiler_chain();
+        input.generator = Generator::ElectricResistance(ElectricResistanceGenerator {
+            equipment_reference: "panel heaters".into(),
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert_eq!(
+            result.monthly[0].generator_electricity_kwh,
+            result.monthly[0].generator_output_kwh
+        );
+        assert!(input.generator.heat_pump().is_none());
+
+        input.generator = Generator::Biomass(BiomassGenerator {
+            appliance: BiomassAppliance::CentralBoiler,
+            location: BiomassLocation::OutsideThermalBoundary,
+            annex_r_compliant_at_most_500_kw: true,
+            annex_r_reference: "type test".into(),
+            equipment_reference: "plate".into(),
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!((jan.biomass_kwh - jan.generator_output_kwh / 0.75).abs() < 1e-9);
+        assert_eq!(
+            biomass_efficiency(
+                BiomassAppliance::PelletStove,
+                BiomassLocation::InsideThermalBoundary
+            ),
+            Some(0.725)
+        );
+        assert_eq!(
+            biomass_efficiency(
+                BiomassAppliance::PelletStove,
+                BiomassLocation::OutsideThermalBoundary
+            ),
+            None
+        );
+
+        input.generator = Generator::Biomass(BiomassGenerator {
+            appliance: BiomassAppliance::PelletStove,
+            location: BiomassLocation::OutsideThermalBoundary,
+            annex_r_compliant_at_most_500_kw: false,
+            annex_r_reference: "x".into(),
+            equipment_reference: "x".into(),
+        });
+        let codes: Vec<_> = assess_space_heating_chain(&input)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert!(codes.contains(&"biomass_class_unsupported"));
+        assert!(codes.contains(&"biomass_efficiency_unavailable"));
     }
 }

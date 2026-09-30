@@ -56,7 +56,7 @@ export function generateNtaCalculationReportHTML(
     const balance = performance.electricityBalance[index];
     const cooling = zones.reduce((sum, zone) => sum + (zone.monthly[index]?.cooling.needKwh ?? 0), 0);
     return `<tr><th>${month}</th><td class="n">${num(heating.monthly[index]?.heatingNeedKwh)}</td><td class="n">${num(cooling)}</td>
-      <td class="n">${num(byCarrier('gas', 'usedKwh'))}</td><td class="n">${num(byCarrier('dh', 'usedKwh'))}</td><td class="n">${num(byCarrier('el', 'usedKwh'))}</td>
+      <td class="n">${num(byCarrier('gas', 'usedKwh'))}</td><td class="n">${num(byCarrier('dh', 'usedKwh'))}</td><td class="n">${num(byCarrier('bm', 'usedKwh'))}</td><td class="n">${num(byCarrier('el', 'usedKwh'))}</td>
       <td class="n">${num(balance?.producedKwh)}</td><td class="n">${num(balance?.selfUsedKwh)}</td><td class="n">${num(balance?.exportedKwh)}</td></tr>`;
   }).join('');
   const zoneRows = zones.map((zone) => `<tr>${cell(zone.monthly.length ? zone.transmission?.method : '—')}
@@ -99,7 +99,7 @@ export function generateNtaCalculationReportHTML(
     <h2>Rekenzones</h2>
     <table><thead><tr><th>Transmissieroute</th><th>H<sub>tr</sub> [W/K]</th><th>H<sub>g</sub> [W/K]</th><th>D<sub>m</sub> [kJ/m²K]</th><th>Q<sub>H;nd</sub> [kWh]</th><th>Q<sub>C;nd</sub> [kWh]</th></tr></thead><tbody>${zoneRows}</tbody></table>
     <h2>Maandoverzicht [kWh]</h2>
-    <table><thead><tr><th>Maand</th><th>Q<sub>H;nd</sub></th><th>Q<sub>C;nd</sub></th><th>Gas</th><th>Warmte (dh)</th><th>Elektriciteit</th><th>Opwekking</th><th>Eigen gebruik</th><th>Export</th></tr></thead><tbody>${carrierRows}</tbody></table>
+    <table><thead><tr><th>Maand</th><th>Q<sub>H;nd</sub></th><th>Q<sub>C;nd</sub></th><th>Gas</th><th>Warmte (dh)</th><th>Biomassa</th><th>Elektriciteit</th><th>Opwekking</th><th>Eigen gebruik</th><th>Export</th></tr></thead><tbody>${carrierRows}</tbody></table>
     <h2>Niet meegenomen</h2><ul>${limits}</ul>
     <h2>Bronnen</h2><ul>
       <li>Klimaat: ${escapeHtml(heating.demand.climateSource)}</li>
