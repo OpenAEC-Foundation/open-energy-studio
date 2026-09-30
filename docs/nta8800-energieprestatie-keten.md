@@ -77,6 +77,20 @@ Relevante bepalingen uit de Omgevingsregeling:
 - art. 5.31a/5.31b: de BENG-waarden voor nieuwbouw worden bepaald door een bedrijf met BRL 9500-detailopname, met een programma dat volgens BRL 9501 is geattesteerd;
 - art. 5.50 lid 2: de koelbehoefte van woningen gaat via de "Rekentool Koelbehoefte NTA 8800" in plaats van bijlage AA.
 
+## TO-juli (§5.7)
+
+Module `tojuli` bepaalt formule 5.40 per oriëntatie met een eigen koudebalans voor juli (7.2.2):
+
+- Ramen en opake vlakken met een helling boven 5° blijven bij hun oriëntatie, met eigen `A·U` en zonwinst. Een hellend dak telt dus mee in zijn oriëntatie.
+- Horizontale vlakken (≤ 5°, §7.6.6.4), koudebruggen, transmissie via onverwarmde ruimte, grond, ventilatie, interne winst en `C_m` worden naar rato van `A_T;or/ΣA_T` verdeeld.
+- Oriëntaties met `A_T;or` ≤ 3 m² worden niet beoordeeld.
+- De uitkomst wordt naar boven afgerond op 0,01 K. De hoogste waarde wordt getoetst aan 1,20 (Bbl 4.149b lid 1).
+- Bij voldoende actieve koeling (`activeCoolingPresent`, §5.7.1) geldt TO-juli = 0.
+
+De module vereist de `components`-transmissieroute, waarin ramen en opake vlakken precies de directe elementgeleiding dekken. Een afwijking geeft `tojuli_envelope_inconsistent`.
+
+**Afhankelijkheid van ventilatie.** In de norm bevat de koudebalans van juli de zomerventilatie uit hoofdstuk 11 (onder meer spuiventilatie `q_V;argI`). Zolang hoofdstuk 11 niet in Rust zit, moet de opgegeven ventilatiegeleiding voor juli die stromen al bevatten. Het synthetische project heeft constant 35 W/K zonder spuiventilatie en komt daardoor op 6,36 K. Dat is rekenkundig consistent met de invoer, maar geen realistische waarde voor een woning. Verder niet uitgewerkt: de boosterwarmtepompterm `Q_C;HP;juli` (5.41a–c, bij afwezigheid 0), de splitsing van lineaire koudebruggen per oriëntatie (nu naar rato) en de geprojecteerde oppervlakte van hellende vlakken (nu bruto). De bron is de F3c-analyse van Open Heatloss Studio.
+
 ## BENG 1
 
 Volgens §5.4 moet de energiebehoefte voor BENG 1 worden berekend met een vast ventilatiesysteem C1 (tabellen 11.5/11.6) en vaste interne warmtelasten. Hoofdstuk 11 zit nog niet in Rust. Daarom verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de ventilatie-invoer het C1-systeem voorstelt. De jaarlijkse behoefte met de opgegeven ventilatie staat altijd in `annualHeatingAndCoolingNeedKwh`.

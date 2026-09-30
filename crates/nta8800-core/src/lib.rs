@@ -44,6 +44,7 @@ pub mod project_performance;
 pub mod pv;
 pub mod reference;
 pub mod space_heating_chain;
+pub mod tojuli;
 pub mod unheated_transmission;
 use direct_transmission::{DirectElement, DirectTransmissionInput, LinearBridge, PointBridge};
 use heat_pumps::{
@@ -284,6 +285,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_pv_yield_chapter_16",
             "indicative_label_class_omgevingsregeling_annex_ix_x",
             "bbl_4_149_beng_requirement_check_single_function",
+            "unverified_tojuli_per_orientation_5_7",
             "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
             "unverified_project_performance_adapter_single_zone",
         ],

@@ -336,6 +336,40 @@ fn sky_loss_kwh(tilt_deg: f64, u: f64, area: f64, hours: f64) -> f64 {
     sky_view_factor(tilt_deg) * R_SE * u * area * H_LR_E * DELTA_THETA_SKY * hours * 0.001
 }
 
+/// 7.32 with 7.40 and 7.39: net solar gain of one window in kWh.
+pub(crate) fn window_solar_kwh(window: &Window, month: u8) -> f64 {
+    let hours = MONTH_HOURS[usize::from(month - 1)];
+    let irradiance = climate::irradiance_w_per_m2(window.orientation, window.tilt_deg, month)
+        .expect("validated tilt");
+    F_W * window.g_perpendicular
+        * window.area_m2
+        * (1.0 - window.frame_fraction)
+        * window.obstruction_factor
+        * irradiance
+        * hours
+        * 0.001
+        - sky_loss_kwh(
+            window.tilt_deg,
+            window.u_value_w_per_m2k,
+            window.area_m2,
+            hours,
+        )
+}
+
+/// 7.33 and 7.39: net solar gain of one opaque element in kWh.
+pub(crate) fn opaque_solar_kwh(element: &OpaqueElement, month: u8) -> f64 {
+    let hours = MONTH_HOURS[usize::from(month - 1)];
+    let irradiance = climate::irradiance_w_per_m2(element.orientation, element.tilt_deg, month)
+        .expect("validated tilt");
+    ALPHA_SOL * R_SE * element.u_value_w_per_m2k * element.area_m2 * irradiance * hours * 0.001
+        - sky_loss_kwh(
+            element.tilt_deg,
+            element.u_value_w_per_m2k,
+            element.area_m2,
+            hours,
+        )
+}
+
 fn finite_nonneg(value: f64) -> bool {
     value.is_finite() && value >= 0.0
 }
@@ -550,9 +584,9 @@ pub struct TransmissionSummary {
     /// Unweighted mean of table 17.1 used in 7.14 for ground transfer.
     pub annual_mean_outdoor_temperature_c: Option<f64>,
     #[serde(skip)]
-    ground_heating_kwh: [f64; 12],
+    pub(crate) ground_heating_kwh: [f64; 12],
     #[serde(skip)]
-    ground_cooling_kwh: [f64; 12],
+    pub(crate) ground_cooling_kwh: [f64; 12],
 }
 
 pub fn annual_mean_outdoor_temperature_c() -> f64 {
@@ -799,47 +833,16 @@ fn compute(
             } => heat_flux_w_per_m2 * area * hours / 1000.0,
         };
 
-        let mut window_solar = 0.0;
-        for window in &input.windows {
-            let irradiance =
-                climate::irradiance_w_per_m2(window.orientation, window.tilt_deg, month)
-                    .expect("validated tilt");
-            let gross = F_W
-                * window.g_perpendicular
-                * window.area_m2
-                * (1.0 - window.frame_fraction)
-                * window.obstruction_factor
-                * irradiance
-                * hours
-                * 0.001;
-            window_solar += gross
-                - sky_loss_kwh(
-                    window.tilt_deg,
-                    window.u_value_w_per_m2k,
-                    window.area_m2,
-                    hours,
-                );
-        }
-        let mut opaque_solar = 0.0;
-        for element in &input.opaque_elements {
-            let irradiance =
-                climate::irradiance_w_per_m2(element.orientation, element.tilt_deg, month)
-                    .expect("validated tilt");
-            let gross = ALPHA_SOL
-                * R_SE
-                * element.u_value_w_per_m2k
-                * element.area_m2
-                * irradiance
-                * hours
-                * 0.001;
-            opaque_solar += gross
-                - sky_loss_kwh(
-                    element.tilt_deg,
-                    element.u_value_w_per_m2k,
-                    element.area_m2,
-                    hours,
-                );
-        }
+        let window_solar: f64 = input
+            .windows
+            .iter()
+            .map(|window| window_solar_kwh(window, month))
+            .sum();
+        let opaque_solar: f64 = input
+            .opaque_elements
+            .iter()
+            .map(|element| opaque_solar_kwh(element, month))
+            .sum();
 
         let conductance =
             transmission.conductance_w_per_k + ground_adjusted + ventilation_conductance;

@@ -148,6 +148,25 @@ export function NtaPerformancePanel() {
           <div><dt>{t('nta.performance.primaryFossil')}</dt><dd>{kwh(performance.annualPrimaryFossilKwh)} kWh</dd></div>
           <div><dt>{t('nta.performance.renewable')}</dt><dd>{kwh(performance.annualRenewablePrimaryKwh)} kWh</dd></div>
         </dl>
+        {performance.tojuli?.status === 'calculated_unverified' && <div className="nta-performance-bbl" role="group" aria-label="TOjuli">
+          <strong>TO<sub>juli</sub> (§5.7)</strong>
+          <small>{t('nta.performance.tojuliScope')}</small>
+          <ul>
+            {performance.tojuli.activeCooling
+              ? <li><span>{t('nta.performance.tojuliCooled')}</span><em>0,00</em></li>
+              : performance.tojuli.orientations.filter((item) => item.assessed).map((item) => (
+                <li key={item.orientation}>
+                  <span>{t(`nta.orientation.${item.orientation}`)}</span>
+                  <em>{item.tojuliK?.toFixed(2)} K</em>
+                </li>
+              ))}
+            <li>
+              <span>{t('nta.performance.tojuliMax')} ≤ 1,20</span>
+              <em>{performance.tojuli.meetsBblLimit == null ? t('nta.performance.bblUnknown')
+                : performance.tojuli.meetsBblLimit ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em>
+            </li>
+          </ul>
+        </div>}
         {performance.bblCheck && <div className="nta-performance-bbl" role="group" aria-label={t('nta.performance.bbl')}>
           <strong>{t('nta.performance.bbl')}</strong>
           <small>A<sub>ls</sub>/A<sub>g</sub> = {performance.bblCheck.lossAreaRatio.toFixed(2)}</small>

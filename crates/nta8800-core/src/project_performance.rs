@@ -66,6 +66,8 @@ pub struct NtaCalculationInput {
     pub label_function: Option<LabelFunction>,
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
+    #[serde(default)]
+    pub active_cooling_present: bool,
     pub demand_uses_fixed_c1_ventilation: bool,
     pub battery_storage_present: bool,
 }
@@ -409,6 +411,7 @@ fn derive_input(
         hot_water: nta.hot_water,
         label_function: nta.label_function,
         bbl_function: nta.bbl_function,
+        active_cooling_present: nta.active_cooling_present,
         loss_area_m2: Some(loss_area),
         loss_area_source_reference: Some(
             "derived: gross project surfaces bordering outdoor air, ground or unheated space"
@@ -459,6 +462,12 @@ mod tests {
         assert!(performance
             .primary_fossil_indicator_kwh_per_m2_year
             .is_some());
+        // Walls 110 + roof 52 + ground floor 50 m².
+        assert_eq!(derived.loss_area_m2, Some(212.0));
+        let tojuli = performance.tojuli.as_ref().unwrap();
+        assert_eq!(tojuli.status, "calculated_unverified");
+        assert!(tojuli.max_tojuli_k.is_some());
+        println!("synthetic TOjuli max {:?}", tojuli.max_tojuli_k);
         assert_eq!(result.attest_status, "unattested");
     }
 

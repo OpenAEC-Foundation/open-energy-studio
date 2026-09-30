@@ -1360,6 +1360,23 @@ export interface NtaBblCheck {
   renewableShareMeets: boolean | null;
 }
 
+export interface NtaTojuliAssessment {
+  status: 'calculated_unverified' | 'invalid';
+  activeCooling: boolean;
+  orientations: Array<{
+    orientation: NtaOrientation;
+    areaM2: number;
+    share: number;
+    assessed: boolean;
+    conductanceWPerK: number;
+    coolingNeedJulyKwh: number;
+    tojuliK: number | null;
+  }>;
+  maxTojuliK: number | null;
+  meetsBblLimit: boolean | null;
+  issues: Array<{ code: string; path: string }>;
+}
+
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
@@ -1395,6 +1412,7 @@ export interface BuildingPerformanceAssessment {
   indicativeLabelClass: string | null;
   labelSource: string;
   bblCheck: NtaBblCheck | null;
+  tojuli: NtaTojuliAssessment | null;
   spaceHeating: SpaceHeatingChainAssessment;
   issues: Array<{ code: string; path: string }>;
 }
@@ -1444,6 +1462,7 @@ export interface NtaCalculationInput {
   hotWater?: NtaHotWaterSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
+  activeCoolingPresent?: boolean;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }

@@ -25,6 +25,7 @@ use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_heating_chain::{
     assess_space_heating_chain, Generator, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
+use crate::tojuli::{assess_tojuli, TojuliAssessment};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -161,6 +162,9 @@ pub struct BuildingPerformanceInput {
     /// buildings use annex IX and may omit it.
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
+    /// §5.7.1: a zone with sufficient active cooling may use TOjuli = 0.
+    #[serde(default)]
+    pub active_cooling_present: bool,
     /// Row of Bbl table 4.148A for the requirement check.
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
@@ -232,6 +236,8 @@ pub struct BuildingPerformanceAssessment {
     /// Class from annex IX/X for the rounded BENG 2; not a registered label.
     pub indicative_label_class: Option<&'static str>,
     pub label_source: &'static str,
+    /// TOjuli per orientation (§5.7); requires the component transmission route.
+    pub tojuli: Option<TojuliAssessment>,
     /// Bbl 4.149 check; only with a function and a loss area.
     pub bbl_check: Option<BblCheck>,
     pub space_heating: SpaceHeatingChainAssessment,
@@ -544,6 +550,8 @@ pub fn assess_building_performance(
             indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
         }),
         label_source: LABEL_SOURCE,
+        tojuli: valid
+            .then(|| assess_tojuli(&input.space_heating.demand, input.active_cooling_present)),
         bbl_check: match (input.bbl_function, input.loss_area_m2, scenario) {
             (Some(function), Some(area), Some(item)) => bbl_check(
                 function,
@@ -963,5 +971,13 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "source_reference_required"));
+    }
+
+    #[test]
+    fn tojuli_needs_component_transmission() {
+        let result = assess_building_performance(&input());
+        let tojuli = result.tojuli.as_ref().unwrap();
+        assert_eq!(tojuli.status, "invalid");
+        assert_eq!(tojuli.issues[0].code, "tojuli_components_required");
     }
 }

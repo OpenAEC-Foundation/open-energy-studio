@@ -83,7 +83,12 @@ describe('NTA performance panel', () => {
           bblCheck: { source: 'Bbl', function: 'other_residential', lossAreaRatio: 2.12,
             limits: { energyNeedMaxKwhPerM2: 78.6, primaryFossilMaxKwhPerM2: 30, renewableShareMinPercent: 50,
               lightConstructionAllowanceApplied: true },
-            energyNeedMeets: null, primaryFossilMeets: false, renewableShareMeets: false }, annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
+            energyNeedMeets: null, primaryFossilMeets: false, renewableShareMeets: false },
+          tojuli: { status: 'calculated_unverified', activeCooling: false, maxTojuliK: 1.34, meetsBblLimit: false, issues: [],
+            orientations: [
+              { orientation: 'south', areaM2: 82, share: 0.5, assessed: true, conductanceWPerK: 45, coolingNeedJulyKwh: 44, tojuliK: 1.34 },
+              { orientation: 'north_east', areaM2: 0, share: 0, assessed: false, conductanceWPerK: 0, coolingNeedJulyKwh: 0, tojuliK: null },
+            ] }, annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
           spaceHeating: {
             omittedTerms: ['9.2.3 node losses and node gains (including solar thermal)'],
             monthly: need.map(month),
@@ -109,6 +114,11 @@ describe('NTA performance panel', () => {
     expect(bbl.getByText('cannot be checked')).toBeInTheDocument();
     expect(bbl.getAllByText('does not meet')).toHaveLength(2);
     expect(bbl.getByText('BENG 2 ≤ 30.0')).toBeInTheDocument();
+    const tojuli = within(screen.getByRole('group', { name: 'TOjuli' }));
+    expect(tojuli.getByText('South')).toBeInTheDocument();
+    expect(tojuli.getByText('1.34 K')).toBeInTheDocument();
+    expect(tojuli.queryByText('North-east')).not.toBeInTheDocument();
+    expect(tojuli.getByText('does not meet')).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(13);
   });
 });
