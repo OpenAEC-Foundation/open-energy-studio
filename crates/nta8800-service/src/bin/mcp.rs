@@ -33,6 +33,12 @@ struct MonthlyDirectArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct MonthlyDemandArgs {
+    /// One calculation zone: floor area, setpoints, explicit transmission and ventilation conductances, thermal-mass classes, internal-gain method, windows and opaque elements with source references.
+    input: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct UnheatedTransmissionArgs {
     /// Named unheated spaces, explicit boundary terms and caller-supplied reduction factors.
     input: Value,
@@ -491,6 +497,31 @@ impl EnergyMcp {
             Ok(input) => {
                 let result =
                     nta8800_core::monthly_direct_transmission::assess_monthly_direct(&input);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "invalid" {
+                    CallToolResult::error(vec![content])
+                } else {
+                    CallToolResult::success(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Calculate the unverified NTA 8800 chapter 7 monthly heating and cooling need of one zone with De Bilt climate; lists omitted corrections; no BENG or label"
+    )]
+    fn calculate_monthly_demand(
+        &self,
+        Parameters(args): Parameters<MonthlyDemandArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::monthly_demand::MonthlyDemandInput>(args.input)
+        {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_monthly_demand_shape", "message":message.to_string()})
+                    .to_string(),
+            )]),
+            Ok(input) => {
+                let result = nta8800_core::monthly_demand::assess_monthly_demand(&input);
                 let content = ContentBlock::text(json!(result).to_string());
                 if result.status == "invalid" {
                     CallToolResult::error(vec![content])

@@ -114,6 +114,13 @@ fn diagnose_final_energy_draft(
 }
 
 #[tauri::command]
+fn calculate_monthly_demand(
+    input: nta8800_core::monthly_demand::MonthlyDemandInput,
+) -> nta8800_core::monthly_demand::MonthlyDemandAssessment {
+    nta8800_core::monthly_demand::assess_monthly_demand(&input)
+}
+
+#[tauri::command]
 fn diagnose_epus_draft(
     input: nta8800_core::epus_draft::EpusDraftInput,
 ) -> nta8800_core::epus_draft::EpusDraftAssessment {
@@ -456,6 +463,7 @@ pub fn run() {
             diagnose_declared_dhw,
             diagnose_final_energy_draft,
             diagnose_epus_draft,
+            calculate_monthly_demand,
             diagnose_bacs_draft,
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,

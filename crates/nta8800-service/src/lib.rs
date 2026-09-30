@@ -32,6 +32,11 @@ pub struct MonthlyDirectRequest {
 }
 
 #[derive(Deserialize)]
+pub struct MonthlyDemandRequest {
+    pub input: nta8800_core::monthly_demand::MonthlyDemandInput,
+}
+
+#[derive(Deserialize)]
 pub struct UnheatedTransmissionRequest {
     pub input: nta8800_core::unheated_transmission::UnheatedTransmissionInput,
 }
@@ -154,6 +159,10 @@ pub fn app() -> Router {
         .route(
             "/v1/nta8800/transmission/direct/monthly-diagnose",
             post(diagnose_monthly_direct),
+        )
+        .route(
+            "/v1/nta8800/demand/monthly/calculate",
+            post(calculate_monthly_demand),
         )
         .route(
             "/v1/nta8800/transmission/unheated/diagnose",
@@ -335,6 +344,18 @@ async fn diagnose_monthly_direct(
 ) -> (StatusCode, Json<Value>) {
     let assessment =
         nta8800_core::monthly_direct_transmission::assess_monthly_direct(&request.input);
+    let status = if assessment.status == "invalid" {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn calculate_monthly_demand(
+    Json(request): Json<MonthlyDemandRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment = nta8800_core::monthly_demand::assess_monthly_demand(&request.input);
     let status = if assessment.status == "invalid" {
         StatusCode::UNPROCESSABLE_ENTITY
     } else {
@@ -1099,6 +1120,57 @@ mod tests {
             .iter()
             .any(|issue| issue["code"] == "floor_area_sum_invalid"));
         assert_eq!(result["assessment"]["calculationAvailable"], false);
+    }
+
+    fn monthly_demand_sample() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-monthly-demand-synthetic.json"
+        ))
+        .unwrap()
+    }
+
+    async fn post_json(uri: &str, body: Value) -> (StatusCode, Value) {
+        let response = app()
+            .oneshot(
+                Request::post(uri)
+                    .header("content-type", "application/json")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn monthly_demand_route_returns_unverified_need() {
+        let (status, result) = post_json(
+            "/v1/nta8800/demand/monthly/calculate",
+            json!({"input": monthly_demand_sample()}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["status"], "calculated_unverified");
+        assert_eq!(result["monthly"].as_array().unwrap().len(), 12);
+        assert!(result["annualHeatingNeedKwh"].as_f64().unwrap() > 0.0);
+        assert_eq!(result["referenceVerified"], false);
+        assert_eq!(result["bengCalculationAvailable"], false);
+    }
+
+    #[tokio::test]
+    async fn monthly_demand_route_rejects_unsupported_tilt_without_numbers() {
+        let mut input = monthly_demand_sample();
+        input["windows"][0]["tiltDeg"] = json!(45.0);
+        let (status, result) = post_json(
+            "/v1/nta8800/demand/monthly/calculate",
+            json!({"input": input}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(result["issues"][0]["code"], "tilt_unsupported");
+        assert!(result["annualHeatingNeedKwh"].is_null());
     }
 
     #[tokio::test]

@@ -300,6 +300,116 @@ export async function diagnoseEpusDraftWithRust(input: EpusDraftInput): Promise<
   throw new Error('Rust draft energy diagnostics are available in the desktop app and local development server.');
 }
 
+export type NtaOrientation =
+  | 'north' | 'north_east' | 'east' | 'south_east'
+  | 'south' | 'south_west' | 'west' | 'north_west';
+export type NtaMassClass = 'light' | 'heavy' | 'very_heavy';
+
+export interface MonthlyDemandInput {
+  zoneId: string;
+  usableFloorAreaM2: number;
+  areaSourceReference: string;
+  setpoints: { heatingC: number; coolingC: number; sourceReference: string };
+  transmission: {
+    conductanceWPerK: number;
+    sourceReference: string;
+    ground: null | {
+      adjustedConductanceWPerK: number;
+      heatingKwh: number[];
+      coolingKwh: number[];
+      sourceReference: string;
+    };
+    groundInventoryConfirmed: boolean;
+  };
+  ventilationFlows: Array<{
+    id: string;
+    sourceReference: string;
+    months: Array<{ month: number; conductanceWPerK: number; supplyTemperatureC?: number | null }>;
+  }>;
+  thermalMass: {
+    floor: NtaMassClass;
+    wall: NtaMassClass;
+    ceiling: 'closed_or_suspended' | 'open_or_none';
+    sourceReference: string;
+  };
+  internalGains:
+    | { method: 'residential'; dwellingCount: number; sourceReference: string }
+    | { method: 'declared'; heatFluxWPerM2: number; sourceReference: string };
+  windowInventoryComplete: boolean;
+  windows: Array<{
+    id: string;
+    areaM2: number;
+    orientation: NtaOrientation;
+    tiltDeg: 0 | 90;
+    gPerpendicular: number;
+    frameFraction: number;
+    uValueWPerM2k: number;
+    obstructionFactor: number;
+    sourceReference: string;
+  }>;
+  opaqueInventoryComplete: boolean;
+  opaqueElements: Array<{
+    id: string;
+    areaM2: number;
+    orientation: NtaOrientation;
+    tiltDeg: 0 | 90;
+    uValueWPerM2k: number;
+    sourceReference: string;
+  }>;
+}
+
+export interface MonthlyDemandBalanceTerms {
+  transmissionKwh: number;
+  ventilationKwh: number;
+  heatTransferKwh: number;
+  gainsKwh: number;
+  gamma: number | null;
+  utilization: number;
+  needKwh: number;
+}
+
+export interface MonthlyDemandAssessment {
+  status: 'calculated_unverified' | 'invalid';
+  scope: string;
+  climateSource: string;
+  inputFingerprint: string;
+  finalEditionVerified: false;
+  referenceVerified: false;
+  bengCalculationAvailable: false;
+  omittedCorrections: string[];
+  specificHeatCapacityKjPerM2k: number | null;
+  monthly: Array<{
+    month: number;
+    hours: number;
+    outdoorTemperatureC: number;
+    timeConstantH: number;
+    a: number;
+    internalGainsKwh: number;
+    windowSolarGainsKwh: number;
+    opaqueSolarGainsKwh: number;
+    heating: MonthlyDemandBalanceTerms;
+    cooling: MonthlyDemandBalanceTerms;
+  }>;
+  annualHeatingNeedKwh: number | null;
+  annualCoolingNeedKwh: number | null;
+  issues: Array<{ code: string; path: string }>;
+}
+
+export async function calculateMonthlyDemandWithRust(input: MonthlyDemandInput): Promise<MonthlyDemandAssessment> {
+  if (isTauri()) {
+    return invoke<MonthlyDemandAssessment>('calculate_monthly_demand', { input });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/demand/monthly/calculate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    });
+    return response.json() as Promise<MonthlyDemandAssessment>;
+  }
+  throw new Error('Rust demand calculation is available in the desktop app and local development server.');
+}
+
 export interface BacsDraftInput {
   buildingUse: 'residential' | 'utility';
   systemInventoryComplete: boolean;

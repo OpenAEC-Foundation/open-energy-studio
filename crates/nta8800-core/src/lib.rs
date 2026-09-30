@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 
 pub mod bacs_draft;
 pub mod boiler_forfait_draft;
+pub mod climate;
 pub mod declared_dhw;
 pub mod declared_heating_table;
 pub mod diagnostic_reference;
@@ -31,6 +32,7 @@ pub mod heat_pumps;
 pub mod heating_aux_draft;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
+pub mod monthly_demand;
 pub mod monthly_direct_transmission;
 pub mod reference;
 pub mod unheated_transmission;
@@ -267,6 +269,7 @@ pub fn capabilities() -> KernelCapabilities {
             "heat_pump_system_link_audit",
             "reference_manifest_field_audit",
             "diagnostic_direct_transmission_reference_comparison",
+            "unverified_chapter_7_monthly_heating_cooling_need_single_zone",
         ],
     }
 }
