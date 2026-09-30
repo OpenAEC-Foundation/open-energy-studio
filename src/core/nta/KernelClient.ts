@@ -370,7 +370,7 @@ export interface MonthlyDemandInput {
     id: string;
     areaM2: number;
     orientation: NtaOrientation;
-    tiltDeg: 0 | 90;
+    tiltDeg: number;
     gPerpendicular: number;
     frameFraction: number;
     uValueWPerM2k: number;
@@ -382,7 +382,7 @@ export interface MonthlyDemandInput {
     id: string;
     areaM2: number;
     orientation: NtaOrientation;
-    tiltDeg: 0 | 90;
+    tiltDeg: number;
     uValueWPerM2k: number;
     sourceReference: string;
   }>;

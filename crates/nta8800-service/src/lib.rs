@@ -1243,7 +1243,7 @@ mod tests {
     #[tokio::test]
     async fn monthly_demand_route_rejects_unsupported_tilt_without_numbers() {
         let mut input = monthly_demand_sample();
-        input["windows"][0]["tiltDeg"] = json!(45.0);
+        input["windows"][0]["tiltDeg"] = json!(200.0);
         let (status, result) = post_json(
             "/v1/nta8800/demand/monthly/calculate",
             json!({"input": input}),

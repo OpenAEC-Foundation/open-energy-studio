@@ -17,8 +17,8 @@ De formules en constanten komen uit de normanalyses C1–C5 van Open Heatloss St
 | Interne winst woning | 7.21–7.24 | `180·N_woon·N_P·0,001·t`; `N_P` per banden ≤30, 30–100, >100 m² |
 | Zonwinst ramen | 7.32, 7.40 | `0,90·g_n·A·(1−F_F)·F_sh;obst·I_sol·t·0,001 − Q_sky` |
 | Zonwinst opaak | 7.33, 7.6.6.3 | `0,6·R_se·U·A·I_sol·t·0,001 − Q_sky`, `F_sh;obst = 1` |
-| Hemelstraling | 7.39, 7.6.6.4 | `F_sky·R_se·U·A·4,14·11·t·0,001`; `F_sky` 1 / 0,75 / 0,5 |
-| Klimaat | tabel 17.1/17.2 | De Bilt; alleen hellingen 0° en 90° |
+| Hemelstraling | 7.39, 7.6.6.4 | `F_sky·R_se·U·A·4,14·11·t·0,001`; `F_sky` 1 (≤5°) / 0,75 (≤75°) / 0,5 (≤90°) / 0 (overhellend) |
+| Klimaat | tabel 17.1/17.2 | De Bilt; hellingen 0–180° met lineaire interpolatie tussen 0/30/45/60/90/135/180°, dichtstbijzijnde oriëntatiekolom (bij gelijke afstand de hoogste waarde) |
 | Setpoints | tabel 7.13 | door de aanroeper met bron (woning 20 / 24 °C) |
 
 ## Invoer
@@ -28,14 +28,13 @@ De transmissie kent twee routes (`transmission.method`):
 - `explicit`: `H_tr` exclusief grond (W/K) met bron, plus optioneel een grondroute (`H_g;adj` en twaalf maandwaarden voor verwarming en koeling);
 - `components`: de module stelt `H_tr` zelf samen uit directe buitenelementen en koudebruggen (8.1, via `direct_transmission`) en onverwarmde ruimtes met opgegeven `b` (via `unheated_transmission`). Vloeren op grond gaan via het P/A-model van §8.3 (module `ground`: 8.30 `B' = A/(0,5·P)`, 8.32 `d = 0,5 + λ(R_si+R_c+0,04)`, λ = 2,0 (8.35), 8.40/8.41, 8.36 `H_g = A·U_fl`). Het grondverlies per maand is `H_g·(θ_int − θ_e;avg;an)·t` (7.14). Het jaargemiddelde is het ongewogen gemiddelde van tabel 17.1 (10,67 °C). De uitkomst geeft `transmission` met de deelcoëfficiënten.
 
-Verder levert de aanroeper expliciet: `A_g` met bron, setpoints, ventilatiestromen met twaalf maandelijkse `H_ve` en optionele toevoertemperatuur, de massaklassen van vloer en wand plus de kolomkeuze van het plafond, de methode voor interne winst en de volledige lijsten met ramen en opake buitenvlakken. Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldige waarde, een onbekend veld of een niet ondersteunde helling geeft `invalid` zonder getallen.
+Verder levert de aanroeper expliciet: `A_g` met bron, setpoints, ventilatiestromen met twaalf maandelijkse `H_ve` en optionele toevoertemperatuur, de massaklassen van vloer en wand plus de kolomkeuze van het plafond, de methode voor interne winst en de volledige lijsten met ramen en opake buitenvlakken. Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldige waarde, een onbekend veld of een helling buiten 0–180° geeft `invalid` zonder getallen.
 
 ## Niet toegepast (altijd meegeleverd als `omittedCorrections`)
 
 - niet-continu verwarmen `a_H;red` (§7.9.2);
 - temperatuurnivellering woningbouw (§7.9.4.2, formule 7.78);
 - beweegbare zonwering en een afzonderlijke `g_gl;C`;
-- hellingen anders dan 0° en 90°;
 - detailberekening van de warmtecapaciteit volgens bijlage B;
 - voetnoot c van tabel 7.10: de kolomkeuze ligt bij de aanroeper.
 

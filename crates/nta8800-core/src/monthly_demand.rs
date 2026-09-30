@@ -42,7 +42,6 @@ pub const OMITTED_CORRECTIONS: &[&str] = &[
     "7.9.2 intermittent heating reduction a_H;red",
     "7.9.4.2 residential temperature levelling (7.78)",
     "movable solar shading and separate g_gl;C",
-    "tilts other than 0° and 90° (table 17.2 columns not transcribed)",
     "annex B detailed thermal capacity",
     "table 7.10 footnote c is the caller's column choice",
 ];
@@ -298,14 +297,17 @@ pub fn occupants_per_dwelling(area_per_dwelling_m2: f64) -> f64 {
     }
 }
 
-/// 7.6.6.4: sky view factor by tilt (0° horizontal, 90° vertical).
+/// 7.6.6.4: sky view factor by tilt (0° facing up, 90° vertical, above 90°
+/// overhanging towards the ground).
 pub fn sky_view_factor(tilt_deg: f64) -> f64 {
     if tilt_deg <= 5.0 {
         1.0
     } else if tilt_deg <= 75.0 {
         0.75
-    } else {
+    } else if tilt_deg <= 90.0 {
         0.5
+    } else {
+        0.0
     }
 }
 
@@ -345,7 +347,7 @@ fn check_reference(value: &str, path: String, issues: &mut Vec<DemandIssue>) {
 }
 
 fn check_tilt(tilt: f64, path: String, issues: &mut Vec<DemandIssue>) {
-    if tilt != 0.0 && tilt != 90.0 {
+    if !(0.0..=180.0).contains(&tilt) {
         issues.push(issue("tilt_unsupported", path));
     }
 }
@@ -1101,7 +1103,7 @@ mod tests {
     #[test]
     fn rejects_incomplete_or_unsupported_input_without_numbers() {
         let mut input = sample();
-        input.windows[0].tilt_deg = 45.0;
+        input.windows[0].tilt_deg = 200.0;
         input.window_inventory_complete = false;
         if let Transmission::Explicit(transmission) = &mut input.transmission {
             transmission.ground_inventory_confirmed = false;
@@ -1217,5 +1219,24 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "ground_floor_invalid"));
+    }
+
+    #[test]
+    fn pitched_roof_uses_interpolated_irradiance_and_sky_factor() {
+        let mut input = sample();
+        input.opaque_elements[0].tilt_deg = 35.0;
+        let result = assess_monthly_demand(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // January south: 30° = 50,5 and 45° = 57,9 W/m², so 35° = 52,966…
+        let irradiance = 50.5 + (57.9 - 50.5) / 3.0;
+        let hours = 744.0;
+        let roof = 0.6 * 0.04 * 0.16 * 50.0 * irradiance * hours * 0.001
+            - 0.75 * 0.04 * 0.16 * 50.0 * 4.14 * 11.0 * hours * 0.001;
+        assert!((result.monthly[0].opaque_solar_gains_kwh - roof).abs() < 1e-9);
+        assert_eq!(sky_view_factor(120.0), 0.0);
     }
 }
