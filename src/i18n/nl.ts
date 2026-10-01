@@ -1243,4 +1243,5 @@ export const nl: Record<string, string> = {
   'nta.form.shading.automatic': 'Automatisch (tabel 7.9)',
   'nta.form.shadingFc': 'Reductiefactor F_c (tabel 7.5/7.6)',
   'nta.form.ventilationFlow': 'Of: ventilatiedebiet incl. infiltratie m³/h (H_ve = q·ρ·c/3600)',
+  'nta.form.emission.local': 'Lokaal toestel (kachel, elektrisch paneel)',
 };

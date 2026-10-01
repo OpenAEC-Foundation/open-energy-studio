@@ -1251,7 +1251,7 @@ export interface SpaceHeatingChainInput {
   demand: MonthlyDemandInput;
   additionalZones?: SpaceHeatingChainZone[];
   emission: {
-    system: 'radiators_or_convectors' | 'floor_heating' | 'fan_assisted_radiators_or_convectors' | 'air_heating' | 'other_or_unknown';
+    system: 'radiators_or_convectors' | 'floor_heating' | 'fan_assisted_radiators_or_convectors' | 'air_heating' | 'local_heater' | 'other_or_unknown';
     balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
     control: 'main_room_thermostat' | 'central_with_room_valves' | 'individual_room_thermostats' | 'other_or_unknown';
     sourceReference: string;

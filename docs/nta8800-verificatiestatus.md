@@ -22,6 +22,25 @@ Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BEN
 
 Teststand bij commit 2ab8aa4: 203 kerntests (ook met Rust 1.77.2), 45 servicetests, 218 UI-tests; clippy schoon. De projectroute is via de Vite-proxy tegen de draaiende API en in de echte browser gecontroleerd. Een debug-desktoppakket is gebouwd.
 
+**Onafhankelijke review (1 oktober 2026).** Een tweede, onafhankelijke controle van de keten vond vijf fouten, die alle vijf zijn hersteld:
+
+- `f_BACS` ontbrak op stadsverwarming en biomassa (5.20);
+- omgevingswarmte van een tapwaterwarmtepomp kon dubbel tellen;
+- "actieve koeling" was mogelijk zonder koelsysteem (§5.7.1);
+- een vloer boven buitenlucht kreeg helling 0° in plaats van 180°;
+- lokale toestellen konden Δθ_hydr = 0 niet gebruiken (tabel 9.3, voetnoot a).
+
+De volgende interpretatievragen moeten tegen de normtekst of wettekst worden beantwoord:
+
+1. Beweegbare zonwering op de warmtebalans bij utiliteit: nu altijd 1,0. Volgens het concept is dat alleen voor woningen voorgeschreven.
+2. TO-juli-noemer: telt de geleiding via een onverwarmde ruimte mee in `H_C;D`?
+3. Dubbele PV-opgave: `onSiteProduction` naast `pvSystems` wordt niet afgevangen.
+4. A0-voorwaarde a: met of zonder de toeslag van Bbl 4.149 lid 4?
+5. Bijlage Xa noemt voor onderwijs 64, waar het patroon 63 doet verwachten. De code volgt de gepubliceerde tekst.
+6. Bewoners bij een woning die over meerdere zones is verdeeld: nu per zone uit zone-A_g/aantal woningen.
+7. Een hernieuwbaar aandeel boven 100% bij negatieve `EPtot` wordt niet afgekapt.
+8. `θ_e;avg;an` is het ongewogen maandgemiddelde.
+
 **Open punten die certificering blokkeren:**
 
 1. Review van alle transcripties tegen de gelicentieerde normtekst. De pdf staat op netwerkshare `Z:`, die op deze machine niet gemount is.

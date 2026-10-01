@@ -415,6 +415,26 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             issues.push(issue("cooling_double_count", "cooling"));
         }
     }
+    if input.hot_water.is_some() && !input.declared_renewable_heat.is_empty() {
+        // Ambient heat of a calculated hot-water heat pump is derived here.
+        issues.push(issue(
+            "hot_water_renewable_double_count",
+            "declaredRenewableHeat",
+        ));
+    }
+    if input.active_cooling_present
+        && input.cooling.is_none()
+        && !input
+            .declared_uses
+            .iter()
+            .any(|item| item.service == Service::SpaceCooling)
+    {
+        // §5.7.1: TOjuli = 0 needs an active cooling system.
+        issues.push(issue(
+            "active_cooling_without_cooling_system",
+            "activeCoolingPresent",
+        ));
+    }
     if let Some(system) = &input.hot_water {
         issues.extend(
             validate_hot_water(system, "hotWater")
@@ -711,7 +731,8 @@ fn compute(
         let mut used_gas = bacs * row.natural_gas_kwh;
         let mut used_oil = 0.0;
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
-        let used_dh = row.district_heat_kwh;
+        // 5.20: f_BACS applies to space heating on every carrier.
+        let used_dh = bacs * row.district_heat_kwh;
         for item in &input.declared_uses {
             let factor = if item.service.bacs_weighted() {
                 bacs
@@ -774,7 +795,7 @@ fn compute(
             });
         }
         fossil += used_dh * F_P_DISTRICT_HEAT_FORFAIT;
-        let used_bm = row.biomass_kwh;
+        let used_bm = bacs * row.biomass_kwh;
         fossil += used_bm * F_P_BIOMASS_B;
         if used_bm > 0.0 {
             carriers.push(CarrierMonth {
@@ -1258,5 +1279,29 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "cooling_double_count"));
+    }
+
+    #[test]
+    fn review_fixes_bacs_on_district_heat_and_consistency_checks() {
+        use crate::space_heating_chain::ExternalHeatGenerator;
+        let mut sample = input();
+        sample.space_heating.generator = Generator::ExternalHeat(ExternalHeatGenerator {
+            supplier_reference: "contract".into(),
+            quality_declaration_present: false,
+        });
+        let plain = assess_building_performance(&sample);
+        sample.bacs_factor = 1.05;
+        let weighted = assess_building_performance(&sample);
+        let heat = plain.space_heating.annual_district_heat_kwh.unwrap();
+        let delta =
+            weighted.annual_primary_fossil_kwh.unwrap() - plain.annual_primary_fossil_kwh.unwrap();
+        assert!((delta - 0.05 * heat * 0.9).abs() < 1e-6, "{delta}");
+
+        let mut cooled = input();
+        cooled.active_cooling_present = true;
+        assert!(assess_building_performance(&cooled)
+            .issues
+            .iter()
+            .any(|item| item.code == "active_cooling_without_cooling_system"));
     }
 }

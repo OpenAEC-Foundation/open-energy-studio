@@ -20,6 +20,8 @@ pub enum EmissionSystem {
     FloorHeating,
     FanAssistedRadiatorsOrConvectors,
     AirHeating,
+    /// Local heaters (stove, local electric heater): table 9.2 "overige", Δθ_hydr = 0.
+    LocalHeater,
     OtherOrUnknown,
 }
 
@@ -55,7 +57,9 @@ pub struct EmissionInput {
 
 pub fn system_correction_k(system: EmissionSystem) -> f64 {
     match system {
-        EmissionSystem::RadiatorsOrConvectors | EmissionSystem::OtherOrUnknown => 0.35,
+        EmissionSystem::RadiatorsOrConvectors
+        | EmissionSystem::OtherOrUnknown
+        | EmissionSystem::LocalHeater => 0.35,
         EmissionSystem::FloorHeating => 0.3,
         EmissionSystem::FanAssistedRadiatorsOrConvectors => -0.15,
         EmissionSystem::AirHeating => 0.0,
@@ -89,8 +93,12 @@ pub fn temperature_increment_k(input: &EmissionInput) -> f64 {
 /// Returns `true` when the balancing choice contradicts footnote a of
 /// table 9.3 (air heating needs `NotApplicable`; wet systems must state it).
 pub fn balancing_consistent(input: &EmissionInput) -> bool {
-    let air = input.system == EmissionSystem::AirHeating;
-    air == (input.balancing == HydronicBalancing::NotApplicable)
+    // Table 9.3 footnote a: local heaters and air heating have Δθ_hydr = 0.
+    let non_hydronic = matches!(
+        input.system,
+        EmissionSystem::AirHeating | EmissionSystem::LocalHeater
+    );
+    non_hydronic == (input.balancing == HydronicBalancing::NotApplicable)
 }
 
 /// 9.16 for one month: `Q_H;em;ls` in kWh for `Q_H;em;out = Q_H;nd`.
@@ -155,6 +163,13 @@ mod tests {
             EmissionControl::OtherOrUnknown,
         );
         assert!(!balancing_consistent(&wrong));
+        let local = input(
+            EmissionSystem::LocalHeater,
+            HydronicBalancing::NotApplicable,
+            EmissionControl::OtherOrUnknown,
+        );
+        assert!(balancing_consistent(&local));
+        assert!((temperature_increment_k(&local) - 2.85).abs() < 1e-12);
     }
 
     #[test]

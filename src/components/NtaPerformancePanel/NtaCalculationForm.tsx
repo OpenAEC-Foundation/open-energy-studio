@@ -184,7 +184,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.emission')}>
       <SelectField {...field} path={['emission', 'system']} label={t('nta.form.emissionSystem')} options={[
         ['radiators_or_convectors', t('nta.form.emission.radiators')], ['floor_heating', t('nta.form.emission.floor')],
-        ['air_heating', t('nta.form.emission.air')], ['other_or_unknown', t('nta.form.unknown')]]} />
+        ['air_heating', t('nta.form.emission.air')], ['local_heater', t('nta.form.emission.local')], ['other_or_unknown', t('nta.form.unknown')]]} />
       <SelectField {...field} path={['emission', 'balancing']} label={t('nta.form.balancing')} options={[
         ['none_or_unknown', t('nta.form.unknown')], ['static', t('nta.form.balancing.static')],
         ['dynamic', t('nta.form.balancing.dynamic')], ['not_applicable', t('nta.form.balancing.na')]]} />

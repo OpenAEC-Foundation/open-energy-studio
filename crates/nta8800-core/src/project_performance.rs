@@ -375,6 +375,8 @@ fn derive_input(
             };
             let tilt = match (tilts.get(id), surface_orientation, surface_type) {
                 (Some(tilt), _, _) => *tilt,
+                // A horizontal floor bordering outdoor air faces down (180°).
+                (None, None, "floor") => 180.0,
                 (None, None, _) => 0.0,
                 (None, Some(_), "wall") => 90.0,
                 (None, Some(_), _) => {
@@ -730,5 +732,24 @@ mod tests {
         assert!((geometry.loss_area_m2 - 247.2).abs() <= 0.01 * 247.2);
         assert!((geometry.loss_area_ratio.unwrap() - 2.575).abs() < 1e-9);
         assert_eq!(geometry.unclassified_surface_count, 0);
+    }
+
+    #[test]
+    fn floor_over_outdoor_air_faces_down() {
+        let mut value = project();
+        value["zones"][0]["surfaces"][5]["thermalBoundary"] = Value::from("outdoor");
+        value["ntaCalculation"]["groundFloors"] = serde_json::json!([]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let floor = result
+            .derived_input
+            .unwrap()
+            .space_heating
+            .demand
+            .opaque_elements
+            .into_iter()
+            .find(|item| item.id == "surface:floor:opaque")
+            .unwrap();
+        assert_eq!(floor.tilt_deg, 180.0);
     }
 }
