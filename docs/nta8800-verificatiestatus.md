@@ -34,7 +34,7 @@ De volgende interpretatievragen moeten tegen de normtekst of wettekst worden bea
 
 1. Beweegbare zonwering op de warmtebalans bij utiliteit: nu altijd 1,0. Volgens het concept is dat alleen voor woningen voorgeschreven.
 2. TO-juli-noemer: telt de geleiding via een onverwarmde ruimte mee in `H_C;D`?
-3. Dubbele PV-opgave: `onSiteProduction` naast `pvSystems` wordt niet afgevangen.
+3. Dubbele PV-opgave: inmiddels opgelost; PV moet via één route lopen (`pv_route_mixed`).
 4. A0-voorwaarde a: met of zonder de toeslag van Bbl 4.149 lid 4?
 5. Bijlage Xa noemt voor onderwijs 64, waar het patroon 63 doet verwachten. De code volgt de gepubliceerde tekst.
 6. Bewoners bij een woning die over meerdere zones is verdeeld: nu per zone uit zone-A_g/aantal woningen.

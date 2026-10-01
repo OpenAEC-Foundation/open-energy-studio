@@ -415,6 +415,15 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             issues.push(issue("cooling_double_count", "cooling"));
         }
     }
+    if !input.pv_systems.is_empty()
+        && input
+            .on_site_production
+            .iter()
+            .any(|item| matches!(item.kind, ProductionKind::Pv | ProductionKind::Pvt))
+    {
+        // One route for solar electricity, so the same array cannot count twice.
+        issues.push(issue("pv_route_mixed", "onSiteProduction"));
+    }
     if input.hot_water.is_some() && !input.declared_renewable_heat.is_empty() {
         // Ambient heat of a calculated hot-water heat pump is derived here.
         issues.push(issue(
@@ -1055,6 +1064,8 @@ mod tests {
     #[test]
     fn calculated_pv_adds_to_declared_production() {
         let mut sample = input();
+        // Mixing both PV routes is rejected; use wind as declared production.
+        sample.on_site_production[0].kind = ProductionKind::Wind;
         let base = assess_building_performance(&sample);
         sample.pv_systems.push(PvSystem {
             id: "roof-pv".into(),
@@ -1303,5 +1314,24 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "active_cooling_without_cooling_system"));
+    }
+
+    #[test]
+    fn mixed_pv_routes_are_rejected() {
+        let mut sample = input();
+        sample.pv_systems.push(PvSystem {
+            id: "roof-pv".into(),
+            peak_power_kw: 3.0,
+            azimuth_deg: 180.0,
+            tilt_deg: 35.0,
+            performance_factor: 0.80,
+            shading_correction: 1.0,
+            obstruction_factor: 1.0,
+            source_reference: "datasheet".into(),
+        });
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "pv_route_mixed"));
     }
 }
