@@ -118,3 +118,20 @@ De Rust-kernel levert momenteel structuur- en schilgeometrievalidatie en een sam
 De UI toont de Rust-invoercontrole op het project- en resultatenscherm. Verwarmings- en tapwaterdialogen kunnen de warmtepompclassificatie vastleggen; de browserontwikkelserver gebruikt een lokale API-proxy en de desktop-app de Tauri-command. Zie `docs/nta8800-verificatiestatus.md` voor de actuele testresultaten en open verificatiepunten, `docs/nta8800-dekkingsregister.md` voor de status per warmtepompvariant en deelmodel, `docs/nta8800-referentieprotocol.md` voor het vereiste bewijs per rekenroute en `docs/nta8800-attestdossier.md` voor de formele test- en kwaliteitsvereisten.
 
 Het openbare hoofdstuk-9-concept is inmiddels ook gebruikt voor een afzonderlijke Rust-generatorverdeling bij nieuwbouw, inclusief tabel 9.1, beta-/energiedeel uit tabel 9.23 en de restvraag uit formules 9.2–9.3. Een gekoppelde hybride diagnose voert de zo afgeleide warmtepompwarmte door naar de forfaitaire maandformule. De UI vraagt hiervoor expliciete nieuwbouwbevestiging, twaalf knooppuntmaanden en bewijs van vermogens, ketelcategorie en afgiftetemperatuur. Tabel 9.25 en formule 9.61 geven nu een voorlopige ketel-aardgasinput; voor individuele ketels geeft forfaitaire formule 9.85 ook elektrische hulpenergie. Met opgeslagen meetcomponenten wordt ook de individuele warmtepomphulpstroom uit de afgeleide maandenergie berekend. Dit blijft een conceptdeelmodel: de knooppuntvraag is aangeleverd, waakvlam en bronpomp/-ventilator ontbreken, renovatie en productgebonden afschakelgrenzen worden geweigerd, en er is geen onafhankelijke actuele EDR-verificatie. Zie [de generatorverdelingsanalyse](nta8800-generatorverdeling-concept.md).
+
+## 12. Uitvoeringsstand 1 oktober 2026: rekenruggengraat
+
+Er is een doorgaande, onverifieerde Rust-keten van `.oes`-project tot:
+
+- BENG 1/2/3, TO-juli en de Bbl-toets;
+- de A0-aanduiding en de indicatieve labelklasse.
+
+De keten dekt hoofdstukken 7, 8, 9 (afgifte; opwekking met ketel, (hybride) warmtepomp, stadsverwarming, elektrisch en biomassa), 10 (koudeopwekking), 13 (tapwaterbehoefte), 16 (PV), 17 (klimaat, belemmering) en 5 (primaire en hernieuwbare energie), met meerdere rekenzones. Projectadapter, formulier, paneel en rekenrapport zijn beschikbaar in de app, via HTTP, MCP en Tauri.
+
+Werkinstructie: [nta8800-werkinstructie.md](nta8800-werkinstructie.md). Stand en blokkades: [verificatiestatus](nta8800-verificatiestatus.md).
+
+De volgende stappen vereisen externe input:
+
+1. de normtekst NTA 8800:2025+C1:2026, voor de review van de transcripties en voor hoofdstuk 11, distributie 9.26 en de rendementstabellen;
+2. de actuele EDR-testset met de uitkomsten uit bijlage 2;
+3. afstemming over de attestscope met InstallQ.
