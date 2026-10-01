@@ -229,6 +229,39 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <CheckField {...field} path={['hotWater', 'renewableHeatPump']} label={t('nta.form.hotWaterHeatPump')} />
       <TextField {...field} path={['hotWater', 'efficiencySourceReference']} label={t('nta.form.source')} />
     </Section>}
+    <Section title={t('nta.form.cooling')}>
+      <label>{t('nta.form.coolingGenerator')}
+        <select value={String(read(draft, ['cooling', 'generator', 'kind']) ?? '')} onChange={(event) => {
+          const kind = event.target.value;
+          if (!kind) { change(['cooling'], null); return; }
+          const current = (read(draft, ['cooling']) as Draft | null) ?? {
+            emissionEfficiency: null, distributionEfficiency: null, controlFactor: null,
+            efficiencySourceReference: '', equipmentReference: '' };
+          change(['cooling'], { ...current, generator: kind === 'free_cooling'
+            ? { kind, source: null, freeCoolingFraction: null, fractionSourceReference: '' } : { kind } });
+        }}>
+          <option value="">{t('nta.form.cooling.none')}</option>
+          <option value="compression">{t('nta.form.cooling.compression')}</option>
+          <option value="gas_absorption">{t('nta.form.cooling.absorption')}</option>
+          <option value="free_cooling">{t('nta.form.cooling.free')}</option>
+        </select>
+      </label>
+      {read(draft, ['cooling']) != null && <>
+        <NumberField {...field} path={['cooling', 'emissionEfficiency']} label={t('nta.form.coolingEmission')} />
+        <NumberField {...field} path={['cooling', 'distributionEfficiency']} label={t('nta.form.coolingDistribution')} />
+        <NumberField {...field} path={['cooling', 'controlFactor']} label={t('nta.form.coolingControl')} />
+        <TextField {...field} path={['cooling', 'efficiencySourceReference']} label={t('nta.form.source')} />
+        <TextField {...field} path={['cooling', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+        {read(draft, ['cooling', 'generator', 'kind']) === 'free_cooling' && <>
+          <SelectField {...field} path={['cooling', 'generator', 'source']} label={t('nta.form.freeCoolingSource')} options={[
+            ['aquifer_dwellings_from2013', t('nta.form.free.aquiferNew')], ['aquifer_dwellings_before2013', t('nta.form.free.aquiferOld')],
+            ['aquifer_utility_before2013', t('nta.form.free.aquiferUtility')], ['surface_water', t('nta.form.free.surface')],
+            ['closed_ground_loop', t('nta.form.free.ground')], ['dew_point_cooling', t('nta.form.free.dewPoint')]]} />
+          <NumberField {...field} path={['cooling', 'generator', 'freeCoolingFraction']} label={t('nta.form.freeCoolingFraction')} />
+          <TextField {...field} path={['cooling', 'generator', 'fractionSourceReference']} label={t('nta.form.source')} />
+        </>}
+      </>}
+    </Section>
     {pv.length > 0 && <Section title={t('nta.form.pv')}>
       {pv.map((item, index) => <div key={String(item.id)} className="nta-form-row">
         <NumberField {...field} path={['pvSystems', index, 'peakPowerKw']} label={`${String(item.id)} — ${t('nta.form.pvPeak')}`} />

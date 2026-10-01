@@ -38,6 +38,16 @@ Module `domestic_hot_water` rekent de netto behoefte uit:
 
 Een optionele maandelijkse douche-WTW-bijdrage (13.51) wordt afgetrokken. De module deelt door de opgegeven `η_W;em` en `η_W;dis` en daarna door `η_W;gen` of de seizoens-COP. De tabellen voor afgifte, distributie en opwekking zijn niet getranscribeerd, dus die rendementen zijn bronverplichte invoer. Omgevingswarmte van een tapwaterwarmtepomp telt bij `renewableHeatPump=true` als hernieuwbaar (5.35/5.36). Dat mag alleen met elektriciteit en COP ≥ 1. `hotWater` en een gedeclareerde tapwaterpost tegelijk geeft `hot_water_double_count`. Bron van de getallen: de referenties van Open Heatloss Studio `nta8800-dhw`; review tegen de normtekst is nog nodig.
 
+## Koeling (§10.5, gedeeltelijk)
+
+Module `space_cooling` neemt de som van de koudebehoefte van alle zones. `Q_C;gen;pref = Q_C;nd/(η_C;em·η_C;dis·f_reg)`, met opgegeven rendementen en bron. Opwekking volgens de forfaitaire methode:
+
+- compressie: `E_el = Q/EER` met EER 3,00 (10.76, tabel 10.29);
+- gasabsorptie: `E_gas = Q/ζ` met ζ 0,80 (10.77, tabel 10.30);
+- vrije koeling: `W_el = Q/EER_fc` (10.86, tabel 10.34: WKO 23/16/14, oppervlaktewater en gesloten bodem 10, dauwpunt 8), met een compressiebackup voor het restant.
+
+Het aandeel vrije koeling wordt opgegeven met bron, omdat tabellen 10.15/10.16 niet zijn getranscribeerd. Vrije koeling met EER ≥ 8 levert omgevingskoude (5.34, `f_Pren;rencold` = 1,0). Koelenergie wordt met `f_BACS` vermenigvuldigd (5.20). `cooling` en een opgegeven koelpost tegelijk geeft `cooling_double_count`. Bron: F3b-analyse van Open Heatloss Studio. Let op: volgens Omgevingsregeling art. 5.50 lid 2 geldt voor de koelbehoefte en minimaal benodigde koelcapaciteit in woningen de "Rekentool Koelbehoefte" in plaats van bijlage AA; die rekentool is niet verwerkt.
+
 ## Warmtepomp als hernieuwbare bron
 
 `Q_H;hp;in = Q_H;gen;out·(1 − 1/COP)` (5.31) telt alleen mee bij COP ≥ 1, een brontemperatuur onder 20 °C en geen afvoerlucht als bron. De aanroeper levert `heatPumpRenewable` met bron. Die opgave moet kloppen met de forfaitaire bronklasse:

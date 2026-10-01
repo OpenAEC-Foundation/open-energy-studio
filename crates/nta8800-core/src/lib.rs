@@ -43,6 +43,7 @@ pub mod monthly_direct_transmission;
 pub mod project_performance;
 pub mod pv;
 pub mod reference;
+pub mod space_cooling;
 pub mod space_heating_chain;
 pub mod tojuli;
 pub mod unheated_transmission;
@@ -283,6 +284,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_space_heating_chain_emission_distribution_single_generator",
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
             "unverified_pv_yield_chapter_16",
+            "unverified_space_cooling_generation_10_5_with_declared_emission",
             "indicative_label_class_omgevingsregeling_annex_ix_x",
             "bbl_4_149_beng_requirement_check_single_function",
             "unverified_tojuli_per_orientation_5_7",

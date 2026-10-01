@@ -22,6 +22,7 @@ use crate::indicators_draft::{
 };
 use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
+use crate::space_cooling::{cooling_month, validate_cooling, CoolingSystem};
 use crate::space_heating_chain::{
     assess_space_heating_chain, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
@@ -43,6 +44,8 @@ pub const F_P_BIOMASS_B: f64 = 0.5;
 pub const F_PREN_BIOMASS_B: f64 = 0.5;
 /// Table 5.4.
 pub const F_PREN_RENELECT: f64 = 1.45;
+/// Table 5.4: ambient cold.
+pub const F_PREN_RENCOLD: f64 = 1.0;
 pub const F_PREN_RENHEAT: f64 = 1.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -182,6 +185,9 @@ pub struct BuildingPerformanceInput {
     pub loss_area_m2: Option<f64>,
     #[serde(default)]
     pub loss_area_source_reference: Option<String>,
+    /// Space cooling generation calculated here (§10.5, partial).
+    #[serde(default)]
+    pub cooling: Option<CoolingSystem>,
     /// Domestic hot water calculated here (chapter 13, partial).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
@@ -392,6 +398,21 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 "source_reference_required",
                 format!("{path}.sourceReference"),
             ));
+        }
+    }
+    if let Some(system) = &input.cooling {
+        issues.extend(
+            validate_cooling(system, "cooling")
+                .into_iter()
+                .map(|item| issue(item.code, item.path)),
+        );
+        if input.declared_uses.iter().any(|item| {
+            matches!(
+                item.service,
+                Service::SpaceCooling | Service::SpaceCoolingAuxiliary
+            )
+        }) {
+            issues.push(issue("cooling_double_count", "cooling"));
         }
     }
     if let Some(system) = &input.hot_water {
@@ -704,6 +725,18 @@ fn compute(
                 Carrier::Oil => used_oil += value,
             }
         }
+        // §10.5: cooling generation for the summed cooling need, weighted by f_BACS (5.20).
+        let mut ambient_cold = 0.0;
+        if let Some(system) = &input.cooling {
+            let need: f64 = std::iter::once(&heating.demand)
+                .chain(&heating.additional_zone_demands)
+                .map(|demand| demand.monthly[index].cooling.need_kwh)
+                .sum();
+            let cooling = cooling_month(system, need);
+            used_el += bacs * cooling.electricity_kwh;
+            used_gas += bacs * cooling.natural_gas_kwh;
+            ambient_cold = cooling.ambient_cold_kwh;
+        }
         let mut hot_water_ambient = 0.0;
         if let Some((carrier, months)) = &hot_water {
             let row = &months[index];
@@ -790,6 +823,7 @@ fn compute(
         };
         renewable += (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT
             + biomass_heat * F_PREN_BIOMASS_B
+            + ambient_cold * F_PREN_RENCOLD
             + produced * F_PREN_RENELECT;
     }
     let need = std::iter::once(&heating.demand)
@@ -1175,5 +1209,54 @@ mod tests {
             - base.annual_renewable_primary_kwh.unwrap();
         assert!((renewable_delta - heat * 0.5).abs() < 1e-6);
         assert!(result.carriers.iter().any(|item| item.carrier == "bm"));
+    }
+
+    #[test]
+    fn cooling_chain_adds_electricity_and_ambient_cold() {
+        use crate::space_cooling::{CoolingGenerator, FreeCoolingSource};
+        let mut sample = input();
+        let base = assess_building_performance(&sample);
+        sample.cooling = Some(CoolingSystem {
+            emission_efficiency: 1.0,
+            distribution_efficiency: 1.0,
+            control_factor: 1.0,
+            efficiency_source_reference: "design".into(),
+            generator: CoolingGenerator::FreeCooling {
+                source: FreeCoolingSource::ClosedGroundLoop,
+                free_cooling_fraction: 1.0,
+                fraction_source_reference: "design".into(),
+            },
+            equipment_reference: "plate".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let cold = result.space_heating.demand.annual_cooling_need_kwh.unwrap();
+        assert!(cold > 0.0);
+        let renewable_delta = result.annual_renewable_primary_kwh.unwrap()
+            - base.annual_renewable_primary_kwh.unwrap();
+        assert!((renewable_delta - cold).abs() < 1e-6);
+        let el = |r: &BuildingPerformanceAssessment| -> f64 {
+            r.carriers
+                .iter()
+                .filter(|item| item.carrier == "el")
+                .map(|item| item.used_kwh)
+                .sum()
+        };
+        assert!((el(&result) - el(&base) - cold / 10.0).abs() < 1e-6);
+        sample.declared_uses.push(DeclaredUse {
+            id: "cool".into(),
+            service: Service::SpaceCooling,
+            carrier: Carrier::El,
+            monthly_kwh: vec![1.0; 12],
+            source_reference: "x".into(),
+        });
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "cooling_double_count"));
     }
 }

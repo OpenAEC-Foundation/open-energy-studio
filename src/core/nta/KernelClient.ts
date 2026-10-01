@@ -1420,6 +1420,24 @@ export interface NtaTojuliAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
+export interface NtaCoolingSystem {
+  emissionEfficiency: number;
+  distributionEfficiency: number;
+  controlFactor: number;
+  efficiencySourceReference: string;
+  generator:
+    | { kind: 'compression' }
+    | { kind: 'gas_absorption' }
+    | {
+        kind: 'free_cooling';
+        source: 'aquifer_dwellings_from2013' | 'aquifer_utility_before2013' | 'aquifer_dwellings_before2013'
+          | 'surface_water' | 'closed_ground_loop' | 'dew_point_cooling';
+        freeCoolingFraction: number;
+        fractionSourceReference: string;
+      };
+  equipmentReference: string;
+}
+
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
@@ -1523,6 +1541,7 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
   activeCoolingPresent?: boolean;
