@@ -1242,4 +1242,5 @@ export const en: Record<string, string> = {
   'nta.form.shading.manual': 'Manual, dwelling (table 7.7)',
   'nta.form.shading.automatic': 'Automatic (table 7.9)',
   'nta.form.shadingFc': 'Reduction factor F_c (table 7.5/7.6)',
+  'nta.form.ventilationFlow': 'Or: ventilation flow incl. infiltration m³/h (H_ve = q·ρ·c/3600)',
 };

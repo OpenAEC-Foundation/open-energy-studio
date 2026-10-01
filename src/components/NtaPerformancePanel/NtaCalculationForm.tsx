@@ -3,6 +3,9 @@ import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
 
 // The block is edited as plain JSON data; the Rust kernel is the validator.
+
+/** ρ_a·c_a/3600 with 1,205 kg/m³ and 1 005 J/(kg·K) (9.29), in W per (m³/h)·K. */
+const AIR_HEAT_CAPACITY_W_PER_M3H_K = (1.205 * 1005) / 3600;
 type Draft = Record<string, unknown>;
 type Path = Array<string | number>;
 
@@ -168,6 +171,12 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <label>{t('nta.form.ventilationConstant')}
         <input type="number" step="any" value={typeof constantConductance === 'number' ? constantConductance : ''}
           onChange={(event) => setConstantVentilation(event.target.value === '' ? null : Number(event.target.value))} />
+      </label>
+      <label>{t('nta.form.ventilationFlow')}
+        <input type="number" step="any" value={typeof constantConductance === 'number'
+          ? Math.round((constantConductance / AIR_HEAT_CAPACITY_W_PER_M3H_K) * 100) / 100 : ''}
+          onChange={(event) => setConstantVentilation(event.target.value === ''
+            ? null : Number(event.target.value) * AIR_HEAT_CAPACITY_W_PER_M3H_K)} />
       </label>
       <TextField {...field} path={['ventilationFlows', 0, 'sourceReference']} label={t('nta.form.source')} />
       <p className="nta-form-note">{t('nta.form.ventilationNote')}</p>

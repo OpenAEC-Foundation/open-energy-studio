@@ -140,6 +140,9 @@ describe('NTA performance panel', () => {
     await user.type(form.getByLabelText('Source of usable floor area'), 'floor plan A-01');
     await user.type(form.getAllByLabelText('Source')[0], 'table 7.13');
     await user.selectOptions(form.getByLabelText('Floors'), 'very_heavy');
+    await user.type(form.getByLabelText('Or: ventilation flow incl. infiltration m³/h (H_ve = q·ρ·c/3600)'), '100');
+    expect(form.getByLabelText('Ventilation conductance H_ve W/K (all months)')).toHaveValue(100 * 1.205 * 1005 / 3600);
+    await user.clear(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'));
     await user.type(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'), '42');
     await user.selectOptions(form.getByLabelText('Emission system'), 'floor_heating');
     await user.selectOptions(form.getByLabelText('Generator type'), 'external_heat');
