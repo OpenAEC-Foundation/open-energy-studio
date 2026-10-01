@@ -136,4 +136,18 @@ describe('NTA input and evidence dossier', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:oes-dossier');
     expect(screen.queryByText('BENG 1')).not.toBeInTheDocument();
   });
+  it('lists every NTA input source and flags missing ones', () => {
+    const project = createDefaultProject();
+    project.ntaCalculation = {
+      calculationScope: 'residential', areaSourceReference: 'plan A-01',
+      setpoints: { heatingC: 20, coolingC: 24, sourceReference: '' },
+    } as unknown as NonNullable<typeof project.ntaCalculation>;
+    const html = generateNtaInputDossierHTML(project);
+    expect(html).toContain('NTA-rekeninvoer en bronnen');
+    expect(html).toContain('ntaCalculation.areaSourceReference');
+    expect(html).toContain('plan A-01');
+    expect(html).toContain('ntaCalculation.setpoints.sourceReference');
+    expect(html).toContain('BRON ONTBREEKT');
+    expect(html).toContain('heatingC: 20');
+  });
 });

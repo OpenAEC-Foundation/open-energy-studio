@@ -127,6 +127,27 @@ function pumpHtml({ context, pump }: PumpEntry): string {
   </section>`;
 }
 
+type SourceRow = { path: string; source: string; values: string };
+
+/** Every object in the NTA block that carries a source reference, with its own scalar values. */
+function ntaSourceRows(value: unknown, path = 'ntaCalculation'): SourceRow[] {
+  if (Array.isArray(value)) return value.flatMap((item, index) => ntaSourceRows(item, `${path}[${index}]`));
+  if (!value || typeof value !== 'object') return [];
+  const entries = Object.entries(value as Record<string, unknown>);
+  const own = entries.filter(([key]) => /Reference$/.test(key));
+  const scalars = entries
+    .filter(([key, item]) => !/Reference$/.test(key) && (item === null || typeof item !== 'object'))
+    .map(([key, item]) => `${key}: ${item === null ? '—' : String(item)}`);
+  const rows = own.map(([key, source]) => ({
+    path: `${path}.${key}`,
+    source: typeof source === 'string' ? source : '',
+    values: scalars.join('; '),
+  }));
+  return [...rows, ...entries
+    .filter(([, item]) => item && typeof item === 'object')
+    .flatMap(([key, item]) => ntaSourceRows(item, `${path}.${key}`))];
+}
+
 /** Standalone input/provenance dossier; deliberately has no energy result. */
 export function generateNtaInputDossierHTML(project: IProject): string {
   const pumps = allHeatPumps(project);
@@ -145,6 +166,10 @@ export function generateNtaInputDossierHTML(project: IProject): string {
       <tr><th>Adres</th>${cell(project.address || 'Niet vastgelegd')}<th>Plaats</th>${cell(project.city || 'Niet vastgelegd')}</tr>
       <tr><th>Rekenzones</th>${cell(project.zones.length)}<th>Warmtepompregistraties</th>${cell(pumps.length)}</tr>
     </tbody></table>
+    <h2>NTA-rekeninvoer en bronnen</h2>
+    ${project.ntaCalculation ? `<table><thead><tr><th>Pad</th><th>Bron</th><th>Waarden</th></tr></thead><tbody>
+      ${ntaSourceRows(project.ntaCalculation).map((row) => `<tr>${cell(row.path)}${cell(row.source.trim() || 'BRON ONTBREEKT')}${cell(row.values)}</tr>`).join('')}
+    </tbody></table>` : '<p>Geen NTA-rekeninvoer vastgelegd.</p>'}
     <h2>Warmtepompen en bewijs</h2>
     ${pumps.length ? pumps.map(pumpHtml).join('') : '<p>Geen geclassificeerde warmtepompen vastgelegd.</p>'}
     <p>De geldigheid van verklaringen, productmatch, bronrechten en toepasselijkheid van normroutes moeten afzonderlijk worden gecontroleerd.</p>
