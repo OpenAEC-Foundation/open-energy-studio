@@ -11,16 +11,18 @@ Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BEN
 | Maandbehoefte H7 | `monthly_demand` | transcriptie Heatloss (C2–C5) |
 | Meerdere rekenzones, gedeelde opwekker | `space_heating_chain`, `project_performance` | 9.2, 5.6/5.8 |
 | Afgifte 9.3 | `heating_emission` | consultatie H9 |
-| Opwekkers: gasketel, forfaitaire warmtepomp (met optioneel gemeten hulpenergie), hybride, externe warmtelevering | `space_heating_chain` | consultatie H9 |
+| Opwekkers: gasketel, forfaitaire warmtepomp (met optioneel gemeten hulpenergie), hybride, externe warmtelevering, elektrisch, biomassa | `space_heating_chain` | consultatie H9 |
+| Koudeopwekking §10.5 | `space_cooling` | transcriptie Heatloss (F3b) |
+| Belemmering en zonwering (§17.3, 7.42) | `solar_shading` | transcriptie Heatloss (F3d) |
 | Tapwaterbehoefte H13 (rendementen opgegeven) | `domestic_hot_water` | referenties Heatloss |
 | PV H16 | `pv` | transcriptie Heatloss (F3d-4) |
 | Primaire/hernieuwbare energie, indicatoren H5 | `building_performance` | consultatie H5 |
 | TO-juli §5.7 per oriëntatie | `tojuli` | transcriptie Heatloss (F3c) |
-| Labelklasse | `label_class` | Omgevingsregeling bijlagen IX/X (wettekst) |
+| Labelklasse en A0 | `label_class`, `bbl_requirements` | Omgevingsregeling bijlagen IX/X/IXa/Xa (wettekst) |
 | BENG-eisen | `bbl_requirements` | Bbl tabel 4.148A (wettekst) |
 | Projectadapter, UI-paneel, formulier, rekenrapport | `project_performance`, `NtaPerformancePanel`, `NtaCalculationReport` | — |
 
-Teststand bij commit 2ab8aa4: 203 kerntests (ook met Rust 1.77.2), 45 servicetests, 218 UI-tests; clippy schoon. De projectroute is via de Vite-proxy tegen de draaiende API en in de echte browser gecontroleerd. Een debug-desktoppakket is gebouwd.
+Teststand bij commit 65de7ff: 218 kerntests (ook met Rust 1.77.2), 45 servicetests, 219 UI-tests; clippy en rustfmt schoon (`scripts/verify-nta.sh`). De projectroute is via de Vite-proxy tegen de draaiende API en in de echte browser gecontroleerd. Een debug-desktoppakket (`src-tauri/target/debug/bundle/deb/`) is na de reviewfixes opnieuw gebouwd.
 
 **Onafhankelijke review (1 oktober 2026).** Een tweede, onafhankelijke controle van de keten vond vijf fouten, die alle vijf zijn hersteld:
 
