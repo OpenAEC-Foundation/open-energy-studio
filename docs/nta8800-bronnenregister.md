@@ -36,3 +36,27 @@ Voor warmtepompen ontbreken hierdoor nog de normatieve prestatie- en hulpenergie
 - Wijzigingsregeling van 24 april 2026 (EPBD IV, eerste tranche), met onder meer bijlagen IXa/Xa (A0) en art. 5.13a: https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html. Nog niet verwerkt.
 - Besluit bouwwerken leefomgeving, art. 4.149–4.149b en tabel 4.148A, geconsolideerde tekst geldig vanaf 1 januari 2026: https://wetten.overheid.nl/BWBR0041297/2026-01-01. De grenswaarden zijn overgenomen in `crates/nta8800-core/src/bbl_requirements.rs`.
 - Omgevingsregeling art. 5.31a/5.31b (BRL 9500-detailopname en BRL 9501-attest voor BENG-bepaling bij nieuwbouw) en art. 5.50 (restwarmte; Rekentool Koelbehoefte in plaats van bijlage AA).
+
+## Transcriptiebronnen van de rekenkern (1 oktober 2026)
+
+De gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` staat op netwerkshare `Z:\50_projecten\7_3BM_bouwkunde\000_Documentatie\98_normen\`, die op de ontwikkelmachine niet gemount is. De onderstaande modules zijn gebouwd op normanalyses die die pdf transcriberen, met paginaverwijzingen. Bij de normreview moet elke regel opnieuw tegen de pdf worden gelegd.
+
+| Module | Normonderdeel | Transcriptiebron (Open Heatloss Studio, MIT) |
+|---|---|---|
+| `climate` | tabellen 17.1/17.2, selectieregels p. 693 | `crates/nta8800-tables/src/climate/de_bilt.rs`, `crates/nta8800-pv/src/tables/irradiation.rs`, analyse F3d-4 |
+| `monthly_demand` | 7.2.1, 7.6/7.7, 7.21–7.24, 7.31–7.40, 7.45–7.57, tabel 7.10/7.13 | `docs/2026-07-13-c2…`, `c3…`, `c4…`, `c5…` |
+| `ground` | 8.30–8.41 | `docs/2026-07-13-c1-norm-analyse-transmissie.md` |
+| `solar_shading` | §17.3 tabel 17.4/17.5, 7.42/7.43, tabel 7.5–7.9 | `docs/2026-07-11-f3d-norm-analyse-beschaduwing.md`, `crates/nta8800-demand/src/calc/shading.rs` |
+| `tojuli` | §5.7.2, formule 5.40 | `docs/2026-07-11-f3c-norm-analyse-tojuli.md` |
+| `space_cooling` | 10.76/10.77/10.86, tabellen 10.29/10.30/10.34, 5.34 | `docs/2026-07-11-f3b-norm-analyse-koeling.md` |
+| `domestic_hot_water` | 13.15–13.18, §13.2.3.1 | `crates/nta8800-dhw/src/references.rs`, `model/demand.rs` |
+| `pv` | 16.2/16.3 | `docs/2026-07-12-f3d4-norm-analyse-pv.md` |
+| `building_performance` | factoren tabel 5.2/5.4 (bevestigd in F3a) | `docs/2026-07-11-f3a-norm-analyse-ep.md` |
+
+De hoofdstukken 5 en 9 (formules 5.9–5.39, 9.9–9.16, 9.64, 9.84, tabellen 9.2–9.4, 9.27, 9.30) volgen het openbare consultatieconcept 2026: <https://www.internetconsultatie.nl/epg2026/document/14147> (H5) en <https://www.internetconsultatie.nl/epg2026/document/14150> (H9). Formule 9.16 is visueel van pagina 15 gelezen.
+
+De wettelijke tabellen zijn letterlijk overgenomen uit de geconsolideerde wetteksten:
+
+- labelklassen uit de Omgevingsregeling, bijlagen IX/X;
+- A0 uit bijlagen IXa/Xa (Stcrt. 2026, 18123);
+- BENG-eisen uit Bbl tabel 4.148A.
