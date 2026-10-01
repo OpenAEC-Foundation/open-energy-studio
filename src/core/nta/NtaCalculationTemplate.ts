@@ -30,7 +30,7 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
     surfaceTilts: surfaces
       .filter((surface) => surface.type === 'roof' && surface.orientation !== 'horizontal')
       .map((surface) => ({ surfaceId: surface.id, tiltDeg: null, sourceReference: '' })),
-    windowSolar: { frameFraction: null, obstructionFactor: null, sourceReference: '' },
+    windowSolar: { frameFraction: null, obstruction: { method: 'minimal' }, sourceReference: '' },
     groundFloors: surfaces
       .filter((surface) => surface.thermalBoundary === 'ground')
       .map((surface) => ({

@@ -304,6 +304,14 @@ export type NtaOrientation =
   | 'north' | 'north_east' | 'east' | 'south_east'
   | 'south' | 'south_west' | 'west' | 'north_west';
 export type NtaMassClass = 'light' | 'heavy' | 'very_heavy';
+export type NtaObstruction =
+  | { method: 'minimal' }
+  | { method: 'declared'; heating: number[]; cooling: number[]; sourceReference: string };
+export interface NtaMovableShading {
+  reductionFactor: number;
+  control: 'manual_residential' | 'automatic';
+  sourceReference: string;
+}
 
 export interface NtaDirectTransmissionInput {
   elements: Array<{ id: string; areaM2: number; uValueWPerM2k: number; sourceReference: string }>;
@@ -374,7 +382,8 @@ export interface MonthlyDemandInput {
     gPerpendicular: number;
     frameFraction: number;
     uValueWPerM2k: number;
-    obstructionFactor: number;
+    obstruction: NtaObstruction;
+    movableShading?: NtaMovableShading | null;
     sourceReference: string;
   }>;
   opaqueInventoryComplete: boolean;
@@ -424,6 +433,7 @@ export interface MonthlyDemandAssessment {
     a: number;
     internalGainsKwh: number;
     windowSolarGainsKwh: number;
+    windowSolarCoolingKwh: number;
     opaqueSolarGainsKwh: number;
     heating: MonthlyDemandBalanceTerms;
     cooling: MonthlyDemandBalanceTerms;
@@ -1511,7 +1521,12 @@ export interface NtaCalculationInput {
   thermalMass: MonthlyDemandInput['thermalMass'];
   internalGains: MonthlyDemandInput['internalGains'];
   surfaceTilts: Array<{ surfaceId: string; tiltDeg: number; sourceReference: string }>;
-  windowSolar: { frameFraction: number; obstructionFactor: number; sourceReference: string };
+  windowSolar: {
+    frameFraction: number;
+    obstruction: NtaObstruction;
+    movableShading?: NtaMovableShading | null;
+    sourceReference: string;
+  };
   groundFloors: Array<{
     surfaceId: string;
     exposedPerimeterM: number;

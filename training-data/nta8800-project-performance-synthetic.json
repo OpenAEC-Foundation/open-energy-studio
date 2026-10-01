@@ -191,8 +191,10 @@
     ],
     "windowSolar": {
       "frameFraction": 0.25,
-      "obstructionFactor": 1.0,
-      "sourceReference": "synthetic: no obstruction"
+      "sourceReference": "synthetic: minimal obstruction (§17.3.2a), no movable shading",
+      "obstruction": {
+        "method": "minimal"
+      }
     },
     "groundFloors": [
       {

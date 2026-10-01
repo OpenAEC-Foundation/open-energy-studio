@@ -92,8 +92,39 @@
         "gPerpendicular": 0.6,
         "frameFraction": 0.25,
         "uValueWPerM2k": 1.2,
-        "obstructionFactor": 1.0,
-        "sourceReference": "synthetic window"
+        "sourceReference": "synthetic window",
+        "obstruction": {
+          "method": "declared",
+          "heating": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "cooling": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "sourceReference": "synthetic: no obstruction"
+        }
       }
     ],
     "opaqueInventoryComplete": true,

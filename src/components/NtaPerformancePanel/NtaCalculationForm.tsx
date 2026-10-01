@@ -125,7 +125,30 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     </Section>
     <Section title={t('nta.form.windows')}>
       <NumberField {...field} path={['windowSolar', 'frameFraction']} label={t('nta.form.frameFraction')} />
-      <NumberField {...field} path={['windowSolar', 'obstructionFactor']} label={t('nta.form.obstruction')} />
+      <label>{t('nta.form.obstruction')}
+        <select value={String(read(draft, ['windowSolar', 'obstruction', 'method']) ?? '')} onChange={(event) => change(
+          ['windowSolar', 'obstruction'], event.target.value === 'declared'
+            ? { method: 'declared', heating: Array(12).fill(null), cooling: Array(12).fill(null), sourceReference: '' }
+            : { method: 'minimal' })}>
+          <option value="minimal">{t('nta.form.obstruction.minimal')}</option>
+          <option value="declared">{t('nta.form.obstruction.declared')}</option>
+        </select>
+      </label>
+      <label>{t('nta.form.shading')}
+        <select value={String(read(draft, ['windowSolar', 'movableShading', 'control']) ?? '')} onChange={(event) => change(
+          ['windowSolar', 'movableShading'], event.target.value
+            ? { reductionFactor: read(draft, ['windowSolar', 'movableShading', 'reductionFactor']) ?? null,
+              control: event.target.value, sourceReference: read(draft, ['windowSolar', 'movableShading', 'sourceReference']) ?? '' }
+            : null)}>
+          <option value="">{t('nta.form.shading.none')}</option>
+          <option value="manual_residential">{t('nta.form.shading.manual')}</option>
+          <option value="automatic">{t('nta.form.shading.automatic')}</option>
+        </select>
+      </label>
+      {read(draft, ['windowSolar', 'movableShading']) != null && <>
+        <NumberField {...field} path={['windowSolar', 'movableShading', 'reductionFactor']} label={t('nta.form.shadingFc')} />
+        <TextField {...field} path={['windowSolar', 'movableShading', 'sourceReference']} label={t('nta.form.source')} />
+      </>}
       <TextField {...field} path={['windowSolar', 'sourceReference']} label={t('nta.form.source')} />
     </Section>
     {tilts.length > 0 && <Section title={t('nta.form.roofTilts')}>

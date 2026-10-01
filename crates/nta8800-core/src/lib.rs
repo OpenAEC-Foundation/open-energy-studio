@@ -43,6 +43,7 @@ pub mod monthly_direct_transmission;
 pub mod project_performance;
 pub mod pv;
 pub mod reference;
+pub mod solar_shading;
 pub mod space_cooling;
 pub mod space_heating_chain;
 pub mod tojuli;

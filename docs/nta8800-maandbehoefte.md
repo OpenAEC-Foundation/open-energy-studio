@@ -15,7 +15,9 @@ De formules en constanten komen uit de normanalyses C1–C5 van Open Heatloss St
 | Tijdconstante | 7.57 | `τ = (C_m/3600)/(H_tr + H_g;adj + H_ve)` |
 | Warmtecapaciteit | tabel 7.10, 7.45 | `D_m` 55/80 … 250/450 kJ/(m²K); `C_m = D_m·1000·A_g` |
 | Interne winst woning | 7.21–7.24 | `180·N_woon·N_P·0,001·t`; `N_P` per banden ≤30, 30–100, >100 m² |
-| Zonwinst ramen | 7.32, 7.40 | `0,90·g_n·A·(1−F_F)·F_sh;obst·I_sol·t·0,001 − Q_sky` |
+| Zonwinst ramen | 7.32, 7.40, 7.42/7.43 | `0,90·g_n·A·(1−F_F)·F_sh;obst·r_sh·I_sol·t·0,001 − Q_sky`, apart voor warmte- en koudebalans |
+| Belemmering | §17.3, tabel 17.4/17.5 | `minimal`: warmte tabel 17.4 (bv. zuid jan 0,23), koude 1,00; of `declared` maandfactoren per balans |
+| Beweegbare zonwering | 7.42/7.43, tabel 7.7/7.9 | `r_sh = (1−f_sh;with)+f_sh;with·F_c`, alleen op de koudebalans (woningen: `f_sh;with = 0` voor warmte) |
 | Zonwinst opaak | 7.33, 7.6.6.3 | `0,6·R_se·U·A·I_sol·t·0,001 − Q_sky`, `F_sh;obst = 1` |
 | Hemelstraling | 7.39, 7.6.6.4 | `F_sky·R_se·U·A·4,14·11·t·0,001`; `F_sky` 1 (≤5°) / 0,75 (≤75°) / 0,5 (≤90°) / 0 (overhellend) |
 | Klimaat | tabel 17.1/17.2 | De Bilt; hellingen 0–180° met lineaire interpolatie tussen 0/30/45/60/90/135/180°, dichtstbijzijnde oriëntatiekolom (bij gelijke afstand de hoogste waarde) |
@@ -34,7 +36,7 @@ Verder levert de aanroeper expliciet: `A_g` met bron, setpoints, ventilatiestrom
 
 - niet-continu verwarmen `a_H;red` (§7.9.2);
 - temperatuurnivellering woningbouw (§7.9.4.2, formule 7.78);
-- beweegbare zonwering en een afzonderlijke `g_gl;C`;
+- belemmeringssituaties b–g van §17.3 worden opgegeven, niet afgeleid; hellingen zijn ingedeeld als 0/45/90° in plaats van geïnterpoleerd;
 - detailberekening van de warmtecapaciteit volgens bijlage B;
 - voetnoot c van tabel 7.10: de kolomkeuze ligt bij de aanroeper.
 

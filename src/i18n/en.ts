@@ -1235,4 +1235,11 @@ export const en: Record<string, string> = {
   'nta.form.free.ground': 'Closed ground loop (EER 10)',
   'nta.form.free.dewPoint': 'Dew point cooling (EER 8)',
   'nta.form.freeCoolingFraction': 'Free cooling share (rest: compression)',
+  'nta.form.obstruction.minimal': 'Minimal obstruction (§17.3.2a, tables 17.4/17.5)',
+  'nta.form.obstruction.declared': 'Other situation: monthly factors (advanced)',
+  'nta.form.shading': 'Movable solar shading (7.42)',
+  'nta.form.shading.none': 'None',
+  'nta.form.shading.manual': 'Manual, dwelling (table 7.7)',
+  'nta.form.shading.automatic': 'Automatic (table 7.9)',
+  'nta.form.shadingFc': 'Reduction factor F_c (table 7.5/7.6)',
 };

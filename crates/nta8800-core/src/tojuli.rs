@@ -17,6 +17,7 @@ use crate::monthly_demand::{
     window_solar_kwh, InternalGains, MonthlyDemandInput, Transmission, A_0,
     INTERNAL_HEAT_PER_OCCUPANT_W, TAU_0_H,
 };
+use crate::solar_shading::Balance;
 use serde::Serialize;
 
 pub const JULY: u8 = 7;
@@ -156,7 +157,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
             window.tilt_deg,
             window.area_m2,
             window.area_m2 * window.u_value_w_per_m2k,
-            window_solar_kwh(window, JULY),
+            window_solar_kwh(window, JULY, Balance::Cooling),
         );
     }
     for element in &input.opaque_elements {

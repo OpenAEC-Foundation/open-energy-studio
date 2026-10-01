@@ -20,6 +20,7 @@ use crate::monthly_demand::{
     ThermalMass, Transmission, VentilationFlow, Window,
 };
 use crate::pv::PvSystem;
+use crate::solar_shading::{MovableShading, Obstruction};
 use crate::space_cooling::CoolingSystem;
 use crate::space_heating_chain::{ChainZone, Distribution, Generator, SpaceHeatingChainInput};
 use crate::{
@@ -110,7 +111,9 @@ pub struct SurfaceTilt {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WindowSolarDefaults {
     pub frame_fraction: f64,
-    pub obstruction_factor: f64,
+    pub obstruction: Obstruction,
+    #[serde(default)]
+    pub movable_shading: Option<MovableShading>,
     pub source_reference: String,
 }
 
@@ -408,7 +411,8 @@ fn derive_input(
                     g_perpendicular: g_value,
                     frame_fraction: nta.window_solar.frame_fraction,
                     u_value_w_per_m2k: u_value,
-                    obstruction_factor: nta.window_solar.obstruction_factor,
+                    obstruction: nta.window_solar.obstruction.clone(),
+                    movable_shading: nta.window_solar.movable_shading.clone(),
                     source_reference: format!(
                         "project:window:{window_id}; {}",
                         nta.window_solar.source_reference

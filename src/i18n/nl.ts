@@ -1235,4 +1235,11 @@ export const nl: Record<string, string> = {
   'nta.form.free.ground': 'Gesloten bodemsysteem (EER 10)',
   'nta.form.free.dewPoint': 'Dauwpuntskoeling (EER 8)',
   'nta.form.freeCoolingFraction': 'Aandeel vrije koeling (rest: compressie)',
+  'nta.form.obstruction.minimal': 'Minimale belemmering (§17.3.2a, tabel 17.4/17.5)',
+  'nta.form.obstruction.declared': 'Andere situatie: maandfactoren (geavanceerd)',
+  'nta.form.shading': 'Beweegbare zonwering (7.42)',
+  'nta.form.shading.none': 'Geen',
+  'nta.form.shading.manual': 'Handbediend, woning (tabel 7.7)',
+  'nta.form.shading.automatic': 'Automatisch (tabel 7.9)',
+  'nta.form.shadingFc': 'Reductiefactor F_c (tabel 7.5/7.6)',
 };

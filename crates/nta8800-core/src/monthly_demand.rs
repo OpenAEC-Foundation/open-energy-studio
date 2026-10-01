@@ -17,6 +17,9 @@
 use crate::climate::{self, Orientation, CLIMATE_SOURCE, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
 use crate::ground::{slab_on_ground_conductance, SlabOnGround};
+use crate::solar_shading::{
+    movable_shading_factor, obstruction_factor, Balance, MovableShading, Obstruction,
+};
 use crate::unheated_transmission::{assess_unheated_transmission, UnheatedTransmissionInput};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
@@ -41,7 +44,7 @@ pub const INTERNAL_HEAT_PER_OCCUPANT_W: f64 = 180.0;
 pub const OMITTED_CORRECTIONS: &[&str] = &[
     "7.9.2 intermittent heating reduction a_H;red",
     "7.9.4.2 residential temperature levelling (7.78)",
-    "movable solar shading and separate g_gl;C",
+    "§17.3 obstruction situations b–g are declared, not derived; tilts bucketed to 0/45/90°",
     "annex B detailed thermal capacity",
     "table 7.10 footnote c is the caller's column choice",
 ];
@@ -194,8 +197,11 @@ pub struct Window {
     pub g_perpendicular: f64,
     pub frame_fraction: f64,
     pub u_value_w_per_m2k: f64,
-    /// `F_sh;obst` for external obstructions, constant over the year.
-    pub obstruction_factor: f64,
+    /// External obstruction `F_sh;obst` per balance (§17.3).
+    pub obstruction: Obstruction,
+    /// Movable solar shading (7.42/7.43), applied to the cooling balance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movable_shading: Option<MovableShading>,
     pub source_reference: String,
 }
 
@@ -240,7 +246,10 @@ pub struct MonthResult {
     pub time_constant_h: f64,
     pub a: f64,
     pub internal_gains_kwh: f64,
+    /// Window solar gains on the heating balance (table 17.4 obstruction).
     pub window_solar_gains_kwh: f64,
+    /// Window solar gains on the cooling balance (table 17.5, movable shading).
+    pub window_solar_cooling_kwh: f64,
     pub opaque_solar_gains_kwh: f64,
     pub heating: BalanceTerms,
     pub cooling: BalanceTerms,
@@ -336,15 +345,31 @@ fn sky_loss_kwh(tilt_deg: f64, u: f64, area: f64, hours: f64) -> f64 {
     sky_view_factor(tilt_deg) * R_SE * u * area * H_LR_E * DELTA_THETA_SKY * hours * 0.001
 }
 
-/// 7.32 with 7.40 and 7.39: net solar gain of one window in kWh.
-pub(crate) fn window_solar_kwh(window: &Window, month: u8) -> f64 {
+/// 7.32 with 7.40, 7.42/7.43 and 7.39: net solar gain of one window in kWh.
+pub(crate) fn window_solar_kwh(window: &Window, month: u8, balance: Balance) -> f64 {
     let hours = MONTH_HOURS[usize::from(month - 1)];
     let irradiance = climate::irradiance_w_per_m2(window.orientation, window.tilt_deg, month)
         .expect("validated tilt");
+    let obstruction = obstruction_factor(
+        &window.obstruction,
+        window.orientation,
+        window.tilt_deg,
+        month,
+        balance,
+    )
+    .expect("validated obstruction");
+    let shading = movable_shading_factor(
+        window.movable_shading.as_ref(),
+        window.orientation,
+        window.tilt_deg,
+        month,
+        balance,
+    );
     F_W * window.g_perpendicular
         * window.area_m2
         * (1.0 - window.frame_fraction)
-        * window.obstruction_factor
+        * obstruction
+        * shading
         * irradiance
         * hours
         * 0.001
@@ -535,11 +560,47 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 format!("{path}.uValueWPerM2k"),
             ));
         }
-        if !(0.0..=1.0).contains(&window.obstruction_factor) {
-            issues.push(issue(
-                "window_obstruction_factor_invalid",
-                format!("{path}.obstructionFactor"),
-            ));
+        match &window.obstruction {
+            Obstruction::Minimal => {
+                if window.tilt_deg > 90.0 {
+                    issues.push(issue(
+                        "window_obstruction_tilt_unsupported",
+                        format!("{path}.obstruction"),
+                    ));
+                }
+            }
+            Obstruction::Declared {
+                heating,
+                cooling,
+                source_reference,
+            } => {
+                if [heating, cooling].iter().any(|values| {
+                    values.len() != 12 || values.iter().any(|value| !(0.0..=1.0).contains(value))
+                }) {
+                    issues.push(issue(
+                        "window_obstruction_factor_invalid",
+                        format!("{path}.obstruction"),
+                    ));
+                }
+                check_reference(
+                    source_reference,
+                    format!("{path}.obstruction.sourceReference"),
+                    issues,
+                );
+            }
+        }
+        if let Some(shading) = &window.movable_shading {
+            if !(0.0..=1.0).contains(&shading.reduction_factor) {
+                issues.push(issue(
+                    "window_shading_factor_invalid",
+                    format!("{path}.movableShading.reductionFactor"),
+                ));
+            }
+            check_reference(
+                &shading.source_reference,
+                format!("{path}.movableShading.sourceReference"),
+                issues,
+            );
         }
         check_reference(
             &window.source_reference,
@@ -836,7 +897,12 @@ fn compute(
         let window_solar: f64 = input
             .windows
             .iter()
-            .map(|window| window_solar_kwh(window, month))
+            .map(|window| window_solar_kwh(window, month, Balance::Heating))
+            .sum();
+        let window_solar_cooling: f64 = input
+            .windows
+            .iter()
+            .map(|window| window_solar_kwh(window, month, Balance::Cooling))
             .sum();
         let opaque_solar: f64 = input
             .opaque_elements
@@ -856,7 +922,9 @@ fn compute(
         // 7.57 and 7.51.
         let tau = capacity_j_per_k / 3600.0 / conductance;
         let a = A_0 + tau / TAU_0_H;
+        // 7.31 with balance-specific window gains (§17.3, 7.42).
         let gains = internal + window_solar + opaque_solar;
+        let gains_cooling = internal + window_solar_cooling + opaque_solar;
 
         let heat_transfer_heating = transmission_heating + ventilation_heating;
         let heating = if heat_transfer_heating <= 0.0 {
@@ -884,7 +952,7 @@ fn compute(
         };
 
         let heat_transfer_cooling = transmission_cooling + ventilation_cooling;
-        if heat_transfer_cooling <= 0.0 && gains > 0.0 {
+        if heat_transfer_cooling <= 0.0 && gains_cooling > 0.0 {
             // Outdoor or supply air warmer than the cooling setpoint: the
             // utilisation route for this case is not transcribed.
             issues.push(issue(
@@ -893,28 +961,28 @@ fn compute(
             ));
             return Vec::new();
         }
-        let cooling = if gains <= 0.0 || heat_transfer_cooling / gains > 2.0 {
-            // 7.6 gate: (1/γ_C) > 2 → no cooling need; no gains → none either.
+        let cooling = if gains_cooling <= 0.0 || heat_transfer_cooling / gains_cooling > 2.0 {
+            // 7.6 gate: (1/γ_C) > 2 → no cooling need; no gains_cooling → none either.
             BalanceTerms {
                 transmission_kwh: transmission_cooling,
                 ventilation_kwh: ventilation_cooling,
                 heat_transfer_kwh: heat_transfer_cooling,
-                gains_kwh: gains,
-                gamma: (gains > 0.0).then(|| gains / heat_transfer_cooling),
+                gains_kwh: gains_cooling,
+                gamma: (gains_cooling > 0.0).then(|| gains_cooling / heat_transfer_cooling),
                 utilization: 0.0,
                 need_kwh: 0.0,
             }
         } else {
-            let gamma = gains / heat_transfer_cooling;
+            let gamma = gains_cooling / heat_transfer_cooling;
             let eta = cooling_utilization(gamma, a);
             BalanceTerms {
                 transmission_kwh: transmission_cooling,
                 ventilation_kwh: ventilation_cooling,
                 heat_transfer_kwh: heat_transfer_cooling,
-                gains_kwh: gains,
+                gains_kwh: gains_cooling,
                 gamma: Some(gamma),
                 utilization: eta,
-                need_kwh: (gains - eta * heat_transfer_cooling).max(0.0),
+                need_kwh: (gains_cooling - eta * heat_transfer_cooling).max(0.0),
             }
         };
         let row = MonthResult {
@@ -925,6 +993,7 @@ fn compute(
             a,
             internal_gains_kwh: internal,
             window_solar_gains_kwh: window_solar,
+            window_solar_cooling_kwh: window_solar_cooling,
             opaque_solar_gains_kwh: opaque_solar,
             heating,
             cooling,
@@ -974,7 +1043,7 @@ mod tests {
             "windows": [{
                 "id": "w-south", "areaM2": 10.0, "orientation": "south", "tiltDeg": 90.0,
                 "gPerpendicular": 0.6, "frameFraction": 0.25, "uValueWPerM2k": 1.2,
-                "obstructionFactor": 1.0, "sourceReference": "synthetic window"
+                "obstruction": {"method": "declared", "heating": vec![1.0; 12], "cooling": vec![1.0; 12], "sourceReference": "synthetic: no obstruction"}, "sourceReference": "synthetic window"
             }],
             "opaqueInventoryComplete": true,
             "opaqueElements": [{
@@ -1312,5 +1381,46 @@ mod tests {
             assert!(cooling >= last - 1e-9, "{window_area}: {cooling} < {last}");
             last = cooling;
         }
+    }
+
+    #[test]
+    fn obstruction_and_movable_shading_act_on_their_own_balance() {
+        use crate::solar_shading::{MovableShading, ShadingControl};
+        let declared = assess_monthly_demand(&sample());
+        let mut minimal = sample();
+        minimal.windows[0].obstruction = Obstruction::Minimal;
+        let minimal_result = assess_monthly_demand(&minimal);
+        // Table 17.4 lowers winter heating gains; table 17.5 leaves cooling unchanged.
+        assert!(
+            minimal_result.annual_heating_need_kwh.unwrap()
+                > declared.annual_heating_need_kwh.unwrap()
+        );
+        assert!(
+            (minimal_result.annual_cooling_need_kwh.unwrap()
+                - declared.annual_cooling_need_kwh.unwrap())
+            .abs()
+                < 1e-9
+        );
+        let mut shaded = minimal.clone();
+        shaded.windows[0].area_m2 = 30.0;
+        let unshaded_result = assess_monthly_demand(&shaded);
+        shaded.windows[0].movable_shading = Some(MovableShading {
+            reduction_factor: 0.2,
+            control: ShadingControl::ManualResidential,
+            source_reference: "table 7.5 screen".into(),
+        });
+        let shaded_result = assess_monthly_demand(&shaded);
+        assert!(
+            shaded_result.annual_cooling_need_kwh.unwrap()
+                < unshaded_result.annual_cooling_need_kwh.unwrap()
+        );
+        assert!(
+            (shaded_result.annual_heating_need_kwh.unwrap()
+                - unshaded_result.annual_heating_need_kwh.unwrap())
+            .abs()
+                < 1e-9
+        );
+        let july = &shaded_result.monthly[6];
+        assert!(july.window_solar_cooling_kwh < july.window_solar_gains_kwh);
     }
 }
