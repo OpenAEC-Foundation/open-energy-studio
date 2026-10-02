@@ -11,9 +11,8 @@
 //!
 //! Not covered (rejected with a code or reported as a warning): cooling,
 //! collective installations, CHP, solar water heating, several heating
-//! generators,
-//! pipes in unheated spaces, sunrooms (AOS), detail-survey (detailopname)
-//! routes and quality declarations other than a measured q_v10.
+//! generators, sunrooms (AOS), detail-survey (detailopname) routes and
+//! quality declarations other than a measured q_v10.
 
 pub mod envelope;
 pub mod general;
@@ -105,6 +104,63 @@ pub struct MeasuredInfiltration {
     pub source_reference: String,
 }
 
+/// Vertical pipe through the thermal envelope (§7.2.4, table 7.7).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyVerticalPipe {
+    /// `None`: not determinable, uninsulated (table 7.7).
+    #[serde(default)]
+    pub insulated: Option<bool>,
+    /// Zones or adjacent heated spaces along the part bordering this zone,
+    /// this zone included; `None`: not shared (NTA 7.3.3).
+    #[serde(default)]
+    pub shared_zones: Option<u32>,
+}
+
+/// §7.2.4 table 7.7 and NTA 7.3.3: the vertical pipes, with one
+/// uninsulated pipe per storey of the zone when their number is unknown.
+/// `default_count` is the number of uninsulated pipes when the pipes are
+/// not determinable, with the rule recorded by the caller.
+pub(crate) fn vertical_pipes(
+    pipes: Option<&[SurveyVerticalPipe]>,
+    storeys: u32,
+    default_count: u32,
+    reference: &str,
+    recorder: &mut Recorder,
+) -> Vec<Value> {
+    let storeys = storeys.max(1);
+    let defaulted;
+    let pipes = match pipes {
+        Some(pipes) => pipes,
+        None => {
+            defaulted = vec![SurveyVerticalPipe::default(); default_count as usize];
+            &defaulted
+        }
+    };
+    pipes
+        .iter()
+        .enumerate()
+        .map(|(index, pipe)| {
+            let insulated = pipe.insulated.unwrap_or_else(|| {
+                recorder.record(
+                    "vertical_pipe_insulation_unknown_uninsulated",
+                    &format!("verticalPipes[{index}].insulated"),
+                    "false".into(),
+                    "ISSO 82.1 p. 63 (table 7.7)",
+                );
+                false
+            });
+            json!({
+                "id": format!("leiding-{}", index + 1),
+                "storeys": storeys,
+                "insulated": insulated,
+                "sharedZones": pipe.shared_zones.unwrap_or(1),
+                "sourceReference": format!("{reference}; basisopname §7.2.4"),
+            })
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResidentialSurvey {
@@ -123,12 +179,23 @@ pub struct ResidentialSurvey {
     pub construction: Construction,
     #[serde(default)]
     pub measured_infiltration: Option<MeasuredInfiltration>,
+    /// Storeys of the dwelling (zone); `None`: the storeys served by the
+    /// heating distribution.
+    #[serde(default)]
+    pub storeys: Option<u32>,
+    /// Vertical pipes through the envelope (§7.2.4); `None`: not
+    /// determinable (one uninsulated pipe per storey), empty: none present.
+    #[serde(default)]
+    pub vertical_pipes: Option<Vec<SurveyVerticalPipe>>,
     pub envelope: SurveyEnvelope,
     pub heating: SurveyHeating,
     pub hot_water: SurveyHotWater,
     pub ventilation: SurveyVentilation,
     #[serde(default)]
     pub pv: Vec<SurveyPv>,
+    /// Building-bound electrical or thermal storage (§15.5).
+    #[serde(default)]
+    pub storage: Option<production::SurveyStorage>,
     /// Building-bound cooling present; not covered by this layer yet.
     #[serde(default)]
     pub cooling_present: bool,
@@ -206,7 +273,9 @@ pub(crate) fn loss_area(envelope: &SurveyEnvelope) -> f64 {
         .map(|surface| {
             let weight = match surface.boundary {
                 SurfaceBoundary::Outdoor | SurfaceBoundary::UnheatedSpace { .. } => 1.0,
-                SurfaceBoundary::Ground | SurfaceBoundary::Crawlspace => 0.7,
+                SurfaceBoundary::Ground
+                | SurfaceBoundary::Crawlspace
+                | SurfaceBoundary::UnheatedCellar => 0.7,
                 SurfaceBoundary::AdjacentHeated => 0.0,
             };
             weight * surface.gross_area_m2
@@ -248,17 +317,53 @@ pub fn derive_residential_input(
             .map(|item| item.qv10_dm3_per_s_m2),
         recorder,
     );
-    let heating = heating::derive_heating(&survey.heating, year, recorder);
-    let hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
+    let mut heating = heating::derive_heating(&survey.heating, year, recorder);
+    let unheated_spaces = survey.envelope.surfaces.iter().any(|surface| {
+        matches!(
+            surface.boundary,
+            SurfaceBoundary::Crawlspace
+                | SurfaceBoundary::UnheatedCellar
+                | SurfaceBoundary::UnheatedSpace { .. }
+        )
+    });
+    let calculated_distribution =
+        heating::apply_unheated_pipes(&survey.heating, &mut heating, unheated_spaces, recorder);
+    let mut hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
+    if matches!(
+        survey.hot_water.generator,
+        hot_water::HotWaterGeneratorAnswer::ElectricBoiler
+    ) {
+        if let Some(vessel) = hot_water::boiler_storage(
+            survey.hot_water.boiler_vessel.as_ref(),
+            year,
+            &survey.hot_water.source_reference,
+            recorder,
+        ) {
+            hot_water["storage"] = json!([vessel]);
+        }
+    } else if survey.hot_water.boiler_vessel.is_some() {
+        recorder.issue("boiler_vessel_not_applicable", "hotWater.boilerVessel");
+    }
     let pv: Vec<Value> = survey
         .pv
         .iter()
         .map(|item| production::derive_pv(item, year, recorder))
         .collect();
+    let (storage_present, storage) =
+        production::derive_storage(survey.storage.as_ref(), !survey.pv.is_empty(), recorder);
     if !recorder.issues.is_empty() {
         return None;
     }
     let area = survey.usable_floor_area_m2;
+    let storeys = survey.storeys.unwrap_or(survey.heating.storeys).max(1);
+    if survey.vertical_pipes.is_none() {
+        recorder.record(
+            "vertical_pipes_unknown_one_per_storey",
+            "verticalPipes",
+            format!("{storeys} uninsulated pipe(s), {storeys} storey(s) each"),
+            "ISSO 82.1 p. 63 (table 7.7); NTA 8800 7.3.3",
+        );
+    }
     let demand = json!({
         "zoneId": "woning",
         "usableFloorAreaM2": area,
@@ -272,6 +377,13 @@ pub fn derive_residential_input(
             "unheated": envelope.unheated,
             "groundFloors": envelope.ground_floors,
             "groundInventoryConfirmed": true,
+            "verticalPipes": vertical_pipes(
+                survey.vertical_pipes.as_deref(),
+                storeys,
+                storeys,
+                reference,
+                recorder,
+            ),
         },
         "ventilationFlows": [],
         "ventilation": ventilation.input,
@@ -288,7 +400,7 @@ pub fn derive_residential_input(
     let mut chain = json!({
         "demand": demand,
         "emission": heating.emission,
-        "distribution": {"method": "heated_zone_only_space_heating", "sourceReference": format!("{reference}; basisopname: pipes in the heated zone")},
+        "distribution": calculated_distribution.unwrap_or_else(|| json!({"method": "heated_zone_only_space_heating", "sourceReference": format!("{reference}; basisopname: pipes in the heated zone")})),
         "generator": heating.generator,
     });
     if let Some(system) = heating.distribution_system {
@@ -310,8 +422,11 @@ pub fn derive_residential_input(
         "lossAreaM2": loss_area(&survey.envelope),
         "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
         "demandUsesFixedC1Ventilation": false,
-        "batteryStoragePresent": false,
+        "batteryStoragePresent": storage_present,
     });
+    if let Some(storage) = storage {
+        input["storage"] = storage;
+    }
     if let Some(renewable) = heating.heat_pump_renewable {
         input["heatPumpRenewable"] = renewable;
     }
@@ -425,6 +540,48 @@ mod tests {
     }
 
     #[test]
+    fn vertical_pipes_default_to_one_per_storey() {
+        let mut survey = fixture("1930");
+        survey.storeys = Some(2);
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
+        assert_eq!(pipes.as_array().unwrap().len(), 2);
+        assert_eq!(pipes[0]["storeys"], 2);
+        assert_eq!(pipes[0]["insulated"], false);
+        // Determined absent: no pipes.
+        survey.vertical_pipes = Some(Vec::new());
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
+        assert!(pipes.as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn fixture_indicators_stay_plausible() {
+        // EP2 ranges typical for the labels of these dwellings (F–G, B–C,
+        // A++ and better); crawlspaces without inspection carry heating
+        // pipes in unheated spaces (afb. 9.1).
+        for (name, low, high, distribution) in [
+            ("1930", 250.0, 450.0, "calculated"),
+            ("1975", 140.0, 240.0, "calculated"),
+            ("2015", 20.0, 80.0, "heated_zone_only_space_heating"),
+        ] {
+            let result = assess_residential_survey(&fixture(name));
+            let performance = result.performance.unwrap();
+            let ep2 = performance
+                .primary_fossil_indicator_kwh_per_m2_year
+                .unwrap();
+            assert!((low..high).contains(&ep2), "{name}: EP2 {ep2}");
+            let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+            assert_eq!(
+                input["spaceHeating"]["distribution"]["method"], distribution,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
     fn loss_area_weights_ground_with_0_7() {
         let survey = fixture("1930");
         let expected: f64 = survey
@@ -432,7 +589,9 @@ mod tests {
             .surfaces
             .iter()
             .map(|s| match s.boundary {
-                SurfaceBoundary::Ground | SurfaceBoundary::Crawlspace => 0.7 * s.gross_area_m2,
+                SurfaceBoundary::Ground
+                | SurfaceBoundary::Crawlspace
+                | SurfaceBoundary::UnheatedCellar => 0.7 * s.gross_area_m2,
                 SurfaceBoundary::AdjacentHeated => 0.0,
                 _ => s.gross_area_m2,
             })

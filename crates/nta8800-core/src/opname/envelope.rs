@@ -15,7 +15,9 @@
 //!   8.2/8.3 with table 8.1); floors on ground get 0,5·P (8.37).
 //! - Adjacent unheated spaces: H_ue = 5·A_T;iu (NTA I.8, basic survey) with
 //!   b_U = H_ue/(H_ue + H_iu) (8.53 with H_V;iu = 0).
-//! - Obstruction: the default situation is "none" (p. 195), NTA §17.3.2a.
+//! - Obstruction: the advisor determines the situation per window (tables
+//!   8.24/8.25, p. 102–103); without declared factors the window has the
+//!   "minimale belemmering" situation (NTA §17.3.2a).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -52,6 +54,11 @@ pub enum SurfaceBoundary {
     },
     /// Adjacent heated space or other dwelling: no transmission (8.5).
     AdjacentHeated,
+    /// Opening of the ground floor to an unheated cellar (not a cellar
+    /// cupboard): a fictitious uninsulated ground floor, perimeter 0,01 m
+    /// when it has none, R_bw from the façade above the rest of the floor
+    /// (ISSO 82.1 p. 72).
+    UnheatedCellar,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -91,6 +98,10 @@ pub struct SurveySurface {
     /// Thermal cushions under a floor (p. 93, R_c 1,95 per WD p. 37).
     #[serde(default)]
     pub thermal_cushions: bool,
+    /// Reed thatch thickness measured at the underside, mm (afb. 8.16,
+    /// table 8.12 and formula 8.5, p. 91–92).
+    #[serde(default)]
+    pub reed_thickness_mm: Option<f64>,
     /// Exposed perimeter of a floor on ground or crawlspace, m.
     #[serde(default)]
     pub exposed_perimeter_m: Option<f64>,
@@ -146,7 +157,8 @@ pub struct SurveyWindow {
     pub glass: GlassAnswer,
     pub frame: FrameAnswer,
     /// Declared obstruction factors per §17.3 (12 heating, 12 cooling);
-    /// absent: no obstruction (p. 195).
+    /// absent: the advisor established "minimale belemmering" (tables
+    /// 8.24/8.25, p. 102–103).
     #[serde(default)]
     pub obstruction: Option<DeclaredObstruction>,
     pub source_reference: String,
@@ -337,11 +349,93 @@ fn default_tilt(surface: &SurveySurface) -> f64 {
     })
 }
 
-fn element_type(surface: &SurveySurface) -> ElementType {
-    match surface.element {
-        SurfaceElement::Facade => ElementType::Facade,
-        SurfaceElement::Roof => ElementType::Roof,
-        SurfaceElement::Floor => ElementType::Floor,
+/// Afb. 8.16 (p. 92): R_c of a thatched roof or façade. The reed is
+/// measured at the underside less 35 mm and rounded to 50 mm (half up).
+/// Without insulation (or unknown) table 8.12 (d/0,105); with insulation
+/// formula 8.5, d_ins/0,045 + d_reed/0,105, with 40 mm when the thickness
+/// is not determinable. The ISSO formula has no R_ad, unlike NTA I.2.1.4;
+/// the basisopname follows the ISSO.
+fn thatch_rc(
+    surface: &SurveySurface,
+    measured_mm: f64,
+    path: &str,
+    recorder: &mut Recorder,
+) -> Option<crate::forfait_envelope::ForfaitOpaqueResult> {
+    if surface.element == SurfaceElement::Floor || !measured_mm.is_finite() {
+        recorder.issue(
+            "reed_thatch_roof_or_facade_only",
+            format!("{path}.reedThicknessMm"),
+        );
+        return None;
+    }
+    let reed_mm = ((measured_mm - 35.0) / 50.0 + 1e-9).round() * 50.0;
+    if !(100.0..=400.0).contains(&reed_mm) {
+        recorder.issue(
+            "reed_thickness_out_of_range",
+            format!("{path}.reedThicknessMm"),
+        );
+        return None;
+    }
+    let insulation_mm = match &surface.insulation {
+        InsulationAnswer::NoneOrUnknown => None,
+        InsulationAnswer::PresentUnknownThickness | InsulationAnswer::CavityFilledUnknownWidth => {
+            recorder.record(
+                "thatch_insulation_thickness_unknown_40_mm",
+                &format!("{path}.insulation"),
+                "40 mm".into(),
+                "ISSO 82.1 p. 92 (afb. 8.16)",
+            );
+            Some(40.0)
+        }
+        InsulationAnswer::Thickness {
+            thickness_mm,
+            proven,
+        } => Some(if *proven {
+            *thickness_mm
+        } else {
+            (thickness_mm / 10.0).round() * 10.0
+        }),
+    };
+    let reed = crate::materials::round_half_up(reed_mm / 1000.0 / 0.105, 2);
+    let r_c = match insulation_mm {
+        None => reed,
+        Some(d) => d / 1000.0 / 0.045 + reed_mm / 1000.0 / 0.105,
+    };
+    let r_si = if surface.element == SurfaceElement::Facade {
+        0.13
+    } else {
+        0.10
+    };
+    let u_c = crate::materials::round_half_up(1.0 / (r_c + r_si + 0.04), 2);
+    let route = if insulation_mm.is_some() {
+        "ISSO 8.5"
+    } else {
+        "ISSO table 8.12"
+    };
+    recorder.record(
+        "thatch_reed_thickness",
+        &format!("{path}.reedThicknessMm"),
+        format!("{reed_mm} mm reed ({measured_mm} mm measured − 35 mm)"),
+        "ISSO 82.1 p. 92",
+    );
+    Some(crate::forfait_envelope::ForfaitOpaqueResult { r_c, u_c, route })
+}
+
+/// Row of tables 8.9/8.10 (p. 88–90) and the R_si override:
+/// - a floor bordering outdoor air takes the "daken en vloeren grenzend aan
+///   de buitenlucht" row, with R_si 0,17 (downward heat flow, table C.2);
+/// - a ceiling to an unheated space (attic floor, AOR) takes the floor row
+///   ("scheiden van de grond of een AOR"; NTA I.4 zoldervloeren), with
+///   R_si 0,10 (upward heat flow): `AtticFloor`.
+fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
+    match (surface.element, &surface.boundary) {
+        (SurfaceElement::Facade, _) => (ElementType::Facade, None),
+        (SurfaceElement::Floor, SurfaceBoundary::Outdoor) => (ElementType::Roof, Some(0.17)),
+        (SurfaceElement::Floor, _) => (ElementType::Floor, None),
+        (SurfaceElement::Roof, SurfaceBoundary::UnheatedSpace { .. }) => {
+            (ElementType::AtticFloor, None)
+        }
+        (SurfaceElement::Roof, _) => (ElementType::Roof, None),
     }
 }
 
@@ -357,7 +451,7 @@ pub fn derive_envelope(
     let mut partitions: Vec<(String, f64, f64, String)> = Vec::new();
     let mut floor_above_crawlspace = false;
     let mut crawl_floors: Vec<usize> = Vec::new();
-    let mut facade_parts: Vec<f64> = Vec::new();
+    let mut facade_parts: Vec<(f64, f64)> = Vec::new();
 
     for (index, surface) in envelope.surfaces.iter().enumerate() {
         let path = format!("envelope.surfaces[{index}]");
@@ -528,7 +622,11 @@ pub fn derive_envelope(
                     "cavity_width_unknown_table_8_26",
                     &format!("{path}.insulation"),
                     format!("{width} mm"),
-                    "ISSO 82.1 p. 84 (table 8.26, erratum §3)",
+                    if construction_year < 1930 {
+                        "ISSO 82.1 p. 84 (table 8.26 starts at 1930; interpretation: its first row)"
+                    } else {
+                        "ISSO 82.1 p. 84 (table 8.26, erratum §3)"
+                    },
                 );
                 InsulationState::KnownThickness {
                     thickness_mm: width,
@@ -549,22 +647,101 @@ pub fn derive_envelope(
                 thermal_cushions: surface.thermal_cushions,
             },
         };
+        let (element, r_si_override) = element_type(surface);
+        if r_si_override.is_some() || element == ElementType::AtticFloor {
+            recorder.record(
+                "surface_table_row_by_boundary",
+                &path,
+                match r_si_override {
+                    Some(r_si) => format!("{element:?} row, R_si {r_si:.2}"),
+                    None => format!("{element:?} (floor row, R_si 0,10)"),
+                },
+                "ISSO 82.1 p. 88–90 (tables 8.9/8.10); NTA I.4, table C.2",
+            );
+        }
+        // p. 93 (WD p. 37): thermal cushions under a floor give R_c 1,95
+        // for the floor construction, whatever else is answered.
+        let cushions = surface.thermal_cushions && element == ElementType::Floor;
+        let insulation = if cushions {
+            recorder.record(
+                "thermal_cushions_rc_1_95",
+                &format!("{path}.thermalCushions"),
+                "R_c 1,95 m²K/W".into(),
+                "ISSO 82.1 p. 93; WD 2025 p. 37",
+            );
+            InsulationState::KnownThickness {
+                thickness_mm: 0.0,
+                thickness_proven: true,
+                known_lambda_equivalent: None,
+                reed_thickness_m: None,
+                thermal_cushions: true,
+            }
+        } else {
+            if surface.thermal_cushions {
+                recorder.issue(
+                    "thermal_cushions_floor_only",
+                    format!("{path}.thermalCushions"),
+                );
+            }
+            match insulation {
+                InsulationState::KnownThickness {
+                    thickness_mm,
+                    thickness_proven,
+                    known_lambda_equivalent,
+                    reed_thickness_m,
+                    ..
+                } => InsulationState::KnownThickness {
+                    thickness_mm,
+                    thickness_proven,
+                    known_lambda_equivalent,
+                    reed_thickness_m,
+                    thermal_cushions: false,
+                },
+                other => other,
+            }
+        };
+        let cellar = matches!(surface.boundary, SurfaceBoundary::UnheatedCellar);
+        let insulation = if cellar {
+            recorder.record(
+                "unheated_cellar_uninsulated_floor",
+                &path,
+                "uninsulated ground floor, R_c 0,15".into(),
+                "ISSO 82.1 p. 72",
+            );
+            InsulationState::KnownThickness {
+                thickness_mm: 0.0,
+                thickness_proven: true,
+                known_lambda_equivalent: None,
+                reed_thickness_m: None,
+                thermal_cushions: false,
+            }
+        } else {
+            insulation
+        };
         let forfait = ForfaitOpaque {
-            element: element_type(surface),
+            element: if cellar { ElementType::Floor } else { element },
             building: BuildingKind::Regular,
             construction_year,
             insulation,
-            cavity: surface.cavity,
-            r_si_override: None,
+            // The flat 1,95 (= 0,15 + 1,8) has no cavity term.
+            cavity: surface.cavity && !cushions && !cellar,
+            r_si_override: if cellar { None } else { r_si_override },
         };
-        let problems = forfait.validate(&path);
-        if !problems.is_empty() {
-            for problem in problems {
-                recorder.issue(problem.code, problem.path);
+        let result = if let Some(reed) = surface.reed_thickness_mm {
+            match thatch_rc(surface, reed, &path, recorder) {
+                Some(result) => result,
+                None => continue,
             }
-            continue;
-        }
-        let result = forfait.calculate();
+        } else {
+            let problems = forfait.validate(&path);
+            if !problems.is_empty() {
+                for problem in problems {
+                    recorder.issue(problem.code, problem.path);
+                }
+                continue;
+            }
+            forfait.calculate()
+        };
         recorder.record(
             "opaque_rc_forfait_annex_i",
             &path,
@@ -572,8 +749,23 @@ pub fn derive_envelope(
             "ISSO 82.1 p. 84–93 (tables 8.9–8.11), NTA annex I",
         );
         match &surface.boundary {
-            SurfaceBoundary::Ground | SurfaceBoundary::Crawlspace => {
-                let Some(perimeter) = surface.exposed_perimeter_m else {
+            SurfaceBoundary::Ground
+            | SurfaceBoundary::Crawlspace
+            | SurfaceBoundary::UnheatedCellar => {
+                let perimeter = match (surface.exposed_perimeter_m, cellar) {
+                    (Some(perimeter), _) => Some(perimeter),
+                    (None, true) => {
+                        recorder.record(
+                            "unheated_cellar_perimeter_0_01",
+                            &format!("{path}.exposedPerimeterM"),
+                            "0,01 m".into(),
+                            "ISSO 82.1 p. 72",
+                        );
+                        Some(0.01)
+                    }
+                    (None, false) => None,
+                };
+                let Some(perimeter) = perimeter else {
                     recorder.issue(
                         "exposed_perimeter_required",
                         format!("{path}.exposedPerimeterM"),
@@ -589,9 +781,14 @@ pub fn derive_envelope(
                     "edgeThermalBridges": {"method": "forfait"},
                     "sourceReference": format!("{}; basisopname R_c {} ({})", surface.source_reference, result.r_c, result.route),
                 });
-                if matches!(surface.boundary, SurfaceBoundary::Crawlspace) {
-                    floor_above_crawlspace = true;
-                    let insulated = surface.crawlspace_bottom_insulated.unwrap_or(false);
+                if matches!(
+                    surface.boundary,
+                    SurfaceBoundary::Crawlspace | SurfaceBoundary::UnheatedCellar
+                ) {
+                    // A cellar is not a crawlspace for the infiltration of
+                    // table 11.1 (old crawlspaces).
+                    floor_above_crawlspace |= !cellar;
+                    let insulated = !cellar && surface.crawlspace_bottom_insulated.unwrap_or(false);
                     recorder.record(
                         "crawlspace_bottom",
                         &path,
@@ -616,7 +813,7 @@ pub fn derive_envelope(
             }
             _ => {
                 if matches!(surface.element, SurfaceElement::Facade) && exterior {
-                    facade_parts.push(result.u_c);
+                    facade_parts.push((result.u_c, result.r_c));
                 }
                 if net > 1e-9 {
                     push_opaque_or_partition(
@@ -645,15 +842,16 @@ pub fn derive_envelope(
     // Table 8.13 (p. 93): crawlspace wall R_bw = R_c of the façade above
     // (the lowest of several); U_xw = U of that façade (8.47 note 3).
     if !crawl_floors.is_empty() {
+        // The façade with the lowest R_c (highest U); R_bw is its R_c
+        // itself, not one recomputed from the rounded U.
         match facade_parts
             .iter()
             .cloned()
-            .fold(None, |max: Option<f64>, u| {
-                Some(max.map_or(u, |m| m.max(u)))
+            .fold(None, |lowest: Option<(f64, f64)>, part| match lowest {
+                Some(best) if best.1 <= part.1 => Some(best),
+                _ => Some(part),
             }) {
-            Some(u_facade) => {
-                // R_si 0,13 + R_se 0,04 of a façade.
-                let r_c = (1.0 / u_facade - 0.17).max(0.01);
+            Some((u_facade, r_c)) => {
                 for index in &crawl_floors {
                     ground_floors[*index]["below"]["wallResistanceM2kPerW"] = json!(r_c);
                     ground_floors[*index]["below"]["wallUValueWPerM2k"] = json!(u_facade);
@@ -720,7 +918,7 @@ pub fn derive_envelope(
             "frame_fraction_forfait",
             "envelope.windows",
             FRAME_FRACTION_FORFAIT.to_string(),
-            "NTA 7.6.6.2 method B; ISSO 82.1 p. 93",
+            "NTA 7.6.6.2 method B; ISSO 82.1 p. 41",
         );
     }
 
@@ -838,6 +1036,7 @@ mod tests {
             cavity: true,
             insulation: InsulationAnswer::NoneOrUnknown,
             thermal_cushions: false,
+            reed_thickness_mm: None,
             exposed_perimeter_m: Some(16.0),
             crawlspace_bottom_insulated: None,
             source_reference: "survey".into(),
@@ -974,10 +1173,118 @@ mod tests {
         assert_eq!(floor["below"]["floorResistanceM2kPerW"], 0.0);
         let u_facade = floor["below"]["wallUValueWPerM2k"].as_f64().unwrap();
         let r_bw = floor["below"]["wallResistanceM2kPerW"].as_f64().unwrap();
-        assert!((r_bw - (1.0 / u_facade - 0.17)).abs() < 1e-9);
+        // R_bw is the façade R_c itself (table 8.13), not 1/U − 0,17.
+        let facade = ForfaitOpaque {
+            element: ElementType::Facade,
+            building: BuildingKind::Regular,
+            construction_year: 1975,
+            insulation: InsulationState::AbsentOrUnknown,
+            cavity: true,
+            r_si_override: None,
+        }
+        .calculate();
+        assert_eq!(r_bw, facade.r_c);
+        assert_eq!(u_facade, facade.u_c);
         // R_si 0,17 is added for the kernel's R_si + R_c.
         let r = floor["constructionResistanceM2kPerW"].as_f64().unwrap();
         assert!(r > 0.17);
         assert!(derived.floor_above_crawlspace);
+    }
+
+    #[test]
+    fn floor_to_outdoor_air_and_thermal_cushions() {
+        let mut recorder = Recorder::default();
+        let mut cushions = surface("kussen", SurfaceElement::Floor, SurfaceBoundary::Crawlspace);
+        let mut cellar = surface(
+            "kelder",
+            SurfaceElement::Floor,
+            SurfaceBoundary::UnheatedCellar,
+        );
+        cellar.exposed_perimeter_m = None;
+        cellar.gross_area_m2 = 6.0;
+        cushions.thermal_cushions = true;
+        cushions.exposed_perimeter_m = Some(10.0);
+        let envelope = SurveyEnvelope {
+            surfaces: vec![
+                surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+                surface("overstek", SurfaceElement::Floor, SurfaceBoundary::Outdoor),
+                cushions,
+                cellar,
+            ],
+            windows: Vec::new(),
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+        };
+        let derived = derive_envelope(&envelope, 1970, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        // Table 8.10: floors to outdoor air take the roof row.
+        let roof_row = ForfaitOpaque {
+            element: ElementType::Roof,
+            building: BuildingKind::Regular,
+            construction_year: 1970,
+            insulation: InsulationState::AbsentOrUnknown,
+            cavity: true,
+            r_si_override: Some(0.17),
+        }
+        .calculate();
+        let overhang = derived
+            .opaque_elements
+            .iter()
+            .find(|item| item["id"] == "overstek")
+            .unwrap();
+        let rule = recorder
+            .applied
+            .iter()
+            .find(|item| {
+                item.rule == "opaque_rc_forfait_annex_i" && item.path == "envelope.surfaces[1]"
+            })
+            .unwrap();
+        assert!(
+            rule.value.starts_with(&format!("R_c {:.2}", roof_row.r_c)),
+            "{}",
+            rule.value
+        );
+        assert!(overhang.is_object());
+        // p. 93: thermal cushions give R_c 1,95 whatever the insulation answer.
+        let floor = &derived.ground_floors[0];
+        let r = floor["constructionResistanceM2kPerW"].as_f64().unwrap();
+        assert!((r - (1.95 + 0.17)).abs() < 1e-9, "{r}");
+        // p. 72: the cellar opening is an uninsulated floor, perimeter 0,01.
+        let cellar = &derived.ground_floors[1];
+        assert_eq!(cellar["exposedPerimeterM"], 0.01);
+        let r = cellar["constructionResistanceM2kPerW"].as_f64().unwrap();
+        assert!((r - (0.15 + 0.17)).abs() < 1e-9, "{r}");
+        assert_eq!(cellar["below"]["kind"], "crawlspace");
+        assert_eq!(cellar["below"]["floorResistanceM2kPerW"], 0.0);
+        assert!(derived.floor_above_crawlspace);
+    }
+
+    #[test]
+    fn ceiling_to_unheated_attic_is_an_attic_floor() {
+        let attic = surface(
+            "zolder",
+            SurfaceElement::Roof,
+            SurfaceBoundary::UnheatedSpace {
+                space_id: "zolder".into(),
+            },
+        );
+        assert_eq!(element_type(&attic), (ElementType::AtticFloor, None));
+    }
+
+    #[test]
+    fn thatched_roof_follows_table_8_12_and_formula_8_5() {
+        let mut recorder = Recorder::default();
+        let mut roof = surface("riet", SurfaceElement::Roof, SurfaceBoundary::Outdoor);
+        roof.cavity = false;
+        roof.tilt_deg = Some(45.0);
+        // 260 − 35 = 225 → 250 mm: table 8.12 R_c 2,38.
+        let result = thatch_rc(&roof, 260.0, "s", &mut recorder).unwrap();
+        assert_eq!(result.r_c, 2.38);
+        // 159 − 35 = 124 → 100 mm; insulation of unknown thickness: 40 mm.
+        roof.insulation = InsulationAnswer::PresentUnknownThickness;
+        let result = thatch_rc(&roof, 159.0, "s", &mut recorder).unwrap();
+        assert!((result.r_c - (0.04 / 0.045 + 0.1 / 0.105)).abs() < 1e-12);
+        assert!(recorder.issues.is_empty());
     }
 }

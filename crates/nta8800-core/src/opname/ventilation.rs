@@ -261,13 +261,18 @@ pub fn derive_ventilation(
             unit["heatRecovery"] = recovery;
         }
     }
-    let fan_year = super::general::device_year(
-        survey.unit_manufacture_year,
-        survey.installation_year,
-        construction_year,
-        recorder,
-        "ventilation.fans",
-    );
+    // Table 11.15: fan manufacture year unknown → construction year. This
+    // specific rule takes precedence over the general installation-year
+    // fallback (and is the conservative one).
+    let fan_year = survey.unit_manufacture_year.unwrap_or_else(|| {
+        recorder.record(
+            "fan_year_unknown_construction_year",
+            "ventilation.fans",
+            construction_year.to_string(),
+            "ISSO 82.1 p. 154 (table 11.15; specific rule over p. 28)",
+        );
+        construction_year
+    });
     let current = match survey.motor.unwrap_or(MotorAnswer::Unknown) {
         MotorAnswer::Ac => "ac",
         MotorAnswer::Dc => "dc",

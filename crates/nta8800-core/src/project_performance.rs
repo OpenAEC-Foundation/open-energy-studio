@@ -669,6 +669,7 @@ fn derive_input(
                 unheated,
                 ground_floors,
                 ground_inventory_confirmed: true,
+                vertical_pipes: Vec::new(),
             }),
             ventilation_flows: data
                 .map(|item| item.ventilation_flows.clone())

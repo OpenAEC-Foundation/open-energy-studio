@@ -523,6 +523,14 @@ pub struct UtilitySurvey {
     pub construction: Construction,
     #[serde(default)]
     pub measured_infiltration: Option<MeasuredInfiltration>,
+    /// Toilet groups, stacked groups counted once (table 7.8, p. 68);
+    /// used when `vertical_pipes` is not determinable.
+    #[serde(default)]
+    pub toilet_stacks: Option<u32>,
+    /// Vertical pipes through the envelope (§7.2.4); `None`: not
+    /// determinable, empty: none present.
+    #[serde(default)]
+    pub vertical_pipes: Option<Vec<super::SurveyVerticalPipe>>,
     pub envelope: SurveyEnvelope,
     /// Windows with evident solar-control glass or film (g 0,4, table 8.14).
     #[serde(default)]
@@ -540,6 +548,9 @@ pub struct UtilitySurvey {
     pub pv: Vec<SurveyPv>,
     #[serde(default)]
     pub bacs: SurveyBacs,
+    /// Building-bound electrical or thermal storage (§15.5).
+    #[serde(default)]
+    pub storage: Option<super::production::SurveyStorage>,
     pub source_reference: String,
 }
 
@@ -558,12 +569,13 @@ fn utility_source(rule: &str) -> Option<&'static str> {
         | "glazing_leaded_light_single"
         | "glazing_glass_blocks_double" => "ISSO 75.1 p. 96",
         "door_insulation_unknown_uninsulated" => "ISSO 75.1 p. 30 (conservative), p. 97",
+        "vertical_pipe_insulation_unknown_uninsulated" => "ISSO 75.1 p. 68 (table 7.8)",
         "door_split_window_and_door" => "ISSO 75.1 p. 74",
         "cavity_width_unknown_table_8_26" => "ISSO 75.1 p. 88",
         "opaque_rc_forfait_annex_i" => "ISSO 75.1 p. 88–93 (tables 8.9–8.11), NTA annex I",
         "crawlspace_bottom" | "crawlspace_wall_from_facade" => "ISSO 75.1 p. 95",
         "thermal_bridges_forfait_delta_u" => "ISSO 75.1 p. 83–84; NTA 8.2/8.3",
-        "frame_fraction_forfait" => "NTA 7.6.6.2 method B; ISSO 75.1 p. 87",
+        "frame_fraction_forfait" => "NTA 7.6.6.2 method B; ISSO 75.1 p. 48",
         "unheated_space_basic_survey_h_ue" => "NTA I.8 (I.2.4) and 8.53; ISSO 75.1 basisopname",
         "no_generator_conventional_boiler" => "ISSO 75.1 p. 109",
         "pilot_flame_unknown_present" | "hydrogen_boiler_hr107" => "ISSO 75.1 p. 110",
@@ -768,11 +780,26 @@ pub fn utility_airtightness(
 /// Table 7.3 and §5.5.8: f_BACS 1,05 when a system above 290 kW (or
 /// serving more than 2 500 m² when the power is unknown) lacks a compliant
 /// BACS.
-pub fn bacs_factor(bacs: &SurveyBacs, recorder: &mut Recorder) -> (f64, String) {
+/// With the power and the served area both unknown, the system is taken to
+/// serve the whole building A_g (p. 62: the served A_g decides).
+pub fn bacs_factor(
+    bacs: &SurveyBacs,
+    building_area_m2: f64,
+    recorder: &mut Recorder,
+) -> (f64, String) {
     let large = match bacs.system_power_kw {
         Some(power) => power > 290.0,
         None => {
-            let large = bacs.served_area_m2.is_some_and(|area| area > 2500.0);
+            let area = bacs.served_area_m2.unwrap_or_else(|| {
+                recorder.record(
+                    "bacs_served_area_unknown_building",
+                    "bacs.servedAreaM2",
+                    format!("{building_area_m2} m² (building A_g)"),
+                    "ISSO 75.1 p. 62 (interpretation: whole building served)",
+                );
+                building_area_m2
+            });
+            let large = area > 2500.0;
             recorder.record(
                 "bacs_power_unknown_served_area",
                 "bacs.systemPowerKw",
@@ -899,6 +926,13 @@ fn derive_utility_heating(
     }
     if kind == "heat_pump_forfait" {
         generator["forfait"]["scope"] = json!("utility_collective_or_over25_kw");
+        // c_source (table 9.27 footnote a) and the table 9.28 row are for
+        // the residential table only.
+        generator["forfait"]["sourceCorrectionFactor"] = Value::Null;
+        generator["forfait"]["sourceCorrectionReference"] = Value::Null;
+        recorder
+            .applied
+            .retain(|item| item.rule != "source_regeneration_none_c_source_1");
         generator["forfait"]["collectiveBuildingInstallation"] = json!(installation.collective);
         if let Some(power) = installation.capacity_kw {
             generator["forfait"]["thermalCapacityKw"] = json!(power);
@@ -961,6 +995,9 @@ fn derive_utility_heating(
         } else {
             "individual"
         });
+        // Table 9.16a (heat meter unknown: present) is for collective
+        // installations only.
+        system["pump"]["heatMeterPresent"] = json!(installation.collective);
         system["usageFunction"] = json!(reduction_function);
         system["connectedStoreys"] = json!(survey.storeys.max(1));
         derived.distribution_system = Some(system);
@@ -1064,7 +1101,7 @@ fn cooling_value(
                     "cooling_balancing_unknown_none",
                     "cooling.balanced",
                     "none_or_unknown".into(),
-                    "ISSO 75.1 p. 133–134 (table 10.5)",
+                    "ISSO 75.1 p. 133 (table 10.6)",
                 );
                 "none_or_unknown"
             }
@@ -1396,15 +1433,16 @@ fn ventilation_value(
     // Tables 11.7/11.8 (p. 148–149).
     let mut flow_reduction = json!({});
     let recirculation = match (vent.recirculation_percent, vent.recirculation) {
-        (Some(percent), _) => Some(percent / 10 * 10),
+        // NTA 11.60: x = 20; a proven higher value, rounded down to tens.
+        (Some(percent), _) => Some((percent / 10 * 10).max(20)),
         (None, Some(RecirculationAnswer::PresentPercentUnknown)) => {
             recorder.record(
-                "recirculation_percent_unknown_below_20",
+                "recirculation_percent_unknown_x_20",
                 "ventilation.recirculation",
-                "< 20 % (x = 10)".into(),
-                "ISSO 75.1 p. 148 (table 11.7)",
+                "< 20 %: NTA default x = 20".into(),
+                "ISSO 75.1 p. 148 (table 11.7); NTA 8800 11.60",
             );
-            Some(10)
+            Some(20)
         }
         (None, Some(RecirculationAnswer::Unknown)) => {
             recorder.record(
@@ -1436,7 +1474,8 @@ fn ventilation_value(
                 },
                 |percent| percent.div_ceil(10) * 10,
             );
-            flow_reduction["flowControlPercent"] = json!(percent.min(100));
+            // NTA 11.61: x = 80; only a proven lower value replaces it.
+            flow_reduction["flowControlPercent"] = json!(percent.min(80));
         }
         None => recorder.record(
             "flow_control_unknown_none",
@@ -1445,13 +1484,18 @@ fn ventilation_value(
             "ISSO 75.1 p. 149 (table 11.8)",
         ),
     }
-    let fan_year = super::general::device_year(
-        vent.unit_manufacture_year,
-        vent.installation_year,
-        year,
-        recorder,
-        "ventilation.fans",
-    );
+    // Table 11.15: fan manufacture year unknown → construction year. This
+    // specific rule takes precedence over the general installation-year
+    // fallback (and is the conservative one).
+    let fan_year = vent.unit_manufacture_year.unwrap_or_else(|| {
+        recorder.record(
+            "fan_year_unknown_construction_year",
+            "ventilation.fans",
+            year.to_string(),
+            "ISSO 75.1 p. 154 (table 11.15; specific rule over p. 30)",
+        );
+        year
+    });
     let current = match vent.motor.unwrap_or(MotorAnswer::Unknown) {
         MotorAnswer::Ac => "ac",
         MotorAnswer::Dc => "dc",
@@ -1552,6 +1596,7 @@ fn hot_water_value(
                 } else {
                     ShowerRecoveryAnswer::None
                 },
+                boiler_vessel: None,
                 source_reference: reference.to_string(),
             },
             recorder,
@@ -1731,7 +1776,22 @@ fn lighting_value(
             _ => None,
         })
         .collect();
-    let whole_forfait = (!forfait_led.is_empty()).then(|| forfait_led.iter().all(|led| *led));
+    // ISSO 75.1 p. 188: the LED value needs LED installed from 2017. Zones
+    // with a measured power that move to the forfait count as LED only
+    // when every lamp is an LED type (their year is the advisor's claim);
+    // a luminaire power list carries no lamp type and counts as not LED.
+    let measured_led = survey.lighting.iter().all(|zone| match &zone.power {
+        LightingPowerAnswer::Unknown { .. } => true,
+        LightingPowerAnswer::Lamps { lamps } => lamps.iter().all(|lamp| {
+            matches!(
+                lamp.lamp_type,
+                LampTypeAnswer::LedInLuminaire | LampTypeAnswer::LedLamp
+            )
+        }),
+        _ => false,
+    });
+    let whole_forfait =
+        (!forfait_led.is_empty()).then(|| forfait_led.iter().all(|led| *led) && measured_led);
     if whole_forfait.is_some() && forfait_led.len() < survey.lighting.len() {
         recorder.record(
             "lighting_forfait_whole_zone",
@@ -1990,7 +2050,35 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         .iter()
         .map(|item| derive_pv(item, year, recorder))
         .collect();
-    let (bacs, bacs_reference) = bacs_factor(&survey.bacs, recorder);
+    let (bacs, bacs_reference) = bacs_factor(&survey.bacs, area, recorder);
+    let (storage_present, storage) =
+        super::production::derive_storage(survey.storage.as_ref(), !survey.pv.is_empty(), recorder);
+    // Table 7.8 (p. 68): one uninsulated pipe per toilet group through all
+    // storeys when the pipes are not determinable.
+    let stacks = match (&survey.vertical_pipes, survey.toilet_stacks) {
+        (Some(_), _) => 0,
+        (None, Some(stacks)) => {
+            recorder.record(
+                "vertical_pipes_unknown_one_per_toilet_group",
+                "verticalPipes",
+                format!(
+                    "{stacks} uninsulated pipe(s) through {} storey(s)",
+                    survey.storeys.max(1)
+                ),
+                "ISSO 75.1 p. 68 (table 7.8); NTA 8800 7.3.3",
+            );
+            stacks
+        }
+        (None, None) => {
+            recorder.record(
+                "vertical_pipes_unknown_one_toilet_group",
+                "toiletStacks",
+                "1 uninsulated pipe (interpretation: at least one toilet group)".into(),
+                "ISSO 75.1 p. 68 (table 7.8); NTA 8800 7.3.3",
+            );
+            1
+        }
+    };
     if !recorder.issues.is_empty() {
         return None;
     }
@@ -2006,6 +2094,13 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
             "unheated": envelope.unheated,
             "groundFloors": envelope.ground_floors,
             "groundInventoryConfirmed": true,
+            "verticalPipes": super::vertical_pipes(
+                survey.vertical_pipes.as_deref(),
+                survey.storeys,
+                stacks,
+                &survey.source_reference,
+                recorder,
+            ),
         },
         "ventilationFlows": [],
         "ventilation": ventilation,
@@ -2055,8 +2150,11 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         "lighting": [lighting],
         "hotWater": hot_water,
         "demandUsesFixedC1Ventilation": false,
-        "batteryStoragePresent": false,
+        "batteryStoragePresent": storage_present,
     });
+    if let Some(storage) = storage {
+        input["storage"] = storage;
+    }
     if let Some(cooling) = cooling {
         input["cooling"] = cooling;
     }
@@ -2326,12 +2424,22 @@ mod tests {
             system_power_kw: Some(290.0),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&small, &mut recorder).0, 1.0);
+        assert_eq!(bacs_factor(&small, 4000.0, &mut recorder).0, 1.0);
+        // Power and served area unknown: the building A_g decides.
+        assert_eq!(
+            bacs_factor(&SurveyBacs::default(), 4000.0, &mut recorder).0,
+            1.05
+        );
+        assert!(applied(&recorder, "bacs_served_area_unknown_building"));
+        assert_eq!(
+            bacs_factor(&SurveyBacs::default(), 2000.0, &mut recorder).0,
+            1.0
+        );
         let unknown = SurveyBacs {
             served_area_m2: Some(2600.0),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&unknown, &mut recorder).0, 1.05);
+        assert_eq!(bacs_factor(&unknown, 4000.0, &mut recorder).0, 1.05);
         assert!(applied(&recorder, "bacs_power_unknown_served_area"));
         assert!(applied(&recorder, "bacs_presence_unknown_no"));
         let present = SurveyBacs {
@@ -2339,7 +2447,7 @@ mod tests {
             present: Some(true),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&present, &mut recorder).0, 1.05);
+        assert_eq!(bacs_factor(&present, 4000.0, &mut recorder).0, 1.05);
         assert!(applied(&recorder, "bacs_automation_class_unknown_d"));
         assert!(applied(&recorder, "bacs_management_class_unknown_c_d"));
         let compliant = SurveyBacs {
@@ -2350,7 +2458,7 @@ mod tests {
             evidence_reference: Some("BACS inspection".into()),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&compliant, &mut recorder).0, 1.0);
+        assert_eq!(bacs_factor(&compliant, 4000.0, &mut recorder).0, 1.0);
         assert!(recorder.issues.is_empty());
     }
 
@@ -2390,6 +2498,8 @@ mod tests {
             air_sink: false,
             high_temperature: false,
             capacity_kw: None,
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
         };
         let (input, _) = derive(&survey);
         let forfait = &input["spaceHeating"]["generator"]["forfait"];
@@ -2502,7 +2612,8 @@ mod tests {
     fn recirculation_and_flow_control_follow_tables_11_7_and_11_8() {
         let (input, recorder) = derive(&fixture("1985"));
         let ventilation = &input["spaceHeating"]["demand"]["ventilation"];
-        assert_eq!(ventilation["flowReduction"]["recirculationPercent"], 10);
+        // NTA 11.60: x = 20 when the percentage is unknown.
+        assert_eq!(ventilation["flowReduction"]["recirculationPercent"], 20);
         assert!(ventilation["flowReduction"]
             .get("flowControlPercent")
             .is_none());
@@ -2525,6 +2636,17 @@ mod tests {
         // Recirculation rounds down, the minimum flow up, both to tens.
         assert_eq!(reduction["recirculationPercent"], 30);
         assert_eq!(reduction["flowControlPercent"], 50);
+        // 11.60/11.61: only proven higher x (recirculation) or lower x
+        // (flow control) than the defaults 20 and 80 count.
+        survey.ventilation.recirculation_percent = Some(15);
+        survey.ventilation.flow_control = Some(SurveyFlowControl {
+            method: FlowControlMethodAnswer::SpeedControl,
+            minimum_percent: Some(95),
+        });
+        let (input, _) = derive(&survey);
+        let reduction = &input["spaceHeating"]["demand"]["ventilation"]["flowReduction"];
+        assert_eq!(reduction["recirculationPercent"], 20);
+        assert_eq!(reduction["flowControlPercent"], 80);
     }
 
     #[test]

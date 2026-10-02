@@ -9,6 +9,12 @@
 //!   13.15, p. 178); it is measured, there is no fixed default.
 //! - Shower heat recovery: unknown → shower not connected (table 13.16,
 //!   p. 179).
+//! - Electric boiler (§13.4, p. 172–174): its vessel losses are determined
+//!   separately. Label unknown → manufacture year; year unknown → the
+//!   construction year (p. 174); location unknown → outside the thermal
+//!   zone (table 13.10); a boiler in a kitchen cabinet used only for the
+//!   kitchen may take 10 l (p. 174). Connections are not distinguished
+//!   (p. 173; NTA 13.6.3 factor 2).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -74,6 +80,26 @@ pub enum TapsServed {
     KitchenOnly,
 }
 
+/// Vessel of a residential electric boiler (ISSO 82.1 §13.4).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyBoilerVessel {
+    /// Storage volume, l; `None` only for a kitchen-cabinet boiler (10 l).
+    #[serde(default)]
+    pub volume_l: Option<f64>,
+    /// Built into a kitchen cabinet and used only for the kitchen (p. 174).
+    #[serde(default)]
+    pub kitchen_cabinet: bool,
+    /// Energy label (vessels ≤ 500 l); `None` follows the manufacture year.
+    #[serde(default)]
+    pub label: Option<crate::domestic_hot_water::StorageLabel>,
+    #[serde(default)]
+    pub manufacture_year: Option<i32>,
+    /// `None` unknown: outside the thermal zone (table 13.10).
+    #[serde(default)]
+    pub in_heated_zone: Option<bool>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SurveyHotWater {
@@ -86,11 +112,79 @@ pub struct SurveyHotWater {
     #[serde(default = "one")]
     pub showers: u32,
     pub shower_heat_recovery: ShowerRecoveryAnswer,
+    /// Vessel of an electric boiler (residential survey).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boiler_vessel: Option<SurveyBoilerVessel>,
     pub source_reference: String,
 }
 
 fn one() -> u32 {
     1
+}
+
+/// Storage of a residential electric boiler (table 13.10, p. 173–174).
+pub fn boiler_storage(
+    vessel: Option<&SurveyBoilerVessel>,
+    construction_year: i32,
+    reference: &str,
+    recorder: &mut Recorder,
+) -> Option<Value> {
+    let default = SurveyBoilerVessel::default();
+    let vessel = vessel.unwrap_or(&default);
+    let path = "hotWater.boilerVessel";
+    let volume = match vessel.volume_l {
+        Some(volume) if volume.is_finite() && volume > 0.0 => volume,
+        Some(_) => {
+            recorder.issue("boiler_volume_invalid", format!("{path}.volumeL"));
+            return None;
+        }
+        None if vessel.kitchen_cabinet => {
+            recorder.record(
+                "kitchen_boiler_forfait_10_l",
+                path,
+                "10 l".into(),
+                "ISSO 82.1 p. 174",
+            );
+            10.0
+        }
+        None => {
+            recorder.issue("boiler_volume_required", format!("{path}.volumeL"));
+            return None;
+        }
+    };
+    let loss = match vessel.label {
+        Some(label) => json!({"method": "label", "label": label}),
+        None => {
+            let year = vessel.manufacture_year.unwrap_or_else(|| {
+                recorder.record(
+                    "vessel_year_unknown_construction_year",
+                    path,
+                    construction_year.to_string(),
+                    "ISSO 82.1 p. 174",
+                );
+                construction_year
+            });
+            json!({"method": "unknown_label", "producedFrom2018": year >= 2018})
+        }
+    };
+    let inside = vessel.in_heated_zone.unwrap_or_else(|| {
+        recorder.record(
+            "vessel_location_unknown_outside",
+            path,
+            "outside the thermal zone".into(),
+            "ISSO 82.1 p. 173 (table 13.10)",
+        );
+        false
+    });
+    Some(json!({
+        "id": "boiler",
+        "volumeL": volume,
+        "loss": loss,
+        // NTA 13.6.3: electric boilers use 2 regardless of insulation.
+        "connectionFactor": 2,
+        "inHeatedZone": inside,
+        "sourceReference": reference,
+    }))
 }
 
 pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Value {
@@ -236,8 +330,25 @@ mod tests {
             bathroom_length_m: Some(5.0),
             showers: 1,
             shower_heat_recovery: ShowerRecoveryAnswer::Unknown,
+            boiler_vessel: None,
             source_reference: "survey".into(),
         }
+    }
+
+    #[test]
+    fn electric_boiler_vessel_defaults() {
+        let mut recorder = Recorder::default();
+        let kitchen = SurveyBoilerVessel {
+            kitchen_cabinet: true,
+            ..SurveyBoilerVessel::default()
+        };
+        let vessel = boiler_storage(Some(&kitchen), 1975, "survey", &mut recorder).unwrap();
+        assert_eq!(vessel["volumeL"], 10.0);
+        assert_eq!(vessel["loss"]["producedFrom2018"], false);
+        assert_eq!(vessel["inHeatedZone"], false);
+        assert_eq!(vessel["connectionFactor"], 2);
+        assert!(boiler_storage(None, 1975, "survey", &mut recorder).is_none());
+        assert_eq!(recorder.issues[0].code, "boiler_volume_required");
     }
 
     #[test]
