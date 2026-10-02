@@ -1,6 +1,6 @@
 # NTA 8800 verificatiestatus — 2 oktober 2026
 
-## Samenvatting stand 3 oktober 2026 (nacht)
+## Samenvatting stand 4 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
 - EP_Tot, EP_ren en RER;
@@ -16,7 +16,7 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
 | H6 A_ls met f_ls (6.7.3), zone-indeling §6.4/6.5.2, gemengde rekenzones §6.5.3 | geïmplementeerd |
 | H7 incl. §7.9, serres (7.30b), bijlagen A/B/D, terugwinbare verliezen 7.3–7.8, leidingdoorvoeren H_p | geïmplementeerd |
 | H8.2 constructies (bijlagen C, E–I, L), H8.3 grond incl. kruipruimte en kelders, H8.4 b_U opgegeven of afgeleid (8.53–8.59) | geïmplementeerd |
-| H9 afgifte incl. ventilatorenergie (9.21/9.22), distributie 9.26–9.51, meerdere opwekkers (9.6.1), bijlagen M/N/O/Q/V/W met f_prac en bovenwaarde | geïmplementeerd |
+| H9 afgifte incl. ventilatorenergie (9.21/9.22), distributie 9.26–9.51, meerdere opwekkers (9.6.1), WKK methode 1 en 2 (9.6.6), terugwinbaar opwekkerverlies (9.7), bijlagen M/N/O/Q/V/W | geïmplementeerd |
 | H10 methoden 1 (NEN-EN 14825), 2 (NEN-EN 14511) en 3, LBK-koeling, toevoerluchtterm 10.20 | geïmplementeerd; methode 2 voor absorptiekoeling volgt tabelwaarden |
 | H11 ventilatie met drukbalans, C1-run, LBK-naverwarming en -koeling (tabel 11.15), herberekening Q.5.3 | geïmplementeerd |
 | H12 incl. terugwinbaar verlies van stoombevochtigers | geïmplementeerd |
@@ -25,8 +25,11 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
 | §17.3 belemmering, situaties a–g (tabellen 17.4–17.15), ook voor collectoren; 17.3.8 als opgegeven factoren | geïmplementeerd |
 | Basisopname ISSO 82.1/75.1, incl. renovatieklassen, sterk geventileerde ruimten, leidingen in onverwarmde ruimten | geïmplementeerd |
 | BRL 9500: registratieblok, termijnen, labelgegevens, bewijsregister, dossierexport, detailopname-eis, herlabelen (6a/6b), versiestempel | geïmplementeerd |
-| Maatwerkadvies (BRL 9500-MWA, ISSO 82.2/75.2) | in uitvoering |
+| Maatwerkadvies (BRL 9500-MWA, ISSO 82.2/75.2): profielen, praktijkfactoren, fitcontrole volgens bijlage C.1, NCW, EPBD-systeemeisen, renovatiepaspoort | geïmplementeerd; ISSO-kostenmodel en locatieklimaat ontbreken (externe data) |
 | Bijlage X (afronding) | geïmplementeerd |
+| §5.9 finaal energiegebruik (5.57–5.60), 16.17 wind = 0 | geïmplementeerd |
+| Bijlage AB ZEB-indicator (informatief) met operationele CO2 | geïmplementeerd |
+| WKK voor tapwater (13.8.4.8), basisopname voor collectieve en meervoudige installaties | in uitvoering |
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
