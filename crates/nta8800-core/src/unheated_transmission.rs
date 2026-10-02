@@ -280,6 +280,7 @@ mod tests {
                         length_m: 2.0,
                         psi_w_per_mk: 0.1,
                         source_reference: "detail-1".into(),
+                        orientations: Vec::new(),
                     }],
                     point_bridges: Vec::new(),
                 },

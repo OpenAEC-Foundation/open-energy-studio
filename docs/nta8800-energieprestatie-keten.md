@@ -4,7 +4,7 @@ De Rust-module `building_performance` sluit de rekenruggengraat af voor een gebo
 
 1. [maandelijkse warmte- en koudebehoefte](nta8800-maandbehoefte.md) (hoofdstuk 7, transmissie uit hoofdstuk 8);
 2. [keten ruimteverwarming](nta8800-verwarmingsketen.md) (afgifte, distributie, één opwekker);
-3. gedeclareerde overige diensten: tapwater, ventilatoren, koeling, hulpenergie (hoofdstukken 10, 11 en 13 nog niet in Rust);
+3. berekende koeling (H10), tapwater (H13), verlichting bij utiliteit (H14) en PV (H16); ventilatoren (H11) en overige posten als gedeclareerde diensten;
 4. `E_EPus` per energiedrager (5.20/5.21, met `f_BACS` op verwarming, koeling en hun hulpenergie);
 5. eigen elektriciteitsproductie: eigengebruik en export (5.22–5.26, met `E_nEPus;el = 0` volgens 5.27);
 6. `EPTot` (5.9–5.14a, tabel 5.2) en `EPrenTot` (5.29–5.32, 5.39, tabel 5.4);
@@ -46,26 +46,101 @@ Omdat de drie elektriciteitsfactoren gelijk zijn, is het netto resultaat maandon
 
 ## PV (hoofdstuk 16)
 
-Module `pv` rekent 16.3 `E_sol = I_sol·t·F_sh;obst/1000` en 16.2 `E_PV = E_sol·P_pk·f_perf·c_sh;PV·0,95/1`. Helling en oriëntatie werken alleen via `I_sol` uit tabel 17.2 (volledig, met interpolatie). De tabellen 16.1–16.3 zijn niet als waarden getranscribeerd. Daarom zijn `P_pk` (kW) en `c_sh;PV` (0,75–1) bronverplichte invoer, en is `f_perf` beperkt tot de in de analyse genoemde 0,76/0,80/0,82. PV kan via `pvSystems` worden berekend of via `onSiteProduction` worden opgegeven; beide tellen op. Een zuiddak van 30° geeft circa 900 kWh/kWp per jaar.
+Module `pv` volgt §16.2 van NTA 8800:2025+C1:2026 (p. 678–682):
 
-## Tapwater (hoofdstuk 13, gedeeltelijk)
+- 16.3: `E_sol = I_sol·t·F_sh;obst/1000`. `F_sh;obst` mag één waarde of twaalf maandwaarden zijn.
+- 16.2: `E_PV = E_sol·P_pk·f_perf·c_sh;PV·0,95/1`.
+- `P_pk` komt uit 16.4a of 16.4b:
+  - 16.4a: `K_pk·A_PV/1000`, met `K_pk` uit tabel 16.1 (moduletype en jaar van plaatsing) of uit een verklaring;
+  - 16.4b: piekvermogen per paneel, naar beneden afgerond op 5 W, maal het aantal panelen.
+- `f_perf` komt uit tabel 16.2 via de bevestigingswijze. Een onbekende bevestiging telt als "niet geventileerd" (0,76).
+- `c_sh;PV` wordt per maand afgeleid uit `F_sh;obst` met tabel 16.3 en lineaire interpolatie. Bij `F_sh;obst` ≤ 0,80 geldt 0,75.
+- Een collectief systeem wordt verdeeld naar `A_g;tot/A_g;gebouw;PV` (p. 678).
 
-Module `domestic_hot_water` rekent de netto behoefte uit:
+Helling en oriëntatie werken alleen via `I_sol` uit tabel 17.2. PV loopt via `pvSystems` of via `onSiteProduction`, niet via beide.
 
-- woningbouw volgens 13.15: 856 kWh per bewoner per jaar (§13.2.3.1), met bewoners volgens 13.16–13.18 (dezelfde banden als 7.22–7.24), verdeeld naar `t_mi/8760`;
-- utiliteit: een opgegeven waarde uit tabel 13.1 met bron.
+## Tapwater (hoofdstuk 13)
 
-Een optionele maandelijkse douche-WTW-bijdrage (13.51) wordt afgetrokken. De module deelt door de opgegeven `η_W;em` en `η_W;dis` en daarna door `η_W;gen` of de seizoens-COP. De tabellen voor afgifte, distributie en opwekking zijn niet getranscribeerd, dus die rendementen zijn bronverplichte invoer. Omgevingswarmte van een tapwaterwarmtepomp telt bij `renewableHeatPump=true` als hernieuwbaar (5.35/5.36). Dat mag alleen met elektriciteit en COP ≥ 1. `hotWater` en een gedeclareerde tapwaterpost tegelijk geeft `hot_water_double_count`. Bron van de getallen: de referenties van Open Heatloss Studio `nta8800-dhw`; review tegen de normtekst is nog nodig.
+Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 525–655). Per maand:
 
-## Koeling (§10.5, gedeeltelijk)
+1. **Nettobehoefte.**
+   - Woningen: 13.15–13.18, 856 kWh per bewoner.
+   - Utiliteit: 13.19 met tabel 13.1 per gebruiksfunctie (`areas`).
+2. **Douche-WTW.** 13.51/13.52 met tabellen 13.7 en 13.8. Het rendement is het gemiddelde over alle douches (13.53); een douche zonder unit telt als 0.
+3. **Afgifte.** `Q_W;em = Q_W;nd/η_W;em − Q_W;rcd` (13.9). De terugwinning gaat er dus ná het afgifterendement af. `η_W;em` komt uit tabel 13.2 (woningen, 13.21–13.23) of tabel 13.3 (utiliteit).
+4. **Circulatie.**
+   - Verlies 13.26, met Ψ uit tabel 13.4 (dichtstbijzijnde diameter) en de diameter uit tabel 13.29 als die onbekend is.
+   - Lengte `L = 0,3·A_red + 10` (13.31), waarvan 15 % in onverwarmde ruimte bij 13 °C.
+   - Pompenergie 13.34–13.44 met tabel 13.6. Van de pompenergie komt 80 % in het tapwater (13.50).
+   - Distributierendement 13.25.
+5. **Voorraadvat.** 13.58 (gemeten `H_sto;ls`) of 13.59 (label, tabel 13.9). Zonder label: C vanaf 2018, anders G.
+6. **Afleversets.** Verlies 13.24/13.24a en elektronica 13.46.
+7. **Opwekking.** `E = Q_W;dis/(f_prac·η_W;gen)` (13.3, 13.152). Ondersteunde opwekkers:
+   - gastoestellen met tabel 13.25 en `c_W;gen` uit tabel 13.26;
+   - warmtepompen 1,4·`c_source` met tabel 13.27, of een EN 16147-meting bij één tappatroon (13.160b, tabel 13.18);
+   - elektrisch doorstroomtoestel (0,95) en elektroboiler (1,0);
+   - gasboiler tot 150 kW (13.165–13.175);
+   - overige direct verwarmde vaten (0,50);
+   - ketel of warmtepomp met indirect vat (tabel 13.28, 1,4);
+   - externe warmtelevering (η 1,0, drager `dh`).
+   
+   Verklaarde rendementen worden naar beneden afgerond op 0,025 (gas) of 0,05 (elektrisch). Een warmtepomp mag niet in een hogere toepassingsklasse rekenen dan waarin hij is gemeten (`hot_water_heat_pump_class_exceeded`).
+8. **Hulpenergie.** 13.181 voor opwekkers waarvan de hulpenergie niet in het rendement zit.
+9. **Omgevingswarmte.** 5.36. Bij een afvoerluchtbron telt alleen het opgegeven buitenluchtdeel mee (5.37).
 
-Module `space_cooling` neemt de som van de koudebehoefte van alle zones. `Q_C;gen;pref = Q_C;nd/(η_C;em·η_C;dis·f_reg)`, met opgegeven rendementen en bron. Opwekking volgens de forfaitaire methode:
+Niet in de kern:
 
-- compressie: `E_el = Q/EER` met EER 3,00 (10.76, tabel 10.29);
-- gasabsorptie: `E_gas = Q/ζ` met ζ 0,80 (10.77, tabel 10.30);
-- vrije koeling: `W_el = Q/EER_fc` (10.86, tabel 10.34: WKO 23/16/14, oppervlaktewater en gesloten bodem 10, dauwpunt 8), met een compressiebackup voor het restant.
+- zonneboilers (§13.7, `Q_W;ren;sol = 0`);
+- meerdere opwekkers per systeem (13.8.2);
+- boosterwarmtepompen (bijlage W);
+- afleversets op een collectief verwarmingssysteem (13.8.4.9.3);
+- terugwinbare verliezen voor de verwarmingsbalans (13.13).
 
-Het aandeel vrije koeling wordt opgegeven met bron, omdat tabellen 10.15/10.16 niet zijn getranscribeerd. Vrije koeling met EER ≥ 8 levert omgevingskoude (5.34, `f_Pren;rencold` = 1,0). Koelenergie wordt met `f_BACS` vermenigvuldigd (5.20). `cooling` en een opgegeven koelpost tegelijk geeft `cooling_double_count`. Bron: F3b-analyse van Open Heatloss Studio. Let op: volgens Omgevingsregeling art. 5.50 lid 2 geldt voor de koelbehoefte en minimaal benodigde koelcapaciteit in woningen de "Rekentool Koelbehoefte" in plaats van bijlage AA; die rekentool is niet verwerkt.
+## Koeling (hoofdstuk 10, methode 3)
+
+Module `space_cooling` (p. 366–426) rekent per maand `Q_C;gen;in = Σ(Q_C;nd + Q_C;em;ls + Q_C;dis;ls + Q_C;dis;rvd) − Q_C;HP` (10.5, 10.7–10.9). Onderdelen:
+
+- **Afgifteverlies.** 10.10/10.11 en 10.15/10.16, met tabellen 10.35, 10.4, 10.5 en 10.5a (8 K woning, 12 K utiliteit).
+- **Bedrijfsuren.** `t_C;mi` uit de koelgrens (10.19, stappen 1–6) en tabel 10.6.
+- **Watergedragen distributie.**
+  - Verlies 10.21/10.22, alleen in niet-gekoelde ruimten. Standaard is dat 15 % van `L_si = 0,64·A_g` bij 19 °C.
+  - Ψ uit tabel 10.9, mediumtemperatuur uit tabel 10.8.
+  - Pompenergie 10.28–10.38 met tabellen 10.10–10.13, plus teruggewonnen pompwarmte (10.45).
+  - Bij directe expansie is er geen distributieverlies.
+- **Ventilatorconvectoren.** 10 W per stuk tijdens de bedrijfsuren (10.17/10.18, tabel 10.7).
+- **Verdeling over opwekkers.** Voorrang volgens tabel 10.15. `β` wordt naar boven afgerond op 0,1; de energiefractie komt uit tabel 10.16 (10.49–10.52). Bij meer dan één prioriteit zijn de vermogens verplicht.
+- **Opwekking (methode 3, §10.5.6).**
+  - Tabel 10.29: compressie 3,00, en gasmotor 3,00·`η_ge` met `ε_chp;el` uit tabel 9.31.
+  - Tabel 10.30: gasabsorptie 0,80, absorptie op externe warmte 0,70.
+  - Externe koude (10.78): drager `dc`, `f_P` = 1,45/3, `f_Pren` = 0.
+  - Vrije koeling (10.86, tabel 10.34).
+  - Regeneratietoeslag voor een bodemopslag die als warmtepompbron dient (10.84/10.85).
+  - Verklaarde EER-waarden worden afgerond op 0,05 (elektrisch) of 0,025 (gas).
+- **Hulpenergie opwekking.** Volgens 10.79:
+  - geen condensorventilator in methode 3;
+  - condensorwaterdistributie volgens tabel 10.33 bij watergekoelde machines;
+  - regeling 0,010 kW gedurende alle uren;
+  - bij vrije koeling alleen pompenergie.
+- **Omgevingskoude.** 5.34: koude van vrije koeling met EER ≥ 8.
+
+Absorptie op een WKK wordt afgewezen (`cooling_chp_unsupported`), omdat WKK niet in de verwarmingsketen zit. Niet gemodelleerd: koeling in de luchtbehandelingskast (H11), ontvochtiging (H12) en methoden 1 en 2 (meetgegevens volgens EN 14825/14511).
+
+## Verlichting (hoofdstuk 14)
+
+Module `lighting` (p. 655–676):
+
+- **Woningen:** `W_L = 0` voor de indicatoren. Verlichtingsinvoer bij woningbouw wordt geweigerd.
+- **Utiliteit, per verlichtingszone:** `W_L = P_n·F_C·(t_D·F_o;D·F_D + t_N·F_o;N)/1000` (14.7), met:
+  - branduren uit tabel 14.1;
+  - vermogen uit 14.8/14.9 met tabel 14.2, naar boven afgerond volgens bijlage X, of het forfait 14.13 met tabel 14.3;
+  - parasitair vermogen 14.10–14.14;
+  - `F_C = 1`;
+  - aanwezigheid 14.16–14.23 met tabellen 14.4/14.5;
+  - daglicht 14.24–14.44 met tabellen 14.6–14.9, voor gevelramen, daklichten of de forfaitaire methode.
+  
+  Bij forfaitair vermogen geldt `F_D = 1`.
+- **Maandverdeling:** `t_mi/t_an`, zoals in 7.28.
+- **Interne winst:** `f_L·W_t·1000/t_an` (7.28) staat per zone in de uitkomst. Neem die op in de opgegeven interne warmtelast van hoofdstuk 7; de koppeling gebeurt nog niet automatisch.
 
 ## Warmtepomp als hernieuwbare bron
 
@@ -113,21 +188,37 @@ De projectadapter leidt `A_ls` af als som van de bruto vlakken die aan buitenluc
 Relevante bepalingen uit de Omgevingsregeling:
 
 - art. 5.31a/5.31b: de BENG-waarden voor nieuwbouw worden bepaald door een bedrijf met BRL 9500-detailopname, met een programma dat volgens BRL 9501 is geattesteerd;
-- art. 5.50 lid 2: de koelbehoefte van woningen gaat via de "Rekentool Koelbehoefte NTA 8800" in plaats van bijlage AA.
+- art. 5.50 lid 2: de koelbehoefte van woningen gaat via de "Rekentool Koelbehoefte NTA 8800" in plaats van bijlage AA. Volgens de verificatie van 2 oktober 2026 vervalt die aanwijzing zodra NTA 8800:2025 is aangewezen. Bijlage AA in de doeluitgave (p. 1135–1147) is de gecorrigeerde versie die de rekentool al volgde. Dit moet nog tegen de geconsolideerde regeling worden bevestigd.
 
 ## TO-juli (§5.7)
 
-Module `tojuli` bepaalt formule 5.40 per oriëntatie met een eigen koudebalans voor juli (7.2.2):
+Module `tojuli` bepaalt formule 5.40 per oriëntatie met een eigen koudebalans voor juli (7.2.2), volgens p. 113–120:
 
-- Ramen en opake vlakken met een helling boven 5° blijven bij hun oriëntatie, met eigen `A·U` en zonwinst. Een hellend dak telt dus mee in zijn oriëntatie.
-- Horizontale vlakken (≤ 5°, §7.6.6.4), koudebruggen, transmissie via onverwarmde ruimte, grond, ventilatie, interne winst en `C_m` worden naar rato van `A_T;or/ΣA_T` verdeeld.
-- Oriëntaties met `A_T;or` ≤ 3 m² worden niet beoordeeld.
-- De uitkomst wordt naar boven afgerond op 0,01 K. De hoogste waarde wordt getoetst aan 1,20 (Bbl 4.149b lid 1).
-- Bij voldoende actieve koeling (`activeCoolingPresent`, §5.7.1) geldt TO-juli = 0.
+- **Stap A.** Ramen en opake vlakken naar buitenlucht met een helling boven 5° blijven bij hun oriëntatie, met eigen `A·U` en zonwinst. Vlakken naar een aangrenzende onverwarmde of verwarmde ruimte (AOR/AVR) doen niet mee. Zij zitten niet in `A_T` en niet in `H_C;D`, en stap B noemt geen component voor hun transmissie.
+- **Stap B, stap 2.** Een koudebrug met expliciete ψ/χ hoort bij de oriëntatie van zijn constructiedelen (`orientations` op de brug, in het project als `N`…`NW`/`horizontal`). Een brug over meerdere oriëntaties wordt gelijk verdeeld.
+- **Verdeling naar rato.** Bruggen zonder oriëntatie, horizontale vlakken (≤ 5°), grond, ventilatie, interne winst en `C_m` worden verdeeld naar `A_T;or/ΣA_T`.
+- **Niet beoordeeld.** Oriëntaties met `A_T;or` ≤ 3 m².
+- **Correcties.** `a_C;red` (7.74/7.75, tabel 7.15 via de gebruiksfunctie) vermenigvuldigt de julibehoefte. De onttrekking door een boosterwarmtepomp `Q_C;HP;juli` (10.6) wordt per zone naar oppervlakte en per oriëntatie naar behoefte verdeeld (5.41a–c).
+- **Afronding en toets.** Naar boven op 0,01 K; toets aan 1,20 (Bbl 4.149b lid 1).
+- **Actieve koeling.** TO-juli = 0 alleen met `activeCooling`. Daarvoor is nodig:
+  - een systeem uit de lijst van §5.7.1;
+  - een capaciteitsbewijs: dynamische koellast, bijlage AA, of beperking van de zoninstraling.
+
+  Controles:
+  - `A_w < 0,2·A_g` wordt tegen de ramen getoetst;
+  - dauwpuntskoeling met bevochtigde afvoerlucht vereist methode 1 of 2;
+  - "overig" is alleen toegestaan bij utiliteit;
+  - het systeem moet passen bij de berekende koelopwekker.
 
 De module vereist de `components`-transmissieroute, waarin ramen en opake vlakken precies de directe elementgeleiding dekken. Een afwijking geeft `tojuli_envelope_inconsistent`.
 
-**Afhankelijkheid van ventilatie.** In de norm bevat de koudebalans van juli de zomerventilatie uit hoofdstuk 11 (onder meer spuiventilatie `q_V;argI`). Zolang hoofdstuk 11 niet in Rust zit, moet de opgegeven ventilatiegeleiding voor juli die stromen al bevatten. Het synthetische project heeft constant 35 W/K zonder spuiventilatie en komt daardoor op 6,36 K. Dat is rekenkundig consistent met de invoer, maar geen realistische waarde voor een woning. Verder niet uitgewerkt: de boosterwarmtepompterm `Q_C;HP;juli` (5.41a–c, bij afwezigheid 0), de splitsing van lineaire koudebruggen per oriëntatie (nu naar rato) en de geprojecteerde oppervlakte van hellende vlakken (nu bruto). De bron is de F3c-analyse van Open Heatloss Studio.
+**Nog niet uitgewerkt:**
+
+- terugwinbare systeemverliezen (`Q_H/C;ls;rbl`); die zitten nog niet in hoofdstuk 7;
+- het geveldeel aan een aangrenzende onverwarmde serre (AOS);
+- de geprojecteerde oppervlakte van hellende vlakken (nu bruto).
+
+De zomerventilatie van hoofdstuk 11 moet in de opgegeven ventilatiegeleiding zitten.
 
 ## BENG 1
 
@@ -139,8 +230,8 @@ De ventilatoren (11.132), de vorstbeveiliging (11.105) en de voorverwarming in r
 
 - opslag zonder opgegeven capaciteit (`storage_capacity_required`);
 - collectieve warmtepompbron (vergt de `dh`-factorroute);
-- externe warmte- en koudelevering, biomassa en export van warmte;
-- verlichting bij woningbouw (volgens de opmerking bij 5.20 op 0);
+- export van warmte en absorptiekoeling op WKK;
+- verlichting bij woningbouw (14.2.1: `W_L;spec = 0`);
 - ventilatoren, verlichting en hulpenergie op een andere drager dan elektriciteit;
 - onvolledige inventaris van diensten of productie.
 

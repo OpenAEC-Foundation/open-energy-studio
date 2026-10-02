@@ -1934,15 +1934,18 @@ export interface BuildingPerformanceInput {
   onSiteProduction: Array<{ id: string; kind: 'pv' | 'pvt' | 'wind'; monthlyKwh: number[]; sourceReference: string }>;
   pvSystems?: Array<{
     id: string;
-    peakPowerKw: number;
+    peakPower: NtaPvPeakPower;
     azimuthDeg: number;
     tiltDeg: number;
-    performanceFactor: 0.76 | 0.8 | 0.82;
-    shadingCorrection: number;
-    obstructionFactor: number;
+    mounting?: 'not_ventilated' | 'moderately_ventilated' | 'strongly_ventilated' | 'unknown';
+    /** F_sh;obst;mi: one value or twelve monthly values (§17.3). */
+    obstructionFactors: number[];
+    collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
+  /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
+  lighting?: NtaZoneLighting[];
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
   storage?: NtaEnergyStorage | null;
@@ -1954,6 +1957,49 @@ export interface NtaEnergyStorage {
   buildingBoundThermalKwh: number;
   sourceReference: string;
 }
+
+/** Chapter 14 lighting of one calculation zone. */
+export interface NtaZoneLighting {
+  zoneId: string;
+  functions: Array<{ function: NtaLabelFunction; areaM2: number }>;
+  lightingZones: Array<{
+    id: string;
+    areaM2: number;
+    power:
+      | { method: 'forfait'; ledFrom2017: boolean }
+      | { method: 'installed'; dynamicFactor?: number | null; sourceReference: string;
+          luminaires: Array<{ count: number; power: { method: 'system'; powerW: number }
+            | { method: 'lamps'; lampPowerW: number; lampCount: number; technology: string } }> };
+    parasitic: { method: 'forfait' } | { method: 'installed'; emergencyChargingW: number; controlStandbyW: number; sourceReference: string };
+    occupancy: {
+      control: 'manual_or_unknown' | 'manual_with_sweep' | 'auto_on_dimmed' | 'auto_on_auto_off' | 'manual_on_dimmed' | 'manual_on_auto_off';
+      centralOnControl: boolean;
+      largeOfficeGroup?: boolean;
+    };
+    daylight: { method: 'none' } | { method: 'forfait'; daylightControl: boolean } | { method: 'sectors'; sectors: unknown[]; sourceReference: string };
+    extractedLuminaires?: boolean;
+  }>;
+  sourceReference: string;
+}
+
+/** Active cooling with demonstrated capacity (NTA 8800 §5.7.1). */
+export interface NtaActiveCoolingEvidence {
+  system:
+    | 'compression_table10_29' | 'absorption_table10_30' | 'free_cooling_table10_34'
+    | 'dew_point_cooling_humidified_exhaust' | 'heat_pump_with_cooling_emitter'
+    | 'external_cold_with_cooling_emitter' | 'split_units_in_every_habitable_room' | 'other_utility';
+  capacity:
+    | { method: 'dynamic_cooling_load'; sourceReference: string }
+    | { method: 'annex_aa'; sourceReference: string }
+    | { method: 'solar_limitation'; criterion: 'small_window_area' | 'shaded_glazing'; sourceReference: string };
+  sourceReference: string;
+}
+
+/** P_pk route of NTA 8800 16.4a/16.4b. */
+export type NtaPvPeakPower =
+  | { method: 'table16_1'; moduleType: string; panelAreaM2: number }
+  | { method: 'declared_specific'; peakPowerWPerM2: number; panelAreaM2: number }
+  | { method: 'panels'; panelPeakPowerW: number; panelCount: number };
 
 export type NtaLabelFunction =
   | 'residential' | 'office' | 'assembly_without_day_care' | 'assembly_with_day_care'
@@ -1999,36 +2045,130 @@ export interface NtaTojuliAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
+type NtaHeatRejection =
+  | 'air_cooled' | 'closed_cooling_tower' | 'open_cooling_tower' | 'dry_cooler' | 'ground_storage' | 'surface_water';
+type NtaDeclaredEfficiency = { value: number; sourceReference: string };
+type NtaChpClass = { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean };
+
+/** Chapter 10 cooling system (NTA 8800 method 3). */
 export interface NtaCoolingSystem {
-  emissionEfficiency: number;
-  distributionEfficiency: number;
-  controlFactor: number;
-  efficiencySourceReference: string;
-  generator:
-    | { kind: 'compression' }
-    | { kind: 'gas_absorption' }
-    | {
-        kind: 'free_cooling';
-        source: 'aquifer_dwellings_from2013' | 'aquifer_utility_before2013' | 'aquifer_dwellings_before2013'
-          | 'surface_water' | 'closed_ground_loop' | 'dew_point_cooling';
-        freeCoolingFraction: number;
-        fractionSourceReference: string;
-      };
-  equipmentReference: string;
+  emission: {
+    emitter: 'floor_cooling' | 'wall_cooling' | 'fan_coil_or_rac_on_outer_wall' | 'ceiling_cooling'
+      | 'fan_coil_or_rac_on_ceiling' | 'other_or_unknown';
+    balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
+    control: 'unknown_or_other' | 'standalone_per_room' | 'central_with_room_control';
+    fanCoilCount?: number;
+    sourceReference: string;
+  };
+  distribution?: {
+    designTemperature: 't6_to12_or_unknown' | 't12_to16' | 't12_to18' | 't17_to21';
+    pipe:
+      | { kind: 'insulated_from1995' | 'insulated1980_to1995' | 'insulated_before1980_or_unknown_age' | 'uninsulated' }
+      | { kind: 'declared'; psiWPerMK: number; sourceReference: string };
+    fittingsInsulated: boolean;
+    pipeLengthM?: number | null;
+    unconditionedPipeLengthM?: number | null;
+    unconditionedAmbientC?: number | null;
+    pump?: {
+      hydraulicallyBalanced: boolean;
+      floorCount: number;
+      heatMeter: boolean;
+      individualDwellingInstallation: boolean;
+      labelPowerKw?: number | null;
+      energyEfficiencyIndex?: number | null;
+      sourceReference: string;
+    } | null;
+    sourceReference: string;
+  } | null;
+  generators: Array<{
+    id: string;
+    generator:
+      | { kind: 'compression'; heatRejection?: NtaHeatRejection | null; declared?: NtaDeclaredEfficiency | null }
+      | { kind: 'room_air_conditioner'; declared?: NtaDeclaredEfficiency | null }
+      | { kind: 'unknown_collective' }
+      | { kind: 'gas_engine_compression'; gasEngine: NtaChpClass; heatRejection?: NtaHeatRejection | null }
+      | { kind: 'gas_absorption'; heatRejection?: NtaHeatRejection | null; declared?: NtaDeclaredEfficiency | null }
+      | { kind: 'absorption_external_heat'; heatRejection?: NtaHeatRejection | null }
+      | { kind: 'absorption_chp'; chp: NtaChpClass; heatRejection?: NtaHeatRejection | null }
+      | { kind: 'external_cold' }
+      | {
+          kind: 'free_cooling';
+          source: 'aquifer_from2013' | 'aquifer_utility_before2013' | 'aquifer_dwellings_before2013'
+            | 'surface_water' | 'closed_ground_loop' | 'dew_point_cooling';
+          heatPumpSource?: boolean;
+          groundAboveZeroDemonstrated?: boolean;
+        };
+    capacityKw?: number | null;
+    equipmentReference: string;
+  }>;
+  /** Q_C;HP;si per month (annex W), kWh. */
+  boosterHeatPumpExtractionKwh?: number[];
+  collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
 }
 
+type NtaApplicationClass = 'class1' | 'class2' | 'class3' | 'class4';
+type NtaDhwDeclared = { value: number; sourceReference: string };
+
+/** Chapter 13 hot-water system with one generator. */
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
-    | { method: 'declared'; specificNeedKwhPerM2Year: number; sourceReference: string };
-  emissionEfficiency: number;
-  distributionEfficiency: number;
-  generationEfficiency: number;
-  carrier: 'el' | 'gas' | 'oil';
-  showerHeatRecoveryKwh?: number[];
-  auxiliaryElectricityKwh?: number[];
-  renewableHeatPump: boolean;
-  efficiencySourceReference: string;
+    | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
+  emission:
+    | { method: 'residential'; served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
+        kitchenLengthM?: number | null; bathroomLengthM?: number | null; sourceReference: string }
+    | { method: 'utility'; meanLengthM: number; sourceReference: string };
+  showerHeatRecovery?: {
+    showers: Array<{ unit: 'none' | 'vertical' | 'horizontal' | 'unknown' } | { unit: 'declared'; efficiency: number; sourceReference: string }>;
+    connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
+    sourceReference: string;
+  } | null;
+  circulation?: {
+    outerDiameterMm?: number | null;
+    insulation: 'none' | 'unknown' | 'mm10' | 'mm15' | 'mm20' | 'mm25';
+    declaredPsiWPerMK?: number | null;
+    fittingsInsulated: boolean;
+    lengthM?: number | null;
+    unheatedLengthM?: number | null;
+    unheatedAmbientC?: number | null;
+    floorCount: number;
+    sportHallAreaM2?: number;
+    connectedDwellings?: number | null;
+    pump: { control: 'uncontrolled_or_unknown' | 'constant_pressure'; labelPowerKw?: number | null; energyEfficiencyIndex?: number | null };
+    sourceReference: string;
+  } | null;
+  storage?: Array<{
+    id: string;
+    volumeL: number;
+    loss:
+      | { method: 'label'; label: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' }
+      | { method: 'unknown_label'; producedFrom2018: boolean }
+      | { method: 'measured'; transmissionWPerK: number };
+    connectionFactor: 1 | 2 | 3 | 4 | 5;
+    inHeatedZone: boolean;
+    unheatedAmbientC?: number | null;
+    sourceReference: string;
+  }>;
+  deliverySets?: { count: number; sourceReference: string } | null;
+  boilingWaterTap?: boolean;
+  generator:
+    | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
+        | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
+        declared?: NtaDhwDeclared | null }
+    | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
+        outdoorAirFraction?: number | null }
+    | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
+        exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null; sourceReference: string }
+    | { kind: 'electric_instantaneous' }
+    | { kind: 'electric_boiler' }
+    | { kind: 'gas_storage_heater'; volumeL: number; measuredStandbyKwhPerDay?: number | null; before1985: boolean; inHeatedZone: boolean }
+    | { kind: 'large_direct_storage'; gasFired: boolean }
+    | { kind: 'indirect_boiler'; boiler: 'conventional_or_unknown' | 'vr' | 'hr100_or104' | 'hr107'; oil: boolean;
+        insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
+    | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
+    | { kind: 'external_heat' };
+  collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
+  equipmentReference: string;
 }
 
 export interface BuildingPerformanceAssessment {
@@ -2068,6 +2208,7 @@ export interface BuildingPerformanceAssessment {
   tojuliMaxK: number | null;
   tojuliMeetsBblLimit: boolean | null;
   spaceHeating: SpaceHeatingChainAssessment;
+  lighting?: Array<{ zoneId: string; annualKwh: number; monthlyKwh: number[]; internalGainW: number }>;
   issues: Array<{ code: string; path: string }>;
 }
 
@@ -2138,10 +2279,12 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
+  lighting?: NtaZoneLighting[];
   cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
-  activeCoolingPresent?: boolean;
+  activeCooling?: NtaActiveCoolingEvidence | null;
   permitApplicationAfter20260529?: boolean;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;

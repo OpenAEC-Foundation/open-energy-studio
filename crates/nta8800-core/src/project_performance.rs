@@ -26,6 +26,7 @@ use crate::space_heating_chain::{
     ChainZone, CollectiveConnection, Distribution, DistributionSystem, Generator,
     SpaceHeatingChainInput,
 };
+use crate::tojuli::ActiveCoolingEvidence;
 use crate::{
     direct_boundary_input_zone, input_fingerprint, unheated_zone_input, ProjectInput,
     ThermalBoundary, KERNEL_VERSION, TARGET_NORM_VERSION,
@@ -85,13 +86,15 @@ pub struct NtaCalculationInput {
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
     #[serde(default)]
+    pub lighting: Vec<crate::lighting::ZoneLighting>,
+    #[serde(default)]
     pub cooling: Option<CoolingSystem>,
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
     #[serde(default)]
-    pub active_cooling_present: bool,
+    pub active_cooling: Option<ActiveCoolingEvidence>,
     #[serde(default, rename = "permitApplicationAfter20260529")]
     pub permit_application_after_2026_05_29: bool,
     pub demand_uses_fixed_c1_ventilation: bool,
@@ -580,10 +583,11 @@ fn derive_input(
         on_site_production: nta.on_site_production,
         pv_systems: nta.pv_systems,
         hot_water: nta.hot_water,
+        lighting: nta.lighting,
         cooling: nta.cooling,
         label_function: nta.label_function,
         bbl_function: nta.bbl_function,
-        active_cooling_present: nta.active_cooling_present,
+        active_cooling: nta.active_cooling,
         permit_application_after_2026_05_29: nta.permit_application_after_2026_05_29,
         loss_area_m2: Some(loss_area),
         loss_area_source_reference: Some(

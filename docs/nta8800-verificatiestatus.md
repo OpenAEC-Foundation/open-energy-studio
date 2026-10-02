@@ -54,6 +54,49 @@ Nieuwe interpretatievragen:
 9. `θ_int;op;H` (7.9.6) als omgevingstemperatuur van zoneleidingen is gelijkgesteld aan het verwarmingssetpoint, totdat §7.9 is gekoppeld.
 10. De terugwinbare verliezen worden nog niet teruggekoppeld naar 7.2.1. Die terugkoppeling hoort bij de behoefteberekening; voor BENG 1 moet ze 0 blijven.
 
+## Stand 2 oktober 2026: hoofdstukken 10, 13, 14, 16 en §5.7 tegen de normtekst
+
+Een verificatie tegen de gelicentieerde NTA 8800:2025+C1:2026 vond afwijkingen in koeling, tapwater, PV en TO-juli. Hoofdstuk 14 ontbrak nog. Al deze modules zijn nu opnieuw opgebouwd vanuit de normtekst. Paginaverwijzingen staan in de modulekoppen en in het [bronnenregister](nta8800-bronnenregister.md).
+
+| Module | Wat is veranderd |
+|---|---|
+| `space_cooling` | De snelkoppeling `Q/(η_em·η_dis·f_reg)` is vervangen door de optelketen van hoofdstuk 10. Die bestaat uit: <ul><li>afgifteverlies 10.15/10.16;</li><li>bedrijfsuren via de koelgrens en tabel 10.6;</li><li>watergedragen distributie 10.21 en pompenergie 10.28–10.38;</li><li>ventilatorconvectoren;</li><li>prioriteit en β volgens tabellen 10.15/10.16;</li><li>methode 3 met alle rijen van tabellen 10.29/10.30;</li><li>externe koude;</li><li>regeneratietoeslag 10.84/10.85;</li><li>hulpenergie 10.83/10.87;</li><li>onttrekking door een boosterwarmtepomp.</li></ul> |
+| `domestic_hot_water` | Volgorde 13.9 (douche-WTW na `η_W;em`). Verder: <ul><li>tabellen 13.1–13.9 en 13.18/13.23–13.29;</li><li>circulatie en pomp 13.25–13.50;</li><li>voorraadvat 13.58/13.59;</li><li>afleversets;</li><li>gasboiler 13.165–13.175;</li><li>`f_prac` 13.152;</li><li>hulpenergie 13.181;</li><li>5.36/5.37.</li></ul> |
+| `pv` | Tabellen 16.1–16.3; onbekende bevestiging telt als 0,76; `c_sh;PV` volgt uit `F_sh;obst` per maand; collectieve verdeling. |
+| `tojuli` | <ul><li>AOR/AVR telt niet mee;</li><li>koudebruggen per oriëntatie;</li><li>`a_C;red`;</li><li>`Q_C;HP;juli`;</li><li>actieve koeling alleen met capaciteitsbewijs.</li></ul> |
+| `lighting` (nieuw) | Hoofdstuk 14 voor utiliteit, inclusief daglicht 14.24–14.44 en afronding volgens bijlage X. |
+
+**Interpretatievragen** (implementatie volgt de gedrukte tekst, tenzij anders vermeld):
+
+1. **10.15.** `Q_C;em;ls = Q·MAX(Δϑ/(ϑ_int,inc − ϑ_e,comb); 0,15)` staat zo gedrukt (p. 376). Dat geeft een afgifteverlies van minimaal 15 % zodra er verlies is. Bij verwarming is 0,15 een bovengrens. Moet dit `MIN` zijn?
+2. **Tabel 10.16.** De kolom "Juli/september" is gelezen als juli tot en met september.
+3. **Externe koude** staat niet in tabel 10.15. De code rangschikt haar bij de centrale opwekkers.
+4. **Hulpenergie methode 3.** §10.5.6 zegt dat de forfaitaire waarden de condensorhulpenergie en de regeling al bevatten. Toch noemt 10.5.7 alleen `W_hr = 0` voor methode 3. De code rekent:
+   - de regeling 10.87 (0,010 kW, alle uren);
+   - condensorwaterdistributie 10.83 voor watergekoelde machines.
+   
+   Bij vrije koeling telt alleen pompenergie.
+5. **Afwijkende EER/ζ.** Voor een waarde uit een kwaliteitsverklaring gebruikt de code `f_prpr = 0,9` (10.54). Alleen voor tabelwaarden is 1,0 voorgeschreven.
+6. **`Q_hr;out` (10.80) in methode 3** gebruikt de tabel-EER zonder `f_C;PL`/`f_EER;corr`, die alleen in methoden 1/2 bestaan.
+7. **Koelgrens.**
+   - Met minder dan twee bruikbare maanden of een niet-stijgende lijn kiest de code 25 °C (de minste uren).
+   - De luchttoevoerterm van 10.20 ontbreekt (H11).
+8. **14.41.** `D_SNA = 0,54·τ·A_Ca/A_D·η_R` geeft een fractie, terwijl tabel 14.8 in % is. De code vermenigvuldigt met 100; anders kan een daklicht nooit daglicht leveren.
+9. **13.181** telt W/kW·kWh zoals gedrukt. De omgevingstemperatuur van verwarmde ruimten voor circulatie en vat is het naar oppervlakte gewogen stooksetpoint, niet `ϑ_int;calc`.
+10. **Tabel 13.27, klasse 4.** Boven 3 890 kWh houdt de code 1,0 aan. Lagere klassen boven hun bereik worden geweigerd (p. 644).
+11. **TO-juli.** Transmissie via AOR/AVR blijft ook buiten de juli-balans per oriëntatie, niet alleen buiten de noemer. Dat is conservatief.
+12. **Tabel 16.3.** De laatste rij luidt "≤ 0,80 → 0,75". Lagere `F_sh;obst` wordt dus niet geweigerd.
+
+**Nog open voor deze hoofdstukken:**
+
+- methoden 1/2 voor koudeopwekkers;
+- AHU-koeling en ontvochtiging;
+- zonneboilers;
+- meerdere tapwateropwekkers en boosterwarmtepompen;
+- bijlage P-verklaringen voor `dh`/`dc`;
+- terugwinbare verliezen in hoofdstuk 7;
+- automatische koppeling van de verlichtingswinst (7.28) aan de interne winst van hoofdstuk 7.
+
 ## Stand 1 oktober 2026: rekenruggengraat
 
 Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BENG 1/2/3, TO-juli, Bbl-toets en indicatieve labelklasse. Onderdelen en bronnen:
@@ -73,6 +116,16 @@ Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BEN
 | PV H16 | `pv` | transcriptie Heatloss (F3d-4) |
 | Primaire/hernieuwbare energie, opslagcorrectie, CO2, indicatoren H5 | `building_performance` | doeleditie p. 72–124 |
 | TO-juli §5.7 per oriëntatie | `tojuli` | transcriptie Heatloss (F3c) |
+
+| Afgifte 9.3 | `heating_emission` | consultatie H9 |
+| Opwekkers: gasketel, forfaitaire warmtepomp (met optioneel gemeten hulpenergie), hybride, externe warmtelevering, elektrisch, biomassa | `space_heating_chain` | consultatie H9 |
+| Koeling H10 (methode 3, afgifte, distributie, prioriteit) | `space_cooling` | normtekst p. 366–426 (2 oktober 2026) |
+| Belemmering en zonwering (§17.3, 7.42) | `solar_shading` | transcriptie Heatloss (F3d) |
+| Tapwater H13 (één opwekker) | `domestic_hot_water` | normtekst p. 525–655 (2 oktober 2026) |
+| Verlichting H14 (utiliteit) | `lighting` | normtekst p. 655–676 (2 oktober 2026) |
+| PV H16 | `pv` | normtekst p. 678–682 (2 oktober 2026) |
+| Primaire/hernieuwbare energie, indicatoren H5 | `building_performance` | consultatie H5 |
+| TO-juli §5.7 per oriëntatie | `tojuli` | normtekst p. 113–120 (2 oktober 2026) |
 | Labelklasse en A0 | `label_class`, `bbl_requirements` | Omgevingsregeling bijlagen IX/X/IXa/Xa (wettekst) |
 | BENG-eisen | `bbl_requirements` | Bbl tabel 4.148A (wettekst) |
 | Projectadapter, UI-paneel, formulier, rekenrapport | `project_performance`, `NtaPerformancePanel`, `NtaCalculationReport` | — |
@@ -90,7 +143,7 @@ Teststand bij commit 65de7ff: 218 kerntests (ook met Rust 1.77.2), 45 servicetes
 De volgende interpretatievragen moeten tegen de normtekst of wettekst worden beantwoord:
 
 1. Beweegbare zonwering op de warmtebalans bij utiliteit: nu altijd 1,0. Volgens het concept is dat alleen voor woningen voorgeschreven.
-2. TO-juli-noemer: telt de geleiding via een onverwarmde ruimte mee in `H_C;D`?
+2. TO-juli-noemer: telt de geleiding via een onverwarmde ruimte mee in `H_C;D`? Opgelost op 2 oktober 2026: nee, volgens §5.7.2 stap A (p. 116). Zie interpretatievraag 11 hierboven.
 3. Dubbele PV-opgave: inmiddels opgelost; PV moet via één route lopen (`pv_route_mixed`).
 4. A0-voorwaarde a: met of zonder de toeslag van Bbl 4.149 lid 4?
 5. Bijlage Xa noemt voor onderwijs 64, waar het patroon 63 doet verwachten. De code volgt de gepubliceerde tekst.
@@ -106,6 +159,11 @@ De volgende interpretatievragen moeten tegen de normtekst of wettekst worden bea
 4. Hoofdstuk 13: rendementstabellen.
 5. Distributie 9.26 is gebouwd; de koppeling met §7.9.2/7.9.6 (`f_H;red`, `θ_int;op;H`) en met de ventilatietermen van 9.28/9.29 loopt nog via opgaven.
 6. Terugkoppeling van 9.2.5 naar 7.2.1, en de correcties `a_H;red`/7.78.
+
+3. Hoofdstuk 10: methoden 1/2, AHU-koeling en ontvochtiging (methode 3 is nu verwerkt, zie boven).
+4. Hoofdstuk 13: zonneboilers, meerdere opwekkers en boosterwarmtepompen (de tabellen zijn nu verwerkt, zie boven).
+5. Distributie 9.26: stookgrens, tabel 7.11, §7.9.2 en 7.9.6.
+6. 9.2.3/9.2.5 en correcties `a_H;red`/7.78.
 7. Bijlage-P-verklaringen.
 8. Weging van gemengde functies (Bbl lid 2).
 9. Wijzigingsregeling 2026 (A0, bijlagen IXa/Xa).

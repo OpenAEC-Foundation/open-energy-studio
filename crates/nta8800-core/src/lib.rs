@@ -43,6 +43,7 @@ pub mod humidification;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod label_class;
+pub mod lighting;
 pub mod materials;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
@@ -295,12 +296,13 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
             "unverified_space_heating_distribution_9_26_to_9_51_and_auxiliary_9_85_9_91",
             "unverified_storage_correction_5_14a_and_co2_emission_5_5_6_1",
-            "unverified_pv_yield_chapter_16",
-            "unverified_space_cooling_generation_10_5_with_declared_emission",
+            "unverified_pv_yield_chapter_16_tables_16_1_to_16_3",
+            "unverified_space_cooling_chapter_10_method_3_with_emission_distribution_priority",
             "indicative_label_class_omgevingsregeling_annex_ix_x",
             "bbl_4_149_beng_requirement_check_single_function",
-            "unverified_tojuli_per_orientation_5_7",
-            "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
+            "unverified_tojuli_per_orientation_5_7_with_capacity_evidence",
+            "unverified_domestic_hot_water_chapter_13_single_generator",
+            "unverified_utility_lighting_chapter_14",
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
             "unverified_humidification_dehumidification_chapter_12",
@@ -1624,6 +1626,33 @@ pub(crate) fn unheated_zone_input(
     Some(UnheatedTransmissionInput { spaces })
 }
 
+/// Optional `orientations` of a project thermal bridge (project codes
+/// N, NE, …, NW, horizontal) for the TOjuli split of §5.7.2 step 2.
+fn bridge_sides(bridge: &Value) -> Option<Vec<direct_transmission::EnvelopeSide>> {
+    use direct_transmission::EnvelopeSide;
+    let Some(items) = bridge.get("orientations") else {
+        return Some(Vec::new());
+    };
+    items
+        .as_array()?
+        .iter()
+        .map(|item| {
+            Some(match item.as_str()? {
+                "N" => EnvelopeSide::North,
+                "NE" => EnvelopeSide::NorthEast,
+                "E" => EnvelopeSide::East,
+                "SE" => EnvelopeSide::SouthEast,
+                "S" => EnvelopeSide::South,
+                "SW" => EnvelopeSide::SouthWest,
+                "W" => EnvelopeSide::West,
+                "NW" => EnvelopeSide::NorthWest,
+                "horizontal" => EnvelopeSide::Horizontal,
+                _ => return None,
+            })
+        })
+        .collect()
+}
+
 pub(crate) fn direct_boundary_input(
     project: &ProjectInput,
     target: ThermalBoundary,
@@ -1713,6 +1742,7 @@ pub(crate) fn direct_boundary_input_zone(
                 length_m: bridge.get("length")?.as_f64()?,
                 psi_w_per_mk: bridge.get("psiValue")?.as_f64()?,
                 source_reference: format!("project:thermalBridge:{id}.psiValue"),
+                orientations: bridge_sides(bridge)?,
             });
         }
         for bridge in zone.point_thermal_bridges.as_deref()? {
@@ -1729,6 +1759,7 @@ pub(crate) fn direct_boundary_input_zone(
                 id: format!("point:{id}"),
                 chi_w_per_k: bridge.get("chiValue")?.as_f64()?,
                 source_reference: bridge.get("sourceReference")?.as_str()?.to_owned(),
+                orientations: bridge_sides(bridge)?,
             });
         }
     }

@@ -39,7 +39,7 @@ Voor warmtepompen ontbreken hierdoor nog de normatieve prestatie- en hulpenergie
 
 ## Transcriptiebronnen van de rekenkern (1 oktober 2026)
 
-De gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` staat op netwerkshare `Z:\50_projecten\7_3BM_bouwkunde\000_Documentatie\98_normen\`, die op de ontwikkelmachine niet gemount is. De onderstaande modules zijn gebouwd op normanalyses die die pdf transcriberen, met paginaverwijzingen. Bij de normreview moet elke regel opnieuw tegen de pdf worden gelegd.
+Sinds 2 oktober 2026 is de gelicentieerde pdf lokaal beschikbaar. De modules `space_cooling`, `domestic_hot_water`, `pv`, `tojuli` en `lighting` zijn daartegen herschreven; de pdf zelf staat niet in de repository. Oorspronkelijk stond de gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` op netwerkshare `Z:\50_projecten\7_3BM_bouwkunde\000_Documentatie\98_normen\`, die op de ontwikkelmachine niet gemount is. De onderstaande modules zijn gebouwd op normanalyses die die pdf transcriberen, met paginaverwijzingen. Bij de normreview moet elke regel opnieuw tegen de pdf worden gelegd.
 
 | Module | Normonderdeel | Transcriptiebron (Open Heatloss Studio, MIT) |
 |---|---|---|
@@ -47,10 +47,11 @@ De gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` staat op netwerkshare `Z:\5
 | `monthly_demand` | 7.2.1, 7.6/7.7, 7.21–7.24, 7.31–7.40, 7.45–7.57, tabel 7.10/7.13 | `docs/2026-07-13-c2…`, `c3…`, `c4…`, `c5…` |
 | `ground` | 8.30–8.41 | `docs/2026-07-13-c1-norm-analyse-transmissie.md` |
 | `solar_shading` | §17.3 tabel 17.4/17.5, 7.42/7.43, tabel 7.5–7.9 | `docs/2026-07-11-f3d-norm-analyse-beschaduwing.md`, `crates/nta8800-demand/src/calc/shading.rs` |
-| `tojuli` | §5.7.2, formule 5.40 | `docs/2026-07-11-f3c-norm-analyse-tojuli.md` |
-| `space_cooling` | 10.76/10.77/10.86, tabellen 10.29/10.30/10.34, 5.34 | `docs/2026-07-11-f3b-norm-analyse-koeling.md` |
-| `domestic_hot_water` | 13.15–13.18, §13.2.3.1 | `crates/nta8800-dhw/src/references.rs`, `model/demand.rs` |
-| `pv` | 16.2/16.3 | `docs/2026-07-12-f3d4-norm-analyse-pv.md` |
+| `tojuli` | §5.7.1/§5.7.2, 5.40/5.41a–c, 7.74/7.75, tabel 7.15 | normtekst p. 113–120, 216, 220 (2 oktober 2026; eerder F3c) |
+| `space_cooling` | hoofdstuk 10 methode 3, tabellen 10.4–10.16, 10.29–10.35, 9.31, 5.34 | normtekst p. 366–426, 106, 343 (2 oktober 2026; eerder F3b) |
+| `domestic_hot_water` | 13.1–13.59, 13.152–13.181, tabellen 13.1–13.9, 13.18, 13.23–13.29, 5.36/5.37 | normtekst p. 525–655, 107 (2 oktober 2026) |
+| `pv` | 16.1–16.4b, tabellen 16.1–16.3 | normtekst p. 678–682 (2 oktober 2026; eerder F3d-4) |
+| `lighting` | 14.1–14.44, tabellen 14.1–14.9, bijlage X, 7.28 | normtekst p. 655–676, 1129, 180 (2 oktober 2026) |
 | `building_performance` | factoren tabel 5.2/5.4 (bevestigd in F3a) | `docs/2026-07-11-f3a-norm-analyse-ep.md` |
 
 De hoofdstukken 5 en 9 volgden eerst het openbare consultatieconcept 2026: <https://www.internetconsultatie.nl/epg2026/document/14147> (H5) en <https://www.internetconsultatie.nl/epg2026/document/14150> (H9). Op 2 oktober 2026 zijn ze vergeleken met de gelicentieerde NTA 8800:2025+C1:2026:

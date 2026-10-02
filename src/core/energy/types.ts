@@ -90,6 +90,8 @@ export interface IThermalBridge {
   zoneId: string;
   thermalBoundary?: ThermalBoundary;
   unheatedSpaceId?: string;
+  /** Construction parts the bridge lies on, for the TOjuli split (NTA 8800 §5.7.2). */
+  orientations?: Orientation[];
 }
 
 export interface IPointThermalBridge {
@@ -99,6 +101,8 @@ export interface IPointThermalBridge {
   zoneId: string;
   thermalBoundary?: ThermalBoundary;
   unheatedSpaceId?: string;
+  /** Construction parts the bridge lies on, for the TOjuli split (NTA 8800 §5.7.2). */
+  orientations?: Orientation[];
   sourceReference: string;
 }
 

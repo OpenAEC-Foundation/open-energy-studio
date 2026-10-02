@@ -13,7 +13,10 @@
 //! required for the indicators (5.27).
 
 use crate::bbl_requirements::{a0_check, check as bbl_check, A0Check, BblCheck, BblFunction};
-use crate::domestic_hot_water::{monthly_hot_water, validate_hot_water, HotWaterSystem};
+use crate::domestic_hot_water::{
+    assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterCarrier, HotWaterContext,
+    HotWaterSystem,
+};
 use crate::final_energy_draft::DRAFT_SOURCE;
 use crate::forfait_heat_pump_draft::TableSource;
 use crate::forfait_heat_pump_monthly_draft::SourceSystem;
@@ -22,12 +25,18 @@ use crate::indicators_draft::{
     IndicatorsDraftInput, ScenarioKind,
 };
 use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
+use crate::lighting::{
+    assess_zone_lighting, validate_lighting, LightingContext, ZoneLighting, ZoneLightingResult,
+};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
-use crate::space_cooling::{cooling_month, validate_cooling, CoolingSystem};
+use crate::space_cooling::{
+    assess_cooling, validate_cooling, CoolingAssessment, CoolingContext, CoolingGeneratorKind,
+    CoolingSystem, CoolingZoneNeed, FreeCoolingSource,
+};
 use crate::space_heating_chain::{
     assess_space_heating_chain, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
-use crate::tojuli::{assess_tojuli, TojuliAssessment};
+use crate::tojuli::{assess_tojuli, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -60,6 +69,8 @@ pub const K_CO2_DISTRICT_HEAT_FORFAIT: f64 = 0.09;
 /// Table 5.4: ambient cold.
 pub const F_PREN_RENCOLD: f64 = 1.0;
 pub const F_PREN_RENHEAT: f64 = 1.0;
+/// Table 5.2: external cold without an annex P declaration, `f_P;del;el / 3`.
+pub const F_P_DISTRICT_COLD_FORFAIT: f64 = F_P_ELECTRICITY / 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -212,9 +223,10 @@ pub struct BuildingPerformanceInput {
     /// buildings use annex IX and may omit it.
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
-    /// §5.7.1: a zone with sufficient active cooling may use TOjuli = 0.
+    /// §5.7.1: an active cooling system with demonstrated capacity; then
+    /// TOjuli = 0.
     #[serde(default)]
-    pub active_cooling_present: bool,
+    pub active_cooling: Option<ActiveCoolingEvidence>,
     /// Permit application after 29 May 2026: the A0 designation may apply.
     #[serde(default, rename = "permitApplicationAfter20260529")]
     pub permit_application_after_2026_05_29: bool,
@@ -226,10 +238,14 @@ pub struct BuildingPerformanceInput {
     pub loss_area_m2: Option<f64>,
     #[serde(default)]
     pub loss_area_source_reference: Option<String>,
-    /// Space cooling generation calculated here (§10.5, partial).
+    /// Space cooling calculated here (chapter 10, method 3).
     #[serde(default)]
     pub cooling: Option<CoolingSystem>,
-    /// Domestic hot water calculated here (chapter 13, partial).
+    /// Utility lighting per calculation zone (chapter 14); dwellings have
+    /// `W_L = 0` and leave this empty.
+    #[serde(default)]
+    pub lighting: Vec<ZoneLighting>,
+    /// Domestic hot water calculated here (chapter 13, one generator).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
     /// Confirms the demand input uses the fixed C1 ventilation system of
@@ -313,6 +329,8 @@ pub struct BuildingPerformanceAssessment {
     /// A0 designation check; only with a Bbl check and a qualifying permit date.
     pub a0_check: Option<A0Check>,
     pub space_heating: SpaceHeatingChainAssessment,
+    /// Chapter 14 per zone, with the 7.28 internal gain for chapter 7.
+    pub lighting: Vec<ZoneLightingResult>,
     pub indicators: Option<IndicatorsDraftAssessment>,
     pub issues: Vec<PerformanceIssue>,
 }
@@ -329,6 +347,116 @@ fn twelve_nonnegative(values: &[f64]) -> bool {
         && values
             .iter()
             .all(|value| value.is_finite() && *value >= 0.0)
+}
+
+/// §5.7.1 system class against the calculated cooling generators.
+fn active_cooling_matches(
+    system: crate::tojuli::ActiveCoolingSystem,
+    cooling: &CoolingSystem,
+) -> bool {
+    use crate::tojuli::ActiveCoolingSystem as A;
+    cooling.generators.iter().any(|generator| {
+        let kind = &generator.generator;
+        match system {
+            A::CompressionTable10_29 | A::HeatPumpWithCoolingEmitter => matches!(
+                kind,
+                CoolingGeneratorKind::Compression { .. }
+                    | CoolingGeneratorKind::RoomAirConditioner { .. }
+                    | CoolingGeneratorKind::UnknownCollective
+                    | CoolingGeneratorKind::GasEngineCompression { .. }
+            ),
+            A::AbsorptionTable10_30 => matches!(
+                kind,
+                CoolingGeneratorKind::GasAbsorption { .. }
+                    | CoolingGeneratorKind::AbsorptionExternalHeat { .. }
+                    | CoolingGeneratorKind::AbsorptionChp { .. }
+            ),
+            A::FreeCoolingTable10_34 => matches!(
+                kind,
+                CoolingGeneratorKind::FreeCooling { source, .. }
+                    if *source != FreeCoolingSource::DewPointCooling
+            ),
+            A::DewPointCoolingHumidifiedExhaust => matches!(
+                kind,
+                CoolingGeneratorKind::FreeCooling {
+                    source: FreeCoolingSource::DewPointCooling,
+                    ..
+                }
+            ),
+            A::ExternalColdWithCoolingEmitter => {
+                matches!(kind, CoolingGeneratorKind::ExternalCold)
+            }
+            A::SplitUnitsInEveryHabitableRoom => {
+                matches!(kind, CoolingGeneratorKind::RoomAirConditioner { .. })
+            }
+            A::OtherUtility => true,
+        }
+    })
+}
+
+/// Chapter 13 context: scope, `A_g;tot` and the area-weighted heating setpoint.
+fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
+    let zones = std::iter::once(&input.space_heating.demand).chain(
+        input
+            .space_heating
+            .additional_zones
+            .iter()
+            .map(|zone| &zone.demand),
+    );
+    let (weighted, area) = zones.fold((0.0, 0.0), |(weighted, area), zone| {
+        (
+            weighted + zone.setpoints.heating_c * zone.usable_floor_area_m2,
+            area + zone.usable_floor_area_m2,
+        )
+    });
+    HotWaterContext {
+        residential: matches!(input.calculation_scope, CalculationScope::Residential),
+        usable_floor_area_m2: input.total_usable_floor_area_m2,
+        heated_ambient_c: if area > 0.0 { weighted / area } else { 20.0 },
+    }
+}
+
+/// Chapter 10 for all zones on the one cooling system.
+fn cooling_assessment(
+    input: &BuildingPerformanceInput,
+    heating: &SpaceHeatingChainAssessment,
+) -> Option<CoolingAssessment> {
+    let system = input.cooling.as_ref()?;
+    let areas = std::iter::once(&input.space_heating.demand)
+        .chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+        .map(|zone| zone.usable_floor_area_m2);
+    let zones: Vec<CoolingZoneNeed> = std::iter::once(&heating.demand)
+        .chain(&heating.additional_zone_demands)
+        .zip(areas)
+        .map(|(demand, area)| CoolingZoneNeed {
+            usable_floor_area_m2: area,
+            need_kwh: std::array::from_fn(|index| demand.monthly[index].cooling.need_kwh),
+        })
+        .collect();
+    // 10.84: heat taken from the source by the space-heating heat pump.
+    let extraction: [f64; 12] = std::array::from_fn(|index| {
+        let row = &heating.monthly[index];
+        (row.heat_pump_output_kwh - row.generator_electricity_kwh).max(0.0)
+    });
+    Some(assess_cooling(
+        system,
+        CoolingContext {
+            zones: &zones,
+            residential: matches!(input.calculation_scope, CalculationScope::Residential),
+            heat_pump_source_extraction_kwh: if input.space_heating.generator.heat_pump().is_some()
+            {
+                extraction
+            } else {
+                [0.0; 12]
+            },
+        },
+    ))
 }
 
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
@@ -494,6 +622,26 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         }) {
             issues.push(issue("cooling_double_count", "cooling"));
         }
+        for (index, generator) in system.generators.iter().enumerate() {
+            if matches!(
+                generator.generator,
+                CoolingGeneratorKind::AbsorptionChp { .. }
+            ) {
+                // Building CHP is not modelled in the heating chain.
+                issues.push(issue(
+                    "cooling_chp_unsupported",
+                    format!("cooling.generators[{index}].generator"),
+                ));
+            }
+        }
+        if let Some(evidence) = &input.active_cooling {
+            if !active_cooling_matches(evidence.system, system) {
+                issues.push(issue(
+                    "active_cooling_system_inconsistent",
+                    "activeCooling.system",
+                ));
+            }
+        }
     }
     let chapter_11_zones = std::iter::once(&input.space_heating.demand)
         .chain(
@@ -529,7 +677,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             "declaredRenewableHeat",
         ));
     }
-    if input.active_cooling_present
+    if input.active_cooling.is_some()
         && input.cooling.is_none()
         && !input
             .declared_uses
@@ -539,12 +687,50 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         // §5.7.1: TOjuli = 0 needs an active cooling system.
         issues.push(issue(
             "active_cooling_without_cooling_system",
-            "activeCoolingPresent",
+            "activeCooling",
         ));
+    }
+    if !input.lighting.is_empty() {
+        if residential {
+            // 14.2.1: W_L;spec = 0 for the indicators of dwellings.
+            issues.push(issue("residential_lighting_must_be_omitted", "lighting"));
+        }
+        if input
+            .declared_uses
+            .iter()
+            .any(|item| item.service == Service::Lighting)
+        {
+            issues.push(issue("lighting_double_count", "lighting"));
+        }
+        let zones: Vec<(&str, f64)> = std::iter::once(&input.space_heating.demand)
+            .chain(
+                input
+                    .space_heating
+                    .additional_zones
+                    .iter()
+                    .map(|zone| &zone.demand),
+            )
+            .map(|zone| (zone.zone_id.as_str(), zone.usable_floor_area_m2))
+            .collect();
+        let mut seen = HashSet::new();
+        for (index, item) in input.lighting.iter().enumerate() {
+            let path = format!("lighting[{index}]");
+            match zones.iter().find(|zone| zone.0 == item.zone_id) {
+                Some((_, area)) if seen.insert(item.zone_id.as_str()) => issues.extend(
+                    validate_lighting(item, *area, &path)
+                        .into_iter()
+                        .map(|found| issue(found.code, found.path)),
+                ),
+                _ => issues.push(issue("lighting_zone_unknown", format!("{path}.zoneId"))),
+            }
+        }
+        if seen.len() != zones.len() {
+            issues.push(issue("lighting_zone_missing", "lighting"));
+        }
     }
     if let Some(system) = &input.hot_water {
         issues.extend(
-            validate_hot_water(system, "hotWater")
+            validate_hot_water(system, hot_water_context(input), "hotWater")
                 .into_iter()
                 .map(|item| issue(item.code, item.path)),
         );
@@ -685,8 +871,55 @@ pub fn assess_building_performance(
     let mut carriers = Vec::new();
     let mut balance = Vec::new();
     let mut totals = None;
+    let cooling = if issues.is_empty() {
+        cooling_assessment(input, &heating)
+    } else {
+        None
+    };
+    let lighting: Vec<ZoneLightingResult> = if issues.is_empty() {
+        let window_area: f64 = std::iter::once(&input.space_heating.demand)
+            .chain(
+                input
+                    .space_heating
+                    .additional_zones
+                    .iter()
+                    .map(|zone| &zone.demand),
+            )
+            .flat_map(|zone| zone.windows.iter())
+            .map(|window| window.area_m2)
+            .sum();
+        let context = LightingContext {
+            total_usable_floor_area_m2: input.total_usable_floor_area_m2,
+            total_window_area_m2: window_area,
+        };
+        input
+            .lighting
+            .iter()
+            .map(|zone| assess_zone_lighting(zone, context))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let hot_water = match (&input.hot_water, issues.is_empty()) {
+        (Some(system), true) => match assess_hot_water(system, hot_water_context(input)) {
+            Ok(result) => Some(result),
+            Err(error) => {
+                issues.push(issue(error.code, error.path));
+                None
+            }
+        },
+        _ => None,
+    };
     if issues.is_empty() {
-        totals = Some(compute(input, &heating, &mut carriers, &mut balance));
+        totals = Some(compute(
+            input,
+            &heating,
+            cooling.as_ref(),
+            hot_water.as_ref(),
+            &lighting,
+            &mut carriers,
+            &mut balance,
+        ));
     }
     let mut indicators = None;
     if let Some(Totals {
@@ -759,9 +992,24 @@ pub fn assess_building_performance(
             f64::INFINITY
         }
     };
+    let residential = matches!(input.calculation_scope, CalculationScope::Residential);
+    // a_C;red follows the zone's usage function (monthly_demand, 7.74/7.75).
     let tojuli: Vec<TojuliAssessment> = if valid {
         zone_demands()
-            .map(|zone| assess_tojuli(zone, input.active_cooling_present))
+            .enumerate()
+            .map(|(zone_index, zone)| {
+                assess_tojuli(
+                    zone,
+                    TojuliOptions {
+                        residential,
+                        active_cooling: input.active_cooling.as_ref(),
+                        // 10.6 per zone, July.
+                        booster_heat_pump_july_kwh: cooling
+                            .as_ref()
+                            .map_or(0.0, |item| item.zone_booster_extraction_kwh[zone_index][6]),
+                    },
+                )
+            })
             .collect()
     } else {
         Vec::new()
@@ -842,6 +1090,7 @@ pub fn assess_building_performance(
             }),
         bbl_check: bbl,
         space_heating: heating,
+        lighting: if valid { lighting } else { Vec::new() },
         indicators: indicators.filter(|_| valid),
         issues,
     }
@@ -881,6 +1130,9 @@ fn storage_correction_factor(input: &BuildingPerformanceInput) -> f64 {
 fn compute(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
+    cooling: Option<&CoolingAssessment>,
+    hot_water: Option<&HotWaterAssessment>,
+    lighting: &[ZoneLightingResult],
     carriers: &mut Vec<CarrierMonth>,
     balance: &mut Vec<ElectricityBalanceMonth>,
 ) -> Totals {
@@ -905,13 +1157,16 @@ fn compute(
             evidence.outdoor_air_heat_fraction.unwrap_or(0.0)
         });
     let cop = heating.generation_efficiency.unwrap_or(0.0);
-    let pv_yields: Vec<[f64; 12]> = input.pv_systems.iter().map(monthly_yield_kwh).collect();
-    let hot_water = input.hot_water.as_ref().map(|system| {
-        (
-            system.carrier,
-            monthly_hot_water(system, input.total_usable_floor_area_m2),
-        )
-    });
+    let pv_yields: Vec<[f64; 12]> = input
+        .pv_systems
+        .iter()
+        .map(|system| monthly_yield_kwh(system, input.total_usable_floor_area_m2))
+        .collect();
+    let hot_water = input
+        .hot_water
+        .as_ref()
+        .zip(hot_water)
+        .map(|(system, result)| (system.carrier(), &result.months));
     for index in 0..12 {
         let month = (index + 1) as u8;
         let row = &heating.monthly[index];
@@ -922,7 +1177,8 @@ fn compute(
         let mut used_oil = 0.0;
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
-        let used_dh = bacs * row.district_heat_kwh;
+        let mut used_dh = bacs * row.district_heat_kwh;
+        let mut used_dc = 0.0;
         for item in &input.declared_uses {
             let factor = if item.service.bacs_weighted() {
                 bacs
@@ -946,25 +1202,30 @@ fn compute(
                     + row.grille_preheating_electricity_kwh;
             }
         }
-        // §10.5: cooling generation for the summed cooling need, weighted by f_BACS (5.20).
+        // Chapter 10 cooling and its auxiliaries, weighted by f_BACS (5.20/5.21).
         let mut ambient_cold = 0.0;
-        if let Some(system) = &input.cooling {
-            let need: f64 = std::iter::once(&heating.demand)
-                .chain(&heating.additional_zone_demands)
-                .map(|demand| demand.monthly[index].cooling.need_kwh)
-                .sum();
-            let cooling = cooling_month(system, need);
-            used_el += bacs * cooling.electricity_kwh;
-            used_gas += bacs * cooling.natural_gas_kwh;
-            ambient_cold = cooling.ambient_cold_kwh;
+        if let Some(assessment) = cooling {
+            let month_row = &assessment.months[index];
+            used_el += bacs * (month_row.electricity_kwh + month_row.auxiliary_electricity_kwh);
+            used_gas += bacs * month_row.natural_gas_kwh;
+            used_dh += bacs * month_row.district_heat_kwh;
+            used_dc += bacs * month_row.district_cold_kwh;
+            ambient_cold = month_row.ambient_cold_kwh;
         }
+        // Chapter 14 lighting (electricity, months by t_mi/t_an).
+        used_el += lighting
+            .iter()
+            .map(|zone| zone.monthly_kwh[index])
+            .sum::<f64>();
         let mut hot_water_ambient = 0.0;
         if let Some((carrier, months)) = &hot_water {
             let row = &months[index];
             match carrier {
-                Carrier::El => used_el += row.carrier_input_kwh,
-                Carrier::Gas => used_gas += row.carrier_input_kwh,
-                Carrier::Oil => used_oil += row.carrier_input_kwh,
+                HotWaterCarrier::Fuel(Carrier::El) => used_el += row.carrier_input_kwh,
+                HotWaterCarrier::Fuel(Carrier::Gas) => used_gas += row.carrier_input_kwh,
+                HotWaterCarrier::Fuel(Carrier::Oil) => used_oil += row.carrier_input_kwh,
+                // Table 5.2: forfait external heat for hot water (dw).
+                HotWaterCarrier::DistrictHeat => used_dh += row.carrier_input_kwh,
             }
             used_el += row.auxiliary_electricity_kwh;
             hot_water_ambient = row.ambient_heat_kwh;
@@ -1014,6 +1275,16 @@ fn compute(
                 month,
                 used_kwh: used_dh,
                 delivered_kwh: used_dh,
+            });
+        }
+        // Table 5.2/5.4: forfait external cold, f_Pren;dcforf = 0.
+        fossil += used_dc * F_P_DISTRICT_COLD_FORFAIT;
+        if used_dc > 0.0 {
+            carriers.push(CarrierMonth {
+                carrier: "dc",
+                month,
+                used_kwh: used_dc,
+                delivered_kwh: used_dc,
             });
         }
         // 5.10 and 5.13: exported electricity is subtracted at f_P;exp;el.
@@ -1390,12 +1661,15 @@ mod tests {
         let base = assess_building_performance(&sample);
         sample.pv_systems.push(PvSystem {
             id: "roof-pv".into(),
-            peak_power_kw: 3.0,
+            peak_power: crate::pv::PeakPower::Panels {
+                panel_peak_power_w: 300.0,
+                panel_count: 10,
+            },
             azimuth_deg: 180.0,
             tilt_deg: 35.0,
-            performance_factor: 0.80,
-            shading_correction: 1.0,
-            obstruction_factor: 1.0,
+            mounting: crate::pv::PvMounting::ModeratelyVentilated,
+            obstruction_factors: vec![1.0],
+            collective: None,
             source_reference: "datasheet".into(),
         });
         let result = assess_building_performance(&sample);
@@ -1404,7 +1678,7 @@ mod tests {
             "{:?}",
             result.issues
         );
-        let pv: f64 = monthly_yield_kwh(&sample.pv_systems[0]).iter().sum();
+        let pv: f64 = monthly_yield_kwh(&sample.pv_systems[0], 100.0).iter().sum();
         let delta = result.annual_renewable_primary_kwh.unwrap()
             - base.annual_renewable_primary_kwh.unwrap();
         assert!((delta - pv * 1.45).abs() < 1e-6);
@@ -1415,21 +1689,34 @@ mod tests {
 
     #[test]
     fn calculated_hot_water_replaces_declared_use_and_blocks_double_count() {
-        use crate::domestic_hot_water::HotWaterNeed;
+        use crate::domestic_hot_water::{
+            GasAppliance, HotWaterEmission, HotWaterGenerator, HotWaterNeed, ServedTaps,
+        };
         let mut sample = input();
         let system = HotWaterSystem {
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
             },
-            emission_efficiency: 0.9,
-            distribution_efficiency: 1.0,
-            generation_efficiency: 0.8,
-            carrier: Carrier::Gas,
-            shower_heat_recovery_kwh: Vec::new(),
-            auxiliary_electricity_kwh: Vec::new(),
-            renewable_heat_pump: false,
-            efficiency_source_reference: "synthetic".into(),
+            emission: HotWaterEmission::Residential {
+                served: ServedTaps::KitchenAndBathroom,
+                kitchen_length_m: Some(1.0),
+                bathroom_length_m: Some(1.0),
+                source_reference: "drawing".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: None,
+            storage: Vec::new(),
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator: HotWaterGenerator::GasAppliance {
+                appliance: GasAppliance::CombiGaskeurHrCw,
+                measured_class: Some(crate::domestic_hot_water::ApplicationClass::Class1),
+                kitchen_only: false,
+                declared: None,
+            },
+            collective: None,
+            equipment_reference: "plate".into(),
         };
         sample.hot_water = Some(system.clone());
         let doubled = assess_building_performance(&sample);
@@ -1452,8 +1739,8 @@ mod tests {
             .filter(|item| item.carrier == "gas")
             .map(|item| item.used_kwh)
             .sum();
-        let expected =
-            result.space_heating.annual_natural_gas_kwh.unwrap() + 856.0 * 2.28 / 0.9 / 0.8;
+        // Short draw-off lines (η_em = 1) and class 1 (c_W;gen = 1).
+        let expected = result.space_heating.annual_natural_gas_kwh.unwrap() + 856.0 * 2.28 / 0.675;
         assert!((gas - expected).abs() < 1e-6);
     }
 
@@ -1583,31 +1870,54 @@ mod tests {
         assert!(result.carriers.iter().any(|item| item.carrier == "bm"));
     }
 
+    fn cooling_system(kind: crate::space_cooling::CoolingGeneratorKind) -> CoolingSystem {
+        use crate::space_cooling::{
+            CoolingBalancing, CoolingControl, CoolingEmission, CoolingEmitter, CoolingGenerator,
+        };
+        CoolingSystem {
+            emission: CoolingEmission {
+                emitter: CoolingEmitter::OtherOrUnknown,
+                balancing: CoolingBalancing::NotApplicable,
+                control: CoolingControl::CentralWithRoomControl,
+                fan_coil_count: 0,
+                source_reference: "design".into(),
+            },
+            distribution: None,
+            generators: vec![CoolingGenerator {
+                id: "cold".into(),
+                generator: kind,
+                capacity_kw: None,
+                equipment_reference: "plate".into(),
+            }],
+            booster_heat_pump_extraction_kwh: Vec::new(),
+            collective: None,
+        }
+    }
+
     #[test]
     fn cooling_chain_adds_electricity_and_ambient_cold() {
-        use crate::space_cooling::{CoolingGenerator, FreeCoolingSource};
         let mut sample = input();
         let base = assess_building_performance(&sample);
-        sample.cooling = Some(CoolingSystem {
-            emission_efficiency: 1.0,
-            distribution_efficiency: 1.0,
-            control_factor: 1.0,
-            efficiency_source_reference: "design".into(),
-            generator: CoolingGenerator::FreeCooling {
-                source: FreeCoolingSource::ClosedGroundLoop,
-                free_cooling_fraction: 1.0,
-                fraction_source_reference: "design".into(),
-            },
-            equipment_reference: "plate".into(),
-        });
+        sample.cooling = Some(cooling_system(CoolingGeneratorKind::FreeCooling {
+            source: FreeCoolingSource::ClosedGroundLoop,
+            heat_pump_source: false,
+            ground_above_zero_demonstrated: false,
+        }));
         let result = assess_building_performance(&sample);
         assert_eq!(
             result.status, "calculated_unverified",
             "{:?}",
             result.issues
         );
-        let cold = result.space_heating.demand.annual_cooling_need_kwh.unwrap();
-        assert!(cold > 0.0);
+        let need = result.space_heating.demand.annual_cooling_need_kwh.unwrap();
+        assert!(need > 0.0);
+        let cooling = cooling_assessment(&sample, &result.space_heating).unwrap();
+        let cold: f64 = cooling
+            .months
+            .iter()
+            .map(|row| row.generator_cold_kwh)
+            .sum();
+        assert!(cold > need);
         let renewable_delta = result.annual_renewable_primary_kwh.unwrap()
             - base.annual_renewable_primary_kwh.unwrap();
         assert!((renewable_delta - cold).abs() < 1e-6);
@@ -1632,6 +1942,71 @@ mod tests {
             .any(|item| item.code == "cooling_double_count"));
     }
 
+    #[test]
+    fn external_cold_uses_forfait_factor_and_chp_absorption_is_rejected() {
+        let mut sample = input();
+        let base = assess_building_performance(&sample);
+        sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let cold: f64 = result
+            .carriers
+            .iter()
+            .filter(|item| item.carrier == "dc")
+            .map(|item| item.used_kwh)
+            .sum();
+        assert!(cold > 0.0);
+        let delta =
+            result.annual_primary_fossil_kwh.unwrap() - base.annual_primary_fossil_kwh.unwrap();
+        assert!((delta - cold * 1.45 / 3.0).abs() < 1e-6);
+        assert_eq!(
+            result.annual_renewable_primary_kwh,
+            base.annual_renewable_primary_kwh
+        );
+        sample.cooling = Some(cooling_system(CoolingGeneratorKind::AbsorptionChp {
+            chp: crate::space_cooling::ChpClass {
+                power_kw: 50.0,
+                built_after_2006: true,
+                hre_declared: false,
+                low_temperature: false,
+            },
+            heat_rejection: None,
+        }));
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "cooling_chp_unsupported"));
+    }
+
+    #[test]
+    fn active_cooling_must_match_the_calculated_generator() {
+        let mut sample = input();
+        sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
+        sample.active_cooling = Some(ActiveCoolingEvidence {
+            system: crate::tojuli::ActiveCoolingSystem::SplitUnitsInEveryHabitableRoom,
+            capacity: crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                source_reference: "annex AA".into(),
+            },
+            source_reference: "design".into(),
+        });
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "active_cooling_system_inconsistent"));
+        sample.active_cooling.as_mut().unwrap().system =
+            crate::tojuli::ActiveCoolingSystem::ExternalColdWithCoolingEmitter;
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert_eq!(result.tojuli_max_k, Some(0.0));
+    }
     #[test]
     fn review_fixes_bacs_on_district_heat_and_consistency_checks() {
         use crate::space_heating_chain::ExternalHeatGenerator;
@@ -1670,7 +2045,13 @@ mod tests {
         );
 
         let mut cooled = input();
-        cooled.active_cooling_present = true;
+        cooled.active_cooling = Some(ActiveCoolingEvidence {
+            system: crate::tojuli::ActiveCoolingSystem::SplitUnitsInEveryHabitableRoom,
+            capacity: crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                source_reference: "annex AA".into(),
+            },
+            source_reference: "design".into(),
+        });
         assert!(assess_building_performance(&cooled)
             .issues
             .iter()
@@ -1678,16 +2059,79 @@ mod tests {
     }
 
     #[test]
+    fn utility_lighting_adds_electricity_and_is_rejected_for_dwellings() {
+        use crate::lighting::{
+            Daylight, InstalledPower, LightingZone, Occupancy, ParasiticPower, SwitchControl,
+            UseArea, ZoneLighting,
+        };
+        let mut sample = input();
+        let zone_id = sample.space_heating.demand.zone_id.clone();
+        let lighting = ZoneLighting {
+            zone_id,
+            functions: vec![UseArea {
+                function: LabelFunction::Office,
+                area_m2: 100.0,
+            }],
+            lighting_zones: vec![LightingZone {
+                id: "open-plan".into(),
+                area_m2: 100.0,
+                power: InstalledPower::Forfait {
+                    led_from_2017: false,
+                },
+                parasitic: ParasiticPower::Forfait,
+                occupancy: Occupancy {
+                    control: SwitchControl::ManualOrUnknown,
+                    central_on_control: true,
+                    large_office_group: false,
+                },
+                daylight: Daylight::None,
+                extracted_luminaires: false,
+            }],
+            source_reference: "lighting plan".into(),
+        };
+        sample.lighting = vec![lighting];
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "residential_lighting_must_be_omitted"));
+        sample.calculation_scope = CalculationScope::Utility;
+        sample.label_function = Some(LabelFunction::Office);
+        let mut base_input = sample.clone();
+        base_input.lighting.clear();
+        let base = assess_building_performance(&base_input);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // 16 W/m² · 100 m² · (2 200 + 300) h + 2,5 kWh/m² · 100 m².
+        let expected = 1600.0 * 2500.0 / 1000.0 + 250.0;
+        assert!((result.lighting[0].annual_kwh - expected).abs() < 1e-9);
+        let el = |r: &BuildingPerformanceAssessment| -> f64 {
+            r.carriers
+                .iter()
+                .filter(|item| item.carrier == "el")
+                .map(|item| item.used_kwh)
+                .sum()
+        };
+        assert!((el(&result) - el(&base) - expected).abs() < 1e-6);
+    }
+
+    #[test]
     fn mixed_pv_routes_are_rejected() {
         let mut sample = input();
         sample.pv_systems.push(PvSystem {
             id: "roof-pv".into(),
-            peak_power_kw: 3.0,
+            peak_power: crate::pv::PeakPower::Panels {
+                panel_peak_power_w: 300.0,
+                panel_count: 10,
+            },
             azimuth_deg: 180.0,
             tilt_deg: 35.0,
-            performance_factor: 0.80,
-            shading_correction: 1.0,
-            obstruction_factor: 1.0,
+            mounting: crate::pv::PvMounting::ModeratelyVentilated,
+            obstruction_factors: vec![1.0],
+            collective: None,
             source_reference: "datasheet".into(),
         });
         assert!(assess_building_performance(&sample)
