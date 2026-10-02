@@ -9,13 +9,17 @@
 //! registration date, p. 24); Besluit energieprestatie gebouwen art. 2.1
 //! lid 7 (label valid ten years from the survey date, p. 4); Regeling
 //! energieprestatie gebouwen art. 4 and 5 (label and registration data,
-//! p. 5–6). BRL 9500-U mirrors these clauses.
+//! p. 5–6); BRL 9500-W §3.1 (mandatory detailed survey, p. 14–15; BRL
+//! 9500-U §3.1 p. 11) and Bijlage 3 (project dossier with evidence,
+//! p. 61–63). BRL 9500-U mirrors these clauses.
 //!
 //! The kernel checks the data; it does not register anything. EP-Online
 //! registration needs the RVO exchange specification.
 
 use crate::KERNEL_VERSION;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashSet;
 
 pub const REGISTRATION_SOURCE: &str = "BRL 9500-W/U (14-10-2025) §4.2.3–4.2.5; Besluit energieprestatie gebouwen art. 2.1 lid 7; Regeling energieprestatie gebouwen art. 4–5";
 
@@ -54,6 +58,97 @@ pub struct Advisor {
     /// Vakbekwaamheidsnummer.
     #[serde(default)]
     pub competence_number: String,
+}
+
+/// Situations of BRL 9500-W/U §3.1 that make the detailed survey
+/// mandatory, besides toets Bbl and delivery (purpose) and a completion
+/// after 1-1-2021 (`completionDate`/`constructionYear`).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailSurveyTriggers {
+    /// Renewal after demolition keeping only foundations and floors.
+    #[serde(default)]
+    pub rebuilt_after_demolition: bool,
+    /// Full renovation with new-build requirements after 1-1-2021.
+    #[serde(default)]
+    pub full_renovation_with_new_build_requirements: bool,
+    /// Energy performance fee (EPV), residential only.
+    #[serde(default)]
+    pub energy_performance_fee: bool,
+    /// Showing that an improvement reaches a BENG requirement.
+    #[serde(default)]
+    pub beng_requirement_proof: bool,
+    /// An earlier report with a detailed survey was registered.
+    #[serde(default)]
+    pub previous_detailed_registration: bool,
+    /// Dwelling added after 2021 to a building realised before 2021.
+    #[serde(default)]
+    pub added_after_2021: bool,
+}
+
+impl DetailSurveyTriggers {
+    fn any(&self) -> bool {
+        self.rebuilt_after_demolition
+            || self.full_renovation_with_new_build_requirements
+            || self.energy_performance_fee
+            || self.beng_requirement_proof
+            || self.previous_detailed_registration
+            || self.added_after_2021
+    }
+}
+
+/// Type of evidence in the project dossier (Bijlage 3 and 5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceKind {
+    PhotoOverview,
+    PhotoDetail,
+    Invoice,
+    Drawing,
+    Datasheet,
+    DeclarationOfPerformance,
+    QualityDeclaration,
+    /// Data supplied by the client (Bijlage 4 form or e-mail).
+    ClientStatement,
+    Other,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GpsPosition {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+/// One evidence file. The kernel keeps its identity (hash) and metadata;
+/// the file itself goes into the dossier export.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EvidenceItem {
+    pub id: String,
+    pub kind: EvidenceKind,
+    pub file_name: String,
+    /// SHA-256 of the file, lowercase hex.
+    pub sha256: String,
+    /// Date the photo or document was made, YYYY-MM-DD.
+    #[serde(default)]
+    pub date: Option<String>,
+    #[serde(default)]
+    pub gps: Option<GpsPosition>,
+    /// Who supplied it (adviser, client, installer, …).
+    #[serde(default)]
+    pub source_party: Option<String>,
+    /// Adviser who checked it (BRL 9500 §4.2.7).
+    #[serde(default)]
+    pub checked_by: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// JSON pointers into the project that this evidence supports.
+    #[serde(default)]
+    pub linked_paths: Vec<String>,
+    /// Local copy of the file in the desktop app.
+    #[serde(default)]
+    pub stored_path: Option<String>,
 }
 
 /// All fields are optional so projects without registration data stay
@@ -110,6 +205,14 @@ pub struct Registration {
     /// EP-Online number, entered after registration.
     #[serde(default)]
     pub ep_online_number: Option<String>,
+    /// Opleverdatum, YYYY-MM-DD (§3.1: after 1-1-2021 detailed survey).
+    #[serde(default)]
+    pub completion_date: Option<String>,
+    #[serde(default)]
+    pub detail_survey_triggers: DetailSurveyTriggers,
+    /// Evidence register of the project dossier (Bijlage 3).
+    #[serde(default)]
+    pub evidence: Vec<EvidenceItem>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -369,6 +472,8 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
     if registration.relabel && registration.purpose == Some(RegistrationPurpose::BblCheck) {
         issues.push(issue("relabel_not_for_bbl_check", "relabel", "error"));
     }
+    check_detail_survey(registration, &mut issues);
+    check_evidence(&registration.evidence, &mut issues);
 
     RegistrationAssessment {
         source: REGISTRATION_SOURCE,
@@ -378,6 +483,205 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
         ready_for_registration: issues.is_empty(),
         issues,
     }
+}
+
+/// BRL 9500-W/U §3.1: situations in which a basic survey is not allowed.
+fn check_detail_survey(registration: &Registration, issues: &mut Vec<RegistrationIssue>) {
+    if registration.survey_type != Some(SurveyType::Basic) {
+        return;
+    }
+    let start_2021 = Date {
+        year: 2021,
+        month: 1,
+        day: 1,
+    };
+    let completed_after_2021 = registration
+        .completion_date
+        .as_deref()
+        .and_then(Date::parse)
+        .is_some_and(|date| date > start_2021)
+        || registration
+            .construction_year
+            .is_some_and(|year| year >= 2021);
+    let reasons = [
+        (
+            matches!(
+                registration.purpose,
+                Some(RegistrationPurpose::BblCheck | RegistrationPurpose::Delivery)
+            ),
+            "detail_survey_required_for_purpose",
+            "purpose",
+        ),
+        (
+            completed_after_2021,
+            "detail_survey_required_completed_after_2021",
+            "completionDate",
+        ),
+        (
+            registration.detail_survey_triggers.any(),
+            "detail_survey_required",
+            "detailSurveyTriggers",
+        ),
+    ];
+    for (applies, code, path) in reasons {
+        if applies {
+            issues.push(issue(code, path, "error"));
+        }
+    }
+}
+
+fn check_evidence(evidence: &[EvidenceItem], issues: &mut Vec<RegistrationIssue>) {
+    let mut ids = HashSet::new();
+    for (index, item) in evidence.iter().enumerate() {
+        let path = format!("evidence[{index}]");
+        if item.id.trim().is_empty() || !ids.insert(item.id.as_str()) {
+            issues.push(issue("evidence_id_invalid", &format!("{path}.id"), "error"));
+        }
+        if item.file_name.trim().is_empty() {
+            issues.push(issue(
+                "evidence_file_name_required",
+                &format!("{path}.fileName"),
+                "error",
+            ));
+        }
+        let hex = item.sha256.len() == 64
+            && item
+                .sha256
+                .chars()
+                .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c));
+        if !hex {
+            issues.push(issue(
+                "evidence_hash_invalid",
+                &format!("{path}.sha256"),
+                "error",
+            ));
+        }
+        if item
+            .date
+            .as_deref()
+            .is_some_and(|date| Date::parse(date).is_none())
+        {
+            issues.push(issue(
+                "evidence_date_invalid",
+                &format!("{path}.date"),
+                "error",
+            ));
+        }
+        if let Some(gps) = &item.gps {
+            let valid =
+                (-90.0..=90.0).contains(&gps.latitude) && (-180.0..=180.0).contains(&gps.longitude);
+            if !valid {
+                issues.push(issue(
+                    "evidence_gps_invalid",
+                    &format!("{path}.gps"),
+                    "error",
+                ));
+            }
+        }
+        if blank(&item.checked_by) {
+            // §4.2.7: the adviser checks evidence supplied by others.
+            issues.push(issue(
+                "evidence_check_required",
+                &format!("{path}.checkedBy"),
+                "missing",
+            ));
+        }
+        for (link, pointer) in item.linked_paths.iter().enumerate() {
+            if !pointer.starts_with('/') {
+                issues.push(issue(
+                    "evidence_link_path_invalid",
+                    &format!("{path}.linkedPaths[{link}]"),
+                    "error",
+                ));
+            }
+        }
+    }
+}
+
+/// Marks an evidence id inside a `…Reference` text, e.g.
+/// `"factuur, evidence:ev-3"`.
+pub const EVIDENCE_REFERENCE_PREFIX: &str = "evidence:";
+
+/// Cross-checks the evidence register against the project: linked paths
+/// must exist, and every `evidence:<id>` in a `…Reference` field must name
+/// a registered item. The registration block itself is skipped.
+pub fn check_evidence_links(
+    project: &Value,
+    registration: &Registration,
+) -> Vec<RegistrationIssue> {
+    let mut issues = Vec::new();
+    let ids: HashSet<&str> = registration
+        .evidence
+        .iter()
+        .map(|item| item.id.as_str())
+        .collect();
+    for (index, item) in registration.evidence.iter().enumerate() {
+        for (link, pointer) in item.linked_paths.iter().enumerate() {
+            if pointer.starts_with('/') && project.pointer(pointer).is_none() {
+                issues.push(issue(
+                    "evidence_link_path_unknown",
+                    &format!("evidence[{index}].linkedPaths[{link}]"),
+                    "error",
+                ));
+            }
+        }
+    }
+    let mut stack: Vec<(String, &Value)> = vec![(String::new(), project)];
+    while let Some((pointer, value)) = stack.pop() {
+        match value {
+            Value::Object(map) => {
+                for (key, child) in map {
+                    if pointer.is_empty() && key == "registration" {
+                        continue;
+                    }
+                    let child_pointer =
+                        format!("{pointer}/{}", key.replace('~', "~0").replace('/', "~1"));
+                    match child {
+                        Value::String(text) if key.ends_with("Reference") => {
+                            for id in referenced_evidence(text) {
+                                if !ids.contains(id) {
+                                    issues.push(RegistrationIssue {
+                                        code: "evidence_reference_unknown",
+                                        path: child_pointer.clone(),
+                                        severity: "error",
+                                    });
+                                }
+                            }
+                        }
+                        _ => stack.push((child_pointer, child)),
+                    }
+                }
+            }
+            Value::Array(items) => {
+                for (index, child) in items.iter().enumerate() {
+                    stack.push((format!("{pointer}/{index}"), child));
+                }
+            }
+            _ => {}
+        }
+    }
+    issues
+}
+
+fn referenced_evidence(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | '(' | ')'))
+        .filter_map(|token| token.strip_prefix(EVIDENCE_REFERENCE_PREFIX))
+        .map(|id| id.trim_end_matches('.'))
+        .filter(|id| !id.is_empty())
+}
+
+/// [`assess_registration`] plus the evidence cross-check against the
+/// project the block belongs to.
+pub fn assess_project_registration(
+    registration: &Registration,
+    project: &Value,
+) -> RegistrationAssessment {
+    let mut result = assess_registration(registration);
+    result
+        .issues
+        .extend(check_evidence_links(project, registration));
+    result.ready_for_registration = result.issues.is_empty();
+    result
 }
 
 #[cfg(test)]
@@ -481,5 +785,87 @@ mod tests {
         let mut similar = complete();
         similar.representation = Some(Representation::Similar);
         assert_eq!(codes(&similar), vec!["reference_object_required"]);
+    }
+
+    fn evidence(id: &str) -> EvidenceItem {
+        EvidenceItem {
+            id: id.into(),
+            kind: EvidenceKind::Invoice,
+            file_name: "factuur.pdf".into(),
+            sha256: "a".repeat(64),
+            date: Some("2026-01-20".into()),
+            gps: None,
+            source_party: Some("opdrachtgever".into()),
+            checked_by: Some("A".into()),
+            description: None,
+            linked_paths: vec!["/zones/0".into()],
+            stored_path: None,
+        }
+    }
+
+    #[test]
+    fn basic_survey_rejected_where_section_3_1_requires_detail() {
+        assert!(codes(&complete()).is_empty());
+        let mut delivery = complete();
+        delivery.purpose = Some(RegistrationPurpose::Delivery);
+        assert!(codes(&delivery).contains(&"detail_survey_required_for_purpose"));
+        delivery.survey_type = Some(SurveyType::Detailed);
+        assert!(!codes(&delivery).contains(&"detail_survey_required_for_purpose"));
+
+        let mut new = complete();
+        new.completion_date = Some("2021-06-01".into());
+        assert!(codes(&new).contains(&"detail_survey_required_completed_after_2021"));
+        new.completion_date = None;
+        new.construction_year = Some(2022);
+        assert!(codes(&new).contains(&"detail_survey_required_completed_after_2021"));
+
+        let mut fee = complete();
+        fee.detail_survey_triggers.energy_performance_fee = true;
+        assert_eq!(codes(&fee), vec!["detail_survey_required"]);
+    }
+
+    #[test]
+    fn evidence_register_is_validated_and_cross_checked() {
+        let mut registration = complete();
+        registration.evidence = vec![evidence("ev-1"), evidence("ev-1")];
+        registration.evidence[1].sha256 = "xyz".into();
+        registration.evidence[1].checked_by = None;
+        registration.evidence[1].gps = Some(GpsPosition {
+            latitude: 95.0,
+            longitude: 5.0,
+        });
+        let found = codes(&registration);
+        for code in [
+            "evidence_id_invalid",
+            "evidence_hash_invalid",
+            "evidence_check_required",
+            "evidence_gps_invalid",
+        ] {
+            assert!(found.contains(&code), "{code}: {found:?}");
+        }
+
+        let mut registration = complete();
+        registration.evidence = vec![evidence("ev-1")];
+        let project = serde_json::json!({
+            "zones": [{"sourceReference": "survey; evidence:ev-1"}],
+            "constructions": [{"evidenceReference": "evidence:ev-9."}],
+            "registration": {"note": "evidence:ignored"}
+        });
+        let result = assess_project_registration(&registration, &project);
+        assert!(result.ready_for_registration == result.issues.is_empty());
+        let unknown: Vec<_> = result
+            .issues
+            .iter()
+            .filter(|item| item.code == "evidence_reference_unknown")
+            .map(|item| item.path.as_str())
+            .collect();
+        assert_eq!(unknown, vec!["/constructions/0/evidenceReference"]);
+        registration.evidence[0].linked_paths = vec!["/zones/3".into()];
+        let result = assess_project_registration(&registration, &project);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "evidence_link_path_unknown"));
+        assert!(!result.ready_for_registration);
     }
 }
