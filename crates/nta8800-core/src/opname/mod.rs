@@ -193,6 +193,9 @@ pub struct ResidentialSurvey {
     pub ventilation: SurveyVentilation,
     #[serde(default)]
     pub pv: Vec<SurveyPv>,
+    /// Building-bound electrical or thermal storage (§15.5).
+    #[serde(default)]
+    pub storage: Option<production::SurveyStorage>,
     /// Building-bound cooling present; not covered by this layer yet.
     #[serde(default)]
     pub cooling_present: bool,
@@ -346,6 +349,8 @@ pub fn derive_residential_input(
         .iter()
         .map(|item| production::derive_pv(item, year, recorder))
         .collect();
+    let (storage_present, storage) =
+        production::derive_storage(survey.storage.as_ref(), !survey.pv.is_empty(), recorder);
     if !recorder.issues.is_empty() {
         return None;
     }
@@ -417,8 +422,11 @@ pub fn derive_residential_input(
         "lossAreaM2": loss_area(&survey.envelope),
         "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
         "demandUsesFixedC1Ventilation": false,
-        "batteryStoragePresent": false,
+        "batteryStoragePresent": storage_present,
     });
+    if let Some(storage) = storage {
+        input["storage"] = storage;
+    }
     if let Some(renewable) = heating.heat_pump_renewable {
         input["heatPumpRenewable"] = renewable;
     }

@@ -14,6 +14,41 @@ use serde_json::{json, Value};
 
 use super::Recorder;
 
+/// Building-bound energy storage (§15.5, p. 193): only with a PV system,
+/// fixed to the installation (no plug-in batteries).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyStorage {
+    #[serde(default)]
+    pub electrical_kwh: f64,
+    #[serde(default)]
+    pub thermal_kwh: f64,
+    pub source_reference: String,
+}
+
+/// `batteryStoragePresent` and `storage` of the kernel input.
+pub fn derive_storage(
+    storage: Option<&SurveyStorage>,
+    pv_present: bool,
+    recorder: &mut Recorder,
+) -> (bool, Option<Value>) {
+    let Some(storage) = storage else {
+        return (false, None);
+    };
+    if !pv_present {
+        recorder.issue("storage_requires_pv", "storage");
+        return (false, None);
+    }
+    (
+        true,
+        Some(json!({
+            "buildingBoundElectricalKwh": storage.electrical_kwh,
+            "buildingBoundThermalKwh": storage.thermal_kwh,
+            "sourceReference": storage.source_reference,
+        })),
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PvTypeAnswer {
@@ -141,6 +176,22 @@ pub fn derive_pv(pv: &SurveyPv, construction_year: i32, recorder: &mut Recorder)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn storage_requires_pv() {
+        let mut recorder = Recorder::default();
+        let storage = SurveyStorage {
+            electrical_kwh: 10.0,
+            thermal_kwh: 0.0,
+            source_reference: "survey".into(),
+        };
+        let (present, value) = derive_storage(Some(&storage), true, &mut recorder);
+        assert!(present);
+        assert_eq!(value.unwrap()["buildingBoundElectricalKwh"], 10.0);
+        let (present, _) = derive_storage(Some(&storage), false, &mut recorder);
+        assert!(!present);
+        assert_eq!(recorder.issues[0].code, "storage_requires_pv");
+    }
 
     #[test]
     fn unknown_type_year_and_mounting_follow_table_15_7() {

@@ -548,6 +548,9 @@ pub struct UtilitySurvey {
     pub pv: Vec<SurveyPv>,
     #[serde(default)]
     pub bacs: SurveyBacs,
+    /// Building-bound electrical or thermal storage (§15.5).
+    #[serde(default)]
+    pub storage: Option<super::production::SurveyStorage>,
     pub source_reference: String,
 }
 
@@ -2048,6 +2051,8 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         .map(|item| derive_pv(item, year, recorder))
         .collect();
     let (bacs, bacs_reference) = bacs_factor(&survey.bacs, area, recorder);
+    let (storage_present, storage) =
+        super::production::derive_storage(survey.storage.as_ref(), !survey.pv.is_empty(), recorder);
     // Table 7.8 (p. 68): one uninsulated pipe per toilet group through all
     // storeys when the pipes are not determinable.
     let stacks = match (&survey.vertical_pipes, survey.toilet_stacks) {
@@ -2142,8 +2147,11 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         "lighting": [lighting],
         "hotWater": hot_water,
         "demandUsesFixedC1Ventilation": false,
-        "batteryStoragePresent": false,
+        "batteryStoragePresent": storage_present,
     });
+    if let Some(storage) = storage {
+        input["storage"] = storage;
+    }
     if let Some(cooling) = cooling {
         input["cooling"] = cooling;
     }
