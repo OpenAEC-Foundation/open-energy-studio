@@ -294,10 +294,10 @@ export function NtaPerformancePanel() {
 
       <div className="nta-performance-actions">
         {!editing && !formOpen && <>
-          <button type="button" onClick={() => { setFormOpen(true); }}>
+          <button type="button" className="btn btn-primary" onClick={() => { setFormOpen(true); }}>
             {project.ntaCalculation ? t('nta.performance.edit') : t('nta.performance.start')}
           </button>
-          <button type="button" onClick={openEditor}>{t('nta.performance.advanced')}</button>
+          <button type="button" className="btn" onClick={openEditor}>{t('nta.performance.advanced')}</button>
         </>}
       </div>
       {formOpen && <NtaCalculationForm project={project}
@@ -314,8 +314,8 @@ export function NtaPerformancePanel() {
         <p>{t('nta.performance.blockHelp')}</p>
         {parseError && <p role="alert">{t('nta.performance.parseError')}</p>}
         <div>
-          <button type="button" onClick={() => setEditing(false)}>{t('dialog.cancel')}</button>
-          <button type="button" onClick={save}>{t('dialog.save')}</button>
+          <button type="button" className="btn" onClick={() => setEditing(false)}>{t('dialog.cancel')}</button>
+          <button type="button" className="btn btn-primary" onClick={save}>{t('dialog.save')}</button>
         </div>
       </div>}
     </section>

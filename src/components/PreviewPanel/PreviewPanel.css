@@ -101,7 +101,35 @@
   border-inline-start: 3px solid var(--border);
 }
 
-.preview-beng-card.indicative { border-inline-start-color: var(--accent); }
+.preview-beng-card { border-inline-start-color: var(--accent); }
+.preview-beng-card.fails { border-inline-start-color: var(--energy-red, #ef4444); }
+
+.preview-kernel-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.preview-kernel-label strong {
+  font-size: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
+}
+
+.preview-kernel-status {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 8px 2px;
+}
+
+.preview-kernel-empty { text-align: start; line-height: 1.5; }
 
 .preview-beng-header {
   display: flex;
@@ -125,7 +153,7 @@
   letter-spacing: 0.05em;
 }
 
-.preview-beng-badge.indicative { background: var(--bg-tertiary); color: var(--text-secondary); }
+.preview-beng-badge { background: var(--bg-tertiary); color: var(--text-secondary); }
 
 .preview-beng-value {
   font-size: 18px;

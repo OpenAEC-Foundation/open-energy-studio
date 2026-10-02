@@ -1,13 +1,27 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
-import { calculateBENGMonthly } from '../../core/energy/BENGCalculatorMonthly';
 import { hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, legacyHeatPumpInputIssue, validProjectFloorArea } from '../../core/energy/ProjectArea';
+import { calculateProjectPerformanceWithRust } from '../../core/nta/KernelClient';
+import { summarizeForPreview, type PreviewSummary } from '../../core/nta/PreviewSummary';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
 import { MonthlyBarChart } from './MonthlyBarChart';
 import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
 import { PanelRightClose } from 'lucide-react';
 import './PreviewPanel.css';
+
+/** Delay before a project change triggers a kernel run, ms. */
+const KERNEL_DEBOUNCE_MS = 400;
+
+type KernelState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'done'; summary: PreviewSummary };
+
+function kwh(value: number | null): string {
+  return value == null ? '–' : `${Math.round(value).toLocaleString('nl-NL')} kWh`;
+}
 
 export function PreviewPanel() {
   const { t } = useI18n();
@@ -18,16 +32,34 @@ export function PreviewPanel() {
   const hasPerformancePoints = hasUnmodelledHeatPumpDetails(project);
   const hasUnheatedTransmission = hasUnmodelledUnheatedTransmission(project);
   const heatPumpIssue = legacyHeatPumpInputIssue(project);
+  const inputAlert = invalidArea ? 'calculation.invalidFloorArea'
+    : hasStandaloneHeatPumps ? 'calculation.standaloneHeatPumps'
+      : hasPerformancePoints ? 'calculation.performancePointsUnsupported'
+        : hasUnheatedTransmission ? 'calculation.unheatedUnsupported'
+          : heatPumpIssue === 'cop' ? 'calculation.invalidHeatPumpCop'
+            : heatPumpIssue === 'coverage' ? 'calculation.invalidHeatPumpCoverage'
+              : null;
+  const hasNtaBlock = Boolean(project.ntaCalculation);
 
-  // Auto-recalculate when project changes
-  const result = useMemo(() => {
-    const hasZones = project.zones.length > 0;
-    if (!hasZones || validProjectFloorArea(project) === null
-      || project.ntaHeatPumps?.length || hasUnmodelledHeatPumpDetails(project)
-      || hasUnmodelledUnheatedTransmission(project)
-      || legacyHeatPumpInputIssue(project)) return null;
-    return calculateBENGMonthly(project);
-  }, [project]);
+  // Single source of results: the Rust kernel (project performance route).
+  const [kernel, setKernel] = useState<KernelState>({ kind: 'idle' });
+  useEffect(() => {
+    if (!hasNtaBlock || project.zones.length === 0) {
+      setKernel({ kind: 'idle' });
+      return;
+    }
+    let cancelled = false;
+    setKernel({ kind: 'loading' });
+    const timer = setTimeout(() => {
+      calculateProjectPerformanceWithRust(project).then(
+        (assessment) => { if (!cancelled) setKernel({ kind: 'done', summary: summarizeForPreview(assessment) }); },
+        (reason: unknown) => {
+          if (!cancelled) setKernel({ kind: 'error', message: reason instanceof Error ? reason.message : String(reason) });
+        },
+      );
+    }, KERNEL_DEBOUNCE_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [project, hasNtaBlock]);
 
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(320);
@@ -67,6 +99,9 @@ export function PreviewPanel() {
     );
   }
 
+  const summary = kernel.kind === 'done' ? kernel.summary : null;
+  const calculated = summary?.status === 'calculated_unverified';
+
   return (
     <div className="preview-panel" style={{ width }}>
       <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
@@ -75,87 +110,87 @@ export function PreviewPanel() {
         <span>{t('preview.title')}</span>
       </div>
       <div className="preview-panel-content">
-        {!result ? (
-          <div className="preview-empty" role={invalidArea || hasStandaloneHeatPumps || hasPerformancePoints || hasUnheatedTransmission || heatPumpIssue ? 'alert' : undefined}>
-            {t(hasStandaloneHeatPumps ? 'calculation.standaloneHeatPumps'
-              : hasPerformancePoints ? 'calculation.performancePointsUnsupported'
-                : hasUnheatedTransmission ? 'calculation.unheatedUnsupported'
-                : invalidArea ? 'calculation.invalidFloorArea'
-                : heatPumpIssue === 'cop' ? 'calculation.invalidHeatPumpCop'
-                  : heatPumpIssue === 'coverage' ? 'calculation.invalidHeatPumpCoverage'
-                    : 'preview.noData')}
-          </div>
+        {project.zones.length === 0 ? (
+          <div className="preview-empty">{t('preview.noData')}</div>
         ) : (
           <>
+            {inputAlert && <div className="preview-empty" role="alert">{t(inputAlert)}</div>}
             <CalculationNotice compact />
             {/* Energy label: only the Rust kernel classifies (one label source). */}
             <p className="preview-label-unavailable">{t('preview.labelFromKernel')}</p>
 
-            {/* BENG indicators */}
-            <div className="preview-section-title">BENG</div>
-            <BENGIndicatorCompact
-              label={`${t('results.beng1.title')} \u2014 ${t('results.beng1.subtitle')}`}
-              value={result.beng1}
-              limit={result.beng1Limit}
-              unit={t('results.beng1.unit')}
-            />
-            <BENGIndicatorCompact
-              label={`${t('results.beng2.title')} \u2014 ${t('results.beng2.subtitle')}`}
-              value={result.beng2}
-              limit={result.beng2Limit}
-              unit={t('results.beng2.unit')}
-            />
-            <BENGIndicatorCompact
-              label={`${t('results.beng3.title')} \u2014 ${t('results.beng3.subtitle')}`}
-              value={result.beng3}
-              limit={result.beng3Limit}
-              unit={t('results.beng3.unit')}
-              higherIsBetter
-            />
+            {!hasNtaBlock && (
+              <div className="preview-empty preview-kernel-empty">{t('preview.kernelEmpty')}</div>
+            )}
+            {hasNtaBlock && kernel.kind === 'loading' && <p role="status" className="preview-kernel-status">{t('preview.kernelLoading')}</p>}
+            {hasNtaBlock && kernel.kind === 'error' && (
+              <div className="preview-empty" role="alert">{t('kernel.unavailable')} <small>{kernel.message}</small></div>
+            )}
+            {summary && !calculated && (
+              <div className="preview-empty preview-kernel-empty" role="status">
+                {summary.status === 'incomplete'
+                  ? t('preview.kernelIncomplete').replace('{count}', String(summary.gapCount))
+                  : t('preview.kernelInvalid').replace('{count}', String(summary.issueCount))}
+              </div>
+            )}
 
-            {/* TO-juli */}
-            <div className="preview-to-juli indicative">
-              <div className="preview-to-juli-header">
-                <span className="preview-to-juli-label">{t('preview.toJuli')}</span>
-                <span className="preview-beng-badge indicative">{t('results.indicativeBadge')}</span>
-              </div>
-              <div className="preview-to-juli-value">
-                GTO: {result.toJuli.gto.toFixed(2)} / {result.toJuli.limit}
-              </div>
-            </div>
+            {summary && calculated && <>
+              {summary.labelClass && (
+                <div className="preview-kernel-label" aria-label={t('preview.energyLabel')}>
+                  <span>{t('preview.energyLabel')}</span>
+                  <strong>{summary.labelClass}</strong>
+                </div>
+              )}
+              <div className="preview-section-title">BENG</div>
+              <BENGIndicatorCompact
+                label={`${t('results.beng1.title')} — ${t('results.beng1.subtitle')}`}
+                value={summary.beng1}
+                limit={summary.beng1Limit}
+                unit={t('results.beng1.unit')}
+              />
+              <BENGIndicatorCompact
+                label={`${t('results.beng2.title')} — ${t('results.beng2.subtitle')}`}
+                value={summary.beng2}
+                limit={summary.beng2Limit}
+                unit={t('results.beng2.unit')}
+              />
+              <BENGIndicatorCompact
+                label={`${t('results.beng3.title')} — ${t('results.beng3.subtitle')}`}
+                value={summary.beng3}
+                limit={summary.beng3Limit}
+                unit={t('results.beng3.unit')}
+                higherIsBetter
+              />
 
-            {/* Monthly chart */}
-            <div className="preview-section-title">{t('preview.monthlyDemand')}</div>
-            <MonthlyBarChart monthly={result.monthly} />
+              <div className="preview-to-juli">
+                <div className="preview-to-juli-header">
+                  <span className="preview-to-juli-label">{t('preview.toJuliKernel')}</span>
+                  <span className="preview-beng-badge">{t('nta.performance.unverified')}</span>
+                </div>
+                <div className="preview-to-juli-value">
+                  {summary.tojuliMaxK == null ? '–' : `${summary.tojuliMaxK.toFixed(2)} K`} / 1.20 K
+                </div>
+              </div>
 
-            {/* Key figures */}
-            <div className="preview-section-title">{t('preview.keyFigures')}</div>
-            <div className="preview-key-figures">
-              <div className="preview-key-row">
-                <span className="preview-key-label">{t('results.transmissionLoss')}</span>
-                <span className="preview-key-value">{result.breakdown.transmissionLoss.toFixed(0)} kWh</span>
+              <div className="preview-section-title">{t('preview.monthlyDemand')}</div>
+              <MonthlyBarChart heating={summary.monthlyHeatingKwh} cooling={summary.monthlyCoolingKwh} />
+
+              <div className="preview-section-title">{t('preview.keyFigures')}</div>
+              <div className="preview-key-figures">
+                <div className="preview-key-row">
+                  <span className="preview-key-label">{t('preview.zebIndicator')}</span>
+                  <span className="preview-key-value">{summary.zebIndicator == null ? '–' : `${summary.zebIndicator.toFixed(2)} kWh/m²`}</span>
+                </div>
+                <div className="preview-key-row">
+                  <span className="preview-key-label">{t('preview.finalEnergy')}</span>
+                  <span className="preview-key-value">{kwh(summary.finalEnergyKwh)}</span>
+                </div>
+                <div className="preview-key-row">
+                  <span className="preview-key-label">{t('preview.co2')}</span>
+                  <span className="preview-key-value">{summary.co2KgPerM2 == null ? '–' : `${summary.co2KgPerM2.toFixed(1)} kg/m²`}</span>
+                </div>
               </div>
-              <div className="preview-key-row">
-                <span className="preview-key-label">{t('results.ventilationLoss')}</span>
-                <span className="preview-key-value">{result.breakdown.ventilationLoss.toFixed(0)} kWh</span>
-              </div>
-              <div className="preview-key-row">
-                <span className="preview-key-label">{t('results.solarGain')}</span>
-                <span className="preview-key-value">{result.breakdown.solarGain.toFixed(0)} kWh</span>
-              </div>
-              <div className="preview-key-row">
-                <span className="preview-key-label">{t('results.heatingDemand')}</span>
-                <span className="preview-key-value">{result.breakdown.heatingDemand.toFixed(0)} kWh</span>
-              </div>
-              <div className="preview-key-row">
-                <span className="preview-key-label">{t('results.coolingDemand')}</span>
-                <span className="preview-key-value">{result.breakdown.coolingDemand.toFixed(0)} kWh</span>
-              </div>
-              <div className="preview-key-row">
-                <span className="preview-key-label">{t('results.pvProduction')}</span>
-                <span className="preview-key-value">{result.breakdown.pvProduction.toFixed(0)} kWh</span>
-              </div>
-            </div>
+            </>}
           </>
         )}
       </div>
