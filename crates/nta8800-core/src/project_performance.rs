@@ -11,13 +11,13 @@ use crate::building_performance::{
 };
 use crate::climate::Orientation;
 use crate::domestic_hot_water::HotWaterSystem;
-use crate::ground::SlabOnGround;
+use crate::ground::{EdgeInsulation, EdgeThermalBridges, SlabOnGround};
 use crate::heating_emission::EmissionInput;
 use crate::indicators_draft::CalculationScope;
 use crate::label_class::LabelFunction;
 use crate::monthly_demand::{
-    ComponentTransmission, InternalGains, MonthlyDemandInput, OpaqueElement, Setpoints,
-    ThermalMass, Transmission, VentilationFlow, Window,
+    ComponentTransmission, DwellingType, InternalGains, MonthlyDemandInput, OpaqueElement,
+    Setpoints, ThermalMass, Transmission, UsageFunction, VentilationFlow, Window,
 };
 use crate::pv::PvSystem;
 use crate::solar_shading::{MovableShading, Obstruction};
@@ -36,6 +36,11 @@ use std::collections::{HashMap, HashSet};
 pub struct NtaCalculationInput {
     pub calculation_scope: CalculationScope,
     pub area_source_reference: String,
+    /// Usage function for tables 7.13–7.15.
+    pub usage_function: UsageFunction,
+    /// 7.78 `f_mod;sp`; required for the residential function.
+    #[serde(default)]
+    pub dwelling_type: Option<DwellingType>,
     pub setpoints: Setpoints,
     pub thermal_mass: ThermalMass,
     pub internal_gains: InternalGains,
@@ -90,6 +95,10 @@ pub struct ZoneNtaData {
     pub ventilation_flows: Vec<VentilationFlow>,
     pub internal_gains: InternalGains,
     #[serde(default)]
+    pub usage_function: Option<UsageFunction>,
+    #[serde(default)]
+    pub dwelling_type: Option<DwellingType>,
+    #[serde(default)]
     pub setpoints: Option<Setpoints>,
     #[serde(default)]
     pub thermal_mass: Option<ThermalMass>,
@@ -123,6 +132,10 @@ pub struct GroundFloorData {
     pub surface_id: String,
     pub exposed_perimeter_m: f64,
     pub construction_resistance_m2k_per_w: f64,
+    /// Floor-edge bridges of 8.36 or the 8.37 forfait.
+    pub edge_thermal_bridges: EdgeThermalBridges,
+    #[serde(default)]
+    pub edge_insulation: Vec<EdgeInsulation>,
     pub source_reference: String,
 }
 
@@ -351,6 +364,8 @@ fn derive_input(
                                 exposed_perimeter_m: data.exposed_perimeter_m,
                                 construction_resistance_m2k_per_w: data
                                     .construction_resistance_m2k_per_w,
+                                edge_thermal_bridges: data.edge_thermal_bridges.clone(),
+                                edge_insulation: data.edge_insulation.clone(),
                                 source_reference: data.source_reference.clone(),
                             });
                         }
@@ -467,6 +482,15 @@ fn derive_input(
             zone_id: zone.id.clone(),
             usable_floor_area_m2: zone.floor_area,
             area_source_reference: nta.area_source_reference.clone(),
+            usage_function: data
+                .and_then(|item| item.usage_function)
+                .unwrap_or(nta.usage_function),
+            // A zone that overrides the usage function brings its own dwelling type.
+            dwelling_type: match data {
+                Some(item) if item.usage_function.is_some() => item.dwelling_type,
+                Some(item) => item.dwelling_type.or(nta.dwelling_type),
+                None => nta.dwelling_type,
+            },
             setpoints: data
                 .and_then(|item| item.setpoints.clone())
                 .unwrap_or_else(|| nta.setpoints.clone()),
@@ -584,7 +608,7 @@ mod tests {
         // Walls 110 m² minus 12 m² glass at 0,21, roof 52 m² at 0,16, glass 12 m² at 1,1, bridges 1,5 W/K.
         let expected = 98.0 * 0.21 + 52.0 * 0.16 + 12.0 * 1.1 + 30.0 * 0.05;
         assert!((summary.conductance_w_per_k - expected).abs() < 1e-9);
-        assert!(summary.ground_conductance_w_per_k > 0.0);
+        assert!(summary.ground_steady_conductance_w_per_k.unwrap() > 0.0);
         assert!(performance
             .primary_fossil_indicator_kwh_per_m2_year
             .is_some());
@@ -695,7 +719,8 @@ mod tests {
             .unwrap()
             .push(serde_json::json!({
                 "surfaceId": "floor-2", "exposedPerimeterM": 20.0,
-                "constructionResistanceM2kPerW": 3.87, "sourceReference": "copy"
+                "constructionResistanceM2kPerW": 3.87,
+                "edgeThermalBridges": {"method": "forfait"}, "sourceReference": "copy"
             }));
         let result = assess_project_performance(&value);
         assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);

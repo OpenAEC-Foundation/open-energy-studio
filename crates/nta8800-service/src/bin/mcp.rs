@@ -34,7 +34,7 @@ struct MonthlyDirectArgs {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct MonthlyDemandArgs {
-    /// One calculation zone: floor area, setpoints, explicit transmission and ventilation conductances, thermal-mass classes, internal-gain method, windows and opaque elements with source references.
+    /// One calculation zone: floor area, usage function (tables 7.13–7.15) and dwelling type, setpoints, transmission (explicit or chapter 8 components with annex D ground), ventilation conductances per balance, thermal-mass classes, internal-gain method, windows and opaque elements with source references.
     input: Value,
 }
 

@@ -1,22 +1,23 @@
 //! Monthly heating and cooling need of one calculation zone, NTA 8800 chapter 7.
 //!
-//! Implements the monthly balance
-//! `Q_H;nd = Q_H;ht − η_H;gn · Q_H;gn` and
-//! `Q_C;nd = Q_C;gn − η_C;ht · Q_C;ht` (with the 7.6 gate) for explicitly
-//! supplied heat-transfer coefficients. Gains are derived here: residential
-//! internal gains (7.21–7.24), window solar gains (7.32 with 7.40) and opaque
-//! solar gains (7.33), both reduced by sky radiation (7.39). Effective thermal
-//! capacity follows table 7.10 and 7.45; utilisation follows 7.46–7.57.
+//! Implements the monthly balance of 7.2 (p. 165–168): heating
+//! `Q_H;nd = Q_H;ht − η_H;gn · Q_H;gn` with the gates 7.1/7.2, cooling
+//! `Q_C;nd = a_C;red · (Q_C;gn − η_C;ht · Q_C;ht)` with the gate 7.6.
+//! Transmission (7.14/7.15) and ventilation (7.18–7.20) use the calculation
+//! temperature of §7.9 (p. 211–220): intermittent heating 7.59–7.73 with
+//! tables 7.14/7.15, dwelling temperature levelling 7.78/7.79 and the
+//! intermittent-cooling factor 7.74/7.75. Ground transfer uses the monthly
+//! `H_g;an;mi` of annex D; the time constants 7.57/7.58 use the seasonal
+//! `H_H/C;g;adj` and the monthly `H_H/C;ve` including `b_v`. Gains: internal
+//! (7.21–7.24 or declared), window solar (7.32, 7.40, 7.42) and opaque solar
+//! (7.33), both reduced by sky radiation (7.39). Utilisation 7.46–7.56.
 //!
-//! Formula numbers and constants come from the Open Heatloss Studio norm
-//! analyses (C1–C5, 2026-07-13), which transcribe NTA 8800:2025+C1:2026 with
-//! page references. They still require an independent review against the
-//! licensed norm text. Corrections this module does not apply are listed in
+//! Corrections this module does not apply are listed in
 //! [`OMITTED_CORRECTIONS`] and returned with every result.
 
 use crate::climate::{self, Orientation, CLIMATE_SOURCE, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
-use crate::ground::{slab_on_ground_conductance, SlabOnGround};
+use crate::ground::{ground_monthly, slab_coefficients, EdgeThermalBridges, SlabOnGround};
 use crate::solar_shading::{
     movable_shading_factor, obstruction_factor, Balance, MovableShading, Obstruction,
 };
@@ -35,18 +36,28 @@ pub const H_LR_E: f64 = 4.14;
 pub const DELTA_THETA_SKY: f64 = 11.0;
 /// 7.6.6.3: solar absorption coefficient of opaque outer surfaces.
 pub const ALPHA_SOL: f64 = 0.6;
-/// 7.51: reference parameters of the monthly method.
+/// 7.51/7.56: reference parameters of the monthly method.
 pub const A_0: f64 = 1.0;
 pub const TAU_0_H: f64 = 15.0;
 /// 7.21: internal heat per occupant in W.
 pub const INTERNAL_HEAT_PER_OCCUPANT_W: f64 = 180.0;
+/// 7.2: heating need is zero above this heat-balance ratio.
+pub const GAMMA_H_MAX: f64 = 2.0;
+/// 7.74: empirical correlation factor for intermittent cooling.
+pub const B_C_RED_WKND: f64 = 0.3;
+/// 7.78: time fraction of moderate heating.
+pub const F_MOD_T: f64 = 0.8;
+/// 7.78: internal specific heat-transfer coefficient, W/(m²K).
+pub const H_INT_SPEC: f64 = 2.0;
 
 pub const OMITTED_CORRECTIONS: &[&str] = &[
-    "7.9.2 intermittent heating reduction a_H;red",
-    "7.9.4.2 residential temperature levelling (7.78)",
-    "§17.3 obstruction situations b–g are declared, not derived; tilts bucketed to 0/45/90°",
+    "7.3–7.5 and 7.7–7.9 recoverable system losses Q_H;ls;rbl / Q_C;ls;rbl and the Δη terms (chapters 9 and 10)",
+    "7.3.3 vertical ducts H_p and 8.5 adjacent heated spaces H_A",
+    "§17.3 obstruction situations b–g are declared, not derived",
     "annex B detailed thermal capacity",
     "table 7.10 footnote c is the caller's column choice",
+    "annex D for floors other than slab on ground (crawlspace, basement)",
+    "one usage function per calculation zone (tables 7.13–7.15)",
 ];
 
 const SCOPE: &str = "nta8800_chapter_7_monthly_need_single_zone_unverified";
@@ -57,6 +68,11 @@ pub struct MonthlyDemandInput {
     pub zone_id: String,
     pub usable_floor_area_m2: f64,
     pub area_source_reference: String,
+    /// Usage function of the zone for tables 7.13–7.15.
+    pub usage_function: UsageFunction,
+    /// `f_mod;sp` of 7.78; required for the residential function.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dwelling_type: Option<DwellingType>,
     pub setpoints: Setpoints,
     pub transmission: Transmission,
     pub ventilation_flows: Vec<VentilationFlow>,
@@ -68,8 +84,82 @@ pub struct MonthlyDemandInput {
     pub opaque_elements: Vec<OpaqueElement>,
 }
 
-/// Table 7.13: residential 20 °C heating and 24 °C cooling. Supplied
-/// explicitly so a utility function cannot silently inherit dwelling values.
+/// Usage functions of tables 7.13–7.15.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UsageFunction {
+    AssemblyChildCare,
+    OtherAssembly,
+    Cell,
+    HealthcareWithBeds,
+    OtherHealthcare,
+    Office,
+    Lodging,
+    Education,
+    Sport,
+    Retail,
+    Residential,
+}
+
+impl UsageFunction {
+    /// Table 7.13 `θ_int;set;H;stc`, °C.
+    pub fn heating_setpoint_c(self) -> f64 {
+        match self {
+            Self::HealthcareWithBeds => 22.0,
+            Self::Sport => 16.0,
+            Self::Residential => 20.0,
+            _ => 21.0,
+        }
+    }
+
+    /// Table 7.13 `θ_int;set;C;stc`, °C.
+    pub fn cooling_setpoint_c(self) -> f64 {
+        24.0
+    }
+
+    /// Table 7.14 reduced setpoint for night and weekend, °C.
+    pub fn reduced_setpoint_c(self) -> f64 {
+        match self {
+            Self::Sport => 14.0,
+            _ => 16.0,
+        }
+    }
+
+    /// Table 7.15: `(t_H;red;day, t_H;red;wknd, t_C;red;wknd)` in h.
+    pub fn reduction_hours(self) -> (f64, f64, f64) {
+        match self {
+            Self::Cell | Self::HealthcareWithBeds => (8.0, 0.0, 0.0),
+            Self::Lodging | Self::Retail => (13.0, 24.0, 24.0),
+            Self::Residential => (10.0, 0.0, 0.0),
+            _ => (14.0, 48.0, 48.0),
+        }
+    }
+
+    pub fn is_residential(self) -> bool {
+        self == Self::Residential
+    }
+}
+
+/// 7.78: `f_mod;sp` 0,5 for apartment buildings (woongebouwen), 0,6 for all
+/// other dwellings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DwellingType {
+    ApartmentBuilding,
+    Other,
+}
+
+impl DwellingType {
+    pub fn spatial_fraction(self) -> f64 {
+        match self {
+            Self::ApartmentBuilding => 0.5,
+            Self::Other => 0.6,
+        }
+    }
+}
+
+/// Table 7.13 `θ_int;set;H/C;stc`. Supplied explicitly with a source and
+/// checked against the table for the usage function.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Setpoints {
@@ -115,12 +205,12 @@ pub struct ExplicitTransmission {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GroundTransfer {
-    /// `H_g;adj` used in the time constant (7.57), W/K.
-    pub adjusted_conductance_w_per_k: f64,
-    /// Monthly ground heat transfer at the heating setpoint, kWh.
-    pub heating_kwh: Vec<f64>,
-    /// Monthly ground heat transfer at the cooling setpoint, kWh.
-    pub cooling_kwh: Vec<f64>,
+    /// Annex D.1 `H_g;an;mi` for January–December, W/K.
+    pub monthly_conductance_w_per_k: Vec<f64>,
+    /// Annex D.2 `H_H;g;adj` for the heating time constant (7.57), W/K.
+    pub heating_adjusted_conductance_w_per_k: f64,
+    /// Annex D.3 `H_C;g;adj` for the cooling time constant (7.58), W/K.
+    pub cooling_adjusted_conductance_w_per_k: f64,
     pub source_reference: String,
 }
 
@@ -132,15 +222,38 @@ pub struct VentilationFlow {
     pub months: Vec<VentilationMonth>,
 }
 
+/// One air flow `k` of 7.19 in one month.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VentilationMonth {
     pub month: u8,
-    /// `H_ve;k;mi = ρ·c·q_v;k;mi` in W/K.
+    /// `ρ_a·c_a·q_v;k;H;mi / 3600` for the heating balance, W/K.
     pub conductance_w_per_k: f64,
-    /// Supply temperature; `None` means outdoor air at `θ_e;avg;mi`.
+    /// Supply temperature for the heating balance; `None` means outdoor air
+    /// at `θ_e;avg;mi`.
     #[serde(default)]
     pub supply_temperature_c: Option<f64>,
+    /// Cooling-balance conductance; `None` means the heating value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooling_conductance_w_per_k: Option<f64>,
+    /// Cooling-balance supply temperature; `None` means the heating value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooling_supply_temperature_c: Option<f64>,
+}
+
+impl VentilationMonth {
+    /// `(conductance, supply temperature)` for one balance.
+    fn balance(&self, balance: Balance, outdoor: f64) -> (f64, f64) {
+        let heating_supply = self.supply_temperature_c.unwrap_or(outdoor);
+        match balance {
+            Balance::Heating => (self.conductance_w_per_k, heating_supply),
+            Balance::Cooling => (
+                self.cooling_conductance_w_per_k
+                    .unwrap_or(self.conductance_w_per_k),
+                self.cooling_supply_temperature_c.unwrap_or(heating_supply),
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -199,7 +312,10 @@ pub struct Window {
     pub u_value_w_per_m2k: f64,
     /// External obstruction `F_sh;obst` per balance (§17.3).
     pub obstruction: Obstruction,
-    /// Movable solar shading (7.42/7.43), applied to the cooling balance.
+    /// Movable solar shading (7.42/7.43); see [`ShadingControl`] for the
+    /// heating balance.
+    ///
+    /// [`ShadingControl`]: crate::solar_shading::ShadingControl
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub movable_shading: Option<MovableShading>,
     pub source_reference: String,
@@ -243,14 +359,14 @@ pub struct MonthResult {
     pub month: u8,
     pub hours: f64,
     pub outdoor_temperature_c: f64,
-    pub time_constant_h: f64,
-    pub a: f64,
     pub internal_gains_kwh: f64,
-    /// Window solar gains on the heating balance (table 17.4 obstruction).
+    /// Window solar gains on the heating balance.
     pub window_solar_gains_kwh: f64,
-    /// Window solar gains on the cooling balance (table 17.5, movable shading).
+    /// Window solar gains on the cooling balance.
     pub window_solar_cooling_kwh: f64,
     pub opaque_solar_gains_kwh: f64,
+    /// Annex D.1 `H_g;an;mi`, W/K.
+    pub ground_conductance_w_per_k: f64,
     pub heating: BalanceTerms,
     pub cooling: BalanceTerms,
 }
@@ -258,6 +374,18 @@ pub struct MonthResult {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceTerms {
+    /// `θ_int;set;H/C` after levelling (7.76/7.77), °C.
+    pub setpoint_c: f64,
+    /// `a_H;red` (7.60) or `a_C;red` (7.74).
+    pub reduction_factor: f64,
+    /// `θ_int;calc;H/C` (7.59, 7.9.3), °C.
+    pub calculation_temperature_c: f64,
+    /// `H_H/C;ve` (7.19 with `b_v`), W/K.
+    pub ventilation_conductance_w_per_k: f64,
+    /// `τ_H/C` (7.57/7.58), h.
+    pub time_constant_h: f64,
+    /// `a_H/C` (7.51/7.56).
+    pub a: f64,
     pub transmission_kwh: f64,
     pub ventilation_kwh: f64,
     pub heat_transfer_kwh: f64,
@@ -320,10 +448,15 @@ pub fn sky_view_factor(tilt_deg: f64) -> f64 {
     }
 }
 
-/// 7.46–7.49: gain utilisation for heating.
-pub fn heating_utilization(gamma: f64, a: f64) -> f64 {
+/// 7.46–7.49: gain utilisation for heating; `gains_kwh` decides between
+/// 7.48 and 7.49 when `γ_H ≤ 0`.
+pub fn heating_utilization(gamma: f64, a: f64, gains_kwh: f64) -> f64 {
     if gamma <= 0.0 {
-        1.0
+        if gains_kwh > 0.0 {
+            1.0 / gamma
+        } else {
+            1.0
+        }
     } else if (gamma - 1.0).abs() < 1e-9 {
         a / (a + 1.0)
     } else {
@@ -331,13 +464,166 @@ pub fn heating_utilization(gamma: f64, a: f64) -> f64 {
     }
 }
 
-/// 7.52–7.55: loss utilisation for cooling, with `γ_C = Q_C;gn / Q_C;ht`.
+/// 7.52–7.54: loss utilisation for cooling, with `γ_C = Q_C;gn / Q_C;ht`.
 pub fn cooling_utilization(gamma: f64, a: f64) -> f64 {
-    if (gamma - 1.0).abs() < 1e-9 {
+    if gamma <= 0.0 {
+        1.0
+    } else if (gamma - 1.0).abs() < 1e-9 {
         a / (a + 1.0)
     } else {
         (1.0 - gamma.powf(-a)) / (1.0 - gamma.powf(-(a + 1.0)))
     }
+}
+
+/// 7.74/7.75: reduction factor for intermittent cooling.
+pub fn cooling_reduction_factor(function: UsageFunction) -> f64 {
+    let (_, _, weekend_hours) = function.reduction_hours();
+    let fraction = weekend_hours / (24.0 * 7.0);
+    1.0 - fraction + B_C_RED_WKND * fraction
+}
+
+/// 7.20: supply-temperature correction `b_v` against the standard setpoint;
+/// 1 when the setpoint equals the outdoor temperature (no defined ratio).
+pub fn supply_temperature_factor(setpoint_c: f64, supply_c: f64, outdoor_c: f64) -> f64 {
+    let denominator = setpoint_c - outdoor_c;
+    if denominator.abs() < 1e-9 {
+        1.0
+    } else {
+        (setpoint_c - supply_c) / denominator
+    }
+}
+
+/// `H_H/C;ve;mi` of 7.19 (W/K, with `b_v` of 7.20) for one month and balance.
+pub(crate) fn ventilation_conductance(
+    input: &MonthlyDemandInput,
+    month: u8,
+    balance: Balance,
+) -> f64 {
+    let outdoor = OUTDOOR_TEMPERATURE_C[usize::from(month - 1)];
+    let setpoint = match balance {
+        Balance::Heating => input.setpoints.heating_c,
+        Balance::Cooling => input.setpoints.cooling_c,
+    };
+    input
+        .ventilation_flows
+        .iter()
+        .map(|flow| {
+            let row = flow
+                .months
+                .iter()
+                .find(|row| row.month == month)
+                .expect("validated twelve unique months");
+            let (conductance, supply) = row.balance(balance, outdoor);
+            conductance * supply_temperature_factor(setpoint, supply, outdoor)
+        })
+        .sum()
+}
+
+/// Intermittency for one heating month (7.59–7.73).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HeatingIntermittency {
+    /// `a_H;red` (7.60).
+    pub reduction_factor: f64,
+    /// `θ_int;calc;H` (7.59), °C.
+    pub calculation_temperature_c: f64,
+}
+
+/// Inputs of 7.60–7.73 for one month.
+#[derive(Debug, Clone, Copy)]
+pub struct IntermittencyInput {
+    pub function: UsageFunction,
+    /// `θ_int;set;H` after levelling (7.76), °C.
+    pub setpoint_c: f64,
+    pub outdoor_c: f64,
+    pub annual_outdoor_c: f64,
+    pub hours: f64,
+    /// `τ_H` (7.57), h.
+    pub time_constant_h: f64,
+    /// `Q_H;gn`, kWh.
+    pub gains_kwh: f64,
+    /// `H_H;tr;excl.gf + H_H;ve`, W/K.
+    pub conductance_w_per_k: f64,
+    /// `H_gr;an;mi`, W/K.
+    pub ground_conductance_w_per_k: f64,
+}
+
+/// 7.64/7.65 with 7.66–7.72 for one interruption period of `period_h`.
+fn mean_reduction(period_h: f64, input: &IntermittencyInput, d_float: f64) -> f64 {
+    if period_h <= 0.0 {
+        return 0.0;
+    }
+    let difference = input.setpoint_c - input.outdoor_c;
+    let low = input.function.reduced_setpoint_c();
+    // 7.70–7.72
+    let d_set = if difference <= 0.0 {
+        1.0
+    } else if low - input.outdoor_c <= 0.0 {
+        0.0
+    } else {
+        ((low - input.outdoor_c) / difference).min(1.0)
+    };
+    let tau = input.time_constant_h;
+    let period_ratio = period_h / tau;
+    // 7.66–7.69
+    let f_low = if d_set - d_float <= 0.0 {
+        1.0
+    } else if d_float >= 1.0 {
+        0.0
+    } else {
+        let low_ratio = -((d_set - d_float) / (1.0 - d_float)).ln();
+        low_ratio / period_ratio
+    };
+    if f_low >= 1.0 {
+        // 7.64
+        d_float + (1.0 - d_float) / period_ratio * (1.0 - (-period_ratio).exp())
+    } else {
+        // 7.65
+        (1.0 - d_set) / period_ratio + f_low * d_float + (1.0 - f_low) * d_set
+    }
+}
+
+/// 7.59–7.73: reduction factor and calculation temperature for heating.
+pub fn heating_intermittency(input: &IntermittencyInput) -> HeatingIntermittency {
+    let (day_h, weekend_h, _) = input.function.reduction_hours();
+    let difference = input.setpoint_c - input.outdoor_c;
+    // 7.73, clamped to [0, 1].
+    let d_float = if difference <= 0.0 {
+        1.0
+    } else {
+        let losses = (input.conductance_w_per_k * difference
+            + input.ground_conductance_w_per_k * (input.setpoint_c - input.annual_outdoor_c))
+            * input.hours;
+        if losses <= 0.0 {
+            1.0
+        } else {
+            (input.gains_kwh * 1000.0 / losses).clamp(0.0, 1.0)
+        }
+    };
+    // 7.62/7.63
+    let f_day = day_h * (7.0 - weekend_h / 24.0) / (24.0 * 7.0);
+    let f_weekend = weekend_h / (24.0 * 7.0);
+    // 7.61
+    let a_day = 1.0 - f_day + f_day * mean_reduction(day_h, input, d_float);
+    let a_weekend = 1.0 - f_weekend + f_weekend * mean_reduction(weekend_h, input, d_float);
+    // 7.60
+    let reduction_factor = 1.0 - (1.0 - a_day) - (1.0 - a_weekend);
+    HeatingIntermittency {
+        reduction_factor,
+        // 7.59
+        calculation_temperature_c: reduction_factor * difference + input.outdoor_c,
+    }
+}
+
+/// 7.78/7.79: setpoint lowering by temperature levelling in dwellings, K.
+pub fn levelling_reduction_k(
+    dwelling: DwellingType,
+    specific_conductance_w_per_m2k: f64,
+    standard_setpoint_c: f64,
+    outdoor_c: f64,
+) -> f64 {
+    let f_sp = dwelling.spatial_fraction();
+    let h_e = f_sp * specific_conductance_w_per_m2k;
+    (F_MOD_T * f_sp) * h_e * (standard_setpoint_c - outdoor_c) / (h_e + H_INT_SPEC)
 }
 
 /// 7.39: sky radiation loss of one envelope element in kWh.
@@ -435,6 +721,25 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         "setpoints.sourceReference".into(),
         issues,
     );
+    let function = input.usage_function;
+    if (setpoints.heating_c - function.heating_setpoint_c()).abs() > 1e-9
+        || (setpoints.cooling_c - function.cooling_setpoint_c()).abs() > 1e-9
+    {
+        issues.push(issue("setpoints_table_7_13_mismatch", "setpoints"));
+    }
+    match (function.is_residential(), input.dwelling_type) {
+        (true, None) => issues.push(issue("dwelling_type_required", "dwellingType")),
+        (false, Some(_)) => issues.push(issue("dwelling_type_not_applicable", "dwellingType")),
+        _ => {}
+    }
+    if matches!(input.internal_gains, InternalGains::Residential { .. })
+        && !function.is_residential()
+    {
+        issues.push(issue(
+            "internal_gains_function_mismatch",
+            "internalGains.method",
+        ));
+    }
 
     if input.ventilation_flows.is_empty() {
         issues.push(issue("ventilation_flow_required", "ventilationFlows"));
@@ -472,13 +777,27 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 ));
             }
             if row
-                .supply_temperature_c
-                .is_some_and(|value| !value.is_finite())
+                .cooling_conductance_w_per_k
+                .is_some_and(|value| !finite_nonneg(value))
             {
                 issues.push(issue(
-                    "ventilation_supply_temperature_invalid",
-                    format!("{row_path}.supplyTemperatureC"),
+                    "ventilation_conductance_invalid",
+                    format!("{row_path}.coolingConductanceWPerK"),
                 ));
+            }
+            for (field, value) in [
+                ("supplyTemperatureC", row.supply_temperature_c),
+                (
+                    "coolingSupplyTemperatureC",
+                    row.cooling_supply_temperature_c,
+                ),
+            ] {
+                if value.is_some_and(|value| !value.is_finite()) {
+                    issues.push(issue(
+                        "ventilation_supply_temperature_invalid",
+                        format!("{row_path}.{field}"),
+                    ));
+                }
             }
         }
     }
@@ -561,14 +880,7 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             ));
         }
         match &window.obstruction {
-            Obstruction::Minimal => {
-                if window.tilt_deg > 90.0 {
-                    issues.push(issue(
-                        "window_obstruction_tilt_unsupported",
-                        format!("{path}.obstruction"),
-                    ));
-                }
-            }
+            Obstruction::Minimal => {}
             Obstruction::Declared {
                 heating,
                 cooling,
@@ -594,6 +906,12 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 issues.push(issue(
                     "window_shading_factor_invalid",
                     format!("{path}.movableShading.reductionFactor"),
+                ));
+            }
+            if !shading.control.fits_function(function.is_residential()) {
+                issues.push(issue(
+                    "window_shading_control_function_mismatch",
+                    format!("{path}.movableShading.control"),
                 ));
             }
             check_reference(
@@ -640,14 +958,27 @@ pub struct TransmissionSummary {
     pub conductance_w_per_k: f64,
     pub direct_conductance_w_per_k: Option<f64>,
     pub unheated_conductance_w_per_k: Option<f64>,
-    /// `H_g;an` (components) or supplied `H_g;adj` (explicit), W/K.
-    pub ground_conductance_w_per_k: f64,
-    /// Unweighted mean of table 17.1 used in 7.14 for ground transfer.
-    pub annual_mean_outdoor_temperature_c: Option<f64>,
-    #[serde(skip)]
-    pub(crate) ground_heating_kwh: [f64; 12],
-    #[serde(skip)]
-    pub(crate) ground_cooling_kwh: [f64; 12],
+    /// Steady `H_g` (8.36/8.37) summed over the slabs (components route), W/K.
+    pub ground_steady_conductance_w_per_k: Option<f64>,
+    /// Annex D.1 `H_g;an;mi`, W/K.
+    pub ground_monthly_conductance_w_per_k: [f64; 12],
+    /// Annex D.2 `H_H;g;adj`, W/K.
+    pub ground_heating_adjusted_w_per_k: f64,
+    /// Annex D.3 `H_C;g;adj`, W/K.
+    pub ground_cooling_adjusted_w_per_k: f64,
+    /// `θ_e;avg;an` used in 7.14/7.15 and D.1–D.3 (mean of table 17.1), °C.
+    pub annual_mean_outdoor_temperature_c: f64,
+}
+
+impl TransmissionSummary {
+    /// 7.14/7.15 ground term in kWh at calculation temperature `theta_c`.
+    pub(crate) fn ground_kwh(&self, month: u8, theta_c: f64) -> f64 {
+        let index = usize::from(month - 1);
+        self.ground_monthly_conductance_w_per_k[index]
+            * (theta_c - self.annual_mean_outdoor_temperature_c)
+            * MONTH_HOURS[index]
+            / 1000.0
+    }
 }
 
 pub fn annual_mean_outdoor_temperature_c() -> f64 {
@@ -659,6 +990,7 @@ fn resolve_transmission(
     issues: &mut Vec<DemandIssue>,
 ) -> Option<TransmissionSummary> {
     let prior = issues.len();
+    let annual_mean = annual_mean_outdoor_temperature_c();
     match &input.transmission {
         Transmission::Explicit(transmission) => {
             if !finite_nonneg(transmission.conductance_w_per_k) {
@@ -678,45 +1010,54 @@ fn resolve_transmission(
                     "transmission.groundInventoryConfirmed",
                 ));
             }
-            let mut heating = [0.0; 12];
-            let mut cooling = [0.0; 12];
-            let mut ground_conductance = 0.0;
+            let mut monthly = [0.0; 12];
+            let mut heating_adjusted = 0.0;
+            let mut cooling_adjusted = 0.0;
             if let Some(ground) = &transmission.ground {
-                if !finite_nonneg(ground.adjusted_conductance_w_per_k) {
-                    issues.push(issue(
-                        "ground_conductance_invalid",
-                        "transmission.ground.adjustedConductanceWPerK",
-                    ));
-                }
-                for (name, values, target) in [
-                    ("heatingKwh", &ground.heating_kwh, &mut heating),
-                    ("coolingKwh", &ground.cooling_kwh, &mut cooling),
+                for (name, value) in [
+                    (
+                        "heatingAdjustedConductanceWPerK",
+                        ground.heating_adjusted_conductance_w_per_k,
+                    ),
+                    (
+                        "coolingAdjustedConductanceWPerK",
+                        ground.cooling_adjusted_conductance_w_per_k,
+                    ),
                 ] {
-                    if values.len() != 12 || values.iter().any(|value| !value.is_finite()) {
+                    if !finite_nonneg(value) {
                         issues.push(issue(
-                            "ground_monthly_invalid",
+                            "ground_conductance_invalid",
                             format!("transmission.ground.{name}"),
                         ));
-                    } else {
-                        target.copy_from_slice(values);
                     }
+                }
+                let values = &ground.monthly_conductance_w_per_k;
+                if values.len() != 12 || values.iter().any(|value| !value.is_finite()) {
+                    issues.push(issue(
+                        "ground_monthly_invalid",
+                        "transmission.ground.monthlyConductanceWPerK",
+                    ));
+                } else {
+                    monthly.copy_from_slice(values);
                 }
                 check_reference(
                     &ground.source_reference,
                     "transmission.ground.sourceReference".into(),
                     issues,
                 );
-                ground_conductance = ground.adjusted_conductance_w_per_k;
+                heating_adjusted = ground.heating_adjusted_conductance_w_per_k;
+                cooling_adjusted = ground.cooling_adjusted_conductance_w_per_k;
             }
             (issues.len() == prior).then_some(TransmissionSummary {
                 method: "explicit",
                 conductance_w_per_k: transmission.conductance_w_per_k,
                 direct_conductance_w_per_k: None,
                 unheated_conductance_w_per_k: None,
-                ground_conductance_w_per_k: ground_conductance,
-                annual_mean_outdoor_temperature_c: None,
-                ground_heating_kwh: heating,
-                ground_cooling_kwh: cooling,
+                ground_steady_conductance_w_per_k: None,
+                ground_monthly_conductance_w_per_k: monthly,
+                ground_heating_adjusted_w_per_k: heating_adjusted,
+                ground_cooling_adjusted_w_per_k: cooling_adjusted,
+                annual_mean_outdoor_temperature_c: annual_mean,
             })
         }
         Transmission::Components(components) => {
@@ -744,7 +1085,7 @@ fn resolve_transmission(
                     "transmission.groundInventoryConfirmed",
                 ));
             }
-            let mut ground_conductance = 0.0;
+            let mut slabs = Vec::new();
             let mut ids = HashSet::new();
             for (index, slab) in components.ground_floors.iter().enumerate() {
                 let path = format!("transmission.groundFloors[{index}]");
@@ -756,8 +1097,26 @@ fn resolve_transmission(
                     format!("{path}.sourceReference"),
                     issues,
                 );
-                match slab_on_ground_conductance(slab) {
-                    Some(value) => ground_conductance += value,
+                if let EdgeThermalBridges::Detailed { bridges } = &slab.edge_thermal_bridges {
+                    for (bridge_index, bridge) in bridges.iter().enumerate() {
+                        check_reference(
+                            &bridge.source_reference,
+                            format!(
+                                "{path}.edgeThermalBridges.bridges[{bridge_index}].sourceReference"
+                            ),
+                            issues,
+                        );
+                    }
+                }
+                for (insulation_index, insulation) in slab.edge_insulation.iter().enumerate() {
+                    check_reference(
+                        &insulation.source_reference,
+                        format!("{path}.edgeInsulation[{insulation_index}].sourceReference"),
+                        issues,
+                    );
+                }
+                match slab_coefficients(slab) {
+                    Some(value) => slabs.push(value),
                     None => issues.push(issue("ground_floor_invalid", path)),
                 }
             }
@@ -769,26 +1128,24 @@ fn resolve_transmission(
                 Some(result) => Some(result.total_reduced_conductance_w_per_k?),
                 None => None,
             };
-            // 7.14: ground transfer against the annual mean outdoor temperature.
-            let annual_mean = annual_mean_outdoor_temperature_c();
-            let mut heating = [0.0; 12];
-            let mut cooling = [0.0; 12];
-            for index in 0..12 {
-                let hours = MONTH_HOURS[index];
-                heating[index] =
-                    ground_conductance * (input.setpoints.heating_c - annual_mean) * hours / 1000.0;
-                cooling[index] =
-                    ground_conductance * (input.setpoints.cooling_c - annual_mean) * hours / 1000.0;
-            }
+            let ground = ground_monthly(
+                &slabs,
+                input.setpoints.heating_c,
+                input.setpoints.cooling_c,
+                annual_mean,
+            );
             Some(TransmissionSummary {
                 method: "components",
                 conductance_w_per_k: direct_conductance + unheated_conductance.unwrap_or(0.0),
                 direct_conductance_w_per_k: Some(direct_conductance),
                 unheated_conductance_w_per_k: unheated_conductance,
-                ground_conductance_w_per_k: ground_conductance,
-                annual_mean_outdoor_temperature_c: Some(annual_mean),
-                ground_heating_kwh: heating,
-                ground_cooling_kwh: cooling,
+                ground_steady_conductance_w_per_k: Some(
+                    slabs.iter().map(|slab| slab.steady_w_per_k).sum(),
+                ),
+                ground_monthly_conductance_w_per_k: ground.monthly_w_per_k,
+                ground_heating_adjusted_w_per_k: ground.heating_adjusted_w_per_k,
+                ground_cooling_adjusted_w_per_k: ground.cooling_adjusted_w_per_k,
+                annual_mean_outdoor_temperature_c: annual_mean,
             })
         }
     }
@@ -844,41 +1201,20 @@ fn compute(
     issues: &mut Vec<DemandIssue>,
 ) -> Vec<MonthResult> {
     let area = input.usable_floor_area_m2;
+    let function = input.usage_function;
     // 7.45: C_m;int;eff in J/K.
     let capacity_j_per_k = d_m * 1000.0 * area;
-    let ground_adjusted = transmission.ground_conductance_w_per_k;
+    let h_tr = transmission.conductance_w_per_k;
+    let heating_standard = input.setpoints.heating_c;
+    let cooling_setpoint = input.setpoints.cooling_c;
+    let annual_outdoor = transmission.annual_mean_outdoor_temperature_c;
+    let cooling_reduction = cooling_reduction_factor(function);
     let mut results = Vec::with_capacity(12);
     for month in 1..=12u8 {
         let index = usize::from(month - 1);
         let hours = MONTH_HOURS[index];
         let outdoor = OUTDOOR_TEMPERATURE_C[index];
-
-        let mut ventilation_conductance = 0.0;
-        let mut ventilation_heating = 0.0;
-        let mut ventilation_cooling = 0.0;
-        for flow in &input.ventilation_flows {
-            let row = flow
-                .months
-                .iter()
-                .find(|row| row.month == month)
-                .expect("validated twelve unique months");
-            let supply = row.supply_temperature_c.unwrap_or(outdoor);
-            ventilation_conductance += row.conductance_w_per_k;
-            ventilation_heating +=
-                row.conductance_w_per_k * (input.setpoints.heating_c - supply) * hours / 1000.0;
-            ventilation_cooling +=
-                row.conductance_w_per_k * (input.setpoints.cooling_c - supply) * hours / 1000.0;
-        }
-        let ground_heating = transmission.ground_heating_kwh[index];
-        let ground_cooling = transmission.ground_cooling_kwh[index];
-        let transmission_heating =
-            transmission.conductance_w_per_k * (input.setpoints.heating_c - outdoor) * hours
-                / 1000.0
-                + ground_heating;
-        let transmission_cooling =
-            transmission.conductance_w_per_k * (input.setpoints.cooling_c - outdoor) * hours
-                / 1000.0
-                + ground_cooling;
+        let ground_monthly = transmission.ground_monthly_conductance_w_per_k[index];
 
         let internal = match &input.internal_gains {
             InternalGains::Residential { dwelling_count, .. } => {
@@ -893,7 +1229,6 @@ fn compute(
                 heat_flux_w_per_m2, ..
             } => heat_flux_w_per_m2 * area * hours / 1000.0,
         };
-
         let window_solar: f64 = input
             .windows
             .iter()
@@ -909,101 +1244,140 @@ fn compute(
             .iter()
             .map(|element| opaque_solar_kwh(element, month))
             .sum();
+        // 7.12/7.13 with balance-specific window gains (§17.3, 7.42).
+        let gains = internal + window_solar + opaque_solar;
+        let gains_cooling = internal + window_solar_cooling + opaque_solar;
 
-        let conductance =
-            transmission.conductance_w_per_k + ground_adjusted + ventilation_conductance;
-        if conductance <= 0.0 {
+        // 7.19/7.20 and the time constants 7.57/7.58.
+        let h_ve_heating = ventilation_conductance(input, month, Balance::Heating);
+        let h_ve_cooling = ventilation_conductance(input, month, Balance::Cooling);
+        let conductance_heating =
+            h_tr + transmission.ground_heating_adjusted_w_per_k + h_ve_heating;
+        let conductance_cooling =
+            h_tr + transmission.ground_cooling_adjusted_w_per_k + h_ve_cooling;
+        if conductance_heating <= 0.0 || conductance_cooling <= 0.0 {
             issues.push(issue(
                 "total_conductance_nonpositive",
                 format!("month[{month}]"),
             ));
             return Vec::new();
         }
-        // 7.57 and 7.51.
-        let tau = capacity_j_per_k / 3600.0 / conductance;
-        let a = A_0 + tau / TAU_0_H;
-        // 7.31 with balance-specific window gains (§17.3, 7.42).
-        let gains = internal + window_solar + opaque_solar;
-        let gains_cooling = internal + window_solar_cooling + opaque_solar;
+        let tau_heating = capacity_j_per_k / 3600.0 / conductance_heating;
+        let tau_cooling = capacity_j_per_k / 3600.0 / conductance_cooling;
+        let a_heating = A_0 + tau_heating / TAU_0_H;
+        let a_cooling = A_0 + tau_cooling / TAU_0_H;
 
+        // 7.76–7.79: setpoint after levelling (dwellings only).
+        let levelling = match input.dwelling_type {
+            Some(dwelling) if function.is_residential() => levelling_reduction_k(
+                dwelling,
+                conductance_heating / area,
+                heating_standard,
+                outdoor,
+            ),
+            _ => 0.0,
+        };
+        let heating_setpoint = heating_standard - levelling;
+        // 7.59–7.73
+        let intermittency = heating_intermittency(&IntermittencyInput {
+            function,
+            setpoint_c: heating_setpoint,
+            outdoor_c: outdoor,
+            annual_outdoor_c: annual_outdoor,
+            hours,
+            time_constant_h: tau_heating,
+            gains_kwh: gains,
+            conductance_w_per_k: h_tr + h_ve_heating,
+            ground_conductance_w_per_k: ground_monthly,
+        });
+        let theta_heating = intermittency.calculation_temperature_c;
+
+        // 7.14/7.15 and 7.18.
+        let transmission_heating = h_tr * (theta_heating - outdoor) * hours / 1000.0
+            + transmission.ground_kwh(month, theta_heating);
+        let transmission_cooling = h_tr * (cooling_setpoint - outdoor) * hours / 1000.0
+            + transmission.ground_kwh(month, cooling_setpoint);
+        let ventilation_heating = h_ve_heating * (theta_heating - outdoor) * hours / 1000.0;
+        let ventilation_cooling = h_ve_cooling * (cooling_setpoint - outdoor) * hours / 1000.0;
+
+        // 7.1–7.3 and 7.46–7.50.
         let heat_transfer_heating = transmission_heating + ventilation_heating;
-        let heating = if heat_transfer_heating <= 0.0 {
-            BalanceTerms {
-                transmission_kwh: transmission_heating,
-                ventilation_kwh: ventilation_heating,
-                heat_transfer_kwh: heat_transfer_heating,
-                gains_kwh: gains,
-                gamma: None,
-                utilization: 1.0,
-                need_kwh: 0.0,
-            }
+        let (gamma_heating, eta_heating, need_heating) = if heat_transfer_heating == 0.0 {
+            (None, 1.0, 0.0)
         } else {
             let gamma = gains / heat_transfer_heating;
-            let eta = heating_utilization(gamma, a);
-            BalanceTerms {
-                transmission_kwh: transmission_heating,
-                ventilation_kwh: ventilation_heating,
-                heat_transfer_kwh: heat_transfer_heating,
-                gains_kwh: gains,
-                gamma: Some(gamma),
-                utilization: eta,
-                need_kwh: (heat_transfer_heating - eta * gains).max(0.0),
-            }
+            let eta = heating_utilization(gamma, a_heating, gains);
+            let need = if (gamma <= 0.0 && gains > 0.0) || gamma > GAMMA_H_MAX {
+                0.0
+            } else {
+                (heat_transfer_heating - eta * gains).max(0.0)
+            };
+            (Some(gamma), eta, need)
         };
 
+        // 7.6–7.7 and 7.52–7.55.
         let heat_transfer_cooling = transmission_cooling + ventilation_cooling;
-        if heat_transfer_cooling <= 0.0 && gains_cooling > 0.0 {
-            // Outdoor or supply air warmer than the cooling setpoint: the
-            // utilisation route for this case is not transcribed.
-            issues.push(issue(
-                "cooling_heat_transfer_nonpositive_unsupported",
-                format!("month[{month}]"),
-            ));
-            return Vec::new();
-        }
-        let cooling = if gains_cooling <= 0.0 || heat_transfer_cooling / gains_cooling > 2.0 {
-            // 7.6 gate: (1/γ_C) > 2 → no cooling need; no gains_cooling → none either.
-            BalanceTerms {
-                transmission_kwh: transmission_cooling,
-                ventilation_kwh: ventilation_cooling,
-                heat_transfer_kwh: heat_transfer_cooling,
-                gains_kwh: gains_cooling,
-                gamma: (gains_cooling > 0.0).then(|| gains_cooling / heat_transfer_cooling),
-                utilization: 0.0,
-                need_kwh: 0.0,
-            }
+        let gamma_cooling =
+            (heat_transfer_cooling != 0.0).then(|| gains_cooling / heat_transfer_cooling);
+        let eta_cooling = gamma_cooling.map_or(1.0, |gamma| cooling_utilization(gamma, a_cooling));
+        let need_cooling = if gains_cooling <= 0.0
+            || gamma_cooling.is_some_and(|gamma| gamma > 0.0 && 1.0 / gamma > 2.0)
+        {
+            0.0
         } else {
-            let gamma = gains_cooling / heat_transfer_cooling;
-            let eta = cooling_utilization(gamma, a);
-            BalanceTerms {
-                transmission_kwh: transmission_cooling,
-                ventilation_kwh: ventilation_cooling,
-                heat_transfer_kwh: heat_transfer_cooling,
-                gains_kwh: gains_cooling,
-                gamma: Some(gamma),
-                utilization: eta,
-                need_kwh: (gains_cooling - eta * heat_transfer_cooling).max(0.0),
-            }
+            (cooling_reduction * (gains_cooling - eta_cooling * heat_transfer_cooling)).max(0.0)
         };
+
         let row = MonthResult {
             month,
             hours,
             outdoor_temperature_c: outdoor,
-            time_constant_h: tau,
-            a,
             internal_gains_kwh: internal,
             window_solar_gains_kwh: window_solar,
             window_solar_cooling_kwh: window_solar_cooling,
             opaque_solar_gains_kwh: opaque_solar,
-            heating,
-            cooling,
+            ground_conductance_w_per_k: ground_monthly,
+            heating: BalanceTerms {
+                setpoint_c: heating_setpoint,
+                reduction_factor: intermittency.reduction_factor,
+                calculation_temperature_c: theta_heating,
+                ventilation_conductance_w_per_k: h_ve_heating,
+                time_constant_h: tau_heating,
+                a: a_heating,
+                transmission_kwh: transmission_heating,
+                ventilation_kwh: ventilation_heating,
+                heat_transfer_kwh: heat_transfer_heating,
+                gains_kwh: gains,
+                gamma: gamma_heating,
+                utilization: eta_heating,
+                need_kwh: need_heating,
+            },
+            cooling: BalanceTerms {
+                setpoint_c: cooling_setpoint,
+                reduction_factor: cooling_reduction,
+                calculation_temperature_c: cooling_setpoint,
+                ventilation_conductance_w_per_k: h_ve_cooling,
+                time_constant_h: tau_cooling,
+                a: a_cooling,
+                transmission_kwh: transmission_cooling,
+                ventilation_kwh: ventilation_cooling,
+                heat_transfer_kwh: heat_transfer_cooling,
+                gains_kwh: gains_cooling,
+                gamma: gamma_cooling,
+                utilization: eta_cooling,
+                need_kwh: need_cooling,
+            },
         };
         let values = [
             row.heating.need_kwh,
             row.cooling.need_kwh,
             row.heating.heat_transfer_kwh,
             row.cooling.heat_transfer_kwh,
-            row.time_constant_h,
+            row.heating.time_constant_h,
+            row.cooling.time_constant_h,
+            row.heating.calculation_temperature_c,
+            row.heating.utilization,
+            row.cooling.utilization,
         ];
         if values.iter().any(|value| !value.is_finite()) {
             issues.push(issue("monthly_result_overflow", format!("month[{month}]")));
@@ -1024,6 +1398,8 @@ mod tests {
             "zoneId": "rz-1",
             "usableFloorAreaM2": 100.0,
             "areaSourceReference": "synthetic plan",
+            "usageFunction": "residential",
+            "dwellingType": "other",
             "setpoints": {"heatingC": 20.0, "coolingC": 24.0, "sourceReference": "table 7.13 residential"},
             "transmission": {
                 "method": "explicit",
@@ -1052,6 +1428,28 @@ mod tests {
             }]
         }))
         .unwrap()
+    }
+
+    fn office() -> MonthlyDemandInput {
+        let mut input = sample();
+        input.usage_function = UsageFunction::Office;
+        input.dwelling_type = None;
+        input.setpoints.heating_c = 21.0;
+        input.internal_gains = InternalGains::Declared {
+            heat_flux_w_per_m2: 4.0,
+            source_reference: "synthetic utility gains".into(),
+        };
+        input
+    }
+
+    fn valid(input: &MonthlyDemandInput) -> MonthlyDemandAssessment {
+        let result = assess_monthly_demand(input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        result
     }
 
     #[test]
@@ -1083,33 +1481,144 @@ mod tests {
         assert_eq!(occupants_per_dwelling(30.0), 1.0);
         assert!((occupants_per_dwelling(67.0) - 1.676_571_428_571_428_6).abs() < 1e-12);
         assert!((occupants_per_dwelling(133.06) - 2.6106).abs() < 1e-12);
-        // Continuity at the 100 m² band edge.
         assert!((occupants_per_dwelling(100.0) - 2.28).abs() < 1e-12);
     }
 
     #[test]
-    fn utilisation_limits() {
-        assert_eq!(heating_utilization(0.0, 2.0), 1.0);
-        assert!((heating_utilization(1.0, 2.0) - 2.0 / 3.0).abs() < 1e-12);
-        assert!((heating_utilization(0.5, 2.0) - (1.0 - 0.25) / (1.0 - 0.125)).abs() < 1e-12);
+    fn utilisation_limits_follow_7_46_to_7_54() {
+        assert!((heating_utilization(1.0, 2.0, 1.0) - 2.0 / 3.0).abs() < 1e-12);
+        assert!((heating_utilization(0.5, 2.0, 1.0) - (1.0 - 0.25) / (1.0 - 0.125)).abs() < 1e-12);
+        // 7.48: γ ≤ 0 with positive gains gives 1/γ; 7.49 gives 1.
+        assert_eq!(heating_utilization(-0.5, 2.0, 10.0), -2.0);
+        assert_eq!(heating_utilization(-0.5, 2.0, -10.0), 1.0);
         assert!((cooling_utilization(1.0, 2.0) - 2.0 / 3.0).abs() < 1e-12);
         assert!((cooling_utilization(2.0, 2.0) - (1.0 - 0.25) / (1.0 - 0.125)).abs() < 1e-12);
+        // 7.54
+        assert_eq!(cooling_utilization(-1.0, 2.0), 1.0);
+    }
+
+    #[test]
+    fn usage_function_tables_7_13_to_7_15() {
+        assert_eq!(UsageFunction::HealthcareWithBeds.heating_setpoint_c(), 22.0);
+        assert_eq!(UsageFunction::Sport.heating_setpoint_c(), 16.0);
+        assert_eq!(UsageFunction::Office.heating_setpoint_c(), 21.0);
+        assert_eq!(UsageFunction::Sport.reduced_setpoint_c(), 14.0);
+        assert_eq!(UsageFunction::Residential.reduced_setpoint_c(), 16.0);
+        assert_eq!(UsageFunction::Retail.reduction_hours(), (13.0, 24.0, 24.0));
+        assert_eq!(UsageFunction::Cell.reduction_hours(), (8.0, 0.0, 0.0));
+        // 7.74/7.75: office f = 48/168, a = 1 − f + 0,3·f.
+        let f = 48.0 / 168.0;
+        assert!(
+            (cooling_reduction_factor(UsageFunction::Office) - (1.0 - f + 0.3 * f)).abs() < 1e-12
+        );
+        assert_eq!(cooling_reduction_factor(UsageFunction::Residential), 1.0);
+    }
+
+    fn intermittency(function: UsageFunction, tau: f64) -> HeatingIntermittency {
+        heating_intermittency(&IntermittencyInput {
+            function,
+            setpoint_c: 20.0,
+            outdoor_c: 0.0,
+            annual_outdoor_c: 10.0,
+            hours: 744.0,
+            time_constant_h: tau,
+            gains_kwh: 0.0,
+            conductance_w_per_k: 100.0,
+            ground_conductance_w_per_k: 0.0,
+        })
+    }
+
+    #[test]
+    fn intermittent_heating_7_64_branch_by_hand() {
+        // No gains: dθ_float = 0; θ_low 16 → dθ_set = 0,8; τ 50 h, t 10 h.
+        // t_low/τ = −ln 0,8 = 0,2231 → f_low = 1,116 ≥ 1 → 7.64.
+        let result = intermittency(UsageFunction::Residential, 50.0);
+        let d_red = 1.0 / 0.2 * (1.0 - (-0.2_f64).exp());
+        let f_day = 10.0 * 7.0 / 168.0;
+        let a = 1.0 - f_day + f_day * d_red;
+        assert!((result.reduction_factor - a).abs() < 1e-12);
+        assert!((result.calculation_temperature_c - a * 20.0).abs() < 1e-12);
+        assert!((result.reduction_factor - 0.960_977).abs() < 1e-6);
+    }
+
+    #[test]
+    fn intermittent_heating_7_65_branch_and_weekend_by_hand() {
+        // τ 5 h: t/τ = 2, f_low = 0,2231/2 < 1 → 7.65.
+        let result = intermittency(UsageFunction::Residential, 5.0);
+        let f_low = -(0.8_f64.ln()) / 2.0;
+        let d_red = (1.0 - 0.8) / 2.0 + (1.0 - f_low) * 0.8;
+        let f_day = 10.0 * 7.0 / 168.0;
+        assert!((result.reduction_factor - (1.0 - f_day + f_day * d_red)).abs() < 1e-12);
+        // Office: 14 h per weekday over 5 days, 48 h weekend (7.62/7.63).
+        let office = intermittency(UsageFunction::Office, 50.0);
+        let f_day = 14.0 * (7.0 - 2.0) / 168.0;
+        let f_wknd = 48.0 / 168.0;
+        let mean = |t: f64| {
+            let ratio = t / 50.0;
+            let f_low = -(0.8_f64.ln()) / ratio;
+            if f_low >= 1.0 {
+                (1.0 - (-ratio).exp()) / ratio
+            } else {
+                0.2 / ratio + (1.0 - f_low) * 0.8
+            }
+        };
+        let a_day = 1.0 - f_day + f_day * mean(14.0);
+        let a_wknd = 1.0 - f_wknd + f_wknd * mean(48.0);
+        assert!((office.reduction_factor - (1.0 - (1.0 - a_day) - (1.0 - a_wknd))).abs() < 1e-12);
+    }
+
+    #[test]
+    fn free_floating_and_warm_months_disable_the_reduction() {
+        // θ_set ≤ θ_e: dθ_set = dθ_float = 1 → a_H;red = 1.
+        let warm = heating_intermittency(&IntermittencyInput {
+            outdoor_c: 21.0,
+            ..IntermittencyInput {
+                function: UsageFunction::Office,
+                setpoint_c: 20.0,
+                outdoor_c: 0.0,
+                annual_outdoor_c: 10.0,
+                hours: 744.0,
+                time_constant_h: 50.0,
+                gains_kwh: 0.0,
+                conductance_w_per_k: 100.0,
+                ground_conductance_w_per_k: 0.0,
+            }
+        });
+        assert!((warm.reduction_factor - 1.0).abs() < 1e-12);
+        // Gains covering all losses: dθ_float = 1 → f_low = 0 → 7.65 gives 1.
+        let covered = heating_intermittency(&IntermittencyInput {
+            function: UsageFunction::Office,
+            setpoint_c: 20.0,
+            outdoor_c: 0.0,
+            annual_outdoor_c: 10.0,
+            hours: 744.0,
+            time_constant_h: 50.0,
+            gains_kwh: 1.0e6,
+            conductance_w_per_k: 100.0,
+            ground_conductance_w_per_k: 0.0,
+        });
+        assert!((covered.reduction_factor - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn dwelling_levelling_7_78_by_hand() {
+        // H_e;spec 1,0 W/m²K, θ 20, θ_e 0, other dwelling f_sp 0,6:
+        // (0,8·0,6)·(0,6·1,0)·20 / (0,6 + 2,0).
+        let delta = levelling_reduction_k(DwellingType::Other, 1.0, 20.0, 0.0);
+        assert!((delta - 0.48 * 0.6 * 20.0 / 2.6).abs() < 1e-12);
+        let apartment = levelling_reduction_k(DwellingType::ApartmentBuilding, 1.0, 20.0, 0.0);
+        assert!((apartment - 0.4 * 0.5 * 20.0 / 2.5).abs() < 1e-12);
     }
 
     #[test]
     fn hand_checked_january_balance() {
-        let result = assess_monthly_demand(&sample());
-        assert_eq!(
-            result.status, "calculated_unverified",
-            "{:?}",
-            result.issues
-        );
+        let result = valid(&sample());
         let jan = &result.monthly[0];
         let hours = 744.0;
-        let q_tr = 80.0 * (20.0 - 2.61) * hours / 1000.0;
-        let q_ve = 40.0 * (20.0 - 2.61) * hours / 1000.0;
-        assert!((jan.heating.transmission_kwh - q_tr).abs() < 1e-9);
-        assert!((jan.heating.ventilation_kwh - q_ve).abs() < 1e-9);
+        let tau = 180.0 * 1000.0 * 100.0 / 3600.0 / 120.0;
+        assert!((jan.heating.time_constant_h - tau).abs() < 1e-9);
+        assert!((jan.cooling.time_constant_h - tau).abs() < 1e-9);
+        let a = 1.0 + tau / 15.0;
         let internal = 180.0 * 2.28 * 0.001 * hours;
         assert!((jan.internal_gains_kwh - internal).abs() < 1e-9);
         let window = 0.9 * 0.6 * 10.0 * 0.75 * 60.1 * hours * 0.001
@@ -1118,31 +1627,132 @@ mod tests {
         let roof = 0.6 * 0.04 * 0.16 * 50.0 * 28.0 * hours * 0.001
             - 1.0 * 0.04 * 0.16 * 50.0 * 4.14 * 11.0 * hours * 0.001;
         assert!((jan.opaque_solar_gains_kwh - roof).abs() < 1e-9);
-        let tau = 180.0 * 1000.0 * 100.0 / 3600.0 / 120.0;
-        assert!((jan.time_constant_h - tau).abs() < 1e-9);
-        let a = 1.0 + tau / 15.0;
         let gains = internal + window + roof;
+        // 7.78/7.79 with H_e;spec = 120/100, then 7.59–7.73.
+        let setpoint = 20.0 - levelling_reduction_k(DwellingType::Other, 1.2, 20.0, 2.61);
+        assert!((jan.heating.setpoint_c - setpoint).abs() < 1e-12);
+        let expected = heating_intermittency(&IntermittencyInput {
+            function: UsageFunction::Residential,
+            setpoint_c: setpoint,
+            outdoor_c: 2.61,
+            annual_outdoor_c: annual_mean_outdoor_temperature_c(),
+            hours,
+            time_constant_h: tau,
+            gains_kwh: gains,
+            conductance_w_per_k: 120.0,
+            ground_conductance_w_per_k: 0.0,
+        });
+        let theta = expected.calculation_temperature_c;
+        assert!((jan.heating.calculation_temperature_c - theta).abs() < 1e-12);
+        assert!(theta < setpoint && setpoint < 20.0);
+        let q_tr = 80.0 * (theta - 2.61) * hours / 1000.0;
+        let q_ve = 40.0 * (theta - 2.61) * hours / 1000.0;
+        assert!((jan.heating.transmission_kwh - q_tr).abs() < 1e-9);
+        assert!((jan.heating.ventilation_kwh - q_ve).abs() < 1e-9);
         let gamma = gains / (q_tr + q_ve);
         let eta = (1.0 - gamma.powf(a)) / (1.0 - gamma.powf(a + 1.0));
         assert!((jan.heating.need_kwh - (q_tr + q_ve - eta * gains)).abs() < 1e-9);
+        // Cooling uses the standard setpoint and a_C;red = 1 for dwellings.
+        assert_eq!(jan.cooling.calculation_temperature_c, 24.0);
+        assert!((jan.cooling.transmission_kwh - 80.0 * (24.0 - 2.61) * 0.744).abs() < 1e-9);
         assert_eq!(jan.cooling.need_kwh, 0.0);
-        assert!(result.annual_heating_need_kwh.unwrap() > result.monthly[0].heating.need_kwh);
         assert!(!result.beng_calculation_available);
     }
 
     #[test]
-    fn gate_and_cooling_month() {
+    fn heating_gate_7_2_stops_need_above_gamma_two() {
         let mut input = sample();
         input.windows[0].area_m2 = 40.0;
-        let result = assess_monthly_demand(&input);
+        let result = valid(&input);
+        let june = &result.monthly[5];
+        let gamma = june.heating.gamma.unwrap();
+        assert!(gamma > 2.0, "{gamma}");
+        assert_eq!(june.heating.need_kwh, 0.0);
+        // Below the gate the old formula still applies.
+        let jan = &result.monthly[0];
+        assert!(jan.heating.gamma.unwrap() <= 2.0);
+        assert!(jan.heating.need_kwh > 0.0);
+    }
+
+    #[test]
+    fn cooling_gate_and_cooling_month() {
+        let mut input = sample();
+        input.windows[0].area_m2 = 40.0;
+        let result = valid(&input);
         let july = &result.monthly[6];
-        let ratio = july.cooling.heat_transfer_kwh / july.cooling.gains_kwh;
-        assert!(ratio <= 2.0);
+        assert!(july.cooling.heat_transfer_kwh / july.cooling.gains_kwh <= 2.0);
         assert!(july.cooling.need_kwh > 0.0);
-        let base = assess_monthly_demand(&sample());
+        let base = valid(&sample());
         let jan = &base.monthly[0];
         assert!(jan.cooling.heat_transfer_kwh / jan.cooling.gains_kwh > 2.0);
         assert_eq!(jan.cooling.need_kwh, 0.0);
+    }
+
+    #[test]
+    fn warm_supply_air_uses_7_54_instead_of_failing() {
+        // July supply air at 30 °C makes H_C;ve negative (b_v < 0) and the
+        // cooling heat transfer negative; a large H_C;g;adj keeps τ_C positive.
+        let mut input = sample();
+        let july = &mut input.ventilation_flows[0].months[6];
+        july.cooling_conductance_w_per_k = Some(400.0);
+        july.cooling_supply_temperature_c = Some(30.0);
+        let Transmission::Explicit(transmission) = &mut input.transmission else {
+            unreachable!()
+        };
+        transmission.ground = Some(GroundTransfer {
+            monthly_conductance_w_per_k: vec![0.0; 12],
+            heating_adjusted_conductance_w_per_k: 0.0,
+            cooling_adjusted_conductance_w_per_k: 1000.0,
+            source_reference: "synthetic".into(),
+        });
+        let result = valid(&input);
+        let july = &result.monthly[6];
+        assert!(july.cooling.heat_transfer_kwh < 0.0);
+        assert_eq!(july.cooling.utilization, 1.0);
+        let expected = july.cooling.gains_kwh - july.cooling.heat_transfer_kwh;
+        assert!((july.cooling.need_kwh - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn utility_cooling_need_includes_a_c_red() {
+        let mut input = office();
+        input.windows[0].area_m2 = 40.0;
+        let result = valid(&input);
+        let july = &result.monthly[6];
+        let f = 48.0 / 168.0;
+        let a_red = 1.0 - f + 0.3 * f;
+        assert!((july.cooling.reduction_factor - a_red).abs() < 1e-12);
+        let raw =
+            july.cooling.gains_kwh - july.cooling.utilization * july.cooling.heat_transfer_kwh;
+        assert!(raw > 0.0);
+        assert!((july.cooling.need_kwh - a_red * raw).abs() < 1e-9);
+        // Utility: no levelling, but intermittent heating lowers θ_calc.
+        let jan = &result.monthly[0];
+        assert_eq!(jan.heating.setpoint_c, 21.0);
+        assert!(jan.heating.calculation_temperature_c < 21.0);
+    }
+
+    #[test]
+    fn supply_temperature_enters_through_b_v() {
+        let mut input = sample();
+        for row in &mut input.ventilation_flows[0].months {
+            row.supply_temperature_c = Some(15.0);
+            row.cooling_conductance_w_per_k = Some(10.0);
+        }
+        let result = valid(&input);
+        let jan = &result.monthly[0];
+        // 7.20: b_v = (20 − 15)/(20 − 2,61); 7.18 with θ_calc.
+        let h_ve = 40.0 * 5.0 / (20.0 - 2.61);
+        assert!((jan.heating.ventilation_conductance_w_per_k - h_ve).abs() < 1e-12);
+        let theta = jan.heating.calculation_temperature_c;
+        assert!((jan.heating.ventilation_kwh - h_ve * (theta - 2.61) * 0.744).abs() < 1e-9);
+        // Cooling: conductance 10, supply 15 → b_v = (24 − 15)/(24 − 2,61).
+        let h_c = 10.0 * 9.0 / (24.0 - 2.61);
+        assert!((jan.cooling.ventilation_conductance_w_per_k - h_c).abs() < 1e-12);
+        assert!((jan.cooling.ventilation_kwh - 10.0 * 9.0 * 0.744).abs() < 1e-9);
+        // τ_H uses H_H;ve with b_v.
+        let tau = 180.0 * 1000.0 * 100.0 / 3600.0 / (80.0 + h_ve);
+        assert!((jan.heating.time_constant_h - tau).abs() < 1e-9);
     }
 
     #[test]
@@ -1151,25 +1761,10 @@ mod tests {
             let mut input = sample();
             input.thermal_mass.floor = MassClass::Light;
             input.thermal_mass.ceiling = CeilingColumn::ClosedOrSuspended;
-            assess_monthly_demand(&input)
-                .annual_heating_need_kwh
-                .unwrap()
+            valid(&input).annual_heating_need_kwh.unwrap()
         };
-        let heavy = assess_monthly_demand(&sample())
-            .annual_heating_need_kwh
-            .unwrap();
+        let heavy = valid(&sample()).annual_heating_need_kwh.unwrap();
         assert!(heavy < light);
-    }
-
-    #[test]
-    fn supply_temperature_reduces_ventilation_loss() {
-        let mut input = sample();
-        for row in &mut input.ventilation_flows[0].months {
-            row.supply_temperature_c = Some(15.0);
-        }
-        let result = assess_monthly_demand(&input);
-        let jan = &result.monthly[0];
-        assert!((jan.heating.ventilation_kwh - 40.0 * 5.0 * 744.0 / 1000.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1181,6 +1776,7 @@ mod tests {
             transmission.ground_inventory_confirmed = false;
         }
         input.ventilation_flows[0].months.pop();
+        input.ventilation_flows[0].months[0].cooling_conductance_w_per_k = Some(-1.0);
         input.opaque_elements[0].id = "w-south".into();
         let result = assess_monthly_demand(&input);
         assert_eq!(result.status, "invalid");
@@ -1192,10 +1788,45 @@ mod tests {
             "window_inventory_incomplete",
             "ground_inventory_unconfirmed",
             "ventilation_twelve_months_required",
+            "ventilation_conductance_invalid",
             "element_id_invalid",
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn rejects_function_inconsistencies() {
+        let mut input = sample();
+        input.setpoints.heating_c = 21.0;
+        input.dwelling_type = None;
+        input.windows[0].movable_shading = Some(MovableShading {
+            reduction_factor: 0.2,
+            control: crate::solar_shading::ShadingControl::ManualUtilityWithoutGlareProtection,
+            source_reference: "table 7.5".into(),
+        });
+        let codes: Vec<_> = assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        for code in [
+            "setpoints_table_7_13_mismatch",
+            "dwelling_type_required",
+            "window_shading_control_function_mismatch",
+        ] {
+            assert!(codes.contains(&code), "{code} missing in {codes:?}");
+        }
+        let mut utility = office();
+        utility.dwelling_type = Some(DwellingType::Other);
+        utility.internal_gains = sample().internal_gains;
+        let codes: Vec<_> = assess_monthly_demand(&utility)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert!(codes.contains(&"dwelling_type_not_applicable"));
+        assert!(codes.contains(&"internal_gains_function_mismatch"));
     }
 
     #[test]
@@ -1206,25 +1837,36 @@ mod tests {
     }
 
     #[test]
-    fn ground_terms_enter_transfer_and_time_constant() {
+    fn explicit_ground_terms_enter_transfer_and_time_constants() {
         let mut input = sample();
         let Transmission::Explicit(transmission) = &mut input.transmission else {
             unreachable!()
         };
         transmission.ground = Some(GroundTransfer {
-            adjusted_conductance_w_per_k: 30.0,
-            heating_kwh: vec![100.0; 12],
-            cooling_kwh: vec![150.0; 12],
-            source_reference: "synthetic 8.3".into(),
+            monthly_conductance_w_per_k: (1..=12).map(|month| 20.0 + f64::from(month)).collect(),
+            heating_adjusted_conductance_w_per_k: 30.0,
+            cooling_adjusted_conductance_w_per_k: 10.0,
+            source_reference: "synthetic annex D".into(),
         });
-        let result = assess_monthly_demand(&input);
-        let base = assess_monthly_demand(&sample());
+        let result = valid(&input);
+        let annual = annual_mean_outdoor_temperature_c();
+        for (index, row) in result.monthly.iter().enumerate() {
+            let h_g = 21.0 + index as f64;
+            assert_eq!(row.ground_conductance_w_per_k, h_g);
+            let theta = row.heating.calculation_temperature_c;
+            let expected = (80.0 * (theta - row.outdoor_temperature_c) + h_g * (theta - annual))
+                * row.hours
+                / 1000.0;
+            assert!((row.heating.transmission_kwh - expected).abs() < 1e-9);
+            let cooling = (80.0 * (24.0 - row.outdoor_temperature_c) + h_g * (24.0 - annual))
+                * row.hours
+                / 1000.0;
+            assert!((row.cooling.transmission_kwh - cooling).abs() < 1e-9);
+        }
         let jan = &result.monthly[0];
-        assert!(
-            (jan.heating.transmission_kwh - base.monthly[0].heating.transmission_kwh - 100.0).abs()
-                < 1e-9
-        );
-        assert!((jan.time_constant_h - 180.0 * 1000.0 * 100.0 / 3600.0 / 150.0).abs() < 1e-9);
+        let c = 180.0 * 1000.0 * 100.0 / 3600.0;
+        assert!((jan.heating.time_constant_h - c / 150.0).abs() < 1e-9);
+        assert!((jan.cooling.time_constant_h - c / 130.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1242,30 +1884,31 @@ mod tests {
             }]},
             "groundFloors": [{
                 "id": "slab", "areaM2": 67.0, "exposedPerimeterM": 32.92,
-                "constructionResistanceM2kPerW": 1.0 / 0.258398, "sourceReference": "C1 example"
+                "constructionResistanceM2kPerW": 1.0 / 0.258398,
+                "edgeThermalBridges": {"method": "detailed", "bridges": []},
+                "sourceReference": "C1 example"
             }],
             "groundInventoryConfirmed": true
         });
         let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
-        let result = assess_monthly_demand(&input);
-        assert_eq!(
-            result.status, "calculated_unverified",
-            "{:?}",
-            result.issues
-        );
+        let result = valid(&input);
         let summary = result.transmission.as_ref().unwrap();
         assert!((summary.direct_conductance_w_per_k.unwrap() - 21.0).abs() < 1e-12);
         assert!((summary.unheated_conductance_w_per_k.unwrap() - 5.0).abs() < 1e-12);
         assert!((summary.conductance_w_per_k - 26.0).abs() < 1e-12);
-        assert!((summary.ground_conductance_w_per_k - 13.163).abs() < 1e-3);
-        let mean = annual_mean_outdoor_temperature_c();
+        assert!((summary.ground_steady_conductance_w_per_k.unwrap() - 13.163).abs() < 1e-3);
+        let Transmission::Components(components) = &input.transmission else {
+            unreachable!()
+        };
+        let slab = crate::ground::slab_coefficients(&components.ground_floors[0]).unwrap();
+        let ground = ground_monthly(&[slab], 20.0, 24.0, annual_mean_outdoor_temperature_c());
+        assert_eq!(
+            summary.ground_monthly_conductance_w_per_k,
+            ground.monthly_w_per_k
+        );
         let jan = &result.monthly[0];
-        let expected = 26.0 * (20.0 - 2.61) * 0.744
-            + summary.ground_conductance_w_per_k * (20.0 - mean) * 0.744;
-        assert!((jan.heating.transmission_kwh - expected).abs() < 1e-9);
-        let tau =
-            180.0 * 1000.0 * 100.0 / 3600.0 / (26.0 + summary.ground_conductance_w_per_k + 40.0);
-        assert!((jan.time_constant_h - tau).abs() < 1e-9);
+        let tau = 180.0 * 1000.0 * 100.0 / 3600.0 / (26.0 + ground.heating_adjusted_w_per_k + 40.0);
+        assert!((jan.heating.time_constant_h - tau).abs() < 1e-9);
     }
 
     #[test]
@@ -1276,7 +1919,8 @@ mod tests {
             "direct": {"elements": [{"id": "wall", "areaM2": -1.0, "uValueWPerM2k": 0.2, "sourceReference": ""}]},
             "unheated": null,
             "groundFloors": [{"id": "slab", "areaM2": 50.0, "exposedPerimeterM": 0.0,
-                "constructionResistanceM2kPerW": 3.0, "sourceReference": "x"}],
+                "constructionResistanceM2kPerW": 3.0, "edgeThermalBridges": {"method": "forfait"},
+                "sourceReference": "x"}],
             "groundInventoryConfirmed": true
         });
         let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
@@ -1297,12 +1941,7 @@ mod tests {
     fn pitched_roof_uses_interpolated_irradiance_and_sky_factor() {
         let mut input = sample();
         input.opaque_elements[0].tilt_deg = 35.0;
-        let result = assess_monthly_demand(&input);
-        assert_eq!(
-            result.status, "calculated_unverified",
-            "{:?}",
-            result.issues
-        );
+        let result = valid(&input);
         // January south: 30° = 50,5 and 45° = 57,9 W/m², so 35° = 52,966…
         let irradiance = 50.5 + (57.9 - 50.5) / 3.0;
         let hours = 744.0;
@@ -1331,40 +1970,41 @@ mod tests {
         for conductance in [20.0, 60.0, 120.0, 240.0] {
             for window_area in [0.5, 10.0, 40.0] {
                 for (floor, wall, ceiling) in masses {
-                    let mut input = sample();
-                    if let Transmission::Explicit(transmission) = &mut input.transmission {
-                        transmission.conductance_w_per_k = conductance;
-                    }
-                    input.windows[0].area_m2 = window_area;
-                    input.thermal_mass.floor = floor;
-                    input.thermal_mass.wall = wall;
-                    input.thermal_mass.ceiling = ceiling;
-                    let result = assess_monthly_demand(&input);
-                    assert_eq!(
-                        result.status, "calculated_unverified",
-                        "{:?}",
-                        result.issues
-                    );
-                    for row in &result.monthly {
-                        for balance in [&row.heating, &row.cooling] {
-                            assert!(balance.need_kwh >= 0.0);
-                            assert!((0.0..=1.0 + 1e-12).contains(&balance.utilization));
+                    for base in [sample(), office()] {
+                        let mut input = base;
+                        if let Transmission::Explicit(transmission) = &mut input.transmission {
+                            transmission.conductance_w_per_k = conductance;
                         }
-                        assert!(
-                            row.heating.need_kwh <= row.heating.heat_transfer_kwh.max(0.0) + 1e-9
-                        );
-                        assert!(row.cooling.need_kwh <= row.cooling.gains_kwh + 1e-9);
+                        input.windows[0].area_m2 = window_area;
+                        input.thermal_mass.floor = floor;
+                        input.thermal_mass.wall = wall;
+                        input.thermal_mass.ceiling = ceiling;
+                        let result = valid(&input);
+                        for row in &result.monthly {
+                            for balance in [&row.heating, &row.cooling] {
+                                assert!(balance.need_kwh >= 0.0);
+                                assert!((0.0..=1.0 + 1e-12).contains(&balance.utilization));
+                                assert!((0.0..=1.0 + 1e-12).contains(&balance.reduction_factor));
+                            }
+                            assert!(
+                                row.heating.need_kwh
+                                    <= row.heating.heat_transfer_kwh.max(0.0) + 1e-9
+                            );
+                            assert!(row.cooling.need_kwh <= row.cooling.gains_kwh + 1e-9);
+                            assert!(
+                                row.heating.calculation_temperature_c
+                                    <= row.heating.setpoint_c + 1e-9
+                            );
+                        }
                     }
                 }
             }
-            // More conductance never lowers the heating need (same glazing and mass).
+            // More conductance never lowers the heating need.
             let mut input = sample();
             if let Transmission::Explicit(transmission) = &mut input.transmission {
                 transmission.conductance_w_per_k = conductance;
             }
-            let heating = assess_monthly_demand(&input)
-                .annual_heating_need_kwh
-                .unwrap();
+            let heating = valid(&input).annual_heating_need_kwh.unwrap();
             if let Some(previous) = previous_heating {
                 assert!(heating >= previous - 1e-9);
             }
@@ -1375,9 +2015,7 @@ mod tests {
         for window_area in [0.5, 5.0, 10.0, 20.0, 40.0] {
             let mut input = sample();
             input.windows[0].area_m2 = window_area;
-            let cooling = assess_monthly_demand(&input)
-                .annual_cooling_need_kwh
-                .unwrap();
+            let cooling = valid(&input).annual_cooling_need_kwh.unwrap();
             assert!(cooling >= last - 1e-9, "{window_area}: {cooling} < {last}");
             last = cooling;
         }
@@ -1386,10 +2024,10 @@ mod tests {
     #[test]
     fn obstruction_and_movable_shading_act_on_their_own_balance() {
         use crate::solar_shading::{MovableShading, ShadingControl};
-        let declared = assess_monthly_demand(&sample());
+        let declared = valid(&sample());
         let mut minimal = sample();
         minimal.windows[0].obstruction = Obstruction::Minimal;
-        let minimal_result = assess_monthly_demand(&minimal);
+        let minimal_result = valid(&minimal);
         // Table 17.4 lowers winter heating gains; table 17.5 leaves cooling unchanged.
         assert!(
             minimal_result.annual_heating_need_kwh.unwrap()
@@ -1403,22 +2041,30 @@ mod tests {
         );
         let mut shaded = minimal.clone();
         shaded.windows[0].area_m2 = 30.0;
-        let unshaded_result = assess_monthly_demand(&shaded);
+        let unshaded_result = valid(&shaded);
         shaded.windows[0].movable_shading = Some(MovableShading {
             reduction_factor: 0.2,
             control: ShadingControl::ManualResidential,
             source_reference: "table 7.5 screen".into(),
         });
-        let shaded_result = assess_monthly_demand(&shaded);
+        let shaded_result = valid(&shaded);
         assert!(
             shaded_result.annual_cooling_need_kwh.unwrap()
                 < unshaded_result.annual_cooling_need_kwh.unwrap()
         );
+        // Manual shading in dwellings: f_sh;with = 0 on the heating balance.
         assert!(
             (shaded_result.annual_heating_need_kwh.unwrap()
                 - unshaded_result.annual_heating_need_kwh.unwrap())
             .abs()
                 < 1e-9
+        );
+        // Automatic shading not tuned per ISO 52016-3 also reduces heating gains.
+        shaded.windows[0].movable_shading.as_mut().unwrap().control = ShadingControl::Automatic;
+        let automatic = valid(&shaded);
+        assert!(
+            automatic.annual_heating_need_kwh.unwrap()
+                > unshaded_result.annual_heating_need_kwh.unwrap()
         );
         let july = &shaded_result.monthly[6];
         assert!(july.window_solar_cooling_kwh < july.window_solar_gains_kwh);
