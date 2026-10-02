@@ -9,6 +9,13 @@
 //! the chapter 7 need here; that coupling belongs to the demand calculation.
 //! All results are unverified.
 
+use crate::annex_q::{
+    calculate_annex_q, validate_annex_q, AnnexQContext, AnnexQHeatPump, AnnexQResult, AnnexQSource,
+    DemandClass,
+};
+use crate::annex_v::{
+    calculate_regeneration, validate_regeneration, RegenerationContext, RegenerationInput,
+};
 use crate::boiler_forfait_draft::{
     assess_boiler_forfait_monthly_draft, BoilerForfaitDraftInput, BoilerForfaitMonthlyDraftInput,
     BoilerRole,
@@ -238,6 +245,9 @@ pub enum Generator {
     HeatPumpForfait(HeatPumpGenerator),
     /// Heat pump with a supplementary boiler, split by table 9.1/9.23 (new build).
     HybridHeatPump(Box<HybridGenerator>),
+    /// Individual electric heat pump with measured product data (annex Q),
+    /// optionally with a supplementary heater for `1 − F_H;gen`.
+    HeatPumpAnnexQ(Box<AnnexQGenerator>),
     /// External heat supply (9.6.7): heat is the energy carrier `dh`.
     ExternalHeat(ExternalHeatGenerator),
     /// Local or central electric resistance heating, COP 1,0 (table 9.27).
@@ -346,13 +356,26 @@ impl Generator {
             Self::GasBoiler(_) => None,
             Self::HeatPumpForfait(generator) => Some((&generator.forfait, generator.source_system)),
             Self::HybridHeatPump(generator) => Some((&generator.forfait, generator.source_system)),
-            Self::ExternalHeat(_) | Self::ElectricResistance(_) | Self::Biomass(_) => None,
+            Self::HeatPumpAnnexQ(_)
+            | Self::ExternalHeat(_)
+            | Self::ElectricResistance(_)
+            | Self::Biomass(_) => None,
+        }
+    }
+
+    /// The annex Q heat pump of this generator, if any.
+    pub fn annex_q(&self) -> Option<&AnnexQGenerator> {
+        match self {
+            Self::HeatPumpAnnexQ(generator) => Some(generator),
+            _ => None,
         }
     }
 
     /// 9.4.4: generators whose 9.85 auxiliary energy includes the pump.
     fn auxiliary_includes_pump(&self) -> bool {
         match self {
+            // Q.1: the circulation pump is part of the annex Q efficiency.
+            Self::HeatPumpAnnexQ(_) => true,
             Self::GasBoiler(generator) => generator.boiler.role != BoilerRole::Collective,
             Self::HeatPumpForfait(generator) => {
                 generator.forfait.collective_building_installation != Some(true)
@@ -368,7 +391,9 @@ impl Generator {
     /// external heat, which takes the emitter design spread.
     fn generator_spread_k(&self) -> Option<f64> {
         match self {
-            Self::HeatPumpForfait(_) | Self::HybridHeatPump(_) => Some(10.0),
+            Self::HeatPumpForfait(_) | Self::HybridHeatPump(_) | Self::HeatPumpAnnexQ(_) => {
+                Some(10.0)
+            }
             Self::ExternalHeat(_) => None,
             _ => Some(20.0),
         }
@@ -400,6 +425,43 @@ pub struct GasBoilerGenerator {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
 }
+
+/// Annex Q heat pump (§9.6.3, required above 55 °C).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AnnexQGenerator {
+    pub heat_pump: AnnexQHeatPump,
+    /// `θ_sup` for tables Q.5 and Q.7, °C (up to 75).
+    pub design_supply_temperature_c: f64,
+    /// Supplementary heater; required when `F_H;gen < 1` (Q.1).
+    #[serde(default)]
+    pub backup: Option<AnnexQBackup>,
+    /// Annex V regeneration of an individual ground heat exchanger.
+    #[serde(default)]
+    pub regeneration: Option<RegenerationInput>,
+    pub equipment_reference: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AnnexQBackup {
+    /// Electric resistance, COP 1,0 (table 9.27).
+    ElectricResistance,
+    /// Gas boiler with the table 9.25 forfait efficiency.
+    GasBoiler { boiler: BoilerForfaitDraftInput },
+}
+
+/// Building data that annex Q (table Q.6) and annex V need from the zones.
+#[derive(Debug, Clone, Copy)]
+struct HeatPumpBuildingContext {
+    residential: bool,
+    heating_need_kwh: f64,
+    cooling_need_kwh: f64,
+    usable_floor_area_m2: f64,
+}
+
+/// `η_el = 1/f_P;del;el` (table 5.2) for V.1.
+const ELECTRICITY_EFFICIENCY: f64 = 1.0 / 1.45;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -521,6 +583,8 @@ pub struct SpaceHeatingChainAssessment {
     pub annual_biomass_kwh: Option<f64>,
     pub distribution: Option<DistributionSummary>,
     pub zone_recoverable_losses: Vec<ZoneRecoverableLoss>,
+    /// Annex Q (and annex V) details of an annex Q heat pump.
+    pub annex_q: Option<AnnexQOutput>,
     pub demand: MonthlyDemandAssessment,
     pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
@@ -1259,6 +1323,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
     let mut generation_efficiency = None;
     let mut distribution_summary = None;
     let mut zone_recoverable_losses = Vec::new();
+    let mut annex_q_result: Option<AnnexQOutput> = None;
     if issues.is_empty() {
         let valid_zones: Vec<ZoneTerms> = zones.into_iter().flatten().collect();
         let distribution = calculate_distribution(
@@ -1358,11 +1423,24 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
             .collect();
         distribution_summary = distribution.summary;
         if issues.is_empty() {
+            let zones = || std::iter::once(&demand).chain(&additional_zone_demands);
+            let building = HeatPumpBuildingContext {
+                residential: input.demand.usage_function.is_residential(),
+                heating_need_kwh: zones()
+                    .map(|zone| zone.annual_heating_need_kwh.unwrap_or(0.0))
+                    .sum(),
+                cooling_need_kwh: zones()
+                    .map(|zone| zone.annual_cooling_need_kwh.unwrap_or(0.0))
+                    .sum(),
+                usable_floor_area_m2: zone_area,
+            };
             generation_efficiency = generate(
                 input,
                 &outputs,
                 building_fraction,
+                building,
                 &mut monthly,
+                &mut annex_q_result,
                 &mut issues,
             );
         }
@@ -1419,6 +1497,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         annual_biomass_kwh: sum(|row| row.biomass_kwh),
         distribution: distribution_summary,
         zone_recoverable_losses,
+        annex_q: annex_q_result.filter(|_| valid),
         monthly,
         demand,
         additional_zone_demands,
@@ -1484,11 +1563,177 @@ fn measured_heat_pump_auxiliary(
 
 /// Generator step; fills the carrier columns and the generator auxiliary
 /// energy of `monthly` and returns the generation efficiency.
+/// Annex Q result and the annex V correction as reported by the chain.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnexQOutput {
+    pub annex_q: AnnexQResult,
+    pub demand_class: DemandClass,
+    /// Annex V degree of regeneration, when given.
+    pub regeneration_degree: Option<f64>,
+    /// `c_source` (table V.1); 1 without regeneration.
+    pub source_correction: f64,
+    /// `η_H;gen;hp · c_source`.
+    pub corrected_efficiency: f64,
+}
+
+fn generate_annex_q(
+    generator: &AnnexQGenerator,
+    outputs: &[MonthlyEnergy],
+    building: HeatPumpBuildingContext,
+    monthly: &mut [ChainMonth],
+    annex_q_result: &mut Option<AnnexQOutput>,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<f64> {
+    let prior = issues.len();
+    issues.extend(
+        validate_annex_q(
+            &generator.heat_pump,
+            generator.design_supply_temperature_c,
+            "generator.heatPump",
+        )
+        .into_iter()
+        .map(|item| issue(item.code, item.path)),
+    );
+    if generator.equipment_reference.trim().is_empty() {
+        issues.push(issue(
+            "source_reference_required",
+            "generator.equipmentReference",
+        ));
+    }
+    if let Some(regeneration) = &generator.regeneration {
+        if generator.heat_pump.source != AnnexQSource::BrineWater {
+            // Table V.1 covers individual ground heat exchangers only.
+            issues.push(issue(
+                "regeneration_requires_ground_source",
+                "generator.regeneration",
+            ));
+        }
+        issues.extend(
+            validate_regeneration(regeneration, "generator.regeneration")
+                .into_iter()
+                .map(|item| issue(item.code, item.path)),
+        );
+    }
+    if issues.len() > prior {
+        return None;
+    }
+    let annual: f64 = outputs.iter().map(|item| item.energy_kwh).sum();
+    let demand_class = DemandClass::from_need(
+        building.residential,
+        if building.usable_floor_area_m2 > 0.0 {
+            building.heating_need_kwh / building.usable_floor_area_m2
+        } else {
+            0.0
+        },
+    );
+    let result = calculate_annex_q(
+        &generator.heat_pump,
+        AnnexQContext {
+            annual_node_input_kwh: annual,
+            design_supply_temperature_c: generator.design_supply_temperature_c,
+            demand_class,
+        },
+    );
+    let fraction = result.energy_fraction;
+    let efficiency = result.generation_efficiency;
+    if !(efficiency.is_finite() && efficiency > 0.0) {
+        issues.push(issue("annex_q_efficiency_invalid", "generator.heatPump"));
+        return None;
+    }
+    // Annex V on the heat-pump heat (hot water on the same source is not
+    // part of the space-heating chain).
+    let regeneration = generator.regeneration.as_ref().map(|input| {
+        calculate_regeneration(
+            input,
+            RegenerationContext {
+                heating_kwh: fraction * annual,
+                heating_efficiency: efficiency,
+                hot_water_kwh: 0.0,
+                hot_water_efficiency: 0.0,
+                annual_cooling_need_kwh: building.cooling_need_kwh,
+                electricity_efficiency: ELECTRICITY_EFFICIENCY,
+            },
+        )
+    });
+    let correction = regeneration.map_or(1.0, |item| item.correction);
+    let corrected = efficiency * correction;
+    if fraction < 1.0 - 1e-9 && generator.backup.is_none() {
+        // Q.2: without supplementary heating the fraction must be 1.
+        issues.push(issue("annex_q_backup_required", "generator.backup"));
+        return None;
+    }
+    let backup_outputs: Vec<MonthlyEnergy> = outputs
+        .iter()
+        .map(|item| MonthlyEnergy {
+            month: item.month,
+            energy_kwh: (1.0 - fraction) * item.energy_kwh,
+        })
+        .collect();
+    let mut backup_gas: Option<Vec<(f64, Option<f64>)>> = None;
+    if let Some(AnnexQBackup::GasBoiler { boiler }) = &generator.backup {
+        let assessed = assess_boiler_forfait_monthly_draft(&BoilerForfaitMonthlyDraftInput {
+            boiler: boiler.clone(),
+            generator_output_kwh: backup_outputs.clone(),
+            generator_output_reference: "annex Q supplementary share".into(),
+        });
+        issues.extend(
+            assessed
+                .issues
+                .iter()
+                .map(|item| issue(item.code, format!("generator.backup.boiler.{}", item.path))),
+        );
+        if assessed.monthly.len() != 12 {
+            if issues.len() == prior {
+                issues.push(issue("generator_result_incomplete", "generator.backup"));
+            }
+            return None;
+        }
+        backup_gas = Some(
+            assessed
+                .monthly
+                .iter()
+                .map(|item| (item.input_natural_gas_kwh, item.auxiliary_electricity_kwh))
+                .collect(),
+        );
+    }
+    for (index, row) in monthly.iter_mut().enumerate() {
+        let output = outputs[index].energy_kwh;
+        let pump = fraction * output;
+        let backup = output - pump;
+        row.heat_pump_output_kwh = pump;
+        row.generator_electricity_kwh = pump / corrected;
+        // Q.1: the source and circulation pumps are in η_H;gen;hp.
+        let mut auxiliary = 0.0;
+        match (&generator.backup, &backup_gas) {
+            (Some(AnnexQBackup::ElectricResistance), _) => {
+                row.generator_electricity_kwh += backup;
+            }
+            (Some(AnnexQBackup::GasBoiler { .. }), Some(gas)) => {
+                row.natural_gas_kwh = gas[index].0;
+                auxiliary += gas[index].1.unwrap_or(0.0);
+            }
+            _ => {}
+        }
+        row.auxiliary_electricity_kwh = Some(auxiliary);
+    }
+    *annex_q_result = Some(AnnexQOutput {
+        annex_q: result,
+        demand_class,
+        regeneration_degree: regeneration.map(|item| item.degree),
+        source_correction: correction,
+        corrected_efficiency: corrected,
+    });
+    Some(corrected)
+}
+
 fn generate(
     input: &SpaceHeatingChainInput,
     outputs: &[MonthlyEnergy],
     building_fraction: f64,
+    building: HeatPumpBuildingContext,
     monthly: &mut [ChainMonth],
+    annex_q_result: &mut Option<AnnexQOutput>,
     issues: &mut Vec<ChainIssue>,
 ) -> Option<f64> {
     let mut generation_efficiency = None;
@@ -1689,6 +1934,16 @@ fn generate(
             } else if issues.is_empty() {
                 issues.push(issue("generator_result_incomplete", "generator"));
             }
+        }
+        Generator::HeatPumpAnnexQ(generator) => {
+            generation_efficiency = generate_annex_q(
+                generator,
+                outputs,
+                building,
+                monthly,
+                annex_q_result,
+                issues,
+            );
         }
         Generator::ExternalHeat(generator) => {
             if generator.supplier_reference.trim().is_empty() {
@@ -1919,6 +2174,61 @@ mod tests {
         let jan = &result.monthly[0];
         assert!((jan.generator_electricity_kwh - jan.generator_output_kwh / cop).abs() < 1e-9);
         assert_eq!(result.annual_natural_gas_kwh, Some(0.0));
+    }
+
+    fn annex_q_chain() -> SpaceHeatingChainInput {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-space-heating-chain-annex-q-synthetic.json"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn annex_q_heat_pump_above_55_degrees_is_calculated() {
+        let input = annex_q_chain();
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let details = result.annex_q.as_ref().unwrap();
+        let fraction = details.annex_q.energy_fraction;
+        let efficiency = details.corrected_efficiency;
+        assert_eq!(details.source_correction, 1.0);
+        assert_eq!(result.generation_efficiency, Some(efficiency));
+        for row in &result.monthly {
+            let pump = fraction * row.generator_output_kwh;
+            assert!((row.heat_pump_output_kwh - pump).abs() < 1e-9);
+            // Electric backup covers 1 − F at COP 1.
+            let expected = pump / efficiency + (row.generator_output_kwh - pump);
+            assert!((row.generator_electricity_kwh - expected).abs() < 1e-9);
+            assert_eq!(row.auxiliary_electricity_kwh, Some(0.0));
+        }
+        // The annual node input of Q.1 equals the chain output.
+        let annual: f64 = result
+            .monthly
+            .iter()
+            .map(|row| row.generator_output_kwh)
+            .sum();
+        assert!((details.annex_q.delivered_kwh - fraction * annual).abs() < 1e-6 * annual.max(1.0));
+    }
+
+    #[test]
+    fn annex_q_without_backup_needs_full_coverage() {
+        let mut input = annex_q_chain();
+        let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
+            panic!("annex Q generator expected");
+        };
+        generator.backup = None;
+        // Switching off below 3 °C evaporator inlet leaves demand uncovered.
+        generator.heat_pump.switch_off.min_evaporator_in_c = Some(3.0);
+        assert!(codes(&input).contains(&"annex_q_backup_required"));
+        let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
+            unreachable!()
+        };
+        generator.heat_pump.source = AnnexQSource::OutdoorAirWater;
+        assert!(codes(&input).contains(&"regeneration_requires_ground_source"));
     }
 
     #[test]
