@@ -50,6 +50,8 @@ Infiltratie, spuien en de bouwkundige voorzieningen voor ventilatieve koeling bl
 
 ## Niet ondersteund (expliciete afwijzing)
 
+- Een drukbalans waarvoor de routine van 11.2.1.6 geen referentiedruk binnen de nauwkeurigheid van 11.14 vindt. Foutcode: `pressure_balance_not_converged`, met de maand en de balans in het pad. Eerder rekende de kern dan stil door met de laatste benadering.
+
 - Een specifiek gastoestel met afvoer gelijktijdig met de mechanische afvoer (tabel 11.11, voetnoot a). Foutcode: `specific_gas_appliance_unsupported`.
 - Een wisselstroomventilator van na 2006 in de forfaitaire methode (tabel 11.23 geeft geen waarde). Foutcode: `forfait_fan_ac_after_2006_unsupported`.
 

@@ -1818,16 +1818,17 @@ impl PressureContext {
     }
 }
 
-/// 11.2.1.6 steps 1–12; returns the reference pressure.
+/// 11.2.1.6 steps 1–12; returns the reference pressure, or `None` when
+/// the routine finds no pressure within the accuracy of 11.14.
 fn solve_reference_pressure(
     zone: &AirflowZone,
     context: &PressureContext,
     fixed_mass_flow: f64,
     accuracy: f64,
-) -> f64 {
+) -> Option<f64> {
     let active: Vec<&Path> = zone.paths.iter().filter(|p| p.coefficient > 0.0).collect();
     if active.is_empty() {
-        return 0.0;
+        return Some(0.0);
     }
     let sum = |reference: f64| -> f64 {
         fixed_mass_flow
@@ -1849,13 +1850,13 @@ fn solve_reference_pressure(
     // Step 2.
     let mut s_a = sum(p_a);
     if s_a.abs() <= accuracy {
-        return p_a;
+        return Some(p_a);
     }
     // Steps 3–5.
     let mut p_b = p_a + 2.0;
     let mut s_b = sum(p_b);
     if s_b.abs() <= accuracy {
-        return p_b;
+        return Some(p_b);
     }
     // Steps 6–7.
     let mut guard = 0;
@@ -1868,11 +1869,11 @@ fn solve_reference_pressure(
         p_b = p_a - 2.0 * sign(s_a) * r;
         s_b = sum(p_b);
         if s_b.abs() <= accuracy {
-            return p_b;
+            return Some(p_b);
         }
         guard += 1;
-        if guard > 100_000 {
-            return p_b;
+        if guard > 100_000 || !s_b.is_finite() {
+            return None;
         }
     }
     // Steps 8–12 (bisection).
@@ -1880,7 +1881,7 @@ fn solve_reference_pressure(
         let p_c = (p_a + p_b) / 2.0;
         let s_c = sum(p_c);
         if s_c.abs() <= accuracy {
-            return p_c;
+            return Some(p_c);
         }
         if sign(s_c) == sign(s_a) {
             p_a = p_c;
@@ -1889,7 +1890,7 @@ fn solve_reference_pressure(
             p_b = p_c;
         }
     }
-    (p_a + p_b) / 2.0
+    None
 }
 
 /// 11.14.
@@ -2517,6 +2518,8 @@ struct MonthBalance {
     ahu_heating_kwh: f64,
     ahu_cooling_kwh: f64,
     outdoor_air_fraction: Option<f64>,
+    /// False when 11.2.1.6 found no reference pressure in some airflow zone.
+    converged: bool,
 }
 
 fn balance_month(
@@ -2698,9 +2701,14 @@ fn balance_month(
     );
     let mut effective = EffectiveFlows::default();
     let mut pressures = Vec::new();
+    let mut converged = true;
     for zone in &zones {
         let reference =
-            solve_reference_pressure(zone, &pressure, fixed_total * zone.share, accuracy);
+            solve_reference_pressure(zone, &pressure, fixed_total * zone.share, accuracy)
+                .unwrap_or_else(|| {
+                    converged = false;
+                    0.0
+                });
         pressures.push(reference);
         for path in &zone.paths {
             let dp = pressure.difference(path, reference);
@@ -2801,6 +2809,7 @@ fn balance_month(
         pressures,
         demand_flows,
         limit_temperatures,
+        converged,
         frost_protection_kwh,
         grille_preheating_kwh,
         heating_limit_air_kwh: if balance == Balance::Heating {
@@ -2957,6 +2966,14 @@ fn calculate_with_policy(
     for m in 0..12 {
         let heating = balance_month(input, &constants, m, Balance::Heating, policy);
         let cooling = balance_month(input, &constants, m, Balance::Cooling, policy);
+        for (name, balance) in [("heating", &heating), ("cooling", &cooling)] {
+            if !balance.converged {
+                return Err(vec![issue(
+                    "pressure_balance_not_converged",
+                    format!("months[{m}].{name}"),
+                )]);
+            }
+        }
         for (((id, q_h, t_h), (_, q_c, t_c)), t_limit) in heating
             .demand_flows
             .iter()
@@ -3317,7 +3334,7 @@ mod tests {
             wind_m_per_s: 3.04,
         };
         let fixed = -density(20.0) * 150.0;
-        let p = solve_reference_pressure(&zone, &context, fixed, 0.9);
+        let p = solve_reference_pressure(&zone, &context, fixed, 0.9).unwrap();
         let sum: f64 = fixed
             + zone
                 .paths
