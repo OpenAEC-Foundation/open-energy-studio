@@ -3,6 +3,7 @@ import { generateReportHTML } from './ReportTemplate';
 import { generateNtaInputDossierHTML } from './NtaInputDossier';
 import { generateNtaCalculationReportHTML } from './NtaCalculationReport';
 import { calculateProjectPerformanceWithRust } from '../nta/KernelClient';
+import { buildProjectDossier, zipProjectDossier } from './ProjectDossier';
 
 /** Export the NTA input and evidence inventory even when BENG is unavailable. */
 export function downloadNtaInputDossierHTML(project: IProject): void {
@@ -27,6 +28,42 @@ export async function downloadNtaCalculationReportHTML(project: IProject): Promi
   link.download = `NTA8800-Rekenrapport-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.html`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Builds the BRL 9500 project dossier (project file, kernel output,
+ * report, evidence files, checklist and hashed manifest) as one ZIP and
+ * saves it. Returns the checklist so the caller can show open items.
+ */
+export async function downloadProjectDossier(project: IProject) {
+  let assessment = null;
+  try {
+    assessment = await calculateProjectPerformanceWithRust(project);
+  } catch {
+    assessment = null;
+  }
+  const reportHtml = assessment ? generateNtaCalculationReportHTML(project, assessment) : null;
+  const bundle = await buildProjectDossier({ project, assessment, reportHtml });
+  const zip = zipProjectDossier(bundle);
+  const fileName = `Projectdossier-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.zip`;
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
+    const path = await save({ defaultPath: fileName, filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+    if (path) {
+      await writeFile(path, zip);
+      return bundle.manifest;
+    }
+    if (path === null) return bundle.manifest;
+  } catch { /* browser fallback */ }
+  const blob = new Blob([zip.buffer as ArrayBuffer], { type: 'application/zip' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+  return bundle.manifest;
 }
 
 /**

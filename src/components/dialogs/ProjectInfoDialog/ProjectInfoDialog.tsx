@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { BuildingFunction } from '../../../core/energy/types';
-import type { NtaRegistration } from '../../../core/nta/KernelClient';
+import type { NtaDetailSurveyTriggers, NtaRegistration } from '../../../core/nta/KernelClient';
 import { cleanRegistration } from '../../../core/nta/Registration';
 import { DialogShell } from '../DialogShell';
+import { EvidenceRegister } from './EvidenceRegister';
 
 interface ProjectInfoDialogProps {
   editId?: string | null;
@@ -17,13 +18,19 @@ const buildingFunctions: BuildingFunction[] = [
 
 type TextKey = 'referenceObjectId' | 'bagObjectId' | 'postcode' | 'houseNumber' | 'houseNumberAddition'
   | 'buildingType' | 'client' | 'certificateNumber' | 'surveyDate' | 'registrationDate'
-  | 'originalKernelVersion' | 'epOnlineNumber';
+  | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate';
 
 const textFields: Array<{ key: TextKey; type?: 'date' }> = [
   { key: 'bagObjectId' }, { key: 'postcode' }, { key: 'houseNumber' }, { key: 'houseNumberAddition' },
   { key: 'buildingType' }, { key: 'client' }, { key: 'certificateNumber' },
-  { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' },
+  { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' }, { key: 'completionDate', type: 'date' },
   { key: 'referenceObjectId' }, { key: 'originalKernelVersion' }, { key: 'epOnlineNumber' },
+];
+
+/** BRL 9500 §3.1 situations that require a detailed survey. */
+const detailTriggers: Array<keyof NtaDetailSurveyTriggers> = [
+  'rebuiltAfterDemolition', 'fullRenovationWithNewBuildRequirements', 'energyPerformanceFee',
+  'bengRequirementProof', 'previousDetailedRegistration', 'addedAfter2021',
 ];
 
 export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
@@ -170,6 +177,20 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
             onChange={(e) => update({ relabel: e.target.checked })} />
           {t('reg.relabel')}
         </label>
+
+        <h3 className="dialog-section-title">{t('reg.detailSurveyTriggers')}</h3>
+        <p className="dialog-hint">{t('reg.detailSurveyTriggersHint')}</p>
+        {detailTriggers.map((key) => (
+          <label className="dialog-check" key={key}>
+            <input type="checkbox" checked={registration.detailSurveyTriggers?.[key] ?? false}
+              onChange={(e) => update({ detailSurveyTriggers: { ...registration.detailSurveyTriggers, [key]: e.target.checked } })} />
+            {t(`reg.trigger.${key}`)}
+          </label>
+        ))}
+
+        <h3 className="dialog-section-title">{t('evidence.title')}</h3>
+        <EvidenceRegister evidence={registration.evidence ?? []}
+          onChange={(evidence) => update({ evidence })} />
     </DialogShell>
   );
 }

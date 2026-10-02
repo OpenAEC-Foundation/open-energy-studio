@@ -150,3 +150,11 @@ Synthetische opnames in `training-data/` (geen echte gebouwen):
 - `nta8800-opname-utility-1985-office.json`: kantoor met kantine, collectieve HR-104, WTW-LBK met recirculatie.
 - `nta8800-opname-utility-2005-school.json`: school met mechanische afzuiging, sensoren en PV.
 - `nta8800-opname-utility-1970-retail.json`: winkel met veel onbekenden, koeling, stoombevochtiging en een onbekend BACS-vermogen.
+
+## Inklapreden per forfaitaire waarde
+
+BRL 9500 §4.2.2 en bijlage 3 vragen een onderbouwing wanneer de adviseur terugvalt op een forfaitaire waarde ("inklappen"). Beide opnames, woning en utiliteit, nemen daarom het veld `inklapRedenen` aan: een object met per pad of regel van een toegepaste standaardwaarde de reden.
+
+- De uitvoer zet die reden als `inklapReden` bij de bijbehorende `appliedDefaults`.
+- Een sleutel zonder bijbehorende standaardwaarde geeft de waarschuwing `collapse_reason_unmatched`.
+- De dossierchecklist markeert toegepaste standaardwaarden zonder reden als ontbrekend.
