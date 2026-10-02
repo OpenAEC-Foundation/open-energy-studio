@@ -45,7 +45,7 @@ export interface EnergyState {
 export type EnergyAction =
   // Project-level
   | { type: 'SET_PROJECT'; payload: IProject }
-  | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city'>> }
+  | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city' | 'registration'>> }
   | { type: 'SET_UNHEATED_SPACES'; payload: NonNullable<IProject['unheatedSpaces']> }
   | { type: 'SET_NTA_CALCULATION'; payload: IProject['ntaCalculation'] }
   // Zones

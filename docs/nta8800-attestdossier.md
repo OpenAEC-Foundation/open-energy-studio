@@ -16,6 +16,29 @@ De editie van ISSO 54 is in de toegankelijke bronmetadata niet eenduidig: [Insta
 | Kwaliteitsbewaking | §6.2–6.5 noemt wijzigingslogboek, testresultaten bij wijzigingen, releasebewijs, releasenotes en klachtenprocedure. | Verificatiestatus en dekkingsregister zijn gestart; geen formeel kwaliteitssysteem. | Release- en wijzigingsdossier met traceerbare tests en reviewer opzetten. |
 | Externe toets | §3.5–3.6 beschrijft rapportage, overeenkomst en afgifte na toetsing. | Geen attesteringsinstelling ingeschakeld en geen attest. | Pas na complete reken- en testdekking een toelatingsonderzoek aanvragen. |
 
+## Eisen uit BRL 9500-W/U, Bep en Regeling aan de software
+
+Deze tabel volgt uit een leesanalyse van BRL 9500-W en -U (ontwerp, 14-10-2025), BRL 9500-MWA-W/U (2024), het Besluit energieprestatie gebouwen (Bep) en de Regeling energieprestatie gebouwen. De eisen zijn in eigen woorden samengevat; de paginaverwijzingen gelden voor de W-versie, de U-versie volgt dezelfde paragrafen.
+
+| Eis (bron) | Status | Waar in de code |
+| --- | --- | --- |
+| Labelklassegrenzen woningen en utiliteit (Reg. bijlage I/Ia, p. 15–17) | aanwezig | `crates/nta8800-core/src/label_class.rs` |
+| Eén bron voor de labelklasse, bepaald op de afgeronde EP2 | aanwezig | De TS-indeling (`EnergyLabel.ts`) is verwijderd. De test `label_class_follows_the_rounded_indicator_at_class_edges` dekt de klassegrenzen. |
+| Afronding van de indicatoren (EP2 omhoog op 0,01, aandeel hernieuwbaar omlaag op 0,1) | aanwezig | `indicators_draft.rs` |
+| Geldigheid tien jaar vanaf de opnamedatum (Bep art. 2.1 lid 7, p. 4) | aanwezig | `registration.rs` (`validUntil`), rapportkop |
+| Registratiegegevens: adres, BAG-id, doel, opnametype, representativiteit, herlabelen, certificaatnummer, beide adviseurs met vakbekwaamheidsnummer, opname- en registratiedatum, opdrachtgever (Reg. art. 5, p. 6; BRL §4.2.5, p. 24; bijlage 3) | aanwezig, optioneel | `registration.rs`, projectblok `registration` (in de invoervingerafdruk), dialoog Projectgegevens |
+| Registratie binnen drie maanden na de opname, zes bij seriematige projecten (BRL §4.2.5, p. 24) | aanwezig | `registration_deadline_exceeded` |
+| Toets Bbl: opnamedatum gelijk aan registratiedatum (BRL §4.2.5 opm. 2) | aanwezig | `bbl_check_dates_differ` |
+| Herlabelen binnen 24 maanden met dezelfde rekenkern en de oorspronkelijke opnamedatum (BRL §4.2.3–4.2.4, p. 23–24) | deels | Termijn en kernelversie worden gecontroleerd. De indeling van maatregelen volgens bijlage 6a/6b ontbreekt nog. |
+| Namen van opnemend en registrerend adviseur op de uitvoer (BRL §4.2.6, p. 25) | aanwezig | `NtaCalculationReport.ts` |
+| Labelgegevens: isolatie per element, installaties, EP2, aandeel hernieuwbaar, TOjuli, BENG 1 (Reg. art. 4, p. 5) | aanwezig | `label_data.rs`, rapport, sectie "Labelgegevens" |
+| Reproduceerbaarheid en bewaren van het databestand (BRL §4.2.7, §6.7.4) | deels | Het projectbestand bewaart kernelversie, normversie en vingerafdruk; bij openen volgt een waarschuwing als die verschillen. Er is nog geen dossierexport. |
+| Bewijsregister met foto's en documenten (BRL §4.2.2, §4.2.7; bijlagen 3 en 5) | ontbreekt | Alleen tekstuele bronverwijzingen |
+| Volledigheidscontrole van het projectdossier (bijlage 3) | ontbreekt | – |
+| Verplichte detailopname (BRL §3.1, p. 14–15) | ontbreekt | – |
+| Maatwerkadvies: maatregelpakketten, besparing, kosten, terugverdientijd (BRL 9500-MWA §3.1, §4.2) | ontbreekt | – |
+| EP-Online-registratie (BRL §4.2.5) | ontbreekt | Vraagt de uitwisselspecificatie van RVO, zie de tabel hierboven |
+
 ## Bestaande Heatloss Studio-gegevens
 
 `open-heatloss-studio/tests/verification/beng_edr_epw/` bevat zes uit de EDR-woningtestset 2022 gedocumenteerde invoergevallen. Hun `expected.json` vermeldt dat de afzonderlijke Bijlage 2-Excel met verwachte eindresultaten ontbreekt; veel `value`-velden zijn daarom `null`. Deze gevallen zijn nuttig voor historische geometrie- en invoeranalyse, maar zijn geen actuele, volledige referentie voor NTA 8800:2025+C1:2026. OES neemt deze gegevens niet stilzwijgend over als een geslaagde normtest. Controleer bovendien hergebruiksrechten voor eventuele kopie van bronmateriaal.

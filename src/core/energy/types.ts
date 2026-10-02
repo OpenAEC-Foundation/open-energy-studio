@@ -1,4 +1,4 @@
-import type { NtaCalculationInput } from '../nta/KernelClient';
+import type { NtaCalculationInput, NtaRegistration } from '../nta/KernelClient';
 // ============================================================
 // Open Energy Studio – BENG Data Model (NTA 8800)
 // ============================================================
@@ -331,6 +331,8 @@ export interface IProject {
   constructions: IConstruction[];
   /** NTA 8800 inputs the legacy model does not hold, each with a source reference. */
   ntaCalculation?: NtaCalculationInput;
+  /** Registration data of the EP report (BRL 9500 §4.2.5); part of the input fingerprint. */
+  registration?: NtaRegistration;
 }
 
 // ------------------------------------------------------------
