@@ -145,6 +145,7 @@ export const nl: Record<string, string> = {
   'reg.registrationDate': "Registratiedatum",
   'reg.referenceObjectId': "Referentieobject (bij gelijkende woning)",
   'reg.originalKernelVersion': "Kernelversie oorspronkelijke opname (herlabelen)",
+  'reg.improvementDate': "Datum verbetering, offerte of factuur (herlabelen, binnen 24 maanden)",
   'reg.epOnlineNumber': "EP-Online-nummer",
   'reg.surveyingAdvisor': "Opnemend adviseur",
   'reg.registeringAdvisor': "Registrerend adviseur",

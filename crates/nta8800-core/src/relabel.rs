@@ -4,8 +4,13 @@
 //! Sources (page numbers only, no text): BRL 9500-W draft 14-10-2025
 //! §4.2.3/4.2.4 (p. 23–24, original survey date and software version),
 //! Bijlage 6a (allowed measures, p. 67) and Bijlage 6b (measures that may
-//! not be counted, p. 68); BRL 9500-U has the same appendices. ISSO 82.1
-//! explains the clusters.
+//! not be counted, p. 68); BRL 9500-U draft 14-10-2025 §4.2.3 (p. 18–19)
+//! and Bijlagen 6a/6b (p. 58–60). For utility buildings 6a covers only
+//! one-to-one replacements: geometric changes of insulation or
+//! installation and changes in distribution, emission or control are 6b.
+//! Lighting is in neither appendix and always needs review. ISSO 82.1 and
+//! 75.1 explain the clusters. The scheme follows the project's
+//! `buildingFunction` (residential → W, otherwise U).
 //!
 //! The classification works on the project JSON and is deliberately
 //! conservative: geometric changes (areas, heights, added or removed
@@ -20,8 +25,20 @@
 use serde::Serialize;
 use serde_json::Value;
 
-pub const RELABEL_SOURCE: &str =
-    "BRL 9500-W/U (14-10-2025) §4.2.3–4.2.4, Bijlage 6a (p. 67) and 6b (p. 68)";
+pub const RELABEL_SOURCE_W: &str =
+    "BRL 9500-W (14-10-2025) §4.2.3–4.2.4 (p. 23–24), Bijlage 6a (p. 67) and 6b (p. 68)";
+pub const RELABEL_SOURCE_U: &str =
+    "BRL 9500-U (14-10-2025) §4.2.3–4.2.4 (p. 18–19), Bijlage 6a (p. 58) and 6b (p. 59–60)";
+
+/// BRL 9500 part that governs the relabel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RelabelScheme {
+    /// 9500-W, dwellings.
+    W,
+    /// 9500-U, utility buildings.
+    U,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -52,6 +69,7 @@ pub struct RelabelChange {
 #[serde(rename_all = "camelCase")]
 pub struct RelabelAssessment {
     pub source: &'static str,
+    pub scheme: RelabelScheme,
     /// No change is classified as not allowed.
     pub allowed: bool,
     pub needs_review: bool,
@@ -138,6 +156,12 @@ const INSTALLATION_MARKERS: &[&str] = &[
     "system",
 ];
 
+/// Elements whose layout may change at an equal loss area (W 6a,
+/// "geometrische wijziging met betrekking tot isolatie").
+const OPENING_ARRAYS: &[&str] = &["windows", "doors", "panels"];
+
+const LIGHTING_MARKERS: &[&str] = &["lighting"];
+
 const SUBSYSTEM_MARKERS: &[&str] = &["emission", "distribution", "control", "balancing"];
 
 const INSULATION_MARKERS: &[&str] = &[
@@ -168,7 +192,12 @@ fn contains_any(path: &str, markers: &[&str]) -> bool {
     markers.iter().any(|marker| lower.contains(marker))
 }
 
-fn classify(path: &str, before: Option<&Value>, after: Option<&Value>) -> RelabelChange {
+fn classify(
+    scheme: RelabelScheme,
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+) -> RelabelChange {
     let parts = segments(path);
     let key = parts
         .iter()
@@ -188,6 +217,29 @@ fn classify(path: &str, before: Option<&Value>, after: Option<&Value>) -> Relabe
         cluster,
         note,
     };
+    // An opening (window, door, panel) added, removed or resized inside a
+    // surface: W 6a allows a layout change of insulation at an equal loss
+    // area per orientation (p. 67); U 6b excludes it (p. 59).
+    let in_opening = parts
+        .iter()
+        .any(|segment| OPENING_ARRAYS.contains(&segment.as_str()));
+    let opening_layout =
+        (element_added_or_removed && last_is_index && OPENING_ARRAYS.contains(&key.as_str()))
+            || (in_opening && GEOMETRY_KEYS.contains(&key.as_str()) && key != "orientation");
+    if opening_layout {
+        return match scheme {
+            RelabelScheme::W => change(
+                RelabelVerdict::Review,
+                "geometric change of insulation: layout of windows, doors or panels",
+                Some("allowed (6a) when the loss area per orientation stays equal, otherwise 6b"),
+            ),
+            RelabelScheme::U => change(
+                RelabelVerdict::NotAllowed,
+                "geometric change of insulation: layout of windows, doors or panels",
+                None,
+            ),
+        };
+    }
     if element_added_or_removed && last_is_index && LAYOUT_ARRAYS.contains(&key.as_str()) {
         return change(
             RelabelVerdict::NotAllowed,
@@ -217,18 +269,39 @@ fn classify(path: &str, before: Option<&Value>, after: Option<&Value>) -> Relabe
         );
     }
     if contains_any(path, SHADING_MARKERS) {
+        return match scheme {
+            RelabelScheme::W => change(
+                RelabelVerdict::Review,
+                "shading, overhang or obstruction",
+                Some("listed under cooling in both 6a (p. 67) and 6b (p. 68); the adviser decides"),
+            ),
+            RelabelScheme::U => change(
+                RelabelVerdict::NotAllowed,
+                "geometric change of the installation: shading, overhang or obstruction",
+                None,
+            ),
+        };
+    }
+    if contains_any(path, LIGHTING_MARKERS) {
         return change(
             RelabelVerdict::Review,
-            "shading, overhang or obstruction",
-            Some("allowed for heating and hot water layouts (6a), not for cooling (6b)"),
+            "lighting",
+            Some("lighting is not listed in Bijlage 6a or 6b; the adviser decides"),
         );
     }
     if contains_any(path, SUBSYSTEM_MARKERS) {
-        return change(
-            RelabelVerdict::Allowed,
-            "change in distribution, emission or control",
-            None,
-        );
+        return match scheme {
+            RelabelScheme::W => change(
+                RelabelVerdict::Allowed,
+                "change in distribution, emission or control",
+                None,
+            ),
+            RelabelScheme::U => change(
+                RelabelVerdict::NotAllowed,
+                "change in distribution, emission or control",
+                None,
+            ),
+        };
     }
     let is_text =
         matches!(before, Some(Value::String(_))) || matches!(after, Some(Value::String(_)));
@@ -267,7 +340,13 @@ fn classify(path: &str, before: Option<&Value>, after: Option<&Value>) -> Relabe
     )
 }
 
-fn diff(path: &str, before: Option<&Value>, after: Option<&Value>, out: &mut Vec<RelabelChange>) {
+fn diff(
+    scheme: RelabelScheme,
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    out: &mut Vec<RelabelChange>,
+) {
     match (before, after) {
         (Some(Value::Object(a)), Some(Value::Object(b))) => {
             let mut keys: Vec<&String> = a.keys().chain(b.keys()).collect();
@@ -281,17 +360,23 @@ fn diff(path: &str, before: Option<&Value>, after: Option<&Value>, out: &mut Vec
                     continue;
                 }
                 let child = format!("{path}/{}", key.replace('~', "~0").replace('/', "~1"));
-                diff(&child, a.get(key), b.get(key), out);
+                diff(scheme, &child, a.get(key), b.get(key), out);
             }
         }
         (Some(Value::Array(a)), Some(Value::Array(b))) => {
             for index in 0..a.len().max(b.len()) {
-                diff(&format!("{path}/{index}"), a.get(index), b.get(index), out);
+                diff(
+                    scheme,
+                    &format!("{path}/{index}"),
+                    a.get(index),
+                    b.get(index),
+                    out,
+                );
             }
         }
         (Some(a), Some(b)) if a == b => {}
         (None, None) => {}
-        _ => out.push(classify(path, before, after)),
+        _ => out.push(classify(scheme, path, before, after)),
     }
 }
 
@@ -299,8 +384,16 @@ fn diff(path: &str, before: Option<&Value>, after: Option<&Value>, out: &mut Vec
 /// project per Bijlage 6a/6b. The registration block is compared only for
 /// the survey date, which must stay the original one (§4.2.4).
 pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
+    let scheme = match current
+        .get("buildingFunction")
+        .or_else(|| original.get("buildingFunction"))
+        .and_then(Value::as_str)
+    {
+        Some(function) if function != "residential" => RelabelScheme::U,
+        _ => RelabelScheme::W,
+    };
     let mut changes = Vec::new();
-    diff("", Some(original), Some(current), &mut changes);
+    diff(scheme, "", Some(original), Some(current), &mut changes);
     let survey_date = |project: &Value| project.pointer("/registration/surveyDate").cloned();
     let (before, after) = (survey_date(original), survey_date(current));
     if before.is_some() && before != after {
@@ -314,7 +407,11 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
         });
     }
     RelabelAssessment {
-        source: RELABEL_SOURCE,
+        source: match scheme {
+            RelabelScheme::W => RELABEL_SOURCE_W,
+            RelabelScheme::U => RELABEL_SOURCE_U,
+        },
+        scheme,
         allowed: changes
             .iter()
             .all(|change| change.verdict != RelabelVerdict::NotAllowed),
@@ -401,12 +498,65 @@ mod tests {
         for path in [
             "/zones/0/surfaces/0/area",
             "/zones/0/surfaces/0/thermalBoundary",
-            "/zones/0/surfaces/0/windows/1",
             "/heatingSystems/0/generator/type",
             "/registration/surveyDate",
         ] {
             assert_eq!(verdict(&result, path), RelabelVerdict::NotAllowed, "{path}");
         }
+    }
+
+    #[test]
+    fn opening_layout_shading_and_lighting_by_scheme() {
+        // W 6a: a panel replaced by glazing at an equal loss area is a
+        // layout change of insulation (p. 67): review, not rejected.
+        let mut original = project();
+        original["windowSolar"] = json!({"obstruction": {"method": "minimal"}});
+        let mut current = original.clone();
+        current["zones"][0]["surfaces"][0]["windows"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": "w2", "area": 1.0, "uValue": 1.1}));
+        current["zones"][0]["surfaces"][0]["windows"][0]["area"] = json!(2.5);
+        current["windowSolar"]["obstruction"]["method"] = json!("overhang");
+        current["lighting"] = json!([{"powerWPerM2": 8.0}]);
+        current["heatingSystems"][0]["distribution"] = json!({"pipesInsulated": true});
+        let w = assess_relabel(&original, &current);
+        assert_eq!(w.scheme, RelabelScheme::W);
+        assert!(w.allowed, "{:?}", w.changes);
+        assert_eq!(
+            verdict(&w, "/zones/0/surfaces/0/windows/1"),
+            RelabelVerdict::Review
+        );
+        assert_eq!(
+            verdict(&w, "/zones/0/surfaces/0/windows/0/area"),
+            RelabelVerdict::Review
+        );
+        assert_eq!(
+            verdict(&w, "/windowSolar/obstruction/method"),
+            RelabelVerdict::Review
+        );
+        assert_eq!(verdict(&w, "/lighting"), RelabelVerdict::Review);
+        assert_eq!(
+            verdict(&w, "/heatingSystems/0/distribution"),
+            RelabelVerdict::Allowed
+        );
+        // U: 6a covers one-to-one replacements only (p. 58); geometric and
+        // distribution or emission changes are 6b (p. 59–60).
+        let mut office = original.clone();
+        office["buildingFunction"] = json!("office");
+        current["buildingFunction"] = json!("office");
+        let u = assess_relabel(&office, &current);
+        assert_eq!(u.scheme, RelabelScheme::U);
+        assert!(u.source.contains("9500-U"));
+        assert!(!u.allowed);
+        for path in [
+            "/zones/0/surfaces/0/windows/1",
+            "/windowSolar/obstruction/method",
+            "/heatingSystems/0/distribution",
+        ] {
+            assert_eq!(verdict(&u, path), RelabelVerdict::NotAllowed, "{path}");
+        }
+        assert_eq!(verdict(&u, "/lighting"), RelabelVerdict::Review);
     }
 
     #[test]

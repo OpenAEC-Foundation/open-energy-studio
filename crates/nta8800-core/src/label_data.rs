@@ -1,6 +1,9 @@
 //! Summary of the label data of Regeling energieprestatie gebouwen art. 4
-//! (p. 5): the insulation per element type and the installations, next to
-//! the indicators that the building assessment already reports.
+//! (p. 5–6): a. the general building data (use function, construction
+//! year, usable floor area and, for dwellings, the dwelling type), b. the
+//! insulation per element type and c. the installations including the
+//! solar water heater, next to the indicators (d) that the building
+//! assessment already reports.
 //!
 //! The summary is derived from the project and the derived kernel input; it
 //! adds no calculation.
@@ -43,12 +46,30 @@ pub struct InstallationSummary {
     pub cooling_generators: Vec<String>,
     pub pv_system_count: usize,
     pub lighting_zone_count: usize,
+    /// Solar water heaters (zonneboiler), counted per appliance.
+    pub solar_water_heater_count: u32,
+    /// Their use: hot water, combi or space heating (kernel tags).
+    pub solar_water_heater_uses: Vec<String>,
+}
+
+/// Art. 4 a: general building data.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneralData {
+    /// Use function (label function of the kernel input, else the project's
+    /// building function).
+    pub use_function: Option<String>,
+    pub construction_year: Option<u32>,
+    pub usable_floor_area_m2: Option<f64>,
+    /// Dwelling type, for a dwelling or residential building only.
+    pub dwelling_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelData {
     pub source: &'static str,
+    pub general: GeneralData,
     pub envelope: Vec<EnvelopeSummary>,
     pub installations: InstallationSummary,
 }
@@ -209,12 +230,67 @@ pub fn installation_summary(input: &BuildingPerformanceInput) -> InstallationSum
             .unwrap_or_default(),
         pv_system_count: input.pv_systems.len(),
         lighting_zone_count: input.lighting.len(),
+        solar_water_heater_count: input
+            .hot_water
+            .iter()
+            .flat_map(|system| &system.solar)
+            .map(|heater| heater.count.max(1))
+            .sum(),
+        solar_water_heater_uses: input
+            .hot_water
+            .iter()
+            .flat_map(|system| &system.solar)
+            .filter_map(|heater| tag(&heater.solar_use))
+            .collect(),
+    }
+}
+
+/// Art. 4 a from the project, its registration block and the kernel input.
+pub fn general_data(
+    project: &ProjectInput,
+    derived: Option<&BuildingPerformanceInput>,
+) -> GeneralData {
+    let registration = project.registration.as_ref();
+    let text = |key: &str| {
+        registration
+            .and_then(|value| value.get(key))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .filter(|value| !value.trim().is_empty())
+    };
+    let residential = matches!(
+        project.building_function,
+        crate::BuildingFunction::Residential
+    );
+    let zone_area: f64 = project.zones.iter().map(|zone| zone.floor_area).sum();
+    GeneralData {
+        use_function: derived
+            .and_then(|input| input.label_function)
+            .and_then(|function| tag(&function))
+            .or_else(|| tag(&project.building_function)),
+        construction_year: registration
+            .and_then(|value| value.get("constructionYear"))
+            .and_then(Value::as_u64)
+            .and_then(|year| u32::try_from(year).ok()),
+        usable_floor_area_m2: derived
+            .map(|input| input.total_usable_floor_area_m2)
+            .or((zone_area > 0.0).then_some(zone_area)),
+        dwelling_type: if residential {
+            text("buildingType").or_else(|| {
+                derived
+                    .and_then(|input| input.space_heating.demand.dwelling_type)
+                    .and_then(|kind| tag(&kind))
+            })
+        } else {
+            None
+        },
     }
 }
 
 pub fn label_data(project: &ProjectInput, derived: Option<&BuildingPerformanceInput>) -> LabelData {
     LabelData {
         source: LABEL_DATA_SOURCE,
+        general: general_data(project, derived),
         envelope: envelope_summary(project),
         installations: derived.map(installation_summary).unwrap_or_default(),
     }
@@ -258,5 +334,23 @@ mod tests {
         let glazing = &summary[2];
         assert_eq!(glazing.category, ElementCategory::Glazing);
         assert_eq!(glazing.mean_u_w_per_m2k, Some(1.4));
+    }
+
+    #[test]
+    fn general_data_follow_article_4a() {
+        let project: ProjectInput = serde_json::from_value(json!({
+            "id": "p", "name": "p", "buildingFunction": "residential",
+            "registration": {"constructionYear": 1975, "buildingType": "tussenwoning"},
+            "zones": [{"id": "z", "floorArea": 96.0, "volume": 250.0, "surfaces": []}]
+        }))
+        .unwrap();
+        let general = general_data(&project, None);
+        assert_eq!(general.use_function.as_deref(), Some("residential"));
+        assert_eq!(general.construction_year, Some(1975));
+        assert_eq!(general.usable_floor_area_m2, Some(96.0));
+        assert_eq!(general.dwelling_type.as_deref(), Some("tussenwoning"));
+        let mut office = project.clone();
+        office.building_function = crate::BuildingFunction::Office;
+        assert!(general_data(&office, None).dwelling_type.is_none());
     }
 }

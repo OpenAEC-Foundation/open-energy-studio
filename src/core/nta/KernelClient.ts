@@ -3547,6 +3547,8 @@ export interface NtaRegistration {
   registrationDate?: string;
   serialProject?: boolean;
   relabel?: boolean;
+  /** Relabel: date of the improvement (quote with order or invoice), YYYY-MM-DD; within 24 months of the survey (BRL 9500 §4.2.3). */
+  improvementDate?: string;
   originalKernelVersion?: string;
   epOnlineNumber?: string;
   /** Opleverdatum, YYYY-MM-DD (§3.1: completed after 1-1-2021 needs a detailed survey). */
@@ -3601,6 +3603,8 @@ export interface RelabelChange {
 /** BRL 9500 Bijlage 6a/6b classification of the changes since the original label. */
 export interface RelabelAssessment {
   source: string;
+  /** BRL 9500-W (dwellings) or 9500-U (utility), from `buildingFunction`. */
+  scheme: 'w' | 'u';
   allowed: boolean;
   needsReview: boolean;
   changes: RelabelChange[];
@@ -3842,6 +3846,13 @@ export interface RegistrationAssessment {
 
 export interface LabelData {
   source: string;
+  /** Regeling art. 4 a. */
+  general: {
+    useFunction: string | null;
+    constructionYear: number | null;
+    usableFloorAreaM2: number | null;
+    dwellingType: string | null;
+  };
   envelope: Array<{
     category: 'facade' | 'roof' | 'floor' | 'glazing';
     areaM2: number;
@@ -3856,6 +3867,8 @@ export interface LabelData {
     coolingGenerators: string[];
     pvSystemCount: number;
     lightingZoneCount: number;
+    solarWaterHeaterCount: number;
+    solarWaterHeaterUses: string[];
   };
 }
 

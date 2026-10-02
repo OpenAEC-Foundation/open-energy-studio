@@ -199,6 +199,11 @@ pub struct Registration {
     /// Relabel message type (§4.2.3/4.2.4).
     #[serde(default)]
     pub relabel: bool,
+    /// Relabel: date of the improvement, YYYY-MM-DD, from the quote with
+    /// order or the specified invoice (§4.2.3, p. 23); it must lie within
+    /// 24 months of the original survey date.
+    #[serde(default)]
+    pub improvement_date: Option<String>,
     /// Kernel version of the original calculation, for a relabel.
     #[serde(default)]
     pub original_kernel_version: Option<String>,
@@ -421,14 +426,35 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
         if registration.relabel {
             // §4.2.3/4.2.4: improvements within 24 months of the original
             // survey, calculated with the original kernel.
+            // §4.2.3 (p. 23): the improvement, proven by a quote with
+            // order or an invoice, must be made within 24 months of the
+            // original survey date; the registration date does not count.
             let deadline = survey.add_months(24);
             relabel_deadline = Some(deadline);
-            if registered.is_some_and(|date| date > deadline) {
-                issues.push(issue(
-                    "relabel_deadline_exceeded",
-                    "registrationDate",
-                    "error",
-                ));
+            match registration.improvement_date.as_deref() {
+                None => issues.push(issue(
+                    "improvement_date_required",
+                    "improvementDate",
+                    "missing",
+                )),
+                Some(text) => match Date::parse(text) {
+                    None => issues.push(issue(
+                        "improvement_date_invalid",
+                        "improvementDate",
+                        "error",
+                    )),
+                    Some(date) if date > deadline => issues.push(issue(
+                        "relabel_deadline_exceeded",
+                        "improvementDate",
+                        "error",
+                    )),
+                    Some(date) if date < survey => issues.push(issue(
+                        "improvement_before_survey",
+                        "improvementDate",
+                        "error",
+                    )),
+                    Some(_) => {}
+                },
             }
             match registration.original_kernel_version.as_deref() {
                 None => issues.push(issue(
@@ -469,8 +495,17 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
             }
         }
     }
-    if registration.relabel && registration.purpose == Some(RegistrationPurpose::BblCheck) {
-        issues.push(issue("relabel_not_for_bbl_check", "relabel", "error"));
+    // §4.2.3 (W p. 23, U p. 18): relabelling only for existing buildings.
+    if registration.relabel
+        && registration
+            .purpose
+            .is_some_and(|purpose| purpose != RegistrationPurpose::ExistingBuilding)
+    {
+        issues.push(issue(
+            "relabel_only_for_existing_buildings",
+            "relabel",
+            "error",
+        ));
     }
     check_detail_survey(registration, &mut issues);
     check_evidence(&registration.evidence, &mut issues);
@@ -762,18 +797,29 @@ mod tests {
 
         let mut relabel = complete();
         relabel.relabel = true;
-        relabel.registration_date = Some("2027-12-01".into());
+        // The registration date may lie after the 24 months; the
+        // improvement date decides (§4.2.3).
+        relabel.registration_date = Some("2028-03-01".into());
         let result = assess_registration(&relabel);
         assert_eq!(result.relabel_deadline.as_deref(), Some("2028-01-31"));
         assert!(result.registration_deadline.is_none());
         let found: Vec<_> = result.issues.iter().map(|item| item.code).collect();
         assert!(!found.contains(&"registration_deadline_exceeded"));
         assert!(found.contains(&"original_kernel_version_required"));
+        assert!(found.contains(&"improvement_date_required"));
         relabel.original_kernel_version = Some("0.0.0-old".into());
         assert!(codes(&relabel).contains(&"relabel_kernel_version_differs"));
         relabel.original_kernel_version = Some(KERNEL_VERSION.into());
-        relabel.registration_date = Some("2028-02-01".into());
+        relabel.improvement_date = Some("2028-01-31".into());
+        assert!(codes(&relabel).is_empty(), "{:?}", codes(&relabel));
+        relabel.improvement_date = Some("2028-02-01".into());
         assert_eq!(codes(&relabel), vec!["relabel_deadline_exceeded"]);
+        relabel.improvement_date = Some("2025-12-01".into());
+        assert_eq!(codes(&relabel), vec!["improvement_before_survey"]);
+        // Only for existing buildings.
+        relabel.improvement_date = Some("2027-06-01".into());
+        relabel.purpose = Some(RegistrationPurpose::Delivery);
+        assert!(codes(&relabel).contains(&"relabel_only_for_existing_buildings"));
     }
 
     #[test]

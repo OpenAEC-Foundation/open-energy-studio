@@ -145,6 +145,7 @@ export const en: Record<string, string> = {
   'reg.registrationDate': "Registration date",
   'reg.referenceObjectId': "Reference object (similar dwelling)",
   'reg.originalKernelVersion': "Kernel version of original survey (relabel)",
+  'reg.improvementDate': "Date of the improvement, quote or invoice (relabel, within 24 months)",
   'reg.epOnlineNumber': "EP-Online number",
   'reg.surveyingAdvisor': "Surveying adviser",
   'reg.registeringAdvisor': "Registering adviser",
