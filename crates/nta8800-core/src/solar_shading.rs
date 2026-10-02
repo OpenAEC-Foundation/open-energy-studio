@@ -14,8 +14,24 @@
 //!   shading or with automatic shading tuned per ISO 52016-3 table C.1
 //!   (AC1/AC2); in every other case the tables apply to both balances.
 //!
+//! - §17.3.4–17.3.7 situations b–g (p. 698–763) with tables 17.7–17.15:
+//!   one situation per window (17.3.2; the situations are alternatives, not
+//!   multiplied). Relative heights and widths take the column of their range;
+//!   tilts take the nearest column of table 17.4 (higher value on a tie).
+//!   Surfaces with a tilt below 15° use the south field of view (17.3.1).
+//!   A situation that table 17.3 marks "not available" for a balance falls
+//!   back to situation g, which for cooling is table 17.5 (1,00) unless an
+//!   overhang parallel to a vertical window is present (table 17.9).
+//! - Collectors and PV (x = P): tables 17.6, 17.12 and 17.15 through
+//!   [`collector_obstruction_factor`].
+//! - The extended method of §17.3.8 needs hourly NEN 5060 data; its result
+//!   enters as `Declared` factors.
+//!
 //! Table values were generated from the licensed norm text and checked
 //! against the rendered pages by the 2026-10-02 review.
+
+#[path = "solar_shading_tables.rs"]
+mod tables;
 
 use crate::climate::Orientation;
 use serde::{Deserialize, Serialize};
@@ -474,12 +490,28 @@ fn column(orientation: Orientation) -> usize {
     }
 }
 
-/// Table 17.4 with the nearest-column rule; `None` outside 0–180°.
-fn obstruction_lookup(orientation: Orientation, tilt_deg: f64, month: u8) -> Option<f64> {
+/// 17.3.1: below 15° the field of view is taken towards the south.
+fn view_orientation(orientation: Orientation, tilt_deg: f64) -> Orientation {
+    if tilt_deg < 15.0 {
+        Orientation::South
+    } else {
+        orientation
+    }
+}
+
+/// Nearest tilt column of a 13-column table (higher value on a tie);
+/// `None` outside 0–180°.
+fn tilt_lookup(
+    table: &[[[f64; 13]; 12]; 8],
+    orientation: Orientation,
+    tilt_deg: f64,
+    month: u8,
+) -> Option<f64> {
     if !(0.0..=180.0).contains(&tilt_deg) {
         return None;
     }
-    let row = &OBSTRUCTION_HEATING[column(orientation)][usize::from(month - 1)];
+    let orientation = view_orientation(orientation, tilt_deg);
+    let row = &table[column(orientation)][usize::from(month - 1)];
     let mut best: Option<(f64, f64)> = None;
     for (index, tilt) in OBSTRUCTION_TILTS_DEG.iter().enumerate() {
         let distance = (tilt - tilt_deg).abs();
@@ -495,6 +527,38 @@ fn obstruction_lookup(orientation: Orientation, tilt_deg: f64, month: u8) -> Opt
         };
     }
     best.map(|(_, value)| value)
+}
+
+/// Table 17.4 with the nearest-column rule; `None` outside 0–180°.
+fn obstruction_lookup(orientation: Orientation, tilt_deg: f64, month: u8) -> Option<f64> {
+    tilt_lookup(&OBSTRUCTION_HEATING, orientation, tilt_deg, month)
+}
+
+/// Whether the nearest tilt column of table 17.4 is the vertical one;
+/// situations b–d apply to vertical surfaces only.
+pub fn is_vertical(tilt_deg: f64) -> bool {
+    (82.5..97.5).contains(&tilt_deg)
+}
+
+/// Column of tables 17.7–17.9: relative height < 0,5, 0,5–1,0, ≥ 1,0.
+fn height_column(relative_height: f64) -> usize {
+    if relative_height < 0.5 {
+        0
+    } else if relative_height < 1.0 {
+        1
+    } else {
+        2
+    }
+}
+
+/// Column of tables 17.10–17.12 for a side and relative width.
+fn side_column(side: ObstructionSide, relative_width: f64) -> usize {
+    let base = match side {
+        ObstructionSide::Left => 0,
+        ObstructionSide::Right => 2,
+        ObstructionSide::Both => 4,
+    };
+    base + usize::from(relative_width >= 1.0)
 }
 
 fn lerp(a: f64, b: f64, fraction: f64) -> f64 {
@@ -519,18 +583,192 @@ fn shading_lookup(table: &ShadingTable, orientation: Orientation, tilt_deg: f64,
     }
 }
 
+/// Side of the field of view with a side obstruction (situation d).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObstructionSide {
+    Left,
+    Right,
+    /// Both sides: `b_b` of the larger obstruction (smallest `b_b`).
+    Both,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Obstruction {
     /// §17.3.2a: no obstructions above 20° and no overhangs below 45°.
     Minimal,
-    /// Other §17.3 situations determined elsewhere, twelve monthly factors.
+    /// §17.3.2b: obstruction of constant height parallel to a vertical
+    /// window; `relativeHeight` is h_b;⊥ (table 17.7). Cooling: situation g.
+    #[serde(rename_all = "camelCase")]
+    ParallelObstruction { relative_height: f64 },
+    /// §17.3.2c: overhang of constant height parallel to a vertical window
+    /// (balcony, gallery); `relativeHeight` is h_o;⊥ (tables 17.8/17.9).
+    #[serde(rename_all = "camelCase")]
+    Overhang { relative_height: f64 },
+    /// §17.3.2d: side obstruction(s) at a vertical window (tables
+    /// 17.10/17.11). Cooling needs `coolingHeightCondition` (lowest point at
+    /// least 2,5 m above the window top); otherwise situation g (table 17.5).
+    #[serde(rename_all = "camelCase")]
+    SideObstruction {
+        side: ObstructionSide,
+        relative_width: f64,
+        #[serde(default)]
+        cooling_height_condition: bool,
+    },
+    /// §17.3.2e: full obstruction (tables 17.13/17.14), conservative for
+    /// heating. Cooling uses table 17.14 only with `coolingConditionsMet`
+    /// (a broad obstruction above h_b 0,36 and a broad overhang below
+    /// h_o 1,00), otherwise table 17.5.
+    #[serde(rename_all = "camelCase")]
+    Full {
+        #[serde(default)]
+        cooling_conditions_met: bool,
+    },
+    /// §17.3.2g: other obstruction; heating table 17.13, cooling table 17.9
+    /// when one of the obstructions is a parallel overhang of a vertical
+    /// window (`overhangRelativeHeight`, h_o;⊥), otherwise table 17.5.
+    #[serde(rename_all = "camelCase")]
+    Other {
+        #[serde(default)]
+        overhang_relative_height: Option<f64>,
+    },
+    /// Other §17.3 situations determined elsewhere (e.g. the extended method
+    /// of §17.3.8), twelve monthly factors.
     Declared {
         heating: Vec<f64>,
         cooling: Vec<f64>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+}
+
+/// Validation codes for an obstruction at a window of the given tilt, as
+/// `(code, field suffix)`; the suffix is appended to the obstruction path.
+pub fn validate_obstruction(
+    obstruction: &Obstruction,
+    tilt_deg: f64,
+) -> Vec<(&'static str, &'static str)> {
+    let mut issues = Vec::new();
+    let geometry = |value: f64| value.is_finite() && value >= 0.0;
+    match obstruction {
+        Obstruction::Minimal | Obstruction::Full { .. } => {}
+        Obstruction::ParallelObstruction { relative_height }
+        | Obstruction::Overhang { relative_height } => {
+            if !geometry(*relative_height) {
+                issues.push(("obstruction_geometry_invalid", ".relativeHeight"));
+            }
+            if !is_vertical(tilt_deg) {
+                issues.push(("obstruction_situation_requires_vertical", ".method"));
+            }
+        }
+        Obstruction::SideObstruction { relative_width, .. } => {
+            if !geometry(*relative_width) {
+                issues.push(("obstruction_geometry_invalid", ".relativeWidth"));
+            }
+            if !is_vertical(tilt_deg) {
+                issues.push(("obstruction_situation_requires_vertical", ".method"));
+            }
+        }
+        Obstruction::Other {
+            overhang_relative_height,
+        } => {
+            if overhang_relative_height.is_some_and(|value| !geometry(value)) {
+                issues.push(("obstruction_geometry_invalid", ".overhangRelativeHeight"));
+            }
+        }
+        Obstruction::Declared {
+            heating, cooling, ..
+        } => {
+            if [heating, cooling].iter().any(|values| {
+                values.len() != 12 || values.iter().any(|value| !(0.0..=1.0).contains(value))
+            }) {
+                issues.push(("window_obstruction_factor_invalid", ""));
+            }
+        }
+    }
+    issues
+}
+
+/// Obstruction of collectors for hot water and PV panels (x = P).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CollectorObstruction {
+    /// Situation a: table 17.6 (1,00).
+    Minimal,
+    /// Situation d: table 17.12; both sides with b_b < 1 on a non-vertical
+    /// panel takes table 17.15 (footnote c).
+    #[serde(rename_all = "camelCase")]
+    SideObstruction {
+        side: ObstructionSide,
+        relative_width: f64,
+    },
+    /// Situation e: table 17.15.
+    Full,
+    /// Situation f: roof edge of height h_dakrand (top of the edge above the
+    /// bottom of the panel) at the shortest horizontal distance l_dakrand;
+    /// obstructing when h > 0,5 m and l < h (table 17.15), otherwise
+    /// situation a.
+    #[serde(rename_all = "camelCase")]
+    RoofEdge { height_m: f64, distance_m: f64 },
+    /// Situation g: table 17.15.
+    Other,
+    /// Determined elsewhere (extended method), twelve monthly factors.
+    Declared {
+        factors: Vec<f64>,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
+}
+
+/// `F_sh;obst;mi` of a collector or PV panel; `None` for invalid input.
+pub fn collector_obstruction_factor(
+    obstruction: &CollectorObstruction,
+    orientation: Orientation,
+    tilt_deg: f64,
+    month: u8,
+) -> Option<f64> {
+    if !(1..=12).contains(&month) || !(0.0..=180.0).contains(&tilt_deg) {
+        return None;
+    }
+    let index = usize::from(month - 1);
+    match obstruction {
+        CollectorObstruction::Minimal => Some(1.0),
+        CollectorObstruction::SideObstruction {
+            side,
+            relative_width,
+        } => {
+            if !(relative_width.is_finite() && *relative_width >= 0.0) {
+                return None;
+            }
+            if *side == ObstructionSide::Both && *relative_width < 1.0 && !is_vertical(tilt_deg) {
+                return tilt_lookup(&tables::TABLE_17_15, orientation, tilt_deg, month);
+            }
+            let view = view_orientation(orientation, tilt_deg);
+            Some(tables::TABLE_17_12[column(view)][index][side_column(*side, *relative_width)])
+        }
+        CollectorObstruction::Full | CollectorObstruction::Other => {
+            tilt_lookup(&tables::TABLE_17_15, orientation, tilt_deg, month)
+        }
+        CollectorObstruction::RoofEdge {
+            height_m,
+            distance_m,
+        } => {
+            let valid = |value: f64| value.is_finite() && value >= 0.0;
+            if !(valid(*height_m) && valid(*distance_m)) {
+                return None;
+            }
+            if *height_m > 0.5 && distance_m < height_m {
+                tilt_lookup(&tables::TABLE_17_15, orientation, tilt_deg, month)
+            } else {
+                Some(1.0)
+            }
+        }
+        CollectorObstruction::Declared { factors, .. } => factors
+            .get(index)
+            .copied()
+            .filter(|value| (0.0..=1.0).contains(value)),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -598,10 +836,66 @@ pub fn obstruction_factor(
     month: u8,
     balance: Balance,
 ) -> Option<f64> {
+    if !(1..=12).contains(&month) {
+        return None;
+    }
+    let index = usize::from(month - 1);
+    let col = column(orientation);
+    // Table 17.5: 1,00 for every tilt and month.
+    let minimal_cooling = (0.0..=180.0).contains(&tilt_deg).then_some(1.0);
+    let vertical = |value: f64| is_vertical(tilt_deg).then_some(value);
     match obstruction {
         Obstruction::Minimal => match balance {
-            Balance::Cooling => Some(1.0),
+            Balance::Cooling => minimal_cooling,
             Balance::Heating => obstruction_lookup(orientation, tilt_deg, month),
+        },
+        Obstruction::ParallelObstruction { relative_height } => match balance {
+            Balance::Heating => {
+                vertical(tables::TABLE_17_7[col][index][height_column(*relative_height)])
+            }
+            // Table 17.3: not available for cooling; situation g without an
+            // overhang is table 17.5.
+            Balance::Cooling => vertical(1.0),
+        },
+        Obstruction::Overhang { relative_height } => {
+            let table = match balance {
+                Balance::Heating => &tables::TABLE_17_8,
+                Balance::Cooling => &tables::TABLE_17_9,
+            };
+            vertical(table[col][index][height_column(*relative_height)])
+        }
+        Obstruction::SideObstruction {
+            side,
+            relative_width,
+            cooling_height_condition,
+        } => match balance {
+            Balance::Heating => {
+                vertical(tables::TABLE_17_10[col][index][side_column(*side, *relative_width)])
+            }
+            Balance::Cooling if *cooling_height_condition => {
+                vertical(tables::TABLE_17_11[col][index][side_column(*side, *relative_width)])
+            }
+            Balance::Cooling => vertical(1.0),
+        },
+        Obstruction::Full {
+            cooling_conditions_met,
+        } => match balance {
+            Balance::Heating => tilt_lookup(&tables::TABLE_17_13, orientation, tilt_deg, month),
+            Balance::Cooling if *cooling_conditions_met => {
+                tilt_lookup(&tables::TABLE_17_14, orientation, tilt_deg, month)
+            }
+            Balance::Cooling => minimal_cooling,
+        },
+        Obstruction::Other {
+            overhang_relative_height,
+        } => match balance {
+            Balance::Heating => tilt_lookup(&tables::TABLE_17_13, orientation, tilt_deg, month),
+            Balance::Cooling => match overhang_relative_height {
+                Some(height) if is_vertical(tilt_deg) => {
+                    Some(tables::TABLE_17_9[col][index][height_column(*height)])
+                }
+                _ => minimal_cooling,
+            },
         },
         Obstruction::Declared {
             heating, cooling, ..
@@ -768,5 +1062,260 @@ mod tests {
         assert!(ShadingControl::ManualUtilityWithoutGlareProtection.fits_function(false));
         assert!(ShadingControl::Automatic.fits_function(true));
         assert!(ShadingControl::Automatic.fits_function(false));
+    }
+
+    fn factor(
+        obstruction: &Obstruction,
+        orientation: Orientation,
+        tilt: f64,
+        month: u8,
+        balance: Balance,
+    ) -> f64 {
+        obstruction_factor(obstruction, orientation, tilt, month, balance).unwrap()
+    }
+
+    #[test]
+    fn parallel_obstruction_follows_table_17_7() {
+        let low = Obstruction::ParallelObstruction {
+            relative_height: 0.3,
+        };
+        let mid = Obstruction::ParallelObstruction {
+            relative_height: 0.5,
+        };
+        let high = Obstruction::ParallelObstruction {
+            relative_height: 1.0,
+        };
+        // South, February: 0,60 / 0,30 / 0,30; June: 1,00 / 1,00 / 0,56.
+        assert_eq!(
+            factor(&low, Orientation::South, 90.0, 2, Balance::Heating),
+            0.60
+        );
+        assert_eq!(
+            factor(&mid, Orientation::South, 90.0, 2, Balance::Heating),
+            0.30
+        );
+        assert_eq!(
+            factor(&high, Orientation::South, 90.0, 6, Balance::Heating),
+            0.56
+        );
+        // Table 17.3: not available for cooling, so situation g without an
+        // overhang (table 17.5).
+        assert_eq!(
+            factor(&high, Orientation::South, 90.0, 6, Balance::Cooling),
+            1.0
+        );
+        // Vertical surfaces only.
+        assert!(obstruction_factor(&high, Orientation::South, 45.0, 6, Balance::Heating).is_none());
+        assert_eq!(
+            validate_obstruction(&high, 45.0),
+            vec![("obstruction_situation_requires_vertical", ".method")]
+        );
+    }
+
+    #[test]
+    fn overhang_follows_tables_17_8_and_17_9() {
+        let balcony = |relative_height| Obstruction::Overhang { relative_height };
+        // Table 17.8 south, January: 0,19 / 0,21 / 0,23; July 0,56 / 0,56 / 0,57.
+        assert_eq!(
+            factor(&balcony(0.2), Orientation::South, 90.0, 1, Balance::Heating),
+            0.19
+        );
+        assert_eq!(
+            factor(&balcony(0.7), Orientation::South, 90.0, 1, Balance::Heating),
+            0.21
+        );
+        assert_eq!(
+            factor(&balcony(1.2), Orientation::South, 90.0, 7, Balance::Heating),
+            0.57
+        );
+        // Table 17.9 south: January 0,88 / 1,00; April 0,36 / 0,61 / 1,00;
+        // south-west July 0,56 / 0,70.
+        assert_eq!(
+            factor(&balcony(0.2), Orientation::South, 90.0, 1, Balance::Cooling),
+            0.88
+        );
+        assert_eq!(
+            factor(&balcony(0.7), Orientation::South, 90.0, 4, Balance::Cooling),
+            0.61
+        );
+        assert_eq!(
+            factor(&balcony(1.0), Orientation::South, 90.0, 4, Balance::Cooling),
+            1.0
+        );
+        assert_eq!(
+            factor(
+                &balcony(0.7),
+                Orientation::SouthWest,
+                90.0,
+                7,
+                Balance::Cooling
+            ),
+            0.70
+        );
+    }
+
+    #[test]
+    fn side_obstructions_follow_tables_17_10_to_17_12() {
+        let fin = |side, relative_width, cooling_height_condition| Obstruction::SideObstruction {
+            side,
+            relative_width,
+            cooling_height_condition,
+        };
+        // Table 17.10 south-west, January: 0,24 0,25 | 0,49 0,49 | 0,24 0,27.
+        let january = |side, width| {
+            factor(
+                &fin(side, width, false),
+                Orientation::SouthWest,
+                90.0,
+                1,
+                Balance::Heating,
+            )
+        };
+        assert_eq!(january(ObstructionSide::Left, 0.5), 0.24);
+        assert_eq!(january(ObstructionSide::Left, 1.0), 0.25);
+        assert_eq!(january(ObstructionSide::Right, 2.0), 0.49);
+        assert_eq!(january(ObstructionSide::Both, 0.9), 0.24);
+        assert_eq!(january(ObstructionSide::Both, 1.5), 0.27);
+        // Table 17.11 east, July: right b_b < 1 → 0,95; only with the 2,5 m
+        // condition, otherwise table 17.5.
+        let east = |condition| {
+            factor(
+                &fin(ObstructionSide::Right, 0.5, condition),
+                Orientation::East,
+                90.0,
+                7,
+                Balance::Cooling,
+            )
+        };
+        assert_eq!(east(true), 0.95);
+        assert_eq!(east(false), 1.0);
+        // Table 17.12 south, June: 0,78 0,91 | 0,78 0,93 | 0,56 0,84; a flat
+        // panel uses the south field of view.
+        let panel = |side, relative_width, orientation, tilt| {
+            collector_obstruction_factor(
+                &CollectorObstruction::SideObstruction {
+                    side,
+                    relative_width,
+                },
+                orientation,
+                tilt,
+                6,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            panel(ObstructionSide::Right, 1.2, Orientation::South, 90.0),
+            0.93
+        );
+        assert_eq!(
+            panel(ObstructionSide::Both, 1.2, Orientation::North, 10.0),
+            0.84
+        );
+        // Footnote c: both sides, b_b < 1 on a tilted panel → table 17.15.
+        assert_eq!(
+            panel(ObstructionSide::Both, 0.5, Orientation::South, 30.0),
+            collector_obstruction_factor(&CollectorObstruction::Full, Orientation::South, 30.0, 6)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn full_and_other_obstruction_follow_tables_17_13_to_17_15() {
+        let full = Obstruction::Full {
+            cooling_conditions_met: true,
+        };
+        // Table 17.13 south, January: 90° 0,19, 30° 0,30, 0° 0,55, 165° 0,82.
+        assert_eq!(
+            factor(&full, Orientation::South, 90.0, 1, Balance::Heating),
+            0.19
+        );
+        assert_eq!(
+            factor(&full, Orientation::South, 32.0, 1, Balance::Heating),
+            0.30
+        );
+        assert_eq!(
+            factor(&full, Orientation::South, 165.0, 1, Balance::Heating),
+            0.82
+        );
+        // Below 15° the south field of view applies (17.3.1): north at 10°
+        // takes the south 15° column (0,39), not the north one (0,95).
+        assert_eq!(
+            factor(&full, Orientation::North, 10.0, 1, Balance::Heating),
+            0.39
+        );
+        // Table 17.14 west, July: 90° 0,55, 105° 0,60.
+        assert_eq!(
+            factor(&full, Orientation::West, 90.0, 7, Balance::Cooling),
+            0.55
+        );
+        assert_eq!(
+            factor(&full, Orientation::West, 105.0, 7, Balance::Cooling),
+            0.60
+        );
+        // Without the conditions of e), cooling falls back to table 17.5.
+        let conservative = Obstruction::Full {
+            cooling_conditions_met: false,
+        };
+        assert_eq!(
+            factor(&conservative, Orientation::West, 90.0, 7, Balance::Cooling),
+            1.0
+        );
+        // Situation g: heating table 17.13; cooling table 17.9 with an
+        // overhang, otherwise table 17.5.
+        let other = Obstruction::Other {
+            overhang_relative_height: Some(0.2),
+        };
+        assert_eq!(
+            factor(&other, Orientation::South, 90.0, 1, Balance::Heating),
+            0.19
+        );
+        assert_eq!(
+            factor(&other, Orientation::South, 90.0, 1, Balance::Cooling),
+            0.88
+        );
+        let plain = Obstruction::Other {
+            overhang_relative_height: None,
+        };
+        assert_eq!(
+            factor(&plain, Orientation::South, 90.0, 1, Balance::Cooling),
+            1.0
+        );
+        // Table 17.15 south, January, 90°: 0,19.
+        assert_eq!(
+            collector_obstruction_factor(&CollectorObstruction::Other, Orientation::South, 90.0, 1),
+            Some(0.19)
+        );
+    }
+
+    #[test]
+    fn roof_edges_obstruct_only_when_high_and_close() {
+        let edge = |height_m, distance_m| {
+            collector_obstruction_factor(
+                &CollectorObstruction::RoofEdge {
+                    height_m,
+                    distance_m,
+                },
+                Orientation::South,
+                30.0,
+                1,
+            )
+            .unwrap()
+        };
+        let table_17_15 =
+            collector_obstruction_factor(&CollectorObstruction::Full, Orientation::South, 30.0, 1)
+                .unwrap();
+        assert_eq!(table_17_15, 0.30);
+        assert_eq!(edge(0.5, 0.1), 1.0);
+        assert_eq!(edge(0.8, 0.8), 1.0);
+        assert_eq!(edge(0.8, 0.5), table_17_15);
+        assert_eq!(
+            collector_obstruction_factor(
+                &CollectorObstruction::Minimal,
+                Orientation::North,
+                0.0,
+                3
+            ),
+            Some(1.0)
+        );
     }
 }

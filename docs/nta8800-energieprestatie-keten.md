@@ -511,3 +511,10 @@ Generator `multiple` bevat twee of meer opwekkers, elk met een preferentie (1 = 
 - **Berekening per opwekker:** elke opwekker rekent zijn eigen route op F·Q_H;gen;out. Daarna worden de dragers en de hulpenergie opgeteld.
 - **Rendement:** het gerapporteerde opwekkingsrendement is dat van de warmtepomp. Daarmee volgt de omgevingswarmte (5.30/5.31) uit de warmtepompoutput. Zonder warmtepomp is het output/input.
 - **Niet toegestaan:** geneste splitsingen. Dat zijn `multiple` of `hybrid_heat_pump` als onderdeel, en een bijlage-Q-warmtepomp met eigen backup.
+
+**Belemmering van zonnecollectoren.** Voor de collectoren gelden de collectortabellen van §17.3:
+- 17.6 bij minimale belemmering (1,00);
+- 17.12 bij zijbelemmering;
+- 17.15 bij volledige belemmering, een dakrand of situatie g.
+
+Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerdere tussenversie gebruikte voor collectoren ten onrechte de raamtabel 17.4.

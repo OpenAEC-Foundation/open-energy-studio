@@ -16,8 +16,11 @@
 //! - Adjacent unheated spaces: H_ue = 5·A_T;iu (NTA I.8, basic survey) with
 //!   b_U = H_ue/(H_ue + H_iu) (8.53 with H_V;iu = 0).
 //! - Obstruction: the advisor determines the situation per window (tables
-//!   8.24/8.25, p. 102–103); without declared factors the window has the
-//!   "minimale belemmering" situation (NTA §17.3.2a).
+//!   8.24/8.25, 82.1 p. 103, 75.1 p. 105) as `shading`, mapped onto NTA
+//!   §17.3.2 a–g; the basic survey allows a constant-height or full
+//!   obstruction only with cooling in the zone, overhangs only on façades
+//!   and side obstructions only in the detailed survey. Without `shading`
+//!   or declared factors the window has "minimale belemmering" (§17.3.2a).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -167,10 +170,13 @@ pub struct SurveyWindow {
     pub glass: GlassAnswer,
     pub frame: FrameAnswer,
     /// Declared obstruction factors per §17.3 (12 heating, 12 cooling);
-    /// absent: the advisor established "minimale belemmering" (tables
-    /// 8.24/8.25, p. 102–103).
+    /// exclusive with `shading`. Both absent: the advisor established
+    /// "minimale belemmering" (tables 8.24/8.25, 82.1 p. 103, 75.1 p. 105).
     #[serde(default)]
     pub obstruction: Option<DeclaredObstruction>,
+    /// Shading situation of tables 8.24/8.25 (NTA §17.3.2).
+    #[serde(default)]
+    pub shading: Option<ShadingSituation>,
     pub source_reference: String,
 }
 
@@ -180,6 +186,81 @@ pub struct DeclaredObstruction {
     pub heating: Vec<f64>,
     pub cooling: Vec<f64>,
     pub source_reference: String,
+}
+
+/// Situations of ISSO 82.1/75.1 tables 8.24 (façades) and 8.25 (roofs),
+/// mapped onto NTA §17.3.2 a–g. Relative heights are measured
+/// perpendicular to the window (h_b;⊥, h_o;⊥).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "situation", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ShadingSituation {
+    /// "Minimale belemmering" (a).
+    Minimal,
+    /// "Belemmering met constante hoogte" (b); only with cooling in the
+    /// zone.
+    #[serde(rename_all = "camelCase")]
+    ConstantHeightObstruction { relative_height: f64 },
+    /// "Constante overstek" (c): balcony or gallery.
+    #[serde(rename_all = "camelCase")]
+    ConstantOverhang { relative_height: f64 },
+    /// "Volledige belemmering" (e); only with cooling in the zone. The
+    /// cooling table needs the conditions of §17.3.2e.
+    #[serde(rename_all = "camelCase")]
+    Full {
+        #[serde(default)]
+        cooling_conditions_met: bool,
+    },
+    /// "Constante overstek en één of meer (zij)belemmering(en)" (g with an
+    /// overhang).
+    #[serde(rename_all = "camelCase")]
+    OverhangWithObstructions { overhang_relative_height: f64 },
+    /// "Overige belemmering" (g).
+    Other,
+    /// "Zijbelemmering" (d): detailed survey only.
+    #[serde(rename_all = "camelCase")]
+    SideObstruction {
+        side: crate::solar_shading::ObstructionSide,
+        relative_width: f64,
+    },
+}
+
+impl ShadingSituation {
+    /// Whether tables 8.24/8.25 allow the situation in the basic survey.
+    fn allowed(&self, facade: bool, cooling: bool) -> bool {
+        match self {
+            Self::Minimal | Self::Other => true,
+            Self::ConstantOverhang { .. } | Self::OverhangWithObstructions { .. } => facade,
+            Self::ConstantHeightObstruction { .. } => facade && cooling,
+            Self::Full { .. } => cooling,
+            Self::SideObstruction { .. } => false,
+        }
+    }
+
+    /// The kernel `obstruction` of the window.
+    fn kernel_value(&self) -> Value {
+        match self {
+            Self::Minimal => json!({"method": "minimal"}),
+            Self::ConstantHeightObstruction { relative_height } => {
+                json!({"method": "parallel_obstruction", "relativeHeight": relative_height})
+            }
+            Self::ConstantOverhang { relative_height } => {
+                json!({"method": "overhang", "relativeHeight": relative_height})
+            }
+            Self::Full {
+                cooling_conditions_met,
+            } => json!({"method": "full", "coolingConditionsMet": cooling_conditions_met}),
+            Self::OverhangWithObstructions {
+                overhang_relative_height,
+            } => json!({"method": "other", "overhangRelativeHeight": overhang_relative_height}),
+            Self::Other => json!({"method": "other"}),
+            Self::SideObstruction {
+                side,
+                relative_width,
+            } => {
+                json!({"method": "side_obstruction", "side": side, "relativeWidth": relative_width})
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -455,10 +536,22 @@ fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
     }
 }
 
-/// Translate the envelope; issues are pushed as (code, path).
+/// Translate the envelope without cooling in the zone; issues are pushed as
+/// (code, path).
 pub fn derive_envelope(
     envelope: &SurveyEnvelope,
     construction_year: i32,
+    recorder: &mut Recorder,
+) -> DerivedEnvelope {
+    derive_envelope_with_cooling(envelope, construction_year, false, recorder)
+}
+
+/// Translate the envelope; `cooling_in_zone` selects the rows of tables
+/// 8.24/8.25 for the shading situations.
+pub fn derive_envelope_with_cooling(
+    envelope: &SurveyEnvelope,
+    construction_year: i32,
+    cooling_in_zone: bool,
     recorder: &mut Recorder,
 ) -> DerivedEnvelope {
     let mut opaque: Vec<OpaquePart> = Vec::new();
@@ -514,6 +607,13 @@ pub fn derive_envelope(
             let row = glass_row(window.glass, recorder, &w_path);
             let frame = frame_group(window.frame, recorder, &w_path);
             let u = forfait_window_u(row, frame, exterior);
+            let obstruction = window_obstruction(
+                window,
+                surface.element == SurfaceElement::Facade,
+                cooling_in_zone,
+                recorder,
+                &w_path,
+            );
             push_window_or_partition(
                 &mut windows,
                 &mut partitions,
@@ -525,7 +625,7 @@ pub fn derive_envelope(
                     g: glass_g(row),
                     orientation,
                     tilt,
-                    obstruction: obstruction(window.obstruction.as_ref()),
+                    obstruction,
                     solar,
                     reference: window.source_reference.clone(),
                 },
@@ -1042,6 +1142,33 @@ pub fn derive_envelope(
     }
 }
 
+/// Kernel obstruction of a survey window: declared factors, a situation of
+/// tables 8.24/8.25 (82.1 p. 103, 75.1 p. 105) or minimal obstruction.
+fn window_obstruction(
+    window: &SurveyWindow,
+    facade: bool,
+    cooling_in_zone: bool,
+    recorder: &mut Recorder,
+    path: &str,
+) -> Value {
+    match (&window.obstruction, &window.shading) {
+        (Some(_), Some(_)) => {
+            recorder.issue("window_obstruction_conflict", format!("{path}.shading"));
+            obstruction(None)
+        }
+        (declared, None) => obstruction(declared.as_ref()),
+        (None, Some(situation)) => {
+            if !situation.allowed(facade, cooling_in_zone) {
+                recorder.issue(
+                    "shading_situation_not_in_basic_survey",
+                    format!("{path}.shading.situation"),
+                );
+            }
+            situation.kernel_value()
+        }
+    }
+}
+
 fn obstruction(declared: Option<&DeclaredObstruction>) -> Value {
     match declared {
         Some(item) => json!({
@@ -1166,6 +1293,7 @@ mod tests {
                 glass: GlassAnswer::Hr,
                 frame: FrameAnswer::WoodOrPlastic,
                 obstruction: None,
+                shading: None,
                 source_reference: "survey".into(),
             }],
             doors: vec![SurveyDoor {
@@ -1217,6 +1345,106 @@ mod tests {
     }
 
     #[test]
+    fn shading_situations_follow_tables_8_24_and_8_25() {
+        let envelope = |shading: Option<ShadingSituation>, element| SurveyEnvelope {
+            surfaces: vec![surface("vlak", element, SurfaceBoundary::Outdoor)],
+            windows: vec![SurveyWindow {
+                id: "raam".into(),
+                surface_id: "vlak".into(),
+                area_m2: 2.0,
+                glass: GlassAnswer::Hr,
+                frame: FrameAnswer::WoodOrPlastic,
+                obstruction: None,
+                shading,
+                source_reference: "survey".into(),
+            }],
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+        };
+        let run = |shading, element, cooling| {
+            let mut recorder = Recorder::default();
+            let derived = derive_envelope_with_cooling(
+                &envelope(shading, element),
+                1975,
+                cooling,
+                &mut recorder,
+            );
+            let codes: Vec<&str> = recorder.issues.iter().map(|item| item.code).collect();
+            (derived.windows[0]["obstruction"].clone(), codes)
+        };
+        // A balcony above a façade window: situation c, h_o;⊥.
+        let (balcony, codes) = run(
+            Some(ShadingSituation::ConstantOverhang {
+                relative_height: 0.6,
+            }),
+            SurfaceElement::Facade,
+            false,
+        );
+        assert!(codes.is_empty());
+        assert_eq!(
+            balcony,
+            json!({"method": "overhang", "relativeHeight": 0.6})
+        );
+        // A gallery with side walls: situation g with the overhang.
+        let (gallery, _) = run(
+            Some(ShadingSituation::OverhangWithObstructions {
+                overhang_relative_height: 0.4,
+            }),
+            SurfaceElement::Facade,
+            false,
+        );
+        assert_eq!(
+            gallery,
+            json!({"method": "other", "overhangRelativeHeight": 0.4})
+        );
+        // Constant-height obstruction and full obstruction need cooling in
+        // the zone; roofs allow no overhang; side obstructions need the
+        // detailed survey.
+        let constant = || {
+            Some(ShadingSituation::ConstantHeightObstruction {
+                relative_height: 0.8,
+            })
+        };
+        assert_eq!(
+            run(constant(), SurfaceElement::Facade, false).1,
+            vec!["shading_situation_not_in_basic_survey"]
+        );
+        assert!(run(constant(), SurfaceElement::Facade, true).1.is_empty());
+        let full = || {
+            Some(ShadingSituation::Full {
+                cooling_conditions_met: false,
+            })
+        };
+        assert!(run(full(), SurfaceElement::Roof, true).1.is_empty());
+        assert!(!run(full(), SurfaceElement::Roof, false).1.is_empty());
+        assert!(!run(
+            Some(ShadingSituation::ConstantOverhang {
+                relative_height: 0.6
+            }),
+            SurfaceElement::Roof,
+            true
+        )
+        .1
+        .is_empty());
+        assert!(!run(
+            Some(ShadingSituation::SideObstruction {
+                side: crate::solar_shading::ObstructionSide::Left,
+                relative_width: 0.5,
+            }),
+            SurfaceElement::Facade,
+            true
+        )
+        .1
+        .is_empty());
+        assert!(
+            run(Some(ShadingSituation::Other), SurfaceElement::Roof, false)
+                .1
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn strongly_ventilated_garage_loses_like_outdoor_without_sun() {
         let envelope = SurveyEnvelope {
             surfaces: vec![
@@ -1234,6 +1462,7 @@ mod tests {
                 glass: GlassAnswer::Double,
                 frame: FrameAnswer::WoodOrPlastic,
                 obstruction: None,
+                shading: None,
                 source_reference: "survey".into(),
             }],
             doors: Vec::new(),

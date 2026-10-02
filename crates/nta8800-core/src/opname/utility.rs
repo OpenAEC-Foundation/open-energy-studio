@@ -20,7 +20,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::envelope::{derive_envelope, SurveyEnvelope};
+use super::envelope::{derive_envelope_with_cooling, SurveyEnvelope};
 use super::general::{infiltration_year, thermal_mass, Construction, Renovation};
 use super::heating::{derive_heating, SurveyHeating};
 use super::hot_water::{
@@ -2068,7 +2068,8 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     let airtightness = utility_airtightness(&survey.building_type, recorder);
     let infiltration = infiltration_year(year, survey.renovation.as_ref(), recorder);
     let (floor, wall, ceiling) = thermal_mass(&survey.construction);
-    let mut envelope = derive_envelope(&survey.envelope, year, recorder);
+    let mut envelope =
+        derive_envelope_with_cooling(&survey.envelope, year, survey.cooling.is_some(), recorder);
     for window in envelope.windows.iter_mut() {
         let id = window["id"].as_str().unwrap_or_default().to_string();
         if survey.solar_control_window_ids.contains(&id) {

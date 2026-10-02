@@ -34,7 +34,7 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | Deuren en panelen | Een deur met minder dan 65 % glas wordt gesplitst in een raam- en een deurdeel. Is niet vast te stellen of de deur geïsoleerd is, dan geldt ongeïsoleerd. Panelen volgen tabel 8.18–8.21 | p. 70, 95–97 |
 | Koudebruggen | Forfaitair voor de hele woning: ΔU_for (NTA 8.2/8.3) op alle buitenvlakken; vloeren op grond krijgen 0,5·P | p. 79 |
 | Aangrenzende onverwarmde ruimten | H_ue = 5·A (NTA I.8) en b_U = H_ue/(H_ue + H_iu) | NTA I.2.4, 8.4.1 |
-| Belemmering | De adviseur bepaalt de situatie per raam. Zonder opgegeven factoren geldt "minimale belemmering" | p. 102–103 (tabel 8.24/8.25) |
+| Belemmering | De adviseur kiest per raam een situatie (`shading`). Zonder situatie of opgegeven factoren geldt "minimale belemmering" | 82.1 p. 103 en 75.1 p. 105 (tabel 8.24/8.25), NTA §17.3.2 |
 | Vloeren naar buitenlucht | Rij "daken en vloeren grenzend aan de buitenlucht" van tabel 8.9/8.10, R_si 0,17. Een plafond naar een onverwarmde zolder (AOR) is een zoldervloer (`attic_floor`: vloerrij, R_si 0,10) | p. 88–90; NTA I.4 |
 | Thermokussens | R_c 1,95, ongeacht het antwoord over isolatie | p. 93; WD p. 37 |
 | Rieten daken en gevels | Riet gemeten aan de onderzijde min 35 mm, afgerond op 50 mm. Zonder (of onbekende) isolatie tabel 8.12 (d/0,105). Met isolatie formule 8.5 (d_iso/0,045 + d_riet/0,105), 40 mm bij onbekende dikte | p. 92 (afb. 8.16) |
@@ -63,7 +63,6 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 - Koeling: geeft de fout `cooling_not_supported_in_basisopname`.
 - Collectieve installaties, WKK, zonneboilers en meerdere opwekkers.
 - Serres (AOS), daklichten en woonboten/woonwagens.
-- Situaties van overstekken, balkons en galerijen (tabel 8.24/8.25): de kern kent nog alleen "minimale belemmering" en opgegeven maandfactoren (§17.3-tabellen ontbreken).
 - Het nominale vermogen van een tapwaterwarmtepomp (§13.3.2.5): de kern toetst de capaciteit van tapwatertoestellen (13.8.2) nog niet.
 - Een afvoerluchtwarmtepomp: die vraagt een tweede opwekker (WD p. 43), en de opname kent één opwekker.
 - Detailopname-routes en kwaliteitsverklaringen. De uitzondering is een gemeten q_v10.
@@ -167,3 +166,21 @@ BRL 9500 §4.2.2 en bijlage 3 vragen een onderbouwing wanneer de adviseur terugv
 - De uitvoer zet die reden als `inklapReden` bij de bijbehorende `appliedDefaults`.
 - Een sleutel zonder bijbehorende standaardwaarde geeft de waarschuwing `collapse_reason_unmatched`.
 - De dossierchecklist markeert toegepaste standaardwaarden zonder reden als ontbrekend.
+
+## Beschaduwingssituaties (tabel 8.24/8.25)
+
+`windows[].shading.situation` volgt de situaties van tabel 8.24 (gevels) en tabel 8.25 (daken), te vinden in 82.1 op p. 103 en in 75.1 op p. 105. De kern rekent ze om naar NTA §17.3.2:
+
+| Situatie ISSO | `situation` | Kern (`obstruction.method`) | Toegestaan in de basisopname |
+|---|---|---|---|
+| Minimale belemmering | `minimal` | `minimal` (a) | altijd |
+| Belemmering met constante hoogte | `constant_height_obstruction` (h_b;⊥) | `parallel_obstruction` (b) | gevel, met koeling in de rekenzone |
+| Constante overstek (balkon, galerij) | `constant_overhang` (h_o;⊥) | `overhang` (c) | gevel |
+| Volledige belemmering | `full` | `full` (e) | met koeling in de rekenzone |
+| Constante overstek en één of meer (zij)belemmering(en) | `overhang_with_obstructions` (h_o;⊥) | `other` met overstek (g) | gevel |
+| Overige belemmering | `other` | `other` (g) | altijd |
+| Zijbelemmering | `side_obstruction` | `side_obstruction` (d) | alleen detailopname |
+
+- Een situatie die niet is toegestaan geeft `shading_situation_not_in_basic_survey`. Opgegeven maandfactoren (`obstruction`) samen met `shading` geven `window_obstruction_conflict`.
+- De woningopname kent geen koeling, dus daar is altijd de rij "zonder koeling" van toepassing. De utiliteitsopname gebruikt de rij "met koeling" zodra `cooling` is ingevuld.
+- Bij volledige belemmering geldt de koudetabel 17.14 alleen met `coolingConditionsMet`. Zonder dat veld rekent de kern conservatief met 1,00.

@@ -19,7 +19,7 @@
 use crate::climate::{irradiance_w_per_m2, Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::domestic_hot_water::{StorageLabel, StorageLoss};
 use crate::significant_figures::{round_down, round_up};
-use crate::solar_shading::{obstruction_factor, Balance, Obstruction};
+use crate::solar_shading::{collector_obstruction_factor, CollectorObstruction as Obstruction};
 use serde::{Deserialize, Serialize};
 
 /// 13.66: `f_prac;sol`.
@@ -401,16 +401,18 @@ fn positive(value: f64) -> bool {
 
 fn obstruction_issue(obstruction: &Obstruction) -> bool {
     match obstruction {
-        Obstruction::Minimal => false,
         Obstruction::Declared {
-            heating,
+            factors,
             source_reference,
-            ..
         } => {
-            heating.len() != 12
-                || heating.iter().any(|value| !(0.0..=1.0).contains(value))
+            factors.len() != 12
+                || factors.iter().any(|value| !(0.0..=1.0).contains(value))
                 || source_reference.trim().is_empty()
         }
+        // The geometric situations are checked by evaluating them.
+        other => (1..=12).any(|month| {
+            collector_obstruction_factor(other, Orientation::South, 45.0, month).is_none()
+        }),
     }
 }
 
@@ -628,8 +630,8 @@ fn plane(orientation: Orientation, tilt_deg: f64, obstruction: &Obstruction) -> 
         let month = index as u8 + 1;
         (
             irradiance_w_per_m2(orientation, tilt_deg, month).unwrap_or(0.0),
-            obstruction_factor(obstruction, orientation, tilt_deg, month, Balance::Heating)
-                .unwrap_or(1.0),
+            // §17.3 collector tables 17.6/17.12/17.15.
+            collector_obstruction_factor(obstruction, orientation, tilt_deg, month).unwrap_or(1.0),
         )
     })
 }
@@ -984,14 +986,9 @@ mod tests {
                 / 200_000.0)
                 .clamp(0.0, 18.0);
         let irradiance = irradiance_w_per_m2(Orientation::South, 45.0, 7).unwrap();
-        let shading = obstruction_factor(
-            &Obstruction::Minimal,
-            Orientation::South,
-            45.0,
-            7,
-            Balance::Heating,
-        )
-        .unwrap();
+        let shading =
+            collector_obstruction_factor(&Obstruction::Minimal, Orientation::South, 45.0, 7)
+                .unwrap();
         let y = area * 0.94 * 0.8 * eta_loop * irradiance * shading * hours / 200_000.0;
         let first = 1.08
             * (1.029 * y - 0.065 * x - 0.245 * y * y + 0.0018 * x * x + 0.0215 * y.powi(3))
@@ -1063,8 +1060,7 @@ mod tests {
         ];
         let use_kwh = [2000.0 / 12.0; 12];
         let open = Obstruction::Declared {
-            heating: vec![1.0; 12],
-            cooling: vec![1.0; 12],
+            factors: vec![1.0; 12],
             source_reference: "free horizon".into(),
         };
         let months = tested_water(

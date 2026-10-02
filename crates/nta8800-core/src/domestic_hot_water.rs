@@ -2993,7 +2993,7 @@ mod tests {
                     module_count: 2,
                     orientation: crate::climate::Orientation::South,
                     tilt_deg: 45.0,
-                    obstruction: crate::solar_shading::Obstruction::Minimal,
+                    obstruction: crate::solar_shading::CollectorObstruction::Minimal,
                     efficiency: CollectorEfficiency::Forfait {
                         collector: CollectorType::Glazed,
                     },
@@ -3122,7 +3122,7 @@ mod tests {
             solar_type: SolarType::Preheater,
             orientation: crate::climate::Orientation::South,
             tilt_deg: 45.0,
-            obstruction: crate::solar_shading::Obstruction::Minimal,
+            obstruction: crate::solar_shading::CollectorObstruction::Minimal,
             total_volume_l: 150.0,
             test_points: vec![
                 SolarTestPoint {
