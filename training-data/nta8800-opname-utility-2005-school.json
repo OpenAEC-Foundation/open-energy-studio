@@ -1,0 +1,58 @@
+{
+  "id": "synthetisch-2005-school",
+  "constructionYear": 2005,
+  "buildingType": {"kind": "single_layer", "position": "detached", "roof": "flat"},
+  "functions": [{"function": "education", "areaM2": 2400.0}],
+  "areaSourceReference": "synthetic: NEN 2580 measurement from drawings",
+  "buildingHeightM": 4.5,
+  "construction": {"floor": "heavy", "wall": "heavy", "lighterCeiling": false, "sourceReference": "synthetic: concrete floor, sand-lime walls"},
+  "envelope": {
+    "surfaces": [
+      {"id": "gevel-zuid", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 270.0, "orientation": "south", "cavity": true, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-noord", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 270.0, "orientation": "north", "cavity": true, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-oost", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 180.0, "orientation": "east", "cavity": true, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-west", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 180.0, "orientation": "west", "cavity": true, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "dak", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 2400.0, "cavity": false, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "vloer", "element": "floor", "boundary": {"kind": "crawlspace"}, "grossAreaM2": 2400.0, "cavity": false, "insulation": {"kind": "present_unknown_thickness"}, "exposedPerimeterM": 200.0, "sourceReference": "synthetic survey"}
+    ],
+    "windows": [
+      {"id": "ramen-zuid", "surfaceId": "gevel-zuid", "areaM2": 110.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey: spacer marking"},
+      {"id": "ramen-noord", "surfaceId": "gevel-noord", "areaM2": 110.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"},
+      {"id": "ramen-oost", "surfaceId": "gevel-oost", "areaM2": 40.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"},
+      {"id": "ramen-west", "surfaceId": "gevel-west", "areaM2": 40.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"}
+    ],
+    "doors": [
+      {"id": "hoofdingang", "surfaceId": "gevel-noord", "areaM2": 5.0, "insulated": true, "frame": "metal_with_thermal_break", "sourceReference": "synthetic survey"}
+    ]
+  },
+  "heating": {
+    "generator": {"kind": "boiler", "boilerType": "hr107", "pilotFlame": false, "insideThermalBoundary": false, "installationYear": 2005},
+    "emitters": "radiators",
+    "control": "central_with_radiator_valves",
+    "sourceReference": "synthetic survey: type plate"
+  },
+  "heatingInstallation": {"collective": true, "capacityKw": 200.0},
+  "ventilation": {
+    "principle": "mechanical_extract",
+    "selfRegulatingVents": true,
+    "installationYear": 2005,
+    "ductsLukaAbc": false,
+    "sourceReference": "synthetic survey: roof fans"
+  },
+  "hotWater": {
+    "generator": {"kind": "none"},
+    "meanDrawOffLengthM": 2.0,
+    "circulation": false,
+    "showerHeatRecovery": "none",
+    "sourceReference": "synthetic survey: cold taps only"
+  },
+  "lighting": [
+    {"id": "lokalen", "areaM2": 1800.0, "power": {"method": "luminaires", "luminaires": [{"count": 540, "powerW": 58.0}]}, "presence": "sensors_type_unknown", "daylight": "unknown", "sourceReference": "synthetic survey: luminaire data sheet"},
+    {"id": "gangen", "areaM2": 600.0, "power": {"method": "luminaires", "luminaires": [{"count": 100, "powerW": 40.0}]}, "presence": "room_switch", "sourceReference": "synthetic survey"}
+  ],
+  "pv": [
+    {"id": "pv-dak", "panelAreaM2": 300.0, "moduleType": "unknown", "azimuthDeg": 180.0, "tiltDeg": 15.0, "mounting": "unknown", "sourceReference": "synthetic survey"}
+  ],
+  "bacs": {"systemPowerKw": 200.0},
+  "sourceReference": "synthetic fixture, not a real building"
+}

@@ -51,6 +51,12 @@ struct ResidentialSurveyArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct UtilitySurveyArgs {
+    /// ISSO 75.1 basic survey of one existing utility building: use functions with areas, building type, envelope, heating installation, cooling, ventilation with AHU, recirculation and flow control, humidification, hot water, lighting zones, PV and BACS, with "unknown" options.
+    survey: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct VentilationArgs {
     /// One zone: use functions, height, system variant (table 11.5), heat recovery, infiltration, combustion appliances, ventilative cooling openings and fans, with source references.
     input: Value,
@@ -623,6 +629,29 @@ impl EnergyMcp {
             )]),
             Ok(survey) => {
                 let result = nta8800_core::opname::assess_residential_survey(&survey);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "calculated_unverified" {
+                    CallToolResult::success(vec![content])
+                } else {
+                    CallToolResult::error(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Translate an ISSO 75.1 basic survey (basisopname) of an existing utility building into NTA 8800 kernel input (one calculation zone; other functions up to 25 % merged), list every applied default with its ISSO page, and calculate the unverified building performance and indicative label"
+    )]
+    fn assess_utility_survey(
+        &self,
+        Parameters(args): Parameters<UtilitySurveyArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::opname::utility::UtilitySurvey>(args.survey) {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_survey_shape", "message":message.to_string()}).to_string(),
+            )]),
+            Ok(survey) => {
+                let result = nta8800_core::opname::utility::assess_utility_survey(&survey);
                 let content = ContentBlock::text(json!(result).to_string());
                 if result.status == "calculated_unverified" {
                     CallToolResult::success(vec![content])

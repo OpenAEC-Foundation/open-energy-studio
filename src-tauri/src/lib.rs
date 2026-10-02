@@ -135,6 +135,13 @@ fn assess_residential_survey(
 }
 
 #[tauri::command]
+fn assess_utility_survey(
+    survey: nta8800_core::opname::utility::UtilitySurvey,
+) -> nta8800_core::opname::OpnameAssessment {
+    nta8800_core::opname::utility::assess_utility_survey(&survey)
+}
+
+#[tauri::command]
 fn calculate_ventilation(
     input: nta8800_core::ventilation::VentilationInput,
 ) -> nta8800_core::ventilation::VentilationAssessment {
@@ -509,6 +516,7 @@ pub fn run() {
             calculate_space_heating_chain,
             calculate_ventilation,
             assess_residential_survey,
+            assess_utility_survey,
             calculate_constructions,
             calculate_building_performance,
             calculate_project_performance,

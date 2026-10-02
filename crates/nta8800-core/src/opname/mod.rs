@@ -20,6 +20,7 @@ pub mod general;
 pub mod heating;
 pub mod hot_water;
 pub mod production;
+pub mod utility;
 pub mod ventilation;
 
 use serde::{Deserialize, Serialize};
@@ -198,7 +199,7 @@ fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
 }
 
 /// A_ls with f_ls of NTA 6.7.3 from the survey surfaces (gross areas).
-fn loss_area(envelope: &SurveyEnvelope) -> f64 {
+pub(crate) fn loss_area(envelope: &SurveyEnvelope) -> f64 {
     envelope
         .surfaces
         .iter()
