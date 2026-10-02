@@ -67,8 +67,6 @@ use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
     "9.2.3 node gains from solar thermal systems, AHU, booster heat pumps and delivery sets",
-    "12.2.1 recoverable losses of steam humidifiers (Q_H;hum;rbl) are reported, not fed back into the need",
-    "9.21 emission fan energy for fan-assisted emitters",
     "more than two generators, product-specific hybrid switching and domestic hot water priority",
     "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
@@ -1711,10 +1709,43 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
                         .map(|zone| (&zone.demand, &zone.emission, &zone.distribution)),
                 )
                 .collect();
+        // Chapter 12: humidifiers per zone.
+        // Q_H;hum;rbl (12.4) of steam humidifiers joins the recoverable
+        // losses of its zone (7.3–7.8).
+        let mut humidification = [[0.0_f64; 3]; 12];
+        let mut humidifier_recoverable = vec![[0.0_f64; 12]; zone_sources.len()];
+        for (h_index, humidifier) in input.humidifiers.iter().enumerate() {
+            let path = format!("humidifiers[{h_index}]");
+            let found = zone_sources
+                .iter()
+                .zip(std::iter::once(&demand).chain(&additional_zone_demands))
+                .enumerate()
+                .find(|(_, ((zone_input, _, _), _))| zone_input.zone_id == humidifier.zone_id);
+            let Some((zone_index, ((zone_input, _, _), zone_demand))) = found else {
+                issues.push(issue("humidifier_zone_unknown", format!("{path}.zoneId")));
+                continue;
+            };
+            if let Some(months) =
+                zone_humidity(humidifier, zone_input, zone_demand, &path, &mut issues)
+            {
+                for (index, month) in months.iter().enumerate() {
+                    humidification[index][0] += month.heating_system_load_kwh;
+                    humidification[index][1] += month.steam_electricity_kwh;
+                    humidification[index][2] += month.steam_fuel_kwh;
+                    humidifier_recoverable[zone_index][index] += month.recoverable_kwh;
+                }
+            }
+        }
         let adjusted: Vec<MonthlyDemandAssessment> = std::iter::once(&demand)
             .chain(&additional_zone_demands)
             .zip(&distribution.zone_recoverable)
-            .map(|(assessed, recoverable)| apply_recoverable_losses(assessed, recoverable, &[]))
+            .zip(&humidifier_recoverable)
+            .map(|((assessed, recoverable), humidifier)| {
+                let total: Vec<f64> = (0..12)
+                    .map(|index| recoverable.get(index).copied().unwrap_or(0.0) + humidifier[index])
+                    .collect();
+                apply_recoverable_losses(assessed, &total, &[])
+            })
             .collect();
         let mut scratch = Vec::new();
         let valid_zones: Vec<ZoneTerms> = zone_sources
@@ -1729,28 +1760,6 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
         let mut adjusted = adjusted.into_iter();
         demand = adjusted.next().expect("primary zone");
         additional_zone_demands = adjusted.collect();
-        // Chapter 12: humidifiers per zone.
-        let mut humidification = [[0.0_f64; 3]; 12];
-        for (h_index, humidifier) in input.humidifiers.iter().enumerate() {
-            let path = format!("humidifiers[{h_index}]");
-            let found = zone_sources
-                .iter()
-                .zip(std::iter::once(&demand).chain(&additional_zone_demands))
-                .find(|((zone_input, _, _), _)| zone_input.zone_id == humidifier.zone_id);
-            let Some(((zone_input, _, _), zone_demand)) = found else {
-                issues.push(issue("humidifier_zone_unknown", format!("{path}.zoneId")));
-                continue;
-            };
-            if let Some(months) =
-                zone_humidity(humidifier, zone_input, zone_demand, &path, &mut issues)
-            {
-                for (index, month) in months.iter().enumerate() {
-                    humidification[index][0] += month.heating_system_load_kwh;
-                    humidification[index][1] += month.steam_electricity_kwh;
-                    humidification[index][2] += month.steam_fuel_kwh;
-                }
-            }
-        }
         // 9.4: reheating coils of air handling units (11.120) also draw on
         // the node.
         let ahu_heating: [f64; 12] = std::array::from_fn(|index| {
@@ -2942,7 +2951,10 @@ mod tests {
             .mechanical_supply_m3_per_h;
         let need = 2538.2 * 1.205 * supply / 3600.0 * 0.82;
         assert!((jan.humidification_electricity_kwh - need / 0.8).abs() < 1e-6);
-        assert!((jan.generator_output_kwh - base.monthly[0].generator_output_kwh).abs() < 1e-9);
+        // 12.4: (1 − η) of the steam humidifier is recoverable (7.3–7.8) and
+        // lowers the heating need.
+        assert!(jan.heating_need_kwh < base.monthly[0].heating_need_kwh);
+        assert!(jan.generator_output_kwh < base.monthly[0].generator_output_kwh);
         input.humidifiers[0].humidification.humidifier = Humidifier::Atomising;
         let atomising = assess_space_heating_chain(&input);
         let jan = &atomising.monthly[0];

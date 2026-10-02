@@ -364,7 +364,7 @@ Via **NTA-invoer starten** opent een gestructureerd formulier met secties die de
 - **Bevochtiging:** `humidifiers` per zone, in de verwarmingsketen (of `ntaCalculation.humidifiers`). Vereist hoofdstuk 11-invoer, want 12.1 gebruikt de mechanische toevoer van de warmtebalans.
   - Een vernevelaar levert zijn latente warmte als last aan het knooppunt van de verwarmingsketen (9.4).
   - Een stoombevochtiger gebruikt elektriciteit (η 0,8) of gas (η 0,6).
-  - Het terugwinbare verlies van stoombevochtiging (12.4) wordt nog niet teruggekoppeld naar de behoefte.
+  - Het terugwinbare verlies van stoombevochtiging (12.4, (1 − η)·Q_hum;nd, nul boven 500 m²) telt per zone mee bij de terugwinbare verliezen van 7.3–7.8, naast die van de distributie, en verlaagt zo de warmtebehoefte.
 
 ## Ventilatoren in de afgifte (9.21/9.22, tabel 9.11)
 
