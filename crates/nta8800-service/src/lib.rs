@@ -214,6 +214,7 @@ pub fn app() -> Router {
         )
         .route("/v1/nta8800/opname/utility", post(assess_utility_survey))
         .route("/v1/nta8800/relabel/assess", post(assess_relabel))
+        .route("/v1/nta8800/maatwerkadvies", post(assess_maatwerkadvies))
         .route(
             "/v1/nta8800/constructions/calculate",
             post(calculate_constructions),
@@ -448,6 +449,29 @@ async fn assess_residential_survey(
         StatusCode::UNPROCESSABLE_ENTITY
     };
     (status, Json(json!(assessment)))
+}
+
+async fn assess_maatwerkadvies(Json(request): Json<Value>) -> (StatusCode, Json<Value>) {
+    let Some(input) = request.get("input").cloned() else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid_request", "message": "missing input" })),
+        );
+    };
+    match nta8800_core::maatwerkadvies::assess_maatwerkadvies_json(input) {
+        Ok(assessment) => {
+            let status = if assessment.status == "invalid" {
+                StatusCode::UNPROCESSABLE_ENTITY
+            } else {
+                StatusCode::OK
+            };
+            (status, Json(json!(assessment)))
+        }
+        Err(message) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid_maatwerkadvies_shape", "message": message })),
+        ),
+    }
 }
 
 async fn assess_relabel(Json(request): Json<RelabelRequest>) -> Json<Value> {
@@ -1352,6 +1376,31 @@ mod tests {
         assert!(!result["appliedDefaults"].as_array().unwrap().is_empty());
         assert_eq!(result["performance"]["status"], "calculated_unverified");
         assert_eq!(result["referenceVerified"], false);
+    }
+
+    #[tokio::test]
+    async fn maatwerkadvies_route_runs_variants() {
+        let building: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-building-performance-synthetic.json"
+        ))
+        .unwrap();
+        let input = json!({
+            "base": {"kind": "building", "input": building},
+            "measures": [{
+                "id": "m1", "name": "test", "category": "other", "target": "building",
+                "patch": [{"op": "replace", "path": "/areaSourceReference", "value": "x"}],
+                "investmentEur": 100.0, "costSource": "offerte", "lifetimeYears": 10.0
+            }],
+            "packages": [{"id": "p1", "name": "Pakket", "measureIds": ["m1"]}],
+            "tariffs": {"gasEurPerM3": 1.4, "electricityEurPerKwh": 0.3, "sourceReference": "test"}
+        });
+        let (status, result) =
+            post_json("/v1/nta8800/maatwerkadvies", json!({ "input": input })).await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["status"], "calculated_unverified");
+        assert_eq!(result["packages"][0]["id"], "p1");
+        let (status, _) = post_json("/v1/nta8800/maatwerkadvies", json!({ "input": {} })).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

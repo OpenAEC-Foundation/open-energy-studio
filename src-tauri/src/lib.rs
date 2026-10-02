@@ -142,6 +142,13 @@ fn assess_utility_survey(
 }
 
 #[tauri::command]
+fn assess_maatwerkadvies(
+    input: serde_json::Value,
+) -> Result<nta8800_core::maatwerkadvies::MaatwerkadviesAssessment, String> {
+    nta8800_core::maatwerkadvies::assess_maatwerkadvies_json(input)
+}
+
+#[tauri::command]
 fn assess_relabel(
     original: serde_json::Value,
     current: serde_json::Value,
@@ -526,6 +533,7 @@ pub fn run() {
             assess_residential_survey,
             assess_utility_survey,
             assess_relabel,
+            assess_maatwerkadvies,
             calculate_constructions,
             calculate_building_performance,
             calculate_project_performance,

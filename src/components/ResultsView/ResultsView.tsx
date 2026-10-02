@@ -6,6 +6,8 @@ import { MonthlyBreakdownChart } from '../MonthlyBreakdownChart/MonthlyBreakdown
 import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
+import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import type { IBENGResultMonthly } from '../../core/energy/types';
 import './ResultsView.css';
 
@@ -61,6 +63,8 @@ export function ResultsView() {
       <CalculationNotice />
       <KernelAuditPanel project={project} />
       <NtaPerformancePanel />
+      <MaatwerkadviesPanel />
+      <RelabelPanel />
 
       <div className="beng-cards">
         <BENGIndicator

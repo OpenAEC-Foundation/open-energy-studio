@@ -1,4 +1,4 @@
-import type { NtaCalculationInput, NtaRegistration } from '../nta/KernelClient';
+import type { NtaCalculationInput, NtaMaatwerkadvies, NtaRegistration } from '../nta/KernelClient';
 // ============================================================
 // Open Energy Studio – BENG Data Model (NTA 8800)
 // ============================================================
@@ -333,6 +333,8 @@ export interface IProject {
   ntaCalculation?: NtaCalculationInput;
   /** Registration data of the EP report (BRL 9500 §4.2.5); part of the input fingerprint. */
   registration?: NtaRegistration;
+  /** Maatwerkadvies definition (BRL 9500-MWA); not part of the label fingerprint. */
+  maatwerkadvies?: NtaMaatwerkadvies;
 }
 
 // ------------------------------------------------------------

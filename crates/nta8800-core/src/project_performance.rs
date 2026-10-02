@@ -379,7 +379,18 @@ fn orientation(value: &str) -> Option<Option<Orientation>> {
 }
 
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
-    let fingerprint = input_fingerprint(project_value);
+    // The maatwerkadvies definition (measures, tariffs) does not change the
+    // energy performance and stays out of the fingerprint.
+    let fingerprint = match project_value.get("maatwerkadvies") {
+        Some(_) => {
+            let mut stripped = project_value.clone();
+            if let Some(map) = stripped.as_object_mut() {
+                map.remove("maatwerkadvies");
+            }
+            input_fingerprint(&stripped)
+        }
+        None => input_fingerprint(project_value),
+    };
     let mut gaps = Vec::new();
     let derived = derive_input(project_value, &mut gaps);
     let performance = derived.as_ref().map(assess_building_performance);
@@ -662,6 +673,7 @@ fn derive_input(
         };
         let Some(direct) = direct else { continue };
         let demand = MonthlyDemandInput {
+            usage_fit: None,
             zone_id: zone.id.clone(),
             usable_floor_area_m2: zone.floor_area,
             area_source_reference: nta.area_source_reference.clone(),
@@ -738,6 +750,7 @@ fn derive_input(
     }
     let primary = zones.remove(0);
     Some(BuildingPerformanceInput {
+        hot_water_need_fit: None,
         calculation_scope: nta.calculation_scope,
         total_usable_floor_area_m2: total_area,
         area_source_reference: nta.area_source_reference,

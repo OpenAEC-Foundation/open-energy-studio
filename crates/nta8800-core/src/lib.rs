@@ -56,6 +56,7 @@ pub mod indicators_draft;
 pub mod label_class;
 pub mod label_data;
 pub mod lighting;
+pub mod maatwerkadvies;
 pub mod materials;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;

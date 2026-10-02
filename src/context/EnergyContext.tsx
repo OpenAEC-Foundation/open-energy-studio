@@ -48,6 +48,7 @@ export type EnergyAction =
   | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city' | 'registration'>> }
   | { type: 'SET_UNHEATED_SPACES'; payload: NonNullable<IProject['unheatedSpaces']> }
   | { type: 'SET_NTA_CALCULATION'; payload: IProject['ntaCalculation'] }
+  | { type: 'SET_MAATWERKADVIES'; payload: IProject['maatwerkadvies'] }
   // Zones
   | { type: 'ADD_ZONE'; payload: IZone }
   | { type: 'UPDATE_ZONE'; payload: { id: string; data: Partial<IZone> } }
@@ -415,6 +416,9 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
 
     case 'SET_NTA_CALCULATION':
       return { ...state, project: { ...state.project, ntaCalculation: action.payload }, isDirty: true };
+
+    case 'SET_MAATWERKADVIES':
+      return { ...state, project: { ...state.project, maatwerkadvies: action.payload }, isDirty: true };
 
     // ----------------------------------------------------------
     // Zones
