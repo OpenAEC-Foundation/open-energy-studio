@@ -10,7 +10,7 @@
 //! All results are unverified.
 
 use crate::annex_m::{
-    boiler_month, validate_product_boiler, BoilerFuel, BoilerMonth, ProductBoiler,
+    boiler_month, validate_product_boiler, BoilerFuel, BoilerMonth, BoilerPlacement, ProductBoiler,
 };
 use crate::annex_n::{
     heater_month, resolve_heater, validate_local_heater, HeaterMonth, LocalHeater,
@@ -71,7 +71,16 @@ pub const OMITTED_TERMS: &[&str] = &[
     "9.21 emission fan energy for fan-assisted emitters",
     "more than two generators, product-specific hybrid switching and domestic hot water priority",
     "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
+    "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
+    "annex Q: W_H;aux;hp;an is not booked again as 9.6.3.2 auxiliary energy, because Q.4 already includes it in η_H;gen;hp (COP of 9.63)",
+    "annex Q: F_H;gen = 1 (Q.1) is taken as met when every bin of table Q.6 is fully covered; the rounded table hours sum to 277,757 instead of 277,778",
+    "annex Q: V.1 hot-water term not needed, because c_source is not applied to method 1",
+    "annex N: E_H;gen;in converted to the gross calorific value (N.3) with f_Hs/Hi of table M.3 (biomass as wood 1,08)",
+    "annex M: ϑ_brm (M.12) from 9.4.2: heating setpoint for a heated space, ϑ_ztu of the distribution system for an installation room; table M.6 otherwise",
 ];
+
+/// 9.63 `f_prac` for heat pumps with annex Q data (method 1).
+pub const ANNEX_Q_PRACTICE_FACTOR: f64 = 0.95;
 
 /// 9.85 forfait constants for individual electric heat pumps (page 360).
 pub const HEAT_PUMP_AUX_A_KWH: f64 = 43.8;
@@ -304,6 +313,17 @@ pub enum LocalHeaterFuel {
     Oil,
     /// Solid biomass or wood pellets (carrier `bm`).
     Biomass,
+}
+
+impl LocalHeaterFuel {
+    /// N.3 `H_s;fuel/H_i;fuel`, taken from table M.3 (biomass as wood).
+    pub fn gross_to_net(self) -> f64 {
+        match self {
+            Self::NaturalGas => BoilerFuel::NaturalGas.gross_to_net(),
+            Self::Oil => BoilerFuel::Oil.gross_to_net(),
+            Self::Biomass => BoilerFuel::Wood.gross_to_net(),
+        }
+    }
 }
 
 /// Annex N heater in the chain.
@@ -1959,11 +1979,14 @@ fn validate_biomass_evidence(
 pub struct AnnexQOutput {
     pub annex_q: AnnexQResult,
     pub demand_class: DemandClass,
-    /// Annex V degree of regeneration, when given.
+    /// Annex V degree of regeneration, when given (reported only).
     pub regeneration_degree: Option<f64>,
-    /// `c_source` (table V.1); 1 without regeneration.
+    /// `c_source`; always 1, because 9.63 (method 1) has no source
+    /// correction.
     pub source_correction: f64,
-    /// `η_H;gen;hp · c_source`.
+    /// 9.63 `f_prac`.
+    pub practice_factor: f64,
+    /// `COP · f_prac` of 9.63: heat-pump output per unit of electricity.
     pub corrected_efficiency: f64,
 }
 
@@ -2048,10 +2071,31 @@ fn generate_annex_q(
             },
         )
     });
-    let correction = regeneration.map_or(1.0, |item| item.correction);
-    let corrected = efficiency * correction;
+    // 9.63: E = Q_out / (COP · f_prac); no c_source for method 1.
+    let correction = 1.0;
+    let corrected = efficiency * ANNEX_Q_PRACTICE_FACTOR;
+    if result
+        .bins
+        .iter()
+        .any(|bin| bin.delivered_kw > 0.0 && !(bin.cop.is_finite() && bin.cop > 0.0))
+    {
+        // Delivered heat needs a positive COP (Q.4).
+        issues.push(issue("annex_q_cop_not_positive", "generator.heatPump"));
+        return None;
+    }
+    // Q.1: the rounded hours of table Q.6 keep F just below 1 even when
+    // every bin is covered; full coverage per bin counts as F = 1.
+    let covers_all_bins = result
+        .bins
+        .iter()
+        .all(|bin| bin.delivered_kw >= bin.demand_kw * (1.0 - 1e-9));
+    let fraction = if covers_all_bins && generator.backup.is_none() {
+        1.0
+    } else {
+        fraction
+    };
     if fraction < 1.0 - 1e-9 && generator.backup.is_none() {
-        // Q.2: without supplementary heating the fraction must be 1.
+        // Q.1: without supplementary heating the fraction must be 1.
         issues.push(issue("annex_q_backup_required", "generator.backup"));
         return None;
     }
@@ -2106,7 +2150,8 @@ fn generate_annex_q(
         let backup = output - pump;
         row.heat_pump_output_kwh = pump;
         row.generator_electricity_kwh = pump / corrected;
-        // Q.1: the source and circulation pumps are in η_H;gen;hp.
+        // Q.4: the source pump is in η_H;gen;hp; 9.6.3.2 W_aux is not
+        // booked a second time (see OMITTED_TERMS).
         let mut auxiliary = 0.0;
         match (&generator.backup, &backup_gas) {
             (Some(AnnexQBackup::ElectricResistance), _) => {
@@ -2125,9 +2170,30 @@ fn generate_annex_q(
         demand_class,
         regeneration_degree: regeneration.map(|item| item.degree),
         source_correction: correction,
+        practice_factor: ANNEX_Q_PRACTICE_FACTOR,
         corrected_efficiency: corrected,
     });
     Some(corrected)
+}
+
+/// M.12 ϑ_brm as ϑ_H,amb of 9.4.2: the heating setpoint (taken for
+/// θ_int;op;H, 7.9.6) in a heated space, ϑ_ztu of the distribution system
+/// (7.82) in an installation room when entered; otherwise table M.6.
+fn boiler_ambient_c(
+    placement: BoilerPlacement,
+    input: &SpaceHeatingChainInput,
+    indoor_c: f64,
+    month: usize,
+) -> Option<f64> {
+    match placement {
+        BoilerPlacement::HeatedSpace => Some(indoor_c),
+        BoilerPlacement::InstallationRoom => input
+            .distribution_system
+            .as_ref()
+            .and_then(|system| system.unheated_ambient_c.as_ref())
+            .and_then(|values| values.get(month).copied()),
+        BoilerPlacement::Outdoors | BoilerPlacement::UnderRoof => None,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2527,6 +2593,12 @@ fn generate(
                         month_hours: MONTH_HOURS[index],
                         return_temperature_c: return_c[index],
                         outdoor_temperature_c: OUTDOOR_TEMPERATURE_C[index],
+                        ambient_temperature_c: boiler_ambient_c(
+                            generator.boiler.placement,
+                            input,
+                            conditions.indoor_c,
+                            index,
+                        ),
                     },
                 );
                 let fuel = result.input_kwh * building_fraction;
@@ -2597,14 +2669,17 @@ fn generate(
                         format!("monthly[{index}]"),
                     ));
                 }
+                // N.3: annex N works on the net calorific value; chapter 5
+                // counts fuel on the gross value (f_Hs/Hi of table M.3).
+                let fuel = result.input_kwh * generator.fuel.gross_to_net();
                 match generator.fuel {
-                    LocalHeaterFuel::NaturalGas => row.natural_gas_kwh = result.input_kwh,
-                    LocalHeaterFuel::Oil => row.oil_kwh = result.input_kwh,
-                    LocalHeaterFuel::Biomass => row.biomass_kwh = result.input_kwh,
+                    LocalHeaterFuel::NaturalGas => row.natural_gas_kwh = fuel,
+                    LocalHeaterFuel::Oil => row.oil_kwh = fuel,
+                    LocalHeaterFuel::Biomass => row.biomass_kwh = fuel,
                 }
                 row.auxiliary_electricity_kwh = Some(result.auxiliary_electricity_kwh);
                 output_total += row.generator_output_kwh;
-                input_total += result.input_kwh;
+                input_total += fuel;
             }
             generation_efficiency = (input_total > 0.0).then(|| output_total / input_total);
         }
@@ -2870,6 +2945,43 @@ mod tests {
     }
 
     #[test]
+    fn annex_q_applies_f_prac_and_accepts_monovalent_full_coverage() {
+        let mut input = annex_q_chain();
+        let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
+            panic!("annex Q generator expected");
+        };
+        generator.backup = None;
+        let power = &mut generator.heat_pump.maximum_power;
+        power.condition1.heating_power_kw *= 10.0;
+        for condition in [&mut power.condition2, &mut power.condition3]
+            .into_iter()
+            .flatten()
+        {
+            condition.heating_power_kw *= 10.0;
+        }
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let details = result.annex_q.as_ref().unwrap();
+        // Table Q.6 rounding keeps the literal F just below 1.
+        assert!(details.annex_q.energy_fraction < 1.0);
+        assert!(details.annex_q.energy_fraction > 0.999);
+        // 9.63: E = Q_out / (COP · 0,95), no c_source.
+        assert_eq!(details.practice_factor, 0.95);
+        assert_eq!(details.source_correction, 1.0);
+        let efficiency = details.annex_q.generation_efficiency;
+        assert!((details.corrected_efficiency - 0.95 * efficiency).abs() < 1e-12);
+        for row in &result.monthly {
+            assert!((row.heat_pump_output_kwh - row.generator_output_kwh).abs() < 1e-9);
+            let expected = row.generator_output_kwh / (0.95 * efficiency);
+            assert!((row.generator_electricity_kwh - expected).abs() < 1e-9);
+        }
+    }
+
+    #[test]
     fn annex_q_without_backup_needs_full_coverage() {
         let mut input = annex_q_chain();
         let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
@@ -3126,6 +3238,8 @@ mod tests {
                     month_hours: MONTH_HOURS[index],
                     return_temperature_c: ret,
                     outdoor_temperature_c: OUTDOOR_TEMPERATURE_C[index],
+                    // 9.4.2: heated space at the setpoint.
+                    ambient_temperature_c: Some(20.0),
                 },
             );
             assert!((row.natural_gas_kwh - expected.input_kwh).abs() < 1e-9);
@@ -3133,6 +3247,24 @@ mod tests {
                 row.auxiliary_electricity_kwh.unwrap() - row.distribution_auxiliary_electricity_kwh;
             assert!((aux - expected.auxiliary_electricity_kwh).abs() < 1e-9);
         }
+        // M.12 in an installation room: ϑ_ztu of the distribution system.
+        let mut room = input.clone();
+        if let Generator::ProductBoiler(generator) = &mut room.generator {
+            generator.boiler.placement = BoilerPlacement::InstallationRoom;
+        }
+        let mut cold = room.clone();
+        cold.distribution_system
+            .as_mut()
+            .unwrap()
+            .unheated_ambient_c = Some(vec![5.0; 12]);
+        let warm_gas = assess_space_heating_chain(&room)
+            .annual_natural_gas_kwh
+            .unwrap();
+        let cold_gas = assess_space_heating_chain(&cold)
+            .annual_natural_gas_kwh
+            .unwrap();
+        // Table M.6 gives 13 °C; 5 °C raises the stand-by loss.
+        assert!(cold_gas > warm_gas);
         // Without a calculated distribution the class must be given.
         input.distribution_system = None;
         assert!(codes(&input).contains(&"distribution_pump_input_required"));
@@ -3204,7 +3336,8 @@ mod tests {
                 outdoor_c: OUTDOOR_TEMPERATURE_C[0],
             },
         );
-        assert!((jan.natural_gas_kwh - expected.input_kwh).abs() < 1e-9);
+        // N.3: gross calorific value with f_Hs/Hi 1,11 (table M.3).
+        assert!((jan.natural_gas_kwh - 1.11 * expected.input_kwh).abs() < 1e-9);
         assert!(jan.natural_gas_kwh > jan.generator_output_kwh);
     }
 

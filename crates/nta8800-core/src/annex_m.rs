@@ -226,6 +226,8 @@ pub struct BoilerMonth {
     /// ϑ_Hc;mn = ϑ_H,out (9.32), °C.
     pub return_temperature_c: f64,
     pub outdoor_temperature_c: f64,
+    /// ϑ_brm (M.12) as ϑ_H,amb of 9.4.2, °C; absent means table M.6.
+    pub ambient_temperature_c: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize)]
@@ -434,7 +436,9 @@ pub fn boiler_month(boiler: &ProductBoiler, month: BoilerMonth) -> BoilerResult 
     // M.9, M.11, M.12.
     let loss_full = load_loss_kw(pn, full, f_hs);
     let loss_int = load_loss_kw(pint, part, f_hs);
-    let ambient = boiler.placement.ambient_c(month.outdoor_temperature_c);
+    let ambient = month
+        .ambient_temperature_c
+        .unwrap_or_else(|| boiler.placement.ambient_c(month.outdoor_temperature_c));
     let ratio = ((mean - ambient) / (product.standby_test_temperature_c - 20.0)).max(0.0);
     let loss_standby =
         pn / (PRACTICE_FACTOR * rated_full) * product.standby_loss_factor * f_hs * ratio.powf(1.25);
@@ -517,6 +521,7 @@ mod tests {
             month_hours: 744.0,
             return_temperature_c: 35.0,
             outdoor_temperature_c: 2.61,
+            ambient_temperature_c: None,
         };
         let result = boiler_month(&boiler, month);
         let out = 1.03 * 1000.0;
@@ -559,6 +564,7 @@ mod tests {
             month_hours: 720.0,
             return_temperature_c: 45.0,
             outdoor_temperature_c: 9.32,
+            ambient_temperature_c: None,
         };
         let result = boiler_month(&boiler, month);
         assert!((result.full_load_efficiency - (0.91 + 0.0004 * 25.0)).abs() < 1e-12);

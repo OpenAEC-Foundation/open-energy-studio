@@ -255,6 +255,28 @@ De zomerventilatie van hoofdstuk 11 moet in de opgegeven ventilatiegeleiding zit
 
 Een `heat_pump_annex_q` telt voor 5.30/5.31 net als een forfaitaire warmtepomp: het omgevingswarmte-aandeel is `Q_hp·(1 − 1/η)` met het bijlage Q-rendement, als `heatPumpRenewable` de bron bevestigt. Een bron met alleen ventilatielucht telt niet. Bij gecombineerde bronnen telt alleen het buitenluchtaandeel (5.32). De bronconsistentie wordt gecontroleerd tegen het bijlage Q-brontype. De bronwarmte telt ook mee in de regeneratietoets van 10.84.
 
+### Herziening na de review van bijlagen Q, M en N (2 oktober 2026)
+
+- **f_prac (9.63, p. 340).** Het elektriciteitsgebruik is `Q_out / (COP · 0,95)`. `practiceFactor` staat in de uitvoer en `correctedEfficiency` is `COP · 0,95`.
+- **Geen c_source bij methode 1.** Formule 9.63 kent geen broncorrectie; c_source (bijlage V) staat alleen in de forfaitaire tabellen 9.27/9.29 en de tapwatertabel. Een opgegeven `regeneration` wordt nog gevalideerd en de regeneratiegraad wordt gerapporteerd, maar `sourceCorrection` is altijd 1. Daardoor is ook de tapwaterterm van V.1 niet nodig.
+- **Hulpenergie bronpomp (9.6.3.2).** Interpretatie: `W_H;aux;hp;an` zit volgens Q.4 al in de noemer van η_H;gen;hp (de COP van 9.63). Een tweede boeking van `W_aux/(12·3,6)` zou de bronpomp dubbel tellen; de kern boekt hem daarom niet opnieuw.
+- **F = 1 zonder bijverwarming (Q.1).** De afgeronde uren van tabel Q.6 sommeren tot 277,757 in plaats van 277,778. Daardoor blijft de letterlijke F net onder 1, ook als de warmtepomp elke bin dekt. Interpretatie: als elke bin volledig is gedekt, geldt F = 1 en is geen bijverwarming nodig. Met bijverwarming blijft de letterlijke F gelden.
+- **COP ≤ 0.** Een bin met geleverde warmte en een COP ≤ 0 (extrapolatie) wordt geweigerd met `annex_q_cop_not_positive`. Voorheen werd die bin stil overgeslagen.
+- **Bijlage N, bovenwaarde (N.3).** Bijlage N rekent op de onderwaarde; hoofdstuk 5 telt brandstof op de calorische bovenwaarde. De keten vermenigvuldigt `E_H;gen;in` met f_Hs/Hi uit tabel M.3: gas 1,11, olie 1,06, biomassa als hout 1,08. Bijlage N geeft zelf geen verhouding.
+- **Bijlage N, maand zonder vraag.** De hulpenergie na de brander (N.29) en in stand-by (N.31) loopt over t_gen door, met t_ON = 0.
+- **Bijlage N, interpretaties.** Deze staan in `annex_n::INTERPRETATIONS`:
+  - N.69 interpoleert de totale verliezen α_ON (N.49/N.50), omdat N.73 de mantelverliezen in de modulatieberekening meeneemt;
+  - N.52 rekent in modulatie met β_cmb;min = 1;
+  - de noemer van N.61 wordt gelezen als 100·(1 + Q_br/Q).
+- **Bijlage M, ϑ_brm (M.12).** De omgevingstemperatuur volgt 9.4.2:
+  - in een verwarmde ruimte het stookpunt (zoals bij de leidingen, voor θ_int;op;H van 7.9.6);
+  - in een installatieruimte ϑ_ztu van het distributiesysteem, als die is ingevoerd;
+  - anders tabel M.6.
+
+Nog open:
+- het terugwinbare verlies van de boosterwarmtepomp (13.164, hoofdstuk 13);
+- de koppeling van de afvoerluchtfuncties van Q.5 aan hoofdstuk 11 (overventilatie, Q.96/Q.97).
+
 ## BENG 1
 
 Volgens §5.4 rekent BENG 1 met een vast ventilatiesysteem C1 (§5.4.3) en, bij utiliteit, met vaste interne warmtelasten (§5.4.2). Als elke zone hoofdstuk 11-invoer heeft (`ventilation`), voert de kern die aparte run zelf uit (`fixedC1` per zone). BENG 1 en `annualHeatingAndCoolingNeedKwh` gebruiken dan de som van die runs. Zonder hoofdstuk 11-invoer verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de opgegeven ventilatie het C1-systeem voorstelt.
