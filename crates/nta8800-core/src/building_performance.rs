@@ -1842,6 +1842,29 @@ mod tests {
     }
 
     #[test]
+    fn annex_p_fixture_resolves_all_carriers() {
+        let supply: ExternalSupply = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-annex-p-synthetic.json"
+        ))
+        .unwrap();
+        let mut sample = input();
+        sample.external_supply = supply;
+        let mut issues = Vec::new();
+        let result = resolve_external(&sample, &mut issues);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert!(result.quality_declaration_used);
+        let heat = result.declared.district_heat;
+        assert!(heat.primary_factor > 0.0 && heat.primary_factor < 0.9);
+        assert!(heat.renewable_factor > 0.5);
+        assert_eq!(result.declared.district_hot_water.primary_factor, 0.55);
+        // EER 20 ≥ 8: fully renewable generator (5.49).
+        let cold = result.cooling.as_ref().unwrap();
+        assert_eq!(cold.generators[0].renewable_factor, 1.0);
+        assert_eq!(result.forfait.district_heat, HEAT_FORFAIT);
+        assert_eq!(result.forfait.district_cold, COLD_FORFAIT);
+    }
+
+    #[test]
     fn annex_p_declaration_gives_two_scenarios() {
         let forfait = assess_building_performance(&external_heat_sample(false));
         let mut sample = external_heat_sample(true);

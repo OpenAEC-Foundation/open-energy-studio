@@ -1,0 +1,71 @@
+{
+  "heating": {
+    "method": "calculated",
+    "function": "heating",
+    "deliveredKwh": 12000000,
+    "distribution": {
+      "method": "flows",
+      "lossKwh": 2400000,
+      "sourceReference": "synthetic: network heat-loss model"
+    },
+    "generators": [
+      {
+        "id": "aquifer-heat-pump",
+        "energyFraction": 0.6,
+        "kind": {
+          "kind": "heat_pump",
+          "efficiency": {
+            "method": "table_p5",
+            "source": "electric_groundwater_below15_c",
+            "supplyTemperatureC": 70
+          },
+          "drive": { "kind": "electricity", "directRenewableShare": 0.2 }
+        }
+      },
+      {
+        "id": "geothermal",
+        "energyFraction": 0.25,
+        "kind": { "kind": "geothermal", "sourceTemperatureC": 75, "returnTemperatureC": 40 }
+      },
+      {
+        "id": "peak-boiler",
+        "energyFraction": 0.15,
+        "kind": {
+          "kind": "combustion",
+          "carrier": { "kind": "natural_gas" },
+          "efficiency": 0.9,
+          "efficiencyReference": "synthetic: type test"
+        }
+      }
+    ],
+    "auxiliaryElectricityKwh": 180000,
+    "auxiliaryRenewableShare": 0,
+    "sourceReference": "synthetic fixture, not a real network"
+  },
+  "hotWater": {
+    "method": "declared",
+    "primaryFactor": 0.55,
+    "renewableFactor": 0.4,
+    "co2KgPerKwh": 0.08,
+    "declarationReference": "synthetic: EMG declaration"
+  },
+  "cooling": {
+    "method": "calculated",
+    "function": "cooling",
+    "deliveredKwh": 800000,
+    "distribution": { "method": "small_cold_forfait", "supplyBelow10C": false },
+    "generators": [
+      {
+        "id": "aquifer-cold",
+        "energyFraction": 1.0,
+        "kind": {
+          "kind": "heat_pump",
+          "efficiency": { "method": "declared", "value": 20, "sourceReference": "synthetic: operating data" },
+          "drive": { "kind": "electricity" }
+        }
+      }
+    ],
+    "auxiliaryElectricityKwh": 15000,
+    "sourceReference": "synthetic fixture, not a real network"
+  }
+}
