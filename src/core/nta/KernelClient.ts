@@ -2393,6 +2393,8 @@ export interface OpnameAssessment {
   issues: Array<{ code: string; path: string }>;
   derivedInput: BuildingPerformanceInput | null;
   performance: BuildingPerformanceAssessment | null;
+  /** §6.4/§6.5.2 schematisation warnings per zone. */
+  schematisation?: Array<{ code: string; zoneId: string }>;
   referenceVerified: false;
 }
 

@@ -74,6 +74,7 @@ pub struct CalculationZoneLayout {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ZoningIssue {
     pub code: &'static str,
     pub zone_id: String,
@@ -167,10 +168,12 @@ pub fn check_zone(zone: &CalculationZoneLayout) -> Vec<ZoningIssue> {
         push("zone_setpoint_spread_exceeds_4_k");
     }
     // §6.5.2 b, only for A, B, C or E.
+    // Note 3: the dominant (largest) ventilation principle decides.
     let dominant_balanced = zone
         .ventilation
         .iter()
-        .all(|share| share.op == VentSysOpInput::Balanced);
+        .max_by(|a, b| a.area_m2.total_cmp(&b.area_m2))
+        .is_some_and(|share| share.op == VentSysOpInput::Balanced);
     if !dominant_balanced && !zone.residence_areas_open {
         let capacities: Vec<(u64, f64)> = zone
             .parts

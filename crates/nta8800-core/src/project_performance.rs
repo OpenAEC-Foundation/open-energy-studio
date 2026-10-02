@@ -196,6 +196,83 @@ pub struct ProjectPerformanceAssessment {
     pub geometry: Option<GeometrySummary>,
     pub derived_input: Option<BuildingPerformanceInput>,
     pub performance: Option<BuildingPerformanceAssessment>,
+    /// §6.4/§6.5.2 schematisation findings per zone (warnings).
+    pub schematisation: Vec<crate::zoning::ZoningIssue>,
+}
+
+/// §6.4/§6.5.2 for the derived calculation zones: one heating chain and at
+/// most one cooling system serve all zones in this kernel.
+fn schematisation_checks(input: &BuildingPerformanceInput) -> Vec<crate::zoning::ZoningIssue> {
+    use crate::zoning::{check_zone, CalculationZoneLayout, VentilationShare, ZonePart};
+    std::iter::once(&input.space_heating.demand)
+        .chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+        .flat_map(|demand| {
+            let capacity = demand
+                .thermal_mass
+                .specific_capacity_kj_per_m2k(demand.usable_floor_area_m2);
+            let parts = if demand.function_areas.is_empty() {
+                vec![ZonePart {
+                    function: demand.usage_function,
+                    area_m2: demand.usable_floor_area_m2,
+                    heat_capacity_kj_per_m2k: capacity,
+                }]
+            } else {
+                demand
+                    .function_areas
+                    .iter()
+                    .map(|part| ZonePart {
+                        function: part.function,
+                        area_m2: part.area_m2,
+                        heat_capacity_kj_per_m2k: capacity,
+                    })
+                    .collect()
+            };
+            let ventilation = match &demand.ventilation {
+                Some(ventilation) => match &ventilation.system {
+                    crate::ventilation::VentilationSystem::Single { unit } => {
+                        vec![VentilationShare {
+                            op: unit.variant.op().into(),
+                            area_m2: demand.usable_floor_area_m2,
+                        }]
+                    }
+                    crate::ventilation::VentilationSystem::Combined {
+                        decentral_area_m2,
+                        total_residence_area_m2,
+                        other,
+                        ..
+                    } => {
+                        let share = decentral_area_m2 / total_residence_area_m2;
+                        vec![
+                            VentilationShare {
+                                op: crate::zoning::VentSysOpInput::Decentral,
+                                area_m2: share * demand.usable_floor_area_m2,
+                            },
+                            VentilationShare {
+                                op: other.variant.op().into(),
+                                area_m2: (1.0 - share) * demand.usable_floor_area_m2,
+                            },
+                        ]
+                    }
+                },
+                None => Vec::new(),
+            };
+            check_zone(&CalculationZoneLayout {
+                id: demand.zone_id.clone(),
+                parts,
+                heating_system_ids: vec!["space-heating".into()],
+                cooling_system_ids: Vec::new(),
+                humidification_system_ids: Vec::new(),
+                ventilation,
+                residence_areas_open: false,
+            })
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -300,6 +377,10 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         attest_status: "unattested",
         gaps,
         geometry: project_geometry(project_value),
+        schematisation: derived
+            .as_ref()
+            .map(schematisation_checks)
+            .unwrap_or_default(),
         derived_input: derived,
         performance,
     }
