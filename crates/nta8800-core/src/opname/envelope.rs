@@ -426,14 +426,14 @@ fn thatch_rc(
 ///   de buitenlucht" row, with R_si 0,17 (downward heat flow, table C.2);
 /// - a ceiling to an unheated space (attic floor, AOR) takes the floor row
 ///   ("scheiden van de grond of een AOR"; NTA I.4 zoldervloeren), with
-///   R_si 0,10 (upward heat flow).
+///   R_si 0,10 (upward heat flow): `AtticFloor`.
 fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
     match (surface.element, &surface.boundary) {
         (SurfaceElement::Facade, _) => (ElementType::Facade, None),
         (SurfaceElement::Floor, SurfaceBoundary::Outdoor) => (ElementType::Roof, Some(0.17)),
         (SurfaceElement::Floor, _) => (ElementType::Floor, None),
         (SurfaceElement::Roof, SurfaceBoundary::UnheatedSpace { .. }) => {
-            (ElementType::Floor, Some(0.10))
+            (ElementType::AtticFloor, None)
         }
         (SurfaceElement::Roof, _) => (ElementType::Roof, None),
     }
@@ -648,14 +648,14 @@ pub fn derive_envelope(
             },
         };
         let (element, r_si_override) = element_type(surface);
-        if r_si_override.is_some() {
+        if r_si_override.is_some() || element == ElementType::AtticFloor {
             recorder.record(
                 "surface_table_row_by_boundary",
                 &path,
-                format!(
-                    "{element:?} row, R_si {:.2}",
-                    r_si_override.unwrap_or_default()
-                ),
+                match r_si_override {
+                    Some(r_si) => format!("{element:?} row, R_si {r_si:.2}"),
+                    None => format!("{element:?} (floor row, R_si 0,10)"),
+                },
                 "ISSO 82.1 p. 88–90 (tables 8.9/8.10); NTA I.4, table C.2",
             );
         }
@@ -1258,6 +1258,18 @@ mod tests {
         assert_eq!(cellar["below"]["kind"], "crawlspace");
         assert_eq!(cellar["below"]["floorResistanceM2kPerW"], 0.0);
         assert!(derived.floor_above_crawlspace);
+    }
+
+    #[test]
+    fn ceiling_to_unheated_attic_is_an_attic_floor() {
+        let attic = surface(
+            "zolder",
+            SurfaceElement::Roof,
+            SurfaceBoundary::UnheatedSpace {
+                space_id: "zolder".into(),
+            },
+        );
+        assert_eq!(element_type(&attic), (ElementType::AtticFloor, None));
     }
 
     #[test]

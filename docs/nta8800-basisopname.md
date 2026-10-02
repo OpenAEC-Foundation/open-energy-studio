@@ -32,7 +32,7 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | Koudebruggen | Forfaitair voor de hele woning: ΔU_for (NTA 8.2/8.3) op alle buitenvlakken; vloeren op grond krijgen 0,5·P | p. 79 |
 | Aangrenzende onverwarmde ruimten | H_ue = 5·A (NTA I.8) en b_U = H_ue/(H_ue + H_iu) | NTA I.2.4, 8.4.1 |
 | Belemmering | De adviseur bepaalt de situatie per raam. Zonder opgegeven factoren geldt "minimale belemmering" | p. 102–103 (tabel 8.24/8.25) |
-| Vloeren naar buitenlucht | Rij "daken en vloeren grenzend aan de buitenlucht" van tabel 8.9/8.10, R_si 0,17. Een plafond naar een onverwarmde zolder (AOR) volgt de vloerrij met R_si 0,10 | p. 88–90; NTA I.4 |
+| Vloeren naar buitenlucht | Rij "daken en vloeren grenzend aan de buitenlucht" van tabel 8.9/8.10, R_si 0,17. Een plafond naar een onverwarmde zolder (AOR) is een zoldervloer (`attic_floor`: vloerrij, R_si 0,10) | p. 88–90; NTA I.4 |
 | Thermokussens | R_c 1,95, ongeacht het antwoord over isolatie | p. 93; WD p. 37 |
 | Rieten daken en gevels | Riet gemeten aan de onderzijde min 35 mm, afgerond op 50 mm. Zonder (of onbekende) isolatie tabel 8.12 (d/0,105). Met isolatie formule 8.5 (d_iso/0,045 + d_riet/0,105), 40 mm bij onbekende dikte | p. 92 (afb. 8.16) |
 | Onverwarmde kelder | Het gat in de begane grondvloer is een fictieve ongeïsoleerde vloer (R_c 0,15), omtrek 0,01 m als die ontbreekt, R_bw van de gevel boven de rest van de vloer | p. 72 |
