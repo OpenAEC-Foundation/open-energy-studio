@@ -5,11 +5,12 @@
 //! `EPrenTot` (5.29–5.31, 5.39, table 5.4) → indicators with the rounding of
 //! `indicators_draft`.
 //!
-//! Source: public 2026 consultation draft of chapter 5, not the verified
-//! target edition. Battery storage (5.14a), exported heat, external heat or
-//! cold delivery, biomass and collective heat-pump sources are rejected
-//! because their draft rules are incomplete or not wired. Non-EP electricity
-//! is fixed at 0 as required for the indicators (5.27).
+//! Checked against NTA 8800:2025+C1:2026 chapter 5: storage correction
+//! 5.14a/5.14b (page 85), `f_BACS` (§5.5.8, page 100) and the operational
+//! CO2 emission of §5.5.6.1 with table 5.3 (page 97). Exported heat,
+//! external cold, annex P declarations and collective heat-pump sources are
+//! rejected because they are not wired. Non-EP electricity is fixed at 0 as
+//! required for the indicators (5.27).
 
 use crate::bbl_requirements::{a0_check, check as bbl_check, A0Check, BblCheck, BblFunction};
 use crate::domestic_hot_water::{monthly_hot_water, validate_hot_water, HotWaterSystem};
@@ -44,6 +45,18 @@ pub const F_P_BIOMASS_B: f64 = 0.5;
 pub const F_PREN_BIOMASS_B: f64 = 0.5;
 /// Table 5.4.
 pub const F_PREN_RENELECT: f64 = 1.45;
+/// 5.14a: policy factor on the stored renewable electricity.
+pub const STORAGE_CORRECTION_FACTOR: f64 = 0.05;
+/// 5.14a: minimum building-bound storage capacity for `f_BAT;cor = 1`, kWh.
+pub const STORAGE_MIN_CAPACITY_KWH: f64 = 5.0;
+/// Table 5.3 `K_CO2` in kg CO2eq/kWh (reference date January 2025).
+pub const K_CO2_ELECTRICITY: f64 = 0.268;
+pub const K_CO2_GAS: f64 = 0.218;
+pub const K_CO2_OIL: f64 = 0.326;
+/// Table 5.3: bmB = 0,5 × 0,104.
+pub const K_CO2_BIOMASS_B: f64 = 0.5 * 0.104;
+/// Table 5.3: external heat without an annex P declaration.
+pub const K_CO2_DISTRICT_HEAT_FORFAIT: f64 = 0.09;
 /// Table 5.4: ambient cold.
 pub const F_PREN_RENCOLD: f64 = 1.0;
 pub const F_PREN_RENHEAT: f64 = 1.0;
@@ -62,6 +75,14 @@ impl Carrier {
             Self::El => F_P_ELECTRICITY,
             Self::Gas => F_P_GAS,
             Self::Oil => F_P_OIL,
+        }
+    }
+
+    fn co2_factor(self) -> f64 {
+        match self {
+            Self::El => K_CO2_ELECTRICITY,
+            Self::Gas => K_CO2_GAS,
+            Self::Oil => K_CO2_OIL,
         }
     }
 
@@ -143,6 +164,26 @@ pub struct HeatPumpRenewableEvidence {
     /// Exhaust-air sources are not renewable without a declaration (5.32).
     pub exhaust_air_source: bool,
     pub source_reference: String,
+    /// Source of both outdoor air and exhaust air: table 9.27 footnote c
+    /// uses the outdoor-air row; 5.32 counts only the outdoor-air share.
+    #[serde(default)]
+    pub combined_outdoor_and_exhaust_air: bool,
+    /// `f_H;buitenlucht` from a quality declaration; absent means 0 (5.32).
+    #[serde(default)]
+    pub outdoor_air_heat_fraction: Option<f64>,
+    #[serde(default)]
+    pub outdoor_air_fraction_reference: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EnergyStorage {
+    /// Building-bound electrical storage behind the meter (plug-in batteries
+    /// do not count), kWh.
+    pub building_bound_electrical_kwh: f64,
+    /// Building-bound thermal storage, kWh.
+    pub building_bound_thermal_kwh: f64,
+    pub source_reference: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -155,7 +196,7 @@ pub struct BuildingPerformanceInput {
     /// Required when the generator is a heat pump.
     #[serde(default)]
     pub heat_pump_renewable: Option<HeatPumpRenewableEvidence>,
-    /// `f_BACS` (5.5.8): 1,0 or 1,05 with source.
+    /// `f_BACS` (5.5.8): 1,0, or 1,05 for utility buildings, with source.
     pub bacs_factor: f64,
     pub bacs_source_reference: String,
     pub use_inventory_complete: bool,
@@ -191,10 +232,15 @@ pub struct BuildingPerformanceInput {
     /// Domestic hot water calculated here (chapter 13, partial).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
-    /// Confirms the demand input uses the fixed C1 ventilation system and
-    /// fixed internal loads of §5.4.3; only then the need indicator is shown.
+    /// Confirms the demand input uses the fixed C1 ventilation system of
+    /// §5.4.3 and the fixed internal loads of §5.4.2; only then the need
+    /// indicator is shown.
     pub demand_uses_fixed_c1_ventilation: bool,
+    /// On-site electrical or thermal storage present (5.14a).
     pub battery_storage_present: bool,
+    /// Capacities for `f_BAT;cor`; required when storage is present.
+    #[serde(default)]
+    pub storage: Option<EnergyStorage>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -242,6 +288,12 @@ pub struct BuildingPerformanceAssessment {
     pub annual_renewable_primary_kwh: Option<f64>,
     pub annual_heat_pump_ambient_heat_kwh: Option<f64>,
     pub annual_heating_and_cooling_need_kwh: Option<f64>,
+    /// 5.14a `E_P;BAT,out;tot` summed over the year, kWh.
+    pub annual_storage_correction_kwh: Option<f64>,
+    /// §5.5.6.1 operational emission `m_CO2`, kg CO2eq per year.
+    pub annual_co2_kg: Option<f64>,
+    /// `m_CO2;spec = m_CO2 / A_g`, kg CO2eq/m².
+    pub co2_kg_per_m2: Option<f64>,
     /// BENG 1, only with confirmed C1 ventilation.
     pub need_indicator_kwh_per_m2_year: Option<f64>,
     /// BENG 2.
@@ -288,6 +340,11 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
     }
     if input.bacs_factor != 1.0 && input.bacs_factor != 1.05 {
         issues.push(issue("bacs_factor_invalid", "bacsFactor"));
+    } else if input.bacs_factor == 1.05
+        && matches!(input.calculation_scope, CalculationScope::Residential)
+    {
+        // §5.5.8: the 1,05 correction applies to utility buildings only.
+        issues.push(issue("bacs_factor_residential_invalid", "bacsFactor"));
     }
     let zone_area: f64 = std::iter::once(&input.space_heating.demand)
         .chain(
@@ -341,12 +398,35 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             "productionInventoryComplete",
         ));
     }
-    if input.battery_storage_present {
-        // 5.14a contains an unresolved placeholder in the public draft.
-        issues.push(issue(
-            "battery_storage_unsupported",
+    match (&input.storage, input.battery_storage_present) {
+        (None, true) => issues.push(issue("storage_capacity_required", "storage")),
+        (Some(_), false) => issues.push(issue(
+            "storage_without_storage_present",
             "batteryStoragePresent",
-        ));
+        )),
+        (Some(storage), true) => {
+            for (value, field) in [
+                (
+                    storage.building_bound_electrical_kwh,
+                    "storage.buildingBoundElectricalKwh",
+                ),
+                (
+                    storage.building_bound_thermal_kwh,
+                    "storage.buildingBoundThermalKwh",
+                ),
+            ] {
+                if !value.is_finite() || value < 0.0 {
+                    issues.push(issue("storage_capacity_invalid", field));
+                }
+            }
+            if storage.source_reference.trim().is_empty() {
+                issues.push(issue(
+                    "source_reference_required",
+                    "storage.sourceReference",
+                ));
+            }
+        }
+        (None, false) => {}
     }
     let mut ids = HashSet::new();
     for (index, item) in input.declared_uses.iter().enumerate() {
@@ -513,6 +593,38 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                         ));
                     }
                     let source = forfait.source;
+                    if evidence.combined_outdoor_and_exhaust_air {
+                        // Table 9.27 footnote c: the outdoor-air row applies.
+                        if source != TableSource::OutdoorAir || evidence.exhaust_air_source {
+                            issues.push(issue(
+                                "heat_pump_source_contradiction",
+                                "heatPumpRenewable.combinedOutdoorAndExhaustAir",
+                            ));
+                        }
+                    } else if evidence.outdoor_air_heat_fraction.is_some() {
+                        issues.push(issue(
+                            "outdoor_air_fraction_without_combined_source",
+                            "heatPumpRenewable.outdoorAirHeatFraction",
+                        ));
+                    }
+                    if let Some(fraction) = evidence.outdoor_air_heat_fraction {
+                        if !(0.0..=1.0).contains(&fraction) {
+                            issues.push(issue(
+                                "outdoor_air_fraction_invalid",
+                                "heatPumpRenewable.outdoorAirHeatFraction",
+                            ));
+                        }
+                        if evidence
+                            .outdoor_air_fraction_reference
+                            .as_deref()
+                            .map_or(true, |value| value.trim().is_empty())
+                        {
+                            issues.push(issue(
+                                "source_reference_required",
+                                "heatPumpRenewable.outdoorAirFractionReference",
+                            ));
+                        }
+                    }
                     let exhaust_expected = source == TableSource::ExhaustAir;
                     let warm_source = matches!(
                         source,
@@ -559,7 +671,13 @@ pub fn assess_building_performance(
         totals = Some(compute(input, &heating, &mut carriers, &mut balance));
     }
     let mut indicators = None;
-    if let Some((fossil, renewable, _, need)) = totals {
+    if let Some(Totals {
+        fossil,
+        renewable,
+        need,
+        ..
+    }) = totals
+    {
         let result = assess_indicators_draft(&IndicatorsDraftInput {
             calculation_scope: input.calculation_scope,
             total_usable_floor_area_m2: input.total_usable_floor_area_m2,
@@ -671,10 +789,13 @@ pub fn assess_building_performance(
         label_available: false,
         carriers,
         electricity_balance: balance,
-        annual_primary_fossil_kwh: totals.map(|item| item.0),
-        annual_renewable_primary_kwh: totals.map(|item| item.1),
-        annual_heat_pump_ambient_heat_kwh: totals.map(|item| item.2),
-        annual_heating_and_cooling_need_kwh: totals.map(|item| item.3),
+        annual_primary_fossil_kwh: totals.map(|item| item.fossil),
+        annual_renewable_primary_kwh: totals.map(|item| item.renewable),
+        annual_heat_pump_ambient_heat_kwh: totals.map(|item| item.ambient),
+        annual_heating_and_cooling_need_kwh: totals.map(|item| item.need),
+        annual_storage_correction_kwh: totals.map(|item| item.storage_correction),
+        annual_co2_kg: totals.map(|item| item.co2_kg),
+        co2_kg_per_m2: totals.map(|item| item.co2_kg / input.total_usable_floor_area_m2),
         need_indicator_kwh_per_m2_year: need_indicator,
         primary_fossil_indicator_kwh_per_m2_year: scenario
             .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
@@ -707,14 +828,45 @@ pub fn assess_building_performance(
     }
 }
 
-/// Returns (EPTot, EPrenTot, heat-pump ambient heat, Q_H+C;nd) in kWh.
+#[derive(Debug, Clone, Copy)]
+struct Totals {
+    /// EPTot, kWh.
+    fossil: f64,
+    /// EPrenTot, kWh.
+    renewable: f64,
+    /// Heat-pump ambient heat, kWh.
+    ambient: f64,
+    /// Q_H+C;nd, kWh.
+    need: f64,
+    /// 5.14a, kWh.
+    storage_correction: f64,
+    /// §5.5.6.1, kg CO2eq.
+    co2_kg: f64,
+}
+
+/// 5.14a: `f_BAT;cor`.
+fn storage_correction_factor(input: &BuildingPerformanceInput) -> f64 {
+    match (&input.storage, input.battery_storage_present) {
+        (Some(storage), true)
+            if storage.building_bound_electrical_kwh + storage.building_bound_thermal_kwh
+                >= STORAGE_MIN_CAPACITY_KWH =>
+        {
+            1.0
+        }
+        _ => 0.0,
+    }
+}
+
 fn compute(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
     carriers: &mut Vec<CarrierMonth>,
     balance: &mut Vec<ElectricityBalanceMonth>,
-) -> (f64, f64, f64, f64) {
+) -> Totals {
     let bacs = input.bacs_factor;
+    let storage_factor = storage_correction_factor(input);
+    let mut storage_correction = 0.0;
+    let mut co2 = 0.0;
     let mut fossil = 0.0;
     let mut renewable = 0.0;
     let mut ambient_total = 0.0;
@@ -723,6 +875,14 @@ fn compute(
             .heat_pump_renewable
             .as_ref()
             .is_some_and(|evidence| evidence.source_below_20_c && !evidence.exhaust_air_source);
+    // 5.32: only the outdoor-air share of a combined source is renewable.
+    let outdoor_share = input
+        .heat_pump_renewable
+        .as_ref()
+        .filter(|evidence| evidence.combined_outdoor_and_exhaust_air)
+        .map_or(1.0, |evidence| {
+            evidence.outdoor_air_heat_fraction.unwrap_or(0.0)
+        });
     let cop = heating.generation_efficiency.unwrap_or(0.0);
     let pv_yields: Vec<[f64; 12]> = input.pv_systems.iter().map(monthly_yield_kwh).collect();
     let hot_water = input.hot_water.as_ref().map(|system| {
@@ -796,6 +956,7 @@ fn compute(
             (Carrier::Oil, used_oil, used_oil),
         ] {
             fossil += delivered * carrier.primary_factor();
+            co2 += delivered * carrier.co2_factor();
             carriers.push(CarrierMonth {
                 carrier: carrier.code(),
                 month,
@@ -804,8 +965,10 @@ fn compute(
             });
         }
         fossil += used_dh * F_P_DISTRICT_HEAT_FORFAIT;
+        co2 += used_dh * K_CO2_DISTRICT_HEAT_FORFAIT;
         let used_bm = bacs * row.biomass_kwh;
         fossil += used_bm * F_P_BIOMASS_B;
+        co2 += used_bm * K_CO2_BIOMASS_B;
         if used_bm > 0.0 {
             carriers.push(CarrierMonth {
                 carrier: "bm",
@@ -824,6 +987,12 @@ fn compute(
         }
         // 5.10 and 5.13: exported electricity is subtracted at f_P;exp;el.
         fossil -= exported * F_P_ELECTRICITY;
+        co2 -= exported * K_CO2_ELECTRICITY;
+        // 5.14a/5.14b: all modelled producers are renewable (no CHP); the
+        // correction is left out of the CO2 emission (§5.5.6.1).
+        let correction = produced.min(used_el) * STORAGE_CORRECTION_FACTOR * storage_factor;
+        fossil -= correction;
+        storage_correction += correction;
         balance.push(ElectricityBalanceMonth {
             month,
             used_kwh: used_el,
@@ -834,7 +1003,7 @@ fn compute(
 
         // 5.30/5.31: ambient heat of the space-heating heat pump.
         let ambient = if heat_pump_renewable && cop >= 1.0 {
-            row.heat_pump_output_kwh * (1.0 - 1.0 / cop)
+            row.heat_pump_output_kwh * (1.0 - 1.0 / cop) * outdoor_share
         } else {
             0.0
         };
@@ -863,7 +1032,14 @@ fn compute(
                 + demand.annual_cooling_need_kwh.unwrap_or(0.0)
         })
         .sum();
-    (fossil, renewable, ambient_total, need)
+    Totals {
+        fossil,
+        renewable,
+        ambient: ambient_total,
+        need,
+        storage_correction,
+        co2_kg: co2,
+    }
 }
 
 #[cfg(test)]
@@ -876,6 +1052,20 @@ mod tests {
         serde_json::from_str(include_str!(
             "../../../training-data/nta8800-space-heating-chain-synthetic.json"
         ))
+        .unwrap()
+    }
+
+    /// Hydronic system whose pump is outside the plot (test fixture only).
+    fn none_on_site_system() -> crate::space_heating_chain::DistributionSystem {
+        serde_json::from_value(json!({
+            "installation": "individual",
+            "usageFunction": "residential",
+            "connectedStoreys": 1,
+            "pipeTransmittance": {"method": "forfait", "insulation": {"state": "unknown"}},
+            "valvesInsulated": false,
+            "pump": {"method": "none_on_site", "sourceReference": "pump in the supplier's station"},
+            "sourceReference": "synthetic"
+        }))
         .unwrap()
     }
 
@@ -993,6 +1183,7 @@ mod tests {
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
             auxiliary_measurements: None,
+            auxiliary: None,
         });
         let missing = assess_building_performance(&sample);
         assert!(missing
@@ -1003,6 +1194,9 @@ mod tests {
             source_below_20_c: true,
             exhaust_air_source: false,
             source_reference: "outdoor air".into(),
+            combined_outdoor_and_exhaust_air: false,
+            outdoor_air_heat_fraction: None,
+            outdoor_air_fraction_reference: None,
         });
         let result = assess_building_performance(&sample);
         assert_eq!(
@@ -1030,6 +1224,19 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "heat_pump_source_contradiction"));
+
+        // 5.32: outdoor air plus exhaust air counts only the outdoor share.
+        let evidence = sample.heat_pump_renewable.as_mut().unwrap();
+        evidence.exhaust_air_source = false;
+        evidence.combined_outdoor_and_exhaust_air = true;
+        let unknown = assess_building_performance(&sample);
+        assert_eq!(unknown.annual_heat_pump_ambient_heat_kwh, Some(0.0));
+        let evidence = sample.heat_pump_renewable.as_mut().unwrap();
+        evidence.outdoor_air_heat_fraction = Some(0.4);
+        evidence.outdoor_air_fraction_reference = Some("quality declaration".into());
+        let combined = assess_building_performance(&sample);
+        let ambient_combined = combined.annual_heat_pump_ambient_heat_kwh.unwrap();
+        assert!((ambient_combined - 0.4 * ambient).abs() < 1e-6);
     }
 
     #[test]
@@ -1052,7 +1259,7 @@ mod tests {
         assert!(result.carriers.is_empty());
         let codes: Vec<_> = result.issues.iter().map(|item| item.code).collect();
         for code in [
-            "battery_storage_unsupported",
+            "storage_capacity_required",
             "production_inventory_incomplete",
             "service_carrier_must_be_electricity",
             "residential_lighting_must_be_omitted",
@@ -1177,7 +1384,13 @@ mod tests {
         sample.space_heating.generator = Generator::ExternalHeat(ExternalHeatGenerator {
             supplier_reference: "contract".into(),
             quality_declaration_present: false,
+            auxiliary: Some(crate::space_heating_chain::OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: None,
+                source_reference: "delivery set".into(),
+            }),
         });
+        sample.space_heating.distribution_system = Some(none_on_site_system());
         let result = assess_building_performance(&sample);
         assert_eq!(
             result.status, "calculated_unverified",
@@ -1187,8 +1400,13 @@ mod tests {
         let heat: f64 = result.space_heating.annual_district_heat_kwh.unwrap();
         let base_gas = base.space_heating.annual_natural_gas_kwh.unwrap();
         let base_aux = base.space_heating.annual_auxiliary_electricity_kwh.unwrap();
-        let expected =
-            base.annual_primary_fossil_kwh.unwrap() - base_gas - base_aux * 1.45 + heat * 0.9;
+        let aux = result
+            .space_heating
+            .annual_auxiliary_electricity_kwh
+            .unwrap();
+        let expected = base.annual_primary_fossil_kwh.unwrap() - base_gas - base_aux * 1.45
+            + heat * 0.9
+            + aux * 1.45;
         assert!((result.annual_primary_fossil_kwh.unwrap() - expected).abs() < 1e-6);
         assert!(result.carriers.iter().any(|item| item.carrier == "dh"));
         assert_eq!(
@@ -1222,7 +1440,15 @@ mod tests {
             annex_r_compliant_at_most_500_kw: true,
             annex_r_reference: "type test".into(),
             equipment_reference: "plate".into(),
+            sole_heating_in_served_rooms: None,
+            automatic_fuel_feed: true,
+            auxiliary: Some(crate::space_heating_chain::OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: Some(15.0),
+                source_reference: "plate".into(),
+            }),
         });
+        sample.space_heating.distribution_system = Some(none_on_site_system());
         let result = assess_building_performance(&sample);
         assert_eq!(
             result.status, "calculated_unverified",
@@ -1299,14 +1525,35 @@ mod tests {
         sample.space_heating.generator = Generator::ExternalHeat(ExternalHeatGenerator {
             supplier_reference: "contract".into(),
             quality_declaration_present: false,
+            auxiliary: Some(crate::space_heating_chain::OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: None,
+                source_reference: "delivery set".into(),
+            }),
         });
-        let plain = assess_building_performance(&sample);
+        sample.space_heating.distribution_system = Some(none_on_site_system());
         sample.bacs_factor = 1.05;
+        // §5.5.8: 1,05 is for utility buildings only.
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "bacs_factor_residential_invalid"));
+        sample.calculation_scope = CalculationScope::Utility;
         let weighted = assess_building_performance(&sample);
+        sample.bacs_factor = 1.0;
+        let plain = assess_building_performance(&sample);
         let heat = plain.space_heating.annual_district_heat_kwh.unwrap();
+        let aux = plain
+            .space_heating
+            .annual_auxiliary_electricity_kwh
+            .unwrap();
         let delta =
             weighted.annual_primary_fossil_kwh.unwrap() - plain.annual_primary_fossil_kwh.unwrap();
-        assert!((delta - 0.05 * heat * 0.9).abs() < 1e-6, "{delta}");
+        // f_BACS weights the heat and the auxiliary energy of space heating.
+        assert!(
+            (delta - 0.05 * (heat * 0.9 + aux * 1.45)).abs() < 1e-6,
+            "{delta}"
+        );
 
         let mut cooled = input();
         cooled.active_cooling_present = true;
@@ -1333,5 +1580,74 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "pv_route_mixed"));
+    }
+    #[test]
+    fn storage_correction_follows_5_14a() {
+        let mut sample = input();
+        let base = assess_building_performance(&sample);
+        sample.battery_storage_present = true;
+        sample.storage = Some(EnergyStorage {
+            building_bound_electrical_kwh: 3.0,
+            building_bound_thermal_kwh: 2.5,
+            source_reference: "installation".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let expected: f64 = result
+            .electricity_balance
+            .iter()
+            .map(|row| row.produced_kwh.min(row.used_kwh) * 0.05)
+            .sum();
+        assert!(expected > 0.0);
+        assert!((result.annual_storage_correction_kwh.unwrap() - expected).abs() < 1e-9);
+        assert!(
+            (base.annual_primary_fossil_kwh.unwrap()
+                - result.annual_primary_fossil_kwh.unwrap()
+                - expected)
+                .abs()
+                < 1e-9
+        );
+        // The correction is not part of the CO2 emission.
+        assert_eq!(result.annual_co2_kg, base.annual_co2_kg);
+        // Below 5 kWh in total: f_BAT;cor = 0, no error.
+        sample.storage.as_mut().unwrap().building_bound_thermal_kwh = 1.0;
+        let small = assess_building_performance(&sample);
+        assert_eq!(small.annual_storage_correction_kwh, Some(0.0));
+        assert_eq!(
+            small.annual_primary_fossil_kwh,
+            base.annual_primary_fossil_kwh
+        );
+    }
+
+    #[test]
+    fn co2_emission_uses_table_5_3() {
+        let result = assess_building_performance(&input());
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let mut expected = 0.0;
+        for row in &result.carriers {
+            expected += row.delivered_kwh
+                * match row.carrier {
+                    "el" => 0.268,
+                    "gas" => 0.218,
+                    "oil" => 0.326,
+                    other => panic!("unexpected carrier {other}"),
+                };
+        }
+        let exported: f64 = result
+            .electricity_balance
+            .iter()
+            .map(|row| row.exported_kwh)
+            .sum();
+        expected -= exported * 0.268;
+        assert!((result.annual_co2_kg.unwrap() - expected).abs() < 1e-9);
+        assert!((result.co2_kg_per_m2.unwrap() - expected / 100.0).abs() < 1e-9);
     }
 }

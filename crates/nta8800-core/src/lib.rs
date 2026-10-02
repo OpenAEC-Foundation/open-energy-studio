@@ -34,6 +34,7 @@ pub mod generator_dispatch_draft;
 pub mod ground;
 pub mod heat_pumps;
 pub mod heating_aux_draft;
+pub mod heating_distribution;
 pub mod heating_emission;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
@@ -284,6 +285,8 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_chapter_7_monthly_heating_cooling_need_single_zone",
             "unverified_space_heating_chain_emission_distribution_single_generator",
             "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
+            "unverified_space_heating_distribution_9_26_to_9_51_and_auxiliary_9_85_9_91",
+            "unverified_storage_correction_5_14a_and_co2_emission_5_5_6_1",
             "unverified_pv_yield_chapter_16",
             "unverified_space_cooling_generation_10_5_with_declared_emission",
             "indicative_label_class_omgevingsregeling_annex_ix_x",

@@ -7,7 +7,7 @@
 use crate::bbl_requirements::BblFunction;
 use crate::building_performance::{
     assess_building_performance, BuildingPerformanceAssessment, BuildingPerformanceInput,
-    DeclaredRenewableHeat, DeclaredUse, HeatPumpRenewableEvidence, OnSiteProduction,
+    DeclaredRenewableHeat, DeclaredUse, EnergyStorage, HeatPumpRenewableEvidence, OnSiteProduction,
 };
 use crate::climate::Orientation;
 use crate::domestic_hot_water::HotWaterSystem;
@@ -22,7 +22,10 @@ use crate::monthly_demand::{
 use crate::pv::PvSystem;
 use crate::solar_shading::{MovableShading, Obstruction};
 use crate::space_cooling::CoolingSystem;
-use crate::space_heating_chain::{ChainZone, Distribution, Generator, SpaceHeatingChainInput};
+use crate::space_heating_chain::{
+    ChainZone, CollectiveConnection, Distribution, DistributionSystem, Generator,
+    SpaceHeatingChainInput,
+};
 use crate::{
     direct_boundary_input_zone, input_fingerprint, unheated_zone_input, ProjectInput,
     ThermalBoundary, KERNEL_VERSION, TARGET_NORM_VERSION,
@@ -51,6 +54,11 @@ pub struct NtaCalculationInput {
     pub emission: EmissionInput,
     pub distribution: Distribution,
     pub generator: Generator,
+    /// §9.4 hydraulic data; see `SpaceHeatingChainInput`.
+    #[serde(default)]
+    pub distribution_system: Option<DistributionSystem>,
+    #[serde(default)]
+    pub collective_connection: Option<CollectiveConnection>,
     #[serde(default)]
     pub heat_pump_renewable: Option<HeatPumpRenewableEvidence>,
     pub bacs_factor: f64,
@@ -79,6 +87,8 @@ pub struct NtaCalculationInput {
     pub permit_application_after_2026_05_29: bool,
     pub demand_uses_fixed_c1_ventilation: bool,
     pub battery_storage_present: bool,
+    #[serde(default)]
+    pub storage: Option<EnergyStorage>,
 }
 
 /// Per-zone data for projects with more than one calculation zone. Omitted
@@ -522,6 +532,8 @@ fn derive_input(
             distribution: primary.distribution,
             additional_zones: zones,
             generator: nta.generator,
+            distribution_system: nta.distribution_system,
+            collective_connection: nta.collective_connection,
         },
         heat_pump_renewable: nta.heat_pump_renewable,
         bacs_factor: nta.bacs_factor,
@@ -545,6 +557,7 @@ fn derive_input(
         ),
         demand_uses_fixed_c1_ventilation: nta.demand_uses_fixed_c1_ventilation,
         battery_storage_present: nta.battery_storage_present,
+        storage: nta.storage,
     })
 }
 
