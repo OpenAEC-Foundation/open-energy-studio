@@ -12,9 +12,12 @@
 //!   13.128–13.140;
 //! - 13.7.2.4 PVT reduction (table 13.16).
 //!
-//! The vessel is taken to stand in a heated room (13.7.2.2.1), so
-//! `ϑ_sto;amb` is the heating setpoint and `f_rbl = 1` (13.107); the
-//! 500 m² rule of 13.13 is applied by the hot-water chain.
+//! The vessel is taken to stand in a heated room (13.7.2.2.1): `ϑ_sto;amb`
+//! is the levelled setpoint `ϑ_int;set;H;zi,mi` (13.69/13.137b), or
+//! `ϑ_int;set;H;stc` with an exhaust-air heat pump for hot water
+//! (13.69a/13.137a), and `f_rbl = 1` (13.107); the 500 m² rule of 13.13 is
+//! applied by the hot-water chain. SOL_USE = SHS (space heating only) uses
+//! `f_H;use = 1` (13.85) and 2 000 pump hours (13.127).
 
 use crate::climate::{irradiance_w_per_m2, Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::domestic_hot_water::{StorageLabel, StorageLoss};
@@ -46,7 +49,8 @@ pub const COLD_WATER_C: f64 = 10.0;
 pub const REFERENCE_VOLUME_L_PER_M2: f64 = 75.0;
 
 pub const INTERPRETATIONS: &[&str] = &[
-    "13.7.2.2.1: the vessel stands in a heated room, so ϑ_sto;amb is the heating setpoint and f_rbl = 1 (13.107); the 500 m² rule of 13.13 applies in the hot-water chain",
+    "13.7.2.2.1: the vessel stands in a heated room, so ϑ_sto;amb follows 13.69/13.69a and f_rbl = 1 (13.107); the 500 m² rule of 13.13 applies in the hot-water chain",
+    "13.69: the levelled setpoint comes from the space-heating chain of the building performance; the run that feeds the hot-water gains of 7.29 uses the heating setpoint",
     "13.129 (method 1) is applied per physical system and per building part as in 13.96: Q_W;sol;us/(f_gebouw;si;W·N_soli)",
     "13.130 is not extrapolated: an annual demand outside the tested range is rejected",
     "13.134: a negative monthly Q_W;ren of an integrated-backup system tested as a whole is set to 0",
@@ -60,6 +64,8 @@ pub enum SolarUse {
     WaterHeating,
     /// SOL_USE = COMBI: hot water and space heating.
     Combi,
+    /// SOL_USE = SHS: space heating only (`f_H;use = 1`, 13.85).
+    SpaceHeating,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -647,13 +653,13 @@ pub struct ServiceSettings {
     /// `ϑ_X;ref;mi`, °C.
     pub reference_c: [f64; 12],
     /// `ϑ_X;low;mi`, °C.
-    pub low_c: f64,
+    pub low_c: [f64; 12],
     /// `ϑ_X;high`, °C.
     pub high_c: f64,
     /// `ϑ_X;bu;set`, °C.
     pub backup_set_c: f64,
-    /// `ϑ_sto;amb`, °C.
-    pub ambient_c: f64,
+    /// `ϑ_sto;amb;mi` (13.69/13.69a), °C.
+    pub ambient_c: [f64; 12],
     /// `t_X;aux`, h/year.
     pub pump_hours: f64,
     /// Space heating: 13.114 adds `Q_H;bu;sto;ls` to the use.
@@ -726,7 +732,7 @@ pub fn calculated_service(
             0.0
         } else {
             loss * (total - solar_volume) / total
-                * (settings.backup_set_c - settings.ambient_c)
+                * (settings.backup_set_c - settings.ambient_c[index])
                 * hours
                 / 1000.0
         };
@@ -764,8 +770,8 @@ pub fn calculated_service(
         let fraction = (first / use_kwh).min(1.0);
         // 13.102/13.120.
         let storage_loss = (loss * solar_volume / total
-            * (settings.low_c + (settings.high_c - settings.low_c) * fraction
-                - settings.ambient_c)
+            * (settings.low_c[index] + (settings.high_c - settings.low_c[index]) * fraction
+                - settings.ambient_c[index])
             * fraction
             * hours
             / 1000.0)
@@ -840,7 +846,7 @@ pub fn tested_water(
     backup_loss_in_generator_efficiency: bool,
     use_kwh: &[f64; 12],
     hot_water_c: f64,
-    ambient_c: f64,
+    ambient_c: [f64; 12],
 ) -> Option<[ServiceMonth; 12]> {
     let incident = plane(orientation, tilt_deg, obstruction);
     // 13.128 with I_sol;s45;an·t_an.
@@ -893,9 +899,10 @@ pub fn tested_water(
     for (index, month) in months.iter_mut().enumerate() {
         let hours = MONTH_HOURS[index];
         // 13.137/13.138.
-        let standing =
-            (hot_water_c - ambient_c) * (0.37 + 2.06 * (use_kwh[index] / hours).powf(0.4)) * hours
-                / 1000.0;
+        let standing = (hot_water_c - ambient_c[index])
+            * (0.37 + 2.06 * (use_kwh[index] / hours).powf(0.4))
+            * hours
+            / 1000.0;
         month.storage_loss_kwh = (standing * solar_fraction).max(0.0);
         month.backup_storage_loss_kwh = match solar_type {
             SolarType::IntegratedBackup if !backup_loss_in_generator_efficiency => {
@@ -965,10 +972,10 @@ mod tests {
             use_kwh: [200.0; 12],
             share: [1.0; 12],
             reference_c: std::array::from_fn(water_reference_c),
-            low_c: COLD_WATER_C,
+            low_c: [COLD_WATER_C; 12],
             high_c: 60.0,
             backup_set_c: 60.0,
-            ambient_c: 20.0,
+            ambient_c: [20.0; 12],
             pump_hours: PUMP_HOURS_WATER,
             add_backup_loss_to_use: false,
         };
@@ -1023,10 +1030,10 @@ mod tests {
             use_kwh: [200.0; 12],
             share: [1.0; 12],
             reference_c: std::array::from_fn(water_reference_c),
-            low_c: COLD_WATER_C,
+            low_c: [COLD_WATER_C; 12],
             high_c: 60.0,
             backup_set_c: 60.0,
-            ambient_c: 20.0,
+            ambient_c: [20.0; 12],
             pump_hours: PUMP_HOURS_WATER,
             add_backup_loss_to_use: false,
         };
@@ -1072,7 +1079,7 @@ mod tests {
             false,
             &use_kwh,
             60.0,
-            20.0,
+            [20.0; 12],
         )
         .unwrap();
         // 13.130: Q_L at 2000 kWh = 700; south 45° gives Σ f_dis = 1.
@@ -1096,7 +1103,7 @@ mod tests {
             false,
             &[500.0; 12],
             60.0,
-            20.0,
+            [20.0; 12],
         )
         .is_none());
     }

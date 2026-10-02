@@ -537,3 +537,37 @@ Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerder
   - Bij methode 2 vervangt PLV · ζ_n · f_prpr de factor 1,00. Dat is een interpretatie, opgenomen in `COOLING_INTERPRETATIONS`.
 - **Tabel 10.32** kent alleen de rij "niet geregeld" met waarde 1. f_hr;PL;el = 1 is daarmee de volledige tabel.
 - **Meetpunten NEN-EN 14825.** ϑ_C;evap;out is de temperatuur die de verdamper verlaat. Bij lucht-luchttoestellen is dat de uitblaaslucht van het binnendeel, niet de binnentemperatuur van de testconditie. ϑ_C;cond;in is de intredetemperatuur van de condensor; bij luchtgekoelde toestellen is dat de buitenlucht. De kern eist ϑ_C;cond;in > ϑ_C;evap;out, omdat 10.56 en 10.64 door dat verschil delen.
+
+## Tapwater: resterende onderdelen van hoofdstuk 13
+
+**Opgegeven aandeel per opwekker (13.146).** Met `declaredShare` (hoofdopwekker of extra opwekker) wordt F_W;gen;gi uit een kwaliteitsverklaring overgenomen. Is het aandeel voor meer tapklassen gegeven, dan wordt lineair geïnterpoleerd op Q_W;dis;nren;an; buiten het gegeven bereik geldt de dichtstbijzijnde waarde. Deze opwekkers leveren F·Q_W;dis;nren als eerste. De overige opwekkers verdelen het restant volgens 13.8.2. De opgegeven aandelen samen mogen niet boven 1 komen (`hot_water_declared_share_sum_exceeds_one`).
+
+**Toestel getest bij twee tappatronen (13.8.4.2).** Generator `measured_two_profiles` neemt de 24-uursmetingen bij tappatroon i1 en i2 over. Dat kan volgens NEN-EN 13203-2 (gas) of NEN-EN 16147 (warmtepomp).
+- **Energiegebruik per test:**
+  - gas: E = 1,11·Q_gas;p, van onder- naar bovenwaarde (13.153a);
+  - warmtepomp: E = Q_elec·(1 − SCF·smart), gecorrigeerd voor T_max;test en T_set;design (13.153b/c; smart = 1 bij SCF ≥ 0,07, T_set;design standaard 55 °C).
+- **Dagelijkse levering:** Q_W;b;d = ΣQ_W;gen;gi;out/(365·f_gebouw) (13.157), met de eigen output van het toestel na de verdeling van 13.8.2.
+- **Dagelijks energiegebruik:** interpolatie 13.154, en onder het onderste meetpunt 13.154a.
+- **Rendement:** η = Q_W;b;d/E_d (13.158), naar beneden afgerond op 0,025 (gas) of 0,05 (elektrisch).
+- **f_prac (13.152):** 0,9 voor voorraadwarmtepompen zonder legionellacyclus in de test, anders 0,95.
+- **Tappatronen en bereik:** de toegestane combinaties i1/i2 en de extrapolatiegrenzen volgen de randvoorwaardentabel van 13.8.4.2. Buiten die grenzen geeft de kern `hot_water_two_profile_out_of_range`.
+- **Hulpenergie (13.159/13.160):** alleen voor gastoestellen die geen combi zijn.
+- **Terugwinbaar verlies (13.160a):** voor afvoerluchtwarmtepompen en voor combi's met een geïntegreerd voorraadvat.
+- **Niet ondersteund:** PFHRD (13.156a/b, vraagt het verwarmingsgebruik van de combi), de mengluchtcorrectie (13.153d–i) en de wintermeetmethode (13.153). E_PFHRD = 0 en C_W;mixed air = 1.
+
+**Warm tapwater uit het verwarmingssysteem (13.8.4.9.3).** Generator `heating_system` geeft het tapwater geen eigen energiedrager, hulpenergie of terugwinbaar verlies. E_W;gen;in;conv;hj = Q_W;gen;gi;out (13.185) komt in de verwarmingsketen als extra belasting van het knooppunt (`hotWaterLoadKwh`), net als bevochtiging en LBK-naverwarming. De verdeling van 13.184, die laat zien welk deel van het opwekkergebruik naar tapwater gaat, wordt niet gerapporteerd.
+
+**Afvoerluchtwarmtepomp: debiet en tijdfractie voor hoofdstuk 11 (13.148/13.149).** Het tapwater wordt eerst berekend, omdat het niet van de ventilatie afhangt. Daarna volgt de keten.
+- **Tijdfractie (13.149):** f_W;t;hp-on = Q_W;gen;gi;out/Q_W;gen;gi;Pout;max, met het maximum van 13.141 (P_nom of 1,0 kW).
+- **Debiet:**
+  - forfaitair, alleen als de warmtepomp uitsluitend tapwater levert (f_combi = 0): q_ve;hp;W;zi = MAX(MAX(44·A_zi/ΣA; 0,44·A_zi)·3,6; q_V;ODA;req) (13.148);
+  - met een kwaliteitsverklaring: q_ve;hp;W·A_zi/ΣA, minimaal q_V;ODA;req (13.148a, `declaredFlowM3PerH`).
+- **q_V;ODA;req:** komt uit een hoofdstuk-11-run zonder overventilatie.
+- **Invullen in hoofdstuk 11:** de waarden vullen lege velden `hotWaterTimeFraction`/`hotWaterFlowM3PerH` van `overventilation`. Heeft de zone geen overventilatie, dan maakt de kern die aan bij een warmtepomp die alleen tapwater levert (f_H = 0). Een combiwarmtepomp zonder opgegeven debiet krijgt alleen de tijdfractie.
+- **Q.5.3:** de herberekening gebruikt deze f_W in Q.84.
+
+**Opstellingstemperatuur van het zonneboilervat (13.69/13.69a, 13.137a/b).** Met een afvoerluchtwarmtepomp voor tapwater is ϑ_sto;amb gelijk aan ϑ_int;set;H;stc van tabel 7.13 (oppervlaktegewogen). In alle andere gevallen is het de genivelleerde setpointtemperatuur ϑ_int;set;H;zi,mi van 7.76, uit de maandbehoefte van de keten. De run die de terugwinbare tapwaterverliezen voor 7.29 levert, rekent nog met het verwarmingssetpoint.
+
+**Zonne-energie alleen voor verwarming (SOL_USE = SHS).** `solarUse: space_heating` rekent alleen het verwarmingsdeel, met f_H;use = 1 (13.85) en 2 000 pompuren (13.127). Hoe tapwater- en verwarmingsvraag over meerdere zonnesystemen worden verdeeld, hangt per dienst af van V_sto;tot: een SHS-systeem neemt geen tapwater, een tapwatersysteem geen verwarming. Het systeem hangt aan `hotWater.solar`; een gebouw zonder tapwatersysteem kan het daarom niet opgeven.
+
+**Volgorde van boosterwarmtepompen (13.8.2.1).** Binnen categorie b rangschikt een boosterwarmtepomp op de outputgewogen COP_W;BWP van bijlage W, niet meer op een vaste 1,0.

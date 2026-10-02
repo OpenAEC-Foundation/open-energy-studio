@@ -940,6 +940,8 @@ fn hot_water_need_kwh(input: &BuildingPerformanceInput) -> Option<f64> {
         usable_floor_area_m2: input.total_usable_floor_area_m2,
         heated_ambient_c: input.space_heating.demand.setpoints.heating_c,
         space_heating: None,
+        standard_setpoint_c: None,
+        levelled_setpoint_c: None,
     };
     crate::domestic_hot_water::assess_hot_water(system, context)
         .ok()
@@ -1834,6 +1836,7 @@ mod tests {
             ..HotWaterMonth::default()
         };
         let mut result = HotWaterAssessment {
+            exhaust_air: None,
             annual_net_need_kwh: 100.0,
             emission_efficiency: 100.0 / 120.0,
             annual_generator_output_kwh: 150.0,

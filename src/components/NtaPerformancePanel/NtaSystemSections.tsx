@@ -237,7 +237,8 @@ export function SolarWaterHeaterFields({ draft, change }: SectionProps) {
         <legend>{t('nta.form.solar.system')} {index + 1}</legend>
         <TextField {...field} path={at('id')} label={t('nta.form.solar.id')} />
         <SelectField {...field} path={at('solarUse')} label={t('nta.form.solar.use')} options={[
-          ['water_heating', t('nta.form.solar.use.water')], ['combi', t('nta.form.solar.use.combi')]]} />
+          ['water_heating', t('nta.form.solar.use.water')], ['combi', t('nta.form.solar.use.combi')],
+          ['space_heating', t('nta.form.solar.use.space')]]} />
         <NumberField {...field} path={at('count')} label={t('nta.form.solar.count')} step="1" />
         <SelectField {...field} path={at('method', 'method')} label={t('nta.form.solar.method')} options={[
           ['calculated', t('nta.form.solar.method.calculated')], ['tested', t('nta.form.solar.method.tested')]]}

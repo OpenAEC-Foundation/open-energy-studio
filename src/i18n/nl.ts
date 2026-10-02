@@ -1848,6 +1848,7 @@ export const nl: Record<string, string> = {
   'nta.form.solar.use': "Toepassing",
   'nta.form.solar.use.water': "Warm tapwater",
   'nta.form.solar.use.combi': "Zonnecombi (tapwater en verwarming)",
+  'nta.form.solar.use.space': "Alleen ruimteverwarming (SHS)",
   'nta.form.solar.count': "Aantal identieke systemen",
   'nta.form.solar.method': "Methode",
   'nta.form.solar.method.calculated': "Berekend (13.7.2.2)",
