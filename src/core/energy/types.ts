@@ -313,7 +313,19 @@ export interface IProject {
   /** Standalone NTA equipment inventory, outside the legacy indicative calculator. */
   ntaHeatPumps?: INtaHeatPumpInput[];
   /** Supplied factors only; sources are recorded, not verified by the kernel. */
-  unheatedSpaces?: Array<{ id: string; name: string; reductionFactor: number; factorSourceReference: string }>;
+  unheatedSpaces?: Array<{
+    id: string;
+    name: string;
+    /** Declared b_U; exclusive with `outside`. */
+    reductionFactor?: number;
+    factorSourceReference?: string;
+    /** Derive b_U from the space's losses to outside (8.53–8.59); other project zones on the space are added. */
+    outside?: {
+      transmission: { elements: Array<{ id: string; areaM2: number; uValueWPerM2k: number; sourceReference: string }>; linearBridges?: Array<{ id: string; lengthM: number; psiWPerMk: number; sourceReference: string }> };
+      ventilation: { method: 'flow'; airflowM3PerH: number; sourceReference: string } | { method: 'half_of_transmission' };
+      otherZonesConductanceWPerK?: number;
+    };
+  }>;
   solarPV: ISolarPV[];
   solarThermal: ISolarThermal[];
   constructions: IConstruction[];

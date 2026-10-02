@@ -109,8 +109,16 @@ pub struct ProjectInput {
 pub struct ProjectUnheatedSpace {
     pub id: String,
     pub name: String,
-    pub reduction_factor: f64,
+    /// Declared `b_U`; exclusive with `outside`.
+    #[serde(default)]
+    pub reduction_factor: Option<f64>,
+    #[serde(default)]
     pub factor_source_reference: String,
+    /// Losses of the space to outside for deriving `b_U` (8.53–8.59).
+    /// Project zones bordering the same space are added to Σ_j
+    /// automatically.
+    #[serde(default)]
+    pub outside: Option<unheated_transmission::UnheatedOutside>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -1379,21 +1387,38 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
                 "Unheated space needs a name",
             ));
         }
-        if !space.reduction_factor.is_finite() || !(0.0..=1.0).contains(&space.reduction_factor) {
-            issues.push(issue(
+        match (space.reduction_factor, &space.outside) {
+            (Some(factor), None) => {
+                if !factor.is_finite() || !(0.0..=1.0).contains(&factor) {
+                    issues.push(issue(
+                        Severity::Error,
+                        "unheated_reduction_factor_invalid",
+                        format!("{path}.reductionFactor"),
+                        "Supplied reduction factor must be between zero and one",
+                    ));
+                }
+                if space.factor_source_reference.trim().is_empty() {
+                    issues.push(issue(
+                        Severity::Error,
+                        "unheated_factor_source_required",
+                        format!("{path}.factorSourceReference"),
+                        "Reduction factor needs a traceable source",
+                    ));
+                }
+            }
+            (None, Some(_)) => {}
+            (Some(_), Some(_)) => issues.push(issue(
                 Severity::Error,
-                "unheated_reduction_factor_invalid",
+                "unheated_factor_declared_and_derived",
                 format!("{path}.reductionFactor"),
-                "Supplied reduction factor must be between zero and one",
-            ));
-        }
-        if space.factor_source_reference.trim().is_empty() {
-            issues.push(issue(
+                "Give either a declared reduction factor or the losses to outside (8.53-8.59)",
+            )),
+            (None, None) => issues.push(issue(
                 Severity::Error,
-                "unheated_factor_source_required",
-                format!("{path}.factorSourceReference"),
-                "Reduction factor needs a traceable source",
-            ));
+                "unheated_reduction_factor_required",
+                format!("{path}.reductionFactor"),
+                "Give a declared reduction factor or the losses to outside (8.53-8.59)",
+            )),
         }
     }
     let mut referenced_unheated_ids = HashSet::new();
@@ -1632,10 +1657,36 @@ pub(crate) fn unheated_zone_input(
             })
         })
         .map(|space| {
+            // 8.53/8.59 Σ_j: with one zone selected, the other project zones
+            // bordering the same space join the declared other-zone term.
+            let outside = match (&space.outside, zone_id) {
+                (Some(outside), Some(zone_id)) => {
+                    let mut outside = outside.clone();
+                    for other in project.zones.iter().filter(|zone| zone.id != zone_id) {
+                        let terms = direct_boundary_input_zone(
+                            project,
+                            ThermalBoundary::UnheatedSpace,
+                            Some(&space.id),
+                            Some(&other.id),
+                        )?;
+                        if terms.elements.is_empty()
+                            && terms.linear_bridges.is_empty()
+                            && terms.point_bridges.is_empty()
+                        {
+                            continue;
+                        }
+                        outside.other_zones_conductance_w_per_k +=
+                            direct_transmission::assess_direct_transmission(&terms)
+                                .total_direct_conductance_w_per_k?;
+                    }
+                    Some(outside)
+                }
+                (outside, _) => outside.clone(),
+            };
             Some(UnheatedSpaceInput {
                 id: space.id.clone(),
-                reduction_factor: Some(space.reduction_factor),
-                outside: None,
+                reduction_factor: space.reduction_factor,
+                outside,
                 factor_source_reference: space.factor_source_reference.clone(),
                 boundary: direct_boundary_input_zone(
                     project,
@@ -2222,6 +2273,53 @@ mod tests {
         let factor = assess_json(value).unwrap();
         assert_eq!(factor.status, "invalid");
         assert!(factor.summary.unheated_transmission_diagnostic.is_none());
+    }
+
+    #[test]
+    fn project_unheated_space_derives_b_u_with_other_project_zones() {
+        let mut value = sample();
+        value["constructions"] = json!([{"id":"c1", "rcValue":5.0, "uValue":0.4, "layers":[]}]);
+        value["zones"][0]["surfaces"] = json!([{
+            "id":"wall", "area":10.0, "constructionId":"c1", "zoneId":"z1",
+            "thermalBoundary":"unheated_space", "unheatedSpaceId":"garage", "windows":[]
+        }]);
+        value["zones"][0]["thermalBridges"] = json!([{
+            "id":"edge", "length":2.0, "psiValue":0.1, "zoneId":"z1",
+            "thermalBoundary":"unheated_space", "unheatedSpaceId":"garage"
+        }]);
+        value["zones"][0]["pointThermalBridges"] = json!([]);
+        value["zones"][0]["pointBridgeInventoryComplete"] = json!(true);
+        value["unheatedSpaces"] = json!([{
+            "id":"garage", "name":"Garage",
+            "outside": {
+                "transmission": {"elements": [{
+                    "id":"garage-walls", "areaM2":20.0, "uValueWPerM2k":1.0,
+                    "sourceReference":"survey"
+                }]},
+                "ventilation": {"method":"half_of_transmission"},
+                "otherZonesConductanceWPerK": 0.0
+            }
+        }]);
+        let result = assess_json(value.clone()).unwrap();
+        assert_eq!(result.status, "structurally_valid", "{:?}", result.issues);
+        let diagnosis = result.summary.unheated_transmission_diagnostic.unwrap();
+        // H_zi;ztu = 10·0,4 + 2·0,1 = 4,2; H_ue = 20 + 10 (8.58).
+        let b = 30.0 / (30.0 + 4.2);
+        assert!((diagnosis.spaces[0].reduction_factor - b).abs() < 1e-12);
+
+        // A second project zone on the same space enters Σ_j (8.53).
+        let mut second = value["zones"][0].clone();
+        second["id"] = json!("z2");
+        second["surfaces"][0]["id"] = json!("wall2");
+        second["surfaces"][0]["zoneId"] = json!("z2");
+        second["thermalBridges"] = json!([]);
+        value["zones"].as_array_mut().unwrap().push(second);
+        let project: ProjectInput = serde_json::from_value(value).unwrap();
+        let input = unheated_zone_input(&project, Some("z1")).unwrap();
+        let outside = input.spaces[0].outside.as_ref().unwrap();
+        assert!((outside.other_zones_conductance_w_per_k - 4.0).abs() < 1e-12);
+        let assessed = unheated_transmission::assess_unheated_transmission(&input);
+        assert!((assessed.spaces[0].reduction_factor - 30.0 / (30.0 + 4.2 + 4.0)).abs() < 1e-12);
     }
 
     #[test]
