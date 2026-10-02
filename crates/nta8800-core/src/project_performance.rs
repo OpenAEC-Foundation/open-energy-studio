@@ -717,6 +717,7 @@ fn derive_input(
         area_source_reference: nta.area_source_reference,
         space_heating: SpaceHeatingChainInput {
             humidifiers: nta.humidifiers.clone(),
+            solar_heating_kwh: Vec::new(),
             demand: primary.demand,
             emission: primary.emission,
             distribution: primary.distribution,

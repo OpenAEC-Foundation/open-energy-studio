@@ -1443,6 +1443,8 @@ export interface SpaceHeatingChainZone {
 
 export interface SpaceHeatingChainInput {
   humidifiers?: NtaZoneHumidifier[];
+  /** 9.2.3.4 Q_H;ren;prac of solar combi systems per month, kWh. */
+  solarHeatingKwh?: number[];
   demand: MonthlyDemandInput;
   additionalZones?: SpaceHeatingChainZone[];
   emission: {
@@ -1833,6 +1835,8 @@ export interface SpaceHeatingChainAssessment {
     distributionLossKwh: number;
     distributionAuxiliaryToMediumKwh: number;
     nodeLossKwh: number;
+    /** 9.2.3.4 node gain of solar combi systems. */
+    solarGainKwh: number;
     generatorOutputKwh: number;
     heatPumpOutputKwh: number;
     naturalGasKwh: number;
@@ -3047,7 +3051,90 @@ export interface NtaCoolingSystem {
 type NtaApplicationClass = 'class1' | 'class2' | 'class3' | 'class4';
 type NtaDhwDeclared = { value: number; sourceReference: string };
 
-/** Chapter 13 hot-water system with one generator. */
+/** 13.144a limits of an exhaust-air heat pump among several generators. */
+export interface NtaExhaustAirUse {
+  /** Ventilation system C or D without heat recovery. */
+  ventilationSuitable: boolean;
+  /** f_combi per month; empty means hot water only. */
+  heatingTimeFraction?: number[];
+}
+
+type NtaSolarObstruction =
+  | { method: 'minimal' }
+  | { method: 'declared'; heating: number[]; cooling: number[]; sourceReference: string };
+
+/** §13.7 solar water heater; see crates/nta8800-core/src/solar_thermal.rs. */
+export interface NtaSolarWaterHeater {
+  id: string;
+  solarUse: 'water_heating' | 'combi';
+  /** N_soli identical physical systems. */
+  count?: number;
+  method:
+    | {
+        method: 'calculated';
+        solarType: 'preheater' | 'integrated_backup';
+        collectors: {
+          moduleAreaM2: number;
+          moduleCount: number;
+          orientation: 'north' | 'north_east' | 'east' | 'south_east' | 'south' | 'south_west' | 'west' | 'north_west';
+          tiltDeg: number;
+          obstruction: NtaSolarObstruction;
+          efficiency:
+            | { method: 'forfait'; collector: 'unglazed_or_unknown' | 'glazed' | 'evacuated_tube' }
+            | { method: 'declared'; eta0: number; a1WPerM2K: number; a2WPerM2K2: number; incidenceAngleModifier: number; sourceReference: string };
+          heatExchangerWPerK?: number | null;
+          loopPipes:
+            | { method: 'forfait' }
+            | { method: 'pipes'; pipes: Array<{ lengthM: number; psiWPerMk: number }>; sourceReference: string }
+            | { method: 'declared'; heatLossWPerK: number; sourceReference: string };
+          pumpPowerW?: number | null;
+        };
+        storage: {
+          totalVolumeL: number;
+          backupVolumeL?: number | null;
+          loss:
+            | { method: 'label'; label: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' }
+            | { method: 'unknown_label'; producedFrom2018: boolean }
+            | { method: 'measured'; transmissionWPerK: number };
+          backupLossInGeneratorEfficiency?: boolean;
+        };
+      }
+    | {
+        method: 'tested';
+        solarType: 'preheater' | 'integrated_backup';
+        orientation: 'north' | 'north_east' | 'east' | 'south_east' | 'south' | 'south_west' | 'west' | 'north_west';
+        tiltDeg: number;
+        obstruction: NtaSolarObstruction;
+        totalVolumeL: number;
+        testPoints: Array<{ annualDemandKwh: number; solarOutputKwh?: number | null; backupOutputKwh?: number | null; auxiliaryKwh: number }>;
+        backupLossInGeneratorEfficiency?: boolean;
+        sourceReference: string;
+      };
+  pvt?: 'unglazed' | 'single_glazed' | 'tested_iso9806' | null;
+  sourceReference: string;
+}
+
+export type NtaHotWaterGenerator =
+    | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
+        | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
+        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null;
+        /** §13.8.4.3 conditions; required with annexT. */
+        annexTConditions?: { typeSuppliedBefore2021: boolean; applianceIndoors: boolean } | null }
+    | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
+        outdoorAirFraction?: number | null }
+    | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
+        exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null; sourceReference: string }
+    | { kind: 'electric_instantaneous' }
+    | { kind: 'electric_boiler' }
+    | { kind: 'gas_storage_heater'; volumeL: number; measuredStandbyKwhPerDay?: number | null; before1985: boolean; inHeatedZone: boolean }
+    | { kind: 'large_direct_storage'; gasFired: boolean }
+    | { kind: 'indirect_boiler'; boiler: 'conventional_or_unknown' | 'vr' | 'hr100_or104' | 'hr107'; oil: boolean;
+        insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
+    | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
+    | { kind: 'external_heat' }
+    | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump);
+
+/** Chapter 13 hot-water system (several generators, solar systems). */
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
@@ -3093,25 +3180,22 @@ export interface NtaHotWaterSystem {
   }>;
   deliverySets?: { count: number; sourceReference: string } | null;
   boilingWaterTap?: boolean;
-  generator:
-    | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
-        | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
-        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null;
-        /** §13.8.4.3 conditions; required with annexT. */
-        annexTConditions?: { typeSuppliedBefore2021: boolean; applianceIndoors: boolean } | null }
-    | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
-        outdoorAirFraction?: number | null }
-    | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
-        exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null; sourceReference: string }
-    | { kind: 'electric_instantaneous' }
-    | { kind: 'electric_boiler' }
-    | { kind: 'gas_storage_heater'; volumeL: number; measuredStandbyKwhPerDay?: number | null; before1985: boolean; inHeatedZone: boolean }
-    | { kind: 'large_direct_storage'; gasFired: boolean }
-    | { kind: 'indirect_boiler'; boiler: 'conventional_or_unknown' | 'vr' | 'hr100_or104' | 'hr107'; oil: boolean;
-        insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
-    | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
-    | { kind: 'external_heat' }
-    | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump);
+  generator: NtaHotWaterGenerator;
+  /** P_nom of the main generator (13.141), kW. */
+  nominalPowerKw?: number | null;
+  /** 13.144a when the main generator is an exhaust-air heat pump. */
+  exhaustAir?: NtaExhaustAirUse | null;
+  /** Further generators (13.8.2). */
+  additionalGenerators?: Array<{
+    generator: NtaHotWaterGenerator;
+    nominalPowerKw?: number | null;
+    exhaustAir?: NtaExhaustAirUse | null;
+    equipmentReference: string;
+  }>;
+  /** 13.141a–d: main generator first, the single additional one second. */
+  series?: { kind: 'hotfill_electric_boiler' } | { kind: 'collective_first_also_heating'; maximumSupplyC: number[] } | null;
+  /** §13.7 solar water heaters and solar combi systems. */
+  solar?: NtaSolarWaterHeater[];
   collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
   equipmentReference: string;
 }
@@ -3158,6 +3242,8 @@ export interface BuildingPerformanceAssessment {
   tojuliMaxK: number | null;
   tojuliMeetsBblLimit: boolean | null;
   spaceHeating: SpaceHeatingChainAssessment;
+  /** Chapter 13 when calculated. */
+  hotWater?: NtaHotWaterAssessment;
   lighting?: Array<{ zoneId: string; annualKwh: number; monthlyKwh: number[]; internalGainW: number }>;
   /** Factors of the external supply and the EMGforf totals (§5.8). */
   externalSupply?: NtaExternalSupplyResult | null;
@@ -3339,4 +3425,34 @@ export async function calculateProjectPerformanceWithRust(project: IProject): Pr
     return response.json() as Promise<ProjectPerformanceAssessment>;
   }
   throw new Error('Rust project calculation is available in the desktop app and local development server.');
+}
+
+/** Chapter 13 result; see crates/nta8800-core/src/domestic_hot_water.rs. */
+export interface NtaHotWaterAssessment {
+  annualNetNeedKwh: number;
+  emissionEfficiency: number;
+  annualGeneratorOutputKwh: number;
+  annualSolarRenewableKwh: number;
+  annualSolarSpaceHeatingKwh: number;
+  months: Array<{
+    month: number;
+    netNeedKwh: number;
+    generatorOutputKwh: number;
+    generationEfficiency: number;
+    carrierInputKwh: number;
+    electricityKwh: number;
+    naturalGasKwh: number;
+    oilKwh: number;
+    districtHeatKwh: number;
+    auxiliaryElectricityKwh: number;
+    ambientHeatKwh: number;
+    recoverableLossKwh: number;
+    solarRenewableKwh: number;
+    solarSpaceHeatingKwh: number;
+    solarAuxiliaryKwh: number;
+    solarBackupStorageLossKwh: number;
+    solarRecoverableKwh: number;
+    extraElectricOutputKwh: number;
+  }>;
+  generators: Array<{ index: number; order: number; monthlyOutputKwh: number[]; monthlyShare: number[] }>;
 }

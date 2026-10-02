@@ -97,6 +97,10 @@ pub struct SpaceHeatingChainInput {
     /// space-heating node (9.4), steam humidifiers have their own carrier.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub humidifiers: Vec<ZoneHumidifier>,
+    /// 9.2.3.4 `Q_H;ren;prac` of solar combi systems per month (13.66a),
+    /// kWh; the node gain is capped at the node output plus losses.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub solar_heating_kwh: Vec<f64>,
     pub demand: MonthlyDemandInput,
     pub emission: EmissionInput,
     pub distribution: Distribution,
@@ -645,6 +649,8 @@ pub struct ChainMonth {
     pub distribution_auxiliary_to_medium_kwh: f64,
     /// 9.2.3: buffer vessel loss at the node.
     pub node_loss_kwh: f64,
+    /// 9.2.3.4 `Q_H;nod;gns` from solar combi systems, kWh.
+    pub solar_gain_kwh: f64,
     pub generator_output_kwh: f64,
     /// Part of the generator output delivered by an electric heat pump.
     pub heat_pump_output_kwh: f64,
@@ -1619,6 +1625,15 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
         .chain(input.additional_zones.iter().map(|zone| &zone.demand))
         .map(|zone| zone.usable_floor_area_m2)
         .sum();
+    if !input.solar_heating_kwh.is_empty()
+        && (input.solar_heating_kwh.len() != 12
+            || input
+                .solar_heating_kwh
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0))
+    {
+        issues.push(issue("solar_heating_invalid", "solarHeatingKwh"));
+    }
     let (connected_area, building_fraction) = match &input.collective_connection {
         None => (zone_area, 1.0),
         Some(connection) => {
@@ -1790,10 +1805,18 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
             }
             // 9.5 node: generator output covers all zones plus the buffer loss.
             // 9.4: the node also supplies atomising humidification (12.1).
-            let generator_output = distribution_input
+            let node_output = distribution_input
                 + distribution.node_loss[index]
                 + humidification[index][0]
                 + ahu_heating[index];
+            // 9.2.3.4/9.5: solar heat reduces the node input.
+            let solar_gain = input
+                .solar_heating_kwh
+                .get(index)
+                .copied()
+                .unwrap_or(0.0)
+                .clamp(0.0, node_output.max(0.0));
+            let generator_output = node_output - solar_gain;
             let month = index as u8 + 1;
             outputs.push(MonthlyEnergy {
                 month,
@@ -1807,6 +1830,7 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
                 distribution_loss_kwh: distribution_loss,
                 distribution_auxiliary_to_medium_kwh: to_medium,
                 node_loss_kwh: distribution.node_loss[index],
+                solar_gain_kwh: solar_gain,
                 generator_output_kwh: generator_output,
                 heat_pump_output_kwh: 0.0,
                 natural_gas_kwh: 0.0,
@@ -2967,6 +2991,7 @@ mod tests {
     fn boiler_chain() -> SpaceHeatingChainInput {
         SpaceHeatingChainInput {
             humidifiers: Vec::new(),
+            solar_heating_kwh: Vec::new(),
             demand: demand(),
             emission: emission(),
             distribution: Distribution::HeatedZoneOnlySpaceHeating {

@@ -66,6 +66,7 @@ pub mod reference;
 pub mod registration;
 pub mod significant_figures;
 pub mod solar_shading;
+pub mod solar_thermal;
 pub mod space_cooling;
 pub mod space_heating_chain;
 pub mod tojuli;
@@ -330,7 +331,7 @@ pub fn capabilities() -> KernelCapabilities {
             "indicative_label_class_omgevingsregeling_annex_ix_x",
             "bbl_4_149_beng_requirement_check_single_function",
             "unverified_tojuli_per_orientation_5_7_with_capacity_evidence",
-            "unverified_domestic_hot_water_chapter_13_single_generator",
+            "unverified_domestic_hot_water_chapter_13_generators_and_solar_13_7",
             "unverified_utility_lighting_chapter_14",
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
