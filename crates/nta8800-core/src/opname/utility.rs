@@ -955,10 +955,41 @@ fn derive_utility_heating(
             "NTA 8800 9.91 (interpretation: one device per surveyed generator)",
         );
     }
+    // Afb. 9.1 (p. 121–122): heating pipes in a crawlspace or other
+    // unheated space; not inspectable or unknown counts as present with the
+    // forfait length (table 9.14).
+    let unheated_spaces_present = survey.envelope.surfaces.iter().any(|surface| {
+        matches!(
+            surface.boundary,
+            super::envelope::SurfaceBoundary::Crawlspace
+                | super::envelope::SurfaceBoundary::UnheatedCellar
+                | super::envelope::SurfaceBoundary::UnheatedSpace { .. }
+        )
+    });
+    let unheated_pipe_length = if hydronic && unheated_spaces_present {
+        match survey.heating.unheated_pipes {
+            Some(super::heating::UnheatedPipesAnswer::Absent) => None,
+            Some(super::heating::UnheatedPipesAnswer::Present { length_m }) => Some(length_m),
+            None => {
+                recorder.record(
+                    "unheated_pipes_unknown_present",
+                    "heating.unheatedPipes",
+                    "present, forfait length (9.26)".into(),
+                    "ISSO 75.1 p. 121–122 (afb. 9.1, table 9.14)",
+                );
+                Some(None)
+            }
+        }
+    } else {
+        None
+    };
     // A collective boiler's pump is not in 9.85: the calculated
-    // distribution (9.26–9.51) with the forfait pump applies.
-    let needs_distribution =
-        hydronic && (derived.distribution_system.is_some() || installation.collective);
+    // distribution (9.26–9.51) with the forfait pump applies; so do pipes
+    // in unheated spaces.
+    let needs_distribution = hydronic
+        && (derived.distribution_system.is_some()
+            || installation.collective
+            || unheated_pipe_length.is_some());
     if needs_distribution {
         let mean = generator["boiler"]["averageDesignEmissionTemperatureC"]
             .as_f64()
@@ -1000,6 +1031,23 @@ fn derive_utility_heating(
         system["pump"]["heatMeterPresent"] = json!(installation.collective);
         system["usageFunction"] = json!(reduction_function);
         system["connectedStoreys"] = json!(survey.storeys.max(1));
+        match unheated_pipe_length {
+            Some(Some(length)) => system["unheatedPipeLengthM"] = json!(length),
+            // Forfait: the kernel's 15 % of L (9.26).
+            Some(None) => {}
+            // Afb. 9.1: no unheated space, or no pipes there; without this
+            // the kernel would assume 15 % of L in unheated spaces.
+            None if system.get("unheatedPipeLengthM").is_none() => {
+                system["unheatedPipeLengthM"] = json!(0.0);
+                recorder.record(
+                    "unheated_pipes_absent_length_0",
+                    "heating.unheatedPipes",
+                    "0 m in unheated spaces".into(),
+                    "ISSO 75.1 p. 121–122 (afb. 9.1)",
+                );
+            }
+            None => {}
+        }
         derived.distribution_system = Some(system);
     }
     derived
@@ -2487,6 +2535,36 @@ mod tests {
         assert_eq!(
             recorder.issues[0].code,
             "collective_generator_power_required"
+        );
+    }
+
+    #[test]
+    fn pipes_in_unheated_spaces_follow_afb_9_1() {
+        // No unheated space: no pipes there, length 0 (not the 15 % forfait).
+        let (input, recorder) = derive(&fixture("1985"));
+        let system = &input["spaceHeating"]["distributionSystem"];
+        assert_eq!(system["unheatedPipeLengthM"], 0.0);
+        assert!(applied(&recorder, "unheated_pipes_absent_length_0"));
+        // A crawlspace with unknown pipes: present, forfait length.
+        let mut survey = fixture("1985");
+        survey.envelope.surfaces[0].boundary = super::super::envelope::SurfaceBoundary::Crawlspace;
+        survey.envelope.surfaces[0].element = super::super::envelope::SurfaceElement::Floor;
+        survey.envelope.surfaces[0].exposed_perimeter_m = Some(40.0);
+        let mut recorder = Recorder::default();
+        let input = derive_utility_input(&survey, &mut recorder).unwrap();
+        let system = &input["spaceHeating"]["distributionSystem"];
+        assert!(system.get("unheatedPipeLengthM").is_none());
+        assert!(applied(&recorder, "unheated_pipes_unknown_present"));
+        // A measured length is passed on.
+        survey.heating.unheated_pipes =
+            Some(super::super::heating::UnheatedPipesAnswer::Present {
+                length_m: Some(12.0),
+            });
+        let mut recorder = Recorder::default();
+        let input = derive_utility_input(&survey, &mut recorder).unwrap();
+        assert_eq!(
+            input["spaceHeating"]["distributionSystem"]["unheatedPipeLengthM"],
+            12.0
         );
     }
 
