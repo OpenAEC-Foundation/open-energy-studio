@@ -39,7 +39,7 @@ Voor warmtepompen ontbreken hierdoor nog de normatieve prestatie- en hulpenergie
 
 ## Transcriptiebronnen van de rekenkern (1 oktober 2026)
 
-Sinds 2 oktober 2026 is de gelicentieerde pdf lokaal beschikbaar. De modules `space_cooling`, `domestic_hot_water`, `pv`, `tojuli` en `lighting` zijn daartegen herschreven; de pdf zelf staat niet in de repository. Oorspronkelijk stond de gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` op netwerkshare `Z:\50_projecten\7_3BM_bouwkunde\000_Documentatie\98_normen\`, die op de ontwikkelmachine niet gemount is. De onderstaande modules zijn gebouwd op normanalyses die die pdf transcriberen, met paginaverwijzingen. Bij de normreview moet elke regel opnieuw tegen de pdf worden gelegd.
+Sinds 2 oktober 2026 is de gelicentieerde pdf lokaal beschikbaar. De modules `space_cooling`, `domestic_hot_water`, `pv`, `tojuli` en `lighting` zijn daartegen herschreven, en `hot_water_tests` is er rechtstreeks uit getranscribeerd (bijlage T, p. 1096–1109; bijlage U, p. 1110–1113); de pdf zelf staat niet in de repository. Oorspronkelijk stond de gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` op netwerkshare `Z:\50_projecten\7_3BM_bouwkunde\000_Documentatie\98_normen\`, die op de ontwikkelmachine niet gemount is. De onderstaande modules zijn gebouwd op normanalyses die die pdf transcriberen, met paginaverwijzingen. Bij de normreview moet elke regel opnieuw tegen de pdf worden gelegd.
 
 | Module | Normonderdeel | Transcriptiebron (Open Heatloss Studio, MIT) |
 |---|---|---|
