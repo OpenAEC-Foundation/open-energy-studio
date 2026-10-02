@@ -57,6 +57,10 @@ pub struct NtaCalculationInput {
     /// Adjacent unheated sunrooms (7.30b); per zone in `zoneData`.
     #[serde(default)]
     pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
+    /// Vertical pipes through the envelope (7.3.3, H_p of 7.17); per zone in
+    /// `zoneData`.
+    #[serde(default)]
+    pub vertical_pipes: Vec<crate::monthly_demand::VerticalPipe>,
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
     #[serde(default)]
@@ -123,6 +127,10 @@ pub struct ZoneNtaData {
     pub function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
     #[serde(default)]
     pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
+    /// 7.3.3 vertical pipes of this zone; empty falls back to the project
+    /// list.
+    #[serde(default)]
+    pub vertical_pipes: Vec<crate::monthly_demand::VerticalPipe>,
     #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
     #[serde(default)]
@@ -453,6 +461,12 @@ fn derive_input(
     }
     let nta = nta?;
     let multi_zone = project.zones.len() > 1;
+    if multi_zone && !nta.vertical_pipes.is_empty() {
+        gaps.push(gap(
+            "vertical_pipes_per_zone_required",
+            "ntaCalculation.verticalPipes",
+        ));
+    }
     let zone_data: HashMap<&str, &ZoneNtaData> = nta
         .zone_data
         .iter()
@@ -669,7 +683,13 @@ fn derive_input(
                 unheated,
                 ground_floors,
                 ground_inventory_confirmed: true,
-                vertical_pipes: Vec::new(),
+                // The project list serves a single zone only; a multi-zone
+                // project gives the pipes per zone (no double counting).
+                vertical_pipes: match data {
+                    Some(item) if !item.vertical_pipes.is_empty() => item.vertical_pipes.clone(),
+                    _ if !multi_zone => nta.vertical_pipes.clone(),
+                    _ => Vec::new(),
+                },
             }),
             ventilation_flows: data
                 .map(|item| item.ventilation_flows.clone())
@@ -888,6 +908,30 @@ mod tests {
             detail.contains("ventilationFlows[0].months[3].conductanceWPerK"),
             "{detail}"
         );
+    }
+
+    #[test]
+    fn vertical_pipes_reach_the_zone_transmission() {
+        let conductance = |value: &Value| {
+            let result = assess_project_performance(value);
+            assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+            result
+                .performance
+                .unwrap()
+                .space_heating
+                .demand
+                .transmission
+                .unwrap()
+                .conductance_w_per_k
+        };
+        let mut value = project();
+        let base = conductance(&value);
+        value["ntaCalculation"]["verticalPipes"] = serde_json::json!([{
+            "id": "standleiding", "storeys": 2, "insulated": false,
+            "sourceReference": "survey"
+        }]);
+        // Table 7.1: 1,8 W/K per storey (7.17).
+        assert!((conductance(&value) - base - 3.6).abs() < 1e-9);
     }
 
     #[test]
