@@ -195,6 +195,9 @@ fn below_terms(slab: &SlabOnGround, below: &FloorBelow) -> Option<BelowTerms> {
     let perimeter = slab.exposed_perimeter_m;
     let b_prime = area / (0.5 * perimeter);
     // 8.2.2.2.1: R_si + R_c of the floor plus R_si towards the space below.
+    // Table C.2 gives R_se 0,04 for surfaces to outside air; like 8.4.2.1
+    // for unheated spaces and 7.2 of NEN-EN-ISO 13370 (U_f between the
+    // interior and the underfloor space), the still air below takes R_si.
     let u_f = 1.0 / (slab.construction_resistance_m2k_per_w + R_SI_DOWN);
     // 8.33/8.34.
     let d_bf = WALL_THICKNESS_M + LAMBDA_GROUND * (R_SI_DOWN + r_bf + R_SE_GROUND);

@@ -28,7 +28,7 @@
 **Wat nog ontbreekt voor certificering.**
 
 1. **Officiële referentie-uitkomsten.** De BRL 9501-testset of de bijlage van ISSO 54 met verwachte resultaten ontbreekt. De ISSO-boeken bevatten geen volledig doorgerekend voorbeeld. Alle uitkomsten zijn dus `referenceVerified: false`.
-2. **Open interpretatievragen.** Ze staan per module in de documentatie en in de uitvoer `interpretations`. De belangrijkste: de letterlijke lezing van 9.29, R_se onder een vloer boven een kruipruimte (0,17 of 0,04), de factor 15 % in formule 10.15, en de kolom "Juli/september" van tabel 10.16.
+2. **Open interpretatievragen.** Ze staan per module in de documentatie en in de uitvoer `interpretations`. De belangrijkste: de letterlijke lezing van 9.29, de factor 15 % in formule 10.15, en de kolom "Juli/september" van tabel 10.16.
 3. **Niet ondersteund (met expliciete foutcode).**
    - luchtbehandelingskasten die de toevoerlucht verwarmen of koelen;
    - koelmethoden 1/2;
@@ -75,6 +75,8 @@ Vier leesreviews hebben de kern opnieuw tegen de normtekst gelegd, zonder de cod
   - een vloer boven buitenlucht krijgt de verkeerde Rc-rij.
 
   Daarnaast ontbreken nog boekregels, zoals leidingdoorvoeren H_p, leidingen in onverwarmde ruimten en het naïsolatiejaar.
+
+De vraag welke R_se onder een vloer boven een kruipruimte of kelder geldt, is beslist op 0,17 (R_si omlaag). Tabel C.2 geeft 0,04 voor buitenlucht. 8.4.2.1 vervangt R_se door de R_si van de onverwarmde ruimte, en 7.2 van NEN-EN-ISO 13370, waar 8.43 op is gebaseerd, definieert U_f tussen het binnenmilieu en de ruimte onder de vloer.
 
 Het interpretatiedocument NTA 8800:2024/INT-V1:2024 is nagelopen. De correcties staan al in de doeleditie 2025+C1:2026:
 - buffervat zonder terugwinbare verliezen bij 9.5;
