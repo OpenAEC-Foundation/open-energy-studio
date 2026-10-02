@@ -129,14 +129,17 @@ function pumpHtml({ context, pump }: PumpEntry): string {
 
 type SourceRow = { path: string; source: string; values: string };
 
+/** Evidence fields: source references plus the chapter 11 evidence texts. */
+const EVIDENCE_KEY = /(Reference|Evidence)$|^maximumCapacityForCooling$/;
+
 /** Every object in the NTA block that carries a source reference, with its own scalar values. */
 function ntaSourceRows(value: unknown, path = 'ntaCalculation'): SourceRow[] {
   if (Array.isArray(value)) return value.flatMap((item, index) => ntaSourceRows(item, `${path}[${index}]`));
   if (!value || typeof value !== 'object') return [];
   const entries = Object.entries(value as Record<string, unknown>);
-  const own = entries.filter(([key]) => /Reference$/.test(key));
+  const own = entries.filter(([key, item]) => EVIDENCE_KEY.test(key) && (item == null || typeof item === 'string'));
   const scalars = entries
-    .filter(([key, item]) => !/Reference$/.test(key) && (item === null || typeof item !== 'object'))
+    .filter(([key, item]) => !EVIDENCE_KEY.test(key) && (item === null || typeof item !== 'object'))
     .map(([key, item]) => `${key}: ${item === null ? '—' : String(item)}`);
   const rows = own.map(([key, source]) => ({
     path: `${path}.${key}`,

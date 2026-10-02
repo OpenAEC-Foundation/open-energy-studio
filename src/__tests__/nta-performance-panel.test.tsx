@@ -163,4 +163,59 @@ describe('NTA performance panel', () => {
     expect(block.setpoints.sourceReference).toBe('table 7.13');
     expect(block.thermalMass.sourceReference).toBe('');
   });
+
+  it('switches the form to chapter 11 ventilation and saves a mirrored block', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ status: 'incomplete', inputFingerprint: 'sha256:x', attestStatus: 'unattested',
+        geometry: null, gaps: [], derivedInput: null, performance: null }),
+    }));
+    renderWithProviders(<Harness />);
+    const panel = within(await screen.findByRole('region', { name: 'NTA 8800 calculation (Rust kernel)' }));
+    await user.click(await panel.findByRole('button', { name: 'Start NTA input' }));
+    await user.selectOptions(panel.getByLabelText('Ventilation input'), 'chapter11');
+    expect(panel.getByText('Ventilation chapter 11 – building')).toBeInTheDocument();
+    await user.selectOptions(panel.getByLabelText('System variant'), 'd5c');
+    await user.click(panel.getByLabelText('Heat recovery (HRU)'));
+    await user.click(panel.getByRole('button', { name: 'Save' }));
+    const block = JSON.parse(screen.getByTestId('block').textContent ?? 'null');
+    expect(block.ventilationFlows).toEqual([]);
+    expect(block.ventilation.system.unit.variant).toBe('d5c');
+    expect(block.ventilation.system.unit.heatRecovery.bypass).toEqual({ kind: 'full' });
+    expect(block.ventilation.heatingSetpointC).toBe(block.setpoints.heatingC);
+    expect(block.ventilation.functions[0].function).toBe('residential');
+  });
+
+  it('shows the BENG 1 basis and chapter 11 outputs', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'calculated_unverified', inputFingerprint: 'sha256:abc', attestStatus: 'unattested', gaps: [], derivedInput: null,
+        performance: {
+          status: 'calculated_unverified', issues: [], needIndicatorKwhPerM2Year: 48.1, primaryFossilIndicatorKwhPerM2Year: 20,
+          renewableSharePercent: 60, indicativeLabelClass: 'A++', labelSource: 'annex IX', bblCheck: null, a0Check: null,
+          tojuli: [], tojuliMaxK: null, tojuliMeetsBblLimit: null, annualPrimaryFossilKwh: 2000, annualRenewablePrimaryKwh: 3000,
+          annualCo2Kg: 812, co2KgPerM2: 6.5, annualStorageCorrectionKwh: 0,
+          spaceHeating: {
+            omittedTerms: [], monthly: Array.from({ length: 12 }, (_, index) => ({ ...month(100, index), recoverableLossKwh: 5 })),
+            additionalZoneDemands: [],
+            demand: {
+              annualHeatingNeedKwh: 3000, annualCoolingNeedKwh: 200, omittedCorrections: [], recoverableLossesApplied: true,
+              monthly: Array.from({ length: 12 }, () => ({ cooling: { needKwh: 10 } })),
+              fixedC1: { status: 'calculated_unverified', annualHeatingNeedKwh: 5500, annualCoolingNeedKwh: 300 },
+              ventilation: { zoneId: 'z1', annualFanElectricityKwh: 210, annualFrostProtectionElectricityKwh: 0,
+                annualGrillePreheatingElectricityKwh: 0,
+                months: [{ heating: { requiredOutdoorAirM3PerH: 191, infiltrationM3PerH: 38, conductanceWPerK: 90.06 } }] },
+            },
+          },
+        },
+      }),
+    }));
+    renderWithProviders(<NtaPerformancePanel />);
+    expect(await screen.findByText(/separate run with the fixed C1 system \(§5\.4\.2\) · 5[.,]?800 kWh/)).toBeInTheDocument();
+    expect(screen.getByText(/H_ve January \(heating\): 90\.1 W\/K/)).toBeInTheDocument();
+    expect(screen.getByText(/Q_H;ls;rbl per year: 60 kWh/)).toBeInTheDocument();
+    expect(screen.getByText(/812 kg · 6\.5 kg\/m²/)).toBeInTheDocument();
+  });
 });

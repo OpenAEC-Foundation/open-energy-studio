@@ -9,6 +9,7 @@ import {
 } from '../../core/nta/KernelClient';
 import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTemplate';
 import { NtaCalculationForm } from './NtaCalculationForm';
+import { summarizeExtras } from '../../core/nta/NtaResultSummary';
 import './NtaPerformancePanel.css';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -80,6 +81,7 @@ export function NtaPerformancePanel() {
   const calculated = assessment?.status === 'calculated_unverified' && performance;
   const heating = performance?.spaceHeating;
   const issues = performance?.issues ?? [];
+  const extras = calculated && performance ? summarizeExtras(performance) : null;
 
   return (
     <section className="nta-performance" aria-label={t('nta.performance.title')}>
@@ -205,6 +207,29 @@ export function NtaPerformancePanel() {
             ))}
           </ul>
         </div>}
+        {extras && <details className="nta-performance-monthly" open={extras.ventilation.length > 0}>
+          <summary>{t('nta.performance.details')}</summary>
+          <dl className="nta-performance-totals">
+            {extras.beng1Basis && <div><dt>{t('nta.performance.beng1Basis')}</dt>
+              <dd>{extras.beng1Basis === 'fixed_c1'
+                ? `${t('nta.performance.beng1FixedC1')} · ${kwh(extras.fixedC1NeedKwh)} kWh`
+                : t('nta.performance.beng1Confirmed')}</dd></div>}
+            {extras.ventilation.map((zone) => <div key={zone.zoneId}>
+              <dt>{t('nta.performance.ventilation')}{extras.ventilation.length > 1 ? ` · ${zone.zoneId}` : ''}</dt>
+              <dd>{t('nta.performance.ventilationFlow')}: {kwh(zone.requiredJanuaryM3PerH)} m³/h · {t('nta.performance.infiltration')}: {kwh(zone.infiltrationJanuaryM3PerH)} m³/h
+                · {t('nta.performance.ventilationConductance')}: {zone.conductanceJanuaryWPerK.toFixed(1)} W/K
+                · {t('nta.performance.fans')}: {kwh(zone.fanKwh)} kWh
+                {zone.frostProtectionKwh > 0 && <> · {t('nta.performance.frost')}: {kwh(zone.frostProtectionKwh)} kWh</>}</dd>
+            </div>)}
+            {extras.recoverableLossesApplied && <div><dt>{t('nta.performance.recoverable')}</dt>
+              <dd>{t('nta.performance.recoverableKwh')}: {kwh(extras.recoverableLossKwh)} kWh</dd></div>}
+            {extras.lightingKwh != null && <div><dt>{t('nta.performance.lighting')}</dt><dd>{kwh(extras.lightingKwh)} kWh</dd></div>}
+            {extras.co2Kg != null && <div><dt>{t('nta.performance.co2')}</dt>
+              <dd>{kwh(extras.co2Kg)} kg · {extras.co2KgPerM2?.toFixed(1) ?? '–'} kg/m²</dd></div>}
+            {extras.storageCorrectionKwh != null && extras.storageCorrectionKwh !== 0 && <div><dt>{t('nta.performance.storage')}</dt>
+              <dd>{kwh(extras.storageCorrectionKwh)} kWh</dd></div>}
+          </dl>
+        </details>}
         <details className="nta-performance-monthly">
           <summary>{t('nta.performance.monthly')}</summary>
           <div className="nta-performance-table"><table>

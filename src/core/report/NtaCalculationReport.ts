@@ -1,6 +1,7 @@
 import type { IProject } from '../energy/types';
 import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
+import { summarizeExtras } from '../nta/NtaResultSummary';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
@@ -33,7 +34,7 @@ export function generateNtaCalculationReportHTML(
     <h1>NTA 8800-rekenrapport</h1>
     <p>Project: ${escapeHtml(project.name)} · Project-ID: ${escapeHtml(project.id)} · Gegenereerd: ${escapeHtml(generatedAt)}</p>
     <div class="notice"><strong>Onverifieerde berekening — geen officieel energielabel, niet geattesteerd.</strong>
-    Deze uitkomst komt uit de Rust-rekenkern van Open Energy Studio. Delen van NTA 8800 zijn gebaseerd op transcripties en het openbare consultatieconcept; ventilatie, koeling en delen van tapwater zijn opgegeven waarden. Een energielabel wordt pas vastgesteld na registratie door een gecertificeerde adviseur met een BRL 9501-geattesteerd rekenprogramma (Omgevingsregeling art. 5.11/5.12).</div>
+    Deze uitkomst komt uit de Rust-rekenkern van Open Energy Studio. De kern is getranscribeerd uit de gelicentieerde normtekst maar nog niet met referentiegevallen geverifieerd; niet-ondersteunde situaties worden afgewezen of als opgegeven waarde vermeld. Een energielabel wordt pas vastgesteld na registratie door een gecertificeerde adviseur met een BRL 9501-geattesteerd rekenprogramma (Omgevingsregeling art. 5.11/5.12).</div>
     <h2>Herleidbaarheid</h2><table><tbody>
       <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Kernelversie</th>${cell(assessment.kernelVersion)}</tr>
       <tr><th>Status</th>${cell(assessment.status)}<th>Atteststatus</th>${cell(assessment.attestStatus)}</tr>
@@ -67,6 +68,13 @@ export function generateNtaCalculationReportHTML(
     : zone.orientations.filter((item) => item.assessed).map((item) =>
       `<tr>${cell(zone.zoneId)}${cell(item.orientation)}<td class="n">${num(item.tojuliK, 2)}</td></tr>`)).join('');
   const bbl = performance.bblCheck;
+  const extras = summarizeExtras(performance);
+  const ventilationRows = extras.ventilation.map((item) => `<tr>${cell(item.zoneId)}<td class="n">${num(item.requiredJanuaryM3PerH)}</td>
+    <td class="n">${num(item.infiltrationJanuaryM3PerH)}</td><td class="n">${num(item.conductanceJanuaryWPerK, 1)}</td>
+    <td class="n">${num(item.fanKwh)}</td><td class="n">${num(item.frostProtectionKwh)}</td><td class="n">${num(item.grillePreheatingKwh)}</td></tr>`).join('');
+  const beng1Basis = extras.beng1Basis === 'fixed_c1'
+    ? `aparte run met vast ventilatiesysteem C1 (§5.4.2), Q<sub>H+C;nd</sub> = ${num(extras.fixedC1NeedKwh)} kWh`
+    : extras.beng1Basis === 'confirmed' ? 'opgegeven ventilatie door de adviseur bevestigd als C1' : '—';
   const limits = [...new Set([...zones.flatMap((zone) => zone.omittedCorrections), ...heating.omittedTerms])]
     .map((item) => `<li>${escapeHtml(item)}</li>`).join('');
   return `${head}
@@ -82,8 +90,14 @@ export function generateNtaCalculationReportHTML(
       <tr><th>Warmte- en koudebehoefte</th><td class="n">${num(performance.annualHeatingAndCoolingNeedKwh)} kWh</td><th>Omgevingswarmte warmtepomp</th><td class="n">${num(performance.annualHeatPumpAmbientHeatKwh)} kWh</td></tr>
       <tr><th>CO<sub>2</sub>-emissie (§5.5.6.1, tabel 5.3)</th><td class="n">${num(performance.annualCo2Kg)} kg/jr</td><th>Per m² gebruiksoppervlakte</th><td class="n">${num(performance.co2KgPerM2, 1)} kg/m²·jr</td></tr>
       <tr><th>Opslagcorrectie (5.14a)</th><td class="n">${num(performance.annualStorageCorrectionKwh)} kWh</td><th>Hulpenergie verwarming</th><td class="n">${num(heating.annualAuxiliaryElectricityKwh)} kWh</td></tr>
+      <tr><th>Basis BENG 1</th><td colspan="3">${beng1Basis}</td></tr>
+      <tr><th>Terugwinbare systeemverliezen (7.3)</th>${cell(extras.recoverableLossesApplied ? 'verrekend' : 'niet verrekend')}<th>Q<sub>H;ls;rbl</sub></th><td class="n">${num(extras.recoverableLossKwh)} kWh</td></tr>
+      ${extras.lightingKwh != null ? `<tr><th>Verlichting (hoofdstuk 14)</th><td class="n">${num(extras.lightingKwh)} kWh</td><th></th><td></td></tr>` : ''}
       <tr><th>Labelbron</th><td colspan="3">${escapeHtml(performance.labelSource)}</td></tr>
     </tbody></table>
+    ${ventilationRows ? `<h2>Ventilatie (hoofdstuk 11)</h2><table><thead><tr><th>Zone</th><th>q<sub>V;ODA;req</sub> jan [m³/h]</th><th>Infiltratie jan [m³/h]</th>
+      <th>H<sub>ve</sub> jan [W/K]</th><th>Ventilatoren [kWh/jr]</th><th>Vorstbeveiliging [kWh/jr]</th><th>Voorverwarming roosters [kWh/jr]</th></tr></thead>
+      <tbody>${ventilationRows}</tbody></table>` : ''}
     ${bbl ? `<h2>Toets Bbl art. 4.149 (tabel 4.148A)</h2><table><tbody>
       <tr><th>Gebruiksfunctie</th>${cell(bbl.function)}<th>A<sub>ls</sub>/A<sub>g</sub></th><td class="n">${num(bbl.lossAreaRatio, 2)}</td></tr>
       <tr><th>BENG 1 ≤ ${num(bbl.limits.energyNeedMaxKwhPerM2, 1)}</th>${cell(meets(bbl.energyNeedMeets))}<th>BENG 2 ≤ ${num(bbl.limits.primaryFossilMaxKwhPerM2, 1)}</th>${cell(meets(bbl.primaryFossilMeets))}</tr>
@@ -107,6 +121,6 @@ export function generateNtaCalculationReportHTML(
       <li>Klimaat: ${escapeHtml(heating.demand.climateSource)}</li>
       <li>Hoofdstuk 9 (afgifte, opwekking): ${escapeHtml(heating.chapter9Source)}</li>
       <li>Hoofdstuk 5 (primaire energie, indicatoren): ${escapeHtml(performance.chapter5Source)}</li>
-      <li>Hoofdstukken 7, 8, 13 en 16: transcripties uit de normanalyses van Open Heatloss Studio; review tegen de normtekst nog nodig.</li>
+      <li>Hoofdstukken 7–17: getranscribeerd uit NTA 8800:2025+C1:2026 (paginaverwijzingen in de kern); verificatie met referentiegevallen nog nodig.</li>
     </ul></body></html>`;
 }
