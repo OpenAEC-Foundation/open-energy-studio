@@ -94,6 +94,10 @@ pub struct SurveySurface {
     /// Exposed perimeter of a floor on ground or crawlspace, m.
     #[serde(default)]
     pub exposed_perimeter_m: Option<f64>,
+    /// Crawlspace bottom insulated without a declaration: R_bf 0,5
+    /// (table 8.13, p. 93); `None`/false: uninsulated.
+    #[serde(default)]
+    pub crawlspace_bottom_insulated: Option<bool>,
     pub source_reference: String,
 }
 
@@ -352,6 +356,8 @@ pub fn derive_envelope(
     let mut ground_floors = Vec::new();
     let mut partitions: Vec<(String, f64, f64, String)> = Vec::new();
     let mut floor_above_crawlspace = false;
+    let mut crawl_floors: Vec<usize> = Vec::new();
+    let mut facade_parts: Vec<f64> = Vec::new();
 
     for (index, surface) in envelope.surfaces.iter().enumerate() {
         let path = format!("envelope.surfaces[{index}]");
@@ -567,14 +573,6 @@ pub fn derive_envelope(
         );
         match &surface.boundary {
             SurfaceBoundary::Ground | SurfaceBoundary::Crawlspace => {
-                if matches!(surface.boundary, SurfaceBoundary::Crawlspace) {
-                    floor_above_crawlspace = true;
-                    recorder.warning(
-                        "crawlspace_floor_approximated_as_slab_on_ground",
-                        &path,
-                        "the kernel lacks NTA 8.3.4.2 / annex D.2.2.4 for crawlspaces",
-                    );
-                }
                 let Some(perimeter) = surface.exposed_perimeter_m else {
                     recorder.issue(
                         "exposed_perimeter_required",
@@ -582,16 +580,44 @@ pub fn derive_envelope(
                     );
                     continue;
                 };
-                ground_floors.push(json!({
+                // The kernel takes R_si + R_c (R_si 0,17 for a floor, C.2).
+                let mut floor = json!({
                     "id": surface.id,
                     "areaM2": net,
                     "exposedPerimeterM": perimeter,
-                    "constructionResistanceM2kPerW": result.r_c,
+                    "constructionResistanceM2kPerW": result.r_c + 0.17,
                     "edgeThermalBridges": {"method": "forfait"},
                     "sourceReference": format!("{}; basisopname R_c {} ({})", surface.source_reference, result.r_c, result.route),
-                }));
+                });
+                if matches!(surface.boundary, SurfaceBoundary::Crawlspace) {
+                    floor_above_crawlspace = true;
+                    let insulated = surface.crawlspace_bottom_insulated.unwrap_or(false);
+                    recorder.record(
+                        "crawlspace_bottom",
+                        &path,
+                        if insulated {
+                            "R_bf 0,5 m²K/W (insulated, no declaration)".to_string()
+                        } else {
+                            "uninsulated bottom, R_bf 0".to_string()
+                        },
+                        "ISSO 82.1 p. 93 table 8.13",
+                    );
+                    floor["below"] = json!({
+                        "kind": "crawlspace",
+                        "floorResistanceM2kPerW": if insulated { 0.5 } else { 0.0 },
+                        "depthClass": "other",
+                        // Filled in from the façade after the loop.
+                        "wallResistanceM2kPerW": 0.0,
+                        "wallUValueWPerM2k": 0.0,
+                    });
+                    crawl_floors.push(ground_floors.len());
+                }
+                ground_floors.push(floor);
             }
             _ => {
+                if matches!(surface.element, SurfaceElement::Facade) && exterior {
+                    facade_parts.push(result.u_c);
+                }
                 if net > 1e-9 {
                     push_opaque_or_partition(
                         &mut opaque,
@@ -613,6 +639,33 @@ pub fn derive_envelope(
                     );
                 }
             }
+        }
+    }
+
+    // Table 8.13 (p. 93): crawlspace wall R_bw = R_c of the façade above
+    // (the lowest of several); U_xw = U of that façade (8.47 note 3).
+    if !crawl_floors.is_empty() {
+        match facade_parts
+            .iter()
+            .cloned()
+            .fold(None, |max: Option<f64>, u| {
+                Some(max.map_or(u, |m| m.max(u)))
+            }) {
+            Some(u_facade) => {
+                // R_si 0,13 + R_se 0,04 of a façade.
+                let r_c = (1.0 / u_facade - 0.17).max(0.01);
+                for index in &crawl_floors {
+                    ground_floors[*index]["below"]["wallResistanceM2kPerW"] = json!(r_c);
+                    ground_floors[*index]["below"]["wallUValueWPerM2k"] = json!(u_facade);
+                }
+                recorder.record(
+                    "crawlspace_wall_from_facade",
+                    "envelope",
+                    format!("R_bw {r_c:.2} m²K/W, U_xw {u_facade:.2} W/(m²K)"),
+                    "ISSO 82.1 p. 93 table 8.13; NTA 8.34, 8.47",
+                );
+            }
+            None => recorder.issue("crawlspace_requires_facade", "envelope.surfaces"),
         }
     }
 
@@ -786,6 +839,7 @@ mod tests {
             insulation: InsulationAnswer::NoneOrUnknown,
             thermal_cushions: false,
             exposed_perimeter_m: Some(16.0),
+            crawlspace_bottom_insulated: None,
             source_reference: "survey".into(),
         }
     }
@@ -898,5 +952,32 @@ mod tests {
             .applied
             .iter()
             .any(|item| item.rule == "door_insulation_unknown_uninsulated"));
+    }
+
+    #[test]
+    fn crawlspace_floor_takes_the_facade_for_its_walls() {
+        let mut recorder = Recorder::default();
+        let envelope = SurveyEnvelope {
+            surfaces: vec![
+                surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+                surface("vloer", SurfaceElement::Floor, SurfaceBoundary::Crawlspace),
+            ],
+            windows: Vec::new(),
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+        };
+        let derived = derive_envelope(&envelope, 1975, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        let floor = &derived.ground_floors[0];
+        assert_eq!(floor["below"]["kind"], "crawlspace");
+        assert_eq!(floor["below"]["floorResistanceM2kPerW"], 0.0);
+        let u_facade = floor["below"]["wallUValueWPerM2k"].as_f64().unwrap();
+        let r_bw = floor["below"]["wallResistanceM2kPerW"].as_f64().unwrap();
+        assert!((r_bw - (1.0 / u_facade - 0.17)).abs() < 1e-9);
+        // R_si 0,17 is added for the kernel's R_si + R_c.
+        let r = floor["constructionResistanceM2kPerW"].as_f64().unwrap();
+        assert!(r > 0.17);
+        assert!(derived.floor_above_crawlspace);
     }
 }

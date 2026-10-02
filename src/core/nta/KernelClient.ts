@@ -436,9 +436,30 @@ export type MonthlyDemandTransmission =
         constructionResistanceM2kPerW: number;
         edgeThermalBridges: NtaGroundEdgeThermalBridges;
         edgeInsulation?: NtaGroundEdgeInsulation[];
+        below?: NtaFloorBelow | null;
         sourceReference: string;
       }>;
       groundInventoryConfirmed: boolean;
+    };
+
+/** 8.3.4.2: crawlspace or unheated basement below a ground floor. */
+export type NtaFloorBelow =
+  | {
+      kind: 'crawlspace';
+      floorResistanceM2kPerW?: number;
+      depthClass: 'on_sand' | 'other';
+      wallResistanceM2kPerW: number;
+      wallUValueWPerM2k: number;
+      ventilationOpeningM2PerM?: number | null;
+    }
+  | {
+      kind: 'unheated_basement';
+      floorResistanceM2kPerW?: number;
+      depthClass: 'on_sand' | 'other';
+      wallResistanceM2kPerW: number;
+      wallUValueWPerM2k: number;
+      volumeM3: number;
+      airChangesPerHour?: number | null;
     };
 
 export interface MonthlyDemandInput {
@@ -2249,6 +2270,7 @@ export interface ResidentialSurvey {
       insulation: OpnameInsulation;
       thermalCushions?: boolean;
       exposedPerimeterM?: number;
+      crawlspaceBottomInsulated?: boolean | null;
       sourceReference: string;
     }>;
     windows?: Array<{
@@ -2923,6 +2945,7 @@ export interface NtaCalculationInput {
     constructionResistanceM2kPerW: number;
     edgeThermalBridges: NtaGroundEdgeThermalBridges;
     edgeInsulation?: NtaGroundEdgeInsulation[];
+    below?: NtaFloorBelow | null;
     sourceReference: string;
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];

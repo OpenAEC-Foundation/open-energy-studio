@@ -82,3 +82,18 @@ Unittests met handberekeningen voor: tabel 7.10, bewonersbanden, benutting inclu
 ## Aanroep
 
 HTTP: `POST /v1/nta8800/demand/monthly/calculate` met `{ "input": { ... } }`. MCP en desktop: `calculate_monthly_demand`. TS: `calculateMonthlyDemandWithRust`.
+
+## Vloer boven kruipruimte of onverwarmde kelder (8.3.4.2, bijlage D.2.2.4/D.2.2.5)
+
+Een vloer op grond kan een `below` krijgen:
+
+- **Kruipruimte:** U_fl volgens 8.43 met U_g (8.44, 8.45) en U_x (8.46–8.48: wand boven maaiveld met h = 0,125 m, kruipruimteventilatie met ε = 0,001 2 m²/m als forfait, u10 = 5 m/s, f_u = 0,05). Maandwaarden volgens D.13/D.14 met tabel D.1 (0, 0).
+- **Onverwarmde kelder:** U_x;V volgens 8.49 met n = 0,3 als forfait. Maandwaarden volgens D.15/D.16 met tabel D.1 (0, 1).
+
+Invoer per vloer:
+
+- de diepteklasse z: 0 m op zand, anders 0,5 m;
+- R_bf van de kruipruimte- of keldervloer (0 als ongeïsoleerd);
+- R_bw en U_xw: de gevel erboven (8.34, 8.47 opmerking 3).
+
+De vloerconstructie zelf krijgt aan de onderzijde R_si = 0,17 (C.2). Randisolatie volgens D.7/D.8 hoort alleen bij een vloer direct op de grond. Een verwarmde kelder (8.3.3.2, D.10/D.11) is nog niet ondersteund.

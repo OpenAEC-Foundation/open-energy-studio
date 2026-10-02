@@ -11,7 +11,7 @@
 //!
 //! Not covered (rejected with a code or reported as a warning): cooling,
 //! collective installations, CHP, solar water heating, several heating
-//! generators, crawlspace floors as such (approximated as slab on ground),
+//! generators,
 //! pipes in unheated spaces, sunrooms (AOS), detail-survey (detailopname)
 //! routes and quality declarations other than a measured q_v10.
 

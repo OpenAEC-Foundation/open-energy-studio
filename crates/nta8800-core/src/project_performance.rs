@@ -159,6 +159,9 @@ pub struct GroundFloorData {
     pub edge_thermal_bridges: EdgeThermalBridges,
     #[serde(default)]
     pub edge_insulation: Vec<EdgeInsulation>,
+    /// Crawlspace or unheated basement below the floor (8.3.4.2).
+    #[serde(default)]
+    pub below: Option<crate::ground::FloorBelow>,
     pub source_reference: String,
 }
 
@@ -400,6 +403,7 @@ fn derive_input(
                                     .construction_resistance_m2k_per_w,
                                 edge_thermal_bridges: data.edge_thermal_bridges.clone(),
                                 edge_insulation: data.edge_insulation.clone(),
+                                below: data.below.clone(),
                                 source_reference: data.source_reference.clone(),
                             });
                         }
