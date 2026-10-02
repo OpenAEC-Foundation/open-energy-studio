@@ -1610,6 +1610,7 @@ fn hot_water_value(
             appliance_type: *appliance_type,
             gaskeur: *gaskeur,
             burner_load_kw: *burner_load_kw,
+            cw_class: None,
         }),
         UtilityHotWaterGenerator::ElectricBoiler => Some(HotWaterGeneratorAnswer::ElectricBoiler),
         UtilityHotWaterGenerator::ElectricInstantaneous => {
