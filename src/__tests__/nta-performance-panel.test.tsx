@@ -156,7 +156,10 @@ describe('NTA performance panel', () => {
     expect(block.ventilationFlows[0].months.every((month: { conductanceWPerK: number }) => month.conductanceWPerK === 42)).toBe(true);
     expect(block.emission.system).toBe('floor_heating');
     expect(block.useInventoryComplete).toBe(true);
-    expect(block.generator).toEqual({ kind: 'external_heat', supplierReference: 'contract 42', qualityDeclarationPresent: false });
+    expect(block.generator).toEqual({
+      kind: 'external_heat', supplierReference: 'contract 42', qualityDeclarationPresent: false,
+      auxiliary: { electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' },
+    });
     expect(block.setpoints.sourceReference).toBe('table 7.13');
     expect(block.thermalMass.sourceReference).toBe('');
   });
