@@ -1,0 +1,15 @@
+.mwa-grid, .mwa-measure { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; margin: 10px 0; }
+.mwa-measure { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.mwa-measure legend { padding: 0 4px; font-weight: 600; }
+.mwa-grid label, .mwa-measure label, .mwa-advised { display: grid; gap: 4px; font-weight: 600; }
+.mwa-wide { grid-column: 1 / -1; }
+.mwa-panel input, .mwa-panel select, .mwa-panel textarea { padding: 5px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.mwa-panel textarea { font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
+.mwa-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.mwa-check { display: flex !important; align-items: center; gap: 6px; font-weight: 400 !important; }
+.mwa-actions { display: flex; gap: 8px; }
+.mwa-panel [role="alert"] { color: var(--energy-red, #ef4444); }
+.relabel-panel table td, .relabel-panel table th { text-align: left; }
+.relabel-allowed { color: var(--energy-green, #16a34a); }
+.relabel-not_allowed { color: var(--energy-red, #ef4444); }
+.relabel-review { color: var(--energy-orange, #f59e0b); }

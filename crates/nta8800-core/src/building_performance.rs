@@ -268,6 +268,10 @@ pub struct BuildingPerformanceInput {
     /// Domestic hot water calculated here (chapter 13, one generator).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
+    /// Maatwerkadvies only (ISSO 82.2/75.2 table 2.2, Q_W;nd;spec): the
+    /// actual annual hot-water need. Never part of a label calculation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hot_water_need_fit: Option<HotWaterNeedFit>,
     /// Confirms the demand input uses the fixed C1 ventilation system of
     /// §5.4.3 and the fixed internal loads of §5.4.2; only then the need
     /// indicator is shown.
@@ -553,6 +557,69 @@ fn active_cooling_matches(
 }
 
 /// Chapter 13 context: scope, `A_g;tot` and the area-weighted heating setpoint.
+/// Maatwerkadvies: actual annual net hot-water need `Q_W;nd`, kWh.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HotWaterNeedFit {
+    pub annual_need_kwh: f64,
+    pub source_reference: String,
+}
+
+/// Rescales a chapter 13 result to a fitted annual net need. The
+/// need-dependent terms (net need, recovered heat, emission input and
+/// delivery-set conversion) scale with `Q_W;nd`; circulation and storage
+/// losses stay; generator output, carrier input, auxiliary and ambient
+/// energy follow the generator output (linearised maatwerkadvies route,
+/// not chapter 13 itself).
+pub fn fit_hot_water_need(result: &mut HotWaterAssessment, annual_need_kwh: f64) {
+    let base: f64 = result.months.iter().map(|month| month.net_need_kwh).sum();
+    if base <= 0.0 || !annual_need_kwh.is_finite() || annual_need_kwh < 0.0 {
+        return;
+    }
+    let factor = annual_need_kwh / base;
+    for month in result.months.iter_mut() {
+        let emission = month.emission_input_kwh * (factor - 1.0);
+        let conversion = month.conversion_loss_kwh * (factor - 1.0);
+        let distribution = if month.distribution_efficiency > 0.0 {
+            emission / month.distribution_efficiency
+        } else {
+            emission
+        };
+        let old_output = month.generator_output_kwh;
+        let new_output = (old_output + distribution + conversion).max(0.0);
+        let ratio = if old_output > 0.0 {
+            new_output / old_output
+        } else {
+            factor
+        };
+        month.net_need_kwh *= factor;
+        month.recovered_kwh *= factor;
+        month.emission_input_kwh *= factor;
+        month.conversion_loss_kwh *= factor;
+        month.generator_output_kwh = new_output;
+        month.carrier_input_kwh *= ratio;
+        month.auxiliary_electricity_kwh *= ratio;
+        month.ambient_heat_kwh *= ratio;
+    }
+    result.annual_net_need_kwh = annual_need_kwh;
+    result.annual_generator_output_kwh = result
+        .months
+        .iter()
+        .map(|month| month.generator_output_kwh)
+        .sum();
+}
+
+/// True when a zone carries a maatwerkadvies usage fit (ISSO 82.2/75.2).
+pub fn usage_fit_applied(input: &BuildingPerformanceInput) -> bool {
+    input.hot_water_need_fit.is_some()
+        || input.space_heating.demand.usage_fit.is_some()
+        || input
+            .space_heating
+            .additional_zones
+            .iter()
+            .any(|zone| zone.demand.usage_fit.is_some())
+}
+
 fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
     let zones = std::iter::once(&input.space_heating.demand).chain(
         input
@@ -1215,7 +1282,12 @@ pub fn assess_building_performance(
     };
     let hot_water = match (&input.hot_water, issues.is_empty()) {
         (Some(system), true) => match assess_hot_water(system, hot_water_context(input)) {
-            Ok(result) => Some(result),
+            Ok(mut result) => {
+                if let Some(fit) = &input.hot_water_need_fit {
+                    fit_hot_water_need(&mut result, fit.annual_need_kwh);
+                }
+                Some(result)
+            }
             Err(error) => {
                 issues.push(issue(error.code, error.path));
                 None
@@ -1435,13 +1507,16 @@ pub fn assess_building_performance(
         primary_fossil_indicator_kwh_per_m2_year: scenario
             .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
         renewable_share_percent: scenario.map(|item| item.renewable_share_percent),
-        indicative_label_class: scenario.and_then(|item| {
-            let function = match input.calculation_scope {
-                CalculationScope::Residential => Some(LabelFunction::Residential),
-                CalculationScope::Utility => input.label_function,
-            };
-            indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
-        }),
+        // A maatwerkadvies run with actual-use parameters gives no label.
+        indicative_label_class: scenario
+            .filter(|_| !usage_fit_applied(input))
+            .and_then(|item| {
+                let function = match input.calculation_scope {
+                    CalculationScope::Residential => Some(LabelFunction::Residential),
+                    CalculationScope::Utility => input.label_function,
+                };
+                indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
+            }),
         label_source: LABEL_SOURCE,
         tojuli_max_k: tojuli_max,
         tojuli_meets_bbl_limit: tojuli_max.map(|value| value <= crate::tojuli::TOJULI_LIMIT_K),

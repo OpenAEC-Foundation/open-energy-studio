@@ -93,6 +93,43 @@ pub struct MonthlyDemandInput {
     /// Adjacent unheated sunrooms (7.30b, §7.6.4).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sunrooms: Vec<Sunroom>,
+    /// Maatwerkadvies only (ISSO 82.2/75.2 table 2.2): actual-use
+    /// parameters. A run with a fit is never a label calculation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_fit: Option<UsageFit>,
+}
+
+/// ISSO 82.2/75.2 §2.5, table 2.2: user-dependent parameters of the
+/// maatwerkadvies. With a fit, `setpoints` may deviate from table 7.13.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UsageFit {
+    /// θ_int;set;H;low (day and weekend), °C.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reduced_setpoint_c: Option<f64>,
+    /// t_H;red;day, h per (work)day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day_reduction_h: Option<f64>,
+    /// t_H;red;wknd, h per weekend.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weekend_reduction_h: Option<f64>,
+    /// t_C;red;wknd, h per weekend.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooling_weekend_reduction_h: Option<f64>,
+    /// f_mod;sp (residential).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spatial_fraction: Option<f64>,
+    /// N_p;woon;zi, occupants of the zone in total (residential).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occupants: Option<f64>,
+    /// q_H/C;int;tot per person, W (residential; persons, appliances and
+    /// lighting, mean over the year).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub internal_gain_per_person_w: Option<f64>,
+    /// q_Oc·f_τ + q_A for utility functions, W/m².
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occupancy_appliance_w_per_m2: Option<f64>,
+    pub source_reference: String,
 }
 
 /// Usage functions of tables 7.13–7.15.
@@ -769,10 +806,94 @@ impl FunctionProfile {
 
 /// The §6.5.3 profile of a demand input.
 pub fn function_profile(input: &MonthlyDemandInput) -> FunctionProfile {
-    if input.function_areas.is_empty() {
+    let mut profile = if input.function_areas.is_empty() {
         FunctionProfile::of(input.usage_function)
     } else {
         FunctionProfile::weighted(&input.function_areas)
+    };
+    // Maatwerkadvies: the actual use replaces tables 7.2/7.3 and 7.13–7.15.
+    if let Some(fit) = &input.usage_fit {
+        profile.heating_setpoint_c = input.setpoints.heating_c;
+        profile.cooling_setpoint_c = input.setpoints.cooling_c;
+        if let Some(value) = fit.reduced_setpoint_c {
+            profile.reduced_setpoint_c = value;
+        }
+        if let Some(value) = fit.day_reduction_h {
+            profile.day_reduction_h = value;
+        }
+        if let Some(value) = fit.weekend_reduction_h {
+            profile.weekend_reduction_h = value;
+        }
+        if let Some(value) = fit.cooling_weekend_reduction_h {
+            profile.cooling_weekend_reduction_h = value;
+        }
+        if let Some(value) = fit.occupancy_appliance_w_per_m2 {
+            profile.occupancy_appliance_w_per_m2 = value;
+        }
+    }
+    profile
+}
+
+fn check_usage_fit(fit: &UsageFit, residential: bool, issues: &mut Vec<DemandIssue>) {
+    let bad = |value: Option<f64>, min: f64, max: f64| {
+        value.is_some_and(|value| !value.is_finite() || value < min || value > max)
+    };
+    for (value, min, max, path) in [
+        (
+            fit.reduced_setpoint_c,
+            -10.0,
+            40.0,
+            "usageFit.reducedSetpointC",
+        ),
+        (fit.day_reduction_h, 0.0, 24.0, "usageFit.dayReductionH"),
+        (
+            fit.weekend_reduction_h,
+            0.0,
+            48.0,
+            "usageFit.weekendReductionH",
+        ),
+        (
+            fit.cooling_weekend_reduction_h,
+            0.0,
+            48.0,
+            "usageFit.coolingWeekendReductionH",
+        ),
+        (fit.spatial_fraction, 0.0, 1.0, "usageFit.spatialFraction"),
+        (fit.occupants, 0.0, 1.0e6, "usageFit.occupants"),
+        (
+            fit.internal_gain_per_person_w,
+            0.0,
+            2000.0,
+            "usageFit.internalGainPerPersonW",
+        ),
+        (
+            fit.occupancy_appliance_w_per_m2,
+            0.0,
+            500.0,
+            "usageFit.occupancyApplianceWPerM2",
+        ),
+    ] {
+        if bad(value, min, max) {
+            issues.push(issue("usage_fit_value_invalid", path));
+        }
+    }
+    let residential_only = fit.spatial_fraction.is_some()
+        || fit.occupants.is_some()
+        || fit.internal_gain_per_person_w.is_some();
+    if residential_only && !residential {
+        issues.push(issue("usage_fit_residential_only", "usageFit"));
+    }
+    if fit.occupancy_appliance_w_per_m2.is_some() && residential {
+        issues.push(issue(
+            "usage_fit_utility_only",
+            "usageFit.occupancyApplianceWPerM2",
+        ));
+    }
+    if fit.source_reference.trim().is_empty() {
+        issues.push(issue(
+            "source_reference_required",
+            "usageFit.sourceReference",
+        ));
     }
 }
 
@@ -918,7 +1039,21 @@ pub fn levelling_reduction_k(
     standard_setpoint_c: f64,
     outdoor_c: f64,
 ) -> f64 {
-    let f_sp = dwelling.spatial_fraction();
+    levelling_reduction_with_fraction_k(
+        dwelling.spatial_fraction(),
+        specific_conductance_w_per_m2k,
+        standard_setpoint_c,
+        outdoor_c,
+    )
+}
+
+/// 7.78/7.79 with an explicit `f_mod;sp` (maatwerkadvies fit).
+pub fn levelling_reduction_with_fraction_k(
+    f_sp: f64,
+    specific_conductance_w_per_m2k: f64,
+    standard_setpoint_c: f64,
+    outdoor_c: f64,
+) -> f64 {
     let h_e = f_sp * specific_conductance_w_per_m2k;
     (F_MOD_T * f_sp) * h_e * (standard_setpoint_c - outdoor_c) / (h_e + H_INT_SPEC)
 }
@@ -1046,6 +1181,9 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         if largest != Some(function) {
             issues.push(issue("usage_function_not_largest", "usageFunction"));
         }
+    }
+    if let Some(fit) = &input.usage_fit {
+        check_usage_fit(fit, function.is_residential(), issues);
     }
     let profile = function_profile(input);
     if (setpoints.heating_c - profile.heating_setpoint_c).abs() > 1e-9
@@ -1704,11 +1842,14 @@ pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64
     match &input.internal_gains {
         InternalGains::Residential { dwelling_count, .. } => {
             let dwellings = f64::from(*dwelling_count);
-            INTERNAL_HEAT_PER_OCCUPANT_W
-                * dwellings
-                * occupants_per_dwelling(area / dwellings)
-                * 0.001
-                * hours
+            let fit = input.usage_fit.as_ref();
+            let occupants = fit
+                .and_then(|fit| fit.occupants)
+                .unwrap_or_else(|| dwellings * occupants_per_dwelling(area / dwellings));
+            let per_person = fit
+                .and_then(|fit| fit.internal_gain_per_person_w)
+                .unwrap_or(INTERNAL_HEAT_PER_OCCUPANT_W);
+            per_person * occupants * 0.001 * hours
         }
         InternalGains::Utility {
             lighting,
@@ -2074,12 +2215,18 @@ fn compute(
 
         // 7.76–7.79: setpoint after levelling (dwellings only).
         let levelling = match input.dwelling_type {
-            Some(dwelling) if input.usage_function.is_residential() => levelling_reduction_k(
-                dwelling,
-                conductance_heating / area,
-                heating_standard,
-                outdoor,
-            ),
+            Some(dwelling) if input.usage_function.is_residential() => {
+                levelling_reduction_with_fraction_k(
+                    input
+                        .usage_fit
+                        .as_ref()
+                        .and_then(|fit| fit.spatial_fraction)
+                        .unwrap_or_else(|| dwelling.spatial_fraction()),
+                    conductance_heating / area,
+                    heating_standard,
+                    outdoor,
+                )
+            }
             _ => 0.0,
         };
         let heating_setpoint = heating_standard - levelling;

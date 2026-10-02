@@ -4,6 +4,22 @@ import { generateNtaInputDossierHTML } from './NtaInputDossier';
 import { generateNtaCalculationReportHTML } from './NtaCalculationReport';
 import { calculateProjectPerformanceWithRust } from '../nta/KernelClient';
 import { buildProjectDossier, zipProjectDossier } from './ProjectDossier';
+import { assessMaatwerkadviesWithRust } from '../nta/KernelClient';
+import { generateMaatwerkadviesReportHTML } from './MaatwerkadviesReport';
+
+/** Runs the maatwerkadvies of the project and downloads its report. */
+export async function downloadMaatwerkadviesReportHTML(project: IProject): Promise<void> {
+  if (!project.maatwerkadvies) throw new Error('Geen maatwerkadvies gedefinieerd.');
+  const assessment = await assessMaatwerkadviesWithRust(project, project.maatwerkadvies);
+  const html = generateMaatwerkadviesReportHTML(project, project.maatwerkadvies, assessment);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Maatwerkadvies-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.html`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 /** Export the NTA input and evidence inventory even when BENG is unavailable. */
 export function downloadNtaInputDossierHTML(project: IProject): void {

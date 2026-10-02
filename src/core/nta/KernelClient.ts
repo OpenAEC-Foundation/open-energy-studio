@@ -3397,6 +3397,213 @@ export async function assessRelabelWithRust(original: unknown, current: unknown)
   throw new Error('Relabel classification is available in the desktop app and local development server.');
 }
 
+// ------------------------------------------------------------------
+// Maatwerkadvies (BRL 9500-MWA-W/U, ISSO 82.2/75.2)
+// ------------------------------------------------------------------
+
+export type MwaUserProfile = 'nta' | 'energy_conscious' | 'average' | 'not_energy_conscious';
+
+/** ISSO 82.2/75.2 table 2.2: user-dependent parameters (profile + free input). */
+export interface MwaUsageProfile {
+  profile: MwaUserProfile;
+  heatingSetpointC?: number;
+  coolingSetpointC?: number;
+  reducedSetpointC?: number;
+  dayReductionH?: number;
+  weekendReductionH?: number;
+  spatialFraction?: number;
+  occupants?: number;
+  internalGainPerPersonW?: number;
+  occupancyApplianceWPerM2?: number;
+  hotWaterNeedPerPersonKwh?: number;
+  annualHotWaterNeedKwh?: number;
+  sourceReference: string;
+}
+
+export type MwaPatchOperation =
+  | { op: 'replace'; path: string; value: unknown }
+  | { op: 'add'; path: string; value: unknown }
+  | { op: 'remove'; path: string };
+
+export type MwaMeasureCategory =
+  | 'insulation' | 'glazing' | 'airtightness' | 'ventilation' | 'heat_recovery' | 'heating'
+  | 'heat_pump' | 'hot_water' | 'cooling' | 'pv' | 'solar_thermal' | 'lighting' | 'control' | 'other';
+
+export interface MwaMeasure {
+  id: string;
+  name: string;
+  category: MwaMeasureCategory;
+  /** `project`: JSON patch on the project; `building`: on the derived building input. */
+  target: 'project' | 'building';
+  patch: MwaPatchOperation[];
+  investmentEur: number;
+  costSource: string;
+  lifetimeYears: number;
+  maintenanceEurPerYear?: number;
+  phaseYear?: number;
+  specialistNote?: string;
+}
+
+export interface MwaPackage {
+  id: string;
+  name: string;
+  measureIds: string[];
+  partialExecutionWarning?: string;
+}
+
+export interface MwaTariffs {
+  gasEurPerM3: number;
+  electricityEurPerKwh: number;
+  electricityExportEurPerKwh?: number;
+  districtHeatEurPerKwh?: number;
+  districtColdEurPerKwh?: number;
+  oilEurPerKwh?: number;
+  biomassEurPerKwh?: number;
+  gasFixedEurPerYear?: number;
+  heatFixedEurPerYear?: number;
+  sourceReference: string;
+}
+
+export interface MwaEconomics {
+  discountRate?: number;
+  energyPriceChange?: number;
+  horizonYears?: number;
+  sourceReference?: string;
+}
+
+export interface MwaMeasuredUse {
+  annualGasM3?: number;
+  annualElectricityKwh?: number;
+  annualHeatKwh?: number;
+  monthlyGasM3?: Array<number | null>;
+  sourceReference?: string;
+}
+
+/** The maatwerkadvies definition stored with a project (the base is the project itself). */
+export interface NtaMaatwerkadvies {
+  currentUse?: MwaUsageProfile;
+  futureUse?: MwaUsageProfile;
+  measures: MwaMeasure[];
+  packages: MwaPackage[];
+  tariffs: MwaTariffs;
+  economics?: MwaEconomics;
+  measured?: MwaMeasuredUse;
+  advisedPackageId?: string;
+  adviceMotivation?: string;
+  notes?: Array<{ text: string; packageId?: string }>;
+}
+
+export interface MwaEnergyUse {
+  gasKwh: number;
+  gasM3: number;
+  electricityImportKwh: number;
+  electricityExportKwh: number;
+  electricityProducedKwh: number;
+  districtHeatKwh: number;
+  districtColdKwh: number;
+  oilKwh: number;
+  biomassKwh: number;
+  primaryFossilKwh: number;
+  co2Kg: number;
+  energyCostEur: number;
+  monthlyGasM3: number[];
+}
+
+export interface MwaIssue { code: string; path: string; detail?: string }
+
+export interface MwaVariantResult {
+  id: string;
+  name: string;
+  kind: 'current' | 'measure' | 'package';
+  measureIds: string[];
+  valid: boolean;
+  label: {
+    labelClass: string | null;
+    needIndicatorKwhPerM2: number | null;
+    primaryFossilIndicatorKwhPerM2: number | null;
+    renewableSharePercent: number | null;
+    tojuliMaxK: number | null;
+  };
+  actualUse: MwaEnergyUse | null;
+  savings: {
+    gasM3: number;
+    electricityKwh: number;
+    heatKwh: number;
+    primaryFossilKwh: number;
+    co2Kg: number;
+    energyCostEur: number;
+  } | null;
+  investmentEur: number;
+  maintenanceEurPerYear: number;
+  simplePaybackYears: number | null;
+  netPresentValueEur: number | null;
+  horizonYears: number;
+  phasing: Array<{ year: number | null; measureIds: string[] }>;
+  issues: MwaIssue[];
+}
+
+export interface MwaRegressionLine {
+  slopeM3PerK: number;
+  interceptM3: number;
+  heatingLimitC: number | null;
+  points: number;
+}
+
+export interface MaatwerkadviesAssessment {
+  status: 'calculated_unverified' | 'partially_calculated' | 'invalid';
+  scope: string;
+  targetNormVersion: string;
+  kernelVersion: string;
+  inputFingerprint: string;
+  attestStatus: string;
+  current: MwaVariantResult | null;
+  measures: MwaVariantResult[];
+  packages: MwaVariantResult[];
+  fitCheck: {
+    calculated: MwaEnergyUse;
+    gasDeviationPercent: number | null;
+    electricityDeviationPercent: number | null;
+    heatDeviationPercent: number | null;
+    measuredGasLine: MwaRegressionLine | null;
+    calculatedGasLine: MwaRegressionLine | null;
+  } | null;
+  advice: {
+    packageId: string | null;
+    chosenBy: 'adviser' | 'automatic_highest_npv';
+    motivation: string | null;
+    warnings: string[];
+    specialistNotes: string[];
+    notes: string[];
+  } | null;
+  interpretations: string[];
+  issues: MwaIssue[];
+}
+
+/** Builds the kernel input: the project (without its own MWA block) is the base. */
+export function buildMaatwerkadviesInput(project: IProject, definition: NtaMaatwerkadvies): Record<string, unknown> {
+  const { maatwerkadvies: _omit, ...base } = project as IProject & { maatwerkadvies?: unknown };
+  void _omit;
+  return { base: { kind: 'project', project: base }, ...definition };
+}
+
+export async function assessMaatwerkadviesWithRust(project: IProject, definition: NtaMaatwerkadvies): Promise<MaatwerkadviesAssessment> {
+  const input = buildMaatwerkadviesInput(project, definition);
+  if (isTauri()) {
+    return invoke<MaatwerkadviesAssessment>('assess_maatwerkadvies', { input });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/maatwerkadvies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    });
+    const body = await response.json() as MaatwerkadviesAssessment & { error?: string; message?: string };
+    if (body.error) throw new Error(`${body.error}: ${body.message ?? ''}`);
+    return body;
+  }
+  throw new Error('Maatwerkadvies is available in the desktop app and local development server.');
+}
+
 export interface RegistrationAssessment {
   source: string;
   validUntil: string | null;
