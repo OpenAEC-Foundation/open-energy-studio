@@ -500,6 +500,9 @@ export interface MonthlyDemandAssessment {
   }>;
   annualHeatingNeedKwh: number | null;
   annualCoolingNeedKwh: number | null;
+  recoverableLossesApplied: boolean;
+  annualHeatingNeedWithoutRecoverableKwh: number | null;
+  annualCoolingNeedWithoutRecoverableKwh: number | null;
   ventilation: VentilationResult | null;
   /** §5.4.2 need with the fixed C1 system (BENG 1). */
   fixedC1: {

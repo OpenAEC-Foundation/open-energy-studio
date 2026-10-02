@@ -1072,9 +1072,14 @@ fn compute(
         .sum();
     let need = fixed_c1_need.unwrap_or_else(|| {
         zone_demands()
+            // §5.4.2: without the recoverable system losses.
             .map(|demand| {
-                demand.annual_heating_need_kwh.unwrap_or(0.0)
-                    + demand.annual_cooling_need_kwh.unwrap_or(0.0)
+                demand
+                    .annual_heating_need_without_recoverable_kwh
+                    .unwrap_or(0.0)
+                    + demand
+                        .annual_cooling_need_without_recoverable_kwh
+                        .unwrap_or(0.0)
             })
             .sum()
     });

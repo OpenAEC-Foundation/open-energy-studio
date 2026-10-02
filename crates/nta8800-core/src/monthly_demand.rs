@@ -51,7 +51,7 @@ pub const F_MOD_T: f64 = 0.8;
 pub const H_INT_SPEC: f64 = 2.0;
 
 pub const OMITTED_CORRECTIONS: &[&str] = &[
-    "7.3–7.5 and 7.7–7.9 recoverable system losses Q_H;ls;rbl / Q_C;ls;rbl and the Δη terms (chapters 9 and 10)",
+    "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl of chapter 10 is still 0",
     "7.3.3 vertical ducts H_p and 8.5 adjacent heated spaces H_A",
     "§17.3 obstruction situations b–g are declared, not derived",
     "annex B detailed thermal capacity",
@@ -426,6 +426,11 @@ pub struct MonthlyDemandAssessment {
     pub monthly: Vec<MonthResult>,
     pub annual_heating_need_kwh: Option<f64>,
     pub annual_cooling_need_kwh: Option<f64>,
+    /// True after 7.3–7.8 applied the recoverable system losses.
+    pub recoverable_losses_applied: bool,
+    /// Annual needs before the recoverable losses (BENG 1 basis, §5.4.2).
+    pub annual_heating_need_without_recoverable_kwh: Option<f64>,
+    pub annual_cooling_need_without_recoverable_kwh: Option<f64>,
     /// Chapter 11 result when the zone gives `ventilation`.
     pub ventilation: Option<crate::ventilation::VentilationResult>,
     /// §5.4.2 need with the fixed C1 system, for BENG 1.
@@ -1492,10 +1497,75 @@ fn assess_resolved(
         monthly,
         annual_heating_need_kwh: annual_heating,
         annual_cooling_need_kwh: annual_cooling,
+        recoverable_losses_applied: false,
+        annual_heating_need_without_recoverable_kwh: annual_heating,
+        annual_cooling_need_without_recoverable_kwh: annual_cooling,
         ventilation: None,
         fixed_c1: None,
         issues,
     }
+}
+
+/// 7.3–7.5 (heating) and 7.7–7.9 (cooling): the needs with the recoverable
+/// losses of the heating system `Q_H;ls;rbl` (9.2.5) and the cooling system
+/// `Q_C;ls;rbl` (10.2), monthly in kWh. The utilisation factors keep the
+/// gains without these losses; their effect enters through Δη (7.4/7.8).
+/// Not for the BENG 1 run (§5.4.2).
+pub fn apply_recoverable_losses(
+    assessment: &MonthlyDemandAssessment,
+    heating_recoverable_kwh: &[f64],
+    cooling_recoverable_kwh: &[f64],
+) -> MonthlyDemandAssessment {
+    let mut adjusted = assessment.clone();
+    if assessment.status != "calculated_unverified" {
+        return adjusted;
+    }
+    for (index, row) in adjusted.monthly.iter_mut().enumerate() {
+        let net = heating_recoverable_kwh.get(index).copied().unwrap_or(0.0)
+            - cooling_recoverable_kwh.get(index).copied().unwrap_or(0.0);
+        let heating = &mut row.heating;
+        if let Some(gamma) = heating.gamma {
+            let gated = (gamma <= 0.0 && heating.gains_kwh > 0.0) || gamma > GAMMA_H_MAX;
+            if !gated {
+                let gains_incl = heating.gains_kwh + net;
+                let eta_incl = heating_utilization(
+                    gains_incl / heating.heat_transfer_kwh,
+                    heating.a,
+                    gains_incl,
+                );
+                let delta = eta_incl - heating.utilization;
+                heating.need_kwh = (heating.heat_transfer_kwh
+                    - heating.utilization * heating.gains_kwh
+                    - delta * heating.gains_kwh
+                    - heating.utilization * net)
+                    .max(0.0);
+            }
+        }
+        let cooling = &mut row.cooling;
+        let gated = cooling.gains_kwh <= 0.0
+            || cooling
+                .gamma
+                .is_some_and(|gamma| gamma > 0.0 && 1.0 / gamma > 2.0);
+        if !gated {
+            let gains_incl = cooling.gains_kwh + net;
+            let eta_incl = if cooling.heat_transfer_kwh != 0.0 {
+                cooling_utilization(gains_incl / cooling.heat_transfer_kwh, cooling.a)
+            } else {
+                1.0
+            };
+            let delta = eta_incl - cooling.utilization;
+            cooling.need_kwh = (cooling.reduction_factor
+                * (cooling.gains_kwh - cooling.utilization * cooling.heat_transfer_kwh + net
+                    - delta * cooling.heat_transfer_kwh))
+                .max(0.0);
+        }
+    }
+    adjusted.annual_heating_need_kwh =
+        Some(adjusted.monthly.iter().map(|r| r.heating.need_kwh).sum());
+    adjusted.annual_cooling_need_kwh =
+        Some(adjusted.monthly.iter().map(|r| r.cooling.need_kwh).sum());
+    adjusted.recoverable_losses_applied = true;
+    adjusted
 }
 
 fn compute(
@@ -1788,6 +1858,32 @@ mod tests {
 
     fn reference_flows() -> Vec<VentilationFlow> {
         sample().ventilation_flows
+    }
+
+    #[test]
+    fn recoverable_losses_follow_7_3_and_7_7() {
+        let base = valid(&sample());
+        let heating = vec![50.0; 12];
+        let adjusted = apply_recoverable_losses(&base, &heating, &[]);
+        assert!(adjusted.recoverable_losses_applied);
+        assert_eq!(
+            adjusted.annual_heating_need_without_recoverable_kwh,
+            base.annual_heating_need_kwh
+        );
+        let jan = &base.monthly[0].heating;
+        let gains_incl = jan.gains_kwh + 50.0;
+        let eta_incl = heating_utilization(gains_incl / jan.heat_transfer_kwh, jan.a, gains_incl);
+        let expected = jan.heat_transfer_kwh
+            - jan.utilization * jan.gains_kwh
+            - (eta_incl - jan.utilization) * jan.gains_kwh
+            - jan.utilization * 50.0;
+        assert!((adjusted.monthly[0].heating.need_kwh - expected.max(0.0)).abs() < 1e-9);
+        assert!(adjusted.monthly[0].heating.need_kwh < jan.need_kwh);
+        // 7.7: heating-system losses add to the cooling need in summer.
+        let july = &base.monthly[6].cooling;
+        if july.need_kwh > 0.0 {
+            assert!(adjusted.monthly[6].cooling.need_kwh > july.need_kwh);
+        }
     }
 
     #[test]

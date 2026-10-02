@@ -42,13 +42,14 @@ use crate::hybrid_heat_pump_monthly_draft::{
     assess_hybrid_heat_pump_monthly_draft, HybridHeatPumpAuxMeasurements,
     HybridHeatPumpMonthlyDraftInput,
 };
-use crate::monthly_demand::{assess_monthly_demand, MonthlyDemandAssessment, MonthlyDemandInput};
+use crate::monthly_demand::{
+    apply_recoverable_losses, assess_monthly_demand, MonthlyDemandAssessment, MonthlyDemandInput,
+};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
     "9.2.3 node gains from solar thermal systems, AHU, humidification, booster heat pumps and delivery sets",
-    "9.2.5 recoverable losses are reported per zone but not fed back into the chapter 7 need",
     "9.21 emission fan energy for fan-assisted emitters",
     "more than two generators, product-specific hybrid switching and domestic hot water priority",
     "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
@@ -1142,7 +1143,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     let mut issues: Vec<ChainIssue> = Vec::new();
-    let demand = assess_monthly_demand(&input.demand);
+    let mut demand = assess_monthly_demand(&input.demand);
     let primary = zone_terms(
         &input.demand,
         &demand,
@@ -1151,7 +1152,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         "",
         &mut issues,
     );
-    let additional_zone_demands: Vec<MonthlyDemandAssessment> = input
+    let mut additional_zone_demands: Vec<MonthlyDemandAssessment> = input
         .additional_zones
         .iter()
         .map(|zone| assess_monthly_demand(&zone.demand))
@@ -1268,6 +1269,36 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
             &input.generator,
             &mut issues,
         );
+        // 7.3/7.7: the recoverable losses (9.2.5) reduce the heating need and
+        // add to the cooling need; the heating limit (9.28) and the
+        // distribution itself use the need without them.
+        let zone_sources: Vec<(&MonthlyDemandInput, &EmissionInput, &Distribution)> =
+            std::iter::once((&input.demand, &input.emission, &input.distribution))
+                .chain(
+                    input
+                        .additional_zones
+                        .iter()
+                        .map(|zone| (&zone.demand, &zone.emission, &zone.distribution)),
+                )
+                .collect();
+        let adjusted: Vec<MonthlyDemandAssessment> = std::iter::once(&demand)
+            .chain(&additional_zone_demands)
+            .zip(&distribution.zone_recoverable)
+            .map(|(assessed, recoverable)| apply_recoverable_losses(assessed, recoverable, &[]))
+            .collect();
+        let mut scratch = Vec::new();
+        let valid_zones: Vec<ZoneTerms> = zone_sources
+            .iter()
+            .zip(&adjusted)
+            .zip(valid_zones)
+            .map(|(((demand_input, emission, route), assessed), original)| {
+                zone_terms(demand_input, assessed, emission, route, "", &mut scratch)
+                    .unwrap_or(original)
+            })
+            .collect();
+        let mut adjusted = adjusted.into_iter();
+        demand = adjusted.next().expect("primary zone");
+        additional_zone_demands = adjusted.collect();
         let mut outputs = Vec::with_capacity(12);
         for index in 0..12 {
             let mut need = 0.0;
