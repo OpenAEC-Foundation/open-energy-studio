@@ -99,6 +99,9 @@ pub struct NtaCalculationInput {
     pub label_function: Option<LabelFunction>,
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
+    /// Bbl art. 4.149 lid 2: several use functions with their areas.
+    #[serde(default)]
+    pub bbl_functions: Vec<crate::bbl_requirements::BblFunctionArea>,
     #[serde(default)]
     pub active_cooling: Option<ActiveCoolingEvidence>,
     #[serde(default, rename = "permitApplicationAfter20260529")]
@@ -739,6 +742,7 @@ fn derive_input(
         cooling: nta.cooling,
         label_function: nta.label_function,
         bbl_function: nta.bbl_function,
+        bbl_functions: nta.bbl_functions.clone(),
         active_cooling: nta.active_cooling,
         permit_application_after_2026_05_29: nta.permit_application_after_2026_05_29,
         loss_area_m2: Some(loss_area),

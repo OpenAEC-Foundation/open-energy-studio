@@ -20,7 +20,9 @@ use crate::annex_p::{
     SupplyFactors, SystemFunction, SystemResult, COLD_FORFAIT, HEAT_FORFAIT,
 };
 use crate::annex_q::AnnexQSource;
-use crate::bbl_requirements::{a0_check, check as bbl_check, A0Check, BblCheck, BblFunction};
+use crate::bbl_requirements::{
+    a0_check, check_mixed as bbl_check_mixed, A0Check, BblCheck, BblFunction, BblFunctionArea,
+};
 use crate::domestic_hot_water::{
     assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterCarrier, HotWaterContext,
     HotWaterSystem,
@@ -247,6 +249,10 @@ pub struct BuildingPerformanceInput {
     /// Row of Bbl table 4.148A for the requirement check.
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
+    /// Several use functions of different kinds (Bbl art. 4.149 lid 2);
+    /// replaces `bblFunction` when not empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bbl_functions: Vec<BblFunctionArea>,
     /// Loss area `A_ls` in m² for the `A_ls/A_g` ratio of table 4.148A.
     #[serde(default)]
     pub loss_area_m2: Option<f64>,
@@ -1374,9 +1380,21 @@ pub fn assess_building_performance(
             .filter_map(|item| item.max_tojuli_k)
             .fold(0.0_f64, f64::max)
     });
-    let bbl = match (input.bbl_function, input.loss_area_m2, scenario) {
-        (Some(function), Some(area), Some(item)) => bbl_check(
-            function,
+    let bbl_functions: Vec<BblFunctionArea> = if input.bbl_functions.is_empty() {
+        input
+            .bbl_function
+            .map(|function| BblFunctionArea {
+                function,
+                area_m2: input.total_usable_floor_area_m2,
+            })
+            .into_iter()
+            .collect()
+    } else {
+        input.bbl_functions.clone()
+    };
+    let bbl = match (bbl_functions.is_empty(), input.loss_area_m2, scenario) {
+        (false, Some(area), Some(item)) => bbl_check_mixed(
+            &bbl_functions,
             area / input.total_usable_floor_area_m2,
             heating_capacity,
             need_indicator,

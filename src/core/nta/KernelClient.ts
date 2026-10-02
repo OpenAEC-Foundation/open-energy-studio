@@ -2886,7 +2886,9 @@ export type NtaBblFunction =
 
 export interface NtaBblCheck {
   source: string;
+  /** The function, or the largest one for mixed functions. */
   function: NtaBblFunction;
+  functions: Array<{ function: NtaBblFunction; areaM2: number }>;
   lossAreaRatio: number;
   limits: {
     energyNeedMaxKwhPerM2: number;
@@ -3239,6 +3241,8 @@ export interface NtaCalculationInput {
   cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
+  /** Bbl art. 4.149 lid 2: several use functions, limits weighted by area. */
+  bblFunctions?: Array<{ function: NtaBblFunction; areaM2: number }>;
   activeCooling?: NtaActiveCoolingEvidence | null;
   permitApplicationAfter20260529?: boolean;
   demandUsesFixedC1Ventilation: boolean;

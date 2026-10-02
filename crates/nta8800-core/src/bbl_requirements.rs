@@ -6,8 +6,10 @@
 //! energy (BENG 2) and minimum renewable share (BENG 3). Paragraph 4 raises
 //! the energy-need limit by 5 kWh/m²·yr when the area-weighted specific
 //! internal heat capacity is at most 180 kJ/m²K, for the rows where table
-//! 4.148A marks paragraph 4 as applicable. Mixed-function weighting
-//! (paragraph 2) is not implemented.
+//! 4.148A marks paragraph 4 as applicable. Paragraph 2: for several use
+//! functions of different kinds the limits of each function are weighted by
+//! usable floor area ([`check_mixed`]); paragraph 3 (an accessory function
+//! of a dwelling takes the dwelling limits) is an input choice.
 
 use serde::{Deserialize, Serialize};
 
@@ -146,6 +148,53 @@ pub fn bbl_limits(
     })
 }
 
+/// One use function with its usable floor area for paragraph 2.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BblFunctionArea {
+    pub function: BblFunction,
+    pub area_m2: f64,
+}
+
+/// Paragraph 2: limits weighted by usable floor area; paragraph 4 applies
+/// per function. `None` for an empty list, a non-positive area or ratio.
+pub fn bbl_limits_mixed(
+    functions: &[BblFunctionArea],
+    loss_area_ratio: f64,
+    specific_heat_capacity_kj_per_m2k: f64,
+) -> Option<BblLimits> {
+    let total: f64 = functions.iter().map(|part| part.area_m2).sum();
+    if functions.is_empty()
+        || !total.is_finite()
+        || total <= 0.0
+        || functions
+            .iter()
+            .any(|part| !part.area_m2.is_finite() || part.area_m2 <= 0.0)
+    {
+        return None;
+    }
+    let mut weighted = BblLimits {
+        energy_need_max_kwh_per_m2: 0.0,
+        primary_fossil_max_kwh_per_m2: 0.0,
+        renewable_share_min_percent: 0.0,
+        light_construction_allowance_applied: false,
+    };
+    for part in functions {
+        let share = part.area_m2 / total;
+        let limits = bbl_limits(
+            part.function,
+            loss_area_ratio,
+            specific_heat_capacity_kj_per_m2k,
+        )?;
+        weighted.energy_need_max_kwh_per_m2 += share * limits.energy_need_max_kwh_per_m2;
+        weighted.primary_fossil_max_kwh_per_m2 += share * limits.primary_fossil_max_kwh_per_m2;
+        weighted.renewable_share_min_percent += share * limits.renewable_share_min_percent;
+        weighted.light_construction_allowance_applied |=
+            limits.light_construction_allowance_applied;
+    }
+    Some(weighted)
+}
+
 pub const A0_SOURCE: &str = "Omgevingsregeling art. 5.11/5.12 lid 5, bijlagen IXa/Xa (Stcrt. 2026, 18123; in werking mei 2026)";
 
 /// Annexes IXa/Xa: maximum primary fossil energy for the A0 designation.
@@ -191,7 +240,18 @@ pub struct A0Check {
 }
 
 pub fn a0_check(check: &BblCheck, beng2: Option<f64>, on_site_fossil_use: bool) -> A0Check {
-    let max = a0_primary_fossil_max(check.function);
+    // Mixed functions: area-weighted like article 4.149 paragraph 2
+    // (interpretation; the Omgevingsregeling gives no mixed rule).
+    let total: f64 = check.functions.iter().map(|part| part.area_m2).sum();
+    let max = if check.functions.len() > 1 && total > 0.0 {
+        check
+            .functions
+            .iter()
+            .map(|part| part.area_m2 / total * a0_primary_fossil_max(part.function))
+            .sum()
+    } else {
+        a0_primary_fossil_max(check.function)
+    };
     let fossil = beng2.map(|value| value <= max);
     let parts = [check.energy_need_meets, fossil, check.renewable_share_meets];
     let eligible = if on_site_fossil_use || parts.contains(&Some(false)) {
@@ -216,7 +276,11 @@ pub fn a0_check(check: &BblCheck, beng2: Option<f64>, on_site_fossil_use: bool) 
 #[serde(rename_all = "camelCase")]
 pub struct BblCheck {
     pub source: &'static str,
+    /// The function, or the largest one for mixed functions.
     pub function: BblFunction,
+    /// Paragraph 2 functions with their areas; one entry for a single
+    /// function.
+    pub functions: Vec<BblFunctionArea>,
     pub loss_area_ratio: f64,
     pub limits: BblLimits,
     /// `None` when the indicator is not available (BENG 1 without C1).
@@ -233,10 +297,44 @@ pub fn check(
     beng2: Option<f64>,
     beng3: Option<f64>,
 ) -> Option<BblCheck> {
-    let limits = bbl_limits(function, loss_area_ratio, specific_heat_capacity_kj_per_m2k)?;
+    check_mixed(
+        &[BblFunctionArea {
+            function,
+            area_m2: 1.0,
+        }],
+        loss_area_ratio,
+        specific_heat_capacity_kj_per_m2k,
+        beng1,
+        beng2,
+        beng3,
+    )
+}
+
+/// Article 4.149 paragraph 2 for one or more use functions.
+pub fn check_mixed(
+    functions: &[BblFunctionArea],
+    loss_area_ratio: f64,
+    specific_heat_capacity_kj_per_m2k: f64,
+    beng1: Option<f64>,
+    beng2: Option<f64>,
+    beng3: Option<f64>,
+) -> Option<BblCheck> {
+    let limits = bbl_limits_mixed(
+        functions,
+        loss_area_ratio,
+        specific_heat_capacity_kj_per_m2k,
+    )?;
+    let function = functions
+        .iter()
+        .fold(None::<&BblFunctionArea>, |best, part| match best {
+            Some(best) if best.area_m2 >= part.area_m2 => Some(best),
+            _ => Some(part),
+        })?
+        .function;
     Some(BblCheck {
         source: BBL_SOURCE,
         function,
+        functions: functions.to_vec(),
         loss_area_ratio,
         energy_need_meets: beng1.map(|value| value <= limits.energy_need_max_kwh_per_m2),
         primary_fossil_meets: beng2.map(|value| value <= limits.primary_fossil_max_kwh_per_m2),
@@ -248,6 +346,31 @@ pub fn check(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mixed_functions_weight_the_limits_by_area() {
+        let parts = [
+            BblFunctionArea {
+                function: BblFunction::Office,
+                area_m2: 750.0,
+            },
+            BblFunctionArea {
+                function: BblFunction::Retail,
+                area_m2: 250.0,
+            },
+        ];
+        let mixed = check_mixed(&parts, 1.5, 250.0, Some(80.0), Some(45.0), Some(30.0)).unwrap();
+        // x ≤ 1,8: office 90 / 40 / 30, retail 70 / 60 / 30.
+        assert!((mixed.limits.energy_need_max_kwh_per_m2 - 85.0).abs() < 1e-12);
+        assert!((mixed.limits.primary_fossil_max_kwh_per_m2 - 45.0).abs() < 1e-12);
+        assert!((mixed.limits.renewable_share_min_percent - 30.0).abs() < 1e-12);
+        assert_eq!(mixed.function, BblFunction::Office);
+        assert_eq!(mixed.primary_fossil_meets, Some(true));
+        // A0: 0,75·36 + 0,25·54 = 40,5.
+        let a0 = a0_check(&mixed, Some(45.0), false);
+        assert!((a0.primary_fossil_max_kwh_per_m2 - 40.5).abs() < 1e-12);
+        assert!(check_mixed(&[], 1.5, 250.0, None, None, None).is_none());
+    }
 
     #[test]
     fn dwelling_limits_follow_table_4_148a() {
