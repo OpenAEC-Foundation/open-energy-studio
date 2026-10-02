@@ -52,6 +52,7 @@ pub mod space_heating_chain;
 pub mod tojuli;
 pub mod unheated_transmission;
 pub mod ventilation;
+pub mod window_u;
 use direct_transmission::{DirectElement, DirectTransmissionInput, LinearBridge, PointBridge};
 use heat_pumps::{
     AuxiliaryMeasurementBoundary, HeatPumpInput, HeatSink, HeatSource, InputEnergyCarrier,
