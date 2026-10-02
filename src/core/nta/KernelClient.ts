@@ -357,9 +357,24 @@ export type NtaOrientation =
   | 'north' | 'north_east' | 'east' | 'south_east'
   | 'south' | 'south_west' | 'west' | 'north_west';
 export type NtaMassClass = 'light' | 'heavy' | 'very_heavy';
+export type NtaObstructionSide = 'left' | 'right' | 'both';
+/** §17.3.2 situations a–g (tables 17.4–17.14); relative heights perpendicular to the window. */
 export type NtaObstruction =
   | { method: 'minimal' }
+  | { method: 'parallel_obstruction'; relativeHeight: number }
+  | { method: 'overhang'; relativeHeight: number }
+  | { method: 'side_obstruction'; side: NtaObstructionSide; relativeWidth: number; coolingHeightCondition?: boolean }
+  | { method: 'full'; coolingConditionsMet?: boolean }
+  | { method: 'other'; overhangRelativeHeight?: number | null }
   | { method: 'declared'; heating: number[]; cooling: number[]; sourceReference: string };
+/** Collectors and PV (x = P): tables 17.6, 17.12 and 17.15. */
+export type NtaCollectorObstruction =
+  | { method: 'minimal' }
+  | { method: 'side_obstruction'; side: NtaObstructionSide; relativeWidth: number }
+  | { method: 'full' }
+  | { method: 'roof_edge'; heightM: number; distanceM: number }
+  | { method: 'other' }
+  | { method: 'declared'; factors: number[]; sourceReference: string };
 export type NtaShadingControl =
   | 'manual_residential'
   | 'automatic_residential_iso52016'
@@ -2383,6 +2398,15 @@ export interface ResidentialSurvey {
       glass: OpnameGlass;
       frame: OpnameFrame;
       obstruction?: { heating: number[]; cooling: number[]; sourceReference: string };
+      /** ISSO 82.1/75.1 tables 8.24/8.25; exclusive with `obstruction`. */
+      shading?:
+        | { situation: 'minimal' }
+        | { situation: 'constant_height_obstruction'; relativeHeight: number }
+        | { situation: 'constant_overhang'; relativeHeight: number }
+        | { situation: 'full'; coolingConditionsMet?: boolean }
+        | { situation: 'overhang_with_obstructions'; overhangRelativeHeight: number }
+        | { situation: 'other' }
+        | { situation: 'side_obstruction'; side: NtaObstructionSide; relativeWidth: number };
       sourceReference: string;
     }>;
     doors?: Array<{

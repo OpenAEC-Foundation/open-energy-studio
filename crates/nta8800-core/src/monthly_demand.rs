@@ -19,7 +19,8 @@ use crate::climate::{self, Orientation, CLIMATE_SOURCE, MONTH_HOURS, OUTDOOR_TEM
 use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
 use crate::ground::{ground_monthly, slab_coefficients, EdgeThermalBridges, SlabOnGround};
 use crate::solar_shading::{
-    movable_shading_factor, obstruction_factor, Balance, MovableShading, Obstruction,
+    movable_shading_factor, obstruction_factor, validate_obstruction, Balance, MovableShading,
+    Obstruction,
 };
 use crate::unheated_transmission::{assess_unheated_transmission, UnheatedTransmissionInput};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -53,7 +54,7 @@ pub const H_INT_SPEC: f64 = 2.0;
 pub const OMITTED_CORRECTIONS: &[&str] = &[
     "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl of chapter 10 is still 0",
     "8.5 adjacent heated spaces H_A",
-    "§17.3 obstruction situations b–g are declared, not derived",
+    "§17.3.8 extended obstruction method (hourly NEN 5060) enters as declared factors",
     "table 7.10 footnote c is the caller's column choice",
     "annex D for floors other than slab on ground (crawlspace, basement)",
 ];
@@ -1299,27 +1300,18 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 format!("{path}.uValueWPerM2k"),
             ));
         }
-        match &window.obstruction {
-            Obstruction::Minimal => {}
-            Obstruction::Declared {
-                heating,
-                cooling,
+        for (code, suffix) in validate_obstruction(&window.obstruction, window.tilt_deg) {
+            issues.push(issue(code, format!("{path}.obstruction{suffix}")));
+        }
+        if let Obstruction::Declared {
+            source_reference, ..
+        } = &window.obstruction
+        {
+            check_reference(
                 source_reference,
-            } => {
-                if [heating, cooling].iter().any(|values| {
-                    values.len() != 12 || values.iter().any(|value| !(0.0..=1.0).contains(value))
-                }) {
-                    issues.push(issue(
-                        "window_obstruction_factor_invalid",
-                        format!("{path}.obstruction"),
-                    ));
-                }
-                check_reference(
-                    source_reference,
-                    format!("{path}.obstruction.sourceReference"),
-                    issues,
-                );
-            }
+                format!("{path}.obstruction.sourceReference"),
+                issues,
+            );
         }
         if let Some(shading) = &window.movable_shading {
             if !(0.0..=1.0).contains(&shading.reduction_factor) {

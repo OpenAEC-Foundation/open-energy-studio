@@ -22,7 +22,7 @@ De module is op 2 oktober 2026 nagelopen tegen de gelicentieerde normtekst (NTA 
 | Warmtecapaciteit | tabel 7.10, 7.45 | `D_m` 55/80 … 250/450 kJ/(m²K); `C_m = D_m·1000·A_g` |
 | Interne winst woning | 7.21–7.24 | `180·N_woon·N_P·0,001·t`; `N_P` per banden ≤30, 30–100, >100 m² |
 | Zonwinst ramen | 7.32, 7.40, 7.42/7.43 | `0,90·g_n·A·(1−F_F)·F_sh;obst·r_sh·I_sol·t·0,001 − Q_sky`, apart voor warmte- en koudebalans |
-| Belemmering | §17.3, tabel 17.4/17.5 (p. 708–715) | `minimal`: warmte tabel 17.4 met dichtstbijzijnde hellingskolom 0–180° (bij gelijke afstand de hoogste), koude 1,00; of `declared` |
+| Belemmering | §17.3, tabel 17.3–17.15 (p. 698–763) | Eén situatie per raam (zie hieronder); hellingen nemen de dichtstbijzijnde kolom van tabel 17.4 (bij gelijke afstand de hoogste); onder 15° geldt het zichtveld zuid; of `declared` |
 | Beweegbare zonwering | 7.42/7.43, tabel 7.7–7.9 (p. 197–202) | `r_sh = (1−f_sh;with)+f_sh;with·F_c`; lineaire interpolatie tussen 0/45/90/180°; `f_sh;with = 0` voor warmte alleen bij woningen met handbediening of automatiek volgens ISO 52016-3 |
 | Zonwinst opaak | 7.33, 7.6.6.3 | `0,6·R_se·U·A·I_sol·t·0,001 − Q_sky`, `F_sh;obst = 1` |
 | Hemelstraling | 7.39, 7.6.6.4 | `F_sky·R_se·U·A·4,14·11·t·0,001`; `F_sky` 1 (≤5°) / 0,75 (≤75°) / 0,5 (≤90°) / 0 (overhellend) |
@@ -62,7 +62,7 @@ Per balans: setpoint na nivellering, reductiefactor (`a_H;red` of `a_C;red`), re
 
 - terugwinbare systeemverliezen `Q_H;ls;rbl`/`Q_C;ls;rbl` en de Δη-termen van 7.3–7.5 en 7.7–7.9 (komen uit hoofdstuk 9 en 10);
 - `H_A` (aangrenzende verwarmde ruimten, 8.5);
-- belemmeringssituaties b–g van §17.3 worden opgegeven, niet afgeleid;
+- de uitgebreide methode van §17.3.8 (uurwaarden NEN 5060) komt binnen als `declared`-factoren;
 - voetnoot c van tabel 7.10: de kolomkeuze ligt bij de aanroeper;
 - bijlage D voor andere vloeren dan vloer op grond (kruipruimte, kelder);
 - één gebruiksfunctie per rekenzone (tabel 7.13–7.15).
@@ -147,3 +147,29 @@ Beide velden tegelijk geeft `unheated_factor_declared_and_derived`. Geen van bei
 ## Leidingdoorvoeren in de projectroute
 
 `ntaCalculation.verticalPipes` geeft de verticale leidingen van 7.3.3 (H_p, 7.17) voor een project met één rekenzone. Bij meer zones staan ze per zone in `zoneData[].verticalPipes`; een projectlijst geeft dan `vertical_pipes_per_zone_required`, zodat dezelfde leiding niet in elke zone wordt meegeteld.
+
+## Belemmeringssituaties (§17.3.2, tabel 17.3)
+
+`obstruction.method` kiest één situatie per raam. De situaties zijn alternatieven; ze worden niet met elkaar vermenigvuldigd. Wat tabel 17.3 voor een balans "niet beschikbaar" noemt, valt terug op situatie g. Voor koeling is dat tabel 17.5 (1,00), behalve met een overstek evenwijdig aan een verticaal raam (tabel 17.9).
+
+| `method` | Situatie | Warmte | Koude |
+|---|---|---|---|
+| `minimal` | a | tabel 17.4 | tabel 17.5 (1,00) |
+| `parallel_obstruction` (`relativeHeight` = h_b;⊥) | b, alleen verticaal | tabel 17.7 | niet beschikbaar → 1,00 |
+| `overhang` (`relativeHeight` = h_o;⊥) | c, alleen verticaal | tabel 17.8 | tabel 17.9 |
+| `side_obstruction` (`side`, `relativeWidth` = b_b) | d, alleen verticaal | tabel 17.10 | tabel 17.11 met `coolingHeightCondition` (≥ 2,5 m boven de bovenkant van het raam), anders 1,00 |
+| `full` | e | tabel 17.13 | tabel 17.14 met `coolingConditionsMet`, anders 1,00 |
+| `other` (`overhangRelativeHeight` optioneel) | g | tabel 17.13 | tabel 17.9 bij een overstek aan een verticaal raam, anders 1,00 |
+
+- De kolommen voor relatieve hoogte zijn < 0,5, 0,5–1,0 en ≥ 1,0. Voor de relatieve breedte zijn het < 1,0 en ≥ 1,0. Bij zijbelemmeringen aan beide zijden telt de kleinste b_b.
+- Verticaal betekent: de dichtstbijzijnde hellingskolom van tabel 17.4 is 90°, dus 82,5° ≤ helling < 97,5°. Situaties b–d op een niet-verticaal vlak geven `obstruction_situation_requires_vertical`.
+- Het zichtveld onder 15° helling is zuid (17.3.1). Dat geldt nu ook voor tabel 17.4: een vlak van 7,5–15° op het noorden neemt de zuidwaarde van de 15°-kolom.
+- Zonnecollectoren en PV (x = P) gebruiken `solar_shading::collector_obstruction_factor`:
+  - `minimal`: tabel 17.6, 1,00;
+  - `side_obstruction`: tabel 17.12; aan beide zijden met b_b < 1 op een schuin paneel geldt tabel 17.15 (voetnoot c);
+  - `full` en `other`: tabel 17.15;
+  - `roof_edge`: tabel 17.15 alleen als h_dakrand > 0,5 m én l_dakrand < h_dakrand, anders 1,00;
+  - `declared`.
+
+  De koppeling aan de zonneboiler- en PV-routes moet nog worden gemaakt.
+- De tabelwaarden van 17.7–17.15 zijn uit de tekstlaag van de gelicentieerde norm gegenereerd en steekproefsgewijs vergeleken met de gerenderde pagina's (733, 727, 750).
