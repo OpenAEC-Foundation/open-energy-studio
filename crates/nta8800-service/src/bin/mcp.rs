@@ -39,6 +39,12 @@ struct MonthlyDemandArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct VentilationArgs {
+    /// One zone: use functions, height, system variant (table 11.5), heat recovery, infiltration, combustion appliances, ventilative cooling openings and fans, with source references.
+    input: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SpaceHeatingChainArgs {
     /// Monthly demand input plus emission system, distribution route and one generator (gas boiler or forfait heat pump).
     input: Value,
@@ -534,6 +540,30 @@ impl EnergyMcp {
             )]),
             Ok(input) => {
                 let result = nta8800_core::monthly_demand::assess_monthly_demand(&input);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "invalid" {
+                    CallToolResult::error(vec![content])
+                } else {
+                    CallToolResult::success(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Calculate unverified NTA 8800 chapter 11 ventilation for one zone: required and effective flows from the pressure balance, supply temperatures, chapter 7 conductances per balance, fan and frost-protection electricity, and the fixed C1 run for BENG 1"
+    )]
+    fn calculate_ventilation(
+        &self,
+        Parameters(args): Parameters<VentilationArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::ventilation::VentilationInput>(args.input) {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_ventilation_shape", "message":message.to_string()})
+                    .to_string(),
+            )]),
+            Ok(input) => {
+                let result = nta8800_core::ventilation::assess_ventilation(&input);
                 let content = ContentBlock::text(json!(result).to_string());
                 if result.status == "invalid" {
                     CallToolResult::error(vec![content])

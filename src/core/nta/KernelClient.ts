@@ -1335,6 +1335,208 @@ export interface SpaceHeatingChainAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
+export type VentilationSystemVariant =
+  | 'a1' | 'a2a' | 'a2b' | 'a2c' | 'b1' | 'b2' | 'b3'
+  | 'c1' | 'c2a' | 'c2b' | 'c2c' | 'c3a' | 'c3b' | 'c3c' | 'c4a' | 'c4b' | 'c4c' | 'c5a' | 'c5b'
+  | 'd1' | 'd2' | 'd3' | 'd4a' | 'd4b' | 'd5a' | 'd5b' | 'd5c';
+
+export type VentilationFunction =
+  | 'residential' | 'assembly_child_care' | 'other_assembly' | 'cell' | 'healthcare_bed_area'
+  | 'other_healthcare' | 'office' | 'lodging_building' | 'education' | 'sport' | 'retail';
+
+export interface VentilationSystemUnit {
+  variant: VentilationSystemVariant;
+  heatRecovery?: {
+    efficiency:
+      | { method: 'declared'; value: number; standard: 'en13141_7' | 'en13141_8' | 'en13142' | 'en13053'; sourceReference: string }
+      | { method: 'table'; exchanger: string };
+    bypass:
+      | { kind: 'none' }
+      | { kind: 'full'; coldRecoveryEvidence?: string }
+      | { kind: 'partial'; fraction: number }
+      | { kind: 'unknown'; bypassPresent: boolean };
+    layout: 'central' | 'decentral';
+    constantVolumeControl?: boolean;
+    supplyDuctLengthM?: number;
+    supplyDuctInsulation:
+      | { kind: 'uninsulated' | 'insulated' | 'unknown' }
+      | { kind: 'specified'; thicknessM: number; conductivityWPerMK: number };
+    manufactureYear?: number;
+    equipmentReference: string;
+  };
+  ducts: 'unknown' | 'luka_a_b_c' | 'luka_d' | 'no_ducts';
+  airHandlingUnit?: {
+    insideThermalZone: boolean;
+    supplyDuctsOutside: 'none' | 'situation1' | 'situation2' | 'situation3';
+    conditionsSupplyAir?: boolean;
+  };
+  equipmentReference: string;
+}
+
+/** Chapter 11 input for one zone; see crates/nta8800-core/src/ventilation.rs. */
+export interface VentilationInput {
+  zoneId: string;
+  usableFloorAreaM2: number;
+  category: 'residential' | 'utility';
+  functions: Array<{ function: VentilationFunction; areaM2: number }>;
+  dwellingCount?: number;
+  wholeDwellingAreaM2?: number;
+  apartmentBuilding?: boolean;
+  buildingHeightM: number;
+  constructionYear: number;
+  floorAboveCrawlspace?: boolean;
+  heatingSetpointC: number;
+  coolingSetpointC: number;
+  system:
+    | { kind: 'single'; unit: VentilationSystemUnit }
+    | {
+        kind: 'combined';
+        decentralAreaM2: number;
+        totalResidenceAreaM2: number;
+        decentral: VentilationSystemUnit;
+        other: VentilationSystemUnit;
+      };
+  maximumCapacityForCooling?: string;
+  installedCapacity?: { totalDm3PerS: number; naturalSupplyDm3PerS?: number; sourceReference: string };
+  flowReduction?: { collective?: boolean; recirculationPercent?: number; flowControlPercent?: number };
+  infiltration:
+    | { method: 'measured'; qv10DmPerSM2: number; sourceReference: string }
+    | { method: 'reference'; buildingType: string; renovationYear?: number };
+  combustionAppliances?: Array<{
+    id: string;
+    kind: string;
+    class: 'kitchen_stove' | 'gas_type_a' | 'open_fireplace' | 'gas_type_b' | 'specific_gas_appliance' | 'room_sealed';
+    nominalInputKw?: number;
+    sourceReference: string;
+  }>;
+  overventilation?: {
+    heatingTimeFraction: number[];
+    hotWaterTimeFraction: number[];
+    heatingFlowM3PerH?: number;
+    heatingAreaShare?: number;
+    hotWaterFlowM3PerH: number[];
+    sourceReference: string;
+  };
+  ventilativeCooling?: {
+    openings: Array<{
+      id: string;
+      area:
+        | { method: 'declared'; netAreaM2: number }
+        | { method: 'discharge'; grossAreaM2: number; dischargeCoefficient: number; entryLossCoefficient: number }
+        | { method: 'opening_angle'; maxNetAreaM2: number; maxAngleDeg: number };
+      centreHeightM: number;
+      openingHeightM: number;
+      azimuthDeg: number;
+      tiltDeg: number;
+    }>;
+    operation: 'manual' | 'automatic' | 'automatic_with_temperature';
+    conditionsEvidence: string;
+  };
+  grillePreheating?: {
+    control:
+      | { method: 'fallback' }
+      | {
+          method: 'specified';
+          maxPowerWPerDm3PerS: number;
+          maxTemperatureRiseK: number;
+          switchOnBelowC: number;
+          maxSupplyTemperatureC: number;
+        };
+    preheatedDesignFlowM3PerH?: number;
+    sourceReference: string;
+  };
+  fans:
+    | { method: 'forfait'; current: 'ac' | 'dc'; manufactureYear?: number }
+    | {
+        method: 'declared';
+        fans: Array<{
+          id: string;
+          power:
+            | { method: 'nominal'; nominalPowerW: number }
+            | { method: 'motor'; motorPowerW: number; manufactureYear?: number; electricalInputW?: number };
+        }>;
+        control:
+          | { method: 'residential_table' }
+          | { method: 'declared'; monthly: number[]; sourceReference: string }
+          | { method: 'flow_control'; control: 'throttle' | 'inlet_vane_or_blade_pitch' | 'speed_control' | 'other' };
+        buildingShare?: number;
+        sourceReference: string;
+      };
+  sourceReference: string;
+}
+
+export interface VentilationBalanceFlows {
+  requiredOutdoorAirM3PerH: number;
+  effectiveOutdoorAirM3PerH: number;
+  infiltrationM3PerH: number;
+  naturalSupplyM3PerH: number;
+  purgeM3PerH: number;
+  ventilativeCoolingM3PerH: number;
+  combustionM3PerH: number;
+  mechanicalSupplyM3PerH: number;
+  mechanicalExtractM3PerH: number;
+  naturalSupplyTemperatureC: number;
+  mechanicalSupplyTemperatureC: number;
+  ventilativeCoolingTemperatureC: number;
+  conductanceWPerK: number;
+  heatFlowPerSetpointW: number;
+}
+
+export interface VentilationResult {
+  zoneId: string;
+  ventilationSystemOp: Array<'natural' | 'supply' | 'extract' | 'balanced'>;
+  infiltrationQV1M3PerH: number;
+  months: Array<{
+    month: number;
+    heating: VentilationBalanceFlows;
+    cooling: VentilationBalanceFlows;
+    heatingReferencePressurePa: number[];
+    coolingReferencePressurePa: number[];
+    fanElectricityKwh: number;
+    frostProtectionElectricityKwh: number;
+    grillePreheatingElectricityKwh: number;
+    outdoorAirFraction: number | null;
+  }>;
+  demandFlows: Array<{
+    id: string;
+    months: Array<{
+      month: number;
+      heatingConductanceWPerK: number;
+      heatingSupplyTemperatureC: number;
+      coolingConductanceWPerK: number;
+      coolingSupplyTemperatureC: number;
+    }>;
+  }>;
+  annualFanElectricityKwh: number;
+  annualFrostProtectionElectricityKwh: number;
+  annualGrillePreheatingElectricityKwh: number;
+  interpretations: string[];
+}
+
+export interface VentilationAssessment {
+  status: 'calculated_unverified' | 'invalid';
+  scope: string;
+  issues: Array<{ code: string; path: string }>;
+  actual: VentilationResult | null;
+  fixedC1: VentilationResult | null;
+  referenceVerified: false;
+}
+
+export async function calculateVentilationWithRust(input: VentilationInput): Promise<VentilationAssessment> {
+  if (isTauri()) {
+    return invoke<VentilationAssessment>('calculate_ventilation', { input });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/ventilation/calculate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    });
+    return response.json() as Promise<VentilationAssessment>;
+  }
+  throw new Error('Rust ventilation calculation is available in the desktop app and local development server.');
+}
+
 export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
   if (isTauri()) {
     return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input });

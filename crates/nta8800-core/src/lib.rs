@@ -48,6 +48,7 @@ pub mod space_cooling;
 pub mod space_heating_chain;
 pub mod tojuli;
 pub mod unheated_transmission;
+pub mod ventilation;
 use direct_transmission::{DirectElement, DirectTransmissionInput, LinearBridge, PointBridge};
 use heat_pumps::{
     AuxiliaryMeasurementBoundary, HeatPumpInput, HeatSink, HeatSource, InputEnergyCarrier,
@@ -291,6 +292,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_tojuli_per_orientation_5_7",
             "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
             "unverified_project_performance_adapter_single_zone",
+            "unverified_ventilation_chapter_11_pressure_balance_and_c1",
         ],
     }
 }

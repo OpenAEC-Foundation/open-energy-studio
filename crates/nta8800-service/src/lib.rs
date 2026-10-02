@@ -37,6 +37,11 @@ pub struct MonthlyDemandRequest {
 }
 
 #[derive(Deserialize)]
+pub struct VentilationRequest {
+    pub input: nta8800_core::ventilation::VentilationInput,
+}
+
+#[derive(Deserialize)]
 pub struct SpaceHeatingChainRequest {
     pub input: nta8800_core::space_heating_chain::SpaceHeatingChainInput,
 }
@@ -177,6 +182,10 @@ pub fn app() -> Router {
         .route(
             "/v1/nta8800/heating/space-heating-chain/calculate",
             post(calculate_space_heating_chain),
+        )
+        .route(
+            "/v1/nta8800/ventilation/calculate",
+            post(calculate_ventilation),
         )
         .route(
             "/v1/nta8800/project/performance",
@@ -378,6 +387,18 @@ async fn calculate_monthly_demand(
     Json(request): Json<MonthlyDemandRequest>,
 ) -> (StatusCode, Json<Value>) {
     let assessment = nta8800_core::monthly_demand::assess_monthly_demand(&request.input);
+    let status = if assessment.status == "invalid" {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn calculate_ventilation(
+    Json(request): Json<VentilationRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment = nta8800_core::ventilation::assess_ventilation(&request.input);
     let status = if assessment.status == "invalid" {
         StatusCode::UNPROCESSABLE_ENTITY
     } else {
@@ -1216,6 +1237,24 @@ mod tests {
         assert!(result["annualHeatingNeedKwh"].as_f64().unwrap() > 0.0);
         assert_eq!(result["referenceVerified"], false);
         assert_eq!(result["bengCalculationAvailable"], false);
+    }
+
+    #[tokio::test]
+    async fn ventilation_route_returns_actual_and_c1_runs() {
+        let input: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-ventilation-synthetic.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/ventilation/calculate",
+            json!({ "input": input }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["status"], "calculated_unverified");
+        assert_eq!(result["actual"]["months"].as_array().unwrap().len(), 12);
+        assert!(result["fixedC1"]["demandFlows"].as_array().unwrap().len() >= 2);
+        assert_eq!(result["referenceVerified"], false);
     }
 
     #[tokio::test]

@@ -30,7 +30,7 @@ Kies **NTA-invoer starten**. Het formulier vraagt alleen wat het projectmodel no
 | Ramen | kozijnfractie; belemmering (minimaal of opgegeven); beweegbare zonwering met F_c en bediening | 7.32, §17.3, 7.42/7.43 |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
 | Vloeren op grond | blootgestelde omtrek P en R_si + R_c | 8.30–8.41 |
-| Ventilatie | H_ve of debiet in m³/h, inclusief infiltratie | (hoofdstuk 11 nog niet in de kern) |
+| Ventilatie | H_ve per maand, of de hoofdstuk 11-invoer via de ventilatieroute (systeemvariant, WTW, infiltratie, ventilatieve koeling, ventilatoren) | hoofdstuk 11, zie [ventilatie](nta8800-ventilatie.md) |
 | Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie alleen in de verwarmde zone | tabel 9.2–9.4, §9.4.1 |
 | Opwekker | gasketel, (hybride) warmtepomp, stadsverwarming, elektrisch of biomassa | §9.6 |
 | Koeling | geen, compressie, gasabsorptie of vrije koeling | §10.5 |
@@ -59,7 +59,7 @@ Maandwaarden, toevoertemperaturen, gegevens per zone (`zoneData` bij meerdere zo
 
 Zie het [verificatiedossier](nta8800-verificatiestatus.md) en het [dekkingsregister](nta8800-dekkingsregister.md). In het kort:
 
-- Hoofdstuk 11 (ventilatie, infiltratie, C1) en de distributie volgens 9.26 ontbreken in de kern.
+- Hoofdstuk 11 (ventilatie, infiltratie, C1) staat als aparte route in de kern; de koppeling aan de maandberekening en de BENG 1-run volgt. De distributie volgens 9.26 ontbreekt nog.
 - De rendementen voor tapwater en voor afgifte van koeling worden opgegeven.
 - Hoofdstukken 7, 8, 13, 16 en 17 zijn getranscribeerd uit normanalyses en nog niet onafhankelijk gereviewd tegen de normtekst. Hoofdstukken 5 en 9 volgen het consultatieconcept.
 - Er zijn nog geen uitkomsten uit de EDR-testset (bijlage 2) vergeleken. Alleen A_g en A_ls van EP-W001 zijn getoetst.
