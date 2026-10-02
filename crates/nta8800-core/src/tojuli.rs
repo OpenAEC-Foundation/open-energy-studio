@@ -15,11 +15,15 @@
 //! annex D.1 in the balance and in 5.40 and `H_C;g;adj` in the time
 //! constant; ventilation uses `H_C;ve` with `b_v` (chapter 11 flows when the
 //! zone gives them). `a_C;red` (7.7) scales the need and the booster
-//! heat-pump extraction `Q_C;HP;juli` is split by 5.41a–c. Recoverable
-//! system losses are not distributed over the orientations yet (step B). Results are rounded up to 0,01 K; the Bbl 4.149b
+//! heat-pump extraction `Q_C;HP;juli` is split by 5.41a–c. The July
+//! recoverable losses `Q_H;ls;rbl` and `Q_C;ls;rbl` of the zone are split by
+//! `A_T;or` (step B) and enter 7.7 with Δη (7.8). Results are rounded up to
+//! 0,01 K; the Bbl 4.149b
 //! limit is 1,20. A zone with an active cooling system of demonstrated
-//! capacity (§5.7.1) has TOjuli = 0.
+//! capacity (§5.7.1) has TOjuli = 0; with the annex AA route the kernel
+//! checks AA.10–AA.13 itself.
 
+use crate::annex_aa::{assess_annex_aa, AnnexAaInput, AnnexAaResult};
 use crate::climate::{Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::{assess_direct_transmission, EnvelopeSide};
 use crate::monthly_demand::{
@@ -89,7 +93,10 @@ pub enum CoolingCapacityEvidence {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+    /// Annex AA: the kernel checks AA.10–AA.13 with `calculation`.
     AnnexAa {
+        #[serde(default)]
+        calculation: Option<AnnexAaInput>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
@@ -104,7 +111,9 @@ impl CoolingCapacityEvidence {
     fn source_reference(&self) -> &str {
         match self {
             Self::DynamicCoolingLoad { source_reference }
-            | Self::AnnexAa { source_reference }
+            | Self::AnnexAa {
+                source_reference, ..
+            }
             | Self::SolarLimitation {
                 source_reference, ..
             } => source_reference,
@@ -127,6 +136,10 @@ pub struct TojuliOptions<'a> {
     pub active_cooling: Option<&'a ActiveCoolingEvidence>,
     /// `Q_C;HP;juli;zi` (10.3.2) in kWh; 0 without a booster heat pump.
     pub booster_heat_pump_july_kwh: f64,
+    /// Step B: July `Q_H;ls;rbl` (9.2.5.1) of the zone, kWh.
+    pub heating_recoverable_july_kwh: f64,
+    /// Step B: July `Q_C;ls;rbl` (10.2) of the zone, kWh.
+    pub cooling_recoverable_july_kwh: f64,
 }
 
 impl Default for TojuliOptions<'_> {
@@ -135,6 +148,8 @@ impl Default for TojuliOptions<'_> {
             residential: true,
             active_cooling: None,
             booster_heat_pump_july_kwh: 0.0,
+            heating_recoverable_july_kwh: 0.0,
+            cooling_recoverable_july_kwh: 0.0,
         }
     }
 }
@@ -161,6 +176,8 @@ pub struct TojuliAssessment {
     pub orientations: Vec<OrientationResult>,
     pub max_tojuli_k: Option<f64>,
     pub meets_bbl_limit: Option<bool>,
+    /// Annex AA capacity check when that is the active-cooling evidence.
+    pub annex_aa: Option<AnnexAaResult>,
     pub issues: Vec<TojuliIssue>,
 }
 
@@ -189,6 +206,7 @@ fn invalid(zone_id: &str, active_cooling: bool, issues: Vec<TojuliIssue>) -> Toj
         orientations: Vec::new(),
         max_tojuli_k: None,
         meets_bbl_limit: None,
+        annex_aa: None,
         issues,
     }
 }
@@ -309,9 +327,40 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
     let resolved = with_resolved_ventilation(input, &demand);
     let input = &resolved;
     if let Some(evidence) = options.active_cooling {
-        let issues = validate_active_cooling(evidence, input, options.residential, "activeCooling");
+        let mut issues =
+            validate_active_cooling(evidence, input, options.residential, "activeCooling");
+        let mut annex_aa = None;
+        if let CoolingCapacityEvidence::AnnexAa { calculation, .. } = &evidence.capacity {
+            match calculation {
+                None => issues.push(issue(
+                    "annex_aa_calculation_required",
+                    "activeCooling.capacity.calculation",
+                )),
+                Some(aa) => {
+                    match assess_annex_aa(aa, input, &demand, "activeCooling.capacity.calculation")
+                    {
+                        Err(found) => issues.extend(found.into_iter().map(|item| TojuliIssue {
+                            code: item.code,
+                            path: item.path,
+                        })),
+                        Ok(result) => {
+                            if !result.sufficient {
+                                // AA.10/AA.12 not met: the capacity is insufficient.
+                                issues.push(issue(
+                                    "annex_aa_capacity_insufficient",
+                                    "activeCooling.capacity.calculation",
+                                ));
+                            }
+                            annex_aa = Some(result);
+                        }
+                    }
+                }
+            }
+        }
         if !issues.is_empty() {
-            return invalid(&input.zone_id, has_active, issues);
+            let mut result = invalid(&input.zone_id, has_active, issues);
+            result.annex_aa = annex_aa;
+            return result;
         }
         // §5.7.2: an active cooling system allows TOjuli = 0 for all orientations.
         return TojuliAssessment {
@@ -321,6 +370,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             orientations: Vec::new(),
             max_tojuli_k: Some(0.0),
             meets_bbl_limit: Some(true),
+            annex_aa,
             issues: Vec::new(),
         };
     }
@@ -450,6 +500,9 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             + share * ground_july
             + share * ventilation_july;
         let gains = share * internal_july + solar[index] + share * horizontal_solar;
+        // Step B: recoverable system losses by A_T;or.
+        let recoverable =
+            share * (options.heating_recoverable_july_kwh - options.cooling_recoverable_july_kwh);
         // 7.6/7.7 with 7.52–7.54 and 7.58.
         let gamma = (heat_transfer != 0.0).then(|| gains / heat_transfer);
         let need = if gains <= 0.0
@@ -461,7 +514,16 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             let tau = share * capacity / 3600.0 / tau_conductance;
             let a = A_0 + tau / TAU_0_H;
             let eta = gamma.map_or(1.0, |gamma| cooling_utilization(gamma, a));
-            (cooling_reduction * (gains - eta * heat_transfer)).max(0.0)
+            // 7.7/7.8: Δη from the gains including the recoverable losses.
+            let eta_incl = if heat_transfer != 0.0 {
+                cooling_utilization((gains + recoverable) / heat_transfer, a)
+            } else {
+                1.0
+            };
+            let delta = eta_incl - eta;
+            (cooling_reduction
+                * (gains - eta * heat_transfer + recoverable - delta * heat_transfer))
+                .max(0.0)
         };
         results.push(OrientationResult {
             orientation: *orientation,
@@ -502,6 +564,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
         orientations: results,
         max_tojuli_k: max,
         meets_bbl_limit: max.map(|value| value <= TOJULI_LIMIT_K),
+        annex_aa: None,
         issues: Vec::new(),
     }
 }
@@ -682,6 +745,93 @@ mod tests {
             validate_active_cooling(&small, &input, true, "a").is_empty(),
             met && input.window_inventory_complete
         );
+    }
+
+    #[test]
+    fn annex_aa_route_needs_a_passing_calculation() {
+        let input = demand();
+        let mut aa = evidence(CoolingCapacityEvidence::AnnexAa {
+            calculation: None,
+            source_reference: "annex AA".into(),
+        });
+        let options = |aa: &ActiveCoolingEvidence| -> TojuliAssessment {
+            assess_tojuli(
+                &input,
+                TojuliOptions {
+                    active_cooling: Some(aa),
+                    ..TojuliOptions::default()
+                },
+            )
+        };
+        let missing = options(&aa);
+        assert_eq!(missing.issues[0].code, "annex_aa_calculation_required");
+        let window = input.windows[0].id.clone();
+        let calculation = |capacity: f64| crate::annex_aa::AnnexAaInput {
+            construction_year: 2020,
+            post_insulated: false,
+            generator_capacity_kw: Some(capacity),
+            rooms: vec![crate::annex_aa::AnnexAaRoom {
+                id: "living".into(),
+                area_m2: 40.0,
+                living: true,
+                opaque_inner_area_m2: 20.0,
+                windows: vec![crate::annex_aa::AnnexAaWindow {
+                    window_id: window.clone(),
+                    u_with_shutter_w_per_m2k: None,
+                }],
+                installed_capacity_kw: capacity,
+            }],
+        };
+        aa.capacity = CoolingCapacityEvidence::AnnexAa {
+            calculation: Some(calculation(100.0)),
+            source_reference: "annex AA".into(),
+        };
+        let passed = options(&aa);
+        assert_eq!(
+            passed.status, "calculated_unverified",
+            "{:?}",
+            passed.issues
+        );
+        assert_eq!(passed.max_tojuli_k, Some(0.0));
+        let required = passed.annex_aa.as_ref().unwrap().required_kw;
+        aa.capacity = CoolingCapacityEvidence::AnnexAa {
+            calculation: Some(calculation(0.0)),
+            source_reference: "annex AA".into(),
+        };
+        let failed = options(&aa);
+        if required > 0.0 {
+            assert!(failed
+                .issues
+                .iter()
+                .any(|item| item.code == "annex_aa_capacity_insufficient"));
+        }
+    }
+
+    #[test]
+    fn recoverable_losses_follow_step_b() {
+        let input = demand();
+        let base = assess_tojuli(&input, TojuliOptions::default());
+        let with = assess_tojuli(
+            &input,
+            TojuliOptions {
+                heating_recoverable_july_kwh: 20.0,
+                ..TojuliOptions::default()
+            },
+        );
+        let (a, b) = (south(&base), south(&with));
+        if a.cooling_need_july_kwh > 0.0 {
+            assert!(b.cooling_need_july_kwh > a.cooling_need_july_kwh);
+        }
+        // Cooling-system losses with the same size cancel the heating ones.
+        let cancelled = assess_tojuli(
+            &input,
+            TojuliOptions {
+                heating_recoverable_july_kwh: 20.0,
+                cooling_recoverable_july_kwh: 20.0,
+                ..TojuliOptions::default()
+            },
+        );
+        assert!((south(&cancelled).cooling_need_july_kwh - a.cooling_need_july_kwh).abs() < 1e-9);
     }
 
     #[test]

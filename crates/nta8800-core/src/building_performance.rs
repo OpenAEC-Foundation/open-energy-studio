@@ -1041,6 +1041,14 @@ pub fn assess_building_performance(
                         booster_heat_pump_july_kwh: cooling
                             .as_ref()
                             .map_or(0.0, |item| item.zone_booster_extraction_kwh[zone_index][6]),
+                        // §5.7.2 step B: July recoverable losses of the zone.
+                        heating_recoverable_july_kwh: heating
+                            .zone_recoverable_losses
+                            .iter()
+                            .find(|item| item.zone_id == zone.zone_id)
+                            .and_then(|item| item.monthly_kwh.get(6).copied())
+                            .unwrap_or(0.0),
+                        cooling_recoverable_july_kwh: 0.0,
                     },
                 )
             })
@@ -2022,8 +2030,8 @@ mod tests {
         sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
         sample.active_cooling = Some(ActiveCoolingEvidence {
             system: crate::tojuli::ActiveCoolingSystem::SplitUnitsInEveryHabitableRoom,
-            capacity: crate::tojuli::CoolingCapacityEvidence::AnnexAa {
-                source_reference: "annex AA".into(),
+            capacity: crate::tojuli::CoolingCapacityEvidence::DynamicCoolingLoad {
+                source_reference: "cooling load calculation".into(),
             },
             source_reference: "design".into(),
         });
@@ -2081,8 +2089,8 @@ mod tests {
         let mut cooled = input();
         cooled.active_cooling = Some(ActiveCoolingEvidence {
             system: crate::tojuli::ActiveCoolingSystem::SplitUnitsInEveryHabitableRoom,
-            capacity: crate::tojuli::CoolingCapacityEvidence::AnnexAa {
-                source_reference: "annex AA".into(),
+            capacity: crate::tojuli::CoolingCapacityEvidence::DynamicCoolingLoad {
+                source_reference: "cooling load calculation".into(),
             },
             source_reference: "design".into(),
         });
