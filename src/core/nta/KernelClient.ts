@@ -1376,6 +1376,16 @@ export interface SpaceHeatingChainInput {
       }
     | { kind: 'electric_resistance'; equipmentReference: string; auxiliary?: NtaOtherGeneratorAuxiliary | null }
     | {
+        kind: 'heat_pump_annex_q';
+        heatPump: NtaAnnexQHeatPump;
+        /** θ_sup for tables Q.5/Q.7, up to 75 °C. */
+        designSupplyTemperatureC: number;
+        /** Required when F_H;gen < 1. */
+        backup?: { kind: 'electric_resistance' } | { kind: 'gas_boiler'; boiler: BoilerForfaitDraftInput } | null;
+        regeneration?: NtaRegenerationInput | null;
+        equipmentReference: string;
+      }
+    | {
         kind: 'biomass';
         appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler';
         location: 'inside_thermal_boundary' | 'outside_thermal_boundary';
@@ -1386,6 +1396,77 @@ export interface SpaceHeatingChainInput {
         automaticFuelFeed?: boolean;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
       };
+}
+
+/** One NEN-EN 14511 / 14825 measurement (annex Q tables Q.11/Q.15). */
+export interface NtaAnnexQPoint {
+  evaporatorInC: number;
+  evaporatorOutC: number;
+  condenserInC: number;
+  condenserOutC: number;
+  cop: number;
+  heatingPowerKw: number;
+}
+
+/** Annex Q heat pump product data. */
+export interface NtaAnnexQHeatPump {
+  source: 'brine_water' | 'water_water' | 'outdoor_air_water' | 'exhaust_air_water' | 'combined_air_water' | 'air_air';
+  /** f_buitenlucht (11.24) for combined_air_water. */
+  outdoorAirFraction?: number | null;
+  maximumPower: {
+    condition1: NtaAnnexQPoint;
+    condition2?: NtaAnnexQPoint | null;
+    condition3?: NtaAnnexQPoint | null;
+    condition4?: NtaAnnexQPoint | null;
+  };
+  modulation:
+    | { method: 'on_off' }
+    | {
+        method: 'modulating';
+        minimumPowerKw: number;
+        lowRange: NtaAnnexQPoint[];
+        highRange?: NtaAnnexQPoint[] | null;
+        condenserPumpModulating: boolean;
+        sourcePumpModulating: boolean;
+      };
+  switchOff?: {
+    minEvaporatorInC?: number | null;
+    minEvaporatorOutC?: number | null;
+    maxCondenserInC?: number | null;
+    maxCondenserOutC?: number | null;
+    minCop?: number | null;
+  };
+  sourcePump?: { nominalPowerW?: number | null; overrunS: number } | null;
+  evaporatorInlet?: { method: 'forfait' } | { method: 'declared'; temperaturesC: number[]; sourceReference: string } | null;
+  testReportReference: string;
+}
+
+/** Annex V regeneration of an individual ground source. */
+export interface NtaRegenerationInput {
+  freeCoolingFromSource?: boolean;
+  solar?: Array<{
+    collectorAreaM2: number;
+    azimuthDeg: number;
+    tiltDeg: number;
+    obstructionFactors?: number[];
+    declaredEfficiency?: number | null;
+    sourceReference: string;
+  }>;
+  sourceReference: string;
+}
+
+/** Annex W booster heat pump. */
+export interface NtaBoosterHeatPump {
+  lowTest: { sourceTemperatureC: number; cop: number };
+  highTest: { sourceTemperatureC: number; cop: number };
+  measuredClass: 'class1' | 'class2' | 'class3' | 'class4';
+  standingLossKw: number;
+  sourceTemperaturesC: number[];
+  coolingExtractionKwh?: number[] | null;
+  heatSource:
+    | { kind: 'external_heat' }
+    | { kind: 'collective_generator'; generationEfficiency: number; carrier: 'gas' | 'oil' | 'electricity'; sourceReference: string };
+  testReportReference: string;
 }
 
 /** 9.91/9.92 inputs for generators outside 9.85. */
@@ -1528,6 +1609,33 @@ export interface SpaceHeatingChainAssessment {
     } | null;
   } | null;
   zoneRecoverableLosses: Array<{ zoneId: string; monthlyKwh: number[] }>;
+  /** Annex Q (and annex V) details of an annex Q heat pump. */
+  annexQ: {
+    annexQ: {
+      energyFraction: number;
+      generationEfficiency: number;
+      deliveredKwh: number;
+      electricityKwh: number;
+      sourcePumpKwh: number;
+      bins: Array<{
+        outdoorC: number;
+        hours: number;
+        demandKw: number;
+        maximumPowerKw: number;
+        deliveredKw: number;
+        cop: number;
+        switchOffFactor: number;
+        onHours: number;
+        onFraction: number;
+      }>;
+      monthlyOnFraction: number[];
+      interpretations: string[];
+    };
+    demandClass: 'residential_low' | 'residential_high' | 'utility_low' | 'utility_high';
+    regenerationDegree: number | null;
+    sourceCorrection: number;
+    correctedEfficiency: number;
+  } | null;
   demand: MonthlyDemandAssessment;
   additionalZoneDemands: MonthlyDemandAssessment[];
   issues: Array<{ code: string; path: string }>;
@@ -2169,7 +2277,8 @@ export interface NtaHotWaterSystem {
     | { kind: 'indirect_boiler'; boiler: 'conventional_or_unknown' | 'vr' | 'hr100_or104' | 'hr107'; oil: boolean;
         insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
     | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
-    | { kind: 'external_heat' };
+    | { kind: 'external_heat' }
+    | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump);
   collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
   equipmentReference: string;
 }

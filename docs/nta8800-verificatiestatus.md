@@ -1,5 +1,18 @@
 # NTA 8800 verificatiestatus — 29 september 2026
 
+## Stand 2 oktober 2026: bijlagen Q, V en W
+
+Bijlage Q (warmtepomp met productgegevens), bijlage V (regeneratie) en bijlage W (boosterwarmtepomp) zijn getranscribeerd (p. 1027–1069, 1114–1128) en gekoppeld aan de verwarmings- en tapwaterketen. Zie [bijlagen Q, V en W](nta8800-bijlagen-q-v-w.md).
+
+Nieuwe interpretatievragen:
+
+1. Q.48: −10 °C als nominale verdampertemperatuur voor L/W (de tekst noemt L/L).
+2. L/L: condensorintrede 20 °C.
+3. Interval 5 (B < 0,15) gebruikt het 15 %-deellastpunt.
+4. De jaarlijkse energiefractie `F_H;gen` wordt per maand toegepast.
+5. Bijlage V in de ruimteverwarmingsketen telt alleen de ruimteverwarmingswarmte in de noemer van V.1.
+6. W.3: `Q_C;HP;si;mi` wordt opgegeven en niet uit hoofdstuk 10 overgenomen; de koelketen en de booster moeten dezelfde waarde krijgen.
+
 ## Stand 2 oktober 2026: review H7, H8 en H17 tegen de normtekst
 
 Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn nagelopen tegen de gelicentieerde normtekst (NTA 8800:2025+C1:2026, pagina's 164–220, 250–257, 690–715 en 790–795). Tabellen 17.1, 17.2, 17.4 (90°/45°), 7.7 en 7.9 en de meeste constanten klopten. De gevonden afwijkingen zijn hersteld:

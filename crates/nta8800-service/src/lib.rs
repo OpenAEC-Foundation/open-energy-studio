@@ -1302,6 +1302,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn space_heating_chain_route_calculates_annex_q_heat_pump() {
+        let input: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-space-heating-chain-annex-q-synthetic.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/heating/space-heating-chain/calculate",
+            json!({ "input": input }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["status"], "calculated_unverified");
+        assert!(
+            result["annexQ"]["annexQ"]["generationEfficiency"]
+                .as_f64()
+                .unwrap()
+                > 1.0
+        );
+        assert!(result["annualGeneratorElectricityKwh"].as_f64().unwrap() > 0.0);
+    }
+
+    #[tokio::test]
     async fn space_heating_chain_route_returns_gas_per_month() {
         let input: Value = serde_json::from_str(include_str!(
             "../../../training-data/nta8800-space-heating-chain-synthetic.json"
