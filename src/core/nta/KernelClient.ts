@@ -467,6 +467,8 @@ export interface MonthlyDemandInput {
   usableFloorAreaM2: number;
   areaSourceReference: string;
   usageFunction: NtaUsageFunction;
+  /** §6.5.3: functions with areas in a mixed zone (area-weighted values). */
+  functionAreas?: Array<{ function: NtaUsageFunction; areaM2: number }>;
   dwellingType?: NtaDwellingType | null;
   setpoints: { heatingC: number; coolingC: number; sourceReference: string };
   transmission: MonthlyDemandTransmission;
@@ -2952,6 +2954,7 @@ export interface NtaCalculationInput {
   ventilation?: VentilationInput | null;
   zoneData?: Array<{
     zoneId: string;
+    functionAreas?: Array<{ function: NtaUsageFunction; areaM2: number }>;
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
     ventilation?: VentilationInput | null;
     internalGains: MonthlyDemandInput['internalGains'];

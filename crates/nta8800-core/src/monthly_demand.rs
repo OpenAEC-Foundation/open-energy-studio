@@ -56,7 +56,6 @@ pub const OMITTED_CORRECTIONS: &[&str] = &[
     "§17.3 obstruction situations b–g are declared, not derived",
     "table 7.10 footnote c is the caller's column choice",
     "annex D for floors other than slab on ground (crawlspace, basement)",
-    "one usage function per calculation zone (tables 7.13–7.15)",
     "7.30b solar gains through adjacent unheated sunrooms (serres)",
 ];
 
@@ -68,8 +67,13 @@ pub struct MonthlyDemandInput {
     pub zone_id: String,
     pub usable_floor_area_m2: f64,
     pub area_source_reference: String,
-    /// Usage function of the zone for tables 7.13–7.15.
+    /// Usage function of the zone for tables 7.13–7.15 (the largest one
+    /// when `function_areas` lists several).
     pub usage_function: UsageFunction,
+    /// §6.5.3: functions with their areas in a mixed zone; values are
+    /// weighted by usable floor area. Empty for a single-function zone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub function_areas: Vec<UsageFunctionArea>,
     /// `f_mod;sp` of 7.78; required for the residential function.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dwelling_type: Option<DwellingType>,
@@ -639,9 +643,88 @@ pub fn cooling_utilization(gamma: f64, a: f64) -> f64 {
 
 /// 7.74/7.75: reduction factor for intermittent cooling.
 pub fn cooling_reduction_factor(function: UsageFunction) -> f64 {
-    let (_, _, weekend_hours) = function.reduction_hours();
+    cooling_reduction_from_hours(function.reduction_hours().2)
+}
+
+/// 7.74/7.75 for `t_C;red;wknd` in hours.
+pub fn cooling_reduction_from_hours(weekend_hours: f64) -> f64 {
     let fraction = weekend_hours / (24.0 * 7.0);
     1.0 - fraction + B_C_RED_WKND * fraction
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UsageFunctionArea {
+    pub function: UsageFunction,
+    pub area_m2: f64,
+}
+
+/// The calculation values of §6.5.3 for a zone: those of its function, or
+/// the area-weighted values of several functions.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionProfile {
+    pub heating_setpoint_c: f64,
+    pub cooling_setpoint_c: f64,
+    pub reduced_setpoint_c: f64,
+    pub day_reduction_h: f64,
+    pub weekend_reduction_h: f64,
+    pub cooling_weekend_reduction_h: f64,
+    /// q_Oc·f_τ + q_A (tables 7.2/7.3), W/m².
+    pub occupancy_appliance_w_per_m2: f64,
+    /// §5.4.2 q_L, W/m².
+    pub fixed_lighting_w_per_m2: f64,
+}
+
+impl FunctionProfile {
+    pub fn of(function: UsageFunction) -> Self {
+        let (day, weekend, cooling_weekend) = function.reduction_hours();
+        Self {
+            heating_setpoint_c: function.heating_setpoint_c(),
+            cooling_setpoint_c: function.cooling_setpoint_c(),
+            reduced_setpoint_c: function.reduced_setpoint_c(),
+            day_reduction_h: day,
+            weekend_reduction_h: weekend,
+            cooling_weekend_reduction_h: cooling_weekend,
+            occupancy_appliance_w_per_m2: function.occupancy_and_appliance_flux_w_per_m2(),
+            fixed_lighting_w_per_m2: function.fixed_lighting_flux_w_per_m2(),
+        }
+    }
+
+    /// §6.5.3: weighted by usable floor area.
+    pub fn weighted(parts: &[UsageFunctionArea]) -> Self {
+        let total: f64 = parts.iter().map(|part| part.area_m2).sum();
+        let mean = |value: fn(&FunctionProfile) -> f64| {
+            parts
+                .iter()
+                .map(|part| value(&Self::of(part.function)) * part.area_m2)
+                .sum::<f64>()
+                / total
+        };
+        Self {
+            heating_setpoint_c: mean(|p| p.heating_setpoint_c),
+            cooling_setpoint_c: mean(|p| p.cooling_setpoint_c),
+            reduced_setpoint_c: mean(|p| p.reduced_setpoint_c),
+            day_reduction_h: mean(|p| p.day_reduction_h),
+            weekend_reduction_h: mean(|p| p.weekend_reduction_h),
+            cooling_weekend_reduction_h: mean(|p| p.cooling_weekend_reduction_h),
+            occupancy_appliance_w_per_m2: mean(|p| p.occupancy_appliance_w_per_m2),
+            fixed_lighting_w_per_m2: mean(|p| p.fixed_lighting_w_per_m2),
+        }
+    }
+
+    pub fn cooling_reduction_factor(&self) -> f64 {
+        cooling_reduction_from_hours(self.cooling_weekend_reduction_h)
+    }
+}
+
+/// The §6.5.3 profile of a demand input.
+pub fn function_profile(input: &MonthlyDemandInput) -> FunctionProfile {
+    if input.function_areas.is_empty() {
+        FunctionProfile::of(input.usage_function)
+    } else {
+        FunctionProfile::weighted(&input.function_areas)
+    }
 }
 
 /// 7.20: supply-temperature correction `b_v` against the standard setpoint;
@@ -693,7 +776,7 @@ pub struct HeatingIntermittency {
 /// Inputs of 7.60–7.73 for one month.
 #[derive(Debug, Clone, Copy)]
 pub struct IntermittencyInput {
-    pub function: UsageFunction,
+    pub profile: FunctionProfile,
     /// `θ_int;set;H` after levelling (7.76), °C.
     pub setpoint_c: f64,
     pub outdoor_c: f64,
@@ -715,7 +798,7 @@ fn mean_reduction(period_h: f64, input: &IntermittencyInput, d_float: f64) -> f6
         return 0.0;
     }
     let difference = input.setpoint_c - input.outdoor_c;
-    let low = input.function.reduced_setpoint_c();
+    let low = input.profile.reduced_setpoint_c;
     // 7.70–7.72
     let d_set = if difference <= 0.0 {
         1.0
@@ -746,7 +829,10 @@ fn mean_reduction(period_h: f64, input: &IntermittencyInput, d_float: f64) -> f6
 
 /// 7.59–7.73: reduction factor and calculation temperature for heating.
 pub fn heating_intermittency(input: &IntermittencyInput) -> HeatingIntermittency {
-    let (day_h, weekend_h, _) = input.function.reduction_hours();
+    let (day_h, weekend_h) = (
+        input.profile.day_reduction_h,
+        input.profile.weekend_reduction_h,
+    );
     let difference = input.setpoint_c - input.outdoor_c;
     // 7.73, clamped to [0, 1].
     let d_float = if difference <= 0.0 {
@@ -885,8 +971,36 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         issues,
     );
     let function = input.usage_function;
-    if (setpoints.heating_c - function.heating_setpoint_c()).abs() > 1e-9
-        || (setpoints.cooling_c - function.cooling_setpoint_c()).abs() > 1e-9
+    if !input.function_areas.is_empty() {
+        let total: f64 = input.function_areas.iter().map(|part| part.area_m2).sum();
+        if input
+            .function_areas
+            .iter()
+            .any(|part| !(part.area_m2.is_finite() && part.area_m2 > 0.0))
+            || (total - input.usable_floor_area_m2).abs() > 0.01 * input.usable_floor_area_m2
+        {
+            issues.push(issue("function_areas_invalid", "functionAreas"));
+        }
+        // §6.5.2: no other function next to the residential function.
+        if input
+            .function_areas
+            .iter()
+            .any(|part| part.function.is_residential())
+        {
+            issues.push(issue("function_areas_residential_mixed", "functionAreas"));
+        }
+        let largest = input
+            .function_areas
+            .iter()
+            .max_by(|a, b| a.area_m2.total_cmp(&b.area_m2))
+            .map(|part| part.function);
+        if largest != Some(function) {
+            issues.push(issue("usage_function_not_largest", "usageFunction"));
+        }
+    }
+    let profile = function_profile(input);
+    if (setpoints.heating_c - profile.heating_setpoint_c).abs() > 1e-9
+        || (setpoints.cooling_c - profile.cooling_setpoint_c).abs() > 1e-9
     {
         issues.push(issue("setpoints_table_7_13_mismatch", "setpoints"));
     }
@@ -1399,7 +1513,7 @@ pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64
         } => {
             // 7.25–7.29; Φ_V and Φ_proc are 0 (7.5.3.5/7.5.3.6).
             let persons_and_appliances =
-                input.usage_function.occupancy_and_appliance_flux_w_per_m2() * area;
+                function_profile(input).occupancy_appliance_w_per_m2 * area;
             let lighting = match lighting {
                 UtilityLighting::Chapter14 => 0.0,
                 UtilityLighting::Declared {
@@ -1498,10 +1612,10 @@ fn fixed_c1_input(
         InternalGains::Utility {
             source_reference, ..
         } => {
-            let function = resolved.usage_function;
+            let profile = function_profile(resolved);
             InternalGains::Declared {
-                heat_flux_w_per_m2: function.occupancy_and_appliance_flux_w_per_m2()
-                    + function.fixed_lighting_flux_w_per_m2(),
+                heat_flux_w_per_m2: profile.occupancy_appliance_w_per_m2
+                    + profile.fixed_lighting_w_per_m2,
                 source_reference: format!("{source_reference}; §5.4.2 fixed q_L, Φ_int;W = 0"),
             }
         }
@@ -1692,14 +1806,14 @@ fn compute(
     issues: &mut Vec<DemandIssue>,
 ) -> Vec<MonthResult> {
     let area = input.usable_floor_area_m2;
-    let function = input.usage_function;
+    let profile = function_profile(input);
     // 7.45: C_m;int;eff in J/K.
     let capacity_j_per_k = d_m * 1000.0 * area;
     let h_tr = transmission.conductance_w_per_k;
     let heating_standard = input.setpoints.heating_c;
     let cooling_setpoint = input.setpoints.cooling_c;
     let annual_outdoor = transmission.annual_mean_outdoor_temperature_c;
-    let cooling_reduction = cooling_reduction_factor(function);
+    let cooling_reduction = profile.cooling_reduction_factor();
     let mut results = Vec::with_capacity(12);
     for month in 1..=12u8 {
         let index = usize::from(month - 1);
@@ -1750,7 +1864,7 @@ fn compute(
 
         // 7.76–7.79: setpoint after levelling (dwellings only).
         let levelling = match input.dwelling_type {
-            Some(dwelling) if function.is_residential() => levelling_reduction_k(
+            Some(dwelling) if input.usage_function.is_residential() => levelling_reduction_k(
                 dwelling,
                 conductance_heating / area,
                 heating_standard,
@@ -1761,7 +1875,7 @@ fn compute(
         let heating_setpoint = heating_standard - levelling;
         // 7.59–7.73
         let intermittency = heating_intermittency(&IntermittencyInput {
-            function,
+            profile,
             setpoint_c: heating_setpoint,
             outdoor_c: outdoor,
             annual_outdoor_c: annual_outdoor,
@@ -2151,6 +2265,46 @@ mod tests {
     }
 
     #[test]
+    fn mixed_zone_uses_area_weighted_values_6_5_3() {
+        let parts = vec![
+            UsageFunctionArea {
+                function: UsageFunction::Office,
+                area_m2: 60.0,
+            },
+            UsageFunctionArea {
+                function: UsageFunction::Retail,
+                area_m2: 40.0,
+            },
+        ];
+        let profile = FunctionProfile::weighted(&parts);
+        assert!((profile.heating_setpoint_c - 21.0).abs() < 1e-12);
+        assert!((profile.day_reduction_h - (0.6 * 14.0 + 0.4 * 13.0)).abs() < 1e-12);
+        // Office 5·0,30 + 4 = 5,5; retail 3·0,40 + 3 = 4,2 W/m².
+        assert!((profile.occupancy_appliance_w_per_m2 - (0.6 * 5.5 + 0.4 * 4.2)).abs() < 1e-12);
+        let hours = 0.6 * 48.0 + 0.4 * 24.0;
+        assert!(
+            (profile.cooling_reduction_factor() - cooling_reduction_from_hours(hours)).abs()
+                < 1e-12
+        );
+        let mut input = office();
+        input.function_areas = parts.clone();
+        valid(&input);
+        input.usage_function = UsageFunction::Retail;
+        let codes: Vec<_> = assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert!(codes.contains(&"usage_function_not_largest"));
+        input.usage_function = UsageFunction::Office;
+        input.function_areas[1].area_m2 = 10.0;
+        assert!(assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .any(|item| item.code == "function_areas_invalid"));
+    }
+
+    #[test]
     fn usage_function_tables_7_13_to_7_15() {
         assert_eq!(UsageFunction::HealthcareWithBeds.heating_setpoint_c(), 22.0);
         assert_eq!(UsageFunction::Sport.heating_setpoint_c(), 16.0);
@@ -2169,7 +2323,7 @@ mod tests {
 
     fn intermittency(function: UsageFunction, tau: f64) -> HeatingIntermittency {
         heating_intermittency(&IntermittencyInput {
-            function,
+            profile: FunctionProfile::of(function),
             setpoint_c: 20.0,
             outdoor_c: 0.0,
             annual_outdoor_c: 10.0,
@@ -2226,7 +2380,7 @@ mod tests {
         let warm = heating_intermittency(&IntermittencyInput {
             outdoor_c: 21.0,
             ..IntermittencyInput {
-                function: UsageFunction::Office,
+                profile: FunctionProfile::of(UsageFunction::Office),
                 setpoint_c: 20.0,
                 outdoor_c: 0.0,
                 annual_outdoor_c: 10.0,
@@ -2240,7 +2394,7 @@ mod tests {
         assert!((warm.reduction_factor - 1.0).abs() < 1e-12);
         // Gains covering all losses: dθ_float = 1 → f_low = 0 → 7.65 gives 1.
         let covered = heating_intermittency(&IntermittencyInput {
-            function: UsageFunction::Office,
+            profile: FunctionProfile::of(UsageFunction::Office),
             setpoint_c: 20.0,
             outdoor_c: 0.0,
             annual_outdoor_c: 10.0,
@@ -2285,7 +2439,7 @@ mod tests {
         let setpoint = 20.0 - levelling_reduction_k(DwellingType::Other, 1.2, 20.0, 2.61);
         assert!((jan.heating.setpoint_c - setpoint).abs() < 1e-12);
         let expected = heating_intermittency(&IntermittencyInput {
-            function: UsageFunction::Residential,
+            profile: FunctionProfile::of(UsageFunction::Residential),
             setpoint_c: setpoint,
             outdoor_c: 2.61,
             annual_outdoor_c: annual_mean_outdoor_temperature_c(),

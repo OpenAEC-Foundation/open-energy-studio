@@ -97,3 +97,20 @@ Invoer per vloer:
 - R_bw en U_xw: de gevel erboven (8.34, 8.47 opmerking 3).
 
 De vloerconstructie zelf krijgt aan de onderzijde R_si = 0,17 (C.2). Randisolatie volgens D.7/D.8 hoort alleen bij een vloer direct op de grond. Een verwarmde kelder (8.3.3.2, D.10/D.11) is nog niet ondersteund.
+
+## Rekenzone met meerdere gebruiksfuncties (§6.5.3)
+
+`functionAreas` geeft de gebruiksfuncties met hun oppervlakte. De volgende rekenwaarden worden dan naar gebruiksoppervlakte gewogen:
+
+- de setpoints (tabel 7.13) en het verlaagde setpoint (tabel 7.14);
+- de reductie-uren (tabel 7.15) en daarmee a_C;red;
+- de interne warmte van personen en apparatuur (tabellen 7.2/7.3);
+- de vaste q_L van de C1-run.
+
+Voorwaarden:
+
+- `usageFunction` moet de grootste functie zijn;
+- de oppervlaktes tellen op tot A_g (1 % tolerantie);
+- een woonfunctie mag niet met andere functies worden gemengd (§6.5.2).
+
+De toetsen op setpointverschil, ventilatiecapaciteit en warmtecapaciteit staan in `zoning.rs`.

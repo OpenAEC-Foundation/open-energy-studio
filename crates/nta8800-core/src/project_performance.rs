@@ -112,6 +112,9 @@ pub struct NtaCalculationInput {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ZoneNtaData {
     pub zone_id: String,
+    /// §6.5.3 functions with areas for a mixed zone.
+    #[serde(default)]
+    pub function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
     #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
     #[serde(default)]
@@ -524,6 +527,9 @@ fn derive_input(
             usage_function: data
                 .and_then(|item| item.usage_function)
                 .unwrap_or(nta.usage_function),
+            function_areas: data
+                .map(|item| item.function_areas.clone())
+                .unwrap_or_default(),
             // A zone that overrides the usage function brings its own dwelling type.
             dwelling_type: match data {
                 Some(item) if item.usage_function.is_some() => item.dwelling_type,
