@@ -15,6 +15,8 @@ De uitkomst is geen energielabel en geen bewijs voor een omgevingsvergunning. Ee
 4. Leg lineaire en puntkoudebruggen vast, met begrenzing. Bevestig dat de puntbruginventaris compleet is.
 5. Leg onverwarmde ruimtes vast met reductiefactor b en bron, en koppel de vlakken eraan.
 
+Bij een constructie (**Constructie bewerken**) berekent de sectie *NTA 8800 U/R_c* de waarde met de kern: uit de lagenopbouw (λ_calc met bron, luchtspouwen, warmtestroomrichting) of forfaitair volgens bijlage I. Met **Toepassen** vervangt die uitkomst de eenvoudige Σd/λ-waarde van het project.
+
 Het paneel **NTA 8800-berekening (Rust-kern)** toont daarna direct A_g, A_ls en A_ls/A_g. A_ls is de som van de vlakken die aan buitenlucht, grond of een onverwarmde ruimte grenzen.
 
 ## 2. NTA-invoer invullen
@@ -26,16 +28,17 @@ Kies **NTA-invoer starten**. Het formulier vraagt alleen wat het projectmodel no
 | Algemeen | rekenscope, bron A_g, gebruiksfunctie van de rekenzone (en bij wonen het woningtype: woongebouw of overige woning), Bbl-gebruiksfunctie, actieve koeling (systeem plus capaciteitsbewijs), vergunningaanvraag na 29 mei 2026 | tabel 7.13–7.15, 7.78, Bbl tabel 4.148A, §5.7.1, Omgevingsregeling 5.11 lid 5 |
 | Setpoints | woning 20/24 °C, utiliteit volgens tabel; moet gelijk zijn aan tabel 7.13 voor de gebruiksfunctie | tabel 7.13 |
 | Thermische massa | klasse vloer en wand, plafondkolom | tabel 7.10–7.12 |
-| Interne winst | aantal woningen, of W/m² bij utiliteit | 7.21–7.24 |
+| Interne winst | aantal woningen; bij utiliteit de tabelmethode (personen en apparatuur uit tabel 7.2/7.3, verlichting uit hoofdstuk 14 of opgegeven W_t, terugwinbaar tapwaterverlies) of een opgegeven W/m² (dan geen BENG 1-run) | 7.21–7.29, §5.4.2 |
 | Ramen | kozijnfractie; belemmering (minimaal of opgegeven); beweegbare zonwering met F_c en bediening (woning handbediend of automatiek volgens ISO 52016-3, overige automatiek, utiliteit handbediend met of zonder lichtwering) | 7.32, §17.3, 7.42/7.43, tabel 7.7–7.9 |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
 | Vloeren op grond | blootgestelde omtrek P, R_si + R_c, vloerrand (ψ per randdeel of forfait 0,5·P) en eventuele randisolatie (via JSON) | 8.30–8.41, bijlage D |
-| Ventilatie | H_ve per maand, of de hoofdstuk 11-invoer via de ventilatieroute (systeemvariant, WTW, infiltratie, ventilatieve koeling, ventilatoren) | hoofdstuk 11, zie [ventilatie](nta8800-ventilatie.md) |
-| Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie in de verwarmde zone, opgegeven, of berekend met `distributionSystem` (via Geavanceerd) | tabel 9.2–9.4, 9.26–9.51 |
+| Ventilatie | kies **Hoofdstuk 11**: gebouwhoogte, bouwjaar, kruipruimte, systeemvariant (tabel 11.5) of gecombineerd systeem E.1, WTW (rendement, bypass, opstelling, toevoerkanaal), kanalen, LBK, infiltratie (gemeten q_v10 of tabel 11.13/11.14), open verbrandingstoestellen, ventilatieve koeling met openingen, voorverwarming in roosters en ventilatoren. Oppervlakte, setpoints en functie neemt het formulier zelf over. Of kies **H_ve zelf opgeven** | hoofdstuk 11, zie [ventilatie](nta8800-ventilatie.md) |
+| Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie alleen in de verwarmde zone of berekend, met installatie, ontwerptemperatuur, leidingisolatie en -lengtes en circulatiepomp | tabel 9.2–9.4, 9.26–9.51 |
 | Opwekker | gasketel, (hybride) warmtepomp, stadsverwarming, elektrisch of biomassa; bij de laatste drie ook toestellen en vermogen voor de hulpenergie | §9.6, 9.85, 9.91 |
 | Koeling | opwekker; afgifte (type, inregeling, regeling, aantal ventilatorconvectoren); watergedragen distributie (ontwerptemperatuur, leidingen) | tabellen 10.4–10.16, 10.29–10.35 |
 | Tapwater | aantal woningen of gebruiksfunctie met oppervlakte; aangesloten tappunten en lengte van de uittapleidingen; toestel en gemeten toepassingsklasse | tabellen 13.1–13.3, 13.25–13.28 |
 | PV | piekvermogen (panelen, opgegeven K_pk of tabel 16.1), azimut, helling, bevestiging, F_sh;obst | tabellen 16.1–16.3 |
+| Verlichting (utiliteit) | gebruiksfunctie en oppervlakte, per verlichtingszone vermogen (forfait of armaturen), schakeling, centrale aan-schakeling, daglicht (geen of forfait), afzuiging | hoofdstuk 14 |
 | Bevestigingen | alle energieposten en alle eigen opwekking opgenomen; f_BACS (1,05 alleen utiliteit); C1-ventilatie; opslag met capaciteit | §5.5, 5.14a |
 
 Deze invoer gaat via **Geavanceerd (JSON)**:
@@ -45,7 +48,8 @@ Deze invoer gaat via **Geavanceerd (JSON)**:
 - hybride opwekkers en bijzondere belemmeringssituaties;
 - meerdere koelopwekkers met vermogens;
 - tapwatercirculatie, voorraadvaten en douche-WTW;
-- verlichting bij utiliteit (`lighting`, hoofdstuk 14);
+- daglichtsectoren en meerdere armatuurtypen bij verlichting;
+- hoofdstuk 11-invoer per zone (`zoneData[].ventilation`) bij meerdere zones;
 - oriëntaties van koudebruggen voor TO-juli.
 
 ## 3. Resultaat lezen

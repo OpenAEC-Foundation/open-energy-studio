@@ -66,5 +66,5 @@ Deze keuzes staan ook in de uitvoer (`interpretations`):
 
 ## Open punten
 
-- De app gebruikt in `src/core/energy/ConstructionCalculator.ts` nog Σd/λ zonder correcties. Vervangen vraagt een andere invoer (materiaalroute per laag, warmtestroomrichting, luchtlagen). Daarom is dat hier niet gedaan; de kernroute is beschikbaar via `calculateConstructionsWithRust`.
+- De constructiedialoog heeft een sectie *NTA 8800 U/R_c* die de kern aanroept met de lagen (λ_calc met bron, luchtspouwen, warmtestroomrichting) of met de forfaitaire bijlage I-gegevens. **Toepassen** zet R_c en U van de kern op de projectconstructie; zonder toepassen blijft de eenvoudige Σd/λ uit `ConstructionCalculator.ts` staan. Samengestelde constructies, correcties (ΔU) en ramen gaan nog via de API/JSON.
 - De uitkomsten zijn nog niet gekoppeld aan `direct_transmission` en `monthly_demand`. U-waarden en ψ-waarden worden daar nog los ingevoerd.

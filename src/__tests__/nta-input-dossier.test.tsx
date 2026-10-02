@@ -141,6 +141,7 @@ describe('NTA input and evidence dossier', () => {
     project.ntaCalculation = {
       calculationScope: 'residential', areaSourceReference: 'plan A-01',
       setpoints: { heatingC: 20, coolingC: 24, sourceReference: '' },
+      ventilation: { buildingHeightM: 9, ventilativeCooling: { operation: 'manual', conditionsEvidence: 'rapport NEN 5096' } },
     } as unknown as NonNullable<typeof project.ntaCalculation>;
     const html = generateNtaInputDossierHTML(project);
     expect(html).toContain('NTA-rekeninvoer en bronnen');
@@ -149,5 +150,8 @@ describe('NTA input and evidence dossier', () => {
     expect(html).toContain('ntaCalculation.setpoints.sourceReference');
     expect(html).toContain('BRON ONTBREEKT');
     expect(html).toContain('heatingC: 20');
+    expect(html).toContain('ntaCalculation.ventilation.ventilativeCooling.conditionsEvidence');
+    expect(html).toContain('rapport NEN 5096');
+    expect(html).toContain('operation: manual');
   });
 });

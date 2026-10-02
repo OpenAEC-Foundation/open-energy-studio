@@ -100,8 +100,8 @@ export function buildVentilationDraft(block: Block, project: IProject): Block {
 
 /**
  * Mirrors zone, area, setpoints, category and functions of the block into
- * `ventilation`, and empties `ventilationFlows` because the kernel accepts
- * only one of both.
+ * `ventilation`, empties `ventilationFlows` because the kernel accepts only
+ * one of both, and drops declared fan energy that chapter 11 replaces.
  */
 export function syncVentilation(block: Block, project: IProject): Block {
   const ventilation = block.ventilation as Block | null | undefined;
@@ -123,7 +123,10 @@ export function syncVentilation(block: Block, project: IProject): Block {
     dwellingCount: residential ? (gains?.dwellingCount ?? ventilation.dwellingCount ?? 1) : 0,
     apartmentBuilding: block.dwellingType === 'apartment_building',
   };
-  return { ...block, ventilation: synced, ventilationFlows: [] };
+  // Chapter 11 yields the fan energy itself; a declared fan use would count twice.
+  const uses = Array.isArray(block.declaredUses)
+    ? (block.declaredUses as Block[]).filter((use) => use.service !== 'ventilation_fans') : block.declaredUses;
+  return { ...block, ventilation: synced, ventilationFlows: [], ...(uses !== undefined ? { declaredUses: uses } : {}) };
 }
 
 /** Back to explicit H_ve flows. */

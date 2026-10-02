@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IConstruction, IConstructionLayer } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { NtaConstructionSection, type NtaConstructionResult } from './NtaConstructionSection';
 
 interface ConstructionEditorDialogProps {
   editId?: string | null;
@@ -22,6 +23,9 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
     existing?.layers ?? [{ material: '', thickness: 0.1, lambda: 0.04 }]
   );
 
+  // Kernel result applied by the user; replaces the simple Σd/λ values below.
+  const [ntaResult, setNtaResult] = useState<NtaConstructionResult | null>(null);
+
   // Rsi + Rse for walls (NTA 8800 default)
   const rSurface = 0.13 + 0.04; // 0.17
 
@@ -40,6 +44,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   }, [rcValue]);
 
   const handleLayerChange = (index: number, field: keyof IConstructionLayer, value: string | number) => {
+    setNtaResult(null);
     setLayers((prev) =>
       prev.map((layer, i) =>
         i === index ? { ...layer, [field]: value } : layer
@@ -48,10 +53,12 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   };
 
   const addLayer = () => {
+    setNtaResult(null);
     setLayers((prev) => [...prev, { material: '', thickness: 0.1, lambda: 0.04 }]);
   };
 
   const removeLayer = (index: number) => {
+    setNtaResult(null);
     setLayers((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -60,8 +67,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
       id: existing?.id ?? crypto.randomUUID(),
       name,
       layers,
-      rcValue: Math.round(rcValue * 100) / 100,
-      uValue: Math.round(uValue * 1000) / 1000,
+      rcValue: ntaResult?.rc ?? Math.round(rcValue * 100) / 100,
+      uValue: ntaResult?.u ?? Math.round(uValue * 1000) / 1000,
     };
 
     if (existing) {
@@ -172,6 +179,12 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
             <input type="text" readOnly value={uValue.toFixed(3)} />
           </div>
         </div>
+        {ntaResult && <p role="status" style={{ fontSize: 12 }}>
+          {t('nta.construction.applied')}: U = {ntaResult.u.toFixed(3)} W/m²K
+          {ntaResult.rc != null && <> · R<sub>c</sub> = {ntaResult.rc.toFixed(2)} m²K/W</>}
+          {' '}<button type="button" className="btn btn-sm" onClick={() => setNtaResult(null)}>{t('nta.construction.undo')}</button>
+        </p>}
+        <NtaConstructionSection layers={layers} onApply={setNtaResult} />
 
     </DialogShell>
   );

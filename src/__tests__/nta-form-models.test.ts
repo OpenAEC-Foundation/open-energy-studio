@@ -28,8 +28,10 @@ describe('NTA form models', () => {
       infiltration: { method: 'measured', qv10DmPerSM2: 0.4, sourceReference: '' },
       system: { kind: 'single', unit: { variant: 'd2', ducts: 'unknown' } },
     });
-    const synced = syncVentilation({ ...block, ventilation, setpoints: { heatingC: 21, coolingC: 24 } }, p);
+    const synced = syncVentilation({ ...block, ventilation, setpoints: { heatingC: 21, coolingC: 24 },
+      declaredUses: [{ id: 'fans', service: 'ventilation_fans' }, { id: 'dhw', service: 'domestic_hot_water' }] }, p);
     expect(synced.ventilationFlows).toEqual([]);
+    expect(synced.declaredUses).toEqual([{ id: 'dhw', service: 'domestic_hot_water' }]);
     expect((synced.ventilation as Record<string, unknown>).heatingSetpointC).toBe(21);
     const back = removeVentilation(synced);
     expect(back.ventilation).toBeUndefined();

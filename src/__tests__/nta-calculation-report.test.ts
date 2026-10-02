@@ -57,6 +57,30 @@ describe('NTA calculation report', () => {
     expect(html).toContain('7.9.2 intermittent heating reduction a_H;red');
     expect(html).toContain('NTA 8800 tables 17.1/17.2');
     expect(html.match(/<tr><th>(jan|feb|mrt|apr|mei|jun|jul|aug|sep|okt|nov|dec)<\/th>/g)).toHaveLength(12);
+    expect(html).not.toContain('Ventilatie (hoofdstuk 11)');
+  });
+
+  it('reports chapter 11 ventilation and the fixed C1 basis of BENG 1', () => {
+    const assessment = calculated();
+    const performance = assessment.performance as unknown as Record<string, unknown> & { spaceHeating: { demand: Record<string, unknown> } };
+    performance.needIndicatorKwhPerM2Year = 48.12;
+    performance.spaceHeating.demand = {
+      ...zone,
+      recoverableLossesApplied: true,
+      fixedC1: { status: 'calculated_unverified', annualHeatingNeedKwh: 4500, annualCoolingNeedKwh: 300 },
+      ventilation: {
+        zoneId: 'z1', annualFanElectricityKwh: 212, annualFrostProtectionElectricityKwh: 3,
+        annualGrillePreheatingElectricityKwh: 0,
+        months: [{ heating: { requiredOutdoorAirM3PerH: 191, infiltrationM3PerH: 38, conductanceWPerK: 90.1 } }],
+      },
+    };
+    const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
+    expect(html).toContain('Ventilatie (hoofdstuk 11)');
+    expect(html).toContain('90.1');
+    expect(html).toContain('212');
+    expect(html).toContain('aparte run met vast ventilatiesysteem C1 (§5.4.2)');
+    expect(html).toContain('4800');
+    expect(html).toContain('verrekend');
   });
 
   it('lists gaps instead of numbers when the kernel has no result', () => {
