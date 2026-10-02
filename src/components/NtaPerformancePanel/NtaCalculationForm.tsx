@@ -67,7 +67,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         onChange={(path, value) => value == null
           ? change(['activeCooling'], null)
           : read(draft, ['activeCooling']) == null
-            ? change(['activeCooling'], { system: value, capacity: { method: 'annex_aa', sourceReference: '' }, sourceReference: '' })
+            ? change(['activeCooling'], { system: value, capacity: { method: 'dynamic_cooling_load', sourceReference: '' }, sourceReference: '' })
             : change(path, value)} />
       {read(draft, ['activeCooling']) != null && <>
         <SelectField {...field} path={['activeCooling', 'capacity', 'method']} label={t('nta.form.ac.capacity')} options={[
