@@ -630,3 +630,34 @@ Volgens AB.0 rekent de software de ZEB-indicator altijd mee naast hoofdstuk 5. D
 | Externe warmte | 0,09 / 0,072 / 0,055 |
 | Koude | 0,027 |
 | Bronwarmte | 0,012 |
+
+
+## Hoofdstuk 13: resterende onderdelen (3 oktober 2026)
+
+- **Menglucht (13.153b, 13.153d–i).** Een combiwarmtepomp op buiten- en retourlucht die getest is bij twee tappatronen, kan `mixedAir` krijgen:
+  - `declared`: twaalf maandfactoren uit een kwaliteitsverklaring;
+  - `en14511`: de factor wordt berekend uit COP, ϑ_cond;out, ϑ_evap;in en ϑ_evap;out bij conditie 2 (A7/W55) en q_V;hp;W.
+  - De maandfactor deelt Q_elec (13.153b) en geeft dus per maand een eigen rendement.
+  - Voor 13.153h/i neemt de kern Σ q_V;ODA;req uit hoofdstuk 11 en ϑ_ETA;dis;out gelijk aan het genivelleerde setpoint van de zone (kanalen binnen de thermische zone). Dat laatste is een interpretatie.
+  - Zonder ventilatiegegevens geldt C = 1.
+- **PFHRD (13.156a/b).** E_W;gen;in;PFHRD = Σ E_H;gen;in / 365 × Q_gas;indirect / Q_gas;CH;test. Dit wordt afgetrokken in 13.154/13.154a. Interpretatie: als het verwarmingsgasverbruik van het combitoestel geldt het gasverbruik van de ruimteverwarmingsketen. Daarom loopt de laatste tapwaterrun na de keten.
+- **Wintermethode (13.153).** `winter_gas_consumption_kwh` geeft Q_gas;w = Q_gas;s − 13,5 × 1,21 × P_s / η100. Het combineren tot Q_gas;p(i) volgt NEN-EN 13203-2 en staat niet in de NTA.
+- **Bereik van 13.154.**
+  - De ondergrenzen gelden alleen bij i2 = XXL (met i1 L: ≥ M, met i1 XL: ≥ L), bij 3XL en bij 4XL.
+  - Onder de ondergrens rekent een warmtepomp met 13.160b voor test i1 en c_W,EU;gen uit tabel 13.18, met Q_W;dis;nren;an = 365·Q_W;b;d.
+  - Een gastoestel onder de ondergrens geeft `hot_water_two_profile_below_range`, omdat tabel 13.18 alleen geldt voor warmtepompen.
+- **13.160a.**
+  - Geldt voor warmtepompen op retourlucht en voor combitoestellen (gas of elektrisch) met een geïntegreerd voorraadvat.
+  - E_test wordt alleen gecorrigeerd voor zomer en winter (gas op bovenwaarde), zonder 13.153b/c.
+  - Het verlies wordt vermenigvuldigd met A_g;zi/A_g;si;W (f_gebouw).
+- **13.148, opmerking 3.** Bij gemeten rendementen (`heat_pump_en16147`, `measured_two_profiles`) is `exhaustAir.declaredFlowM3PerH` verplicht (`hot_water_exhaust_air_declared_flow_required`).
+- **Combiwarmtepomp op retourlucht.** Heeft de zone geen overventilatieblok, dan maakt de kern er een aan met f_W en q_W, zodat 11.23 en Q.5.3 die gegevens krijgen. Zonder opgegeven debiet geldt q_W = q_V;ODA;req. Bij een bijlage-Q-keten blijft de verwarmingsfractie van de hoofdzone leeg, zodat Q.5.3 die afleidt.
+- **Circulatie- en vatverlies (13.26, 13.58).** Deze gebruiken ϑ_int;set;H;zi,mi uit 7.9.4, inclusief nivellering (7.9.4.2). De nivellering hangt niet af van de interne winst. Daarom levert een eerste ketenrun het setpoint, en worden de 7.29-winsten daarna opnieuw bepaald.
+- **13.184.** `hotWaterFromHeating` rapporteert per maand het deel van de dragers van de verwarmingsketen dat naar tapwater uit het verwarmingssysteem gaat:
+  - aandeel = E_W;gen;in;conv;hj / Q_H;nod;in;
+  - volgens de opmerking bij 13.184 vervalt de extra noemerterm, omdat de knoop de tapwaterlast al bevat.
+  - De totalen veranderen hierdoor niet.
+- **Losse zonne-installatie voor verwarming (SHS).** `spaceHeatingSolar` neemt §13.7-systemen met `solarUse: space_heating` op zonder tapwatersysteem. Alleen de berekende methode is toegestaan; de geteste methode geldt alleen voor tapwater.
+  - De winst gaat naar de verwarmingsknoop (9.2.3.4) en telt mee voor 5.39d.
+  - De pompenergie (13.67) telt als elektriciteit.
+  - De terugwinbare verliezen (13.68) worden alleen gerapporteerd.

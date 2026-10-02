@@ -2,8 +2,8 @@ import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import {
   additionalHotWaterGeneratorTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
-  en14825PointTemplate, hotWaterGeneratorTemplate, preferredGeneratorTemplate, solarWaterHeaterTemplate,
-  spaceGeneratorTemplate, testedSolarMethod, windowObstructionTemplate,
+  declaredShareTemplate, en14825PointTemplate, exhaustAirUseTemplate, hotWaterGeneratorTemplate, preferredGeneratorTemplate,
+  solarWaterHeaterTemplate, spaceGeneratorTemplate, testedSolarMethod, windowObstructionTemplate,
 } from '../../core/nta/NtaSystemTemplates';
 import {
   CheckField, NumberField, read, SelectField, TextField, type Draft, type Path,
@@ -123,7 +123,114 @@ function MultipleGeneratorFields({ draft, change, base, project }: SectionProps 
 function hotWaterGeneratorOptions(t: Translate): Array<[string, string]> {
   return [['gas_appliance', t('nta.form.dhwGen.gas')], ['heat_pump', t('nta.form.dhwGen.heatPump')],
     ['electric_instantaneous', t('nta.form.dhwGen.instantaneous')], ['electric_boiler', t('nta.form.dhwGen.electricBoiler')],
-    ['indirect_boiler', t('nta.form.dhwGen.indirectBoiler')], ['external_heat', t('nta.form.dhwGen.external')]];
+    ['indirect_boiler', t('nta.form.dhwGen.indirectBoiler')], ['external_heat', t('nta.form.dhwGen.external')],
+    ['measured_two_profiles', t('nta.form.dhwGen.twoProfiles')], ['heating_system', t('nta.form.dhwGen.heatingSystem')]];
+}
+
+const PROFILES: Array<[string, string]> = ['s', 'm', 'l', 'xl', 'xxl', '3xl', '4xl'].map((key) => [key, key.toUpperCase()]);
+
+/** §13.8.4.2 test results at two tapping profiles (13.153a–13.160a). */
+function TwoProfileFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const at = (...rest: Path): Path => [...base, ...rest];
+  const electric = read(draft, at('standard')) === 'en16147_heat_pump';
+  const pfhrd = read(draft, at('pfhrd'));
+  const mixed = read(draft, at('mixedAir', 'method'));
+  return <div className="nta-form-subsection">
+    <SelectField {...field} path={at('standard')} label={t('nta.form.twoProfile.standard')} options={[
+      ['en13203_gas', t('nta.form.twoProfile.gas')], ['en16147_heat_pump', t('nta.form.twoProfile.heatPump')]]} />
+    <CheckField {...field} path={at('storageAppliance')} label={t('nta.form.twoProfile.storage')} />
+    {(['low', 'high'] as const).map((which) => <fieldset key={which} className="nta-form-row">
+      <legend>{t(`nta.form.twoProfile.${which}`)}</legend>
+      <SelectField {...field} path={at(which, 'profile')} label={t('nta.form.twoProfile.profile')} options={PROFILES} />
+      <NumberField {...field} path={at(which, 'deliveredKwhPerDay')} label={t('nta.form.twoProfile.delivered')} />
+      <NumberField {...field} path={at(which, 'inputKwhPerDay')} label={t(electric ? 'nta.form.twoProfile.inputElectric' : 'nta.form.twoProfile.inputGas')} />
+      {!electric && <NumberField {...field} path={at(which, 'auxiliaryKwhPerDay')} label={t('nta.form.twoProfile.auxiliary')} />}
+      {electric && <NumberField {...field} path={at(which, 'maxTestTemperatureC')} label={t('nta.form.twoProfile.maxTemperature')} />}
+    </fieldset>)}
+    <CheckField {...field} path={at('combi')} label={t('nta.form.twoProfile.combi')} />
+    <CheckField {...field} path={at('integratedVessel')} label={t('nta.form.twoProfile.vessel')} />
+    {electric && <>
+      <CheckField {...field} path={at('exhaustAirSource')} label={t('nta.form.dhwExhaustAir')} />
+      <NumberField {...field} path={at('outdoorAirFraction')} label={t('nta.form.twoProfile.outdoorShare')} />
+      <NumberField {...field} path={at('smartControlFactor')} label={t('nta.form.twoProfile.scf')} />
+      <NumberField {...field} path={at('designSetTemperatureC')} label={t('nta.form.twoProfile.designSet')} />
+      <CheckField {...field} path={at('legionellaCycleTested')} label={t('nta.form.twoProfile.legionella')} />
+      <label>{t('nta.form.twoProfile.mixedAir')}
+        <select value={typeof mixed === 'string' ? mixed : ''} onChange={(event) => change(at('mixedAir'),
+          event.target.value === 'declared' ? { method: 'declared', monthlyFactors: Array(12).fill(null), sourceReference: '' }
+            : event.target.value === 'en14511' ? { method: 'en14511', copCondition2: null, condenserOutC: 55, evaporatorInC: 7,
+              evaporatorOutC: null, minimumAirFlowM3PerH: null, sourceReference: '' } : null)}>
+          <option value="">{t('nta.form.twoProfile.mixedAir.none')}</option>
+          <option value="declared">{t('nta.form.twoProfile.mixedAir.declared')}</option>
+          <option value="en14511">{t('nta.form.twoProfile.mixedAir.en14511')}</option>
+        </select>
+      </label>
+      {mixed === 'declared' && <MonthlyValues draft={draft} change={change} path={at('mixedAir', 'monthlyFactors')}
+        label={t('nta.form.twoProfile.mixedAir.factors')} />}
+      {mixed === 'en14511' && <>
+        <NumberField {...field} path={at('mixedAir', 'copCondition2')} label={t('nta.form.twoProfile.mixedAir.cop')} />
+        <NumberField {...field} path={at('mixedAir', 'condenserOutC')} label={t('nta.form.twoProfile.mixedAir.condenserOut')} />
+        <NumberField {...field} path={at('mixedAir', 'evaporatorInC')} label={t('nta.form.twoProfile.mixedAir.evaporatorIn')} />
+        <NumberField {...field} path={at('mixedAir', 'evaporatorOutC')} label={t('nta.form.twoProfile.mixedAir.evaporatorOut')} />
+        <NumberField {...field} path={at('mixedAir', 'minimumAirFlowM3PerH')} label={t('nta.form.twoProfile.mixedAir.flow')} />
+      </>}
+      {mixed && <TextField {...field} path={at('mixedAir', 'sourceReference')} label={t('nta.form.source')} />}
+    </>}
+    {!electric && <label className="nta-form-check">
+      <input type="checkbox" checked={pfhrd != null} onChange={(event) => change(at('pfhrd'), event.target.checked
+        ? { indirectGasKwhPerDay: null, heatingGasKwhPerDay: null, sourceReference: '' } : null)} />
+      {t('nta.form.twoProfile.pfhrd')}
+    </label>}
+    {!electric && pfhrd != null && <>
+      <NumberField {...field} path={at('pfhrd', 'indirectGasKwhPerDay')} label={t('nta.form.twoProfile.pfhrdIndirect')} />
+      <NumberField {...field} path={at('pfhrd', 'heatingGasKwhPerDay')} label={t('nta.form.twoProfile.pfhrdHeating')} />
+      <TextField {...field} path={at('pfhrd', 'sourceReference')} label={t('nta.form.source')} />
+    </>}
+    <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
+  </div>;
+}
+
+/** Per generator: 13.144a/13.148 exhaust-air use and the 13.146 declared share; `unit` holds `generator`. */
+export function HotWaterUnitFields({ draft, change, unit }: SectionProps & { unit: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const generator = read(draft, [...unit, 'generator']) as Draft | undefined;
+  const exhaustSource = generator != null && (generator.exhaustAirSource === true);
+  const exhaust = read(draft, [...unit, 'exhaustAir']);
+  const share = read(draft, [...unit, 'declaredShare']);
+  const points = list(draft, [...unit, 'declaredShare', 'points']);
+  return <>
+    {exhaustSource && <label className="nta-form-check">
+      <input type="checkbox" checked={exhaust != null}
+        onChange={(event) => change([...unit, 'exhaustAir'], event.target.checked ? exhaustAirUseTemplate() : null)} />
+      {t('nta.form.dhwExhaust.use')}
+    </label>}
+    {exhaustSource && exhaust != null && <>
+      <CheckField {...field} path={[...unit, 'exhaustAir', 'ventilationSuitable']} label={t('nta.form.dhwExhaust.suitable')} />
+      <NumberField {...field} path={[...unit, 'exhaustAir', 'declaredFlowM3PerH']} label={t('nta.form.dhwExhaust.flow')} />
+      <MonthlyValues draft={draft} change={change} path={[...unit, 'exhaustAir', 'heatingTimeFraction']}
+        label={t('nta.form.dhwExhaust.combi')} />
+    </>}
+    <label className="nta-form-check">
+      <input type="checkbox" checked={share != null}
+        onChange={(event) => change([...unit, 'declaredShare'], event.target.checked ? declaredShareTemplate() : null)} />
+      {t('nta.form.dhwShare')}
+    </label>
+    {share != null && <>
+      {points.map((_, index) => <fieldset key={index} className="nta-form-row">
+        <NumberField {...field} path={[...unit, 'declaredShare', 'points', index, 'annualKwh']} label={t('nta.form.dhwShare.annual')} />
+        <NumberField {...field} path={[...unit, 'declaredShare', 'points', index, 'share']} label={t('nta.form.dhwShare.share')} />
+        {points.length > 1 && <RemoveButton label={t('nta.form.remove')}
+          onClick={() => change([...unit, 'declaredShare', 'points'], points.filter((__, other) => other !== index))} />}
+      </fieldset>)}
+      <button type="button" onClick={() => change([...unit, 'declaredShare', 'points'], [...points, { annualKwh: null, share: null }])}>
+        {t('nta.form.dhwShare.add')}
+      </button>
+      <TextField {...field} path={[...unit, 'declaredShare', 'sourceReference']} label={t('nta.form.source')} />
+    </>}
+  </>;
 }
 
 /** One hot-water generator at `base` (13.8). */
@@ -148,6 +255,8 @@ export function HotWaterGeneratorFields({ draft, change, base }: SectionProps & 
     </>}
     {kind === 'indirect_boiler' && <SelectField {...field} path={[...base, 'boiler']} label={t('nta.form.dhwBoiler')} options={[
       ['hr107', 'HR 107'], ['hr100_or104', 'HR 100/104'], ['vr', 'VR'], ['conventional_or_unknown', t('nta.form.dhwGas.unknown')]]} />}
+    {kind === 'measured_two_profiles' && <TwoProfileFields draft={draft} change={change} base={base} />}
+    {kind === 'heating_system' && <p className="nta-form-note">{t('nta.form.dhwGen.heatingSystemNote')}</p>}
   </>;
 }
 
@@ -159,10 +268,12 @@ export function HotWaterGeneratorsFields({ draft, change }: SectionProps) {
   const series = read(draft, ['hotWater', 'series', 'kind']);
   return <div className="nta-form-subsection">
     <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={t('nta.form.dhwNominalPower')} />
+    <HotWaterUnitFields draft={draft} change={change} unit={['hotWater']} />
     {extra.map((_, index) => <fieldset key={index} className="nta-form-row">
       <legend>{t('nta.form.dhwExtra')} {index + 1}</legend>
       <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'additionalGenerators', index, 'generator']} />
       <NumberField {...field} path={['hotWater', 'additionalGenerators', index, 'nominalPowerKw']} label={t('nta.form.dhwNominalPower')} />
+      <HotWaterUnitFields draft={draft} change={change} unit={['hotWater', 'additionalGenerators', index]} />
       <TextField {...field} path={['hotWater', 'additionalGenerators', index, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
       <RemoveButton label={t('nta.form.remove')}
         onClick={() => change(['hotWater', 'additionalGenerators'], extra.filter((__, other) => other !== index))} />

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { IProject } from '../core/energy/types';
 import {
-  CoolingPerformanceFields, HotWaterGeneratorsFields, SolarWaterHeaterFields, SpaceGeneratorFields, WindowObstructionFields,
+  CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields, SpaceGeneratorFields,
+  WindowObstructionFields,
 } from '../components/NtaPerformancePanel/NtaSystemSections';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
 import {
@@ -100,6 +101,50 @@ describe('NTA system sections', () => {
     expect(hotWater.series).toEqual({ kind: 'hotfill_electric_boiler' });
     await user.selectOptions(screen.getByLabelText('Series arrangement (13.141a–d)'), 'collective_first_also_heating');
     expect(current().hotWater.series).toEqual({ kind: 'collective_first_also_heating', maximumSupplyC: Array(12).fill(null) });
+  });
+
+  it('edits a two-profile appliance, the heating-system generator, exhaust air and a declared share', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ hotWater: { generator: { kind: 'electric_boiler' } } }}
+      body={(draft, change) => <>
+        <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
+        <HotWaterGeneratorsFields draft={draft} change={change} />
+      </>} />);
+    await user.selectOptions(screen.getAllByLabelText('Hot-water generator')[0], 'measured_two_profiles');
+    await user.selectOptions(screen.getByLabelText('Test standard'), 'en16147_heat_pump');
+    const inputs = screen.getAllByLabelText('Electricity Q_elec, kWh/day');
+    await user.type(inputs[0], '2.6');
+    await user.type(inputs[1], '4.4');
+    await user.click(screen.getByLabelText('Combi appliance'));
+    await user.click(screen.getByLabelText('exhaust-air source'));
+    await user.selectOptions(screen.getByLabelText('Mixed-air correction (combi heat pump on outdoor and return air)'), 'en14511');
+    await user.type(screen.getByLabelText('COP at condition 2 (A7/W55)'), '3');
+    let generator = current().hotWater.generator;
+    expect(generator).toMatchObject({
+      kind: 'measured_two_profiles', standard: 'en16147_heat_pump', combi: true,
+      low: { profile: 'm', deliveredKwhPerDay: 5.845, inputKwhPerDay: 2.6 },
+      high: { profile: 'l', deliveredKwhPerDay: 11.655, inputKwhPerDay: 4.4 },
+      mixedAir: { method: 'en14511', copCondition2: 3, condenserOutC: 55, evaporatorInC: 7 },
+    });
+    // 13.144a/13.148: exhaust-air use with the declared flow.
+    await user.click(screen.getByLabelText('Uses ventilation return air (13.144a/13.148)'));
+    await user.type(screen.getByLabelText('Ventilation flow q_ve;hp;W from a quality declaration, m³/h'), '150');
+    expect(current().hotWater.exhaustAir).toMatchObject({ ventilationSuitable: true, declaredFlowM3PerH: 150 });
+    // 13.146 declared share with two classes.
+    await user.click(screen.getByLabelText('Energy share from a quality declaration (13.146)'));
+    await user.type(screen.getByLabelText('Q_W;dis;nren;an of the class, kWh'), '1000');
+    await user.type(screen.getByLabelText('Share F_W;gen'), '0.6');
+    await user.click(screen.getByRole('button', { name: 'Add class' }));
+    expect(current().hotWater.declaredShare.points).toEqual([{ annualKwh: 1000, share: 0.6 }, { annualKwh: null, share: null }]);
+    // PFHRD only for gas appliances.
+    await user.selectOptions(screen.getByLabelText('Test standard'), 'en13203_gas');
+    await user.click(screen.getByLabelText('PFHRD (flue heat recovery) present'));
+    await user.type(screen.getByLabelText('Q_gas;indirect, kWh/day (net value)'), '0.5');
+    generator = current().hotWater.generator;
+    expect(generator.pfhrd).toEqual({ indirectGasKwhPerDay: 0.5, heatingGasKwhPerDay: null, sourceReference: '' });
+    // 13.8.4.9.3: hot water from the heating system has no own fields.
+    await user.selectOptions(screen.getAllByLabelText('Hot-water generator')[0], 'heating_system');
+    expect(current().hotWater.generator).toEqual({ kind: 'heating_system' });
   });
 
   it('edits a calculated and a tested solar water heater (13.7)', async () => {

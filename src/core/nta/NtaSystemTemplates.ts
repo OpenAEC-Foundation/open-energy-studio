@@ -60,7 +60,34 @@ export function hotWaterGeneratorTemplate(kind: string): Block {
   if (kind === 'gas_appliance') return { kind, appliance: null, measuredClass: 'class4', kitchenOnly: false };
   if (kind === 'heat_pump') return { kind, exhaustAirSource: false, measuredClass: 'class4' };
   if (kind === 'indirect_boiler') return { kind, boiler: null, oil: false, insideBoundary: true, alsoSpaceHeating: true };
+  if (kind === 'measured_two_profiles') return twoProfileTemplate();
   return { kind };
+}
+
+/** §13.8.4.2: appliance tested at two tapping profiles (i1 = M, i2 = L). */
+export function twoProfileTemplate(): Block {
+  return {
+    kind: 'measured_two_profiles',
+    standard: 'en13203_gas',
+    storageAppliance: false,
+    low: { profile: 'm', deliveredKwhPerDay: 5.845, inputKwhPerDay: null, auxiliaryKwhPerDay: null },
+    high: { profile: 'l', deliveredKwhPerDay: 11.655, inputKwhPerDay: null, auxiliaryKwhPerDay: null },
+    combi: false,
+    integratedVessel: false,
+    exhaustAirSource: false,
+    legionellaCycleTested: false,
+    sourceReference: '',
+  };
+}
+
+/** 13.144a/13.148: exhaust-air use of a hot-water heat pump. */
+export function exhaustAirUseTemplate(): Block {
+  return { ventilationSuitable: true, heatingTimeFraction: [], declaredFlowM3PerH: null };
+}
+
+/** 13.146: declared energy share of a generator. */
+export function declaredShareTemplate(): Block {
+  return { points: [{ annualKwh: null, share: null }], sourceReference: '' };
 }
 
 /** 13.8.2: a further hot-water generator. */
