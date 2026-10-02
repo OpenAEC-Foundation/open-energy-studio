@@ -15,7 +15,9 @@
 //!   8.2/8.3 with table 8.1); floors on ground get 0,5·P (8.37).
 //! - Adjacent unheated spaces: H_ue = 5·A_T;iu (NTA I.8, basic survey) with
 //!   b_U = H_ue/(H_ue + H_iu) (8.53 with H_V;iu = 0).
-//! - Obstruction: the default situation is "none" (p. 195), NTA §17.3.2a.
+//! - Obstruction: the advisor determines the situation per window (tables
+//!   8.24/8.25, p. 102–103); without declared factors the window has the
+//!   "minimale belemmering" situation (NTA §17.3.2a).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -146,7 +148,8 @@ pub struct SurveyWindow {
     pub glass: GlassAnswer,
     pub frame: FrameAnswer,
     /// Declared obstruction factors per §17.3 (12 heating, 12 cooling);
-    /// absent: no obstruction (p. 195).
+    /// absent: the advisor established "minimale belemmering" (tables
+    /// 8.24/8.25, p. 102–103).
     #[serde(default)]
     pub obstruction: Option<DeclaredObstruction>,
     pub source_reference: String,
@@ -538,7 +541,11 @@ pub fn derive_envelope(
                     "cavity_width_unknown_table_8_26",
                     &format!("{path}.insulation"),
                     format!("{width} mm"),
-                    "ISSO 82.1 p. 84 (table 8.26, erratum §3)",
+                    if construction_year < 1930 {
+                        "ISSO 82.1 p. 84 (table 8.26 starts at 1930; interpretation: its first row)"
+                    } else {
+                        "ISSO 82.1 p. 84 (table 8.26, erratum §3)"
+                    },
                 );
                 InsulationState::KnownThickness {
                     thickness_mm: width,
@@ -779,7 +786,7 @@ pub fn derive_envelope(
             "frame_fraction_forfait",
             "envelope.windows",
             FRAME_FRACTION_FORFAIT.to_string(),
-            "NTA 7.6.6.2 method B; ISSO 82.1 p. 93",
+            "NTA 7.6.6.2 method B; ISSO 82.1 p. 41",
         );
     }
 

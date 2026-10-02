@@ -1,8 +1,10 @@
 //! ISSO 82.1 (7e druk) chapter 15: PV in the basic survey.
 //!
-//! - PV type unknown: polycrystalline; installation year unknown: the
-//!   construction year (a year before 2001 counts as 2000); amorphous of
-//!   unknown type: multi-junction (table 15.7, p. 191).
+//! - Crystalline type known, installation year unknown: the construction
+//!   year (a year before 2001 counts as 2000). Type unknown: polycrystalline
+//!   with the installation year, or placed before 2001 when that year is
+//!   unknown too. Amorphous of unknown type: multi-junction (table 15.7,
+//!   p. 191).
 //! - Building integration unknown: not ventilated (p. 191), the kernel's
 //!   `f_perf` 0,76.
 //! - East/west installations are two systems (p. 191).
@@ -69,24 +71,30 @@ fn crystalline(mono: bool, year: i32) -> &'static str {
 
 pub fn derive_pv(pv: &SurveyPv, construction_year: i32, recorder: &mut Recorder) -> Value {
     let path = format!("pv[{}]", pv.id);
-    let year = pv.installation_year.unwrap_or_else(|| {
-        let year = construction_year.max(2000);
-        recorder.record(
-            "pv_year_unknown_construction_year",
-            &path,
-            year.to_string(),
-            "ISSO 82.1 p. 191 (table 15.7)",
-        );
-        year
-    });
+    let crystalline_year = |recorder: &mut Recorder| {
+        pv.installation_year.unwrap_or_else(|| {
+            let year = construction_year.max(2000);
+            recorder.record(
+                "pv_year_unknown_construction_year",
+                &path,
+                year.to_string(),
+                "ISSO 82.1 p. 191 (table 15.7)",
+            );
+            year
+        })
+    };
     let module = match pv.module_type {
-        PvTypeAnswer::Monocrystalline => crystalline(true, year),
-        PvTypeAnswer::Polycrystalline => crystalline(false, year),
+        PvTypeAnswer::Monocrystalline => crystalline(true, crystalline_year(recorder)),
+        PvTypeAnswer::Polycrystalline => crystalline(false, crystalline_year(recorder)),
         PvTypeAnswer::Unknown => {
+            let year = pv.installation_year.unwrap_or(2000);
             recorder.record(
                 "pv_type_unknown_polycrystalline",
                 &path,
-                "polycrystalline".into(),
+                match pv.installation_year {
+                    Some(year) => format!("polycrystalline, installed {year}"),
+                    None => "polycrystalline, placed before 2001".into(),
+                },
                 "ISSO 82.1 p. 191 (table 15.7)",
             );
             crystalline(false, year)
@@ -156,6 +164,23 @@ mod tests {
         assert_eq!(value["mounting"], "not_ventilated");
         let system: crate::pv::PvSystem = serde_json::from_value(value).unwrap();
         assert!((system.peak_power.kw() - 115.0 * 16.0 / 1000.0).abs() < 1e-9);
-        assert_eq!(recorder.applied.len(), 3);
+        assert_eq!(recorder.applied.len(), 2);
+        // Type and year unknown: placed before 2001, whatever the
+        // construction year.
+        let newer = derive_pv(&pv, 2015, &mut recorder);
+        assert_eq!(
+            newer["peakPower"]["moduleType"],
+            "multicrystalline_before2001"
+        );
+        // Known crystalline type: the construction year.
+        let mono = SurveyPv {
+            module_type: PvTypeAnswer::Monocrystalline,
+            ..pv
+        };
+        let value = derive_pv(&mono, 2015, &mut recorder);
+        assert_eq!(
+            value["peakPower"]["moduleType"],
+            "monocrystalline2015_to2017"
+        );
     }
 }

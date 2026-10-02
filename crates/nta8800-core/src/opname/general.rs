@@ -209,7 +209,7 @@ pub fn airtightness_type(dwelling: &DwellingType, recorder: &mut Recorder) -> Ai
                         "partly_flat_roof_only_detached",
                         "dwelling.roofType",
                         "pitched".into(),
-                        "ISSO 82.1 p. 52",
+                        "ISSO 82.1 p. 52 (partly flat exists for detached dwellings only; interpretation: pitched)",
                     );
                     RoofType::Pitched
                 }
@@ -240,7 +240,7 @@ pub fn airtightness_type(dwelling: &DwellingType, recorder: &mut Recorder) -> Ai
                         "apartment_side_unknown_end",
                         "dwelling.side",
                         "end_or_corner".into(),
-                        "ISSO 82.1 p. 51",
+                        "ISSO 82.1 p. 51 asks a substantiated choice; interpretation: end/corner (conservative, p. 28)",
                     );
                     ApartmentSide::EndOrCorner
                 }
