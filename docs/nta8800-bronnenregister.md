@@ -53,7 +53,19 @@ De gelicentieerde pdf `NTA 8800_2025+C1_2026 nl.pdf` staat op netwerkshare `Z:\5
 | `pv` | 16.2/16.3 | `docs/2026-07-12-f3d4-norm-analyse-pv.md` |
 | `building_performance` | factoren tabel 5.2/5.4 (bevestigd in F3a) | `docs/2026-07-11-f3a-norm-analyse-ep.md` |
 
-De hoofdstukken 5 en 9 (formules 5.9–5.39, 9.9–9.16, 9.64, 9.84, tabellen 9.2–9.4, 9.27, 9.30) volgen het openbare consultatieconcept 2026: <https://www.internetconsultatie.nl/epg2026/document/14147> (H5) en <https://www.internetconsultatie.nl/epg2026/document/14150> (H9). Formule 9.16 is visueel van pagina 15 gelezen.
+De hoofdstukken 5 en 9 volgden eerst het openbare consultatieconcept 2026: <https://www.internetconsultatie.nl/epg2026/document/14147> (H5) en <https://www.internetconsultatie.nl/epg2026/document/14150> (H9). Op 2 oktober 2026 zijn ze vergeleken met de gelicentieerde NTA 8800:2025+C1:2026:
+
+- In hoofdstuk 9 is alles ongewijzigd, behalve dat 9.16 nu 9.12a heet.
+- Nieuw rechtstreeks uit de doeleditie overgenomen, met paginanummers:
+  - 5.14a/5.14b (p. 85), §5.5.6.1 en tabel 5.3 (p. 97), §5.5.8 (p. 100);
+  - 9.2.3 en 9.2.5 (p. 290–294), 9.26–9.51 met de tabellen 9.14–9.22 en 9.X (p. 302–321);
+  - 9.85-forfait (p. 360) en 9.91/9.92 met 9.6.8.2.3 (p. 363–365);
+  - tabel 13.9 (buffervat) en 5.32 (p. 104).
+- Beeldformules zijn visueel van de pagina gelezen. Er staat geen normtekst in de repository.
+
+| Module | Formules | Bron |
+|---|---|---|
+| `heating_distribution` | 9.26–9.51, tabel 9.14/9.15/9.16/9.19/9.21/9.22/9.X, 13.9 | NTA 8800:2025+C1:2026 p. 290–321, 570 |
 
 De wettelijke tabellen zijn letterlijk overgenomen uit de geconsolideerde wetteksten:
 

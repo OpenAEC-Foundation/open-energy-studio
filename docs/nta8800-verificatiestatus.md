@@ -1,5 +1,42 @@
 # NTA 8800 verificatiestatus — 29 september 2026
 
+## Stand 2 oktober 2026: hoofdstuk 5 en 9 tegen de doeleditie
+
+Een woordvergelijking van het consultatieconcept met NTA 8800:2025+C1:2026 (hoofdstuk 5, pagina's 72–124; hoofdstuk 9, pagina's 290–365) laat zien:
+
+- In hoofdstuk 9 zijn alle formules, tabellen en getallen die de code gebruikt ongewijzigd. Alleen 9.16 heet nu 9.12a.
+- In hoofdstuk 5 zijn vier onderdelen inhoudelijk gewijzigd: 5.14a, 5.20a/5.20b, tabel 5.3 en de collectieve warmtepompbron.
+
+Wat daarop in de kern is gebouwd of hersteld:
+
+- **Distributie volledig** (`heating_distribution`, `distributionSystem`):
+  - 9.26–9.40: stookgrens met kleinste-kwadratenfit (9.28), bedrijfstijd 9.32a/9.32b met tabel 9.15 en tabel "9.X", watertemperaturen 9.30–9.32 met tabel 9.14, Ψ uit tabel 9.16 of 9.33–9.35, leidinglengtes 9.36/9.27, terugwinbaar deel 9.38;
+  - pomp 9.41–9.51;
+  - buffervat 9.2.3;
+  - terugwinbare verliezen per zone (9.7) als uitvoer.
+  - Het verlies wordt niet meer op 0 gezet in maanden zonder warmtebehoefte.
+- **Hulpenergie**: 9.85-forfait voor individuele elektrische warmtepompen, ook in een hybride; 9.91/9.92 voor collectieve ketels, collectieve warmtepompen, externe warmte, elektrische verwarming en biomassa. De pompplicht van §9.4.4 wordt afgedwongen.
+- **Opslagcorrectie 5.14a/5.14b**: batterijen en thermische opslag geven geen fout meer, maar `f_BAT;cor` = 0 of 1.
+- **`f_BACS` = 1,05** alleen bij utiliteitsbouw (§5.5.8).
+- **CO2-emissie** volgens §5.5.6.1 met tabel 5.3.
+- **5.32**: warmtepomp met gecombineerde bron buitenlucht/ventilatieretourlucht.
+- **Weigeringen en checks**:
+  - een losse warmtepomp boven 55 °C wordt geweigerd (bijlage Q);
+  - een biomassakachel telt alleen als enige verwarming van de ruimten die hij bedient (§9.6.5).
+
+Nieuwe interpretatievragen:
+
+1. Tabel 9.X: `f_H;red;pmp;op` = 0,10 voor een woning met individuele installatie. Letterlijk toegepast in 9.32a geldt die factor ook voor het leidingverlies, niet alleen voor de pomp. Bij individuele gasketels en warmtepompen zit de pomp echter in 9.85; de factor raakt dan alleen het leidingverlies.
+2. 9.32a wordt gedrukt als `MAX(…)` met één argument; dat is gelezen als een product.
+3. Stookgrens stap 5: "maximale snijpunt: θ_int;set;H;stc" is gelezen als een bovengrens gelijk aan het setpoint.
+4. Een stookgrens die niet te bepalen is (stijgende lijn of minder dan twee punten) geeft een invoergat. De norm regelt dit geval niet.
+5. Tabel 9.21 heeft geen rij voor een opwekker met `Δθ_g ≤ 10 K` en een afgifte met `Δθ_a > 10 K`. Daarvoor is de eerste rij gebruikt.
+6. 9.45 vraagt `t_H;mi;max` en `Δθ_min` in de maand met de hoogste behoefte. Bij meerdere zones neemt de keten de langste bedrijfstijd over de zones.
+7. Telt de afleverset van externe warmte als toestel voor de 10 W van 9.6.8.2.3? De gebruiker legt dat vast in `electricallyConnectedDevices`.
+8. Losse warmtepomp boven 55 °C: §9.6.3 eist bijlage Q, terwijl tabel 9.27 kolommen tot 70 °C heeft. De kern weigert, conform de tekst.
+9. `θ_int;op;H` (7.9.6) als omgevingstemperatuur van zoneleidingen is gelijkgesteld aan het verwarmingssetpoint, totdat §7.9 is gekoppeld.
+10. De terugwinbare verliezen worden nog niet teruggekoppeld naar 7.2.1. Die terugkoppeling hoort bij de behoefteberekening; voor BENG 1 moet ze 0 blijven.
+
 ## Stand 1 oktober 2026: rekenruggengraat
 
 Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BENG 1/2/3, TO-juli, Bbl-toets en indicatieve labelklasse. Onderdelen en bronnen:
@@ -10,13 +47,14 @@ Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BEN
 | Transmissie H8: direct, onverwarmd, P/A-grond | `monthly_demand` (components), `ground` | transcriptie Heatloss (C1) |
 | Maandbehoefte H7 | `monthly_demand` | transcriptie Heatloss (C2–C5) |
 | Meerdere rekenzones, gedeelde opwekker | `space_heating_chain`, `project_performance` | 9.2, 5.6/5.8 |
-| Afgifte 9.3 | `heating_emission` | consultatie H9 |
-| Opwekkers: gasketel, forfaitaire warmtepomp (met optioneel gemeten hulpenergie), hybride, externe warmtelevering, elektrisch, biomassa | `space_heating_chain` | consultatie H9 |
+| Afgifte 9.3 | `heating_emission` | doeleditie p. 296–297 (gelijk aan consultatie) |
+| Distributie 9.26–9.51, buffervat 9.2.3, terugwinbaar 9.2.5 | `heating_distribution`, `space_heating_chain` | doeleditie p. 290–321 |
+| Opwekkers: gasketel, forfaitaire warmtepomp, hybride, externe warmtelevering, elektrisch, biomassa; hulpenergie 9.85/9.91 | `space_heating_chain` | doeleditie p. 323–365 |
 | Koudeopwekking §10.5 | `space_cooling` | transcriptie Heatloss (F3b) |
 | Belemmering en zonwering (§17.3, 7.42) | `solar_shading` | transcriptie Heatloss (F3d) |
 | Tapwaterbehoefte H13 (rendementen opgegeven) | `domestic_hot_water` | referenties Heatloss |
 | PV H16 | `pv` | transcriptie Heatloss (F3d-4) |
-| Primaire/hernieuwbare energie, indicatoren H5 | `building_performance` | consultatie H5 |
+| Primaire/hernieuwbare energie, opslagcorrectie, CO2, indicatoren H5 | `building_performance` | doeleditie p. 72–124 |
 | TO-juli §5.7 per oriëntatie | `tojuli` | transcriptie Heatloss (F3c) |
 | Labelklasse en A0 | `label_class`, `bbl_requirements` | Omgevingsregeling bijlagen IX/X/IXa/Xa (wettekst) |
 | BENG-eisen | `bbl_requirements` | Bbl tabel 4.148A (wettekst) |
@@ -49,8 +87,8 @@ De volgende interpretatievragen moeten tegen de normtekst of wettekst worden bea
 2. Hoofdstuk 11: ventilatie, infiltratie, C1-systeem voor BENG 1, zomerventilatie voor TO-juli (tabellen 11.5/11.6/11.8 ontbreken).
 3. Hoofdstuk 10: koeling.
 4. Hoofdstuk 13: rendementstabellen.
-5. Distributie 9.26: stookgrens, tabel 7.11, §7.9.2 en 7.9.6.
-6. 9.2.3/9.2.5 en correcties `a_H;red`/7.78.
+5. Distributie 9.26 is gebouwd; de koppeling met §7.9.2/7.9.6 (`f_H;red`, `θ_int;op;H`) en met de ventilatietermen van 9.28/9.29 loopt nog via opgaven.
+6. Terugkoppeling van 9.2.5 naar 7.2.1, en de correcties `a_H;red`/7.78.
 7. Bijlage-P-verklaringen.
 8. Weging van gemengde functies (Bbl lid 2).
 9. Wijzigingsregeling 2026 (A0, bijlagen IXa/Xa).
