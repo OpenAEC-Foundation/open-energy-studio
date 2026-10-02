@@ -81,7 +81,7 @@ export function useI18n() {
   };
 
   return {
-    t: t as (key: string) => string,
+    t: t as (key: string, options?: Record<string, unknown>) => string,
     locale: i18n.language as Locale,
     setLocale,
   };

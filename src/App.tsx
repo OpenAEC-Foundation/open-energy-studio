@@ -33,7 +33,8 @@ import { downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
 import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
-import { serializeProject, deserializeProject } from './core/io/ProjectSerializer';
+import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
+import { stampProject } from './core/io/KernelStampClient';
 import { AppMenu } from './components/AppMenu/AppMenu';
 import type { DialogType, IProject } from './core/energy/types';
 
@@ -267,6 +268,7 @@ function EmptyStatusBar() {
 function AppContent() {
   const { docState, docDispatch } = useDocumentManager();
   const hasActiveDoc = useHasActiveDocument();
+  const { t } = useI18n();
   const untitledCounter = useRef(0);
 
   const createEmptyProject = useCallback((): IProject => {
@@ -296,7 +298,7 @@ function AppContent() {
     existingPath: string | null,
     forcePrompt: boolean,
   ): Promise<string | null> => {
-    const json = serializeProject(project);
+    const json = serializeProject(project, await stampProject(project));
 
     // Save directly if we have a path and aren't forcing a prompt
     if (existingPath && !forcePrompt) {
@@ -349,15 +351,22 @@ function AppContent() {
       });
       if (!filePath) return;
       const json = await readTextFile(filePath as string);
-      const loaded = deserializeProject(json);
+      const { project: loaded, kernel: saved } = deserializeProjectFile(json);
       docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath: filePath as string } });
+      const current = await stampProject(loaded);
+      const [difference] = compareKernelStamp(saved, current);
+      if (difference === 'version' && saved && current) {
+        alert(t('project.kernelChanged', { saved: describeStamp(saved), current: describeStamp(current) }));
+      } else if (difference === 'input') {
+        alert(t('project.inputChanged'));
+      }
     } catch (err) {
       const msg = (err as Error).message;
       if (msg && !msg.includes('cancelled')) {
         alert('Failed to open project: ' + msg);
       }
     }
-  }, [docDispatch]);
+  }, [docDispatch, t]);
 
   // ── Save (Ctrl+S) — save to existing path, or prompt Save As if new ──
   const handleSaveProject = useCallback(async () => {

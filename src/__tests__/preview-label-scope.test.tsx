@@ -14,14 +14,15 @@ function ChangeToOffice() {
 }
 
 describe('preview label scope', () => {
-  it('does not apply residential label thresholds to an office project', async () => {
+  it('never classifies a label outside the Rust kernel', async () => {
     const user = userEvent.setup();
     renderWithProviders(<><ChangeToOffice /><PreviewPanel /></>);
 
-    expect(document.querySelector('.preview-energy-label')).toBeInTheDocument();
+    expect(document.querySelector('.preview-energy-label')).not.toBeInTheDocument();
+    expect(screen.getByText(/label class comes only from the NTA 8800 kernel/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Office' }));
 
     expect(document.querySelector('.preview-energy-label')).not.toBeInTheDocument();
-    expect(screen.getByText(/Energy label classification is not yet implemented/)).toBeInTheDocument();
+    expect(screen.getByText(/label class comes only from the NTA 8800 kernel/)).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import type { IProject } from '../energy/types';
-import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
+import type { LabelData, NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
 import { summarizeExtras } from '../nta/NtaResultSummary';
 
@@ -11,6 +11,57 @@ function num(value: number | null | undefined, digits = 0): string {
 }
 function meets(value: boolean | null | undefined): string {
   return value == null ? 'niet te toetsen' : value ? 'voldoet (onverifieerd)' : 'voldoet niet';
+}
+
+
+const PURPOSE: Record<string, string> = { existing_building: 'bestaand gebouw', delivery: 'oplevering', bbl_check: 'toets Bbl' };
+const SURVEY: Record<string, string> = { basic: 'basisopname', detailed: 'detailopname' };
+const REPRESENTATION: Record<string, string> = { unique: 'uniek', reference: 'referentiewoning', similar: 'gelijkende woning' };
+const CATEGORY: Record<string, string> = { facade: 'Gevel', roof: 'Dak', floor: 'Vloer', glazing: 'Beglazing' };
+
+function advisor(value: NtaRegistration['surveyingAdvisor']): string {
+  if (!value) return '—';
+  return `${value.name || '—'} (vakbekwaamheid ${value.competenceNumber || '—'})`;
+}
+
+/** Report header of BRL 9500 §4.2.5/§4.2.6: advisers, dates and validity. */
+function registrationSection(registration: NtaRegistration | undefined, assessment: RegistrationAssessment | null | undefined): string {
+  if (!registration) {
+    return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie).</p>';
+  }
+  const issues = (assessment?.issues ?? []).map((item) =>
+    `<tr>${cell(item.severity === 'error' ? 'fout' : 'ontbreekt')}${cell(item.code)}${cell(item.path)}</tr>`).join('');
+  const address = [registration.postcode, registration.houseNumber, registration.houseNumberAddition].filter(Boolean).join(' ');
+  return `<h2>Registratie</h2><table><tbody>
+    <tr><th>Doel</th>${cell(PURPOSE[registration.purpose ?? ''] ?? '—')}<th>Opname</th>${cell(SURVEY[registration.surveyType ?? ''] ?? '—')}</tr>
+    <tr><th>Representativiteit</th>${cell(REPRESENTATION[registration.representation ?? ''] ?? '—')}<th>Herlabelen</th>${cell(registration.relabel ? 'ja' : 'nee')}</tr>
+    <tr><th>Adres (postcode, huisnummer)</th>${cell(address || '—')}<th>BAG-verblijfsobject</th>${cell(registration.bagObjectId ?? '—')}</tr>
+    <tr><th>Bouwjaar</th>${cell(registration.constructionYear ?? '—')}<th>Woningtype / gebruiksfunctie</th>${cell(registration.buildingType ?? '—')}</tr>
+    <tr><th>Opdrachtgever</th>${cell(registration.client ?? '—')}<th>Certificaatnummer</th>${cell(registration.certificateNumber ?? '—')}</tr>
+    <tr><th>Opnemend adviseur</th>${cell(advisor(registration.surveyingAdvisor))}<th>Registrerend adviseur</th>${cell(advisor(registration.registeringAdvisor))}</tr>
+    <tr><th>Opnamedatum</th>${cell(registration.surveyDate ?? '—')}<th>Registratiedatum</th>${cell(registration.registrationDate ?? '—')}</tr>
+    <tr><th>Uiterste registratiedatum</th>${cell(assessment?.registrationDeadline ?? assessment?.relabelDeadline ?? '—')}<th>Geldig tot (opnamedatum + 10 jaar)</th>${cell(assessment?.validUntil ?? '—')}</tr>
+    <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Gereed voor registratie</th>${cell(assessment?.readyForRegistration ? 'ja' : 'nee')}</tr>
+  </tbody></table>
+  ${issues ? `<table><thead><tr><th>Soort</th><th>Code</th><th>Pad</th></tr></thead><tbody>${issues}</tbody></table>` : ''}
+  ${assessment ? `<p>Bron termijnen: ${escapeHtml(assessment.source)}.</p>` : ''}`;
+}
+
+/** Label data of Regeling energieprestatie gebouwen art. 4. */
+function labelDataSection(labelData: LabelData | null | undefined): string {
+  if (!labelData) return '';
+  const envelope = labelData.envelope.map((item) => `<tr>${cell(CATEGORY[item.category] ?? item.category)}<td class="n">${num(item.areaM2, 1)}</td>
+    <td class="n">${num(item.meanUWPerM2k, 2)}</td><td class="n">${num(item.minRcM2kPerW, 2)}</td><td class="n">${num(item.maxRcM2kPerW, 2)}</td></tr>`).join('');
+  const installations = labelData.installations;
+  const list = (values: string[]) => values.length ? values.join(', ') : '—';
+  return `<h2>Labelgegevens</h2>
+    <table><thead><tr><th>Element</th><th>Oppervlakte [m²]</th><th>Gemiddelde U [W/m²K]</th><th>Laagste R<sub>c</sub></th><th>Hoogste R<sub>c</sub></th></tr></thead><tbody>${envelope || '<tr><td colspan="5">Geen scheidingsconstructies met een thermische grens.</td></tr>'}</tbody></table>
+    <table><tbody>
+      <tr><th>Verwarming</th>${cell(installations.heatingGenerator ?? '—')}<th>Warm tapwater</th>${cell(installations.hotWaterGenerator ?? '—')}</tr>
+      <tr><th>Ventilatie</th>${cell(list(installations.ventilationSystems))}<th>Koeling</th>${cell(list(installations.coolingGenerators))}</tr>
+      <tr><th>PV-systemen</th>${cell(installations.pvSystemCount)}<th>Verlichtingszones</th>${cell(installations.lightingZoneCount)}</tr>
+      <tr><th>Bron</th><td colspan="3">${escapeHtml(labelData.source)}</td></tr>
+    </tbody></table>`;
 }
 
 /**
@@ -41,7 +92,8 @@ export function generateNtaCalculationReportHTML(
       <tr><th>Invoervingerafdruk</th><td colspan="3"><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>
       ${assessment.geometry ? `<tr><th>A<sub>g</sub> / A<sub>ls</sub></th><td>${num(assessment.geometry.usableFloorAreaM2, 1)} / ${num(assessment.geometry.lossAreaM2, 1)} m²</td>
         <th>A<sub>ls</sub>/A<sub>g</sub></th><td>${num(assessment.geometry.lossAreaRatio, 3)}</td></tr>` : ''}
-    </tbody></table>`;
+    </tbody></table>
+    ${registrationSection(project.registration, assessment.registration)}`;
   if (!performance || assessment.status !== 'calculated_unverified') {
     const gaps = assessment.gaps.map((gap) => `<tr>${cell(gap.code)}${cell(gap.path)}${cell(gap.detail ?? '')}</tr>`).join('');
     const issues = (performance?.issues ?? []).map((item) => `<tr>${cell(item.code)}${cell(item.path)}<td></td></tr>`).join('');
@@ -94,7 +146,9 @@ export function generateNtaCalculationReportHTML(
       <tr><th>Terugwinbare systeemverliezen (7.3)</th>${cell(extras.recoverableLossesApplied ? 'verrekend' : 'niet verrekend')}<th>Q<sub>H;ls;rbl</sub></th><td class="n">${num(extras.recoverableLossKwh)} kWh</td></tr>
       ${extras.lightingKwh != null ? `<tr><th>Verlichting (hoofdstuk 14)</th><td class="n">${num(extras.lightingKwh)} kWh</td><th></th><td></td></tr>` : ''}
       <tr><th>Labelbron</th><td colspan="3">${escapeHtml(performance.labelSource)}</td></tr>
+      <tr><th>Labelgegevens (Reg. art. 4)</th><td colspan="3">EP2 ${num(performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr · hernieuwbaar ${num(performance.renewableSharePercent, 1)} % · TO<sub>juli</sub> ${num(performance.tojuliMaxK, 2)} K · ${project.buildingFunction === 'residential' ? 'warmtebehoefte (BENG 1)' : 'energiebehoefte (BENG 1)'} ${num(performance.needIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td></tr>
     </tbody></table>
+    ${labelDataSection(assessment.labelData)}
     ${ventilationRows ? `<h2>Ventilatie (hoofdstuk 11)</h2><table><thead><tr><th>Zone</th><th>q<sub>V;ODA;req</sub> jan [m³/h]</th><th>Infiltratie jan [m³/h]</th>
       <th>H<sub>ve</sub> jan [W/K]</th><th>Ventilatoren [kWh/jr]</th><th>Vorstbeveiliging [kWh/jr]</th><th>Voorverwarming roosters [kWh/jr]</th></tr></thead>
       <tbody>${ventilationRows}</tbody></table>` : ''}

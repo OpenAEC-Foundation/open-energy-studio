@@ -3191,6 +3191,64 @@ export interface ProjectPerformanceAssessment {
   };
   derivedInput: BuildingPerformanceInput | null;
   performance: BuildingPerformanceAssessment | null;
+  /** BRL 9500 §4.2.3–4.2.5 checks; null without a registration block. */
+  registration?: RegistrationAssessment | null;
+  /** Regeling energieprestatie gebouwen art. 4 label data. */
+  labelData?: LabelData | null;
+}
+
+/** Registration data of the EP report (crates/nta8800-core/src/registration.rs); all optional. */
+export interface NtaRegistration {
+  purpose?: 'existing_building' | 'delivery' | 'bbl_check';
+  surveyType?: 'basic' | 'detailed';
+  representation?: 'unique' | 'reference' | 'similar';
+  referenceObjectId?: string;
+  bagObjectId?: string;
+  postcode?: string;
+  houseNumber?: string;
+  houseNumberAddition?: string;
+  constructionYear?: number;
+  buildingType?: string;
+  client?: string;
+  certificateNumber?: string;
+  surveyingAdvisor?: { name: string; competenceNumber: string };
+  registeringAdvisor?: { name: string; competenceNumber: string };
+  /** YYYY-MM-DD; for a relabel the original survey date. */
+  surveyDate?: string;
+  /** YYYY-MM-DD. */
+  registrationDate?: string;
+  serialProject?: boolean;
+  relabel?: boolean;
+  originalKernelVersion?: string;
+  epOnlineNumber?: string;
+}
+
+export interface RegistrationAssessment {
+  source: string;
+  validUntil: string | null;
+  registrationDeadline: string | null;
+  relabelDeadline: string | null;
+  readyForRegistration: boolean;
+  issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
+}
+
+export interface LabelData {
+  source: string;
+  envelope: Array<{
+    category: 'facade' | 'roof' | 'floor' | 'glazing';
+    areaM2: number;
+    meanUWPerM2k: number | null;
+    minRcM2kPerW: number | null;
+    maxRcM2kPerW: number | null;
+  }>;
+  installations: {
+    heatingGenerator: string | null;
+    hotWaterGenerator: string | null;
+    ventilationSystems: string[];
+    coolingGenerators: string[];
+    pvSystemCount: number;
+    lightingZoneCount: number;
+  };
 }
 
 export async function calculateProjectPerformanceWithRust(project: IProject): Promise<ProjectPerformanceAssessment> {

@@ -203,6 +203,11 @@ pub struct ProjectPerformanceAssessment {
     pub performance: Option<BuildingPerformanceAssessment>,
     /// §6.4/§6.5.2 schematisation findings per zone (warnings).
     pub schematisation: Vec<crate::zoning::ZoningIssue>,
+    /// Registration data checks (BRL 9500 §4.2.3–4.2.5); `None` when the
+    /// project has no registration block.
+    pub registration: Option<crate::registration::RegistrationAssessment>,
+    /// Label data of Regeling energieprestatie gebouwen art. 4.
+    pub label_data: Option<crate::label_data::LabelData>,
 }
 
 /// §6.4/§6.5.2 for the derived calculation zones: one heating chain and at
@@ -374,12 +379,35 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         }
         _ => "invalid",
     };
+    let project: Option<ProjectInput> = serde_json::from_value(project_value.clone()).ok();
+    let registration = match project_value.get("registration") {
+        None | Some(Value::Null) => None,
+        Some(block) => {
+            match serde_path_to_error::deserialize::<_, crate::registration::Registration>(
+                block.clone(),
+            ) {
+                Ok(registration) => Some(crate::registration::assess_registration(&registration)),
+                Err(error) => {
+                    gaps.push(InputGap {
+                        detail: Some(error.to_string()),
+                        ..gap("registration_block_invalid", "registration")
+                    });
+                    None
+                }
+            }
+        }
+    };
+    let label_data = project
+        .as_ref()
+        .map(|project| crate::label_data::label_data(project, derived.as_ref()));
     ProjectPerformanceAssessment {
         status,
         target_norm_version: TARGET_NORM_VERSION,
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         attest_status: "unattested",
+        registration,
+        label_data,
         gaps,
         geometry: project_geometry(project_value),
         schematisation: derived
@@ -801,6 +829,38 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn registration_and_label_data_are_reported_and_fingerprinted() {
+        let mut value = project();
+        let plain = assess_project_performance(&value);
+        assert!(plain.registration.is_none());
+        let label = plain.label_data.expect("label data");
+        assert!(!label.envelope.is_empty());
+        assert!(label.installations.heating_generator.is_some());
+        value["registration"] = serde_json::json!({
+            "purpose": "existing_building",
+            "surveyDate": "2026-03-15",
+            "registrationDate": "2026-07-01"
+        });
+        let registered = assess_project_performance(&value);
+        assert_ne!(registered.input_fingerprint, plain.input_fingerprint);
+        assert_eq!(registered.status, plain.status);
+        let registration = registered.registration.unwrap();
+        assert_eq!(registration.valid_until.as_deref(), Some("2036-03-15"));
+        assert!(registration
+            .issues
+            .iter()
+            .any(|item| item.code == "registration_deadline_exceeded"));
+        value["registration"]["unknownField"] = serde_json::json!(1);
+        let broken = assess_project_performance(&value);
+        assert_eq!(broken.status, plain.status);
+        assert!(broken.registration.is_none());
+        assert!(broken
+            .gaps
+            .iter()
+            .any(|item| item.code == "registration_block_invalid"));
     }
 
     #[test]

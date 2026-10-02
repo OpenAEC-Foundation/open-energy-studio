@@ -3,7 +3,6 @@ import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { calculateBENGMonthly } from '../../core/energy/BENGCalculatorMonthly';
 import { hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, legacyHeatPumpInputIssue, validProjectFloorArea } from '../../core/energy/ProjectArea';
-import { calculateEnergyLabel } from '../../core/energy/EnergyLabel';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
 import { MonthlyBarChart } from './MonthlyBarChart';
 import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
@@ -89,19 +88,8 @@ export function PreviewPanel() {
         ) : (
           <>
             <CalculationNotice compact />
-            {/* Energy label */}
-            {project.buildingFunction === 'residential' ? (() => {
-              const labelResult = calculateEnergyLabel(result.beng2);
-              return (
-                <div className="preview-energy-label" aria-label={`${t('results.indicative')}: ${labelResult.label}`}>
-                  <div className="preview-energy-label-arrow" style={{ backgroundColor: labelResult.color }}>
-                    <span className="preview-energy-label-text">{labelResult.label}</span>
-                  </div>
-                </div>
-              );
-            })() : (
-              <p className="preview-label-unavailable">{t('results.labelUnavailable')}</p>
-            )}
+            {/* Energy label: only the Rust kernel classifies (one label source). */}
+            <p className="preview-label-unavailable">{t('preview.labelFromKernel')}</p>
 
             {/* BENG indicators */}
             <div className="preview-section-title">BENG</div>

@@ -54,6 +54,7 @@ pub mod humidification;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod label_class;
+pub mod label_data;
 pub mod lighting;
 pub mod materials;
 pub mod monthly_demand;
@@ -62,6 +63,7 @@ pub mod opname;
 pub mod project_performance;
 pub mod pv;
 pub mod reference;
+pub mod registration;
 pub mod significant_figures;
 pub mod solar_shading;
 pub mod space_cooling;
@@ -102,6 +104,12 @@ pub struct ProjectInput {
     pub constructions: Vec<Value>,
     #[serde(default)]
     pub unheated_spaces: Vec<ProjectUnheatedSpace>,
+    /// Registration data for the EP report (BRL 9500 §4.2.5); optional and
+    /// part of the input fingerprint.
+    /// Parsed separately so an invalid block is reported without
+    /// rejecting the project.
+    #[serde(default)]
+    pub registration: Option<Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

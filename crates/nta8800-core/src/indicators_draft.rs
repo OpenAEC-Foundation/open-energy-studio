@@ -279,6 +279,33 @@ mod tests {
         assert!(!result.reference_verified && !result.label_available);
     }
     #[test]
+    fn label_class_follows_the_rounded_indicator_at_class_edges() {
+        use crate::label_class::{indicative_label_class, LabelFunction};
+        let class_for = |fossil_kwh: f64, function: LabelFunction| {
+            let mut input = sample();
+            input.scenarios[0].annual_primary_fossil_kwh = fossil_kwh;
+            let ep2 = assess_indicators_draft(&input).scenarios[0]
+                .primary_fossil_indicator_kwh_per_m2_year;
+            (ep2, indicative_label_class(function, ep2).unwrap())
+        };
+        // Annex IX: exactly on the A/B bound stays A; any excess rounds up
+        // to 160,01 and gives B.
+        assert_eq!(class_for(16000.0, LabelFunction::Residential), (160.0, "A"));
+        assert_eq!(
+            class_for(16000.001, LabelFunction::Residential),
+            (160.01, "B")
+        );
+        assert_eq!(class_for(38000.0, LabelFunction::Residential), (380.0, "F"));
+        assert_eq!(
+            class_for(38000.0001, LabelFunction::Residential),
+            (380.01, "G")
+        );
+        // Annex X office column, A++++ upper bound 40.
+        assert_eq!(class_for(4000.0, LabelFunction::Office), (40.0, "A++++"));
+        assert_eq!(class_for(4000.0001, LabelFunction::Office), (40.01, "A+++"));
+    }
+
+    #[test]
     fn requires_both_emg_scenarios_without_mixing_ordinary() {
         let mut input = sample();
         input.scenarios[0].kind = ScenarioKind::EmgDeclaration;
