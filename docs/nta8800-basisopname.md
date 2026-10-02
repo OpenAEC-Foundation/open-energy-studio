@@ -62,10 +62,9 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 ## Niet ondersteund
 
 - Koeling: geeft de fout `cooling_not_supported_in_basisopname`.
-- Collectieve installaties, WKK, zonneboilers en meerdere opwekkers.
 - Serres (AOS), daklichten en woonboten/woonwagens.
 - Het nominale vermogen van een tapwaterwarmtepomp (§13.3.2.5): de kern toetst de capaciteit van tapwatertoestellen (13.8.2) nog niet.
-- Een afvoerluchtwarmtepomp: die vraagt een tweede opwekker (WD p. 43), en de opname kent één opwekker.
+- Een afvoerluchtwarmtepomp zonder tweede opwekker (WD p. 43): `exhaust_air_heat_pump_second_generator_required`. Met `additionalGenerators` wordt hij aanvaard.
 - Detailopname-routes en kwaliteitsverklaringen. De uitzondering is een gemeten q_v10.
 
 ## Interpretatievragen
@@ -140,7 +139,7 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 - Meer dan één rekenzone, en functiemengsels boven 25 %.
 - Koeling via de LBK (DX of watergevoerd), passieve koeling met bypass, en koeling met warmtepompen die ook verwarmen.
 - Ontvochtiging en de latente last van adiabatische bevochtiging.
-- Meerdere opwekkers per dienst, WKK, zonneboilers, warmtapwater via afleversets en luchtverwarming via de LBK.
+- Meerdere tapwateropwekkers met eigen typen in de utiliteitsopname, en luchtverwarming via de LBK. WKK, meerdere verwarmingsopwekkers en zonneboilers zijn wel ondersteund (zie hieronder).
 - Daglichtsectoren. Een bekende daglichtregeling rekent met de forfaitaire daglichtmethode.
 
 ## Interpretatievragen
@@ -185,3 +184,60 @@ BRL 9500 §4.2.2 en bijlage 3 vragen een onderbouwing wanneer de adviseur terugv
 - Een situatie die niet is toegestaan geeft `shading_situation_not_in_basic_survey`. Opgegeven maandfactoren (`obstruction`) samen met `shading` geven `window_obstruction_conflict`.
 - De woningopname kent geen koeling, dus daar is altijd de rij "zonder koeling" van toepassing. De utiliteitsopname gebruikt de rij "met koeling" zodra `cooling` is ingevuld.
 - Bij volledige belemmering geldt de koudetabel 17.14 alleen met `coolingConditionsMet`. Zonder dat veld rekent de kern conservatief met 1,00.
+
+
+## Meerdere opwekkers, collectieve installaties, WKK en zonneboilers
+
+Deze routes gelden voor de woningopname (ISSO 82.1) en, waar vermeld, ook voor de utiliteitsopname (ISSO 75.1).
+
+**Meerdere verwarmingsopwekkers (§9.3.2, p. 112–113; NTA 9.6.1).**
+- Met `heating.additionalGenerators` worden alle ongelijke opwekkers opgenomen, elk met een nominaal vermogen volgens tabel 9.7. Ontbreekt een vermogen, dan geeft de opname `generator_power_required`.
+- Er zijn twee uitzonderingen:
+  - Externe warmtelevering met onbekend vermogen levert 50 % (tabel 9.7).
+  - Een WKK met onbekend thermisch vermogen krijgt 1,5 × het elektrisch vermogen (vuistregel voor gasmotoren).
+- De preferentie volgt de volgorde van p. 112:
+  1. afvoerluchtwarmtepompen;
+  2. overige warmtepompen;
+  3. WKK;
+  4. biomassa;
+  5. externe warmte;
+  6. elektrisch;
+  7. ketels.
+
+  De kern rekent met de opwekker `multiple`.
+- Een bijgeplaatste preferente opwekker (§9.3.6) zet `addedPreferredGenerator` (NTA 9.58/9.59).
+- Tabel 9.9 geldt per opwekker. Een warmtepomp in een hybride opstelling krijgt standaard de laagtemperatuurklasse (voetnoot 8). De distributie krijgt de klasse van de opwekker die geen warmtepomp is.
+- In de utiliteitsopname gelden de collectieve rol, het warmtepompbereik en de hulpenergie per deelopwekker.
+
+**Collectieve verwarming (p. 106, 121–122).**
+- `heating.collective` maakt van de ketel een collectieve ketel. Het nominale vermogen is dan verplicht.
+- Een warmtepomp wordt een collectieve gebouwinstallatie.
+- De distributie wordt collectief, met de forfaitaire pomp.
+- Warmtemeters onbekend: aanwezig (tabel 9.16).
+- Het aangesloten gebruiksoppervlak (f_gebouw, `collectiveConnection`) is bij onbekend het aantal woningen × het oppervlak van de woning (p. 121).
+
+**WKK (tabel 9.7, NTA 9.6.6.1, tabel 9.31).**
+- `kind: chp` met het elektrisch vermogen (rij van tabel 9.31) en het fabricagejaar (vóór of na 2006).
+- Het thermisch vermogen dient als brandervermogen voor 9.91.
+- De WKK-stroom telt als eigen productie volgens 16.12.
+
+**Collectief tapwater (p. 164, 176).**
+- Collectieve opwekker onbekend: overige direct verwarmde voorraadvaten op gas (tabel 13.2).
+- Het bediende gebruiksoppervlak is bij onbekend het aantal woningen × het oppervlak van de woning.
+- `delivery_set_from_heating` is warm tapwater via een afleverset op het (collectieve) verwarmingssysteem (§13.3.4, NTA 13.8.4.9.3).
+
+**Meerdere tapwateropwekkers (NTA 13.8.2).** `hotWater.nominalPowerKw` en `hotWater.additionalGenerators` worden doorgegeven aan de cascade van de kern.
+
+**Zonneboilers (§15.3–15.4; NTA 13.7.2.2), woning en utiliteit.**
+
+| Gegeven | Bij onbekend |
+|---|---|
+| Collectortype | onverglaasd (tabel 15.8) |
+| Naverwarming | voorverwarmer met apart naverwarmingstoestel (tabel 15.4) |
+| Back-upvolume | afgeleid van het totale volume (tabel 15.5, NTA 13.80) |
+| Fabricagejaar van het vat | bouwjaar (§15.3.3/§13.3.2) |
+| Beschaduwing | minimale belemmering (§15.4.7) |
+
+- Een bruto-oppervlak van vacuümbuizen telt voor 60 % (p. 192).
+- Rendement, collectorkring en pomp zijn forfaitair.
+- `alsoSpaceHeating` maakt er een zonnecombi van.
