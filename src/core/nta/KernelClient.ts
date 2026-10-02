@@ -1460,6 +1460,8 @@ export interface SpaceHeatingChainInput {
   humidifiers?: NtaZoneHumidifier[];
   /** 9.2.3.4 Q_H;ren;prac of solar combi systems per month, kWh. */
   solarHeatingKwh?: number[];
+  /** 13.185 hot water made with heat from this system (§13.8.4.9.3), kWh per month. */
+  hotWaterLoadKwh?: number[];
   demand: MonthlyDemandInput;
   additionalZones?: SpaceHeatingChainZone[];
   emission: {
@@ -2199,10 +2201,12 @@ export interface VentilationInput {
   overventilation?: {
     /** Q.5.3 f_H;t;hp-on per month; leave out to let an annex Q heat pump chain derive it. */
     heatingTimeFraction?: number[];
-    hotWaterTimeFraction: number[];
+    /** 13.149 f_W;t;hp-on per month; leave out to derive it from the hot-water system. */
+    hotWaterTimeFraction?: number[];
     heatingFlowM3PerH?: number;
     heatingAreaShare?: number;
-    hotWaterFlowM3PerH: number[];
+    /** 13.148/13.148a q_ve;hp;W per month; leave out to derive it from the hot-water system. */
+    hotWaterFlowM3PerH?: number[];
     sourceReference: string;
   };
   ventilativeCooling?: {
@@ -3141,6 +3145,39 @@ export interface NtaExhaustAirUse {
   ventilationSuitable: boolean;
   /** f_combi per month; empty means hot water only. */
   heatingTimeFraction?: number[];
+  /** q_ve;hp;W from a quality declaration (13.148a), m³/h. */
+  declaredFlowM3PerH?: number | null;
+}
+
+/** 13.146: F_W;gen;gi from a quality declaration, interpolated over Q_W;dis;nren;an. */
+export interface NtaDeclaredGeneratorShare {
+  points: Array<{ annualKwh: number; share: number }>;
+  sourceReference: string;
+}
+
+/** §13.8.4.2 tapping profile test (NEN-EN 13203-2 / NEN-EN 16147). */
+export interface NtaProfileTest {
+  profile: 's' | 'm' | 'l' | 'xl' | 'xxl' | '3xl' | '4xl';
+  deliveredKwhPerDay: number;
+  /** Gas: Q_gas;p on the net calorific value; heat pump: Q_elec. */
+  inputKwhPerDay: number;
+  auxiliaryKwhPerDay?: number | null;
+  maxTestTemperatureC?: number | null;
+}
+
+export interface NtaTwoProfileTest {
+  standard: 'en13203_gas' | 'en16147_heat_pump';
+  storageAppliance: boolean;
+  low: NtaProfileTest;
+  high: NtaProfileTest;
+  combi?: boolean;
+  integratedVessel?: boolean;
+  exhaustAirSource?: boolean;
+  outdoorAirFraction?: number | null;
+  smartControlFactor?: number | null;
+  designSetTemperatureC?: number | null;
+  legionellaCycleTested?: boolean;
+  sourceReference: string;
 }
 
 /** Collectors use the §17.3 collector tables (17.6/17.12/17.15). */
@@ -3149,7 +3186,7 @@ type NtaSolarObstruction = NtaCollectorObstruction;
 /** §13.7 solar water heater; see crates/nta8800-core/src/solar_thermal.rs. */
 export interface NtaSolarWaterHeater {
   id: string;
-  solarUse: 'water_heating' | 'combi';
+  solarUse: 'water_heating' | 'combi' | 'space_heating';
   /** N_soli identical physical systems. */
   count?: number;
   method:
@@ -3215,7 +3252,9 @@ export type NtaHotWaterGenerator =
         insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
     | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
     | { kind: 'external_heat' }
-    | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump);
+    | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump)
+    | ({ kind: 'measured_two_profiles' } & NtaTwoProfileTest)
+    | { kind: 'heating_system' };
 
 /** Chapter 13 hot-water system (several generators, solar systems). */
 export interface NtaHotWaterSystem {
@@ -3268,11 +3307,14 @@ export interface NtaHotWaterSystem {
   nominalPowerKw?: number | null;
   /** 13.144a when the main generator is an exhaust-air heat pump. */
   exhaustAir?: NtaExhaustAirUse | null;
+  /** 13.146 for the main generator. */
+  declaredShare?: NtaDeclaredGeneratorShare | null;
   /** Further generators (13.8.2). */
   additionalGenerators?: Array<{
     generator: NtaHotWaterGenerator;
     nominalPowerKw?: number | null;
     exhaustAir?: NtaExhaustAirUse | null;
+    declaredShare?: NtaDeclaredGeneratorShare | null;
     equipmentReference: string;
   }>;
   /** 13.141a–d: main generator first, the single additional one second. */
@@ -3819,6 +3861,10 @@ export interface NtaHotWaterAssessment {
     solarBackupStorageLossKwh: number;
     solarRecoverableKwh: number;
     extraElectricOutputKwh: number;
+    /** 13.185 output supplied by the space-heating system (§13.8.4.9.3). */
+    heatingSystemLoadKwh: number;
   }>;
   generators: Array<{ index: number; order: number; monthlyOutputKwh: number[]; monthlyShare: number[] }>;
+  /** 13.148/13.149 data of an exhaust-air heat pump. */
+  exhaustAir?: { timeFraction: number[]; hotWaterOnly: boolean; declaredFlowM3PerH: number | null };
 }

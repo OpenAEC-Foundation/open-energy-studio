@@ -680,7 +680,9 @@ pub struct Overventilation {
     /// annex Q heat pump derives it with the Q.5.3 recalculation.
     #[serde(default)]
     pub heating_time_fraction: Vec<f64>,
-    /// f_W;τ;hp-on;mi from 13.8.2.4.
+    /// f_W;τ;hp-on;mi from 13.8.2.4 (13.149). Left empty, the building
+    /// performance fills it from the hot-water system.
+    #[serde(default)]
     pub hot_water_time_fraction: Vec<f64>,
     /// q_V;hp;H from the supplier, m³/h.
     #[serde(default)]
@@ -688,7 +690,9 @@ pub struct Overventilation {
     /// A_g;zi/Σ A_g of the zones served by the heat pump (11.23a).
     #[serde(default = "one")]
     pub heating_area_share: f64,
-    /// q_V;hp;W;mi from 13.8.2.4, m³/h.
+    /// q_V;hp;W;mi from 13.8.2.4 (13.148/13.148a), m³/h. Left empty, the
+    /// building performance fills it from the hot-water system.
+    #[serde(default)]
     pub hot_water_flow_m3_per_h: Vec<f64>,
     pub source_reference: String,
 }

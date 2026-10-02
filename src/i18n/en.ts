@@ -1848,6 +1848,7 @@ export const en: Record<string, string> = {
   'nta.form.solar.use': "Use",
   'nta.form.solar.use.water': "Hot water",
   'nta.form.solar.use.combi': "Solar combi (hot water and heating)",
+  'nta.form.solar.use.space': "Space heating only (SHS)",
   'nta.form.solar.count': "Number of identical systems",
   'nta.form.solar.method': "Method",
   'nta.form.solar.method.calculated': "Calculated (13.7.2.2)",

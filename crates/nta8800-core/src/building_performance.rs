@@ -643,17 +643,22 @@ fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
             .iter()
             .map(|zone| &zone.demand),
     );
-    let (weighted, area) = zones.fold((0.0, 0.0), |(weighted, area), zone| {
-        (
-            weighted + zone.setpoints.heating_c * zone.usable_floor_area_m2,
-            area + zone.usable_floor_area_m2,
-        )
-    });
+    let (weighted, standard, area) =
+        zones.fold((0.0, 0.0, 0.0), |(weighted, standard, area), zone| {
+            (
+                weighted + zone.setpoints.heating_c * zone.usable_floor_area_m2,
+                standard + zone.usage_function.heating_setpoint_c() * zone.usable_floor_area_m2,
+                area + zone.usable_floor_area_m2,
+            )
+        });
     HotWaterContext {
         residential: matches!(input.calculation_scope, CalculationScope::Residential),
         usable_floor_area_m2: input.total_usable_floor_area_m2,
         heated_ambient_c: if area > 0.0 { weighted / area } else { 20.0 },
         space_heating: None,
+        // 13.69a/13.137a: table 7.13.
+        standard_setpoint_c: (area > 0.0).then(|| standard / area),
+        levelled_setpoint_c: None,
     }
 }
 
@@ -1274,6 +1279,121 @@ fn with_lighting_gains(input: &BuildingPerformanceInput) -> SpaceHeatingChainInp
     chain
 }
 
+/// Area-weighted `ϑ_int;set;H;zi,mi` (7.76) of the chain's zones.
+fn levelled_setpoint(
+    input: &BuildingPerformanceInput,
+    heating: &SpaceHeatingChainAssessment,
+) -> Option<[f64; 12]> {
+    let areas = std::iter::once(&input.space_heating.demand)
+        .chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+        .map(|zone| zone.usable_floor_area_m2);
+    let zones: Vec<(&crate::monthly_demand::MonthlyDemandAssessment, f64)> =
+        std::iter::once(&heating.demand)
+            .chain(&heating.additional_zone_demands)
+            .zip(areas)
+            .filter(|(zone, _)| zone.monthly.len() == 12)
+            .collect();
+    let area: f64 = zones.iter().map(|(_, area)| area).sum();
+    (area > 0.0).then(|| {
+        std::array::from_fn(|index| {
+            zones
+                .iter()
+                .map(|(zone, area)| zone.monthly[index].heating.setpoint_c * area)
+                .sum::<f64>()
+                / area
+        })
+    })
+}
+
+/// 13.148/13.149 for 11.2.2.1.2: the flow `q_ve;hp;W;zi;mi` and time
+/// fraction `f_W;t;hp-on;mi` of an exhaust-air heat pump for hot water fill
+/// empty overventilation fields of the zones with a chapter 11 input. A
+/// hot-water-only heat pump (`f_combi = 0`) also creates the
+/// overventilation when the zone has none. The hot water does not depend
+/// on the ventilation, so it is assessed first and the chain follows.
+fn apply_exhaust_air_hot_water(
+    result: &HotWaterAssessment,
+    total_area: f64,
+    chain: &mut SpaceHeatingChainInput,
+) {
+    let Some(exhaust) = &result.exhaust_air else {
+        return;
+    };
+    let apply = |demand: &mut MonthlyDemandInput| {
+        let area = demand.usable_floor_area_m2;
+        let Some(ventilation) = demand.ventilation.as_mut() else {
+            return;
+        };
+        // 11.22: q_V;ODA;req without overventilation.
+        let mut plain = ventilation.clone();
+        plain.overventilation = None;
+        let Ok(base) = crate::ventilation::calculate_ventilation(&plain) else {
+            return;
+        };
+        let required: Vec<f64> = base
+            .months
+            .iter()
+            .map(|month| month.heating.required_outdoor_air_m3_per_h)
+            .collect();
+        if required.len() != 12 {
+            return;
+        }
+        let share = area / total_area;
+        // 13.148a with a declared flow, else 13.148 for a hot-water-only
+        // heat pump; a combi heat pump needs the declaration.
+        let flow: Option<Vec<f64>> = match exhaust.declared_flow_m3_per_h {
+            Some(declared) => Some(
+                required
+                    .iter()
+                    .map(|q| (declared * share).max(*q))
+                    .collect(),
+            ),
+            None if exhaust.hot_water_only => Some(
+                required
+                    .iter()
+                    .map(|q| ((44.0 * share).max(area * 0.44) * 3.6).max(*q))
+                    .collect(),
+            ),
+            None => None,
+        };
+        match ventilation.overventilation.as_mut() {
+            Some(over) => {
+                if over.hot_water_time_fraction.is_empty() {
+                    over.hot_water_time_fraction = exhaust.time_fraction.clone();
+                }
+                if over.hot_water_flow_m3_per_h.is_empty() {
+                    if let Some(flow) = flow {
+                        over.hot_water_flow_m3_per_h = flow;
+                    }
+                }
+            }
+            None if exhaust.hot_water_only => {
+                if let Some(flow) = flow {
+                    ventilation.overventilation = Some(crate::ventilation::Overventilation {
+                        heating_time_fraction: vec![0.0; 12],
+                        hot_water_time_fraction: exhaust.time_fraction.clone(),
+                        heating_flow_m3_per_h: None,
+                        heating_area_share: 1.0,
+                        hot_water_flow_m3_per_h: flow,
+                        source_reference: "NTA 8800 13.148/13.149".into(),
+                    });
+                }
+            }
+            None => {}
+        }
+    };
+    apply(&mut chain.demand);
+    for zone in &mut chain.additional_zones {
+        apply(&mut zone.demand);
+    }
+}
+
 /// 7.29 with 13.13/13.14: an empty `hotWaterRecoverableKwh` of a utility
 /// zone takes the recoverable hot-water losses of the building's system,
 /// split by usable floor area, when that system is valid.
@@ -1298,6 +1418,19 @@ fn with_hot_water_gains(
     if total_area <= 0.0 {
         return chain;
     }
+    // 13.185: hot water made with heat from the space-heating system.
+    if result
+        .months
+        .iter()
+        .any(|month| month.heating_system_load_kwh > 0.0)
+    {
+        chain.hot_water_load_kwh = result
+            .months
+            .iter()
+            .map(|month| month.heating_system_load_kwh)
+            .collect();
+    }
+    apply_exhaust_air_hot_water(&result, total_area, &mut chain);
     // 9.2.3.4: solar combi systems supply the space-heating node.
     if result
         .months
@@ -1350,7 +1483,7 @@ pub fn assess_building_performance(
         system
             .solar
             .iter()
-            .any(|heater| heater.solar_use == crate::solar_thermal::SolarUse::Combi)
+            .any(|heater| heater.solar_use != crate::solar_thermal::SolarUse::WaterHeating)
     });
     if combi {
         if let Some(space_heating) = solar_space_heating(input, &heating) {
@@ -1385,6 +1518,8 @@ pub fn assess_building_performance(
     } else {
         Vec::new()
     };
+    // 13.69/13.137b: the levelled setpoint of 7.76 from the chain's demand.
+    hot_water_context.levelled_setpoint_c = levelled_setpoint(input, &heating);
     let hot_water = match (&input.hot_water, issues.is_empty()) {
         (Some(system), true) => match assess_hot_water(system, hot_water_context) {
             Ok(mut result) => {
@@ -2476,6 +2611,7 @@ mod tests {
         };
         let mut sample = input();
         let system = HotWaterSystem {
+            declared_share: None,
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
@@ -2543,6 +2679,7 @@ mod tests {
             .declared_uses
             .retain(|item| item.service != Service::DomesticHotWater);
         let mut system = HotWaterSystem {
+            declared_share: None,
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
@@ -2618,6 +2755,183 @@ mod tests {
         );
     }
 
+    fn hot_water_system(generator: crate::domestic_hot_water::HotWaterGenerator) -> HotWaterSystem {
+        use crate::domestic_hot_water::{HotWaterEmission, HotWaterNeed, ServedTaps};
+        HotWaterSystem {
+            declared_share: None,
+            need: HotWaterNeed::Residential {
+                dwelling_count: 1,
+                source_reference: "one dwelling".into(),
+            },
+            emission: HotWaterEmission::Residential {
+                served: ServedTaps::KitchenAndBathroom,
+                kitchen_length_m: Some(1.0),
+                bathroom_length_m: Some(1.0),
+                source_reference: "drawing".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: None,
+            storage: Vec::new(),
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator,
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
+            collective: None,
+            equipment_reference: "plate".into(),
+        }
+    }
+
+    #[test]
+    fn solar_space_heating_only_feeds_the_node_and_no_hot_water() {
+        use crate::domestic_hot_water::{GasAppliance, HotWaterGenerator};
+        let mut sample = input();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let mut system = hot_water_system(HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::CombiGaskeurHrCw,
+            measured_class: Some(crate::domestic_hot_water::ApplicationClass::Class1),
+            kitchen_only: false,
+            declared: None,
+            annex_t: None,
+            annex_t_conditions: None,
+        });
+        sample.hot_water = Some(system.clone());
+        let plain = assess_building_performance(&sample);
+        system.solar = vec![serde_json::from_value(serde_json::json!({
+            "id": "roof", "solarUse": "space_heating",
+            "method": {"method": "calculated", "solarType": "preheater",
+                "collectors": {"moduleAreaM2": 2.0, "moduleCount": 2, "orientation": "south",
+                    "tiltDeg": 45.0, "obstruction": {"method": "minimal"},
+                    "efficiency": {"method": "forfait", "collector": "glazed"},
+                    "loopPipes": {"method": "forfait"}},
+                "storage": {"totalVolumeL": 200.0, "loss": {"method": "label", "label": "b"}}},
+            "sourceReference": "datasheet"
+        }))
+        .unwrap()];
+        sample.hot_water = Some(system);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let hot_water = result.hot_water.as_ref().unwrap();
+        // SOL_USE = SHS: f_W;use = 0, f_H;use = 1 (13.85).
+        assert_eq!(hot_water.annual_solar_renewable_kwh, 0.0);
+        let march = &result.space_heating.monthly[2];
+        assert!(march.solar_gain_kwh > 0.0);
+        assert!(march.generator_output_kwh < plain.space_heating.monthly[2].generator_output_kwh);
+    }
+
+    #[test]
+    fn heating_system_hot_water_loads_the_space_heating_node() {
+        use crate::domestic_hot_water::HotWaterGenerator;
+        let mut sample = input();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        sample.hot_water = Some(hot_water_system(HotWaterGenerator::ElectricInstantaneous));
+        let plain = assess_building_performance(&sample);
+        assert_eq!(plain.status, "calculated_unverified", "{:?}", plain.issues);
+        sample.hot_water = Some(hot_water_system(HotWaterGenerator::HeatingSystem));
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let hot_water = result.hot_water.as_ref().unwrap();
+        let jan = &result.space_heating.monthly[0];
+        let load = hot_water.months[0].heating_system_load_kwh;
+        assert!(load > 0.0);
+        // 13.185: the node supplies E_W;gen;in;conv;hj; hot water itself has
+        // no carrier.
+        assert!((jan.hot_water_load_kwh - load).abs() < 1e-9);
+        assert_eq!(hot_water.months[0].carrier_input_kwh, 0.0);
+        let extra = jan.generator_output_kwh - plain.space_heating.monthly[0].generator_output_kwh;
+        // The electric instantaneous heater adds recoverable losses (13.179)
+        // to the plain run, so the difference is at least the load.
+        assert!(extra >= load - 1e-6);
+    }
+
+    #[test]
+    fn exhaust_air_hot_water_heat_pump_feeds_13_148_and_13_149_into_chapter_11() {
+        use crate::domestic_hot_water::{ExhaustAirUse, HotWaterGenerator};
+        let mut sample = input();
+        sample.declared_uses.retain(|item| {
+            !matches!(
+                item.service,
+                Service::DomesticHotWater | Service::VentilationFans
+            )
+        });
+        let demand = &mut sample.space_heating.demand;
+        let ventilation: crate::ventilation::VentilationInput =
+            serde_json::from_value(serde_json::json!({
+                "zoneId": demand.zone_id,
+                "usableFloorAreaM2": demand.usable_floor_area_m2,
+                "category": "residential",
+                "functions": [{"function": "residential", "areaM2": demand.usable_floor_area_m2}],
+                "dwellingCount": 1,
+                "buildingHeightM": 9.0,
+                "constructionYear": 2020,
+                "heatingSetpointC": demand.setpoints.heating_c,
+                "coolingSetpointC": demand.setpoints.cooling_c,
+                "system": {"kind": "single", "unit": {"variant": "c1", "ducts": "luka_a_b_c", "equipmentReference": "synthetic"}},
+                "infiltration": {"method": "measured", "qv10DmPerSM2": 0.4, "sourceReference": "synthetic"},
+                "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
+                "sourceReference": "synthetic"
+            }))
+            .unwrap();
+        demand.ventilation_flows.clear();
+        demand.ventilation = Some(ventilation.clone());
+        let area = demand.usable_floor_area_m2;
+        let mut system = hot_water_system(HotWaterGenerator::HeatPump {
+            exhaust_air_source: true,
+            source_correction: None,
+            measured_class: None,
+            outdoor_air_fraction: None,
+        });
+        system.exhaust_air = Some(ExhaustAirUse {
+            ventilation_suitable: true,
+            heating_time_fraction: Vec::new(),
+            declared_flow_m3_per_h: None,
+        });
+        sample.hot_water = Some(system);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let hot_water = result.hot_water.as_ref().unwrap();
+        let f_w = hot_water.exhaust_air.as_ref().unwrap().time_fraction[0];
+        assert!(f_w > 0.0 && f_w < 1.0);
+        // 13.148 forfait (one zone): MAX(MAX(44; 0,44·A)·3,6; q_ODA;req).
+        let base = crate::ventilation::calculate_ventilation(&ventilation)
+            .unwrap()
+            .months[0]
+            .heating
+            .required_outdoor_air_m3_per_h;
+        let q_w = ((44.0_f64).max(0.44 * area) * 3.6).max(base);
+        // 11.23: (1 − f_H − f_W)·q + f_W·q_W with f_H = 0.
+        let expected = (1.0 - f_w) * base + f_w * q_w;
+        let actual = result
+            .space_heating
+            .demand
+            .ventilation
+            .as_ref()
+            .unwrap()
+            .months[0]
+            .heating
+            .required_outdoor_air_m3_per_h;
+        assert!((actual - expected).abs() < 1e-9, "{actual} vs {expected}");
+    }
+
     #[test]
     fn recoverable_hot_water_losses_feed_utility_internal_gains() {
         use crate::domestic_hot_water::{
@@ -2645,6 +2959,7 @@ mod tests {
         };
         let area = demand.usable_floor_area_m2;
         sample.hot_water = Some(HotWaterSystem {
+            declared_share: None,
             need: HotWaterNeed::Utility {
                 areas: vec![UtilityArea {
                     function: LabelFunction::Office,
