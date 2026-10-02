@@ -25,7 +25,7 @@ Status: **ongeverifieerd**. Er zijn nog geen referentiegevallen vergeleken.
 
 | Onderdeel | Normdeel | Uitvoering |
 |---|---|---|
-| Rekenwaarde λ_calc en R_calc | E.3–E.10, tabel E.1–E.5 | Gedeclareerde isolatie met F_T, F_M, F_A en F_conv. Forfaitaire λ (tabel E.10, kolom bestaande bouw; tabel E.11 en E.12). Metselwerk via E.5 of via tabel E.14–E.17. Overige materialen met F_MA. Afronding volgens NEN-EN-ISO 10456. |
+| Rekenwaarde λ_calc en R_calc | E.3–E.10, tabel E.1–E.5 | Gedeclareerde isolatie met F_T, F_M, F_A en F_conv; gedeclareerde R_D via E.4. Forfaitaire λ (tabel E.10, kolom bestaande bouw; tabel E.11 en E.12). Metselwerk via E.5 of via tabel E.14–E.17. Overige materialen met F_MA. Afronding volgens NEN-EN-ISO 10456. |
 | Reflecterende folies | tabel E.13 | Foliepakket d/0,03, cachering 0, en systemen met twee of drie folies. |
 | Materialen voor ramen en kozijnen | tabel H.1 | λ_for per materiaal. |
 | Overgangsweerstanden | tabel C.2 | R_si naar warmtestroomrichting, R_se = 0,04. |
@@ -50,7 +50,20 @@ Status: **ongeverifieerd**. Er zijn nog geen referentiegevallen vergeleken.
 - Afschotdaken met een helling boven 5 % (`tapered_roof_above_5_percent_requires_numerical_method`).
 - Numerieke 2D- en 3D-berekeningen (§8.6). De kern verwerkt alleen de resulterende L_2D/L_3D (8.25–8.29) of L_C (8.5). Vliesgevels (NEN-EN-ISO 12631), bedrijfsdeuren (NEN-EN 12428) en dakkoepels (NEN-EN 1873) worden als opgegeven productwaarde ingevoerd.
 - Bijlage J (statistische bepaling van gedeclareerde waarden) en de grafische schematiseringsregels van bijlage K. A_T, A_con, ℓ_gl en A_fr worden als invoer gevraagd.
-- Paneeldiktes buiten 10–300 mm in tabel I.15/I.16 (`panel_thickness_outside_table`).
+- Paneeldiktes onder 10 mm, en boven 300 mm bij panelen die niet aan buitenlucht grenzen (tabel I.16) (`panel_thickness_outside_table`). Boven 300 mm aan buitenlucht rekent de kern met de formule achter tabel I.15 (I.4, I.1, 25 % kozijn met U_fr;for, ψ = 0, p. 837–838); die formule reproduceert de tabelrij van 300 mm.
+
+## Validatieregels (foutcodes)
+
+| Regel | Normdeel | Foutcode |
+|---|---|---|
+| Producten die van nature in situ worden aangebracht (vlokken, parels, gespoten PUR, UF, cellulose, gespoten vlas) moeten F_A uit tabel E.5 gebruiken, met de passende productgroep of "overig" | E.2.1.4.1, tabel E.5 (p. 802–803) | `in_situ_material_requires_in_situ_ageing`, `in_situ_product_mismatch` |
+| De indringingsdiepte d_fa ligt binnen de isolatielaag | 8.12 (p. 234) | `fastener_penetration_exceeds_insulation` |
+| Tabel F.1 alleen bij U ≤ 1,0; tabel F.2/F.3 alleen bij U > 1,0 | bijlage F | `narrow_cavity_table_f1_requires_u_at_most_1`, `tubular_cavity_tables_f2_f3_require_u_above_1` |
+| Opgegeven isolatiesectie bestaat | 8.9/8.11/8.13 | `insulation_section_unknown` |
+| Thermisch verbeterde afstandhouder alleen met wegen die aan L.1 voldoen of met een productverklaring | L.3 (p. 868) | `spacer_evidence_required`, `spacer_not_thermally_improved` |
+| Eén keuze tussen 8.14 en 8.15 voor alle ramen | 8.2.2.3.1 | `window_formula_8_14_and_8_15_mixed` |
+| ΔU_for alleen voor dichte delen van categorie a); geen ramen, deuren, panelen of daklichten | 8.3, 8.2.2.1 | `transparent_element_not_in_supplement`, `door_or_panel_not_in_supplement` |
+| Thermokussens: R_ad + 1,8, zonder isolatiedikte | I.2.1.4 (p. 833) | `thermal_cushions_exclude_insulation_thickness` |
 
 ## Interpretatiekeuzes
 
@@ -63,6 +76,14 @@ Deze keuzes staan ook in de uitvoer (`interpretations`):
 5. Tabel E.1 neemt de dichtstbijzijnde dichtheid (bij gelijke afstand de hoogste factor). Tabel E.14–E.17 nemen de eerstvolgende hogere dichtheid (conservatief).
 6. Formule 8.25 rekent U_p van het vervangende paneel met R_T = R_p = d_p/λ_p, zonder overgangsweerstanden, zoals de formule is geschreven.
 7. Tabel I.6 (woonwagens, 1965–1983): voor gevels geldt 0,19. De paneelwaarde 0,04 wordt niet automatisch toegepast.
+8. ΔU_a, ΔU_fa en ΔU_r bij een samengestelde constructie: R_1 en R_T (C.3, zonder thermische bruggen, p. 231–234) komen uit de isolatiesectie. Standaard is dat de sectie met de hoogste C.3-R_T; met `insulationSection` kies je een sectie expliciet. Daarmee hangt de uitkomst niet meer af van de volgorde van de secties.
+9. Tabel C.4 voetnoot b: een reflecterende laag die omhoog is gericht (`reflectiveFacingUp`) krijgt geen waarde tussen haakjes, tenzij de spouw hermetisch is afgesloten (`hermeticallySealed`). De kern past dit toe zodra de invoer de laag als omhooggericht markeert, ook bij verticale spouwen.
+10. Tabel C.4: bij warmtestroom omhoog met een werkzame reflecterende laag geldt R_se = 0,05 (waarde tussen haakjes). R_C trekt dezelfde R_se af.
+11. Tabel F.1 en F.2/F.3 worden getoetst aan de U_C van de hele constructie.
+12. §8.2.2.1: de U in H_D (8.1) en in ΔU_for (8.3) is de afgeronde waarde (`uValue`). De onafgeronde waarde staat in `uUnrounded`. Forfaitaire deuren en panelen volgen de afronding van transparante delen.
+13. ΔU_for: ventilatieroosters (8.2.2.2.1) vallen onder §8.2.2.2 en mogen meetellen. Ramen, deuren, panelen en daklichten niet.
+14. R_calc wordt naar beneden afgerond (E.2.1.1): opgegeven R_calc, E.4 met R_D (`declared_resistance`) en foliepakketten d/0,03.
+15. Zoldervloeren (`attic_floor`) gebruiken de vloerrijen van tabel I.4/I.5 met R_si = 0,10 (warmtestroom omhoog). Vloeren boven kruipruimte of op de grond blijven op 0,17.
 
 ## Open punten
 

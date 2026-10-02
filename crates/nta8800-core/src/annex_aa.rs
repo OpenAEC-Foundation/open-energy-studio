@@ -282,7 +282,8 @@ fn window_solar_w(window: &Window, hour: usize) -> f64 {
     GLASS_RATIO
         * window.area_m2
         * F_W
-        * window.g_perpendicular
+        // AA.6b: g_gl;C;juli, the July value of a dynamic window (annex A).
+        * window.g_for_month(6)
         * obstruction
         * shading
         * irradiance_at_hour(window.orientation, window.tilt_deg, hour)
@@ -376,7 +377,7 @@ pub fn assess_annex_aa(
                     }
                     let u = item
                         .u_with_shutter_w_per_m2k
-                        .unwrap_or(window.u_value_w_per_m2k);
+                        .unwrap_or(window.u_for_month(6));
                     if !(u.is_finite() && u > 0.0) {
                         issues.push(issue(
                             "annex_aa_u_invalid",
@@ -576,6 +577,22 @@ mod tests {
                 },
             ],
         }
+    }
+
+    #[test]
+    fn dynamic_window_uses_the_july_g() {
+        let (mut input, demand) = zone();
+        input.windows[0].dynamic = Some(crate::annex_a::DynamicTransparent::SingleState {
+            state: crate::annex_a::DynamicState {
+                id: "tinted".into(),
+                g_perpendicular: 0.3,
+                u_value_w_per_m2k: 1.0,
+            },
+            source_reference: "product sheet".into(),
+        });
+        let result = assess_annex_aa(&rooms(2.0), &input, &demand, "aa").unwrap();
+        // AA.6b with g_gl;C;juli = 0,3 instead of the nominal 0,6.
+        assert!((result.solar_w - 0.75 * 10.0 * 0.9 * 0.3 * 663.0).abs() < 1e-9);
     }
 
     #[test]

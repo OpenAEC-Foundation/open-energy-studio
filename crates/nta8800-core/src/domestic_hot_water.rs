@@ -352,6 +352,9 @@ pub enum ShowerUnit {
     /// Annex U at the application class of the heater (class 4 utility).
     Declared {
         efficiency: f64,
+        /// Table U.1 class of the declared value; checked when given.
+        #[serde(default, rename = "testClass", skip_serializing_if = "Option::is_none")]
+        test_class: Option<crate::hot_water_tests::ShowerTestClass>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
@@ -367,10 +370,53 @@ impl ShowerUnit {
             Self::None => 0.0,
             Self::Vertical => 0.40,
             Self::Horizontal | Self::Unknown => 0.20,
-            Self::Declared { efficiency, .. } => *efficiency,
+            // Annex U: rounded down to a multiple of 0,025.
+            Self::Declared { efficiency, .. } => round_down(*efficiency, 0.025),
             Self::AnnexU { test } => test.efficiency().unwrap_or(0.0),
         }
     }
+
+    fn test_class(&self) -> Option<crate::hot_water_tests::ShowerTestClass> {
+        match self {
+            Self::Declared { test_class, .. } => *test_class,
+            Self::AnnexU { test } => Some(test.class),
+            _ => None,
+        }
+    }
+}
+
+/// §13.5.3: the annex U class to use. Dwellings use the application class
+/// of the hot-water appliance (class 4 when unknown), utility buildings
+/// class 4. Table U.1 has no class 1 row; a class 1 appliance uses the
+/// class 2 measurement (interpretation, the nearest lower demand).
+fn required_shower_class(
+    system: &HotWaterSystem,
+    residential: bool,
+) -> crate::hot_water_tests::ShowerTestClass {
+    use crate::hot_water_tests::ShowerTestClass;
+    if !residential {
+        return ShowerTestClass::Class4;
+    }
+    let class = match &system.generator {
+        HotWaterGenerator::GasAppliance { measured_class, .. }
+        | HotWaterGenerator::HeatPump { measured_class, .. } => *measured_class,
+        _ => None,
+    };
+    match class.unwrap_or(ApplicationClass::Class4) {
+        ApplicationClass::Class1 | ApplicationClass::Class2 => ShowerTestClass::Class2,
+        ApplicationClass::Class3 => ShowerTestClass::Class3,
+        ApplicationClass::Class4 => ShowerTestClass::Class4,
+    }
+}
+
+/// §13.8.4.3 conditions for the annex T (NEN 7120 annex A) method.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AnnexTConditions {
+    /// The appliance type was already supplied before 2021.
+    pub type_supplied_before_2021: bool,
+    /// The appliance stands indoors.
+    pub appliance_indoors: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -463,6 +509,13 @@ pub enum HotWaterGenerator {
         /// Annex T test report replacing the table value (Gaskeur coupling).
         #[serde(default, rename = "annexT", skip_serializing_if = "Option::is_none")]
         annex_t: Option<AnnexTTest>,
+        /// §13.8.4.3 conditions; required with `annexT`.
+        #[serde(
+            default,
+            rename = "annexTConditions",
+            skip_serializing_if = "Option::is_none"
+        )]
+        annex_t_conditions: Option<AnnexTConditions>,
     },
     /// Table 13.25 individual heat pump, 1,4·c_source with table 13.27.
     HeatPump {
@@ -809,7 +862,14 @@ pub fn validate_hot_water(
         if shower.showers.is_empty() {
             push("hot_water_showers_required", "showerHeatRecovery.showers");
         }
+        let required = required_shower_class(system, context.residential);
         for (index, unit) in shower.showers.iter().enumerate() {
+            if unit.test_class().is_some_and(|class| class != required) {
+                push(
+                    "annex_u_test_class_mismatch",
+                    &format!("showerHeatRecovery.showers[{index}]"),
+                );
+            }
             if let ShowerUnit::AnnexU { test } = unit {
                 for code in test.issues() {
                     push(code, &format!("showerHeatRecovery.showers[{index}].test"));
@@ -818,6 +878,7 @@ pub fn validate_hot_water(
             if let ShowerUnit::Declared {
                 efficiency,
                 source_reference,
+                ..
             } = unit
             {
                 if !(0.0..=1.0).contains(efficiency) {
@@ -938,11 +999,20 @@ pub fn validate_hot_water(
         measured_class,
         declared,
         annex_t: Some(test),
+        annex_t_conditions,
         ..
     } = &system.generator
     {
         for code in test.issues() {
             push(code, "generator.annexT");
+        }
+        match annex_t_conditions {
+            None => push("annex_t_conditions_required", "generator.annexTConditions"),
+            Some(conditions) => {
+                if !conditions.type_supplied_before_2021 || !conditions.appliance_indoors {
+                    push("annex_t_not_applicable", "generator.annexTConditions");
+                }
+            }
         }
         if declared.is_some() {
             push("hot_water_efficiency_declared_twice", "generator.annexT");
@@ -1120,6 +1190,7 @@ fn generation(system: &HotWaterSystem, annual_output_kwh: f64) -> Result<(f64, f
             kitchen_only,
             declared,
             annex_t,
+            ..
         } => {
             let (table, corrected) = appliance.table();
             let base = match (annex_t, declared) {
@@ -1130,7 +1201,9 @@ fn generation(system: &HotWaterSystem, annual_output_kwh: f64) -> Result<(f64, f
                 (None, Some(item)) => round_down(item.value, 0.025),
                 (None, None) => table,
             };
-            let correction = if *kitchen_only || !corrected {
+            // Table 13.25 note 3 d: every measured value holds for its class.
+            let measured = annex_t.is_some() || declared.is_some();
+            let correction = if *kitchen_only || !(corrected || measured) {
                 1.0
             } else {
                 gas_class_correction(
@@ -1654,6 +1727,7 @@ mod tests {
             kitchen_only: false,
             declared: None,
             annex_t: None,
+            annex_t_conditions: None,
         }
     }
 
@@ -1914,6 +1988,10 @@ mod tests {
             kitchen_only: false,
             declared: None,
             annex_t: Some(report.clone()),
+            annex_t_conditions: Some(AnnexTConditions {
+                type_supplied_before_2021: true,
+                appliance_indoors: true,
+            }),
         });
         let run = |r: f64| ShowerRun::Energies {
             recovered_kj: r,
@@ -1953,6 +2031,81 @@ mod tests {
             .map(|item| item.code)
             .collect();
         assert!(codes.contains(&"annex_t_appliance_mismatch"));
+    }
+
+    #[test]
+    fn annex_u_class_and_annex_t_conditions_are_checked() {
+        use crate::hot_water_tests::ShowerTestClass;
+        let mut input = system(combi());
+        let declared = |class| ShowerUnit::Declared {
+            efficiency: 0.61,
+            test_class: Some(class),
+            source_reference: "report".into(),
+        };
+        input.shower_heat_recovery = Some(ShowerHeatRecovery {
+            showers: vec![declared(ShowerTestClass::Class2)],
+            connection: ShowerConnection::MixerAndHeater,
+            source_reference: "plan".into(),
+        });
+        let codes = |input: &HotWaterSystem, residential: bool| -> Vec<&'static str> {
+            let mut ctx = context();
+            ctx.residential = residential;
+            validate_hot_water(input, ctx, "dhw")
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        // §13.5.3: a class 4 appliance needs the class 4 measurement.
+        assert!(codes(&input, true).contains(&"annex_u_test_class_mismatch"));
+        input.shower_heat_recovery.as_mut().unwrap().showers =
+            vec![declared(ShowerTestClass::Class4)];
+        assert!(!codes(&input, true).contains(&"annex_u_test_class_mismatch"));
+        // Declared values are rounded down to 0,025.
+        assert!(
+            (input.shower_heat_recovery.as_ref().unwrap().showers[0].efficiency() - 0.6).abs()
+                < 1e-12
+        );
+        // Class 1 appliance: class 2 measurement; utility: class 4 always.
+        if let HotWaterGenerator::GasAppliance { measured_class, .. } = &mut input.generator {
+            *measured_class = Some(ApplicationClass::Class1);
+        }
+        input.shower_heat_recovery.as_mut().unwrap().showers =
+            vec![declared(ShowerTestClass::Class2)];
+        assert!(!codes(&input, true).contains(&"annex_u_test_class_mismatch"));
+        assert!(codes(&input, false).contains(&"annex_u_test_class_mismatch"));
+        // Annex T needs the §13.8.4.3 conditions.
+        let report = AnnexTTest::WaterHeater {
+            useful_mj: 20.0,
+            fuel_input_mj: 25.0,
+            electricity_kwh: 0.0,
+            fuel: crate::hot_water_tests::TestFuel::NaturalGas,
+            source_reference: "report".into(),
+        };
+        let mut heater = system(HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::WithoutGaskeur,
+            measured_class: Some(ApplicationClass::Class3),
+            kitchen_only: false,
+            declared: None,
+            annex_t: Some(report.clone()),
+            annex_t_conditions: None,
+        });
+        assert!(codes(&heater, true).contains(&"annex_t_conditions_required"));
+        if let HotWaterGenerator::GasAppliance {
+            annex_t_conditions, ..
+        } = &mut heater.generator
+        {
+            *annex_t_conditions = Some(AnnexTConditions {
+                type_supplied_before_2021: false,
+                appliance_indoors: true,
+            });
+        }
+        assert!(codes(&heater, true).contains(&"annex_t_not_applicable"));
+        // Note 3 d: the measured value is class-corrected for every type.
+        let annual = 3000.0;
+        let (efficiency, _) = generation(&heater, annual).unwrap();
+        let expected = round_down(report.efficiency().unwrap(), 0.025)
+            * gas_class_correction(ApplicationClass::Class3, annual);
+        assert!((efficiency - expected).abs() < 1e-12);
     }
 
     #[test]

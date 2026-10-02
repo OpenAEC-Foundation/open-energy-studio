@@ -106,8 +106,11 @@ pub fn forfait_psi(position: u16, variant: u8, column: PsiColumn) -> Option<f64>
 pub enum ElementType {
     /// Tilt from vertical at most 15°.
     Facade,
-    /// Floors over crawlspaces or on ground, attic floors.
+    /// Floors over crawlspaces or on ground (heat flow downward).
     Floor,
+    /// Attic floors ("zoldervloeren"): the floor rows of tables I.4/I.5,
+    /// with R_si 0,10 for the upward heat flow (table C.2).
+    AtticFloor,
     /// Tilt from vertical at least 15°, bordering outdoor air.
     Roof,
     /// Hull of a floating building (table I.7).
@@ -115,20 +118,28 @@ pub enum ElementType {
 }
 
 impl ElementType {
+    /// Row of tables I.4–I.7 and formula I.2.
+    fn table_row(self) -> Self {
+        match self {
+            Self::AtticFloor => Self::Floor,
+            other => other,
+        }
+    }
+
     /// R_ad of formula I.2.
     fn additional_resistance(self) -> f64 {
-        match self {
+        match self.table_row() {
             Self::Facade => 0.36,
-            Self::Floor | Self::FloatingHull => 0.15,
+            Self::Floor | Self::AtticFloor | Self::FloatingHull => 0.15,
             Self::Roof => 0.22,
         }
     }
 
     fn cavity_resistance(self) -> f64 {
-        match self {
+        match self.table_row() {
             Self::Facade => 0.16,
             Self::Roof => 0.13,
-            Self::Floor | Self::FloatingHull => 0.18,
+            Self::Floor | Self::AtticFloor | Self::FloatingHull => 0.18,
         }
     }
 
@@ -137,7 +148,7 @@ impl ElementType {
         match self {
             Self::Facade => 0.13,
             Self::Floor | Self::FloatingHull => 0.17,
-            Self::Roof => 0.10,
+            Self::Roof | Self::AtticFloor => 0.10,
         }
     }
 }
@@ -211,20 +222,21 @@ pub struct ForfaitIssue {
 
 /// Table I.4.
 fn table_i4(element: ElementType, cavity: bool, insulated: bool) -> Option<f64> {
-    let (absent, present) = match (element, cavity) {
+    let (absent, present) = match (element.table_row(), cavity) {
         (ElementType::Facade, true) => (0.35, 0.85),
         (ElementType::Facade, false) => (0.19, 0.69),
         (ElementType::Floor, true) => (0.33, 0.83),
         (ElementType::Floor, false) => (0.15, 0.65),
         (ElementType::Roof, true) => (0.35, 0.85),
         (ElementType::Roof, false) => (0.22, 0.72),
-        (ElementType::FloatingHull, _) => return None,
+        (ElementType::FloatingHull | ElementType::AtticFloor, _) => return None,
     };
     Some(if insulated { present } else { absent })
 }
 
 /// Tables I.5–I.7 for construction years from 1965.
 fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option<f64> {
+    let element = element.table_row();
     let pick = |bounds: &[(i32, f64)]| {
         bounds
             .iter()
@@ -263,7 +275,7 @@ fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option
                 (2015, 6.0),
                 (2021, 6.3),
             ]),
-            ElementType::FloatingHull => None,
+            ElementType::FloatingHull | ElementType::AtticFloor => None,
         },
         BuildingKind::Caravan => match element {
             // 1965–1983: 0,19 for façades (0,04 for panels, see table I.6).
@@ -288,7 +300,7 @@ fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option
                 (2014, 2.5),
                 (2021, 2.6),
             ]),
-            ElementType::FloatingHull => None,
+            ElementType::FloatingHull | ElementType::AtticFloor => None,
         },
         BuildingKind::Floating {
             new_berth_since_2018,
@@ -338,7 +350,7 @@ fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option
                         (2021, 4.7),
                     ])
                 }
-                ElementType::Floor => None,
+                ElementType::Floor | ElementType::AtticFloor => None,
             }
         }
     }
@@ -383,6 +395,13 @@ impl ForfaitOpaque {
                 issues.push(ForfaitIssue {
                     code: "thermal_cushions_floor_only",
                     path: format!("{path}.insulation.thermalCushions"),
+                });
+            }
+            // I.2.1.4: with thermal cushions the floor is R_ad + 1,8 only.
+            if *thermal_cushions && *thickness_mm != 0.0 {
+                issues.push(ForfaitIssue {
+                    code: "thermal_cushions_exclude_insulation_thickness",
+                    path: format!("{path}.insulation.thicknessMm"),
                 });
             }
         } else if self.forfait_rc_from_tables().is_none() {
@@ -561,6 +580,9 @@ pub fn forfait_panel_u(
         }
         PanelInsulation::KnownThickness { thickness_mm } => {
             let d = ((thickness_mm / 10.0).round() * 10.0) as i32;
+            if d > 300 && exterior {
+                return Some(panel_formula_u(f64::from(d) / 1000.0, frame));
+            }
             if !(10..=300).contains(&d) {
                 return None;
             }
@@ -645,6 +667,19 @@ pub fn forfait_panel_u(
     }
 }
 
+/// I.2.2.4.2 behind table I.15: R_c from I.4 (λ 0,035, R_ad 0,07), U_p
+/// from I.1, 25 % frame with U_fr;for (I.5–I.7), ψ = 0; unrounded.
+pub fn panel_formula_u(insulation_m: f64, frame: FrameGroup) -> f64 {
+    let r_c = insulation_m / 0.035 + 0.07;
+    let u_panel = 1.0 / (r_c + 0.13 + 0.04);
+    let u_frame = match frame {
+        FrameGroup::WoodOrPlastic => 2.4,
+        FrameGroup::MetalWithThermalBreak => 3.8,
+        FrameGroup::MetalWithoutThermalBreak => 7.0,
+    };
+    0.75 * u_panel + 0.25 * u_frame
+}
+
 /// I.8: H_ue = 5·A_T;iu in the basic survey of ISSO 82.1/75.1.
 pub fn basic_survey_unheated_transfer(separation_area_m2: f64) -> f64 {
     5.0 * separation_area_m2
@@ -663,6 +698,41 @@ mod tests {
             cavity: true,
             r_si_override: None,
         }
+    }
+
+    #[test]
+    fn attic_floors_use_upward_r_si_and_cushions_exclude_thickness() {
+        let mut attic = element(1970, InsulationState::AbsentOrUnknown);
+        attic.element = ElementType::AtticFloor;
+        let r = attic.calculate();
+        // Floor row of table I.5 (0,17) with R_si 0,10.
+        assert_eq!(r.r_c, 0.17);
+        assert_eq!(r.u_c, round_half_up(1.0 / (0.17 + 0.10 + 0.04), 2));
+        let mut floor = element(
+            1970,
+            InsulationState::KnownThickness {
+                thickness_mm: 50.0,
+                thickness_proven: false,
+                known_lambda_equivalent: None,
+                reed_thickness_m: None,
+                thermal_cushions: true,
+            },
+        );
+        floor.element = ElementType::Floor;
+        floor.cavity = false;
+        assert!(floor
+            .validate("f")
+            .iter()
+            .any(|i| i.code == "thermal_cushions_exclude_insulation_thickness"));
+        floor.insulation = InsulationState::KnownThickness {
+            thickness_mm: 0.0,
+            thickness_proven: false,
+            known_lambda_equivalent: None,
+            reed_thickness_m: None,
+            thermal_cushions: true,
+        };
+        assert!(floor.validate("f").is_empty());
+        assert!((floor.calculate().r_c - (0.15 + 1.8)).abs() < 1e-12);
     }
 
     #[test]
@@ -822,6 +892,30 @@ mod tests {
                 false,
                 FrameGroup::WoodOrPlastic,
                 true
+            )
+            .map(crate::window_u::round_transparent),
+            Some(0.66)
+        );
+        // The formula reproduces the last row of table I.15.
+        for (frame, table) in [
+            (FrameGroup::WoodOrPlastic, 0.69),
+            (FrameGroup::MetalWithThermalBreak, 1.0),
+            (FrameGroup::MetalWithoutThermalBreak, 1.8),
+        ] {
+            assert_eq!(
+                crate::window_u::round_transparent(panel_formula_u(0.3, frame)),
+                table
+            );
+        }
+        // Table I.16 (not to outdoor air) is not extended by the formula.
+        assert_eq!(
+            forfait_panel_u(
+                PanelInsulation::KnownThickness {
+                    thickness_mm: 400.0
+                },
+                false,
+                FrameGroup::WoodOrPlastic,
+                false
             ),
             None
         );

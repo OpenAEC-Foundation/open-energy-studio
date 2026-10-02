@@ -144,7 +144,7 @@ export function NtaConstructionSection({ layers, onApply }: {
     <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <button type="button" className="btn btn-sm" disabled={busy} onClick={calculate}>{t('nta.construction.calculate')}</button>
       {element && <>
-        <span role="status">{t('nta.construction.result')}: U = {element.uRounded.toFixed(3)} W/m²K
+        <span role="status">{t('nta.construction.result')}: U = {element.uRounded.toFixed(2)} W/m²K
           {element.rCRounded != null && <> · R<sub>c</sub> = {element.rCRounded.toFixed(2)} m²K/W</>}</span>
         <button type="button" className="btn btn-sm" onClick={() => onApply({ rc: element.rCRounded, u: element.uRounded, route: element.route })}>
           {t('nta.construction.apply')}</button>

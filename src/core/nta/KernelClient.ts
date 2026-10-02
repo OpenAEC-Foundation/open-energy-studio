@@ -1891,7 +1891,11 @@ export interface SpaceHeatingChainAssessment {
     };
     demandClass: 'residential_low' | 'residential_high' | 'utility_low' | 'utility_high';
     regenerationDegree: number | null;
+    /** Always 1: 9.63 (method 1) has no c_source. */
     sourceCorrection: number;
+    /** 9.63 f_prac (0,95). */
+    practiceFactor: number;
+    /** COP · f_prac. */
     correctedEfficiency: number;
   } | null;
   demand: MonthlyDemandAssessment;
@@ -1942,12 +1946,25 @@ export type MaterialConductivity =
 export type ConstructionLayer =
   | { kind: 'material'; thicknessM: number; conductivity: MaterialConductivity }
   | { kind: 'resistance'; resistanceM2KPerW: number; thicknessM?: number; sourceReference: string }
+  | {
+      kind: 'declared_resistance';
+      resistanceDeclared: number;
+      moisture: string;
+      ageing: { kind: 'factory_made' } | { kind: 'in_situ'; product: string; situation: 'a' | 'b'; practiceTested?: boolean };
+      temperature?: { meanTemperatureC: number; conversionCoefficient: number; sourceReference: string };
+      convectionFactor?: number;
+      thicknessM?: number;
+      sourceReference: string;
+    }
   | { kind: 'reflective_foil'; system: { kind: 'foil_layers'; thicknessM: number } | { kind: 'facing' | 'two_foils_with_air_layer' | 'three_foils_with_air_layers' } }
   | {
       kind: 'air_cavity';
       thicknessMm: number;
       ventilation: { kind: 'unventilated' } | { kind: 'weakly'; openingMm2?: number } | { kind: 'strongly' };
       reflectiveSurface?: boolean;
+      /** Reflective layer facing up: no bracket value unless hermetically sealed (table C.4 note b). */
+      reflectiveFacingUp?: boolean;
+      hermeticallySealed?: boolean;
     }
   | { kind: 'narrow_cavity'; thicknessMm: number; widthMm: number }
   | { kind: 'tubular_cavity'; thicknessMm: number; widthMm: number; orientation: 'horizontal' | 'vertical' }
@@ -1969,6 +1986,8 @@ export interface OpaqueConstructionInput {
         kind: 'composite';
         sections: Array<{ id: string; area: number; layers: ConstructionLayer[] }>;
         interruption: 'stony_unshielded' | 'woody_unshielded' | 'metal_one_side_shielded' | 'other';
+        /** Section id for R_1/R_T of 8.9/8.11/8.13; default: highest C.3 R_T. */
+        insulationSection?: string;
       };
   corrections?: {
     airVoids?: { level: 'none' | 'weak' | 'strong'; insulationLayer: number };
@@ -2027,8 +2046,10 @@ export interface EnvelopeAssessment {
   elements: Array<{
     id: string;
     route: string;
+    /** Rounded per 8.2.2.1; the value used in H_D and ΔU_for. */
     uValue: number;
     uRounded: number;
+    uUnrounded: number;
     rC: number | null;
     rCRounded: number | null;
     opaque: Record<string, number | null> | null;
@@ -2681,6 +2702,10 @@ export type NtaAnnexPRoute =
       generators: Array<{ id: string; energyFraction: number; kind: NtaAnnexPGenerator }>;
       auxiliaryElectricityKwh: number;
       auxiliaryRenewableShare?: number;
+      /** P.34/P.35 η_WD;gen;sto; required for hot water (WD). */
+      hotWaterStorage?:
+        | { method: 'losses'; storageLossKwh: number; pipeLossKwh: number; sourceReference: string }
+        | { method: 'forfait'; insulation: 'at_least20_mm' | 'at_least10_mm' | 'none' };
       sourceReference: string;
     }
   | {
@@ -2721,6 +2746,7 @@ export interface NtaAnnexPSystemResult {
   factors: NtaSupplyFactors;
   distributionEfficiency: number | null;
   generationPrimaryFactor: number | null;
+  storageEfficiency?: number;
   generators: Array<{ id: string; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; heatKwh: number }>;
 }
 
@@ -3022,7 +3048,7 @@ export interface NtaHotWaterSystem {
   showerHeatRecovery?: {
     showers: Array<
       | { unit: 'none' | 'vertical' | 'horizontal' | 'unknown' }
-      | { unit: 'declared'; efficiency: number; sourceReference: string }
+      | { unit: 'declared'; efficiency: number; testClass?: 'class2' | 'class3' | 'class4'; sourceReference: string }
       | { unit: 'annex_u'; test: NtaAnnexUTest }
     >;
     connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
@@ -3059,7 +3085,9 @@ export interface NtaHotWaterSystem {
   generator:
     | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
         | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
-        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null }
+        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null;
+        /** §13.8.4.3 conditions; required with annexT. */
+        annexTConditions?: { typeSuppliedBefore2021: boolean; applianceIndoors: boolean } | null }
     | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
         outdoorAirFraction?: number | null }
     | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;

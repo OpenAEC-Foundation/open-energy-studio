@@ -481,11 +481,15 @@ pub struct Window {
 }
 
 impl Window {
-    /// Perpendicular g of the month (annex A.2 when dynamic).
+    /// Perpendicular g of the month (annex A.2 when dynamic). The nominal
+    /// `g_gl;n` is rounded down to a multiple of 0,05 (§7.6.6.1.2, below
+    /// 7.40); the A.2 monthly weighted value of a dynamic window is used as
+    /// calculated.
     pub fn g_for_month(&self, month_index: usize) -> f64 {
-        self.dynamic
-            .as_ref()
-            .map_or(self.g_perpendicular, |item| item.g_for_month(month_index))
+        self.dynamic.as_ref().map_or_else(
+            || (self.g_perpendicular / 0.05 + 1e-9).floor() * 0.05,
+            |item| item.g_for_month(month_index),
+        )
     }
 
     /// U of the month (annex A.1 when dynamic).
@@ -2337,6 +2341,15 @@ mod tests {
             result.specific_heat_capacity_kj_per_m2k,
             base.specific_heat_capacity_kj_per_m2k
         );
+    }
+
+    #[test]
+    fn nominal_g_is_rounded_down_to_0_05() {
+        let mut window = sample().windows[0].clone();
+        window.g_perpendicular = 0.63;
+        assert!((window.g_for_month(6) - 0.60).abs() < 1e-12);
+        window.g_perpendicular = 0.65;
+        assert!((window.g_for_month(6) - 0.65).abs() < 1e-12);
     }
 
     #[test]

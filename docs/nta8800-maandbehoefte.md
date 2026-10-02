@@ -132,3 +132,14 @@ De toetsen op setpointverschil, ventilatiecapaciteit en warmtecapaciteit staan i
 - b_U en H_zi;ztu uit §8.4, en de verdeelfactor (7.36).
 
 De winst is (1 − b_U)·F·f_gn;max·Q_sol;ztu. Q_sol;ztu volgt uit 7.34/7.35 met F_sh;obst = 1. De begrenzing f_gn;max (7.37) geldt alleen in de verwarmingsstand. Het warmteverlies via de serre loopt via de onverwarmde ruimte van §8.4. De vereenvoudigde route uit de norm (de serre negeren) blijft mogelijk door geen `sunrooms` op te geven.
+
+## Reductiefactor b_U in de projectroute
+
+Een onverwarmde ruimte in het project (`unheatedSpaces`) heeft óf een opgegeven `reductionFactor` met bron, óf `outside` met de verliezen van de ruimte naar buiten. Met `outside` leidt de kern b_U af volgens 8.53–8.59:
+
+- `transmission` is H_D;ue;
+- `ventilation` is 8.57 (debiet) of 8.58 (0,5·H_D;ue).
+
+Wordt per zone gerekend, dan telt de kern H_zi,j;ztu van de andere projectzones die aan dezelfde ruimte grenzen automatisch op bij Σ_j, bovenop `otherZonesConductanceWPerK`.
+
+Beide velden tegelijk geeft `unheated_factor_declared_and_derived`. Geen van beide geeft `unheated_reduction_factor_required`.
