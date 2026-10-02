@@ -1208,7 +1208,7 @@ fn compute(
         let mut used_el =
             bacs * (row.generator_electricity_kwh + row.auxiliary_electricity_kwh.unwrap_or(0.0));
         let mut used_gas = bacs * row.natural_gas_kwh;
-        let mut used_oil = 0.0;
+        let mut used_oil = bacs * row.oil_kwh;
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
         let mut used_dh = bacs * row.district_heat_kwh;
