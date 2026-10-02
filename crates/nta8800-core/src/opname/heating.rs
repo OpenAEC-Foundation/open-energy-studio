@@ -1,0 +1,598 @@
+//! ISSO 82.1 (7e druk) chapter 9: space heating in the basic survey.
+//!
+//! - No generator present during a renovation: the previous one, else a
+//!   conventional boiler (p. 107).
+//! - Pilot flame unknown: with pilot flame (table 9.3, p. 108); a hydrogen
+//!   boiler counts as HR-107 on natural gas (p. 108).
+//! - Heat-pump water source unknown: ground; individual surface water:
+//!   ground (table 9.6, p. 110–111).
+//! - Design temperature class unknown: table 9.9 (p. 114, erratum §4).
+//! - Several emitters: surface heating before radiators/convectors before
+//!   air heating (p. 123–124).
+//! - Hydronic balancing unknown: not balanced (table 9.10, p. 116).
+//! - Emission control unknown: other/unknown (table 9.17, p. 124).
+//! - Pipe insulation unknown: not insulated (table 9.12, p. 117); heat
+//!   meter unknown: present (table 9.16a, p. 122); pumps unknown: forfait
+//!   (table 9.11, p. 117).
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use super::Recorder;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BoilerType {
+    Conventional,
+    Vr,
+    Hr100,
+    Hr104,
+    Hr107,
+    /// Boiler on hydrogen: HR-107 on natural gas (p. 108).
+    Hydrogen,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeatPumpSource {
+    OutdoorAir,
+    ExhaustAir,
+    OutdoorAndExhaustAir,
+    Ground,
+    Groundwater,
+    /// Individual systems: counts as ground (p. 111).
+    SurfaceWater,
+    /// Water-based source of unknown kind: ground (table 9.6).
+    WaterBasedUnknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BiomassApplianceAnswer {
+    FreestandingWoodStove,
+    InsertStove,
+    PelletStove,
+    AccumulatingStove,
+    CentralBoiler,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum HeatingGenerator {
+    Boiler {
+        #[serde(rename = "boilerType")]
+        boiler_type: BoilerType,
+        #[serde(default, rename = "pilotFlame")]
+        pilot_flame: Option<bool>,
+        #[serde(rename = "insideThermalBoundary")]
+        inside_thermal_boundary: bool,
+        #[serde(default, rename = "manufactureYear")]
+        manufacture_year: Option<i32>,
+        #[serde(default, rename = "installationYear")]
+        installation_year: Option<i32>,
+    },
+    HeatPump {
+        source: HeatPumpSource,
+        /// Indoor air as the sink (air/air heat pump).
+        #[serde(default, rename = "airSink")]
+        air_sink: bool,
+        /// Suitable for high temperatures (table 9.9).
+        #[serde(default, rename = "highTemperature")]
+        high_temperature: bool,
+        #[serde(default, rename = "capacityKw")]
+        capacity_kw: Option<f64>,
+    },
+    DistrictHeat,
+    Electric {
+        #[serde(rename = "connectedDevices")]
+        connected_devices: u32,
+    },
+    Biomass {
+        appliance: BiomassApplianceAnswer,
+        #[serde(rename = "insideThermalBoundary")]
+        inside_thermal_boundary: bool,
+        #[serde(rename = "soleHeatingInServedRooms")]
+        sole_heating_in_served_rooms: bool,
+    },
+    /// No generator present (renovation), previous one unknown.
+    NonePresent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Emitters {
+    Radiators,
+    LowTemperatureRadiators,
+    FloorHeating,
+    FloorHeatingAndRadiators,
+    AirHeating,
+    LocalHeaters,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlAnswer {
+    RoomThermostat,
+    CentralWithRadiatorValves,
+    IndividualRoomControl,
+    Unknown,
+}
+
+/// Table 9.9 classes (supply/return, °C).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DesignClass {
+    C45_40,
+    C55_47,
+    C70_50,
+    C90_70,
+}
+
+impl DesignClass {
+    fn supply_c(self) -> f64 {
+        match self {
+            Self::C45_40 => 45.0,
+            Self::C55_47 => 55.0,
+            Self::C70_50 => 70.0,
+            Self::C90_70 => 90.0,
+        }
+    }
+
+    fn mean_c(self) -> f64 {
+        match self {
+            Self::C45_40 => 42.5,
+            Self::C55_47 => 51.0,
+            Self::C70_50 => 60.0,
+            Self::C90_70 => 80.0,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::C45_40 => "45/40",
+            Self::C55_47 => "55/47",
+            Self::C70_50 => "70/50",
+            Self::C90_70 => "90/70",
+        }
+    }
+
+    /// NTA table 9.14 class for the distribution; ISSO 70/50 has no NTA
+    /// row and takes 70/60 (same design supply temperature).
+    fn kernel(self) -> &'static str {
+        match self {
+            Self::C45_40 => "45_40",
+            Self::C55_47 => "55_47",
+            Self::C70_50 => "70_60",
+            Self::C90_70 => "90_70",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyHeating {
+    pub generator: HeatingGenerator,
+    pub emitters: Emitters,
+    #[serde(default)]
+    pub design_class: Option<DesignClass>,
+    /// `None`: not determinable.
+    #[serde(default)]
+    pub balanced: Option<bool>,
+    pub control: ControlAnswer,
+    /// Storeys served by the distribution (9.37).
+    #[serde(default = "one")]
+    pub storeys: u32,
+    pub source_reference: String,
+}
+
+fn one() -> u32 {
+    1
+}
+
+/// Table 9.9 when the class is unknown.
+pub fn design_class(
+    emitters: Emitters,
+    generator: &HeatingGenerator,
+    recorder: &mut Recorder,
+) -> DesignClass {
+    let class = match (emitters, generator) {
+        (Emitters::FloorHeating, _) => DesignClass::C45_40,
+        (Emitters::LowTemperatureRadiators, _) => DesignClass::C55_47,
+        (
+            _,
+            HeatingGenerator::HeatPump {
+                high_temperature: false,
+                ..
+            },
+        ) => DesignClass::C55_47,
+        (
+            _,
+            HeatingGenerator::HeatPump {
+                high_temperature: true,
+                ..
+            },
+        ) => DesignClass::C70_50,
+        _ => DesignClass::C90_70,
+    };
+    recorder.record(
+        "design_temperature_class_unknown",
+        "heating.designClass",
+        class.label().into(),
+        "ISSO 82.1 p. 114 (table 9.9, erratum §4)",
+    );
+    class
+}
+
+/// Kernel fragments for the space-heating chain.
+pub struct DerivedHeating {
+    pub emission: Value,
+    pub generator: Value,
+    pub distribution_system: Option<Value>,
+    pub heat_pump_renewable: Option<Value>,
+}
+
+pub fn derive_heating(
+    heating: &SurveyHeating,
+    construction_year: i32,
+    recorder: &mut Recorder,
+) -> DerivedHeating {
+    let reference = heating.source_reference.as_str();
+    let generator = match &heating.generator {
+        HeatingGenerator::NonePresent => {
+            recorder.record(
+                "no_generator_conventional_boiler",
+                "heating.generator",
+                "conventional boiler".into(),
+                "ISSO 82.1 p. 107",
+            );
+            HeatingGenerator::Boiler {
+                boiler_type: BoilerType::Conventional,
+                pilot_flame: None,
+                inside_thermal_boundary: true,
+                manufacture_year: None,
+                installation_year: None,
+            }
+        }
+        other => other.clone(),
+    };
+    let design = heating
+        .design_class
+        .unwrap_or_else(|| design_class(heating.emitters, &generator, recorder));
+    let (system, hydronic) = match heating.emitters {
+        Emitters::Radiators | Emitters::LowTemperatureRadiators => {
+            ("radiators_or_convectors", true)
+        }
+        Emitters::FloorHeating => ("floor_heating", true),
+        Emitters::FloorHeatingAndRadiators => {
+            recorder.record(
+                "several_emitters_surface_heating_first",
+                "heating.emitters",
+                "floor_heating".into(),
+                "ISSO 82.1 p. 123–124",
+            );
+            ("floor_heating", true)
+        }
+        Emitters::AirHeating => ("air_heating", false),
+        Emitters::LocalHeaters => ("local_heater", false),
+    };
+    let balancing = if !hydronic {
+        "not_applicable"
+    } else {
+        match heating.balanced {
+            Some(true) => "static",
+            Some(false) => "none_or_unknown",
+            None => {
+                recorder.record(
+                    "hydronic_balancing_unknown_none",
+                    "heating.balanced",
+                    "none_or_unknown".into(),
+                    "ISSO 82.1 p. 116 (table 9.10)",
+                );
+                "none_or_unknown"
+            }
+        }
+    };
+    let control = match heating.control {
+        ControlAnswer::RoomThermostat => "main_room_thermostat",
+        ControlAnswer::CentralWithRadiatorValves => "central_with_room_valves",
+        ControlAnswer::IndividualRoomControl => "individual_room_thermostats",
+        ControlAnswer::Unknown => {
+            recorder.record(
+                "emission_control_unknown_other",
+                "heating.control",
+                "other_or_unknown".into(),
+                "ISSO 82.1 p. 124 (table 9.17)",
+            );
+            "other_or_unknown"
+        }
+    };
+    let emission = json!({
+        "system": system, "balancing": balancing, "control": control,
+        "sourceReference": format!("{reference}; basisopname"),
+    });
+
+    let mut heat_pump_renewable = None;
+    let mut needs_pump = false;
+    let generator_value = match &generator {
+        HeatingGenerator::Boiler {
+            boiler_type,
+            pilot_flame,
+            inside_thermal_boundary,
+            manufacture_year,
+            installation_year,
+        } => {
+            let kind = match boiler_type {
+                BoilerType::Conventional => "conventional",
+                BoilerType::Vr => "vr",
+                BoilerType::Hr100 => "hr100",
+                BoilerType::Hr104 => "hr104",
+                BoilerType::Hr107 => "hr107",
+                BoilerType::Hydrogen => {
+                    recorder.record(
+                        "hydrogen_boiler_hr107",
+                        "heating.generator.boilerType",
+                        "hr107".into(),
+                        "ISSO 82.1 p. 108",
+                    );
+                    "hr107"
+                }
+            };
+            let pilot = pilot_flame.unwrap_or_else(|| {
+                recorder.record(
+                    "pilot_flame_unknown_present",
+                    "heating.generator.pilotFlame",
+                    "true".into(),
+                    "ISSO 82.1 p. 108 (table 9.3)",
+                );
+                true
+            });
+            let year = super::general::device_year(
+                *manufacture_year,
+                *installation_year,
+                construction_year,
+                recorder,
+                "heating.generator",
+            );
+            json!({
+                "kind": "gas_boiler",
+                "boiler": {
+                    "generatorId": "ketel",
+                    "role": "individual_main",
+                    "location": if *inside_thermal_boundary { "inside_thermal_boundary" } else { "outside_thermal_boundary" },
+                    "kind": kind,
+                    "fuel": "natural_gas",
+                    "averageDesignEmissionTemperatureC": design.mean_c(),
+                    "emissionCircuit": "direct",
+                    "equipmentReference": reference,
+                    "locationReference": reference,
+                    "temperatureAndCircuitReference": format!("{reference}; table 9.9 class {}", design.label()),
+                    "pilotFlamePresent": pilot,
+                    "installationYear": year,
+                    "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+                }
+            })
+        }
+        HeatingGenerator::HeatPump {
+            source,
+            air_sink,
+            capacity_kw,
+            ..
+        } => {
+            let table_source = match source {
+                HeatPumpSource::OutdoorAir => "outdoor_air",
+                HeatPumpSource::ExhaustAir => "exhaust_air",
+                HeatPumpSource::OutdoorAndExhaustAir => {
+                    recorder.record(
+                        "combined_air_source_outdoor_row",
+                        "heating.generator.source",
+                        "outdoor_air".into(),
+                        "NTA table 9.27 footnote c; ISSO 82.1 WD p. 43–45",
+                    );
+                    "outdoor_air"
+                }
+                HeatPumpSource::Ground => "ground",
+                HeatPumpSource::Groundwater => "groundwater_below15_c",
+                HeatPumpSource::SurfaceWater => {
+                    recorder.record(
+                        "individual_surface_water_as_ground",
+                        "heating.generator.source",
+                        "ground".into(),
+                        "ISSO 82.1 p. 111",
+                    );
+                    "ground"
+                }
+                HeatPumpSource::WaterBasedUnknown => {
+                    recorder.record(
+                        "heat_pump_water_source_unknown_ground",
+                        "heating.generator.source",
+                        "ground".into(),
+                        "ISSO 82.1 p. 110 (table 9.6)",
+                    );
+                    "ground"
+                }
+            };
+            let exhaust = matches!(source, HeatPumpSource::ExhaustAir);
+            heat_pump_renewable = Some(json!({
+                "sourceBelow20C": true,
+                "exhaustAirSource": exhaust,
+                "combinedOutdoorAndExhaustAir": matches!(source, HeatPumpSource::OutdoorAndExhaustAir),
+                "sourceReference": reference,
+            }));
+            let mut forfait = json!({
+                "generatorId": "warmtepomp",
+                "classificationSourceReference": reference,
+                "scope": "residential_at_most25_kw",
+                "source": table_source,
+                "sink": if *air_sink { "indoor_air" } else { "hydronic" },
+                "designSupplyTemperatureC": design.supply_c(),
+                "sourceCorrectionFactor": null,
+                "sourceCorrectionReference": null,
+                "collectiveBuildingInstallation": false,
+            });
+            if let Some(capacity) = capacity_kw {
+                forfait["thermalCapacityKw"] = json!(capacity);
+                forfait["capacitySourceReference"] = json!(reference);
+            }
+            json!({
+                "kind": "heat_pump_forfait",
+                "forfait": forfait,
+                "sourceSystem": "individual",
+                "sourceSystemReference": reference,
+            })
+        }
+        HeatingGenerator::DistrictHeat => {
+            needs_pump = hydronic;
+            json!({
+                "kind": "external_heat",
+                "supplierReference": reference,
+                "qualityDeclarationPresent": false,
+                "auxiliary": {"electricallyConnectedDevices": 1, "sourceReference": "basisopname: one delivery set"},
+            })
+        }
+        HeatingGenerator::Electric { connected_devices } => {
+            needs_pump = hydronic;
+            json!({
+                "kind": "electric_resistance",
+                "equipmentReference": reference,
+                "auxiliary": {"electricallyConnectedDevices": connected_devices, "sourceReference": reference},
+            })
+        }
+        HeatingGenerator::Biomass {
+            appliance,
+            inside_thermal_boundary,
+            sole_heating_in_served_rooms,
+        } => {
+            needs_pump = hydronic;
+            let appliance = match appliance {
+                BiomassApplianceAnswer::FreestandingWoodStove => "freestanding_wood_stove",
+                BiomassApplianceAnswer::InsertStove => "insert_stove",
+                BiomassApplianceAnswer::PelletStove => "pellet_stove",
+                BiomassApplianceAnswer::AccumulatingStove => "accumulating_stove",
+                BiomassApplianceAnswer::CentralBoiler => "central_boiler",
+            };
+            json!({
+                "kind": "biomass",
+                "appliance": appliance,
+                "location": if *inside_thermal_boundary { "inside_thermal_boundary" } else { "outside_thermal_boundary" },
+                "annexRCompliantAtMost500Kw": true,
+                "annexRReference": reference,
+                "equipmentReference": reference,
+                "soleHeatingInServedRooms": sole_heating_in_served_rooms,
+                "auxiliary": {"electricallyConnectedDevices": 1, "sourceReference": reference},
+            })
+        }
+        HeatingGenerator::NonePresent => unreachable!("replaced above"),
+    };
+    let distribution_system = needs_pump.then(|| {
+        recorder.record(
+            "pipe_insulation_unknown_uninsulated",
+            "heating.distribution",
+            "uninsulated".into(),
+            "ISSO 82.1 p. 117 (table 9.12)",
+        );
+        recorder.record(
+            "heat_meter_unknown_present",
+            "heating.distribution.pump",
+            "true".into(),
+            "ISSO 82.1 p. 122 (table 9.16a, erratum §5)",
+        );
+        recorder.record(
+            "pump_unknown_forfait",
+            "heating.distribution.pump",
+            "forfait (9.41–9.51)".into(),
+            "ISSO 82.1 p. 117 (table 9.11)",
+        );
+        json!({
+            "designTemperatureClass": design.kernel(),
+            "installation": "individual",
+            "usageFunction": "residential",
+            "connectedStoreys": heating.storeys.max(1),
+            "pipeTransmittance": {"method": "forfait", "insulation": {"state": "uninsulated"}},
+            "valvesInsulated": false,
+            "pump": {"method": "calculated", "heatMeterPresent": true, "sourceReference": "basisopname forfait"},
+            "sourceReference": format!("{reference}; basisopname"),
+        })
+    });
+    DerivedHeating {
+        emission,
+        generator: generator_value,
+        distribution_system,
+        heat_pump_renewable,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn heating(generator: HeatingGenerator, emitters: Emitters) -> SurveyHeating {
+        SurveyHeating {
+            generator,
+            emitters,
+            design_class: None,
+            balanced: None,
+            control: ControlAnswer::Unknown,
+            storeys: 2,
+            source_reference: "survey".into(),
+        }
+    }
+
+    #[test]
+    fn missing_generator_is_a_conventional_boiler_with_pilot_flame() {
+        let mut recorder = Recorder::default();
+        let derived = derive_heating(
+            &heating(HeatingGenerator::NonePresent, Emitters::Radiators),
+            1960,
+            &mut recorder,
+        );
+        assert_eq!(derived.generator["boiler"]["kind"], "conventional");
+        assert_eq!(derived.generator["boiler"]["pilotFlamePresent"], true);
+        assert_eq!(derived.generator["boiler"]["installationYear"], 1960);
+        assert_eq!(
+            derived.generator["boiler"]["averageDesignEmissionTemperatureC"],
+            80.0
+        );
+        assert_eq!(derived.emission["balancing"], "none_or_unknown");
+        assert_eq!(derived.emission["control"], "other_or_unknown");
+        assert!(derived.distribution_system.is_none());
+    }
+
+    #[test]
+    fn design_class_follows_table_9_9() {
+        let mut recorder = Recorder::default();
+        let hp = HeatingGenerator::HeatPump {
+            source: HeatPumpSource::WaterBasedUnknown,
+            air_sink: false,
+            high_temperature: false,
+            capacity_kw: Some(6.0),
+        };
+        assert_eq!(
+            design_class(Emitters::FloorHeating, &hp, &mut recorder),
+            DesignClass::C45_40
+        );
+        assert_eq!(
+            design_class(Emitters::Radiators, &hp, &mut recorder),
+            DesignClass::C55_47
+        );
+        let derived = derive_heating(&heating(hp, Emitters::Radiators), 2015, &mut recorder);
+        assert_eq!(derived.generator["forfait"]["source"], "ground");
+        assert_eq!(
+            derived.generator["forfait"]["designSupplyTemperatureC"],
+            55.0
+        );
+        assert!(derived.heat_pump_renewable.is_some());
+    }
+
+    #[test]
+    fn district_heat_with_radiators_gets_a_forfait_pump() {
+        let mut recorder = Recorder::default();
+        let derived = derive_heating(
+            &heating(HeatingGenerator::DistrictHeat, Emitters::Radiators),
+            1975,
+            &mut recorder,
+        );
+        let system = derived.distribution_system.unwrap();
+        assert_eq!(system["pump"]["heatMeterPresent"], true);
+        assert_eq!(system["designTemperatureClass"], "90_70");
+    }
+}

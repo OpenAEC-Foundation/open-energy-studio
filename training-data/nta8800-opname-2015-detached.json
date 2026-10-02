@@ -1,0 +1,56 @@
+{
+  "id": "synthetisch-2015-vrijstaand",
+  "constructionYear": 2015,
+  "dwelling": {"kind": "single_family", "position": "detached", "roofType": "pitched"},
+  "usableFloorAreaM2": 160.0,
+  "areaSourceReference": "synthetic: NEN 2580 measurement",
+  "buildingHeightM": 9.0,
+  "construction": {"floor": "heavy", "wall": "heavy", "lighterCeiling": false, "sourceReference": "synthetic: hollow-core floor, sand-lime walls"},
+  "envelope": {
+    "surfaces": [
+      {"id": "gevel-zuid", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 40.0, "orientation": "south", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 140.0}, "sourceReference": "synthetic survey: drawing and core sample"},
+      {"id": "gevel-noord", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 40.0, "orientation": "north", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 140.0}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-oost", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 30.0, "orientation": "east", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 140.0}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-west", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 30.0, "orientation": "west", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 140.0}, "sourceReference": "synthetic survey"},
+      {"id": "dak-zuid", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 55.0, "orientation": "south", "tiltDeg": 40.0, "cavity": false, "insulation": {"kind": "thickness", "thicknessMm": 200.0}, "sourceReference": "synthetic survey"},
+      {"id": "dak-noord", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 55.0, "orientation": "north", "tiltDeg": 40.0, "cavity": false, "insulation": {"kind": "thickness", "thicknessMm": 200.0}, "sourceReference": "synthetic survey"},
+      {"id": "begane-grondvloer", "element": "floor", "boundary": {"kind": "ground"}, "grossAreaM2": 85.0, "cavity": false, "insulation": {"kind": "thickness", "thicknessMm": 120.0}, "exposedPerimeterM": 38.0, "sourceReference": "synthetic survey"}
+    ],
+    "windows": [
+      {"id": "ramen-zuid", "surfaceId": "gevel-zuid", "areaM2": 14.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"},
+      {"id": "ramen-noord", "surfaceId": "gevel-noord", "areaM2": 6.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"},
+      {"id": "ramen-oost", "surfaceId": "gevel-oost", "areaM2": 5.0, "glass": "hr_plus_plus", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"},
+      {"id": "ramen-west", "surfaceId": "gevel-west", "areaM2": 5.0, "glass": "triple_hr", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"}
+    ],
+    "doors": [
+      {"id": "voordeur", "surfaceId": "gevel-noord", "areaM2": 2.2, "insulated": true, "frame": "wood_or_plastic", "sourceReference": "synthetic survey"}
+    ]
+  },
+  "heating": {
+    "generator": {"kind": "heat_pump", "source": "outdoor_air", "capacityKw": 7.0},
+    "emitters": "floor_heating",
+    "balanced": true,
+    "control": "individual_room_control",
+    "storeys": 2,
+    "sourceReference": "synthetic survey: type plate"
+  },
+  "hotWater": {
+    "generator": {"kind": "heat_pump", "exhaustAirSource": false},
+    "served": "kitchen_and_bathroom",
+    "kitchenLengthM": 5.0,
+    "bathroomLengthM": 4.0,
+    "showerHeatRecovery": "vertical",
+    "sourceReference": "synthetic survey"
+  },
+  "ventilation": {
+    "principle": "balanced",
+    "heatRecovery": "counter_flow_plastic",
+    "bypassPresent": true,
+    "unitManufactureYear": 2015,
+    "sourceReference": "synthetic survey: unit data sheet"
+  },
+  "pv": [
+    {"id": "pv-zuid", "panelAreaM2": 20.0, "moduleType": "monocrystalline", "installationYear": 2015, "azimuthDeg": 180.0, "tiltDeg": 40.0, "mounting": "unknown", "sourceReference": "synthetic survey"}
+  ],
+  "sourceReference": "synthetic fixture, not a real dwelling"
+}

@@ -2197,6 +2197,173 @@ export async function calculateVentilationWithRust(input: VentilationInput): Pro
   throw new Error('Rust ventilation calculation is available in the desktop app and local development server.');
 }
 
+/** ISSO 82.1 basic survey of an existing dwelling; see docs/nta8800-basisopname.md. */
+export type OpnameInsulation =
+  | { kind: 'none_or_unknown' }
+  | { kind: 'present_unknown_thickness' }
+  | { kind: 'cavity_filled_unknown_width' }
+  | { kind: 'thickness'; thicknessMm: number; proven?: boolean };
+
+export type OpnameGlass =
+  | 'triple_hr' | 'hr_plus_plus' | 'hr_plus' | 'hr' | 'coated_type_unknown' | 'double'
+  | 'double_with_coating' | 'double_with_secondary' | 'hr_with_secondary'
+  | 'hr_plus_plus_with_secondary' | 'secondary_window' | 'single' | 'leaded_light' | 'glass_blocks';
+
+export type OpnameFrame = 'wood_or_plastic' | 'metal_with_thermal_break' | 'metal' | 'none';
+
+export interface ResidentialSurvey {
+  id: string;
+  constructionYear: number;
+  renovation?: {
+    envelopePostInsulated: boolean;
+    glazingReplacedWithDraughtStrips: boolean;
+    framesReplaced: boolean;
+    frameJointsSealed: boolean;
+    year?: number | null;
+    evidenceReference: string;
+  } | null;
+  dwelling:
+    | { kind: 'single_family'; position: 'terraced' | 'end_or_corner' | 'detached' | 'unknown'; roofType: 'pitched' | 'partly_flat' | 'flat' }
+    | { kind: 'apartment'; floor: 'ground_or_intermediate' | 'top'; side: 'middle' | 'end_or_corner' | 'unknown' };
+  usableFloorAreaM2: number;
+  areaSourceReference: string;
+  buildingHeightM: number;
+  construction: {
+    floor: 'light' | 'heavy' | 'very_heavy';
+    wall: 'light' | 'heavy' | 'very_heavy';
+    lighterCeiling?: boolean;
+    sourceReference: string;
+  };
+  measuredInfiltration?: { qv10Dm3PerSM2: number; sourceReference: string } | null;
+  envelope: {
+    surfaces: Array<{
+      id: string;
+      element: 'facade' | 'roof' | 'floor';
+      boundary:
+        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' }
+        | { kind: 'unheated_space'; spaceId: string };
+      grossAreaM2: number;
+      orientation?: NtaOrientation;
+      tiltDeg?: number;
+      cavity: boolean;
+      insulation: OpnameInsulation;
+      thermalCushions?: boolean;
+      exposedPerimeterM?: number;
+      sourceReference: string;
+    }>;
+    windows?: Array<{
+      id: string;
+      surfaceId: string;
+      areaM2: number;
+      glass: OpnameGlass;
+      frame: OpnameFrame;
+      obstruction?: { heating: number[]; cooling: number[]; sourceReference: string };
+      sourceReference: string;
+    }>;
+    doors?: Array<{
+      id: string;
+      surfaceId: string;
+      areaM2: number;
+      insulated?: boolean | null;
+      glassFraction?: number;
+      glass?: OpnameGlass;
+      frame: OpnameFrame;
+      sourceReference: string;
+    }>;
+    panels?: Array<{
+      id: string;
+      surfaceId: string;
+      areaM2: number;
+      insulation:
+        | { kind: 'absent_or_unknown' | 'present_unknown_thickness' }
+        | { kind: 'known_thickness'; thicknessMm: number };
+      cavity: boolean;
+      frame: OpnameFrame;
+      sourceReference: string;
+    }>;
+    unheatedSpaces?: Array<{ id: string; description: string }>;
+  };
+  heating: {
+    generator:
+      | { kind: 'boiler'; boilerType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'hydrogen'; pilotFlame?: boolean | null; insideThermalBoundary: boolean; manufactureYear?: number; installationYear?: number }
+      | { kind: 'heat_pump'; source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water' | 'water_based_unknown'; airSink?: boolean; highTemperature?: boolean; capacityKw?: number }
+      | { kind: 'district_heat' }
+      | { kind: 'electric'; connectedDevices: number }
+      | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean }
+      | { kind: 'none_present' };
+    emitters: 'radiators' | 'low_temperature_radiators' | 'floor_heating' | 'floor_heating_and_radiators' | 'air_heating' | 'local_heaters';
+    designClass?: 'c45_40' | 'c55_47' | 'c70_50' | 'c90_70' | null;
+    balanced?: boolean | null;
+    control: 'room_thermostat' | 'central_with_radiator_valves' | 'individual_room_control' | 'unknown';
+    storeys?: number;
+    sourceReference: string;
+  };
+  hotWater: {
+    generator:
+      | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' }
+      | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number }
+      | { kind: 'heat_pump'; exhaustAirSource: boolean };
+    served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
+    kitchenLengthM?: number;
+    bathroomLengthM?: number;
+    showers?: number;
+    showerHeatRecovery: 'none' | 'vertical' | 'horizontal' | 'unknown';
+    sourceReference: string;
+  };
+  ventilation: {
+    principle: 'natural' | 'mechanical_supply' | 'mechanical_extract' | 'balanced';
+    declaredVariant?: VentilationSystemVariant | null;
+    selfRegulatingVents?: boolean | null;
+    pressureClass?: 'at_most1_pa' | 'from1_to5_pa' | 'from5_to10_pa' | null;
+    installationYear?: number | null;
+    heatRecovery?: 'counter_flow_aluminium' | 'counter_flow_plastic' | 'counter_flow_unknown_material' | 'cross_flow' | 'plate_or_tube' | 'rotary' | 'enthalpy' | 'heat_pipe' | 'two_element' | 'unknown' | null;
+    bypassPresent?: boolean | null;
+    unitManufactureYear?: number | null;
+    motor?: 'ac' | 'dc' | 'unknown' | null;
+    sourceReference: string;
+  };
+  pv?: Array<{
+    id: string;
+    panelAreaM2: number;
+    moduleType: 'monocrystalline' | 'polycrystalline' | 'amorphous_single_junction' | 'amorphous_multi_junction' | 'amorphous_unknown' | 'cigs' | 'cd_te' | 'unknown';
+    installationYear?: number | null;
+    azimuthDeg: number;
+    tiltDeg: number;
+    mounting: 'not_ventilated' | 'moderately_ventilated' | 'strongly_ventilated' | 'unknown';
+    obstructionFactors?: number[];
+    sourceReference: string;
+  }>;
+  coolingPresent?: boolean;
+  sourceReference: string;
+}
+
+export interface OpnameAssessment {
+  status: 'calculated_unverified' | 'derived_input_rejected' | 'invalid';
+  scope: string;
+  source: string;
+  appliedDefaults: Array<{ rule: string; path: string; value: string; source: string }>;
+  warnings: Array<{ code: string; path: string; note: string }>;
+  issues: Array<{ code: string; path: string }>;
+  derivedInput: BuildingPerformanceInput | null;
+  performance: BuildingPerformanceAssessment | null;
+  referenceVerified: false;
+}
+
+export async function assessResidentialSurveyWithRust(survey: ResidentialSurvey): Promise<OpnameAssessment> {
+  if (isTauri()) {
+    return invoke<OpnameAssessment>('assess_residential_survey', { survey });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/opname/residential', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ survey }),
+    });
+    return response.json() as Promise<OpnameAssessment>;
+  }
+  throw new Error('Rust basic survey is available in the desktop app and local development server.');
+}
+
 export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
   if (isTauri()) {
     return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input });
