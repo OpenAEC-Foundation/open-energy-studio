@@ -672,6 +672,32 @@ pub struct CombustionAppliance {
     pub source_reference: String,
 }
 
+/// ISSO 82.2/75.2 practice factors; `None` takes the standard values.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VentilationPractice {
+    /// f_prac;vent;sys: system A 0,25, C 0,5, D 0,75 (B is not listed and
+    /// takes the C value).
+    #[serde(default)]
+    pub system: Option<f64>,
+    /// f_prac;argl on purge ventilation, standard 0,5.
+    #[serde(default)]
+    pub purge: Option<f64>,
+    /// f_prac;lea on infiltration, standard 0,5.
+    #[serde(default)]
+    pub leakage: Option<f64>,
+}
+
+impl VentilationPractice {
+    fn system_factor(&self, op: VentSysOp) -> f64 {
+        self.system.unwrap_or(match op {
+            VentSysOp::Natural => 0.25,
+            VentSysOp::Supply | VentSysOp::Extract => 0.5,
+            VentSysOp::Balanced => 0.75,
+        })
+    }
+}
+
 /// 11.23/11.23a: exhaust-air heat pump overventilation.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -953,6 +979,11 @@ pub struct VentilationInput {
     pub combustion_appliances: Vec<CombustionAppliance>,
     #[serde(default)]
     pub overventilation: Option<Overventilation>,
+    /// Maatwerkadvies only (ISSO 82.2 table 2.7, 75.2 table 2.8): practice
+    /// factors on the actual system flow, purge and infiltration. Never set
+    /// for the energy label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub practice: Option<VentilationPractice>,
     #[serde(default)]
     pub ventilative_cooling: Option<VentilativeCooling>,
     #[serde(default)]
@@ -2592,8 +2623,11 @@ fn balance_month(
     let mut extract = 0.0;
     let mut balanced_oda = 0.0;
     let mut natural_parts = false;
+    // Maatwerkadvies practice factors apply to the actual system only.
+    let practice = input.practice.as_ref().filter(|_| policy.use_installed);
     for (index, part) in parts(&input.system).into_iter().enumerate() {
-        let q = required * part.fraction;
+        let factor = practice.map_or(1.0, |item| item.system_factor(part.unit.variant.op()));
+        let q = required * part.fraction * factor;
         match part.unit.variant.op() {
             VentSysOp::Natural => {
                 coefficients.vent_in += q;
@@ -2625,8 +2659,11 @@ fn balance_month(
         (Category::Residential, Balance::Cooling) => TAU_PURGE_COOLING[m],
         _ => TAU_PURGE_DEFAULT,
     };
-    let purge =
-        tau_purge * area_weighted(input, |f| f.purge_capacity()) * input.usable_floor_area_m2 * 3.6;
+    let purge = tau_purge
+        * area_weighted(input, |f| f.purge_capacity())
+        * input.usable_floor_area_m2
+        * 3.6
+        * practice.map_or(1.0, |item| item.purge.unwrap_or(0.5));
     coefficients.purge_in = purge;
     coefficients.purge_out = purge;
 
@@ -2636,7 +2673,8 @@ fn balance_month(
         (0.0, 0.0)
     };
     coefficients.combustion_in = combustion_in;
-    coefficients.leakage = constants.leakage_q1_m3_per_h;
+    coefficients.leakage =
+        constants.leakage_q1_m3_per_h * practice.map_or(1.0, |item| item.leakage.unwrap_or(0.5));
 
     let (argii_in, argii_out) = if balance == Balance::Cooling {
         ventilative_cooling_flows(input, m, indoor, outdoor)
@@ -3139,6 +3177,7 @@ pub fn c1_variant(input: &VentilationInput) -> VentilationInput {
     fixed.flow_reduction = FlowReduction::default();
     fixed.combustion_appliances.clear();
     fixed.overventilation = None;
+    fixed.practice = None;
     fixed.grille_preheating = None;
     fixed
 }
@@ -3244,6 +3283,7 @@ mod tests {
             },
             combustion_appliances: Vec::new(),
             overventilation: None,
+            practice: None,
             ventilative_cooling: None,
             grille_preheating: None,
             fans: Fans::Forfait {
@@ -3539,6 +3579,33 @@ mod tests {
         close(
             hall.months[6].cooling.mechanical_supply_temperature_c,
             16.0,
+            1e-9,
+        );
+    }
+
+    #[test]
+    fn maatwerkadvies_practice_factors_scale_the_actual_flows() {
+        let input = dwelling(SystemVariant::C1);
+        let mut practice = input.clone();
+        practice.practice = Some(VentilationPractice::default());
+        let base = calculate_ventilation(&input).unwrap();
+        let fitted = calculate_ventilation(&practice).unwrap();
+        // System C: f_prac;vent;sys = 0,5 on the mechanical extract.
+        close(
+            fitted.months[0].heating.mechanical_extract_m3_per_h,
+            0.5 * base.months[0].heating.mechanical_extract_m3_per_h,
+            1e-9,
+        );
+        assert!(
+            fitted.months[0].heating.conductance_w_per_k
+                < base.months[0].heating.conductance_w_per_k
+        );
+        // The fixed C1 run of §5.4.3 ignores the practice factors.
+        let c1 = calculate_c1_ventilation(&practice).unwrap();
+        let c1_base = calculate_c1_ventilation(&input).unwrap();
+        close(
+            c1.months[0].heating.conductance_w_per_k,
+            c1_base.months[0].heating.conductance_w_per_k,
             1e-9,
         );
     }

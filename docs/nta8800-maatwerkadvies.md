@@ -133,7 +133,6 @@ Het paneel "Herlabelen" laadt het projectbestand van het oorspronkelijke label e
 
 ## Nog niet ondersteund
 
-- De praktijkfactoren voor ventilatie f<sub>prac;vent;sys</sub>, f<sub>prac;argl</sub> en f<sub>prac;lea</sub> (ISSO 82.2 tabel 2.7, p. 39; 75.2 tabel 2.8, p. 45). Daarvoor is een koppeling in hoofdstuk 11 nodig.
 - Locatiespecifieke klimaatgegevens en beschaduwing (§2.6).
 - De branduren van verlichting voor utiliteit (75.2 tabel 2.7, p. 44).
 - De interne warmte per persoon voor utiliteit (80 W, 75.2 tabel 2.6).
@@ -143,3 +142,16 @@ Het paneel "Herlabelen" laadt het projectbestand van het oorspronkelijke label e
 - De EPBD-systeemeisen (ISSO 82.2 §5.2, tabel 5.1) als automatische controle.
 - De kostenrekenregels van de ISSO-modelbeschrijving (rapport 110293).
 - Monitoringbestanden voor MWA-registratie: daarvoor is een externe specificatie nodig.
+
+
+## Praktijkfactoren voor ventilatie
+
+Bij de berekening voor het werkelijk gebruik worden altijd de praktijkfactoren voor ventilatie toegepast (ISSO 82.2 tabel 2.7, p. 39; 75.2 tabel 2.8, p. 45). In het gebruiksprofiel kunnen ze worden overschreven met `ventilationPractice`.
+
+| Factor | Werkt op | Standaardwaarde |
+|---|---|---|
+| f_prac;vent;sys | systeemgebonden debiet per deel van het systeem | A 0,25; C 0,5; D 0,75 |
+| f_prac;argl | spuiventilatie | 0,5 |
+| f_prac;lea | infiltratie | 0,5 |
+
+Systeem B staat niet in de tabel en krijgt, als interpretatie, de waarde van C. De factoren lopen via `usageFit.ventilationPractice` naar hoofdstuk 11 (`VentilationInput.practice`). De labelberekening en de vaste C1-berekening voor BENG 1 gebruiken ze niet. De ventilatorenergie blijft gebaseerd op het eisdebiet.

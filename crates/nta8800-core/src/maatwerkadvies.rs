@@ -113,6 +113,10 @@ pub struct UsageProfile {
     /// inputs.
     #[serde(default)]
     pub annual_hot_water_need_kwh: Option<f64>,
+    /// ISSO 82.2 table 2.7 / 75.2 table 2.8 practice factors; omitted
+    /// fields take the standard values.
+    #[serde(default)]
+    pub ventilation_practice: crate::ventilation::VentilationPractice,
     pub source_reference: String,
 }
 
@@ -693,6 +697,7 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
             occupancy_appliance_w_per_m2: resolved
                 .occupancy_appliance_w_per_m2
                 .filter(|_| !residential_zone),
+            ventilation_practice: Some(profile.ventilation_practice.clone()),
             source_reference: format!("maatwerkadvies: {}", profile.source_reference),
         });
     };
@@ -1652,6 +1657,7 @@ mod tests {
             CalculationScope::Residential
         );
         input.current_use = Some(UsageProfile {
+            ventilation_practice: Default::default(),
             profile: UserProfile::EnergyConscious,
             heating_setpoint_c: None,
             cooling_setpoint_c: None,
@@ -1784,6 +1790,7 @@ mod tests {
         apply_use(
             &mut building,
             &UsageProfile {
+                ventilation_practice: Default::default(),
                 profile: UserProfile::NotEnergyConscious,
                 heating_setpoint_c: None,
                 cooling_setpoint_c: None,

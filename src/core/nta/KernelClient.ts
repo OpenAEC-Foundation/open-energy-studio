@@ -3578,6 +3578,8 @@ export interface MwaUsageProfile {
   occupancyApplianceWPerM2?: number;
   hotWaterNeedPerPersonKwh?: number;
   annualHotWaterNeedKwh?: number;
+  /** ISSO 82.2 table 2.7 / 75.2 table 2.8; omitted fields take the standard values (A 0,25, C 0,5, D 0,75; purge and infiltration 0,5). */
+  ventilationPractice?: { system?: number; purge?: number; leakage?: number };
   sourceReference: string;
 }
 

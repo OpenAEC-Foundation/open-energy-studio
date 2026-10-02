@@ -127,6 +127,10 @@ pub struct UsageFit {
     /// lighting, mean over the year).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub internal_gain_per_person_w: Option<f64>,
+    /// ISSO 82.2 table 2.7 / 75.2 table 2.8 ventilation practice factors
+    /// for the chapter 11 route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ventilation_practice: Option<crate::ventilation::VentilationPractice>,
     /// q_Oc·f_τ + q_A for utility functions, W/m².
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occupancy_appliance_w_per_m2: Option<f64>,
@@ -1934,7 +1938,15 @@ fn resolve_ventilation(
             "ventilation.heatingSetpointC",
         ));
     }
-    let assessment = crate::ventilation::assess_ventilation(ventilation);
+    let mut ventilation = ventilation.clone();
+    if let Some(practice) = input
+        .usage_fit
+        .as_ref()
+        .and_then(|fit| fit.ventilation_practice.clone())
+    {
+        ventilation.practice = Some(practice);
+    }
+    let assessment = crate::ventilation::assess_ventilation(&ventilation);
     issues.extend(
         assessment
             .issues
