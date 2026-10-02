@@ -2332,8 +2332,15 @@ fn mechanical_supply_temperature(
         dis_out_c: formula_out + coil_k,
         defrost_k: defrost,
         heating_limit_c: oda_preh - duct_outside,
-        before_coil_c: dis_in,
+        before_coil_c: dis_in - fan_rise,
         coil_k,
+        // 11.115/11.119: from ϑ_SUP;RCA or ϑ_SUP;hu (without the fan rise)
+        // to ϑ_SUP;dis;in = table value + ΔT_du.
+        coil_energy_k: if coil_k != 0.0 {
+            coil_k + fan_rise
+        } else {
+            0.0
+        },
     }
 }
 
@@ -2342,10 +2349,12 @@ struct SupplyTemperature {
     dis_out_c: f64,
     defrost_k: f64,
     heating_limit_c: f64,
-    /// θ_SUP;dis;in without the coil (θ_SUP;hu or θ_SUP;RCA), °C.
+    /// ϑ_SUP;hu or ϑ_SUP;RCA: before the coil and the fan, °C.
     before_coil_c: f64,
-    /// Temperature change by the AHU coil, K (positive heating).
+    /// Change of ϑ_SUP;dis;out by the AHU coil, K (positive heating).
     coil_k: f64,
+    /// ϑ_SUP;dis;in − ϑ_SUP;hu/RCA of 11.115/11.119, K (positive heating).
+    coil_energy_k: f64,
 }
 
 /// Table 11.15, area-weighted between sport and the other functions.
@@ -2653,18 +2662,15 @@ fn balance_month(
         let (temperature, defrost, limit_temperature) =
             (supply.dis_out_c, supply.defrost_k, supply.heating_limit_c);
         if supply.coil_k != 0.0 {
-            // 11.115/11.116 and 11.119/11.120 with q_V;SUP;dis;in (11.88).
-            let air = q_supply
-                * flea_du
-                * density(supply.before_coil_c)
-                * AIR_HEAT_CAPACITY_KWH
-                * hours
-                * supply.coil_k.abs()
-                / AHU_COIL_EFFICIENCY;
+            // 11.115/11.116 and 11.119/11.120 with q_V;SUP;dis;in (11.88),
+            // literally from the temperature before the fan.
+            let air =
+                q_supply * flea_du * density(supply.before_coil_c) * AIR_HEAT_CAPACITY_KWH * hours
+                    / AHU_COIL_EFFICIENCY;
             if supply.coil_k > 0.0 {
-                ahu_heating_kwh += air;
+                ahu_heating_kwh += air * supply.coil_energy_k.max(0.0);
             } else {
-                ahu_cooling_kwh += air;
+                ahu_cooling_kwh += air * (-supply.coil_energy_k).max(0.0);
             }
         }
         if balance == Balance::Heating && defrost > 0.0 {
@@ -3470,9 +3476,11 @@ mod tests {
             18.0,
             1e-9,
         );
-        // 11.119/11.120 with q_SUP;dis;in ≥ q_SUP;dis;out.
+        // 11.119/11.120 with q_SUP;dis;in ≥ q_SUP;dis;out, from ϑ_SUP;hu
+        // (before the 0,7 K fan rise) to ϑ_SUP;dis;in = 18 °C (no ducts).
         let q_out = coils.months[0].heating.mechanical_supply_m3_per_h;
-        let per_flow = density(before) * 0.000_027_9 * 744.0 * (18.0 - before) / 0.98;
+        let hu = before - 0.7;
+        let per_flow = density(hu) * 0.000_027_9 * 744.0 * (18.0 - hu) / 0.98;
         let flow = coils.months[0].ahu_heating_kwh / per_flow;
         assert!(
             flow >= q_out - 1e-9 && flow <= q_out * 1.2,

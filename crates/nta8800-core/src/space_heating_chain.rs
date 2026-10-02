@@ -66,7 +66,7 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
-    "9.2.3 node gains from solar thermal systems, AHU, booster heat pumps and delivery sets",
+    "9.2.3 node gains from solar thermal systems, booster heat pumps and delivery sets",
     "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
     "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
@@ -769,6 +769,7 @@ fn zone_humidity(
     humidifier: &ZoneHumidifier,
     zone_input: &MonthlyDemandInput,
     zone_demand: &MonthlyDemandAssessment,
+    installation_area_m2: f64,
     path: &str,
     issues: &mut Vec<ChainIssue>,
 ) -> Option<Vec<crate::humidification::HumidityMonth>> {
@@ -797,6 +798,7 @@ fn zone_humidity(
     let input = HumidityInput {
         zone_id: zone_input.zone_id.clone(),
         usable_floor_area_m2: zone_input.usable_floor_area_m2,
+        installation_area_m2: Some(installation_area_m2),
         functions,
         humidification: Some(humidifier.humidification.clone()),
         supply_flow_m3_per_h: ventilation
@@ -1794,9 +1796,14 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
                 issues.push(issue("humidifier_zone_unknown", format!("{path}.zoneId")));
                 continue;
             };
-            if let Some(months) =
-                zone_humidity(humidifier, zone_input, zone_demand, &path, &mut issues)
-            {
+            if let Some(months) = zone_humidity(
+                humidifier,
+                zone_input,
+                zone_demand,
+                connected_area,
+                &path,
+                &mut issues,
+            ) {
                 for (index, month) in months.iter().enumerate() {
                     humidification[index][0] += month.heating_system_load_kwh;
                     humidification[index][1] += month.steam_electricity_kwh;
@@ -1932,24 +1939,46 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
             );
         }
         // 9.22 with t_H;op;si;mi (9.32a): the longest operating time of the
-        // zones on the system.
+        // zones on the system, t_H·f_H;red·f_H;red;pmp;op as for the pump.
         let fan_power: f64 = valid_zones.iter().map(|zone| zone.fan_power_w).sum();
         if fan_power > 0.0 {
-            let limits: Vec<i32> = valid_zones
-                .iter()
-                .filter_map(|zone| {
-                    let need: [f64; 12] = std::array::from_fn(|month| {
-                        zone.need[month] + zone.heating_limit_extra[month]
-                    });
-                    heating_limit_c(&need, zone.setpoint_c)
-                })
-                .collect();
+            let system_hours: [f64; 12] = match &distribution_summary {
+                Some(summary) => std::array::from_fn(|month| {
+                    summary
+                        .zones
+                        .iter()
+                        .map(|zone| zone.operating_hours[month])
+                        .fold(0.0_f64, f64::max)
+                }),
+                None => {
+                    // Without hydraulic data: the use function of the primary
+                    // zone, an individual installation for dwellings.
+                    let function = reduction_function(input.demand.usage_function);
+                    let pump = if function == ReductionFunction::Residential {
+                        0.10
+                    } else {
+                        1.0
+                    };
+                    let factor = function.heating_reduction_factor() * pump;
+                    let limits: Vec<i32> = valid_zones
+                        .iter()
+                        .filter_map(|zone| {
+                            let need: [f64; 12] = std::array::from_fn(|month| {
+                                zone.need[month] + zone.heating_limit_extra[month]
+                            });
+                            heating_limit_c(&need, zone.setpoint_c)
+                        })
+                        .collect();
+                    std::array::from_fn(|month| {
+                        limits
+                            .iter()
+                            .map(|limit| heating_limit_hours(*limit, month) * factor)
+                            .fold(0.0_f64, f64::max)
+                    })
+                }
+            };
             for (index, row) in monthly.iter_mut().enumerate() {
-                let hours = limits
-                    .iter()
-                    .map(|limit| heating_limit_hours(*limit, index))
-                    .fold(0.0_f64, f64::max);
-                row.emission_fan_electricity_kwh = fan_power * hours / 1000.0;
+                row.emission_fan_electricity_kwh = fan_power * system_hours[index] / 1000.0;
             }
         }
         // 9.6: total auxiliary energy includes the distribution pump and the
@@ -2408,6 +2437,23 @@ fn boiler_ambient_c(
             .and_then(|system| system.unheated_ambient_c.as_ref())
             .and_then(|values| values.get(month).copied()),
         BoilerPlacement::Outdoors | BoilerPlacement::UnderRoof => None,
+    }
+}
+
+/// Table 7.15 use function of a monthly-demand usage function.
+fn reduction_function(usage: crate::monthly_demand::UsageFunction) -> ReductionFunction {
+    use crate::monthly_demand::UsageFunction as U;
+    match usage {
+        U::AssemblyChildCare | U::OtherAssembly => ReductionFunction::Assembly,
+        U::Cell => ReductionFunction::Cell,
+        U::HealthcareWithBeds => ReductionFunction::HealthcareWithBeds,
+        U::OtherHealthcare => ReductionFunction::HealthcareOther,
+        U::Office => ReductionFunction::Office,
+        U::Lodging => ReductionFunction::Lodging,
+        U::Education => ReductionFunction::Education,
+        U::Sport => ReductionFunction::Sport,
+        U::Retail => ReductionFunction::Retail,
+        U::Residential => ReductionFunction::Residential,
     }
 }
 
@@ -3601,7 +3647,19 @@ mod tests {
         );
         let jan = &result.monthly[0];
         assert!(jan.emission_fan_electricity_kwh > 0.0);
-        assert!(jan.emission_fan_electricity_kwh <= 40.0 * 744.0 / 1000.0 + 1e-9);
+        // 9.32a for a dwelling with an individual installation:
+        // t_H·f_H;red·0,10 with f_H;red = 1 − 70/168.
+        let hours = jan.emission_fan_electricity_kwh * 1000.0 / 40.0;
+        let factor = ReductionFunction::Residential.heating_reduction_factor() * 0.10;
+        let limit = heating_limit_hours(
+            heating_limit_c(
+                &std::array::from_fn(|month| result.demand.monthly[month].heating.need_kwh),
+                input.demand.setpoints.heating_c,
+            )
+            .unwrap(),
+            0,
+        );
+        assert!((hours - limit * factor).abs() < 1e-6 * limit.max(1.0) || hours <= 744.0 * factor);
         let mut plain = input.clone();
         if let Some(fans) = plain.emission.fans.as_mut() {
             fans.tested_power_w = Some(0.0);

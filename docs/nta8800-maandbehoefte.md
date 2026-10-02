@@ -147,3 +147,13 @@ Beide velden tegelijk geeft `unheated_factor_declared_and_derived`. Geen van bei
 ## Leidingdoorvoeren in de projectroute
 
 `ntaCalculation.verticalPipes` geeft de verticale leidingen van 7.3.3 (H_p, 7.17) voor een project met één rekenzone. Bij meer zones staan ze per zone in `zoneData[].verticalPipes`; een projectlijst geeft dan `vertical_pipes_per_zone_required`, zodat dezelfde leiding niet in elke zone wordt meegeteld.
+
+## Interpretatie: R_si onder een vloer boven een kruipruimte of kelder
+
+U_f in 8.43 verwijst via 8.2.2.2.1 en C.1.2 naar tabel C.2. Letterlijk gelezen geeft dat R_se = 0,04 aan de onderzijde. De kern gebruikt toch R_si 0,17 (omlaag), om vier redenen:
+- 8.4.2.1 vervangt R_se door de R_si van de onverwarmde ruimte;
+- 8.33 gebruikt aan de kruipruimtezijde ook R_si;
+- 7.2 van NEN-EN-ISO 13370 definieert U_f tussen het binnenmilieu en de ruimte onder de vloer;
+- U_g en U_x behandelen de kruipruimtelucht als een apart knooppunt.
+
+Ten opzichte van 0,04 geeft dit een lagere U_fl: −2,7 % bij R_c 3,5, en −11 % bij een ongeïsoleerde vloer. Referentiesoftware die letterlijk rekent, kan hierop afwijken.

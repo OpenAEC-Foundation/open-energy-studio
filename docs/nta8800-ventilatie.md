@@ -44,9 +44,12 @@ Infiltratie, spuien en de bouwkundige voorzieningen voor ventilatieve koeling bl
 
 - Tabel 11.15 geeft θ_SUP;dis;out: 16 °C het hele jaar voor sport, en voor de overige functies 18 / 18 / 17,5 / 17,5 / 17 / 16,5 / 16,5 / 16,5 / 17 / 17 / 17,5 / 18 °C. Bij gemengde functies wordt naar oppervlakte gewogen.
 - Warmtebalans: met naverwarmer is θ_SUP;dis;out = max(formulewaarde, tabelwaarde). Koelbalans: met koelbatterij is het min(formulewaarde, tabelwaarde), conform 11.100/11.101. Volgens noot 1 kent de koelbalans geen naverwarming en de warmtebalans geen koeling.
-- Energie (11.115/11.116 en 11.119/11.120): Q = q_V;SUP;dis;in·ρ(θ vóór de batterij)·c_a (0,0000279 kWh/(kg·K))·t·|Δθ| / 0,98.
+- Energie (11.115/11.116 en 11.119/11.120): Q = q_V;SUP;dis;in·ρ·c_a (0,0000279 kWh/(kg·K))·t·|Δθ| / 0,98, waarin:
+  - Δθ letterlijk loopt van ϑ_SUP;hu of ϑ_SUP;RCA (zonder ventilatoropwarming) tot ϑ_SUP;dis;in = tabelwaarde + ΔT_du;
+  - ρ bepaald wordt bij die begintemperatuur.
+
+  Bij naverwarmen telt de ventilatoropwarming daardoor mee in de energie van de batterij. Bij koelen gaat die er juist van af.
 - De naverwarming komt als extra belasting op het knooppunt van de verwarming (9.4), net als verstuivende bevochtiging. De koeling komt zonder afgifte- en distributieverlies op de koudeopwekker (`ahuCoolingKwh` in de koelmaand).
-- Interpretatie: de dichtheid wordt bepaald bij de temperatuur vóór de batterij.
 
 ## Niet ondersteund (expliciete afwijzing)
 

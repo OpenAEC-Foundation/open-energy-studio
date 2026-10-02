@@ -134,8 +134,12 @@ impl CoolingDesignTemperature {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HumidityInput {
     pub zone_id: String,
-    /// A_g of the zone (12.2.1: no recoverable loss above 500 m²).
+    /// A_g of the zone.
     pub usable_floor_area_m2: f64,
+    /// A_g served by the installation for the 500 m² limit of 12.2.1 (like
+    /// 9.2.5.1, per building or system); the zone area when absent.
+    #[serde(default)]
+    pub installation_area_m2: Option<f64>,
     pub functions: Vec<HumidityFunctionArea>,
     #[serde(default)]
     pub humidification: Option<Humidification>,
@@ -267,7 +271,11 @@ pub fn calculate_humidity(input: &HumidityInput) -> Result<Vec<HumidityMonth>, V
                             SteamCarrier::Electricity => month.steam_electricity_kwh = energy,
                             SteamCarrier::GasOrOil => month.steam_fuel_kwh = energy,
                         }
-                        if input.usable_floor_area_m2 <= 500.0 {
+                        if input
+                            .installation_area_m2
+                            .unwrap_or(input.usable_floor_area_m2)
+                            <= 500.0
+                        {
                             month.recoverable_kwh = (1.0 - efficiency) * need;
                         }
                     }
@@ -290,6 +298,7 @@ mod tests {
         HumidityInput {
             zone_id: "z".into(),
             usable_floor_area_m2: 400.0,
+            installation_area_m2: None,
             functions: vec![HumidityFunctionArea {
                 function: HumidityFunction::General,
                 area_m2: 400.0,

@@ -2250,6 +2250,7 @@ fn humidification_use(
     let input = HumidityInput {
         zone_id: "utiliteit".into(),
         usable_floor_area_m2: survey.functions.iter().map(|item| item.area_m2).sum(),
+        installation_area_m2: None,
         functions: vec![HumidityFunctionArea {
             function,
             area_m2: survey.functions.iter().map(|item| item.area_m2).sum(),
