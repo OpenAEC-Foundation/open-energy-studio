@@ -2858,6 +2858,7 @@ export interface BuildingPerformanceInput {
   }>;
   declaredRenewableHeat?: Array<{ id: string; monthlyKwh: number[]; sourceReference: string }>;
   productionInventoryComplete: boolean;
+  /** `wind` must be all zeros: 16.17 sets E_el;wind = 0. */
   onSiteProduction: Array<{ id: string; kind: 'pv' | 'pvt' | 'wind'; monthlyKwh: number[]; sourceReference: string }>;
   pvSystems?: Array<{
     id: string;
@@ -3362,6 +3363,12 @@ export interface BuildingPerformanceAssessment {
   annualHeatingAndCoolingNeedKwh: number | null;
   annualStorageCorrectionKwh: number | null;
   annualCo2Kg: number | null;
+  /** 5.57/5.58 final energy per carrier, kWh. */
+  finalEnergyByCarrier: Array<{ carrier: string; annualKwh: number }>;
+  /** 5.57 E_Final, kWh (own production not netted). */
+  annualFinalEnergyKwh: number | null;
+  /** 5.60 E_Final;EED = E_Final + solar thermal yields, kWh. */
+  annualFinalEnergyEedKwh: number | null;
   co2KgPerM2: number | null;
   needIndicatorKwhPerM2Year: number | null;
   primaryFossilIndicatorKwhPerM2Year: number | null;

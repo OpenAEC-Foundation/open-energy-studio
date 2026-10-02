@@ -571,3 +571,9 @@ Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerder
 **Zonne-energie alleen voor verwarming (SOL_USE = SHS).** `solarUse: space_heating` rekent alleen het verwarmingsdeel, met f_H;use = 1 (13.85) en 2 000 pompuren (13.127). Hoe tapwater- en verwarmingsvraag over meerdere zonnesystemen worden verdeeld, hangt per dienst af van V_sto;tot: een SHS-systeem neemt geen tapwater, een tapwatersysteem geen verwarming. Het systeem hangt aan `hotWater.solar`; een gebouw zonder tapwatersysteem kan het daarom niet opgeven.
 
 **Volgorde van boosterwarmtepompen (13.8.2.1).** Binnen categorie b rangschikt een boosterwarmtepomp op de outputgewogen COP_W;BWP van bijlage W, niet meer op een vaste 1,0.
+
+## Finaal energiegebruik (5.9) en windenergie (16.5)
+
+- **5.57/5.58:** `finalEnergyByCarrier` en `annualFinalEnergyKwh` zijn per energiedrager de som van E_EPus over de maanden. Zelf opgewekte elektriciteit wordt daarbij niet verrekend.
+- **5.60:** `annualFinalEnergyEedKwh` telt daar de zonnewarmte bij op, Q_H;ren;sol,prac en Q_W;ren;sol,prac. Dit is de definitie voor de Europese Energy Efficiency Directive (EED).
+- **16.17:** de opbrengst van windenergie kan met de NTA nog niet worden bepaald en is daarom 0. Een opgegeven windproductie groter dan 0 geeft `wind_production_not_determinable`.

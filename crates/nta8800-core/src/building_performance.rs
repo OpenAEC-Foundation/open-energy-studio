@@ -430,6 +430,13 @@ pub struct CarrierMonth {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FinalEnergyCarrier {
+    pub carrier: &'static str,
+    pub annual_kwh: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ElectricityBalanceMonth {
     pub month: u8,
     pub used_kwh: f64,
@@ -468,6 +475,13 @@ pub struct BuildingPerformanceAssessment {
     pub annual_storage_correction_kwh: Option<f64>,
     /// §5.5.6.1 operational emission `m_CO2`, kg CO2eq per year.
     pub annual_co2_kg: Option<f64>,
+    /// 5.57/5.58: final energy `E_Final` per carrier (Σ E_EPus;ci), kWh.
+    pub final_energy_by_carrier: Vec<FinalEnergyCarrier>,
+    /// 5.57 `E_Final`, kWh; own electricity production is not netted.
+    pub annual_final_energy_kwh: Option<f64>,
+    /// 5.60 `E_Final;EED`: `E_Final` plus the solar thermal yields
+    /// Q_H;ren;sol,prac and Q_W;ren;sol,prac, kWh.
+    pub annual_final_energy_eed_kwh: Option<f64>,
     /// `m_CO2;spec = m_CO2 / A_g`, kg CO2eq/m².
     pub co2_kg_per_m2: Option<f64>,
     /// BENG 1, only with confirmed C1 ventilation.
@@ -1077,6 +1091,13 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
     }
     for (index, item) in input.on_site_production.iter().enumerate() {
         let path = format!("onSiteProduction[{index}]");
+        // 16.5/16.17: wind energy cannot yet be determined, E_el;wind = 0.
+        if item.kind == ProductionKind::Wind && item.monthly_kwh.iter().any(|value| *value > 0.0) {
+            issues.push(issue(
+                "wind_production_not_determinable",
+                format!("{path}.monthlyKwh"),
+            ));
+        }
         if item.id.trim().is_empty() || !ids.insert(item.id.as_str()) {
             issues.push(issue("id_invalid", format!("{path}.id")));
         }
@@ -1707,6 +1728,38 @@ pub fn assess_building_performance(
     let on_site_fossil_use = carriers
         .iter()
         .any(|item| matches!(item.carrier, "gas" | "oil") && item.used_kwh > 0.0);
+    // 5.57/5.58: E_Final per carrier from E_EPus; 5.60 adds the solar yields.
+    let mut final_by_carrier: Vec<FinalEnergyCarrier> = Vec::new();
+    for row in &carriers {
+        match final_by_carrier
+            .iter_mut()
+            .find(|item| item.carrier == row.carrier)
+        {
+            Some(item) => item.annual_kwh += row.used_kwh,
+            None => final_by_carrier.push(FinalEnergyCarrier {
+                carrier: row.carrier,
+                annual_kwh: row.used_kwh,
+            }),
+        }
+    }
+    let final_energy = totals.is_some().then(|| {
+        final_by_carrier
+            .iter()
+            .map(|item| item.annual_kwh)
+            .sum::<f64>()
+    });
+    let solar_yield: f64 = heating
+        .monthly
+        .iter()
+        .map(|row| row.solar_gain_kwh)
+        .sum::<f64>()
+        + hot_water.as_ref().map_or(0.0, |result| {
+            result
+                .months
+                .iter()
+                .map(|month| month.solar_renewable_kwh)
+                .sum::<f64>()
+        });
     BuildingPerformanceAssessment {
         status: if valid {
             "calculated_unverified"
@@ -1722,6 +1775,9 @@ pub fn assess_building_performance(
         reference_verified: false,
         attest_status: "unattested",
         label_available: false,
+        final_energy_by_carrier: final_by_carrier,
+        annual_final_energy_kwh: final_energy,
+        annual_final_energy_eed_kwh: final_energy.map(|value| value + solar_yield),
         carriers,
         electricity_balance: balance,
         annual_primary_fossil_kwh: totals.map(|item| item.fossil),
@@ -2565,10 +2621,41 @@ mod tests {
     }
 
     #[test]
+    fn final_energy_sums_carriers_and_wind_is_zero() {
+        let mut sample = input();
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // 5.57/5.58: Σ E_EPus per carrier, own production not netted.
+        let used: f64 = result.carriers.iter().map(|row| row.used_kwh).sum();
+        assert!((result.annual_final_energy_kwh.unwrap() - used).abs() < 1e-9);
+        let by_carrier: f64 = result
+            .final_energy_by_carrier
+            .iter()
+            .map(|item| item.annual_kwh)
+            .sum();
+        assert!((by_carrier - used).abs() < 1e-9);
+        // No solar thermal: E_Final;EED = E_Final (5.60).
+        assert_eq!(
+            result.annual_final_energy_eed_kwh,
+            result.annual_final_energy_kwh
+        );
+        // 16.17: declared wind production is not allowed.
+        sample.on_site_production[0].kind = ProductionKind::Wind;
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "wind_production_not_determinable"));
+    }
+
+    #[test]
     fn calculated_pv_adds_to_declared_production() {
         let mut sample = input();
-        // Mixing both PV routes is rejected; use wind as declared production.
-        sample.on_site_production[0].kind = ProductionKind::Wind;
+        // Mixing both PV routes is rejected; start without declared PV.
+        sample.on_site_production.clear();
         let base = assess_building_performance(&sample);
         sample.pv_systems.push(PvSystem {
             id: "roof-pv".into(),
