@@ -370,6 +370,11 @@ pub struct ForfaitHeaterGenerator {
     pub kind: ForfaitHeaterKind,
     pub fuel: ForfaitHeaterFuel,
     pub equipment_reference: String,
+    /// Number of pilot flames of gas air heaters (§9.6.2.1: 695 kWh each per
+    /// year; the table 9.25 values exclude them). Local heating with flue
+    /// already includes its pilot.
+    #[serde(default)]
+    pub pilot_flames: u32,
     /// 9.91 inputs (devices and burner power).
     #[serde(default)]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
@@ -2600,6 +2605,11 @@ fn generate(
                 issues.push(issue("forfait_air_heater_gas_only", "generator.fuel"));
             }
             validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+            if generator.pilot_flames > 0
+                && (!generator.kind.air_heater() || generator.fuel != ForfaitHeaterFuel::NaturalGas)
+            {
+                issues.push(issue("pilot_flame_not_applicable", "generator.pilotFlames"));
+            }
             if !issues.is_empty() {
                 return None;
             }
@@ -2609,7 +2619,15 @@ fn generate(
             for (index, row) in monthly.iter_mut().enumerate() {
                 let fuel = row.generator_output_kwh / efficiency;
                 match generator.fuel {
-                    ForfaitHeaterFuel::NaturalGas => row.natural_gas_kwh = fuel,
+                    ForfaitHeaterFuel::NaturalGas => {
+                        // §9.6.2.1 pilot flames, scaled with f_gebouw;H.
+                        row.natural_gas_kwh = fuel
+                            + f64::from(generator.pilot_flames)
+                                * crate::boiler_forfait_draft::PILOT_FLAME_ANNUAL_KWH
+                                * MONTH_HOURS[index]
+                                / crate::climate::YEAR_HOURS
+                                * building_fraction
+                    }
                     ForfaitHeaterFuel::Oil => row.oil_kwh = fuel,
                 }
                 row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
@@ -3187,6 +3205,7 @@ mod tests {
             kind: ForfaitHeaterKind::LocalWithFlue,
             fuel: ForfaitHeaterFuel::Oil,
             equipment_reference: "survey".into(),
+            pilot_flames: 0,
             auxiliary: other_aux(1, Some(8.0)),
         });
         let result = assess_space_heating_chain(&input);
@@ -3208,9 +3227,22 @@ mod tests {
             kind: ForfaitHeaterKind::AirHeaterHr107,
             fuel: ForfaitHeaterFuel::Oil,
             equipment_reference: "survey".into(),
+            pilot_flames: 0,
             auxiliary: other_aux(1, Some(8.0)),
         });
         assert!(codes(&input).contains(&"forfait_air_heater_gas_only"));
+        // §9.6.2.1: two pilot flames of gas air heaters, 695 kWh each.
+        input.generator = Generator::ForfaitHeater(ForfaitHeaterGenerator {
+            kind: ForfaitHeaterKind::AirHeaterConventional,
+            fuel: ForfaitHeaterFuel::NaturalGas,
+            equipment_reference: "survey".into(),
+            pilot_flames: 2,
+            auxiliary: other_aux(1, Some(8.0)),
+        });
+        let gas = assess_space_heating_chain(&input);
+        let jan = &gas.monthly[0];
+        let pilot = 2.0 * 695.0 * 744.0 / 8760.0;
+        assert!((jan.natural_gas_kwh - (jan.generator_output_kwh / 0.75 + pilot)).abs() < 1e-9);
     }
 
     #[test]

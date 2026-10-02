@@ -1528,6 +1528,8 @@ export interface SpaceHeatingChainInput {
           | 'air_heater_conventional' | 'air_heater_vr' | 'air_heater_hr100' | 'air_heater_hr104' | 'air_heater_hr107';
         fuel: 'natural_gas' | 'oil';
         equipmentReference: string;
+        /** Pilot flames of gas air heaters (695 kWh/year each, §9.6.2.1). */
+        pilotFlames?: number;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
       };
 }
