@@ -585,7 +585,7 @@ export const en: Record<string, string> = {
   'kernel.classified': 'Classified',
   'kernel.scope': 'This checks structure only; it is not an NTA 8800 calculation or attested energy label.',
   'kernel.unheated.title': 'Unheated spaces',
-  'kernel.unheated.scope': 'Record each space and supplied reduction factor with its source. The Rust kernel does not derive the factor.',
+  'kernel.unheated.scope': 'Record each space and supplied reduction factor with its source. A derived b_U (8.53–8.59) can be entered through the NTA input (outside).',
   'kernel.unheated.add': 'Add space',
   'kernel.unheated.empty': 'No unheated spaces recorded yet.',
   'kernel.unheated.space': 'Unheated space',

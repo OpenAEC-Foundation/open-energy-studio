@@ -585,7 +585,7 @@ export const nl: Record<string, string> = {
   'kernel.classified': 'Geclassificeerd',
   'kernel.scope': 'Dit is een structuurcontrole, geen NTA 8800-berekening of geattesteerd energielabel.',
   'kernel.unheated.title': 'Onverwarmde ruimtes',
-  'kernel.unheated.scope': 'Leg elke ruimte en de aangeleverde reductiefactor met bron vast. De Rust-kern leidt de factor niet af.',
+  'kernel.unheated.scope': 'Leg elke ruimte en de aangeleverde reductiefactor met bron vast. Een afgeleide b_U (8.53–8.59) kan via de NTA-invoer (outside) worden opgegeven.',
   'kernel.unheated.add': 'Ruimte toevoegen',
   'kernel.unheated.empty': 'Nog geen onverwarmde ruimtes vastgelegd.',
   'kernel.unheated.space': 'Onverwarmde ruimte',

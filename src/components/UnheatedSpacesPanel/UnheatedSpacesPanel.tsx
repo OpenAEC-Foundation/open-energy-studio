@@ -35,13 +35,13 @@ export function UnheatedSpacesPanel() {
   return <section className="unheated-spaces" aria-label={t('kernel.unheated.title')}>
     <div className="unheated-spaces-head">
       <div><h3>{t('kernel.unheated.title')}</h3><p>{t('kernel.unheated.scope')}</p></div>
-      <button type="button" onClick={() => edit(null)}>{t('kernel.unheated.add')}</button>
+      <button type="button" className="btn btn-primary" onClick={() => edit(null)}>{t('kernel.unheated.add')}</button>
     </div>
     {spaces.length === 0 && <p>{t('kernel.unheated.empty')}</p>}
     {spaces.length > 0 && <ul>{spaces.map((space) => <li key={space.id}>
       <span><strong>{space.name}</strong><small>{t('kernel.unheated.factor')}: {space.reductionFactor} · {space.factorSourceReference}</small></span>
-      <button type="button" onClick={() => edit(space.id)}>{t('kernel.inventory.edit')}</button>
-      <button type="button" onClick={() => dispatch({ type: 'SET_UNHEATED_SPACES', payload: spaces.filter((item) => item.id !== space.id) })}
+      <button type="button" className="btn" onClick={() => edit(space.id)}>{t('kernel.inventory.edit')}</button>
+      <button type="button" className="btn" onClick={() => dispatch({ type: 'SET_UNHEATED_SPACES', payload: spaces.filter((item) => item.id !== space.id) })}
         aria-label={`${t('kernel.inventory.remove')}: ${space.id}`}>×</button>
     </li>)}</ul>}
     {editingId !== null && <div className="unheated-spaces-form">
@@ -50,8 +50,8 @@ export function UnheatedSpacesPanel() {
         onChange={(event) => setFactor(event.target.value)} /></label>
       <label>{t('kernel.unheated.source')}<input value={source} onChange={(event) => setSource(event.target.value)} /></label>
       {error && <p role="alert">{t('kernel.unheated.invalid')}</p>}
-      <div><button type="button" onClick={() => setEditingId(null)}>{t('dialog.cancel')}</button>
-        <button type="button" onClick={save}>{t('dialog.save')}</button></div>
+      <div><button type="button" className="btn" onClick={() => setEditingId(null)}>{t('dialog.cancel')}</button>
+        <button type="button" className="btn btn-primary" onClick={save}>{t('dialog.save')}</button></div>
     </div>}
   </section>;
 }
