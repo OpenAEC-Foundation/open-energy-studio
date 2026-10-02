@@ -2496,6 +2496,8 @@ export interface ResidentialSurvey {
     tiltDeg: number;
     mounting: 'not_ventilated' | 'moderately_ventilated' | 'strongly_ventilated' | 'unknown';
     obstructionFactors?: number[];
+    /** ISSO §15.4.7 / table 16.1 situation; exclusive with `obstructionFactors`. Absent: minimal. */
+    shading?: NtaCollectorObstruction;
     sourceReference: string;
   }>;
   /** Building-bound storage (§15.5); requires PV. */
@@ -3042,6 +3044,18 @@ type NtaHeatRejection =
   | 'air_cooled' | 'closed_cooling_tower' | 'open_cooling_tower' | 'dry_cooler' | 'ground_storage' | 'surface_water';
 type NtaDeclaredEfficiency = { value: number; sourceReference: string };
 type NtaChpClass = { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean };
+/** Method 2 (10.66) of an absorption chiller: ζ_n at the NEN-EN 14511 rating conditions; PLV 0,95. */
+export interface NtaAbsorptionRating {
+  nominalHeatRatio: number;
+  sourceReference: string;
+}
+
+/**
+ * NEN-EN 14825 part-load point (10.63). `evaporatorOutletC` is the temperature leaving the
+ * evaporator (for air-to-air units the leaving supply air, not the indoor test temperature);
+ * `condenserInletC` the temperature entering the condenser (outdoor air for air-cooled units).
+ * The kernel requires condenserInletC > evaporatorOutletC.
+ */
 type NtaEn14825Point = { partLoadPercent: number; eer: number; evaporatorOutletC: number; condenserInletC: number };
 /** §10.5.4 (method 1, NEN-EN 14825) or §10.5.5 (method 2, NEN-EN 14511) instead of table 10.29. */
 export type NtaCompressionPerformance =
@@ -3113,9 +3127,10 @@ export interface NtaCoolingSystem {
       | { kind: 'room_air_conditioner'; declared?: NtaDeclaredEfficiency | null; performance?: NtaCompressionPerformance | null }
       | { kind: 'unknown_collective' }
       | { kind: 'gas_engine_compression'; gasEngine: NtaChpClass; heatRejection?: NtaHeatRejection | null }
-      | { kind: 'gas_absorption'; heatRejection?: NtaHeatRejection | null; declared?: NtaDeclaredEfficiency | null }
-      | { kind: 'absorption_external_heat'; heatRejection?: NtaHeatRejection | null }
-      | { kind: 'absorption_chp'; chp: NtaChpClass; heatRejection?: NtaHeatRejection | null }
+      | { kind: 'gas_absorption'; heatRejection?: NtaHeatRejection | null; declared?: NtaDeclaredEfficiency | null; rating?: NtaAbsorptionRating }
+      | { kind: 'absorption_external_heat'; heatRejection?: NtaHeatRejection | null; rating?: NtaAbsorptionRating }
+      /** Table 10.30 with 9.65: CHP fuel booked as gas, its electricity (ε_chp;el) credited in chapter 16. */
+      | { kind: 'absorption_chp'; chp: NtaChpClass; heatRejection?: NtaHeatRejection | null; rating?: NtaAbsorptionRating }
       | { kind: 'external_cold' }
       | {
           kind: 'free_cooling';

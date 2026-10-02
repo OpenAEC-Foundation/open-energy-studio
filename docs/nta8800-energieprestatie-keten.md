@@ -522,3 +522,18 @@ Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerder
 **Belemmering van PV-panelen (16.3).** Een PV-systeem kan `obstruction` krijgen met een situatie uit §17.3 voor collectoren (tabellen 17.6/17.12/17.15). Er wordt dan geen `obstructionFactors` opgegeven. De kern gebruikt de dichtstbijzijnde van de acht tabeloriëntaties. Uit de maandfactor volgt ook c_sh;PV volgens tabel 16.3.
 
 **Afvoerluchtwarmtepomp als enige tapwateropwekker.** Ook als er maar één opwekker is, gelden de standaardwaarde van 1,0 kW (13.141) en de begrenzing van 13.144a. `exhaustAir` is dan verplicht. Bij ongeschikte ventilatie levert de warmtepomp niets en neemt het extra elektrische toestel alles over. Ongeschikt is alles behalve systeem C, of D zonder warmteterugwinning. De basisopname vult `exhaustAir` in op basis van het ventilatieprincipe en de aanwezigheid van WTW.
+
+## Absorptiekoeling: methode 2 en WKK (10.66, 10.81, tabel 10.30)
+
+- **Methode 2 (10.66).** Absorptiekoelers krijgen een optionele `rating` met ζ_n, de nominale warmteverhouding bij de ratingcondities van NEN-EN 14511. Dat kan bij koelers op gas, op externe warmte en op WKK.
+  - De warmte-input is Q_C / (PLV · ζ_n · f_prpr), met PLV 0,95 (10.67).
+  - f_prpr is 0,60 bij een luchtgekoelde absorber (directe condensatie, principe 2) en 0,9 in alle andere gevallen.
+  - Voor de afgevoerde condensorwarmte (10.81) geldt ζ_n · 0,95, zonder f_prpr. Zonder `rating` blijft tabel 10.30 gelden.
+  - Een opgegeven waarde (§10.1) samen met een `rating` geeft `cooling_declared_and_performance`.
+- **Absorptiekoeling op gebouwgebonden WKK** wordt niet meer afgewezen.
+  - Volgens tabel 10.30 is ζ = 1,00 · ε_chp;th. Q_C/ζ is dan de brandstof van de WKK (9.65, op bovenwaarde) en wordt als aardgas geboekt, gewogen met f_BACS.
+  - De WKK-elektriciteit, ε_chp;el · brandstof (§9.6.6.1, tabel 9.31), telt in hoofdstuk 16 als eigen productie. Ze wordt eerst zelf gebruikt; het overschot wordt geëxporteerd tegen f_P;exp;el.
+  - Ze telt niet als hernieuwbaar en valt buiten de opslagcorrectie 5.14a, omdat 5.14b WKK uitsluit.
+  - Bij methode 2 vervangt PLV · ζ_n · f_prpr de factor 1,00. Dat is een interpretatie, opgenomen in `COOLING_INTERPRETATIONS`.
+- **Tabel 10.32** kent alleen de rij "niet geregeld" met waarde 1. f_hr;PL;el = 1 is daarmee de volledige tabel.
+- **Meetpunten NEN-EN 14825.** ϑ_C;evap;out is de temperatuur die de verdamper verlaat. Bij lucht-luchttoestellen is dat de uitblaaslucht van het binnendeel, niet de binnentemperatuur van de testconditie. ϑ_C;cond;in is de intredetemperatuur van de condensor; bij luchtgekoelde toestellen is dat de buitenlucht. De kern eist ϑ_C;cond;in > ϑ_C;evap;out, omdat 10.56 en 10.64 door dat verschil delen.

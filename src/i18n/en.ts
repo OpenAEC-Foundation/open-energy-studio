@@ -1905,7 +1905,7 @@ export const en: Record<string, string> = {
   'nta.form.cool.nominalCapacity': "Nominal capacity, kW",
   'nta.form.cool.minimumCapacity': "Minimum continuous capacity, kW",
   'nta.form.cool.partLoad': "part load, %",
-  'nta.form.cool.evapOut': "Evaporator outlet, °C",
+  'nta.form.cool.evapOut': "Evaporator outlet, °C (air-to-air: indoor unit leaving air, not the indoor temperature)",
   'nta.form.cool.condIn': "Condenser inlet, °C",
   'nta.form.cool.fifthPoint': "Fifth test point (10.63)",
   'nta.form.cool.condLimit': "Condenser inlet limit, °C (optional)",
