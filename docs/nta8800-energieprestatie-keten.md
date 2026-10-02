@@ -683,3 +683,12 @@ Interpretaties, vastgelegd in `micro_chp::INTERPRETATIONS`:
 - Warmte boven het vollastpunt wordt geboekt met het rendement van CHP_100+Sup_100.
 - De elektriciteit van een collectieve WKK wordt met f_gebouw geschaald.
 - CGN_HCON (tabel 9.39) wordt vastgelegd, maar komt in geen formule voor.
+
+## Terugwinbaar opwekkerverlies in de warmtebehoefte (9.7)
+
+Volgens 9.7 hoort het terugwinbare verlies van de opwekker (9.6) bij Q_H;ls;rbl van 7.3–7.8. Het gaat om de bijlagen M en N en om WKK-methode 1 (9.80). Omdat dat verlies volgt uit de output van de opwekker, rekent de keten in twee stappen:
+
+1. Een eerste doorrekening bepaalt het verlies.
+2. Een tweede doorrekening telt het verlies op bij de terugwinbare distributie- en bevochtigerverliezen, verdeeld over de zones naar gebruiksoppervlak.
+
+Interpretatie: de kern doet één substitutiestap. De norm schrijft geen iteratie voor.

@@ -755,8 +755,8 @@ pub struct ChainMonth {
     pub biomass_kwh: f64,
     /// Fuel oil input (annex M/N, table 9.25 oil appliances).
     pub oil_kwh: f64,
-    /// Annex M/N generator losses recoverable in the space (M.16/M.19);
-    /// reported, not fed back into the need.
+    /// Annex M/N/CHP generator losses recoverable in the space (M.16/M.19,
+    /// 9.80); fed back into 7.3–7.8 through 9.7.
     pub generator_recoverable_loss_kwh: f64,
     pub generator_electricity_kwh: f64,
     /// 9.6: generator plus distribution auxiliary energy.
@@ -1671,7 +1671,29 @@ fn exhaust_air_recalculation(
     Some(third)
 }
 
+/// 9.7: the recoverable generator losses (9.6) belong to Q_H;ls;rbl of
+/// 7.3–7.8, but follow from the generator output. A first pass gives them;
+/// a second pass feeds them back, split over the zones by usable area (one
+/// substitution step, documented as an interpretation).
 fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessment {
+    let first = assess_chain_pass(input, None);
+    if first.monthly.len() != 12
+        || first
+            .monthly
+            .iter()
+            .all(|row| row.generator_recoverable_loss_kwh <= 0.0)
+    {
+        return first;
+    }
+    let losses: [f64; 12] =
+        std::array::from_fn(|index| first.monthly[index].generator_recoverable_loss_kwh);
+    assess_chain_pass(input, Some(&losses))
+}
+
+fn assess_chain_pass(
+    input: &SpaceHeatingChainInput,
+    generator_recoverable: Option<&[f64; 12]>,
+) -> SpaceHeatingChainAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     let mut issues: Vec<ChainIssue> = Vec::new();
@@ -1869,12 +1891,24 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
             .chain(&additional_zone_demands)
             .zip(&distribution.zone_recoverable)
             .zip(&humidifier_recoverable)
-            .map(|((assessed, recoverable), humidifier)| {
-                let total: Vec<f64> = (0..12)
-                    .map(|index| recoverable.get(index).copied().unwrap_or(0.0) + humidifier[index])
-                    .collect();
-                apply_recoverable_losses(assessed, &total, &[])
-            })
+            .zip(&zone_sources)
+            .map(
+                |(((assessed, recoverable), humidifier), (zone_input, _, _))| {
+                    let share = if zone_area > 0.0 {
+                        zone_input.usable_floor_area_m2 / zone_area
+                    } else {
+                        0.0
+                    };
+                    let total: Vec<f64> = (0..12)
+                        .map(|index| {
+                            recoverable.get(index).copied().unwrap_or(0.0)
+                                + humidifier[index]
+                                + generator_recoverable.map_or(0.0, |losses| losses[index] * share)
+                        })
+                        .collect();
+                    apply_recoverable_losses(assessed, &total, &[])
+                },
+            )
             .collect();
         let mut scratch = Vec::new();
         let valid_zones: Vec<ZoneTerms> = zone_sources
@@ -3602,6 +3636,10 @@ mod tests {
         assert!((jan.chp_electricity_kwh - expected.electricity_kwh).abs() < 1e-9);
         assert!(jan.chp_electricity_kwh > 0.0);
         assert!((jan.generator_recoverable_loss_kwh - 0.4 * hours).abs() < 1e-9);
+        // 9.7: the recoverable generator loss lowers the heating need
+        // against a pass without it (7.3–7.8).
+        let without = assess_chain_pass(&input, None);
+        assert!(jan.heating_need_kwh < without.monthly[0].heating_need_kwh);
         // Both methods at once, or none, are rejected.
         if let Generator::Chp(generator) = &mut input.generator {
             generator.method1 = None;
