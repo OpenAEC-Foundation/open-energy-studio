@@ -373,6 +373,9 @@ pub struct UtilityHotWater {
     /// (electric and indirectly heated boilers, p. 172).
     #[serde(default)]
     pub storage: Vec<SurveyStorage>,
+    /// Solar water heaters (ISSO 75.1 §15.3–15.4).
+    #[serde(default)]
+    pub solar: Vec<super::hot_water::SurveySolarWaterHeater>,
     pub source_reference: String,
 }
 
@@ -875,22 +878,16 @@ fn design_class_from_mean(mean: f64) -> &'static str {
     }
 }
 
-/// Utility heating: the residential translation plus collective role,
-/// heat-pump scope, 9.91 auxiliaries and the calculated distribution.
-fn derive_utility_heating(
-    survey: &UtilitySurvey,
-    reduction_function: &str,
+/// Collective role, heat-pump scope, 9.91 auxiliaries and the large
+/// installation location of one utility generator.
+fn adjust_utility_generator(
+    generator: &mut Value,
+    installation: &HeatingInstallation,
+    capacity: Option<f64>,
     area: f64,
+    reference: &str,
     recorder: &mut Recorder,
-) -> super::heating::DerivedHeating {
-    let mut derived = derive_heating(&survey.heating, survey.construction_year, recorder);
-    let installation = &survey.heating_installation;
-    let reference = survey.heating.source_reference.as_str();
-    let hydronic = !matches!(
-        survey.heating.emitters,
-        super::heating::Emitters::AirHeating | super::heating::Emitters::LocalHeaters
-    );
-    let generator = &mut derived.generator;
+) {
     let kind = generator["kind"].as_str().unwrap_or_default().to_string();
     // p. 17/117: the technical room of a large installation (A_g served
     // > 500 m²) lies outside the thermal zone by definition.
@@ -914,7 +911,7 @@ fn derive_utility_heating(
     }
     if kind == "gas_boiler" && installation.collective {
         generator["boiler"]["role"] = json!("collective");
-        match installation.capacity_kw {
+        match capacity {
             Some(power) => {
                 generator["auxiliary"] = json!({
                     "electricallyConnectedDevices": 1,
@@ -938,14 +935,14 @@ fn derive_utility_heating(
             .applied
             .retain(|item| item.rule != "source_regeneration_none_c_source_1");
         generator["forfait"]["collectiveBuildingInstallation"] = json!(installation.collective);
-        if let Some(power) = installation.capacity_kw {
+        if let Some(power) = capacity {
             generator["forfait"]["thermalCapacityKw"] = json!(power);
             generator["forfait"]["capacitySourceReference"] = json!(reference);
         }
         if installation.collective {
             let mut auxiliary =
                 json!({"electricallyConnectedDevices": 1, "sourceReference": reference});
-            if let Some(power) = installation.capacity_kw {
+            if let Some(power) = capacity {
                 auxiliary["nominalPowerKw"] = json!(power);
             }
             generator["auxiliary"] = auxiliary;
@@ -957,6 +954,48 @@ fn derive_utility_heating(
             "heating.generator.auxiliary",
             "1 electrically connected device (10 W stand-by)".into(),
             "NTA 8800 9.91 (interpretation: one device per surveyed generator)",
+        );
+    }
+}
+
+/// Utility heating: the residential translation plus collective role,
+/// heat-pump scope, 9.91 auxiliaries and the calculated distribution.
+fn derive_utility_heating(
+    survey: &UtilitySurvey,
+    reduction_function: &str,
+    area: f64,
+    recorder: &mut Recorder,
+) -> super::heating::DerivedHeating {
+    let mut derived = derive_heating(&survey.heating, survey.construction_year, recorder);
+    let installation = &survey.heating_installation;
+    let reference = survey.heating.source_reference.as_str();
+    let hydronic = !matches!(
+        survey.heating.emitters,
+        super::heating::Emitters::AirHeating | super::heating::Emitters::LocalHeaters
+    );
+    // Utility adjustments per generator, also inside `multiple` (9.6.1).
+    if derived.generator["kind"] == "multiple" {
+        if let Some(parts) = derived.generator["generators"].as_array_mut() {
+            for part in parts.iter_mut() {
+                let capacity = part["nominalPowerKw"].as_f64();
+                adjust_utility_generator(
+                    &mut part["generator"],
+                    installation,
+                    capacity,
+                    area,
+                    reference,
+                    recorder,
+                );
+            }
+        }
+    } else {
+        adjust_utility_generator(
+            &mut derived.generator,
+            installation,
+            installation.capacity_kw,
+            area,
+            reference,
+            recorder,
         );
     }
     // Afb. 9.1 (p. 121–122): heating pipes in a crawlspace or other
@@ -995,9 +1034,19 @@ fn derive_utility_heating(
             || installation.collective
             || unheated_pipe_length.is_some());
     if needs_distribution {
+        // The derived distribution class (several generators: the highest).
+        let generator = &derived.generator;
         let mean = generator["boiler"]["averageDesignEmissionTemperatureC"]
             .as_f64()
-            .or_else(|| generator["forfait"]["designSupplyTemperatureC"].as_f64());
+            .or_else(|| generator["forfait"]["designSupplyTemperatureC"].as_f64())
+            .or_else(|| {
+                (!derived.design_class.is_empty()).then_some(match derived.design_class {
+                    "45_40" => 42.5,
+                    "55_47" => 51.0,
+                    "70_60" => 65.0,
+                    _ => 80.0,
+                })
+            });
         let mut system = derived.distribution_system.take().unwrap_or_else(|| {
             recorder.record(
                 "pipe_insulation_unknown_uninsulated",
@@ -1650,6 +1699,10 @@ fn hot_water_value(
                     ShowerRecoveryAnswer::None
                 },
                 boiler_vessel: None,
+                nominal_power_kw: None,
+                additional_generators: Vec::new(),
+                collective: None,
+                solar: Vec::new(),
                 source_reference: reference.to_string(),
             },
             recorder,
@@ -1752,6 +1805,13 @@ fn hot_water_value(
             "presence of a circulation loop was not established; none entered",
         ),
     }
+    super::hot_water::apply_solar(
+        &mut system,
+        &hot.solar,
+        survey.construction_year,
+        true,
+        recorder,
+    );
     system
 }
 
@@ -2392,6 +2452,85 @@ mod tests {
             .iter()
             .map(|item| item.rule)
             .collect()
+    }
+
+    #[test]
+    fn chp_with_peak_boilers_and_a_solar_water_heater() {
+        use super::super::heating::{AdditionalHeatingGenerator, BoilerType, HeatingGenerator};
+        let mut survey = fixture("1985");
+        let boiler = survey.heating.generator.clone();
+        assert!(matches!(boiler, HeatingGenerator::Boiler { .. }));
+        survey.heating.generator = HeatingGenerator::Chp {
+            electrical_power_kw: 20.0,
+            thermal_power_kw: None,
+            manufacture_year: Some(2012),
+            hre_declared: false,
+            low_temperature: false,
+        };
+        survey.heating.additional_generators = vec![AdditionalHeatingGenerator {
+            generator: HeatingGenerator::Boiler {
+                boiler_type: BoilerType::Hr107,
+                pilot_flame: Some(false),
+                inside_thermal_boundary: true,
+                manufacture_year: Some(2012),
+                installation_year: None,
+            },
+            nominal_power_kw: Some(150.0),
+        }];
+        survey.hot_water.solar = vec![super::super::hot_water::SurveySolarWaterHeater {
+            id: "zb".into(),
+            collector: super::super::hot_water::CollectorAnswer::Glazed,
+            collector_area_m2: 10.0,
+            gross_area: false,
+            collector_count: 4,
+            orientation: crate::climate::Orientation::South,
+            tilt_deg: 30.0,
+            shading: None,
+            backup: super::super::hot_water::SolarBackupAnswer::Unknown,
+            storage_volume_l: 500.0,
+            backup_volume_l: None,
+            storage_label: None,
+            storage_manufacture_year: Some(2012),
+            also_space_heating: false,
+            pvt: None,
+            source_reference: "datasheet".into(),
+        }];
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["kind"], "multiple");
+        let parts = generator["generators"].as_array().unwrap();
+        let chp = parts
+            .iter()
+            .find(|part| part["generator"]["kind"] == "chp")
+            .unwrap();
+        // Table 9.7: thermal power 1,5 × 20 kW; p. 112: CHP before boilers.
+        assert_eq!(chp["nominalPowerKw"], 30.0);
+        assert_eq!(chp["preference"], 1);
+        let boiler = parts
+            .iter()
+            .find(|part| part["generator"]["kind"] == "gas_boiler")
+            .unwrap();
+        // The collective utility adjustments reach the part.
+        assert_eq!(boiler["generator"]["boiler"]["role"], "collective");
+        assert_eq!(boiler["generator"]["auxiliary"]["nominalPowerKw"], 150.0);
+        assert!(input["hotWater"]["solar"]
+            .as_array()
+            .is_some_and(|items| items.len() == 1));
+        let performance = result.performance.unwrap();
+        let produced: f64 = performance
+            .electricity_balance
+            .iter()
+            .map(|month| month.produced_kwh)
+            .sum();
+        assert!(produced > 0.0, "CHP electricity (16.12)");
     }
 
     #[test]

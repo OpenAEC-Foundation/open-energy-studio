@@ -373,6 +373,14 @@ pub fn derive_residential_input(
     let calculated_distribution =
         heating::apply_unheated_pipes(&survey.heating, &mut heating, unheated_spaces, recorder);
     let mut hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
+    hot_water::apply_extensions(
+        &mut hot_water,
+        &survey.hot_water,
+        year,
+        survey.usable_floor_area_m2,
+        false,
+        recorder,
+    );
     hot_water::apply_exhaust_air_use(
         &mut hot_water,
         survey.ventilation.principle,
@@ -454,6 +462,11 @@ pub fn derive_residential_input(
     });
     if let Some(system) = heating.distribution_system {
         chain["distributionSystem"] = system;
+    }
+    if let Some(connection) =
+        heating::collective_connection(&survey.heating, survey.usable_floor_area_m2, recorder)
+    {
+        chain["collectiveConnection"] = connection;
     }
     let mut input = json!({
         "calculationScope": "residential",
@@ -664,6 +677,304 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    fn heat_pump(source: heating::HeatPumpSource) -> heating::HeatingGenerator {
+        heating::HeatingGenerator::HeatPump {
+            source,
+            air_sink: false,
+            high_temperature: false,
+            capacity_kw: Some(5.0),
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
+        }
+    }
+
+    fn boiler() -> heating::HeatingGenerator {
+        heating::HeatingGenerator::Boiler {
+            boiler_type: heating::BoilerType::Hr107,
+            pilot_flame: Some(false),
+            inside_thermal_boundary: true,
+            manufacture_year: Some(2015),
+            installation_year: None,
+        }
+    }
+
+    #[test]
+    fn hybrid_heat_pump_becomes_multiple_generators() {
+        let mut survey = fixture("1975");
+        survey.heating.generator = boiler();
+        survey.heating.nominal_power_kw = Some(24.0);
+        survey.heating.additional_generators = vec![heating::AdditionalHeatingGenerator {
+            generator: heat_pump(heating::HeatPumpSource::OutdoorAir),
+            nominal_power_kw: Some(4.0),
+        }];
+        survey.heating.added_preferred_generator = true;
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["kind"], "multiple");
+        assert_eq!(generator["addedPreferredGenerator"], true);
+        // p. 112: the heat pump is preferred over the boiler.
+        let parts = generator["generators"].as_array().unwrap();
+        let preference = |kind: &str| {
+            parts
+                .iter()
+                .find(|part| part["generator"]["kind"] == kind)
+                .unwrap()["preference"]
+                .clone()
+        };
+        assert_eq!(preference("heat_pump_forfait"), 1);
+        assert_eq!(preference("gas_boiler"), 2);
+        // Table 9.9: the boiler decides the design class with radiators.
+        assert!(result
+            .applied_defaults
+            .iter()
+            .any(|item| item.rule == "several_generators_preference_order"));
+        // Without the boiler's power the survey is incomplete (table 9.7).
+        survey.heating.nominal_power_kw = None;
+        let missing = assess_residential_survey(&survey);
+        assert!(missing
+            .issues
+            .iter()
+            .any(|item| item.code == "generator_power_required"));
+    }
+
+    #[test]
+    fn exhaust_air_heat_pump_is_accepted_with_a_second_generator() {
+        let mut survey = fixture("2015");
+        survey.heating.generator = heat_pump(heating::HeatPumpSource::ExhaustAir);
+        let alone = assess_residential_survey(&survey);
+        assert!(alone
+            .issues
+            .iter()
+            .any(|item| item.code == "exhaust_air_heat_pump_second_generator_required"));
+        survey.heating.nominal_power_kw = Some(1.5);
+        survey.heating.additional_generators = vec![heating::AdditionalHeatingGenerator {
+            generator: heating::HeatingGenerator::Electric {
+                connected_devices: 1,
+            },
+            nominal_power_kw: Some(3.0),
+        }];
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+    }
+
+    #[test]
+    fn collective_boiler_uses_connected_area_and_heat_meters() {
+        let mut survey = fixture("1975");
+        survey.heating.generator = boiler();
+        survey.heating.nominal_power_kw = Some(300.0);
+        survey.heating.collective = Some(heating::CollectiveHeating {
+            connected_usable_area_m2: None,
+            connected_dwellings: Some(40),
+            connected_storeys: Some(4),
+            heat_meters_present: None,
+        });
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        let chain = &input["spaceHeating"];
+        assert_eq!(chain["generator"]["boiler"]["role"], "collective");
+        assert_eq!(
+            chain["collectiveConnection"]["connectedUsableAreaM2"],
+            40.0 * survey.usable_floor_area_m2
+        );
+        assert_eq!(chain["distributionSystem"]["installation"], "collective");
+        assert_eq!(
+            chain["distributionSystem"]["pump"]["heatMeterPresent"],
+            true
+        );
+        let rules: Vec<_> = result
+            .applied_defaults
+            .iter()
+            .map(|item| item.rule)
+            .collect();
+        assert!(rules.contains(&"collective_area_dwellings_times_area"));
+        assert!(rules.contains(&"heat_meters_unknown_present"));
+        // §13.3.4: hot water through a delivery set on that system
+        // (NTA 13.8.4.9.3) loads the heating node instead of a carrier.
+        survey.hot_water.generator = hot_water::HotWaterGeneratorAnswer::DeliverySetFromHeating;
+        let delivery = assess_residential_survey(&survey);
+        assert_eq!(
+            delivery.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            delivery.issues,
+            delivery.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(delivery.derived_input.as_ref().unwrap()).unwrap();
+        assert_eq!(input["hotWater"]["generator"]["kind"], "heating_system");
+    }
+
+    fn solar(backup: hot_water::SolarBackupAnswer) -> hot_water::SurveySolarWaterHeater {
+        hot_water::SurveySolarWaterHeater {
+            id: "zb".into(),
+            collector: hot_water::CollectorAnswer::Unknown,
+            collector_area_m2: 2.4,
+            gross_area: true,
+            collector_count: 1,
+            orientation: crate::climate::Orientation::South,
+            tilt_deg: 45.0,
+            shading: None,
+            backup,
+            storage_volume_l: 150.0,
+            backup_volume_l: None,
+            storage_label: None,
+            storage_manufacture_year: None,
+            also_space_heating: false,
+            pvt: None,
+            source_reference: "survey photo".into(),
+        }
+    }
+
+    #[test]
+    fn solar_water_heater_follows_tables_15_4_and_15_8() {
+        let mut survey = fixture("2015");
+        let base = assess_residential_survey(&survey);
+        survey.hot_water.solar = vec![solar(hot_water::SolarBackupAnswer::Unknown)];
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        let heater = &input["hotWater"]["solar"][0];
+        assert_eq!(heater["method"]["solarType"], "preheater");
+        assert_eq!(
+            heater["method"]["collectors"]["efficiency"]["collector"],
+            "unglazed_or_unknown"
+        );
+        assert_eq!(
+            heater["method"]["collectors"]["obstruction"]["method"],
+            "minimal"
+        );
+        let rules: Vec<_> = result
+            .applied_defaults
+            .iter()
+            .map(|item| item.rule)
+            .collect();
+        for rule in [
+            "solar_collector_unknown_unglazed",
+            "solar_backup_unknown_preheater",
+            "solar_vessel_year_unknown_construction_year",
+            "solar_shading_not_entered_minimal",
+        ] {
+            assert!(rules.contains(&rule), "{rule}");
+        }
+        // A glazed collector on a gas-heated dwelling lowers the primary
+        // fossil energy (the unglazed forfait, a1 = 15, yields little).
+        let ep = |result: &OpnameAssessment| {
+            result
+                .performance
+                .as_ref()
+                .unwrap()
+                .primary_fossil_indicator_kwh_per_m2_year
+                .unwrap()
+        };
+        let mut gas = fixture("1930");
+        let gas_base = assess_residential_survey(&gas);
+        let mut glazed = solar(hot_water::SolarBackupAnswer::SeparateHeater);
+        glazed.collector = hot_water::CollectorAnswer::Glazed;
+        glazed.storage_manufacture_year = Some(2020);
+        gas.hot_water.solar = vec![glazed];
+        let gas_solar = assess_residential_survey(&gas);
+        assert_eq!(
+            gas_solar.status, "calculated_unverified",
+            "{:?}",
+            gas_solar.issues
+        );
+        assert!(
+            ep(&gas_solar) < ep(&gas_base),
+            "{} vs {}",
+            ep(&gas_solar),
+            ep(&gas_base)
+        );
+        let _ = base;
+        // An evacuated-tube gross area counts 60 % (p. 192).
+        let mut tube = solar(hot_water::SolarBackupAnswer::IntegratedElectric);
+        tube.collector = hot_water::CollectorAnswer::EvacuatedTube;
+        survey.hot_water.solar = vec![tube];
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let collectors = &input["hotWater"]["solar"][0]["method"]["collectors"];
+        assert!((collectors["moduleAreaM2"].as_f64().unwrap() - 1.44).abs() < 1e-9);
+        assert_eq!(
+            input["hotWater"]["solar"][0]["method"]["solarType"],
+            "integrated_backup"
+        );
+    }
+
+    #[test]
+    fn collective_hot_water_and_a_second_generator() {
+        let mut survey = fixture("1975");
+        survey.hot_water.generator = hot_water::HotWaterGeneratorAnswer::CollectiveUnknown;
+        survey.hot_water.collective = Some(hot_water::CollectiveHotWaterAnswer {
+            building_usable_area_m2: None,
+            connected_dwellings: Some(24),
+        });
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        assert_eq!(
+            input["hotWater"]["generator"]["kind"],
+            "large_direct_storage"
+        );
+        assert_eq!(
+            input["hotWater"]["collective"]["buildingUsableFloorAreaM2"],
+            24.0 * survey.usable_floor_area_m2
+        );
+        // A heat-pump boiler with an electric heater behind it (13.8.2).
+        let mut survey = fixture("2015");
+        survey.hot_water.generator = hot_water::HotWaterGeneratorAnswer::HeatPump {
+            exhaust_air_source: false,
+        };
+        survey.hot_water.nominal_power_kw = Some(1.5);
+        survey.hot_water.additional_generators = vec![hot_water::AdditionalHotWaterAnswer {
+            generator: hot_water::HotWaterGeneratorAnswer::ElectricInstantaneous,
+            nominal_power_kw: Some(6.0),
+        }];
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        assert_eq!(
+            input["hotWater"]["additionalGenerators"][0]["generator"]["kind"],
+            "electric_instantaneous"
+        );
     }
 
     #[test]

@@ -75,6 +75,89 @@ pub enum HotWaterGeneratorAnswer {
         exhaust_air_source: bool,
     },
     DistrictHeat,
+    /// Collective generator of unknown type: other directly heated
+    /// storage (table 13.2, p. 164).
+    CollectiveUnknown,
+    /// Delivery set on the (collective) heating system (§13.3.4,
+    /// NTA 13.8.4.9.3).
+    DeliverySetFromHeating,
+}
+
+/// A further hot-water generator (NTA 13.8.2) with its nominal power.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AdditionalHotWaterAnswer {
+    pub generator: HotWaterGeneratorAnswer,
+    #[serde(default)]
+    pub nominal_power_kw: Option<f64>,
+}
+
+/// Collective hot-water system of a dwelling in a building (p. 164).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CollectiveHotWaterAnswer {
+    /// Usable area served by the collective system, m².
+    #[serde(default)]
+    pub building_usable_area_m2: Option<f64>,
+    /// Dwellings on the system, for the p. 121/176 rule.
+    #[serde(default)]
+    pub connected_dwellings: Option<u32>,
+}
+
+/// Table 15.4: backup heating of a solar water heater.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SolarBackupAnswer {
+    /// Preheater with a separate backup appliance.
+    SeparateHeater,
+    IntegratedGas,
+    IntegratedElectric,
+    Unknown,
+}
+
+/// Table 15.8 collector types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CollectorAnswer {
+    Unglazed,
+    Glazed,
+    EvacuatedTube,
+    Unknown,
+}
+
+/// A solar water heater (ISSO 82.1/75.1 §15.3–15.4).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveySolarWaterHeater {
+    pub id: String,
+    pub collector: CollectorAnswer,
+    /// Aperture or reference area; with `grossArea` the gross area (p. 192).
+    pub collector_area_m2: f64,
+    #[serde(default)]
+    pub gross_area: bool,
+    #[serde(default = "one")]
+    pub collector_count: u32,
+    pub orientation: crate::climate::Orientation,
+    pub tilt_deg: f64,
+    /// §15.4.7 situation; `None`: minimal obstruction.
+    #[serde(default)]
+    pub shading: Option<crate::solar_shading::CollectorObstruction>,
+    pub backup: SolarBackupAnswer,
+    pub storage_volume_l: f64,
+    /// Table 15.5: `None` with integrated backup → from the total volume.
+    #[serde(default)]
+    pub backup_volume_l: Option<f64>,
+    #[serde(default)]
+    pub storage_label: Option<crate::domestic_hot_water::StorageLabel>,
+    #[serde(default)]
+    pub storage_manufacture_year: Option<i32>,
+    /// The vessel also serves space heating (combi system, §15.3.3).
+    #[serde(default)]
+    pub also_space_heating: bool,
+    /// PVT collectors instead of thermal collectors.
+    #[serde(default)]
+    pub pvt: Option<crate::solar_thermal::PvtCover>,
+    pub source_reference: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -130,6 +213,18 @@ pub struct SurveyHotWater {
     /// Vessel of an electric boiler (residential survey).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub boiler_vessel: Option<SurveyBoilerVessel>,
+    /// Nominal power of the main generator (13.141), kW.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nominal_power_kw: Option<f64>,
+    /// Further generators of the same system (NTA 13.8.2).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_generators: Vec<AdditionalHotWaterAnswer>,
+    /// Collective hot-water system (p. 164).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collective: Option<CollectiveHotWaterAnswer>,
+    /// Solar water heaters on this system (§15.3).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub solar: Vec<SurveySolarWaterHeater>,
     pub source_reference: String,
 }
 
@@ -221,13 +316,245 @@ pub fn apply_exhaust_air_use(
     hot_water["exhaustAir"] = json!({ "ventilationSuitable": suitable });
 }
 
-pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Value {
+/// Further generators, the collective system and solar water heaters
+/// (NTA 13.8.2, §13.7; ISSO §13.3, §15.3–15.4) on a derived system.
+pub fn apply_extensions(
+    system: &mut Value,
+    survey: &SurveyHotWater,
+    construction_year: i32,
+    zone_area_m2: f64,
+    utility: bool,
+    recorder: &mut Recorder,
+) {
     let reference = survey.source_reference.as_str();
-    let generator = match &survey.generator {
+    if let Some(power) = survey.nominal_power_kw {
+        system["nominalPowerKw"] = json!(power);
+    }
+    if !survey.additional_generators.is_empty() {
+        let extras: Vec<Value> = survey
+            .additional_generators
+            .iter()
+            .enumerate()
+            .map(|(index, extra)| {
+                let path = format!("hotWater.additionalGenerators[{index}].generator");
+                let mut value = json!({
+                    "generator": convert_generator(&extra.generator, false, &path, recorder),
+                    "equipmentReference": reference,
+                });
+                if let Some(power) = extra.nominal_power_kw {
+                    value["nominalPowerKw"] = json!(power);
+                }
+                value
+            })
+            .collect();
+        system["additionalGenerators"] = json!(extras);
+    }
+    if let Some(collective) = &survey.collective {
+        let area = match (
+            collective.building_usable_area_m2,
+            collective.connected_dwellings,
+        ) {
+            (Some(area), _) => Some(area),
+            (None, Some(dwellings)) => {
+                let area = f64::from(dwellings) * zone_area_m2;
+                recorder.record(
+                    "collective_hot_water_area_dwellings_times_area",
+                    "hotWater.collective.buildingUsableAreaM2",
+                    format!("{dwellings} × {zone_area_m2} m² = {area} m²"),
+                    if utility {
+                        "ISSO 75.1 §13.5 (collective area)"
+                    } else {
+                        "ISSO 82.1 p. 176"
+                    },
+                );
+                Some(area)
+            }
+            (None, None) => {
+                recorder.issue(
+                    "collective_hot_water_area_required",
+                    "hotWater.collective.buildingUsableAreaM2",
+                );
+                None
+            }
+        };
+        if let Some(area) = area {
+            system["collective"] = json!({
+                "buildingUsableFloorAreaM2": area,
+                "sourceReference": format!("{reference}; {}", if utility { "ISSO 75.1 p. 165" } else { "ISSO 82.1 p. 164, 176" }),
+            });
+        }
+    }
+    apply_solar(system, &survey.solar, construction_year, utility, recorder);
+}
+
+/// Solar water heaters (§15.3–15.4) on a derived hot-water system.
+pub fn apply_solar(
+    system: &mut Value,
+    heaters: &[SurveySolarWaterHeater],
+    construction_year: i32,
+    utility: bool,
+    recorder: &mut Recorder,
+) {
+    if heaters.is_empty() {
+        return;
+    }
+    let heaters: Vec<Value> = heaters
+        .iter()
+        .map(|heater| solar_heater(heater, construction_year, utility, recorder))
+        .collect();
+    system["solar"] = json!(heaters);
+}
+
+/// §15.3–15.4 (tables 15.4, 15.5, 15.8) as an NTA §13.7.2.2 calculated
+/// solar water heater.
+fn solar_heater(
+    heater: &SurveySolarWaterHeater,
+    construction_year: i32,
+    utility: bool,
+    recorder: &mut Recorder,
+) -> Value {
+    let path = format!("hotWater.solar[{}]", heater.id);
+    let collector = match heater.collector {
+        CollectorAnswer::Unglazed => "unglazed_or_unknown",
+        CollectorAnswer::Glazed => "glazed",
+        CollectorAnswer::EvacuatedTube => "evacuated_tube",
+        CollectorAnswer::Unknown => {
+            recorder.record(
+                "solar_collector_unknown_unglazed",
+                &path,
+                "unglazed".into(),
+                if utility {
+                    "ISSO 75.1 p. 198 (table 15.8)"
+                } else {
+                    "ISSO 82.1 p. 192 (table 15.8)"
+                },
+            );
+            "unglazed_or_unknown"
+        }
+    };
+    // p. 192: an evacuated-tube reference area is 60 % of the gross area.
+    let area = if heater.gross_area && heater.collector == CollectorAnswer::EvacuatedTube {
+        recorder.record(
+            "evacuated_tube_reference_area_60_percent",
+            &path,
+            format!("0,6 × {} m²", heater.collector_area_m2),
+            if utility {
+                "ISSO 75.1 p. 198 (§15.4.6)"
+            } else {
+                "ISSO 82.1 p. 192 (§15.4.6)"
+            },
+        );
+        0.6 * heater.collector_area_m2
+    } else {
+        heater.collector_area_m2
+    };
+    let count = heater.collector_count.max(1);
+    let solar_type = match heater.backup {
+        SolarBackupAnswer::SeparateHeater => "preheater",
+        SolarBackupAnswer::IntegratedGas | SolarBackupAnswer::IntegratedElectric => {
+            "integrated_backup"
+        }
+        SolarBackupAnswer::Unknown => {
+            recorder.record(
+                "solar_backup_unknown_preheater",
+                &path,
+                "preheater with a separate backup appliance".into(),
+                if utility {
+                    "ISSO 75.1 p. 195 (table 15.4)"
+                } else {
+                    "ISSO 82.1 p. 189 (table 15.4)"
+                },
+            );
+            "preheater"
+        }
+    };
+    let loss = match heater.storage_label {
+        Some(label) => json!({"method": "label", "label": label}),
+        None => {
+            let year = heater.storage_manufacture_year.unwrap_or_else(|| {
+                recorder.record(
+                    "solar_vessel_year_unknown_construction_year",
+                    &path,
+                    construction_year.to_string(),
+                    if utility {
+                        "ISSO 75.1 p. 195 (§15.3.3, §13.3.2)"
+                    } else {
+                        "ISSO 82.1 p. 189 (§15.3.3, §13.3.2)"
+                    },
+                );
+                construction_year
+            });
+            json!({"method": "unknown_label", "producedFrom2018": year >= 2018})
+        }
+    };
+    let mut storage = json!({"totalVolumeL": heater.storage_volume_l, "loss": loss});
+    match heater.backup_volume_l {
+        Some(volume) => storage["backupVolumeL"] = json!(volume),
+        None if solar_type == "integrated_backup" => recorder.record(
+            "solar_backup_volume_from_total",
+            &path,
+            "from the total vessel volume (NTA 13.80)".into(),
+            if utility {
+                "ISSO 75.1 p. 196 (table 15.5)"
+            } else {
+                "ISSO 82.1 p. 190 (table 15.5)"
+            },
+        ),
+        None => {}
+    }
+    let obstruction = match &heater.shading {
+        Some(shading) => serde_json::to_value(shading).expect("serializable"),
+        None => {
+            recorder.record(
+                "solar_shading_not_entered_minimal",
+                &path,
+                "minimal".into(),
+                if utility {
+                    "ISSO 75.1 p. 198–199 (§15.4.7)"
+                } else {
+                    "ISSO 82.1 p. 192–193 (§15.4.7)"
+                },
+            );
+            json!({"method": "minimal"})
+        }
+    };
+    let mut value = json!({
+        "id": heater.id,
+        "solarUse": if heater.also_space_heating { "combi" } else { "water_heating" },
+        "method": {
+            "method": "calculated",
+            "solarType": solar_type,
+            "collectors": {
+                "moduleAreaM2": area / f64::from(count),
+                "moduleCount": count,
+                "orientation": heater.orientation,
+                "tiltDeg": heater.tilt_deg,
+                "obstruction": obstruction,
+                "efficiency": {"method": "forfait", "collector": collector},
+                "loopPipes": {"method": "forfait"},
+            },
+            "storage": storage,
+        },
+        "sourceReference": heater.source_reference,
+    });
+    if let Some(pvt) = heater.pvt {
+        value["pvt"] = json!(pvt);
+    }
+    value
+}
+
+/// One survey answer as a kernel hot-water generator.
+fn convert_generator(
+    answer: &HotWaterGeneratorAnswer,
+    kitchen_only: bool,
+    path: &str,
+    recorder: &mut Recorder,
+) -> Value {
+    match answer {
         HotWaterGeneratorAnswer::None => {
             recorder.record(
                 "no_hot_water_system_electric_instantaneous",
-                "hotWater.generator",
+                path,
                 "electric_instantaneous".into(),
                 "ISSO 82.1 p. 164",
             );
@@ -243,7 +570,7 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
             if kind == GasApplianceType::Unknown {
                 recorder.record(
                     "gas_appliance_type_unknown_bath_geyser",
-                    "hotWater.generator.applianceType",
+                    &format!("{path}.applianceType"),
                     "bath_geyser".into(),
                     "ISSO 82.1 p. 168 (table 13.6)",
                 );
@@ -253,7 +580,7 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
             {
                 recorder.record(
                     "kitchen_geyser_above_13_kw_bath_geyser",
-                    "hotWater.generator.applianceType",
+                    &format!("{path}.applianceType"),
                     "bath_geyser".into(),
                     "ISSO 82.1 p. 169",
                 );
@@ -263,7 +590,7 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
                 GaskeurAnswer::Unknown => {
                     recorder.record(
                         "gaskeur_unknown_none",
-                        "hotWater.generator.gaskeur",
+                        &format!("{path}.gaskeur"),
                         "none".into(),
                         "ISSO 82.1 p. 168 (table 13.6)",
                     );
@@ -292,7 +619,7 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
                     CwClassAnswer::Unknown => {
                         recorder.record(
                             "cw_class_unknown_cw_4_5_6",
-                            "hotWater.generator.cwClass",
+                            &format!("{path}.cwClass"),
                             "class 4".into(),
                             "ISSO 82.1 p. 168 (table 13.6)",
                         );
@@ -305,7 +632,7 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
             let mut value = json!({
                 "kind": "gas_appliance",
                 "appliance": appliance,
-                "kitchenOnly": survey.served == TapsServed::KitchenOnly,
+                "kitchenOnly": kitchen_only,
             });
             if let Some(class) = class {
                 value["measuredClass"] = json!(class);
@@ -320,7 +647,27 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
             json!({"kind": "heat_pump", "exhaustAirSource": exhaust_air_source})
         }
         HotWaterGeneratorAnswer::DistrictHeat => json!({"kind": "external_heat"}),
-    };
+        HotWaterGeneratorAnswer::CollectiveUnknown => {
+            recorder.record(
+                "collective_generator_unknown_direct_storage",
+                path,
+                "other directly heated storage (gas)".into(),
+                "ISSO 82.1 p. 164 / 75.1 p. 165 (table 13.2)",
+            );
+            json!({"kind": "large_direct_storage", "gasFired": true})
+        }
+        HotWaterGeneratorAnswer::DeliverySetFromHeating => json!({"kind": "heating_system"}),
+    }
+}
+
+pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Value {
+    let reference = survey.source_reference.as_str();
+    let generator = convert_generator(
+        &survey.generator,
+        survey.served == TapsServed::KitchenOnly,
+        "hotWater.generator",
+        recorder,
+    );
     let unit = match survey.shower_heat_recovery {
         ShowerRecoveryAnswer::None => None,
         ShowerRecoveryAnswer::Vertical => Some("vertical"),
@@ -384,6 +731,10 @@ mod tests {
             showers: 1,
             shower_heat_recovery: ShowerRecoveryAnswer::Unknown,
             boiler_vessel: None,
+            nominal_power_kw: None,
+            additional_generators: Vec::new(),
+            collective: None,
+            solar: Vec::new(),
             source_reference: "survey".into(),
         }
     }

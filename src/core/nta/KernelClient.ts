@@ -368,6 +368,44 @@ export type NtaObstruction =
   | { method: 'other'; overhangRelativeHeight?: number | null }
   | { method: 'declared'; heating: number[]; cooling: number[]; sourceReference: string };
 /** Collectors and PV (x = P): tables 17.6, 17.12 and 17.15. */
+/** ISSO 82.1/75.1 survey heating generator (opname/heating.rs). */
+export type OpnameHeatingGenerator =
+  | { kind: 'boiler'; boilerType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'hydrogen'; pilotFlame?: boolean | null; insideThermalBoundary: boolean; manufactureYear?: number; installationYear?: number }
+  | { kind: 'heat_pump'; source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water' | 'water_based_unknown'; airSink?: boolean; highTemperature?: boolean; capacityKw?: number; sourceRegenerationFactor?: number | null; highEfficiencyEvidence?: unknown }
+  | { kind: 'district_heat' }
+  | { kind: 'electric'; connectedDevices: number }
+  | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean; annexRCompliant?: boolean | null }
+  /** Building CHP (NTA table 9.31); thermal power unknown → 1,5 × P_el (table 9.7). */
+  | { kind: 'chp'; electricalPowerKw: number; thermalPowerKw?: number | null; manufactureYear?: number | null; hreDeclared?: boolean; lowTemperature?: boolean }
+  | { kind: 'none_present' };
+
+/** ISSO 82.1 survey hot-water generator (opname/hot_water.rs). */
+export type OpnameHotWaterGenerator =
+  | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' | 'collective_unknown' | 'delivery_set_from_heating' }
+  | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number; cwClass?: 'cw1' | 'cw2' | 'cw3' | 'cw4_to6' | 'unknown' | null }
+  | { kind: 'heat_pump'; exhaustAirSource: boolean };
+
+/** Solar water heater in the survey (§15.3–15.4, tables 15.4/15.5/15.8). */
+export interface OpnameSolarWaterHeater {
+  id: string;
+  collector: 'unglazed' | 'glazed' | 'evacuated_tube' | 'unknown';
+  collectorAreaM2: number;
+  /** Gross area: evacuated tubes count 60 % (p. 192). */
+  grossArea?: boolean;
+  collectorCount?: number;
+  orientation: 'north' | 'north_east' | 'east' | 'south_east' | 'south' | 'south_west' | 'west' | 'north_west';
+  tiltDeg: number;
+  shading?: NtaCollectorObstruction | null;
+  backup: 'separate_heater' | 'integrated_gas' | 'integrated_electric' | 'unknown';
+  storageVolumeL: number;
+  backupVolumeL?: number | null;
+  storageLabel?: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | null;
+  storageManufactureYear?: number | null;
+  alsoSpaceHeating?: boolean;
+  pvt?: 'unglazed' | 'single_glazed' | 'tested_iso9806' | null;
+  sourceReference: string;
+}
+
 export type NtaCollectorObstruction =
   | { method: 'minimal' }
   | { method: 'side_obstruction'; side: NtaObstructionSide; relativeWidth: number }
@@ -2453,13 +2491,7 @@ export interface ResidentialSurvey {
     unheatedSpaces?: Array<{ id: string; description: string }>;
   };
   heating: {
-    generator:
-      | { kind: 'boiler'; boilerType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'hydrogen'; pilotFlame?: boolean | null; insideThermalBoundary: boolean; manufactureYear?: number; installationYear?: number }
-      | { kind: 'heat_pump'; source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water' | 'water_based_unknown'; airSink?: boolean; highTemperature?: boolean; capacityKw?: number; sourceRegenerationFactor?: number | null; highEfficiencyEvidence?: unknown }
-      | { kind: 'district_heat' }
-      | { kind: 'electric'; connectedDevices: number }
-      | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean; annexRCompliant?: boolean | null }
-      | { kind: 'none_present' };
+    generator: OpnameHeatingGenerator;
     emitters: 'radiators' | 'low_temperature_radiators' | 'floor_heating' | 'floor_heating_and_radiators' | 'air_heating' | 'local_heaters';
     designClass?: 'c45_40' | 'c55_47' | 'c70_50' | 'c90_70' | null;
     balanced?: boolean | null;
@@ -2467,13 +2499,23 @@ export interface ResidentialSurvey {
     /** Afb. 9.1; absent: present with the forfait length when unheated spaces exist. */
     unheatedPipes?: { kind: 'absent' } | { kind: 'present'; lengthM?: number | null } | null;
     storeys?: number;
+    /** Table 9.7 nominal power of the main generator, kW; required with additionalGenerators. */
+    nominalPowerKw?: number | null;
+    /** §9.3.2: further unequal generators (kernel `multiple`, preference per p. 112). */
+    additionalGenerators?: Array<{ generator: OpnameHeatingGenerator; nominalPowerKw?: number | null }>;
+    /** §9.3.6: a preferred generator added after delivery. */
+    addedPreferredGenerator?: boolean;
+    /** Collective installation (p. 106, 121–122). */
+    collective?: {
+      connectedUsableAreaM2?: number | null;
+      connectedDwellings?: number | null;
+      connectedStoreys?: number | null;
+      heatMetersPresent?: boolean | null;
+    } | null;
     sourceReference: string;
   };
   hotWater: {
-    generator:
-      | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' }
-      | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number; cwClass?: 'cw1' | 'cw2' | 'cw3' | 'cw4_to6' | 'unknown' | null }
-      | { kind: 'heat_pump'; exhaustAirSource: boolean };
+    generator: OpnameHotWaterGenerator;
     served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
     kitchenLengthM?: number;
     bathroomLengthM?: number;
@@ -2487,6 +2529,14 @@ export interface ResidentialSurvey {
       manufactureYear?: number | null;
       inHeatedZone?: boolean | null;
     } | null;
+    /** 13.141 nominal power of the main generator, kW. */
+    nominalPowerKw?: number | null;
+    /** NTA 13.8.2 further generators. */
+    additionalGenerators?: Array<{ generator: OpnameHotWaterGenerator; nominalPowerKw?: number | null }>;
+    /** Collective hot-water system (p. 164, 176). */
+    collective?: { buildingUsableAreaM2?: number | null; connectedDwellings?: number | null } | null;
+    /** Solar water heaters (§15.3–15.4). */
+    solar?: OpnameSolarWaterHeater[];
     sourceReference: string;
   };
   ventilation: {
@@ -2645,6 +2695,8 @@ export interface UtilitySurvey {
       inHeatedZone?: boolean | null;
       sourceReference: string;
     }>;
+    /** Solar water heaters (ISSO 75.1 §15.3–15.4). */
+    solar?: OpnameSolarWaterHeater[];
     sourceReference: string;
   };
   lighting: Array<{
