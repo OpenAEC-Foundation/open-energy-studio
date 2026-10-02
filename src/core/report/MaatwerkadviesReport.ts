@@ -8,6 +8,29 @@ function num(value: number | null | undefined, digits = 0): string {
 }
 function n(value: number | null | undefined, digits = 0): string { return `<td class="n">${num(value, digits)}</td>`; }
 
+const SYSTEM: Record<string, string> = {
+  space_heating: 'Ruimteverwarming',
+  space_cooling: 'Ruimtekoeling',
+  hot_water: 'Warm tapwater',
+  ventilation: 'Ventilatie',
+  lighting: 'Ingebouwde verlichting',
+};
+
+const REQUIREMENT: Record<string, string> = {
+  three_steps_present: 'Drie stappen aanwezig (beperken vraag, duurzame installaties, opwekking)',
+  insulation_standard: 'Standaard voor Woningisolatie gehaald (stap 1)',
+  prewar_standard_motivated: 'Vooroorlogse standaard gemotiveerd',
+  overheating_measures: 'Maatregelen tegen oververhitting in stap 1',
+  natural_gas_free_main_heating: 'Hoofdverwarming aardgasvrij (stap 2)',
+  emission_free_result: 'Geen verbranding van fossiele brandstof op het perceel (stap 3)',
+  renewable_production: 'Hernieuwbare opwekking toegevoegd (stap 3)',
+  storage_considered: 'Opslagcapaciteit afgewogen (stap 3)',
+};
+
+function verdict(value: boolean | null | undefined): string {
+  return value == null ? 'niet te beoordelen' : value ? 'voldoet' : 'voldoet niet';
+}
+
 const PROFILE: Record<string, string> = {
   nta: 'NTA 8800',
   energy_conscious: 'energiebewust',
@@ -67,6 +90,7 @@ export function generateMaatwerkadviesReportHTML(
   const phasingRows = assessment.packages.flatMap((result) => result.phasing.map((step) =>
     `<tr>${cell(result.name)}${cell(step.year ?? 'direct')}${cell(step.measureIds.map((id) => definition.measures.find((m) => m.id === id)?.name ?? id).join(', '))}</tr>`)).join('');
   const chosen = assessment.packages.find((item) => item.id === advice?.packageId);
+  const passport = assessment.renovationPassport;
   const list = (items: string[]) => items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<p>Geen.</p>';
   return `${head}
     <h2>Huidige situatie</h2>
@@ -80,6 +104,13 @@ export function generateMaatwerkadviesReportHTML(
       <tr><th>Afwijking gas</th>${n(fit.gasDeviationPercent, 1)}<th>Afwijking elektriciteit</th>${n(fit.electricityDeviationPercent, 1)}</tr>
       <tr><th>Gemeten helling gas [m³/K] / stookgrens [°C]</th><td>${num(fit.measuredGasLine?.slopeM3PerK, 2)} / ${num(fit.measuredGasLine?.heatingLimitC, 1)}</td>
         <th>Berekende helling [m³/K] / stookgrens [°C]</th><td>${num(fit.calculatedGasLine?.slopeM3PerK, 2)} / ${num(fit.calculatedGasLine?.heatingLimitC, 1)}</td></tr>
+      <tr><th>Basislast gas gemeten / berekend [m³/mnd]</th><td>${num(fit.measuredGasBaseLoad, 1)} / ${num(fit.calculatedGasBaseLoad, 1)}</td>
+        <th>Afwijking warmte</th>${n(fit.heatDeviationPercent, 1)}</tr>
+      <tr><th>Gemeten helling elektriciteit [kWh/K] / stookgrens [°C]</th><td>${num(fit.measuredElectricityLine?.slopeM3PerK, 1)} / ${num(fit.measuredElectricityLine?.heatingLimitC, 1)}</td>
+        <th>Berekende helling elektriciteit [kWh/K] / stookgrens [°C]</th><td>${num(fit.calculatedElectricityLine?.slopeM3PerK, 1)} / ${num(fit.calculatedElectricityLine?.heatingLimitC, 1)}</td></tr>
+      <tr><th>Fitcriteria ISSO 82.2 bijlage C.1 (jaar ±5 %, helling ±5 %, stookgrens ±1 °C, basislijn ±5 %)</th><td colspan="3">${escapeHtml(verdict(fit.criteria.withinCriteria))}
+        (jaar gas ${escapeHtml(verdict(fit.criteria.annualGas))}, elektriciteit ${escapeHtml(verdict(fit.criteria.annualElectricity))}, warmte ${escapeHtml(verdict(fit.criteria.annualHeat))};
+        helling gas ${escapeHtml(verdict(fit.criteria.gasSlope))}, stookgrens gas ${escapeHtml(verdict(fit.criteria.gasHeatingLimit))}, basislijn gas ${escapeHtml(verdict(fit.criteria.gasBaseLine))})</td></tr>
     </tbody></table>` : ''}
     <h2>Maatregelen</h2>
     <table><thead><tr><th>Maatregel</th><th>Soort</th><th>Investering [€]</th><th>Kostenbron</th><th>Levensduur [jr]</th><th>Onderhoud [€/jr]</th><th>Fasering</th></tr></thead><tbody>${measureRows}</tbody></table>
@@ -92,6 +123,26 @@ export function generateMaatwerkadviesReportHTML(
     <h3>Besparing per pakket (jaarlijks)</h3>
     <table><thead><tr><th>Pakket</th><th>Gas [m³]</th><th>Elektriciteit [kWh]</th><th>Warmte [kWh]</th><th>CO<sub>2</sub> [kg]</th><th>Primair fossiel [kWh]</th><th>Energiekosten [€]</th></tr></thead><tbody>${savingsRows}</tbody></table>
     ${phasingRows ? `<h3>Fasering</h3><table><thead><tr><th>Pakket</th><th>Jaar</th><th>Maatregelen</th></tr></thead><tbody>${phasingRows}</tbody></table>` : ''}
+    ${chosen && chosen.systemChecks?.length ? `<h3>Systeemeisen Bbl art. 4.248 voor het geadviseerde pakket (ISSO 82.2 §5.2)</h3>
+    <table><thead><tr><th>Systeem</th><th>Waarde</th><th>Eis</th><th>Eenheid</th><th>Oordeel</th><th>Toelichting</th></tr></thead><tbody>
+    ${chosen.systemChecks.map((check) => `<tr>${cell(SYSTEM[check.system] ?? check.system)}${n(check.value, 2)}${n(check.limit, 2)}${cell(check.unit)}${cell(check.limit == null ? 'geen eis' : verdict(check.meets))}${cell(check.note ?? '')}</tr>`).join('')}
+    </tbody></table>
+    <p>De systeemeisen gelden wanneer de opwekker, de ventilatie-unit of een derde van de afgiftelichamen of armaturen wordt geïnstalleerd, vervangen of verbeterd.</p>` : ''}
+    ${passport ? `<h2>Renovatiepaspoort (ISSO 82.2 §1.10 en §4.4)</h2>
+    <p><strong>Voldoet aan de eisen:</strong> ${escapeHtml(verdict(passport.eligible))}</p>
+    <table><thead><tr><th>Stap</th><th>Label (NTA 8800)</th><th>EP2</th><th>Gas [m³]</th><th>Elektr. netto [kWh]</th><th>CO<sub>2</sub> [kg]</th><th>Energiekosten [€/jr]</th></tr></thead><tbody>
+    ${passport.steps.map((step) => `<tr>${cell(step.name)}${cell(step.label.labelClass ?? '—')}${n(step.label.primaryFossilIndicatorKwhPerM2, 1)}${n(step.actualUse?.gasM3)}${n(step.actualUse ? step.actualUse.electricityImportKwh - step.actualUse.electricityExportKwh : null)}${n(step.actualUse?.co2Kg)}${n(step.actualUse?.energyCostEur)}</tr>`).join('')}
+    </tbody></table>
+    <p>De labels zijn gestapeld: stap 2 bevat de maatregelen van stap 1, stap 3 die van stap 1 en 2. Ze volgen de standaard NTA 8800-berekening en kunnen afwijken van het energiegebruik op het paspoort.</p>
+    <table><thead><tr><th>Eis</th><th>Oordeel</th><th>Toelichting</th></tr></thead><tbody>
+    ${passport.requirements.map((item) => `<tr>${cell(REQUIREMENT[item.code] ?? item.code)}${cell(verdict(item.met))}${cell(item.detail ?? '')}</tr>`).join('')}
+    </tbody></table>
+    <h3>Over oververhitting</h3><ul>
+      <li>TO<sub>juli</sub>, GTO en ATG geven alleen een indicatie en zijn beperkt voor bestaande bouw.</li>
+      <li>Let op risico's die de berekening niet laat zien, zoals de noodzaak van zonwering of ventilatie.</li>
+      <li>De berekening gebruikt verouderde klimaatgegevens en geeft geen garantie voor het werkelijke risico.</li>
+      <li>Het gebouw kan in de praktijk gevoeliger zijn voor oververhitting; aanvullende (dynamische) studies kunnen zinvol zijn.</li>
+    </ul>` : ''}
     <h2>Advies</h2>
     <p><strong>Best passend pakket:</strong> ${escapeHtml(chosen?.name ?? '—')} (${advice?.chosenBy === 'adviser' ? 'keuze adviseur' : 'automatisch: hoogste netto contante waarde, door adviseur te bevestigen'})</p>
     ${advice?.motivation ? `<p>${escapeHtml(advice.motivation)}</p>` : ''}

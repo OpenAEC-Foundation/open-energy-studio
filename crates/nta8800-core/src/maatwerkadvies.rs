@@ -55,6 +55,14 @@ pub const INTERPRETATIONS: &[&str] = &[
     "gas costs use 35,17 MJ/m³ (Groningen equivalent, gross calorific value)",
     "heat from a collective heat-pump source (dh_hp_source) is priced at the district-heat tariff",
     "the best-fit package is the adviser's choice; without one, the package with the highest net present value is proposed and marked as automatic",
+    "ISSO 82.2 §2.5.3: the NTA option carries the MWA practice correction for hot water; taken as the average-profile 545 kWh per occupant",
+    "ventilation practice factors (82.2 table 2.7, 75.2 table 2.8) apply to the standard profiles or when entered, not to the NTA option (table 2.2 '–'); system B takes the system C value",
+    "fit check (82.2 §3.2, Bijlage C.1): heating limit at the knee above the base load (mean of the months ≥ 15 °C); the measured line uses the local temperatures when given, the calculated line the NTA 8800 climate year; electricity is compared as monthly net delivery",
+    "NCW phasing: an investment starts in its phase year relative to economics.baseYear; savings of a package start in year 1",
+    "EPBD system requirements (Bbl art. 4.248, Omgevingsregeling bijlage VIII) on the standard NTA 8800 run with table 5.2 f_P;del (external heat by forfait); the lighting limit follows the Bbl (75 kWh_prim/m2), ISSO 82.2 table 5.1 prints 17; cooling is not evaluated",
+    "utility persons route (75.2 table 2.6): N_p of the building split over the zones by area, q_oc;p 80 W, f_t and q_A from NTA tables 7.2/7.3 unless entered",
+    "renovation passport (82.2 §1.10.2/§4.4): the Standaard voor Woningisolatie is the adviser's statement or an entered net heat need limit; gas-free means no natural gas or oil use in the actual-use run",
+    "location-specific climate data (82.2 §2.6) is not used: NEN 5060 hourly or KNMI data is not available to the kernel",
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -113,10 +121,27 @@ pub struct UsageProfile {
     /// inputs.
     #[serde(default)]
     pub annual_hot_water_need_kwh: Option<f64>,
+    /// Utility: N_p;usi of the building (ISSO 75.2 table 2.6, p. 44); split
+    /// over the zones by area. With it, q_Oc·f_τ becomes N_p·q_oc;p·f_t/A_g.
+    #[serde(default)]
+    pub persons: Option<f64>,
+    /// Utility: q_oc;p;usi, W per person (standard 80 W).
+    #[serde(default)]
+    pub heat_per_person_w: Option<f64>,
+    /// Utility: f_t;usi occupancy time fraction (standard table 7.2).
+    #[serde(default)]
+    pub occupancy_time_fraction: Option<f64>,
+    /// Utility: q_A, W/m² (standard table 7.3).
+    #[serde(default)]
+    pub appliance_w_per_m2: Option<f64>,
+    /// Utility: factor on the table 14.1 burning hours (ISSO 75.2 table
+    /// 2.7, p. 44: 0,8 / 1,0 / 1,2 by profile).
+    #[serde(default)]
+    pub lighting_hours_factor: Option<f64>,
     /// ISSO 82.2 table 2.7 / 75.2 table 2.8 practice factors; omitted
     /// fields take the standard values.
     #[serde(default)]
-    pub ventilation_practice: crate::ventilation::VentilationPractice,
+    pub ventilation_practice: Option<crate::ventilation::VentilationPractice>,
     pub source_reference: String,
 }
 
@@ -225,9 +250,19 @@ pub struct Economics {
     /// Horizon in years; defaults to the longest lifetime in the variant.
     #[serde(default)]
     pub horizon_years: Option<f64>,
+    /// Calendar year of t = 0; with it, a measure's `phaseYear` delays its
+    /// investment (and replacements) in the NCW.
+    #[serde(default)]
+    pub base_year: Option<u32>,
+    /// Annual change of maintenance costs (fraction).
+    #[serde(default)]
+    pub maintenance_price_change: f64,
     #[serde(default)]
     pub source_reference: String,
 }
+
+/// ISSO 75.2 table 2.6 (p. 44): standard q_oc;p;usi, W per person.
+pub const UTILITY_HEAT_PER_PERSON_W: f64 = 80.0;
 
 fn default_discount() -> f64 {
     0.03
@@ -239,6 +274,8 @@ impl Default for Economics {
             discount_rate: default_discount(),
             energy_price_change: 0.0,
             horizon_years: None,
+            base_year: None,
+            maintenance_price_change: 0.0,
             source_reference: String::new(),
         }
     }
@@ -258,6 +295,17 @@ pub struct MeasuredUse {
     /// Monthly gas readings, m³ (January–December); `null` for no reading.
     #[serde(default)]
     pub monthly_gas_m3: Vec<Option<f64>>,
+    /// Monthly delivered electricity, kWh (§3.2: monthly readings, e.g.
+    /// smart meter); `null` for no reading.
+    #[serde(default)]
+    pub monthly_electricity_kwh: Vec<Option<f64>>,
+    /// Monthly delivered heat (external heat), kWh.
+    #[serde(default)]
+    pub monthly_heat_kwh: Vec<Option<f64>>,
+    /// Local monthly mean outdoor temperature of the metered period, °C
+    /// (§3.2.1 step 1); `null` falls back to table 17.1 of NTA 8800.
+    #[serde(default)]
+    pub monthly_outdoor_temperature_c: Vec<Option<f64>>,
     #[serde(default)]
     pub source_reference: String,
 }
@@ -294,6 +342,46 @@ pub struct MaatwerkadviesInput {
     pub advice_motivation: Option<String>,
     #[serde(default)]
     pub notes: Vec<AdviceNote>,
+    /// ISSO 82.2 §1.10.2 / §4.4: the three cumulative steps of a
+    /// renovation passport, each a package.
+    #[serde(default)]
+    pub renovation_passport: Option<RenovationPassportInput>,
+}
+
+/// ISSO 82.2 §1.10.2 and §4.4.2 (p. 22–23, 75–77).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RenovationPassportInput {
+    /// Step 1: limit the heat and cold demand (insulation, airtightness,
+    /// ventilation, overheating).
+    pub demand_package_id: String,
+    /// Step 2: sustainable heating, hot water and cooling (natural-gas-free
+    /// main heating).
+    pub systems_package_id: String,
+    /// Step 3: building-bound renewable production and storage.
+    pub production_package_id: String,
+    /// The pre-war insulation standard is used because façade insulation is
+    /// technically impossible; a hybrid heat pump is then allowed.
+    #[serde(default)]
+    pub prewar_standard: bool,
+    /// Required with `prewarStandard`.
+    #[serde(default)]
+    pub prewar_motivation: Option<String>,
+    /// The adviser's statement that step 1 meets the Standaard voor
+    /// Woningisolatie (RVO); used when no limit value is given.
+    #[serde(default)]
+    pub insulation_standard_met: Option<bool>,
+    /// Optional limit of the standard as a net heat need, kWh/m²·yr,
+    /// checked against the step 1 label run (BENG 1 indicator).
+    #[serde(default)]
+    pub insulation_standard_max_need_kwh_per_m2: Option<f64>,
+    /// Measures in step 1 that limit the risk of overheating.
+    #[serde(default)]
+    pub overheating_measure_ids: Vec<String>,
+    /// Storage capacity matched to the production was considered (§4.4.2
+    /// step 3).
+    #[serde(default)]
+    pub storage_considered: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -330,6 +418,12 @@ pub struct EnergyUse {
     pub energy_cost_eur: f64,
     /// Monthly gas, m³.
     pub monthly_gas_m3: Vec<f64>,
+    /// Monthly delivered electricity (use minus self-used production), kWh.
+    pub monthly_electricity_import_kwh: Vec<f64>,
+    /// Monthly delivered external heat, kWh.
+    pub monthly_heat_kwh: Vec<f64>,
+    /// Monthly exported electricity, kWh.
+    pub monthly_electricity_export_kwh: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -371,7 +465,25 @@ pub struct VariantResult {
     pub net_present_value_eur: Option<f64>,
     pub horizon_years: f64,
     pub phasing: Vec<PhaseStep>,
+    /// EPBD system requirements on the standard run (ISSO 82.2 §5.2).
+    pub system_checks: Vec<SystemPerformanceCheck>,
     pub issues: Vec<MwaIssue>,
+}
+
+/// Bbl art. 4.248 (table 4.248) with Omgevingsregeling art. 5.2 and
+/// bijlage VIII: energy performance of one technical building system,
+/// from the standard NTA 8800 run of a variant (ISSO 82.2 §5.2).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemPerformanceCheck {
+    pub system: &'static str,
+    pub value: Option<f64>,
+    pub limit: Option<f64>,
+    pub unit: &'static str,
+    /// `None` when the system is absent, has no limit for this function or
+    /// cannot be evaluated.
+    pub meets: Option<bool>,
+    pub note: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -392,14 +504,95 @@ pub struct FitCheck {
     /// intercept m³ of months with readings below 15 °C.
     pub measured_gas_line: Option<RegressionLine>,
     pub calculated_gas_line: Option<RegressionLine>,
+    /// The same for delivered heat (§3.2.6/3.2.7 with heat instead of
+    /// gas), kWh per month; slope in kWh/K.
+    pub measured_heat_line: Option<RegressionLine>,
+    pub calculated_heat_line: Option<RegressionLine>,
+    /// Base load (months at or above 15 °C, §3.2.4): mean measured and
+    /// calculated gas, m³/month, and heat, kWh/month.
+    pub measured_gas_base_load: Option<f64>,
+    pub calculated_gas_base_load: Option<f64>,
+    pub measured_heat_base_load: Option<f64>,
+    pub calculated_heat_base_load: Option<f64>,
+    /// Monthly electricity, measured against calculated (§3.2.5), %; the
+    /// fit is on the shape, not on single months.
+    pub monthly_electricity_deviation_percent: Vec<Option<f64>>,
+    /// Mean monthly measured and calculated electricity, kWh.
+    pub measured_electricity_monthly_mean_kwh: Option<f64>,
+    pub calculated_electricity_monthly_mean_kwh: Option<f64>,
+    /// Electricity lines (all-electric heat pumps, Bijlage C.2 example 2),
+    /// on the monthly net delivery (delivered minus exported, C.3).
+    pub measured_electricity_line: Option<RegressionLine>,
+    pub calculated_electricity_line: Option<RegressionLine>,
+    pub measured_electricity_base_load: Option<f64>,
+    pub calculated_electricity_base_load: Option<f64>,
+    /// ISSO 82.2 Bijlage C.1 (p. 105) fit criteria.
+    pub criteria: FitCriteria,
+}
+
+/// ISSO 82.2 Bijlage C.1: annual use per carrier within 5 %, slope within
+/// 5 %, heating limit within 1 °C, base line within 5 %. `None` when the
+/// measurement or the calculated line is missing.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FitCriteria {
+    pub annual_gas: Option<bool>,
+    pub annual_electricity: Option<bool>,
+    pub annual_heat: Option<bool>,
+    pub gas_slope: Option<bool>,
+    pub gas_heating_limit: Option<bool>,
+    pub gas_base_line: Option<bool>,
+    pub heat_slope: Option<bool>,
+    pub heat_heating_limit: Option<bool>,
+    pub heat_base_line: Option<bool>,
+    pub electricity_slope: Option<bool>,
+    pub electricity_heating_limit: Option<bool>,
+    pub electricity_base_line: Option<bool>,
+    /// All evaluated criteria met; `None` when none could be evaluated.
+    pub within_criteria: Option<bool>,
+}
+
+const FIT_TOLERANCE_PERCENT: f64 = 5.0;
+const FIT_TOLERANCE_LIMIT_K: f64 = 1.0;
+
+fn within_percent(calculated: Option<f64>, measured: Option<f64>) -> Option<bool> {
+    match (calculated, measured) {
+        (Some(c), Some(m)) if m.abs() > 1e-9 => {
+            Some(((c - m) / m * 100.0).abs() <= FIT_TOLERANCE_PERCENT + 1e-9)
+        }
+        (Some(c), Some(_)) => Some(c.abs() <= 1e-9),
+        _ => None,
+    }
+}
+
+fn within_kelvin(calculated: Option<f64>, measured: Option<f64>) -> Option<bool> {
+    match (calculated, measured) {
+        (Some(c), Some(m)) => Some((c - m).abs() <= FIT_TOLERANCE_LIMIT_K + 1e-9),
+        _ => None,
+    }
+}
+
+/// §3.2.7: the heating limit is the knee where the line reaches the base
+/// load (hot water and cooking), θ = (a − base)/(−b); without a base load
+/// the zero crossing.
+fn with_base(line: Option<RegressionLine>, base: Option<f64>) -> Option<RegressionLine> {
+    line.map(|mut line| {
+        let level = base.unwrap_or(0.0);
+        line.heating_limit_c =
+            (line.slope_m3_per_k < 0.0).then(|| (line.intercept_m3 - level) / -line.slope_m3_per_k);
+        line
+    })
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegressionLine {
+    /// Slope per K in the unit of the series (m³ gas, kWh heat or
+    /// electricity per month).
     pub slope_m3_per_k: f64,
     pub intercept_m3: f64,
-    /// Outdoor temperature where the line reaches zero (heating limit).
+    /// Heating limit: outdoor temperature where the line meets the base
+    /// load (§3.2.7), or zero without a base load.
     pub heating_limit_c: Option<f64>,
     pub points: usize,
 }
@@ -413,6 +606,30 @@ pub struct Advice {
     pub warnings: Vec<String>,
     pub specialist_notes: Vec<String>,
     pub notes: Vec<String>,
+}
+
+/// One requirement of the renovation passport.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PassportRequirement {
+    pub code: &'static str,
+    /// `None` when it depends on a statement that was not given.
+    pub met: Option<bool>,
+    pub detail: Option<String>,
+}
+
+/// ISSO 82.2 §1.10 / §4.4: stacked steps (step 2 includes step 1, step 3
+/// includes steps 1 and 2) with their NTA 8800 labels and actual-use
+/// energy, and the requirements for registration.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenovationPassport {
+    pub steps: Vec<VariantResult>,
+    pub requirements: Vec<PassportRequirement>,
+    /// All requirements met; `None` while a statement is missing.
+    pub eligible: Option<bool>,
+    /// Points the advice must cover (§1.10.2), paraphrased.
+    pub required_statements: Vec<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -429,6 +646,7 @@ pub struct MaatwerkadviesAssessment {
     pub packages: Vec<VariantResult>,
     pub fit_check: Option<FitCheck>,
     pub advice: Option<Advice>,
+    pub renovation_passport: Option<RenovationPassport>,
     pub interpretations: Vec<&'static str>,
     pub issues: Vec<MwaIssue>,
 }
@@ -525,13 +743,19 @@ struct ResolvedUse {
     hot_water_per_person_kwh: Option<f64>,
     hot_water_factor: Option<f64>,
     annual_hot_water_kwh: Option<f64>,
+    lighting_hours_factor: Option<f64>,
 }
 
 /// Standard profile values for dwellings: ISSO 82.2 tables 2.3–2.6
 /// (p. 36–38).
 fn residential_profile(profile: UserProfile, apartment_building: bool) -> ResolvedUse {
     match profile {
-        UserProfile::Nta => ResolvedUse::default(),
+        // §2.5.3: the NTA option carries the MWA practice correction for hot
+        // water; taken as the average-profile value (interpretation).
+        UserProfile::Nta => ResolvedUse {
+            hot_water_per_person_kwh: Some(545.0),
+            ..ResolvedUse::default()
+        },
         UserProfile::EnergyConscious => ResolvedUse {
             heating_setpoint_c: Some(18.0),
             cooling_setpoint_c: Some(26.0),
@@ -584,6 +808,11 @@ fn utility_profile(profile: UserProfile, demand: &MonthlyDemandInput) -> Resolve
         day_reduction_h: Some((base.day_reduction_h * hours_factor).clamp(0.0, 24.0)),
         weekend_reduction_h: Some((base.weekend_reduction_h + weekend_shift).clamp(0.0, 48.0)),
         hot_water_factor: Some(hot_water),
+        // 75.2 table 2.7: NTA burning hours −20 % / +20 %.
+        lighting_hours_factor: Some(match profile {
+            UserProfile::EnergyConscious => 0.8,
+            _ => 1.2,
+        }),
         ..ResolvedUse::default()
     }
 }
@@ -629,6 +858,10 @@ fn resolve_use(profile: &UsageProfile, input: &BuildingPerformanceInput) -> Reso
     set(
         &mut resolved.annual_hot_water_kwh,
         profile.annual_hot_water_need_kwh,
+    );
+    set(
+        &mut resolved.lighting_hours_factor,
+        profile.lighting_hours_factor,
     );
     resolved
 }
@@ -681,6 +914,31 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
             0.0
         };
         let residential_zone = demand.usage_function.is_residential();
+        // ISSO 75.2 table 2.6: N_p·q_oc;p·f_t/A_g + q_A per zone; a free
+        // q_Oc·f_τ + q_A takes precedence.
+        let per_person = (!residential_zone
+            && (profile.persons.is_some() || profile.appliance_w_per_m2.is_some()))
+        .then(|| {
+            let (f_tau, table_q_a) = crate::monthly_demand::occupancy_time_and_appliances(demand);
+            let q_a = profile.appliance_w_per_m2.unwrap_or(table_q_a);
+            let area = demand.usable_floor_area_m2;
+            let occupancy = match profile.persons {
+                Some(total) if area > 0.0 => {
+                    total
+                        * share
+                        * profile
+                            .heat_per_person_w
+                            .unwrap_or(UTILITY_HEAT_PER_PERSON_W)
+                        * profile.occupancy_time_fraction.unwrap_or(f_tau)
+                        / area
+                }
+                _ => {
+                    crate::monthly_demand::function_profile(demand).occupancy_appliance_w_per_m2
+                        - table_q_a
+                }
+            };
+            occupancy + q_a
+        });
         demand.usage_fit = Some(UsageFit {
             reduced_setpoint_c: resolved.reduced_setpoint_c,
             day_reduction_h: resolved.day_reduction_h,
@@ -696,14 +954,26 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
                 .filter(|_| residential_zone),
             occupancy_appliance_w_per_m2: resolved
                 .occupancy_appliance_w_per_m2
+                .or(per_person)
                 .filter(|_| !residential_zone),
-            ventilation_practice: Some(profile.ventilation_practice.clone()),
+            // ISSO 82.2 table 2.2: no practice factors under the NTA 8800
+            // option ("–"); standard values for the standard profiles.
+            ventilation_practice: profile.ventilation_practice.clone().or_else(|| {
+                (profile.profile != UserProfile::Nta)
+                    .then(crate::ventilation::VentilationPractice::default)
+            }),
             source_reference: format!("maatwerkadvies: {}", profile.source_reference),
         });
     };
     fit_zone(&mut input.space_heating.demand);
     for zone in input.space_heating.additional_zones.iter_mut() {
         fit_zone(&mut zone.demand);
+    }
+    // ISSO 75.2 table 2.7: burning hours of chapter 14.
+    if let Some(factor) = resolved.lighting_hours_factor.filter(|_| !residential) {
+        for zone in input.lighting.iter_mut() {
+            zone.burning_hours_factor = Some(factor);
+        }
     }
     // Hot water: Q_W;nd;spec × N_p (dwellings) or a factor on the NTA need.
     let annual = resolved.annual_hot_water_kwh.or_else(|| {
@@ -734,6 +1004,9 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
 fn energy_use(result: &BuildingPerformanceAssessment, tariffs: &Tariffs) -> EnergyUse {
     let mut usage = EnergyUse {
         monthly_gas_m3: vec![0.0; 12],
+        monthly_electricity_import_kwh: vec![0.0; 12],
+        monthly_heat_kwh: vec![0.0; 12],
+        monthly_electricity_export_kwh: vec![0.0; 12],
         ..EnergyUse::default()
     };
     for row in &result.carriers {
@@ -745,13 +1018,21 @@ fn energy_use(result: &BuildingPerformanceAssessment, tariffs: &Tariffs) -> Ener
             }
             "oil" => usage.oil_kwh += row.used_kwh,
             "bm" => usage.biomass_kwh += row.used_kwh,
-            "dh" | "dw" | "dh_hp_source" => usage.district_heat_kwh += row.used_kwh,
+            "dh" | "dw" | "dh_hp_source" => {
+                usage.district_heat_kwh += row.used_kwh;
+                let month = usize::from(row.month.saturating_sub(1)).min(11);
+                usage.monthly_heat_kwh[month] += row.used_kwh;
+            }
             "dc" => usage.district_cold_kwh += row.used_kwh,
             _ => {}
         }
     }
     for row in &result.electricity_balance {
-        usage.electricity_import_kwh += (row.used_kwh - row.self_used_kwh).max(0.0);
+        let imported = (row.used_kwh - row.self_used_kwh).max(0.0);
+        let month = usize::from(row.month.saturating_sub(1)).min(11);
+        usage.monthly_electricity_import_kwh[month] += imported;
+        usage.monthly_electricity_export_kwh[month] += row.exported_kwh;
+        usage.electricity_import_kwh += imported;
         usage.electricity_export_kwh += row.exported_kwh;
         usage.electricity_produced_kwh += row.produced_kwh;
     }
@@ -791,7 +1072,147 @@ fn label_result(result: &BuildingPerformanceAssessment) -> LabelResult {
 struct RunOutcome {
     label: LabelResult,
     actual: Option<EnergyUse>,
+    system_checks: Vec<SystemPerformanceCheck>,
     issues: Vec<MwaIssue>,
+}
+
+/// Bbl table 4.248 limits.
+const LIMIT_HEATING: f64 = 1.31;
+const LIMIT_COOLING: f64 = 1.33;
+const LIMIT_VENTILATION_KWH_PER_M3H: f64 = 3.8;
+const LIMIT_HOT_WATER: f64 = 3.45;
+const LIMIT_LIGHTING_KWH_PER_M2: f64 = 75.0;
+
+/// Omgevingsregeling bijlage VIII on a standard NTA 8800 result. Primary
+/// energy uses the table 5.2 f_P;del factors (external heat by forfait);
+/// CHP credits (E_H;WKK, E_W;WKK) are zero because the chain has no CHP
+/// for heating or hot water.
+pub fn system_performance_checks(
+    input: &BuildingPerformanceInput,
+    result: &BuildingPerformanceAssessment,
+) -> Vec<SystemPerformanceCheck> {
+    use crate::building_performance::{
+        F_P_BIOMASS_B, F_P_DISTRICT_HEAT_FORFAIT, F_P_ELECTRICITY, F_P_GAS, F_P_OIL,
+    };
+    let residential = matches!(input.calculation_scope, CalculationScope::Residential);
+    let check = |system: &'static str,
+                 value: Option<f64>,
+                 limit: Option<f64>,
+                 unit: &'static str,
+                 note: Option<&'static str>| SystemPerformanceCheck {
+        system,
+        value,
+        limit,
+        unit,
+        meets: match (value, limit) {
+            (Some(value), Some(limit)) => Some(value <= limit + 1e-9),
+            _ => None,
+        },
+        note,
+    };
+    let ratio = |energy: f64, need: f64| (need > 0.0 && energy > 0.0).then(|| energy / need);
+    // 1. Space heating: (E_H − E_H;WKK) / Q_H;nd without recoverable losses.
+    let heating_energy: f64 = result
+        .space_heating
+        .monthly
+        .iter()
+        .map(|row| {
+            F_P_GAS * row.natural_gas_kwh
+                + F_P_OIL * row.oil_kwh
+                + F_P_BIOMASS_B * row.biomass_kwh
+                + F_P_DISTRICT_HEAT_FORFAIT * row.district_heat_kwh
+                + F_P_ELECTRICITY
+                    * (row.generator_electricity_kwh + row.auxiliary_electricity_kwh.unwrap_or(0.0))
+        })
+        .sum();
+    let zones = || {
+        std::iter::once(&result.space_heating.demand)
+            .chain(&result.space_heating.additional_zone_demands)
+    };
+    let heating_need: f64 = zones()
+        .filter_map(|zone| zone.annual_heating_need_without_recoverable_kwh)
+        .sum();
+    let mut checks = vec![check(
+        "space_heating",
+        ratio(heating_energy, heating_need),
+        Some(LIMIT_HEATING),
+        "-",
+        None,
+    )];
+    // 2. Space cooling: the chapter 10 result is not part of the output.
+    checks.push(check(
+        "space_cooling",
+        None,
+        input.cooling.as_ref().map(|_| LIMIT_COOLING),
+        "-",
+        input
+            .cooling
+            .as_ref()
+            .map(|_| "chapter 10 primary energy per system is not reported; check separately"),
+    ));
+    // 3. Hot water: (E_W − E_W;WKK) / Q_W;nd.
+    let hot_water = result.hot_water.as_ref().map(|water| {
+        let energy: f64 = water
+            .months
+            .iter()
+            .map(|row| {
+                F_P_ELECTRICITY * (row.electricity_kwh + row.auxiliary_electricity_kwh)
+                    + F_P_GAS * row.natural_gas_kwh
+                    + F_P_OIL * row.oil_kwh
+                    + F_P_DISTRICT_HEAT_FORFAIT * row.district_heat_kwh
+            })
+            .sum();
+        ratio(energy, water.annual_net_need_kwh)
+    });
+    checks.push(check(
+        "hot_water",
+        hot_water.flatten(),
+        hot_water.map(|_| LIMIT_HOT_WATER),
+        "-",
+        None,
+    ));
+    // 4. Ventilation (utility): E_V / q_V;ODA;req in kWh/(m³/h).
+    let ventilation = zones().filter_map(|zone| zone.ventilation.as_ref()).fold(
+        None::<(f64, f64)>,
+        |total, item| {
+            let energy: f64 = item
+                .months
+                .iter()
+                .map(|row| {
+                    F_P_ELECTRICITY
+                        * (row.fan_electricity_kwh
+                            + row.frost_protection_electricity_kwh
+                            + row.grille_preheating_electricity_kwh)
+                })
+                .sum();
+            let flow = item
+                .months
+                .iter()
+                .map(|row| row.heating.required_outdoor_air_m3_per_h)
+                .sum::<f64>()
+                / item.months.len().max(1) as f64;
+            let (e, q) = total.unwrap_or((0.0, 0.0));
+            Some((e + energy, q + flow))
+        },
+    );
+    checks.push(check(
+        "ventilation",
+        ventilation.and_then(|(energy, flow)| ratio(energy, flow)),
+        (!residential && ventilation.is_some()).then_some(LIMIT_VENTILATION_KWH_PER_M3H),
+        "kWh/(m3/h)",
+        None,
+    ));
+    // 5. Built-in lighting (utility): E_L / A_g in kWh_prim/m².
+    let lighting: f64 = result.lighting.iter().map(|zone| zone.annual_kwh).sum();
+    checks.push(check(
+        "lighting",
+        (!result.lighting.is_empty() && input.total_usable_floor_area_m2 > 0.0)
+            .then(|| F_P_ELECTRICITY * lighting / input.total_usable_floor_area_m2),
+        (!residential && !result.lighting.is_empty()).then_some(LIMIT_LIGHTING_KWH_PER_M2),
+        "kWh/m2",
+        Some("Bbl table 4.248 gives 75 kWh_prim/m2; ISSO 82.2 table 5.1 prints 17"),
+    ));
+    checks
 }
 
 /// Builds the building input of a variant from the base and the measures.
@@ -874,6 +1295,7 @@ fn run_variant(
         return RunOutcome {
             label: LabelResult::default(),
             actual: None,
+            system_checks: Vec::new(),
             issues,
         };
     };
@@ -881,6 +1303,7 @@ fn run_variant(
         return RunOutcome {
             label: LabelResult::default(),
             actual: None,
+            system_checks: Vec::new(),
             issues,
         };
     }
@@ -897,10 +1320,12 @@ fn run_variant(
         return RunOutcome {
             label: LabelResult::default(),
             actual: None,
+            system_checks: Vec::new(),
             issues,
         };
     }
     let label = label_result(&standard);
+    let system_checks = system_performance_checks(&building, &standard);
     // Actual-use run.
     let actual = match usage {
         None => energy_use(&standard, &input.tariffs),
@@ -919,6 +1344,7 @@ fn run_variant(
                 return RunOutcome {
                     label,
                     actual: None,
+                    system_checks,
                     issues,
                 };
             }
@@ -928,6 +1354,7 @@ fn run_variant(
     RunOutcome {
         label,
         actual: Some(actual),
+        system_checks,
         issues,
     }
 }
@@ -961,15 +1388,21 @@ pub fn net_present_value(
     let e = economics.energy_price_change;
     let years = horizon_years.max(0.0).floor() as u32;
     let maintenance: f64 = measures.iter().map(|m| m.maintenance_eur_per_year).sum();
+    let m = economics.maintenance_price_change;
     let mut value = 0.0;
     for t in 1..=years {
         let t_f = f64::from(t);
         let saving = annual_cost_saving_eur * (1.0 + e).powf(t_f - 1.0);
-        value += (saving - maintenance) / (1.0 + r).powf(t_f);
+        let upkeep = maintenance * (1.0 + m).powf(t_f - 1.0);
+        value += (saving - upkeep) / (1.0 + r).powf(t_f);
     }
     for measure in measures {
         let lifetime = measure.lifetime_years.max(1.0);
-        let mut start = 0.0;
+        // Phasing: the investment starts in its phase year.
+        let mut start = match (measure.phase_year, economics.base_year) {
+            (Some(year), Some(base)) if year > base => f64::from(year - base),
+            _ => 0.0,
+        };
         while start < horizon_years - 1e-9 {
             value -= measure.investment_eur / (1.0 + r).powf(start);
             start += lifetime;
@@ -1061,7 +1494,260 @@ fn variant_result(
         net_present_value_eur: npv,
         horizon_years: horizon,
         phasing: phasing(measures),
+        system_checks: outcome.system_checks,
         issues: outcome.issues,
+    }
+}
+
+/// Bijlage C.1 criteria on a fit check.
+fn fit_criteria(check: &FitCheck, measured: Option<&MeasuredUse>) -> FitCriteria {
+    let annual = |given: Option<f64>, monthly: &[Option<f64>]| {
+        given.or_else(|| {
+            (monthly.len() == 12 && monthly.iter().all(Option::is_some))
+                .then(|| monthly.iter().map(|value| value.unwrap_or(0.0)).sum())
+        })
+    };
+    let measured_gas = measured.and_then(|m| annual(m.annual_gas_m3, &m.monthly_gas_m3));
+    let measured_el =
+        measured.and_then(|m| annual(m.annual_electricity_kwh, &m.monthly_electricity_kwh));
+    let measured_heat = measured.and_then(|m| annual(m.annual_heat_kwh, &m.monthly_heat_kwh));
+    let slope = |a: &Option<RegressionLine>, b: &Option<RegressionLine>| {
+        within_percent(a.map(|l| l.slope_m3_per_k), b.map(|l| l.slope_m3_per_k))
+    };
+    let limit = |a: &Option<RegressionLine>, b: &Option<RegressionLine>| {
+        within_kelvin(
+            a.and_then(|l| l.heating_limit_c),
+            b.and_then(|l| l.heating_limit_c),
+        )
+    };
+    let calculated = &check.calculated;
+    let mut criteria = FitCriteria {
+        annual_gas: within_percent(measured_gas.map(|_| calculated.gas_m3), measured_gas),
+        annual_electricity: within_percent(
+            measured_el
+                .map(|_| calculated.electricity_import_kwh - calculated.electricity_export_kwh),
+            measured_el,
+        ),
+        annual_heat: within_percent(
+            measured_heat.map(|_| calculated.district_heat_kwh),
+            measured_heat,
+        ),
+        gas_slope: slope(&check.calculated_gas_line, &check.measured_gas_line),
+        gas_heating_limit: limit(&check.calculated_gas_line, &check.measured_gas_line),
+        gas_base_line: within_percent(check.calculated_gas_base_load, check.measured_gas_base_load),
+        heat_slope: slope(&check.calculated_heat_line, &check.measured_heat_line),
+        heat_heating_limit: limit(&check.calculated_heat_line, &check.measured_heat_line),
+        heat_base_line: within_percent(
+            check.calculated_heat_base_load,
+            check.measured_heat_base_load,
+        ),
+        electricity_slope: slope(
+            &check.calculated_electricity_line,
+            &check.measured_electricity_line,
+        ),
+        electricity_heating_limit: limit(
+            &check.calculated_electricity_line,
+            &check.measured_electricity_line,
+        ),
+        electricity_base_line: within_percent(
+            check.calculated_electricity_base_load,
+            check.measured_electricity_base_load,
+        ),
+        within_criteria: None,
+    };
+    let all = [
+        criteria.annual_gas,
+        criteria.annual_electricity,
+        criteria.annual_heat,
+        criteria.gas_slope,
+        criteria.gas_heating_limit,
+        criteria.gas_base_line,
+        criteria.heat_slope,
+        criteria.heat_heating_limit,
+        criteria.heat_base_line,
+        criteria.electricity_slope,
+        criteria.electricity_heating_limit,
+        criteria.electricity_base_line,
+    ];
+    criteria.within_criteria = if all.contains(&Some(false)) {
+        Some(false)
+    } else if all.iter().any(Option::is_some) {
+        Some(true)
+    } else {
+        None
+    };
+    criteria
+}
+
+// ------------------------------------------------------ renovation passport
+
+/// §1.10.2: statements the advice must contain (paraphrased).
+const PASSPORT_STATEMENTS: &[&str] = &[
+    "TO-juli, GTO and ATG only indicate the overheating risk and are limited for existing buildings",
+    "the owner is pointed to risks the calculation may not show, such as the need for solar shading or ventilation",
+    "the overheating calculation uses outdated climate data and gives no guarantee",
+    "the building may be more sensitive to overheating in practice; further dynamic studies may be advised",
+    "the stacked labels follow the standard NTA 8800 calculation and can differ from the passport's energy use",
+];
+
+fn renovation_passport(
+    input: &MaatwerkadviesInput,
+    passport: &RenovationPassportInput,
+    current: &EnergyUse,
+) -> RenovationPassport {
+    let package = |id: &str| input.packages.iter().find(|item| item.id == id);
+    let measures_of = |ids: &[&str]| -> Vec<&Measure> {
+        let mut out: Vec<&Measure> = Vec::new();
+        for id in ids {
+            if let Some(item) = package(id) {
+                for measure_id in &item.measure_ids {
+                    if let Some(measure) = input.measures.iter().find(|m| &m.id == measure_id) {
+                        if !out.iter().any(|m| m.id == measure.id) {
+                            out.push(measure);
+                        }
+                    }
+                }
+            }
+        }
+        out
+    };
+    let ids = [
+        passport.demand_package_id.as_str(),
+        passport.systems_package_id.as_str(),
+        passport.production_package_id.as_str(),
+    ];
+    let names = [
+        "Stap 1: beperken warmte- en koudevraag",
+        "Stap 2: duurzame verwarming, tapwater en koeling",
+        "Stap 3: gebouwgebonden opwekking en opslag",
+    ];
+    let steps: Vec<VariantResult> = (0..3)
+        .map(|step| {
+            let measures = measures_of(&ids[..=step]);
+            variant_result(
+                input,
+                &format!("passport-step-{}", step + 1),
+                names[step],
+                "passport_step",
+                &measures,
+                Some(current),
+            )
+        })
+        .collect();
+    let mut requirements = Vec::new();
+    let mut require = |code: &'static str, met: Option<bool>, detail: Option<String>| {
+        requirements.push(PassportRequirement { code, met, detail })
+    };
+    let missing: Vec<&str> = ids
+        .iter()
+        .copied()
+        .filter(|id| package(id).is_none())
+        .collect();
+    require(
+        "three_steps_present",
+        Some(missing.is_empty() && steps.iter().all(|step| step.valid)),
+        (!missing.is_empty()).then(|| format!("unknown packages: {}", missing.join(", "))),
+    );
+    // Step 1: insulation standard (post-1945, or pre-war with motivation).
+    let insulation = match passport.insulation_standard_max_need_kwh_per_m2 {
+        Some(limit) => steps[0]
+            .label
+            .need_indicator_kwh_per_m2
+            .map(|need| need <= limit + 1e-9),
+        None => passport.insulation_standard_met,
+    };
+    require(
+        "insulation_standard",
+        insulation,
+        passport
+            .insulation_standard_max_need_kwh_per_m2
+            .map(|limit| {
+                format!(
+                    "step 1 net heat need {:?} kWh/m2 against {limit} kWh/m2",
+                    steps[0].label.need_indicator_kwh_per_m2
+                )
+            }),
+    );
+    if passport.prewar_standard {
+        require(
+            "prewar_standard_motivated",
+            Some(
+                passport
+                    .prewar_motivation
+                    .as_ref()
+                    .is_some_and(|text| !text.trim().is_empty()),
+            ),
+            None,
+        );
+    }
+    let step_one = package(&passport.demand_package_id);
+    let overheating = !passport.overheating_measure_ids.is_empty()
+        && passport
+            .overheating_measure_ids
+            .iter()
+            .all(|id| step_one.is_some_and(|item| item.measure_ids.iter().any(|m| m == id)));
+    require("overheating_measures", Some(overheating), None);
+    // Step 2/3: no combustion of natural gas or oil on site (biomass and
+    // biogas excepted); a hybrid heat pump is allowed with the pre-war
+    // standard.
+    let fossil = |step: &VariantResult| {
+        step.actual_use
+            .as_ref()
+            .map(|use_| use_.gas_kwh > 1e-6 || use_.oil_kwh > 1e-6)
+    };
+    require(
+        "natural_gas_free_main_heating",
+        if passport.prewar_standard {
+            Some(true)
+        } else {
+            fossil(&steps[1]).map(|uses| !uses)
+        },
+        passport
+            .prewar_standard
+            .then(|| "pre-war standard: hybrid heat pump allowed".to_string()),
+    );
+    require(
+        "emission_free_result",
+        if passport.prewar_standard {
+            None
+        } else {
+            fossil(&steps[2]).map(|uses| !uses)
+        },
+        passport
+            .prewar_standard
+            .then(|| "pre-war standard: hybrid allowed; adviser judgement".to_string()),
+    );
+    // Step 3: renewable production added and storage considered.
+    let production = match (&steps[1].actual_use, &steps[2].actual_use) {
+        (Some(before), Some(after)) => {
+            let solar = measures_of(&ids[2..]).iter().any(|measure| {
+                matches!(
+                    measure.category,
+                    MeasureCategory::Pv | MeasureCategory::SolarThermal
+                )
+            });
+            Some(after.electricity_produced_kwh > before.electricity_produced_kwh + 1e-6 || solar)
+        }
+        _ => None,
+    };
+    require("renewable_production", production, None);
+    require(
+        "storage_considered",
+        Some(passport.storage_considered),
+        None,
+    );
+    let eligible = if requirements.iter().any(|item| item.met == Some(false)) {
+        Some(false)
+    } else if requirements.iter().all(|item| item.met.is_some()) {
+        Some(true)
+    } else {
+        None
+    };
+    RenovationPassport {
+        steps,
+        requirements,
+        eligible,
+        required_statements: PASSPORT_STATEMENTS.to_vec(),
     }
 }
 
@@ -1070,11 +1756,26 @@ fn variant_result(
 /// Least squares of monthly gas against the outdoor temperature for the
 /// months below 15 °C (heating season).
 pub fn gas_regression(monthly_m3: &[Option<f64>]) -> Option<RegressionLine> {
-    let points: Vec<(f64, f64)> = monthly_m3
+    regression(monthly_m3, &[])
+}
+
+/// Month temperature: the local value when given, else table 17.1.
+fn month_temperature(local: &[Option<f64>], index: usize) -> f64 {
+    local
+        .get(index)
+        .copied()
+        .flatten()
+        .unwrap_or(OUTDOOR_TEMPERATURE_C[index])
+}
+
+/// Least squares of a monthly series against the (local) outdoor
+/// temperature for the months below 15 °C; the units follow the series.
+pub fn regression(monthly: &[Option<f64>], local_c: &[Option<f64>]) -> Option<RegressionLine> {
+    let points: Vec<(f64, f64)> = monthly
         .iter()
         .enumerate()
         .take(12)
-        .filter_map(|(index, value)| value.map(|v| (OUTDOOR_TEMPERATURE_C[index], v)))
+        .filter_map(|(index, value)| value.map(|v| (month_temperature(local_c, index), v)))
         .filter(|(theta, _)| *theta < 15.0)
         .collect();
     if points.len() < 2 {
@@ -1096,6 +1797,23 @@ pub fn gas_regression(monthly_m3: &[Option<f64>]) -> Option<RegressionLine> {
         heating_limit_c: (slope < 0.0).then(|| -intercept / slope),
         points: points.len(),
     })
+}
+
+/// Mean of the months at or above 15 °C (outside the heating season).
+fn base_load(monthly: &[Option<f64>], local_c: &[Option<f64>]) -> Option<f64> {
+    let values: Vec<f64> = monthly
+        .iter()
+        .enumerate()
+        .take(12)
+        .filter(|(index, _)| month_temperature(local_c, *index) >= 15.0)
+        .filter_map(|(_, value)| *value)
+        .collect();
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+}
+
+fn mean_of(values: &[Option<f64>]) -> Option<f64> {
+    let present: Vec<f64> = values.iter().take(12).filter_map(|value| *value).collect();
+    (!present.is_empty()).then(|| present.iter().sum::<f64>() / present.len() as f64)
 }
 
 fn deviation(calculated: f64, measured: Option<f64>) -> Option<f64> {
@@ -1234,8 +1952,37 @@ fn validate(input: &MaatwerkadviesInput, issues: &mut Vec<MwaIssue>) {
         }
     }
     if let Some(measured) = &input.measured {
-        if !measured.monthly_gas_m3.is_empty() && measured.monthly_gas_m3.len() != 12 {
-            issues.push(issue("measured_monthly_length", "measured.monthlyGasM3"));
+        // Electricity is the net delivery per month (Bijlage C.3) and may be
+        // negative with on-site production.
+        for (field, values, signed) in [
+            ("monthlyGasM3", &measured.monthly_gas_m3, false),
+            (
+                "monthlyElectricityKwh",
+                &measured.monthly_electricity_kwh,
+                true,
+            ),
+            ("monthlyHeatKwh", &measured.monthly_heat_kwh, false),
+        ] {
+            if !values.is_empty() && values.len() != 12 {
+                issues.push(issue(
+                    "measured_monthly_length",
+                    format!("measured.{field}"),
+                ));
+            }
+            if values
+                .iter()
+                .flatten()
+                .any(|value| !value.is_finite() || (!signed && *value < 0.0))
+            {
+                issues.push(issue("measured_value_invalid", format!("measured.{field}")));
+            }
+        }
+        let temperatures = &measured.monthly_outdoor_temperature_c;
+        if !temperatures.is_empty() && temperatures.len() != 12 {
+            issues.push(issue(
+                "measured_monthly_length",
+                "measured.monthlyOutdoorTemperatureC",
+            ));
         }
     }
 }
@@ -1257,6 +2004,7 @@ pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAsses
         packages: Vec::new(),
         fit_check: None,
         advice: None,
+        renovation_passport: None,
         interpretations: INTERPRETATIONS.to_vec(),
         issues,
     };
@@ -1286,6 +2034,7 @@ pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAsses
         net_present_value_eur: None,
         horizon_years: 0.0,
         phasing: Vec::new(),
+        system_checks: current_outcome.system_checks.clone(),
         issues: Vec::new(),
     };
     let measure_results: Vec<VariantResult> = input
@@ -1324,30 +2073,139 @@ pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAsses
 
     // Fit check against measured use (current use, chapter 3).
     let fit_check = input.measured.as_ref().map(|measured| {
-        let calculated: Vec<Option<f64>> = current_use
-            .monthly_gas_m3
-            .iter()
-            .map(|v| Some(*v))
+        let wrap =
+            |values: &[f64]| -> Vec<Option<f64>> { values.iter().map(|v| Some(*v)).collect() };
+        let calculated_gas = wrap(&current_use.monthly_gas_m3);
+        let calculated_heat = wrap(&current_use.monthly_heat_kwh);
+        let calculated_el = wrap(&current_use.monthly_electricity_import_kwh);
+        let local = &measured.monthly_outdoor_temperature_c;
+        // C.3: electricity is compared as the monthly net delivery.
+        let calculated_net: Vec<Option<f64>> = (0..12)
+            .map(|index| {
+                Some(
+                    current_use.monthly_electricity_import_kwh[index]
+                        - current_use.monthly_electricity_export_kwh[index],
+                )
+            })
             .collect();
+        let measured_gas_base = base_load(&measured.monthly_gas_m3, local);
+        let calculated_gas_base = base_load(&calculated_gas, &[]);
+        let measured_heat_base = base_load(&measured.monthly_heat_kwh, local);
+        let has_heat = current_use.district_heat_kwh > 0.0;
+        let calculated_heat_base = has_heat.then(|| base_load(&calculated_heat, &[])).flatten();
+        let calculated_heat_line = has_heat
+            .then(|| regression(&calculated_heat, &[]))
+            .flatten();
+        let measured_el_base = base_load(&measured.monthly_electricity_kwh, local);
+        let calculated_el_base = base_load(&calculated_net, &[]);
+        // Annual values from complete monthly readings when not given.
+        let annual = |given: Option<f64>, monthly: &[Option<f64>]| {
+            given.or_else(|| {
+                (monthly.len() == 12 && monthly.iter().all(Option::is_some))
+                    .then(|| monthly.iter().map(|value| value.unwrap_or(0.0)).sum())
+            })
+        };
         FitCheck {
             calculated: current_use.clone(),
-            gas_deviation_percent: deviation(current_use.gas_m3, measured.annual_gas_m3),
+            gas_deviation_percent: deviation(
+                current_use.gas_m3,
+                annual(measured.annual_gas_m3, &measured.monthly_gas_m3),
+            ),
             electricity_deviation_percent: deviation(
                 current_use.electricity_import_kwh,
-                measured.annual_electricity_kwh,
+                annual(
+                    measured.annual_electricity_kwh,
+                    &measured.monthly_electricity_kwh,
+                ),
             ),
             heat_deviation_percent: deviation(
                 current_use.district_heat_kwh,
-                measured.annual_heat_kwh,
+                annual(measured.annual_heat_kwh, &measured.monthly_heat_kwh),
             ),
-            measured_gas_line: gas_regression(&measured.monthly_gas_m3),
-            calculated_gas_line: gas_regression(&calculated),
+            // The measured line uses the local temperatures of the metered
+            // period, the calculated line the NTA 8800 climate year.
+            measured_gas_line: with_base(
+                regression(&measured.monthly_gas_m3, local),
+                measured_gas_base,
+            ),
+            calculated_gas_line: with_base(regression(&calculated_gas, &[]), calculated_gas_base),
+            measured_heat_line: with_base(
+                regression(&measured.monthly_heat_kwh, local),
+                measured_heat_base,
+            ),
+            calculated_heat_line: with_base(calculated_heat_line, calculated_heat_base),
+            measured_gas_base_load: measured_gas_base,
+            calculated_gas_base_load: calculated_gas_base,
+            measured_heat_base_load: measured_heat_base,
+            calculated_heat_base_load: calculated_heat_base,
+            measured_electricity_line: with_base(
+                regression(&measured.monthly_electricity_kwh, local),
+                measured_el_base,
+            ),
+            calculated_electricity_line: with_base(
+                regression(&calculated_net, &[]),
+                calculated_el_base,
+            ),
+            measured_electricity_base_load: measured_el_base,
+            calculated_electricity_base_load: calculated_el_base,
+            criteria: FitCriteria::default(),
+            monthly_electricity_deviation_percent: (0..12)
+                .map(|index| {
+                    deviation(
+                        current_use.monthly_electricity_import_kwh[index],
+                        measured
+                            .monthly_electricity_kwh
+                            .get(index)
+                            .copied()
+                            .flatten(),
+                    )
+                })
+                .collect(),
+            measured_electricity_monthly_mean_kwh: mean_of(&measured.monthly_electricity_kwh),
+            calculated_electricity_monthly_mean_kwh: mean_of(&calculated_el),
         }
+    });
+
+    // ISSO 82.2 table 2.7: practice factors need the chapter 11 route; zones
+    // with declared ventilation flows cannot be scaled per flow part.
+    let practice_requested = [input.current_use.as_ref(), input.future_use.as_ref()]
+        .into_iter()
+        .flatten()
+        .any(|profile| {
+            profile.ventilation_practice.is_some() || profile.profile != UserProfile::Nta
+        });
+    let practice_gap = practice_requested && {
+        let mut scratch = Vec::new();
+        variant_input(&input.base, &[], &mut scratch).is_some_and(|building| {
+            std::iter::once(&building.space_heating.demand)
+                .chain(
+                    building
+                        .space_heating
+                        .additional_zones
+                        .iter()
+                        .map(|zone| &zone.demand),
+                )
+                .any(|demand| demand.ventilation.is_none())
+        })
+    };
+    let renovation_passport = input
+        .renovation_passport
+        .as_ref()
+        .map(|passport| renovation_passport(input, passport, &current_use));
+
+    let fit_check = fit_check.map(|mut check| {
+        check.criteria = fit_criteria(&check, input.measured.as_ref());
+        check
     });
 
     // Advice.
     let mut warnings = Vec::new();
     let mut specialist = Vec::new();
+    if practice_gap {
+        warnings.push(
+            "ventilation_practice_not_applied: de praktijkfactoren voor ventilatie (ISSO 82.2 tabel 2.7) vragen de route van hoofdstuk 11; zones met opgegeven ventilatiestromen worden niet gecorrigeerd".into(),
+        );
+    }
     if input.packages.len() < 2 {
         warnings.push(
             "ISSO 82.2/75.2 §4.2.2: combineer de maatregelen in minimaal twee pakketten".into(),
@@ -1368,6 +2226,20 @@ pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAsses
                     package.name
                 ));
             }
+        }
+        for check in result
+            .system_checks
+            .iter()
+            .filter(|c| c.meets == Some(false))
+        {
+            warnings.push(format!(
+                "{}: systeemeis Bbl art. 4.248 voor {} niet gehaald ({:.2} > {:.2} {}); geldt bij vervanging of verbetering van het systeem (ISSO 82.2 §5.2)",
+                package.name,
+                check.system,
+                check.value.unwrap_or(0.0),
+                check.limit.unwrap_or(0.0),
+                check.unit
+            ));
         }
         if result
             .savings
@@ -1438,6 +2310,7 @@ pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAsses
         packages: package_results,
         fit_check,
         advice: Some(advice),
+        renovation_passport,
         interpretations: INTERPRETATIONS.to_vec(),
         issues,
     }
@@ -1540,6 +2413,8 @@ mod tests {
             discount_rate: 0.0,
             energy_price_change: 0.0,
             horizon_years: None,
+            base_year: None,
+            maintenance_price_change: 0.0,
             source_reference: String::new(),
         };
         // r = 0: 15 × 100 − 1000 − 1000 (year 10) + 500 residual.
@@ -1659,7 +2534,12 @@ mod tests {
             CalculationScope::Residential
         );
         input.current_use = Some(UsageProfile {
-            ventilation_practice: Default::default(),
+            ventilation_practice: None,
+            persons: None,
+            heat_per_person_w: None,
+            occupancy_time_fraction: None,
+            appliance_w_per_m2: None,
+            lighting_hours_factor: None,
             profile: UserProfile::EnergyConscious,
             heating_setpoint_c: None,
             cooling_setpoint_c: None,
@@ -1696,6 +2576,288 @@ mod tests {
         } else {
             assert!(total(gas_after) <= total(gas_before) + 1e-6);
         }
+    }
+
+    fn profile(kind: UserProfile) -> UsageProfile {
+        UsageProfile {
+            profile: kind,
+            heating_setpoint_c: None,
+            cooling_setpoint_c: None,
+            reduced_setpoint_c: None,
+            day_reduction_h: None,
+            weekend_reduction_h: None,
+            spatial_fraction: None,
+            occupants: None,
+            internal_gain_per_person_w: None,
+            occupancy_appliance_w_per_m2: None,
+            hot_water_need_per_person_kwh: None,
+            annual_hot_water_need_kwh: None,
+            persons: None,
+            heat_per_person_w: None,
+            occupancy_time_fraction: None,
+            appliance_w_per_m2: None,
+            lighting_hours_factor: None,
+            ventilation_practice: None,
+            source_reference: "gesprek".into(),
+        }
+    }
+
+    #[test]
+    fn utility_persons_and_lighting_hours_follow_isso_75_2() {
+        use crate::lighting::{
+            Daylight, InstalledPower, LightingZone, Occupancy, ParasiticPower, SwitchControl,
+            UseArea, ZoneLighting,
+        };
+        let mut building: BuildingPerformanceInput = serde_json::from_value(building()).unwrap();
+        building.calculation_scope = CalculationScope::Utility;
+        building.space_heating.demand.usage_function = crate::monthly_demand::UsageFunction::Office;
+        building.space_heating.demand.function_areas.clear();
+        let area = building.space_heating.demand.usable_floor_area_m2;
+        building.lighting = vec![ZoneLighting {
+            zone_id: building.space_heating.demand.zone_id.clone(),
+            functions: vec![UseArea {
+                function: crate::label_class::LabelFunction::Office,
+                area_m2: area,
+            }],
+            lighting_zones: vec![LightingZone {
+                id: "lz".into(),
+                area_m2: area,
+                power: InstalledPower::Forfait {
+                    led_from_2017: false,
+                },
+                parasitic: ParasiticPower::Forfait,
+                occupancy: Occupancy {
+                    control: SwitchControl::ManualOrUnknown,
+                    central_on_control: true,
+                    large_office_group: false,
+                },
+                daylight: Daylight::None,
+                extracted_luminaires: false,
+            }],
+            source_reference: "plan".into(),
+            burning_hours_factor: None,
+        }];
+        // 75.2 table 2.6: N_p·80 W·f_t/A_g + q_A (office f_τ 0,30, q_A 4).
+        let mut use_ = profile(UserProfile::EnergyConscious);
+        use_.persons = Some(12.0);
+        let mut fitted = building.clone();
+        apply_use(&mut fitted, &use_);
+        let fit = fitted.space_heating.demand.usage_fit.as_ref().unwrap();
+        let expected = 12.0 * 80.0 * 0.30 / area + 4.0;
+        assert!((fit.occupancy_appliance_w_per_m2.unwrap() - expected).abs() < 1e-9);
+        // 75.2 table 2.7: energy-conscious burning hours −20 %.
+        assert_eq!(fitted.lighting[0].burning_hours_factor, Some(0.8));
+        // ISSO 82.2 table 2.2: standard profiles take the practice factors.
+        assert!(fit.ventilation_practice.is_some());
+        // The NTA option keeps the NTA burning hours and no practice factors.
+        let mut nta = building.clone();
+        apply_use(&mut nta, &profile(UserProfile::Nta));
+        assert_eq!(nta.lighting[0].burning_hours_factor, None);
+        assert!(nta
+            .space_heating
+            .demand
+            .usage_fit
+            .as_ref()
+            .unwrap()
+            .ventilation_practice
+            .is_none());
+    }
+
+    #[test]
+    fn system_checks_follow_omgevingsregeling_bijlage_viii() {
+        use crate::building_performance::{F_P_DISTRICT_HEAT_FORFAIT, F_P_ELECTRICITY};
+        let input: BuildingPerformanceInput = serde_json::from_value(building()).unwrap();
+        let result = crate::building_performance::assess_building_performance(&input);
+        let checks = system_performance_checks(&input, &result);
+        let heating = checks.iter().find(|c| c.system == "space_heating").unwrap();
+        let energy: f64 = result
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| {
+                row.natural_gas_kwh
+                    + row.oil_kwh
+                    + 0.5 * row.biomass_kwh
+                    + F_P_DISTRICT_HEAT_FORFAIT * row.district_heat_kwh
+                    + F_P_ELECTRICITY
+                        * (row.generator_electricity_kwh
+                            + row.auxiliary_electricity_kwh.unwrap_or(0.0))
+            })
+            .sum();
+        let need = result
+            .space_heating
+            .demand
+            .annual_heating_need_without_recoverable_kwh
+            .unwrap();
+        assert!((heating.value.unwrap() - energy / need).abs() < 1e-9);
+        assert_eq!(heating.limit, Some(1.31));
+        assert_eq!(heating.meets, Some(energy / need <= 1.31));
+        // Dwellings: no ventilation or lighting limit.
+        let ventilation = checks.iter().find(|c| c.system == "ventilation").unwrap();
+        assert_eq!(ventilation.limit, None);
+        let assessed = assess_maatwerkadvies(&mwa(building()));
+        assert_eq!(assessed.current.unwrap().system_checks.len(), checks.len());
+    }
+
+    #[test]
+    fn fit_check_uses_monthly_series_and_isso_criteria() {
+        // §3.2.7: heating limit at the knee above the base load.
+        let line = RegressionLine {
+            slope_m3_per_k: -10.0,
+            intercept_m3: 200.0,
+            heating_limit_c: None,
+            points: 6,
+        };
+        let knee = with_base(Some(line), Some(30.0)).unwrap();
+        assert!((knee.heating_limit_c.unwrap() - 17.0).abs() < 1e-12);
+        assert!(
+            (with_base(Some(line), None)
+                .unwrap()
+                .heating_limit_c
+                .unwrap()
+                - 20.0)
+                .abs()
+                < 1e-12
+        );
+        // Measured series equal to the calculated ones meet every criterion.
+        let plain = assess_maatwerkadvies(&mwa(building()));
+        let current = plain.current.unwrap().actual_use.unwrap();
+        let mut input = mwa(building());
+        input.measured = Some(MeasuredUse {
+            monthly_gas_m3: current.monthly_gas_m3.iter().map(|v| Some(*v)).collect(),
+            monthly_electricity_kwh: (0..12)
+                .map(|index| {
+                    Some(
+                        current.monthly_electricity_import_kwh[index]
+                            - current.monthly_electricity_export_kwh[index],
+                    )
+                })
+                .collect(),
+            source_reference: "slimme meter".into(),
+            ..MeasuredUse::default()
+        });
+        let fitted = assess_maatwerkadvies(&input);
+        let check = fitted.fit_check.unwrap();
+        assert_eq!(check.criteria.annual_gas, Some(true));
+        assert_eq!(check.criteria.gas_slope, Some(true));
+        assert_eq!(check.criteria.gas_heating_limit, Some(true));
+        assert_eq!(check.criteria.within_criteria, Some(true));
+        assert!(check.monthly_electricity_deviation_percent.len() == 12);
+        // 20 % more gas fails the annual criterion; a warmer local climate
+        // moves the measured heating limit.
+        let mut more = input.clone();
+        let measured = more.measured.as_mut().unwrap();
+        for value in measured.monthly_gas_m3.iter_mut().flatten() {
+            *value *= 1.2;
+        }
+        measured.monthly_outdoor_temperature_c = (0..12)
+            .map(|index| Some(crate::climate::OUTDOOR_TEMPERATURE_C[index] + 2.0))
+            .collect();
+        let check = assess_maatwerkadvies(&more).fit_check.unwrap();
+        assert_eq!(check.criteria.annual_gas, Some(false));
+        assert_eq!(check.criteria.within_criteria, Some(false));
+    }
+
+    #[test]
+    fn renovation_passport_stacks_the_three_steps() {
+        let mut input = mwa(building());
+        let noop = |id: &str, category: MeasureCategory| Measure {
+            id: id.into(),
+            name: id.into(),
+            category,
+            target: PatchTarget::Building,
+            patch: vec![PatchOperation::Replace {
+                path: "/areaSourceReference".into(),
+                value: json!(id),
+            }],
+            investment_eur: 100.0,
+            cost_source: "offerte".into(),
+            lifetime_years: 20.0,
+            maintenance_eur_per_year: 0.0,
+            phase_year: None,
+            specialist_note: None,
+        };
+        input.measures = vec![
+            noop("isolatie", MeasureCategory::Insulation),
+            noop("zonwering", MeasureCategory::Other),
+            noop("wp", MeasureCategory::HeatPump),
+            noop("pv", MeasureCategory::Pv),
+        ];
+        let package = |id: &str, measures: &[&str]| Package {
+            id: id.into(),
+            name: id.into(),
+            measure_ids: measures.iter().map(|m| m.to_string()).collect(),
+            partial_execution_warning: None,
+        };
+        input.packages = vec![
+            package("stap1", &["isolatie", "zonwering"]),
+            package("stap2", &["wp"]),
+            package("stap3", &["pv"]),
+        ];
+        input.renovation_passport = Some(RenovationPassportInput {
+            demand_package_id: "stap1".into(),
+            systems_package_id: "stap2".into(),
+            production_package_id: "stap3".into(),
+            prewar_standard: false,
+            prewar_motivation: None,
+            insulation_standard_met: Some(true),
+            insulation_standard_max_need_kwh_per_m2: None,
+            overheating_measure_ids: vec!["zonwering".into()],
+            storage_considered: true,
+        });
+        let result = assess_maatwerkadvies(&input);
+        let passport = result.renovation_passport.unwrap();
+        assert_eq!(passport.steps.len(), 3);
+        // Stacked: step 3 contains the measures of steps 1 and 2.
+        assert_eq!(passport.steps[2].measure_ids.len(), 4);
+        let met = |code: &str| {
+            passport
+                .requirements
+                .iter()
+                .find(|item| item.code == code)
+                .unwrap()
+                .met
+        };
+        assert_eq!(met("three_steps_present"), Some(true));
+        assert_eq!(met("overheating_measures"), Some(true));
+        assert_eq!(met("renewable_production"), Some(true));
+        // The no-op "heat pump" leaves the gas boiler in place.
+        assert_eq!(met("natural_gas_free_main_heating"), Some(false));
+        assert_eq!(passport.eligible, Some(false));
+    }
+
+    #[test]
+    fn npv_discounts_phased_investments_and_escalates_maintenance() {
+        let measure = Measure {
+            id: "m".into(),
+            name: "m".into(),
+            category: MeasureCategory::Other,
+            target: PatchTarget::Building,
+            patch: Vec::new(),
+            investment_eur: 1000.0,
+            cost_source: "offerte".into(),
+            lifetime_years: 30.0,
+            maintenance_eur_per_year: 10.0,
+            phase_year: Some(2030),
+            specialist_note: None,
+        };
+        let economics = Economics {
+            discount_rate: 0.05,
+            energy_price_change: 0.0,
+            horizon_years: None,
+            base_year: Some(2026),
+            maintenance_price_change: 0.02,
+            source_reference: String::new(),
+        };
+        let horizon = 10.0;
+        let npv = net_present_value(&[&measure], 0.0, &economics, horizon);
+        let upkeep: f64 = (1..=10)
+            .map(|t| 10.0 * 1.02_f64.powi(t - 1) / 1.05_f64.powi(t))
+            .sum();
+        // Invested in year 4; residual (30 − 6)/30 at the horizon.
+        let expected =
+            -upkeep - 1000.0 / 1.05_f64.powi(4) + 1000.0 * (1.0 - 6.0 / 30.0) / 1.05_f64.powi(10);
+        assert!((npv - expected).abs() < 1e-9, "{npv} vs {expected}");
     }
 
     fn project() -> Value {
@@ -1792,7 +2954,12 @@ mod tests {
         apply_use(
             &mut building,
             &UsageProfile {
-                ventilation_practice: Default::default(),
+                ventilation_practice: None,
+                persons: None,
+                heat_per_person_w: None,
+                occupancy_time_fraction: None,
+                appliance_w_per_m2: None,
+                lighting_hours_factor: None,
                 profile: UserProfile::NotEnergyConscious,
                 heating_setpoint_c: None,
                 cooling_setpoint_c: None,

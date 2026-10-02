@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { createDefaultProject } from '../context/EnergyContext';
-import { MaatwerkadviesPanel } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { MaatwerkadviesPanel, parseMonthly } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../components/MaatwerkadviesPanel/RelabelPanel';
 import { buildMaatwerkadviesInput, type MaatwerkadviesAssessment } from '../core/nta/KernelClient';
 import { generateMaatwerkadviesReportHTML } from '../core/report/MaatwerkadviesReport';
@@ -15,6 +15,11 @@ function Editor() {
 }
 
 describe('maatwerkadvies panel', () => {
+  it('parses monthly readings with gaps', () => {
+    expect(parseMonthly('')).toBeUndefined();
+    expect(parseMonthly('300; 280; -; 150,5')).toEqual([300, 280, null, 150.5]);
+  });
+
   it('starts an advice and adds measures and packages to the project', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
@@ -53,17 +58,29 @@ describe('maatwerkadvies input and report', () => {
         gasKwh: 9769, gasM3: 1000, electricityImportKwh: 2500, electricityExportKwh: 0, electricityProducedKwh: 0,
         districtHeatKwh: 0, districtColdKwh: 0, oilKwh: 0, biomassKwh: 0, primaryFossilKwh: 20000, co2Kg: 2500,
         energyCostEur: 2150, monthlyGasM3: new Array(12).fill(83),
+        monthlyElectricityImportKwh: new Array(12).fill(208), monthlyHeatKwh: new Array(12).fill(0),
+        monthlyElectricityExportKwh: new Array(12).fill(0),
       },
       savings: kind === 'package' ? { gasM3: 300, electricityKwh: 0, heatKwh: 0, primaryFossilKwh: 3000, co2Kg: 550, energyCostEur: 420 } : null,
       investmentEur: kind === 'package' ? 8000 : 0, maintenanceEurPerYear: 0,
       simplePaybackYears: kind === 'package' ? 19 : null, netPresentValueEur: kind === 'package' ? -500 : null,
       horizonYears: 40, phasing: [], issues: [],
+      systemChecks: [
+        { system: 'space_heating' as const, value: 1.42, limit: 1.31, unit: '-', meets: false, note: null },
+        { system: 'ventilation' as const, value: null, limit: null, unit: 'kWh/(m3/h)', meets: null, note: null },
+      ],
     });
     const assessment: MaatwerkadviesAssessment = {
       status: 'calculated_unverified', scope: 's', targetNormVersion: 'NTA', kernelVersion: 'k', inputFingerprint: 'f',
       attestStatus: 'unattested', current: variant('current', 'Huidige situatie', 'current'), measures: [],
       packages: [variant('p1', 'Spouwmuur', 'package')], fitCheck: null,
       advice: { packageId: 'p1', chosenBy: 'adviser', motivation: 'past bij budget', warnings: ['let op ventilatie'], specialistNotes: [], notes: [] },
+      renovationPassport: {
+        steps: [variant('passport-step-1', 'Stap 1: beperken warmte- en koudevraag', 'package')],
+        requirements: [{ code: 'natural_gas_free_main_heating', met: false, detail: null }],
+        eligible: false,
+        requiredStatements: [],
+      },
       interpretations: ['npv'], issues: [],
     };
     const html = generateMaatwerkadviesReportHTML(project, {
@@ -75,5 +92,9 @@ describe('maatwerkadvies input and report', () => {
     expect(html).toContain('keuze adviseur');
     expect(html).toContain('let op ventilatie');
     expect(html).toContain('tarieven 2026');
+    expect(html).toContain('Systeemeisen Bbl art. 4.248');
+    expect(html).toContain('Ruimteverwarming');
+    expect(html).toContain('Renovatiepaspoort');
+    expect(html).toContain('Hoofdverwarming aardgasvrij');
   });
 });

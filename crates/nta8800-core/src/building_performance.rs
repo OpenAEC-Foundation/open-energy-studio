@@ -3386,6 +3386,7 @@ mod tests {
                 extracted_luminaires: false,
             }],
             source_reference: "lighting plan".into(),
+            burning_hours_factor: None,
         };
         sample.lighting = vec![lighting];
         assert!(assess_building_performance(&sample)

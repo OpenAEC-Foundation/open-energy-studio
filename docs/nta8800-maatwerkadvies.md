@@ -133,20 +133,20 @@ Het paneel "Herlabelen" laadt het projectbestand van het oorspronkelijke label e
 
 ## Nog niet ondersteund
 
-- Locatiespecifieke klimaatgegevens en beschaduwing (§2.6).
-- De branduren van verlichting voor utiliteit (75.2 tabel 2.7, p. 44).
-- De interne warmte per persoon voor utiliteit (80 W, 75.2 tabel 2.6).
-- Maandelijkse elektriciteits- en warmtemeting in de fitcontrole.
-- Een exacte warmtapwaterfit in hoofdstuk 13 zelf. Nu is die lineair geschaald, omdat `domestic_hot_water.rs` buiten deze wijziging viel.
-- Het renovatiepaspoort (ISSO 82.2 §1.10 en §4.4).
-- De EPBD-systeemeisen (ISSO 82.2 §5.2, tabel 5.1) als automatische controle.
-- De kostenrekenregels van de ISSO-modelbeschrijving (rapport 110293).
-- Monitoringbestanden voor MWA-registratie: daarvoor is een externe specificatie nodig.
-
+- **Locatiespecifieke klimaatgegevens en beschaduwing (§2.6).** De kern heeft geen NEN 5060-uurwaarden of KNMI-reeksen. Wel kan de adviseur bij de fitcontrole de lokale maandtemperaturen van de meetperiode opgeven.
+- **Een exacte warmtapwaterfit in hoofdstuk 13 zelf.** Die wordt nu lineair geschaald.
+- **De kostenrekenregels van de ISSO-modelbeschrijving (rapport 110293).**
+- **Monitoringbestanden voor MWA-registratie.** Daarvoor is een externe specificatie nodig.
+- **De systeemeis voor koeling.** Hoofdstuk 10 rapporteert de primaire energie niet per systeem, dus de kern kan deze eis niet toetsen.
 
 ## Praktijkfactoren voor ventilatie
 
-Bij de berekening voor het werkelijk gebruik worden altijd de praktijkfactoren voor ventilatie toegepast (ISSO 82.2 tabel 2.7, p. 39; 75.2 tabel 2.8, p. 45). In het gebruiksprofiel kunnen ze worden overschreven met `ventilationPractice`.
+De praktijkfactoren voor ventilatie staan in ISSO 82.2 tabel 2.7 (p. 39) en 75.2 tabel 2.8 (p. 45).
+
+- **Standaardprofielen:** de berekening voor het werkelijk gebruik past de factoren toe bij de profielen energiebewust, gemiddeld en niet energiebewust.
+- **NTA-optie:** hier gelden ze alleen als ze zijn ingevuld, want tabel 2.2 (p. 35) geeft voor de NTA-optie "–".
+- **Eigen waarden:** met `ventilationPractice` kunnen de factoren worden overschreven.
+- **Opgegeven ventilatiestromen:** zones zonder de route van hoofdstuk 11 kunnen niet per deel worden gecorrigeerd. Het advies krijgt dan de waarschuwing `ventilation_practice_not_applied`.
 
 | Factor | Werkt op | Standaardwaarde |
 |---|---|---|
@@ -155,3 +155,98 @@ Bij de berekening voor het werkelijk gebruik worden altijd de praktijkfactoren v
 | f_prac;lea | infiltratie | 0,5 |
 
 Systeem B staat niet in de tabel en krijgt, als interpretatie, de waarde van C. De factoren lopen via `usageFit.ventilationPractice` naar hoofdstuk 11 (`VentilationInput.practice`). De labelberekening en de vaste C1-berekening voor BENG 1 gebruiken ze niet. De ventilatorenergie blijft gebaseerd op het eisdebiet.
+
+
+## Utiliteit: personen en branduren verlichting
+
+**Interne warmte per persoon (ISSO 75.2 tabel 2.6, p. 44).** Met `persons` (N_p van het gebouw) wordt q_Oc·f_τ per zone N_p·aandeel·q_oc;p·f_t/A_g:
+- het aandeel is het aandeel in de gebruiksoppervlakte;
+- q_oc;p is standaard 80 W (`heatPerPersonW`);
+- f_t komt uit NTA tabel 7.2 (`occupancyTimeFraction`).
+
+Daarbij komt q_A uit NTA tabel 7.3 (`applianceWPerM2`). Een vrij ingevulde `occupancyApplianceWPerM2` gaat voor.
+
+**Branduren verlichting (75.2 tabel 2.7).** De branduren t_D en t_N van tabel 14.1 worden per profiel geschaald:
+
+| Profiel | Factor |
+|---|---|
+| energiebewust | 0,8 |
+| gemiddeld / NTA | 1,0 |
+| niet energiebewust | 1,2 |
+
+`lightingHoursFactor` overschrijft de factor. In hoofdstuk 14 werkt de factor via `ZoneLighting.burningHoursFactor`; de labelberekening zet die nooit.
+
+## Warm tapwater bij de NTA-optie
+
+ISSO 82.2 §2.5.3 (p. 37) noemt een praktijkcorrectie voor de NTA-optie, maar geeft geen getal. De kern neemt daarom de waarde van het gemiddelde profiel: 545 kWh per bewoner. Dit is een interpretatie.
+
+## Fitcontrole (ISSO 82.2 hoofdstuk 3 en bijlage C.1)
+
+**Meetgegevens.** Naast de jaarwaarden kunnen maandreeksen worden opgegeven voor:
+- gas, in m³;
+- elektriciteit, als netto afname min teruglevering (C.3);
+- warmte;
+- de lokale gemiddelde buitentemperatuur van de meetperiode (§3.2.1).
+
+Ontbreekt de jaarwaarde, dan telt de kern een volledige maandreeks op.
+
+**Regressielijnen.** Per drager bepaalt de kern een lijn door de maanden onder 15 °C:
+- de gemeten lijn met de lokale temperaturen;
+- de berekende lijn met het klimaatjaar van NTA 8800.
+
+**Basislast.** Dit is het gemiddelde van de maanden vanaf 15 °C, het verbruik voor warm tapwater en koken.
+
+**Stookgrens.** Dit is het knikpunt waar de lijn de basislast raakt: θ = (a − basis)/(−b) (§3.2.7).
+
+**Criteria (bijlage C.1, p. 105).** De kern geeft per criterium voldoet, voldoet niet of niet te beoordelen, plus een totaaloordeel:
+
+| Criterium | Tolerantie |
+|---|---|
+| jaarverbruik per drager | ±5 % |
+| helling | ±5 % |
+| stookgrens | ±1 °C |
+| basislijn | ±5 % |
+
+## Systeemeisen EPBD (ISSO 82.2 §5.2)
+
+Elke variant krijgt `systemChecks` volgens Bbl art. 4.248 (tabel 4.248) en Omgevingsregeling art. 5.2 met bijlage VIII. De kern rekent ze op de standaard NTA 8800-berekening van de variant.
+
+| Systeem | Waarde | Eis |
+|---|---|---|
+| Ruimteverwarming | (E_H − E_H;WKK)/Q_H;nd, met Q_H;nd zonder terugwinbare verliezen | ≤ 1,31 |
+| Warm tapwater | (E_W − E_W;WKK)/Q_W;nd | ≤ 3,45 |
+| Ventilatie (utiliteit) | E_V/q_V;ODA;req | ≤ 3,8 kWh/(m³/h) |
+| Ingebouwde verlichting (utiliteit) | E_L/A_g | ≤ 75 kWh_prim/m² |
+
+Uitgangspunten:
+- De primaire energie volgt de f_P;del-factoren van tabel 5.2 van NTA 8800. Externe warmte telt forfaitair.
+- WKK-bijdragen zijn 0, omdat de keten geen WKK voor verwarming of tapwater kent.
+- Voor verlichting volgt de kern het Bbl (75). ISSO 82.2 tabel 5.1 drukt 17 af.
+
+Het advies waarschuwt bij een pakket dat een eis niet haalt. De eisen gelden alleen als een systeem wordt geïnstalleerd, vervangen of verbeterd.
+
+## Renovatiepaspoort (ISSO 82.2 §1.10 en §4.4)
+
+Met `renovationPassport` wijst de adviseur drie pakketten aan:
+1. beperken van de warmte- en koudevraag;
+2. duurzame installaties;
+3. opwekking en opslag.
+
+De stappen zijn gestapeld: stap 2 bevat de maatregelen van stap 1, en stap 3 die van stap 1 en 2. Per stap rapporteert de kern het NTA 8800-label en het energiegebruik bij het werkelijk gebruik.
+
+De eisen die de kern beoordeelt:
+- alle drie de stappen aanwezig;
+- Standaard voor Woningisolatie: een verklaring van de adviseur, of de BENG 1-waarde van stap 1 tegen een opgegeven grens;
+- een motivatie bij de vooroorlogse standaard;
+- maatregelen tegen oververhitting in stap 1;
+- aardgasvrije hoofdverwarming na stap 2: geen gas- of oliegebruik, of hybride bij de vooroorlogse standaard;
+- geen fossiele verbranding na stap 3;
+- hernieuwbare opwekking in stap 3;
+- opslagcapaciteit afgewogen.
+
+Het rapport neemt de verplichte kanttekeningen over oververhitting op (§1.10.2), in eigen woorden.
+
+## Netto contante waarde
+
+- **Fasering.** Met `economics.baseYear` begint de investering van een maatregel in zijn `phaseYear`. De besparing van een pakket begint in jaar 1.
+- **Onderhoud.** De onderhoudskosten stijgen jaarlijks met `maintenancePriceChange`.
