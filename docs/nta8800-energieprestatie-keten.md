@@ -131,7 +131,9 @@ De module vereist de `components`-transmissieroute, waarin ramen en opake vlakke
 
 ## BENG 1
 
-Volgens §5.4 moet de energiebehoefte voor BENG 1 worden berekend met een vast ventilatiesysteem C1 (tabellen 11.5/11.6) en vaste interne warmtelasten. Hoofdstuk 11 zit nog niet in Rust. Daarom verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de ventilatie-invoer het C1-systeem voorstelt. De jaarlijkse behoefte met de opgegeven ventilatie staat altijd in `annualHeatingAndCoolingNeedKwh`.
+Volgens §5.4 rekent BENG 1 met een vast ventilatiesysteem C1 (§5.4.3) en, bij utiliteit, met vaste interne warmtelasten (§5.4.2). Als elke zone hoofdstuk 11-invoer heeft (`ventilation`), voert de kern die aparte run zelf uit (`fixedC1` per zone). BENG 1 en `annualHeatingAndCoolingNeedKwh` gebruiken dan de som van die runs. Zonder hoofdstuk 11-invoer verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de opgegeven ventilatie het C1-systeem voorstelt.
+
+De ventilatoren (11.132), de vorstbeveiliging (11.105) en de voorverwarming in roosters (11.125) uit hoofdstuk 11 tellen als elektriciteit zonder f_BACS. Ventilatorenergie mag dan niet ook als opgegeven post staan (`ventilation_fans_double_count`).
 
 ## Geweigerd of niet ondersteund
 

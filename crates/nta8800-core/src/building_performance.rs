@@ -495,6 +495,24 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             issues.push(issue("cooling_double_count", "cooling"));
         }
     }
+    let chapter_11_zones = std::iter::once(&input.space_heating.demand)
+        .chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+        .any(|demand| demand.ventilation.is_some());
+    if chapter_11_zones
+        && input
+            .declared_uses
+            .iter()
+            .any(|item| item.service == Service::VentilationFans)
+    {
+        // Chapter 11 already yields the fan energy.
+        issues.push(issue("ventilation_fans_double_count", "declaredUses"));
+    }
     if !input.pv_systems.is_empty()
         && input
             .on_site_production
@@ -709,9 +727,10 @@ pub fn assess_building_performance(
         .filter(|_| valid)
         .and_then(|result| result.scenarios.first());
     let totals = totals.filter(|_| valid);
+    let need_from_fixed_c1 = totals.is_some_and(|item| item.need_from_fixed_c1);
     let need_indicator = indicators
         .as_ref()
-        .filter(|_| valid && input.demand_uses_fixed_c1_ventilation)
+        .filter(|_| valid && (input.demand_uses_fixed_c1_ventilation || need_from_fixed_c1))
         .and_then(|result| result.need_indicator_kwh_per_m2_year);
     // Bbl 4.149 paragraph 4: capacity weighted by usable floor area.
     let zone_demands = || {
@@ -836,8 +855,10 @@ struct Totals {
     renewable: f64,
     /// Heat-pump ambient heat, kWh.
     ambient: f64,
-    /// Q_H+C;nd, kWh.
+    /// Q_H+C;nd for BENG 1, kWh: the §5.4.2 C1 run when every zone has
+    /// one, otherwise the need of the supplied ventilation.
     need: f64,
+    need_from_fixed_c1: bool,
     /// 5.14a, kWh.
     storage_correction: f64,
     /// §5.5.6.1, kg CO2eq.
@@ -913,6 +934,16 @@ fn compute(
                 Carrier::El => used_el += value,
                 Carrier::Gas => used_gas += value,
                 Carrier::Oil => used_oil += value,
+            }
+        }
+        // Chapter 11: fans (11.132), frost protection (11.105) and grille
+        // preheating (11.125); not weighted by f_BACS.
+        for demand in std::iter::once(&heating.demand).chain(&heating.additional_zone_demands) {
+            if let Some(ventilation) = &demand.ventilation {
+                let row = &ventilation.months[index];
+                used_el += row.fan_electricity_kwh
+                    + row.frost_protection_electricity_kwh
+                    + row.grille_preheating_electricity_kwh;
             }
         }
         // §10.5: cooling generation for the summed cooling need, weighted by f_BACS (5.20).
@@ -1025,18 +1056,34 @@ fn compute(
             + ambient_cold * F_PREN_RENCOLD
             + produced * F_PREN_RENELECT;
     }
-    let need = std::iter::once(&heating.demand)
-        .chain(&heating.additional_zone_demands)
+    let zone_demands = || std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
+    // §5.4.2: the fixed C1 run, when chapter 11 supplied it for every zone.
+    let fixed_c1_need: Option<f64> = zone_demands()
         .map(|demand| {
-            demand.annual_heating_need_kwh.unwrap_or(0.0)
-                + demand.annual_cooling_need_kwh.unwrap_or(0.0)
+            demand
+                .fixed_c1
+                .as_ref()
+                .filter(|run| run.status == "calculated_unverified")
+                .map(|run| {
+                    run.annual_heating_need_kwh.unwrap_or(0.0)
+                        + run.annual_cooling_need_kwh.unwrap_or(0.0)
+                })
         })
         .sum();
+    let need = fixed_c1_need.unwrap_or_else(|| {
+        zone_demands()
+            .map(|demand| {
+                demand.annual_heating_need_kwh.unwrap_or(0.0)
+                    + demand.annual_cooling_need_kwh.unwrap_or(0.0)
+            })
+            .sum()
+    });
     Totals {
         fossil,
         renewable,
         ambient: ambient_total,
         need,
+        need_from_fixed_c1: fixed_c1_need.is_some(),
         storage_correction,
         co2_kg: co2,
     }
@@ -1155,6 +1202,68 @@ mod tests {
         let need = result.annual_heating_and_cooling_need_kwh.unwrap();
         let beng1 = result.need_indicator_kwh_per_m2_year.unwrap();
         assert!(beng1 >= need / 100.0 && beng1 - need / 100.0 < 0.01);
+    }
+
+    #[test]
+    fn chapter_11_ventilation_gives_beng1_and_fan_energy() {
+        let mut sample = input();
+        let without = assess_building_performance(&sample);
+        let demand = &mut sample.space_heating.demand;
+        demand.ventilation_flows.clear();
+        demand.ventilation = Some(
+            serde_json::from_value(serde_json::json!({
+                "zoneId": demand.zone_id,
+                "usableFloorAreaM2": demand.usable_floor_area_m2,
+                "category": "residential",
+                "functions": [{"function": "residential", "areaM2": demand.usable_floor_area_m2}],
+                "dwellingCount": 1,
+                "buildingHeightM": 9.0,
+                "constructionYear": 2020,
+                "heatingSetpointC": demand.setpoints.heating_c,
+                "coolingSetpointC": demand.setpoints.cooling_c,
+                "system": {"kind": "single", "unit": {"variant": "c4a", "ducts": "luka_a_b_c", "equipmentReference": "synthetic"}},
+                "infiltration": {"method": "measured", "qv10DmPerSM2": 0.4, "sourceReference": "synthetic"},
+                "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
+                "sourceReference": "synthetic"
+            }))
+            .unwrap(),
+        );
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::VentilationFans);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(!sample.demand_uses_fixed_c1_ventilation);
+        let beng1 = result.need_indicator_kwh_per_m2_year.unwrap();
+        let fixed = result.space_heating.demand.fixed_c1.as_ref().unwrap();
+        let need = fixed.annual_heating_need_kwh.unwrap() + fixed.annual_cooling_need_kwh.unwrap();
+        assert!((result.annual_heating_and_cooling_need_kwh.unwrap() - need).abs() < 1e-9);
+        assert!(beng1 > 0.0);
+        let fans = result
+            .space_heating
+            .demand
+            .ventilation
+            .as_ref()
+            .unwrap()
+            .annual_fan_electricity_kwh;
+        assert!(fans > 0.0);
+        assert!(without.need_indicator_kwh_per_m2_year.is_none());
+        // Declared fan energy next to chapter 11 counts twice.
+        sample.declared_uses.push(DeclaredUse {
+            id: "fans".into(),
+            service: Service::VentilationFans,
+            carrier: Carrier::El,
+            monthly_kwh: vec![10.0; 12],
+            source_reference: "x".into(),
+        });
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "ventilation_fans_double_count"));
     }
 
     #[test]
