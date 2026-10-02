@@ -180,7 +180,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
           </div>
         </div>
         {ntaResult && <p role="status" style={{ fontSize: 12 }}>
-          {t('nta.construction.applied')}: U = {ntaResult.u.toFixed(3)} W/m²K
+          {t('nta.construction.applied')}: U = {ntaResult.u.toFixed(2)} W/m²K
           {ntaResult.rc != null && <> · R<sub>c</sub> = {ntaResult.rc.toFixed(2)} m²K/W</>}
           {' '}<button type="button" className="btn btn-sm" onClick={() => setNtaResult(null)}>{t('nta.construction.undo')}</button>
         </p>}

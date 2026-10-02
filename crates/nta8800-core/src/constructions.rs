@@ -19,10 +19,16 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::materials::{round_half_up, Conductivity, ReflectiveFoilSystem};
+use crate::materials::{
+    round_half_up, round_resistance_down, Ageing, Conductivity, InsulationMoisture,
+    ReflectiveFoilSystem, TemperatureConversion,
+};
 
 /// Table C.2 R_se, (m²·K)/W.
 pub const R_SE: f64 = 0.04;
+/// Table C.4: R_se for upward heat flow over a horizontal cavity with a
+/// reflective layer (value in brackets).
+pub const R_SE_UPWARD_REFLECTIVE: f64 = 0.05;
 /// 8.4: practice factor for opaque parts.
 pub const F_PRAC_OPAQUE: f64 = 1.0;
 /// 8.2.2.2.1: ventilation grilles and silencer boxes.
@@ -35,6 +41,10 @@ pub const INTERPRETATIONS: &[&str] = &[
     "table C.4 downward heat flow: thicknesses between rows take the next lower tabulated thickness",
     "tables F.1–F.3 are interpolated bilinearly; values outside the table axes are clamped to the edge rows",
     "8.2.2.2.2: the 3 % rule compares the total ΔU with U_T",
+    "8.9/8.11/8.13 in a composite construction: R_1 and R_T (C.3, thermal bridges neglected) come from the insulation section, by default the section with the highest C.3 R_T",
+    "table C.4 footnote b: a reflective layer facing upward earns no bracket value unless the cavity is hermetically sealed; footnote b is applied to vertical cavities only when the input marks the layer as facing up",
+    "table C.4: R_se 0,05 (bracket value) applies to upward heat flow when a horizontal cavity with an effective reflective layer is present; R_C subtracts the same R_se",
+    "table F.1 (U ≤ 1,0) and tables F.2/F.3 (U > 1,0) are checked against the U_C of the whole construction",
 ];
 
 /// Direction of the heat flow through the element (table C.2 note 3).
@@ -128,6 +138,22 @@ pub enum Layer {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+    /// E.4: R_calc = R_D/(F_T·F_M·F_A·F_conv), rounded down (E.2.1.1).
+    DeclaredResistance {
+        #[serde(rename = "resistanceDeclared")]
+        resistance_declared: f64,
+        moisture: InsulationMoisture,
+        ageing: Ageing,
+        #[serde(default)]
+        temperature: Option<TemperatureConversion>,
+        #[serde(default, rename = "convectionFactor")]
+        convection_factor: Option<f64>,
+        /// Needed only inside composite constructions.
+        #[serde(default, rename = "thicknessM")]
+        thickness_m: Option<f64>,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
     ReflectiveFoil {
         system: ReflectiveFoilSystem,
     },
@@ -140,6 +166,14 @@ pub enum Layer {
         /// C.3/C.4).
         #[serde(default, rename = "reflectiveSurface")]
         reflective_surface: bool,
+        /// The reflective layer faces upward (bottom of the cavity); table
+        /// C.4 footnote b grants no bracket value then.
+        #[serde(default, rename = "reflectiveFacingUp")]
+        reflective_facing_up: bool,
+        /// Hermetically sealed cavity: footnote b allows the bracket value
+        /// for an upward-facing reflective layer.
+        #[serde(default, rename = "hermeticallySealed")]
+        hermetically_sealed: bool,
     },
     /// Table F.1: unventilated narrow air layer or tube in a component with
     /// U ≤ 1,0 W/(m²·K).
@@ -327,14 +361,31 @@ impl Layer {
                 thickness_m,
                 conductivity,
             } => Some(thickness_m / conductivity.lambda_calc()),
-            Self::Resistance { resistance, .. } => Some(*resistance),
+            // E.2.1.1: R_calc rounded down.
+            Self::Resistance { resistance, .. } => Some(round_resistance_down(*resistance)),
+            Self::DeclaredResistance {
+                resistance_declared,
+                moisture,
+                ageing,
+                temperature,
+                convection_factor,
+                ..
+            } => Some(round_resistance_down(
+                resistance_declared
+                    / (temperature
+                        .as_ref()
+                        .map_or(1.0, TemperatureConversion::factor)
+                        * moisture.factor()
+                        * ageing.factor()
+                        * convection_factor.unwrap_or(1.0)),
+            )),
             Self::ReflectiveFoil { system } => Some(system.resistance()),
             Self::AirCavity {
                 thickness_mm,
                 ventilation,
-                reflective_surface,
+                ..
             } => {
-                let (nv, zv) = cavity_table(*thickness_mm, heat_flow, *reflective_surface);
+                let (nv, zv) = cavity_table(*thickness_mm, heat_flow, self.effective_reflective());
                 match ventilation {
                     CavityVentilation::Unventilated => Some(nv),
                     CavityVentilation::Weakly { opening_mm2: None } => Some(zv),
@@ -379,11 +430,27 @@ impl Layer {
         }
     }
 
+    /// A reflective cavity surface that earns the bracket values of tables
+    /// C.3/C.4 (footnote b of table C.4).
+    fn effective_reflective(&self) -> bool {
+        matches!(
+            self,
+            Self::AirCavity {
+                reflective_surface: true,
+                reflective_facing_up,
+                hermetically_sealed,
+                ..
+            } if !*reflective_facing_up || *hermetically_sealed
+        )
+    }
+
     /// Thickness in m for the C.6 layer split; `None` when unknown.
     fn thickness(&self) -> Option<f64> {
         match self {
             Self::Material { thickness_m, .. } => Some(*thickness_m),
-            Self::Resistance { thickness_m, .. } => *thickness_m,
+            Self::Resistance { thickness_m, .. } | Self::DeclaredResistance { thickness_m, .. } => {
+                *thickness_m
+            }
             Self::AirCavity { thickness_mm, .. }
             | Self::NarrowCavity { thickness_mm, .. }
             | Self::TubularCavity { thickness_mm, .. } => Some(thickness_mm / 1000.0),
@@ -428,6 +495,44 @@ impl Layer {
                 }
                 if thickness_m.is_some_and(|t| !positive(t)) {
                     issues.push(issue("thickness_invalid", format!("{path}.thicknessM")));
+                }
+                if source_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "source_reference_required",
+                        format!("{path}.sourceReference"),
+                    ));
+                }
+            }
+            Self::DeclaredResistance {
+                resistance_declared,
+                temperature,
+                convection_factor,
+                thickness_m,
+                source_reference,
+                ..
+            } => {
+                if !(resistance_declared.is_finite() && *resistance_declared >= 0.0) {
+                    issues.push(issue(
+                        "resistance_invalid",
+                        format!("{path}.resistanceDeclared"),
+                    ));
+                }
+                if thickness_m.is_some_and(|t| !positive(t)) {
+                    issues.push(issue("thickness_invalid", format!("{path}.thicknessM")));
+                }
+                if let Some(t) = temperature {
+                    if !t.mean_temperature_c.is_finite() || !t.conversion_coefficient.is_finite() {
+                        issues.push(issue(
+                            "temperature_conversion_invalid",
+                            format!("{path}.temperature"),
+                        ));
+                    }
+                }
+                if convection_factor.is_some_and(|f| !(f.is_finite() && f >= 1.0)) {
+                    issues.push(issue(
+                        "convection_factor_invalid",
+                        format!("{path}.convectionFactor"),
+                    ));
                 }
                 if source_reference.trim().is_empty() {
                     issues.push(issue(
@@ -535,18 +640,24 @@ pub fn total_resistance(layers: &[Layer], heat_flow: HeatFlow, exterior_air: boo
         match layer.resistance(heat_flow) {
             Some(r) => total += r,
             None => {
-                let reflective = matches!(
-                    layer,
-                    Layer::AirCavity {
-                        reflective_surface: true,
-                        ..
-                    }
-                );
-                return total + still_air_exterior_resistance(heat_flow, reflective);
+                return total
+                    + still_air_exterior_resistance(heat_flow, layer.effective_reflective());
             }
         }
     }
-    total + if exterior_air { R_SE } else { 0.0 }
+    total + exterior_resistance(layers, heat_flow, exterior_air)
+}
+
+/// R_se of table C.2, or 0,05 of table C.4 for upward heat flow with an
+/// effective reflective cavity layer; 0 without exterior air.
+pub fn exterior_resistance(layers: &[Layer], heat_flow: HeatFlow, exterior_air: bool) -> f64 {
+    if !exterior_air {
+        0.0
+    } else if heat_flow == HeatFlow::Upward && layers.iter().any(Layer::effective_reflective) {
+        R_SE_UPWARD_REFLECTIVE
+    } else {
+        R_SE
+    }
 }
 
 /// Table C.1 classes for the weighting factor a′.
@@ -684,6 +795,10 @@ pub enum Build {
     Composite {
         sections: Vec<Section>,
         interruption: InterruptionClass,
+        /// Section id holding the insulation for R_1 and R_T of 8.9/8.11/
+        /// 8.13; `None` takes the section with the highest C.3 R_T.
+        #[serde(default, rename = "insulationSection")]
+        insulation_section: Option<String>,
     },
 }
 
@@ -794,6 +909,19 @@ impl OpaqueConstruction {
                 }
             }
         }
+        if let Build::Composite {
+            sections,
+            insulation_section: Some(id),
+            ..
+        } = &self.build
+        {
+            if !sections.iter().any(|s| &s.id == id) {
+                issues.push(issue(
+                    "insulation_section_unknown",
+                    format!("{path}.build.insulationSection"),
+                ));
+            }
+        }
         let layer_count = match &self.build {
             Build::Homogeneous { layers } => layers.len(),
             Build::Composite { sections, .. } => sections.first().map_or(0, |s| s.layers.len()),
@@ -857,6 +985,13 @@ impl OpaqueConstruction {
                             format!("{path}.corrections.fasteners"),
                         ));
                     }
+                    // 8.12: d_fa is the penetration depth into the layer.
+                    if penetration_depth_m > insulation_thickness_m {
+                        issues.push(issue(
+                            "fastener_penetration_exceeds_insulation",
+                            format!("{path}.corrections.fasteners.penetrationDepthM"),
+                        ));
+                    }
                 }
             }
         }
@@ -876,15 +1011,84 @@ impl OpaqueConstruction {
                 ));
             }
         }
+        if issues.is_empty() {
+            // Table F.1 applies to components with U ≤ 1,0, tables F.2/F.3
+            // to components with U > 1,0.
+            let all_layers: Vec<&Layer> = match &self.build {
+                Build::Homogeneous { layers } => layers.iter().collect(),
+                Build::Composite { sections, .. } => {
+                    sections.iter().flat_map(|s| s.layers.iter()).collect()
+                }
+            };
+            let narrow = all_layers
+                .iter()
+                .any(|l| matches!(l, Layer::NarrowCavity { .. }));
+            let tubular = all_layers
+                .iter()
+                .any(|l| matches!(l, Layer::TubularCavity { .. }));
+            if narrow || tubular {
+                let u = self.calculate().u_c;
+                if narrow && u > 1.0 {
+                    issues.push(issue(
+                        "narrow_cavity_table_f1_requires_u_at_most_1",
+                        format!("{path}.build"),
+                    ));
+                }
+                if tubular && u <= 1.0 {
+                    issues.push(issue(
+                        "tubular_cavity_tables_f2_f3_require_u_above_1",
+                        format!("{path}.build"),
+                    ));
+                }
+            }
+        }
         issues
     }
 
-    fn insulation_resistance(&self, index: usize) -> f64 {
-        let layers = match &self.build {
+    /// Layers of the section used for R_1 and R_T in 8.9/8.11/8.13: the
+    /// homogeneous build, the named insulation section, or the section with
+    /// the highest C.3 R_T.
+    fn insulation_layers(&self) -> &[Layer] {
+        match &self.build {
             Build::Homogeneous { layers } => layers,
-            Build::Composite { sections, .. } => &sections[0].layers,
-        };
-        layers[index].resistance(self.heat_flow).unwrap_or(0.0)
+            Build::Composite {
+                sections,
+                insulation_section,
+                ..
+            } => {
+                if let Some(id) = insulation_section {
+                    if let Some(section) = sections.iter().find(|s| &s.id == id) {
+                        return &section.layers;
+                    }
+                }
+                sections
+                    .iter()
+                    .max_by(|a, b| {
+                        let ra = total_resistance(&a.layers, self.heat_flow, self.exterior_air);
+                        let rb = total_resistance(&b.layers, self.heat_flow, self.exterior_air);
+                        ra.total_cmp(&rb)
+                    })
+                    .map_or(&[], |s| s.layers.as_slice())
+            }
+        }
+    }
+
+    /// R_se of the construction (tables C.2/C.4).
+    fn r_se(&self) -> f64 {
+        let reflective_upward = self.heat_flow == HeatFlow::Upward
+            && match &self.build {
+                Build::Homogeneous { layers } => layers.iter().any(Layer::effective_reflective),
+                Build::Composite { sections, .. } => sections
+                    .iter()
+                    .any(|s| s.layers.iter().any(Layer::effective_reflective)),
+            };
+        if !self.exterior_air {
+            0.0
+        } else if reflective_upward {
+            R_SE_UPWARD_REFLECTIVE
+        } else {
+            R_SE
+        }
     }
 
     /// Call after `validate` returned no issues.
@@ -899,6 +1103,7 @@ impl OpaqueConstruction {
             Build::Composite {
                 sections,
                 interruption,
+                ..
             } => {
                 let total_area: f64 = sections.iter().map(|s| s.area).sum();
                 // C.5.
@@ -910,7 +1115,7 @@ impl OpaqueConstruction {
                         })
                         .sum::<f64>();
                 // C.6/C.7: λ″ per layer to three decimals.
-                let mut lower = self.heat_flow.r_si() + if self.exterior_air { R_SE } else { 0.0 };
+                let mut lower = self.heat_flow.r_si() + self.r_se();
                 for j in 0..sections[0].layers.len() {
                     let d = sections[0].layers[j].thickness().unwrap_or(0.0);
                     let lambda: f64 = sections
@@ -942,7 +1147,17 @@ impl OpaqueConstruction {
             }
         };
         let u_t = 1.0 / r_t;
-        let ratio = |index: usize| (self.insulation_resistance(index) / r_t).powi(2);
+        // 8.9/8.11/8.13: R_1 and R_T (C.3, thermal bridges neglected) of the
+        // insulation section.
+        let basis = self.insulation_layers();
+        let basis_r_t = total_resistance(basis, self.heat_flow, self.exterior_air);
+        let ratio = |index: usize| {
+            let r_1 = basis
+                .get(index)
+                .and_then(|layer| layer.resistance(self.heat_flow))
+                .unwrap_or(0.0);
+            (r_1 / basis_r_t).powi(2)
+        };
         let delta_a = self
             .corrections
             .air_voids
@@ -976,7 +1191,7 @@ impl OpaqueConstruction {
         let total = delta_a + delta_fa + delta_r;
         let delta_u = if total > 0.03 * u_t { total } else { 0.0 };
         let u_c = u_t / F_PRAC_OPAQUE + delta_u;
-        let r_se = if self.exterior_air { R_SE } else { 0.0 };
+        let r_se = self.r_se();
         // C.2 with β = R_T·ΔU (C.8).
         let r_c = r_t / (1.0 + r_t * delta_u) - self.heat_flow.r_si() - r_se;
         let r_equivalent = self
@@ -1171,6 +1386,8 @@ mod tests {
                         thickness_mm: 40.0,
                         ventilation: CavityVentilation::Weakly { opening_mm2: None },
                         reflective_surface: false,
+                        reflective_facing_up: false,
+                        hermetically_sealed: false,
                     },
                     material(0.1, 1.16),
                 ],
@@ -1259,6 +1476,7 @@ mod tests {
                     section("stud", 0.15, 0.3),
                 ],
                 interruption: InterruptionClass::WoodyUnshielded,
+                insulation_section: None,
             },
             corrections: Corrections::default(),
             unheated_reduction_factor: None,
@@ -1288,6 +1506,8 @@ mod tests {
                 opening_mm2: Some(1000.0),
             },
             reflective_surface: false,
+            reflective_facing_up: false,
+            hermetically_sealed: false,
         };
         assert!((weak.resistance(HeatFlow::Horizontal).unwrap() - 0.15).abs() < 1e-12);
         // Strongly ventilated: outer layers dropped, still-air R_se 0,12.
@@ -1297,6 +1517,8 @@ mod tests {
                 thickness_mm: 30.0,
                 ventilation: CavityVentilation::Strongly,
                 reflective_surface: false,
+                reflective_facing_up: false,
+                hermetically_sealed: false,
             },
             material(0.1, 1.0),
         ];
@@ -1376,6 +1598,8 @@ mod tests {
                         thickness_mm: 10.0,
                         ventilation: CavityVentilation::Unventilated,
                         reflective_surface: false,
+                        reflective_facing_up: false,
+                        hermetically_sealed: false,
                     },
                 ],
             },
@@ -1397,5 +1621,175 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    fn composite_roof(first_insulation: bool) -> OpaqueConstruction {
+        let section = |id: &str, area: f64, lambda: f64| Section {
+            id: id.into(),
+            area,
+            layers: vec![
+                material(0.012, 0.17),
+                material(0.15, lambda),
+                material(0.018, 0.13),
+            ],
+        };
+        let mut sections = vec![
+            section("insulation", 0.9, 0.04),
+            section("rafter", 0.1, 0.13),
+        ];
+        if !first_insulation {
+            sections.reverse();
+        }
+        OpaqueConstruction {
+            heat_flow: HeatFlow::Upward,
+            exterior_air: true,
+            build: Build::Composite {
+                sections,
+                interruption: InterruptionClass::WoodyUnshielded,
+                insulation_section: None,
+            },
+            corrections: Corrections {
+                air_voids: Some(AirVoidCorrection {
+                    level: AirVoidLevel::Weak,
+                    insulation_layer: 1,
+                }),
+                ..Corrections::default()
+            },
+            unheated_reduction_factor: None,
+        }
+    }
+
+    #[test]
+    fn composite_delta_u_uses_the_insulation_section_c3() {
+        let a = composite_roof(true);
+        let b = composite_roof(false);
+        assert!(a.validate("r").is_empty());
+        let (ra, rb) = (a.calculate(), b.calculate());
+        // Independent of the section order.
+        assert!((ra.delta_u_air_voids - rb.delta_u_air_voids).abs() < 1e-15);
+        // 8.9 with R_1 and the C.3 R_T of the insulation section.
+        let r_1: f64 = 0.15 / 0.04;
+        let rt_c3 = 0.10 + 0.012 / 0.17 + r_1 + 0.018 / 0.13 + 0.04;
+        assert!((ra.delta_u_air_voids - 0.01 * (r_1 / rt_c3).powi(2)).abs() < 1e-12);
+        // An explicit insulation section takes precedence.
+        let mut named = composite_roof(true);
+        if let Build::Composite {
+            insulation_section, ..
+        } = &mut named.build
+        {
+            *insulation_section = Some("rafter".into());
+        }
+        let r_rafter: f64 = 0.15 / 0.13;
+        let rt_rafter = 0.10 + 0.012 / 0.17 + r_rafter + 0.018 / 0.13 + 0.04;
+        assert!(
+            (named.calculate().delta_u_air_voids - 0.01 * (r_rafter / rt_rafter).powi(2)).abs()
+                < 1e-12
+        );
+        if let Build::Composite {
+            insulation_section, ..
+        } = &mut named.build
+        {
+            *insulation_section = Some("missing".into());
+        }
+        assert!(named
+            .validate("r")
+            .iter()
+            .any(|i| i.code == "insulation_section_unknown"));
+    }
+
+    #[test]
+    fn upward_reflective_layers_follow_table_c4() {
+        let cavity = |facing_up: bool, sealed: bool| Layer::AirCavity {
+            thickness_mm: 50.0,
+            ventilation: CavityVentilation::Unventilated,
+            reflective_surface: true,
+            reflective_facing_up: facing_up,
+            hermetically_sealed: sealed,
+        };
+        let roof = |layer: Layer| OpaqueConstruction {
+            heat_flow: HeatFlow::Upward,
+            exterior_air: true,
+            build: Build::Homogeneous {
+                layers: vec![material(0.1, 0.04), layer, material(0.02, 0.13)],
+            },
+            corrections: Corrections::default(),
+            unheated_reduction_factor: None,
+        };
+        let base = 0.10 + 2.5 + 0.02 / 0.13;
+        // Facing down: bracket values 0,41 and R_se 0,05.
+        let down = roof(cavity(false, false)).calculate();
+        assert!((down.r_t - (base + 0.41 + 0.05)).abs() < 1e-12);
+        assert!((down.r_c - (down.r_t - 0.10 - 0.05)).abs() < 1e-12);
+        // Facing up without sealing: no bonus, R_se 0,04.
+        let up = roof(cavity(true, false)).calculate();
+        assert!((up.r_t - (base + 0.16 + 0.04)).abs() < 1e-12);
+        // Hermetically sealed: bonus again.
+        let sealed = roof(cavity(true, true)).calculate();
+        assert!((sealed.r_t - down.r_t).abs() < 1e-12);
+    }
+
+    #[test]
+    fn declared_resistance_and_foils_round_down() {
+        let layer = Layer::DeclaredResistance {
+            resistance_declared: 2.5,
+            moisture: InsulationMoisture::Regular,
+            ageing: Ageing::InSitu {
+                product: crate::materials::InSituProduct::EpsBeads,
+                situation: crate::materials::InSituSituation::B,
+                practice_tested: false,
+            },
+            temperature: None,
+            convection_factor: None,
+            thickness_m: None,
+            source_reference: "DoP".into(),
+        };
+        // 2,5/(1,05·1,15) = 2,0704… → 2,07.
+        assert_eq!(layer.resistance(HeatFlow::Horizontal), Some(2.07));
+        let foil = ReflectiveFoilSystem::FoilLayers {
+            thickness_m: 0.0101,
+        };
+        // 0,0101/0,03 = 0,3366… → 0,33.
+        assert!((foil.resistance() - 0.33).abs() < 1e-12);
+    }
+
+    #[test]
+    fn annex_f_tables_follow_the_u_value_and_fasteners_stay_in_the_layer() {
+        let wall = |layers: Vec<Layer>| OpaqueConstruction {
+            heat_flow: HeatFlow::Horizontal,
+            exterior_air: true,
+            build: Build::Homogeneous { layers },
+            corrections: Corrections::default(),
+            unheated_reduction_factor: None,
+        };
+        let narrow = Layer::NarrowCavity {
+            thickness_mm: 10.0,
+            width_mm: 5.0,
+        };
+        let tube = Layer::TubularCavity {
+            thickness_mm: 20.0,
+            width_mm: 40.0,
+            orientation: TubeOrientation::Horizontal,
+        };
+        let codes = |w: OpaqueConstruction| -> Vec<&'static str> {
+            w.validate("w").iter().map(|i| i.code).collect()
+        };
+        assert!(codes(wall(vec![material(0.1, 0.04), narrow.clone()])).is_empty());
+        assert!(codes(wall(vec![material(0.1, 1.0), narrow]))
+            .contains(&"narrow_cavity_table_f1_requires_u_at_most_1"));
+        assert!(codes(wall(vec![material(0.01, 1.0), tube.clone()])).is_empty());
+        assert!(codes(wall(vec![material(0.1, 0.04), tube]))
+            .contains(&"tubular_cavity_tables_f2_f3_require_u_above_1"));
+        let mut anchored = wall(vec![material(0.1, 0.04)]);
+        anchored.corrections.fasteners = Some(FastenerCorrection {
+            fasteners: Fasteners::Formula {
+                count_per_m2: 4.0,
+                lambda_w_per_mk: 17.0,
+                cross_section_m2: 1.3e-5,
+                penetration_depth_m: 0.12,
+                insulation_thickness_m: 0.1,
+            },
+            insulation_layer: 0,
+        });
+        assert!(codes(anchored).contains(&"fastener_penetration_exceeds_insulation"));
     }
 }

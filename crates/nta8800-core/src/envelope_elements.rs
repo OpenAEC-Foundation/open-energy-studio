@@ -17,7 +17,7 @@ use crate::forfait_envelope::{
     ForfaitGlass, ForfaitOpaque, ForfaitOpaqueResult, PanelInsulation, PsiColumn, PSI_DEFAULT,
 };
 use crate::materials::round_half_up;
-use crate::window_u::{round_transparent, FrameGroup, WindowInput, WindowResult};
+use crate::window_u::{round_transparent, FrameGroup, WindowInput, WindowMethod, WindowResult};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -134,10 +134,13 @@ pub struct EnvelopeIssue {
 pub struct ElementResult {
     pub id: String,
     pub route: &'static str,
-    /// U used in H_D (unrounded), W/(m²·K).
+    /// U used in H_D (8.1) and ΔU_for (8.3): rounded per 8.2.2.1 (opaque
+    /// 2 decimals; transparent 1 decimal above 1,0, else 2), W/(m²·K).
     pub u_value: f64,
-    /// Presented value per 8.2.2.1 (opaque 2 decimals; transparent 1 or 2).
+    /// Same as `u_value`; kept for clients of the presented value.
     pub u_rounded: f64,
+    /// U before the 8.2.2.1 rounding, W/(m²·K).
+    pub u_unrounded: f64,
     pub r_c: Option<f64>,
     pub r_c_rounded: Option<f64>,
     pub opaque: Option<OpaqueResult>,
@@ -216,7 +219,14 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                     push(x.code, x.path);
                 }
             }
-            ElementKind::ForfaitWindow { .. } => {}
+            ElementKind::ForfaitWindow { .. } => {
+                if e.in_forfait_supplement {
+                    push(
+                        "transparent_element_not_in_supplement",
+                        format!("{path}.inForfaitSupplement"),
+                    );
+                }
+            }
             ElementKind::ForfaitDoor {
                 glass_fraction,
                 glass,
@@ -228,6 +238,13 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                         push("glazed_door_invalid", el.clone());
                     }
                 }
+                // 8.3: only opaque category a) elements (8.2.2.1).
+                if e.in_forfait_supplement {
+                    push(
+                        "door_or_panel_not_in_supplement",
+                        format!("{path}.inForfaitSupplement"),
+                    );
+                }
             }
             ElementKind::ForfaitPanel {
                 insulation,
@@ -237,6 +254,12 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
             } => {
                 if forfait_panel_u(*insulation, *cavity, *frame, *exterior).is_none() {
                     push("panel_thickness_outside_table", el.clone());
+                }
+                if e.in_forfait_supplement {
+                    push(
+                        "door_or_panel_not_in_supplement",
+                        format!("{path}.inForfaitSupplement"),
+                    );
                 }
             }
             ElementKind::Rooflight {
@@ -252,6 +275,12 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                 }
                 if source_reference.trim().is_empty() {
                     push("source_reference_required", format!("{el}.sourceReference"));
+                }
+                if e.in_forfait_supplement {
+                    push(
+                        "transparent_element_not_in_supplement",
+                        format!("{path}.inForfaitSupplement"),
+                    );
                 }
             }
             ElementKind::VentilationGrille => {}
@@ -272,6 +301,20 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                 }
             }
         }
+    }
+    // 8.2.2.3.1: one choice between 8.14 and 8.15 for all windows.
+    let method_of = |e: &EnvelopeElement| match &e.element {
+        ElementKind::Window { window } => match window.method {
+            WindowMethod::Detailed { .. } => Some(true),
+            WindowMethod::Simplified { .. } => Some(false),
+            _ => None,
+        },
+        _ => None,
+    };
+    let detailed = input.elements.iter().filter_map(method_of).any(|d| d);
+    let simplified = input.elements.iter().filter_map(method_of).any(|d| !d);
+    if detailed && simplified {
+        push("window_formula_8_14_and_8_15_mixed", "elements".into());
     }
     for (i, b) in input.forfait_bridges.iter().enumerate() {
         let path = format!("forfaitBridges[{i}]");
@@ -301,8 +344,9 @@ fn element_result(e: &EnvelopeElement) -> ElementResult {
     let base = |route, u: f64, rounded: f64| ElementResult {
         id: e.id.clone(),
         route,
-        u_value: u,
+        u_value: rounded,
         u_rounded: rounded,
+        u_unrounded: u,
         r_c: None,
         r_c_rounded: None,
         opaque: None,
@@ -360,7 +404,7 @@ fn element_result(e: &EnvelopeElement) -> ElementResult {
                 }
                 _ => forfait_door_u(*insulated, *exterior),
             };
-            base("I.2.2.3", u, u)
+            base("I.2.2.3", u, round_transparent(u))
         }
         ElementKind::ForfaitPanel {
             insulation,
@@ -369,7 +413,7 @@ fn element_result(e: &EnvelopeElement) -> ElementResult {
             exterior,
         } => {
             let u = forfait_panel_u(*insulation, *cavity, *frame, *exterior).unwrap_or(f64::NAN);
-            base("I.2.2.4", u, u)
+            base("I.2.2.4", u, round_transparent(u))
         }
         ElementKind::Rooflight {
             u_rc,
@@ -455,6 +499,8 @@ pub fn assess_envelope(input: &EnvelopeInput) -> EnvelopeAssessment {
 }
 
 pub const INTERPRETATIONS: &[&str] = &[
+    "8.2.2.1: the U in H_D and in ΔU_for (8.3) is the rounded value; forfait doors and panels follow the transparent rounding",
+    "8.3: only opaque category a) elements (opaque constructions, tapered roofs, forfait opaque values, numerical U, ventilation grilles of 8.2.2.2.1) may enter ΔU_for",
     "table E.1, E.14–E.17: densities between table rows use the nearest row (E.1) or the next higher density (masonry)",
     "8.25: U_p of the substitute panel uses R_T = R_p = d_p/λ_p without surface resistances, as written",
     "table I.6 caravans 1965–1983: 0,19 for façades; the 0,04 panel value is not applied automatically",
@@ -518,5 +564,137 @@ mod tests {
         let a = assess_envelope(&ok);
         // U = 6,2 → ΔU_for = max(0; 0,1 − 0,25·5,8) = 0.
         assert_eq!(a.delta_u_forfait, Some(0.0));
+    }
+
+    #[test]
+    fn rounded_u_feeds_h_d_and_supplement_excludes_doors_and_panels() {
+        use crate::window_u::{EdgePsi, GlazingU, Spacer};
+        let window = |method: WindowMethod| ElementKind::Window {
+            window: WindowInput {
+                method,
+                shutter: None,
+            },
+        };
+        let simplified = || {
+            window(WindowMethod::Simplified {
+                glazing: GlazingU::Declared {
+                    value: 1.2,
+                    source_reference: "glass".into(),
+                },
+                frame_u_w_per_m2k: 1.6,
+                frame_source_reference: "frame".into(),
+                edge: EdgePsi::Table {
+                    frame: FrameGroup::WoodOrPlastic,
+                    spacer: Spacer::AluminiumOrSteel,
+                    low_e: true,
+                    spacer_paths: Vec::new(),
+                    spacer_source_reference: None,
+                },
+            })
+        };
+        let element = |id: &str, supplement: bool, element: ElementKind| EnvelopeElement {
+            id: id.into(),
+            projected_area_m2: Some(2.0),
+            in_forfait_supplement: supplement,
+            element,
+        };
+        let input = EnvelopeInput {
+            elements: vec![
+                element("w", false, simplified()),
+                element(
+                    "n",
+                    true,
+                    ElementKind::Numerical {
+                        coupling_w_per_k: 0.5678,
+                        construction_area_m2: 2.0,
+                        delta_u: 0.0,
+                        source_reference: "2D".into(),
+                    },
+                ),
+            ],
+            forfait_bridges: Vec::new(),
+            forfait_supplement: true,
+        };
+        let a = assess_envelope(&input);
+        assert_eq!(a.status, "calculated_unverified", "{:?}", a.issues);
+        let w = &a.elements[0];
+        assert_eq!(w.u_value, round_transparent(w.u_unrounded));
+        assert_eq!(w.u_value, w.u_rounded);
+        let n = &a.elements[1];
+        assert!((n.u_unrounded - 0.2839).abs() < 1e-12);
+        assert_eq!(n.u_value, 0.28);
+        // ΔU_for from the rounded U_C (8.3): 0,1 − 0,25·(0,28 − 0,4) = 0,13.
+        assert!((a.delta_u_forfait.unwrap() - 0.13).abs() < 1e-12);
+
+        // Doors, panels and transparent forfait elements may not enter 8.3.
+        let mut bad = input.clone();
+        bad.elements.push(element(
+            "d",
+            true,
+            ElementKind::ForfaitDoor {
+                insulated: true,
+                exterior: true,
+                glass_fraction: None,
+                glass: None,
+                frame: None,
+            },
+        ));
+        bad.elements.push(element(
+            "p",
+            true,
+            ElementKind::ForfaitPanel {
+                insulation: PanelInsulation::AbsentOrUnknown,
+                cavity: false,
+                frame: FrameGroup::WoodOrPlastic,
+                exterior: true,
+            },
+        ));
+        bad.elements.push(element(
+            "fw",
+            true,
+            ElementKind::ForfaitWindow {
+                glass: ForfaitGlass::HrPlusPlus,
+                frame: FrameGroup::WoodOrPlastic,
+                exterior: true,
+            },
+        ));
+        let codes: Vec<_> = assess_envelope(&bad)
+            .issues
+            .iter()
+            .map(|i| i.code)
+            .collect();
+        assert_eq!(
+            codes
+                .iter()
+                .filter(|c| **c == "door_or_panel_not_in_supplement")
+                .count(),
+            2
+        );
+        assert!(codes.contains(&"transparent_element_not_in_supplement"));
+
+        // 8.2.2.3.1: 8.14 and 8.15 may not be mixed.
+        let mut mixed = input;
+        mixed.elements.push(element(
+            "w2",
+            false,
+            window(WindowMethod::Detailed {
+                glazing: Vec::new(),
+                panels: vec![crate::window_u::PanelPart {
+                    area_m2: 1.0,
+                    u_value_w_per_m2k: 0.5,
+                    perimeter_m: 4.0,
+                    psi_w_per_mk: 0.0,
+                    source_reference: "panel".into(),
+                }],
+                frame_area_m2: 0.3,
+                frame_u_w_per_m2k: 1.6,
+                frame_source_reference: "frame".into(),
+                glazing_bars: None,
+            }),
+        ));
+        assert!(assess_envelope(&mixed)
+            .issues
+            .iter()
+            .any(|i| i.code == "window_formula_8_14_and_8_15_mixed"));
     }
 }

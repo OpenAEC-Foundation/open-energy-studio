@@ -24,7 +24,7 @@ describe('NTA construction section', () => {
       json: async () => ({
         status: 'calculated_unverified', scope: 'x', issues: [], bridges: [], deltaUForfait: null, interpretations: [],
         referenceVerified: false,
-        elements: [{ id: 'construction', route: 'opaque', uValue: 0.2123, uRounded: 0.212, rC: 4.5, rCRounded: 4.5,
+        elements: [{ id: 'construction', route: 'opaque', uValue: 0.21, uRounded: 0.21, uUnrounded: 0.2123, rC: 4.5, rCRounded: 4.5,
           opaque: null, window: null, forfait: null }],
       }),
     });
@@ -37,10 +37,10 @@ describe('NTA construction section', () => {
     expect(body.input.elements[0].element.construction.build.layers[0]).toMatchObject({
       kind: 'material', thicknessM: 0.1, conductivity: { method: 'calculated', lambdaCalc: 0.04 } });
     await user.click(await screen.findByRole('button', { name: 'Apply to this construction' }));
-    expect(screen.getByText(/Applied from the NTA kernel: U = 0\.212/)).toBeInTheDocument();
+    expect(screen.getByText(/Applied from the NTA kernel: U = 0\.21\b/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const after = JSON.parse(screen.getByTestId('constructions').textContent ?? '[]');
     expect(after).toHaveLength(before + 1);
-    expect(after[after.length - 1].slice(1)).toEqual([4.5, 0.212]);
+    expect(after[after.length - 1].slice(1)).toEqual([4.5, 0.21]);
   });
 });
