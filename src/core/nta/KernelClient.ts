@@ -1383,8 +1383,34 @@ export interface BuildingPerformanceInput {
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
+  /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
+  lighting?: NtaZoneLighting[];
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
+}
+
+/** Chapter 14 lighting of one calculation zone. */
+export interface NtaZoneLighting {
+  zoneId: string;
+  functions: Array<{ function: NtaLabelFunction; areaM2: number }>;
+  lightingZones: Array<{
+    id: string;
+    areaM2: number;
+    power:
+      | { method: 'forfait'; ledFrom2017: boolean }
+      | { method: 'installed'; dynamicFactor?: number | null; sourceReference: string;
+          luminaires: Array<{ count: number; power: { method: 'system'; powerW: number }
+            | { method: 'lamps'; lampPowerW: number; lampCount: number; technology: string } }> };
+    parasitic: { method: 'forfait' } | { method: 'installed'; emergencyChargingW: number; controlStandbyW: number; sourceReference: string };
+    occupancy: {
+      control: 'manual_or_unknown' | 'manual_with_sweep' | 'auto_on_dimmed' | 'auto_on_auto_off' | 'manual_on_dimmed' | 'manual_on_auto_off';
+      centralOnControl: boolean;
+      largeOfficeGroup?: boolean;
+    };
+    daylight: { method: 'none' } | { method: 'forfait'; daylightControl: boolean } | { method: 'sectors'; sectors: unknown[]; sourceReference: string };
+    extractedLuminaires?: boolean;
+  }>;
+  sourceReference: string;
 }
 
 /** Active cooling with demonstrated capacity (NTA 8800 §5.7.1). */
@@ -1610,6 +1636,7 @@ export interface BuildingPerformanceAssessment {
   tojuliMaxK: number | null;
   tojuliMeetsBblLimit: boolean | null;
   spaceHeating: SpaceHeatingChainAssessment;
+  lighting?: Array<{ zoneId: string; annualKwh: number; monthlyKwh: number[]; internalGainW: number }>;
   issues: Array<{ code: string; path: string }>;
 }
 
@@ -1670,6 +1697,8 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
+  lighting?: NtaZoneLighting[];
   cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;

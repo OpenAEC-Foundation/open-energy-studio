@@ -69,6 +69,8 @@ pub struct NtaCalculationInput {
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
     #[serde(default)]
+    pub lighting: Vec<crate::lighting::ZoneLighting>,
+    #[serde(default)]
     pub cooling: Option<CoolingSystem>,
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
@@ -534,6 +536,7 @@ fn derive_input(
         on_site_production: nta.on_site_production,
         pv_systems: nta.pv_systems,
         hot_water: nta.hot_water,
+        lighting: nta.lighting,
         cooling: nta.cooling,
         label_function: nta.label_function,
         bbl_function: nta.bbl_function,

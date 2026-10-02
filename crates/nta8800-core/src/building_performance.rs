@@ -24,6 +24,9 @@ use crate::indicators_draft::{
     IndicatorsDraftInput, ScenarioKind,
 };
 use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
+use crate::lighting::{
+    assess_zone_lighting, validate_lighting, LightingContext, ZoneLighting, ZoneLightingResult,
+};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_cooling::{
     assess_cooling, validate_cooling, CoolingAssessment, CoolingContext, CoolingGeneratorKind,
@@ -199,6 +202,10 @@ pub struct BuildingPerformanceInput {
     /// Space cooling calculated here (chapter 10, method 3).
     #[serde(default)]
     pub cooling: Option<CoolingSystem>,
+    /// Utility lighting per calculation zone (chapter 14); dwellings have
+    /// `W_L = 0` and leave this empty.
+    #[serde(default)]
+    pub lighting: Vec<ZoneLighting>,
     /// Domestic hot water calculated here (chapter 13, one generator).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
@@ -272,6 +279,8 @@ pub struct BuildingPerformanceAssessment {
     /// A0 designation check; only with a Bbl check and a qualifying permit date.
     pub a0_check: Option<A0Check>,
     pub space_heating: SpaceHeatingChainAssessment,
+    /// Chapter 14 per zone, with the 7.28 internal gain for chapter 7.
+    pub lighting: Vec<ZoneLightingResult>,
     pub indicators: Option<IndicatorsDraftAssessment>,
     pub issues: Vec<PerformanceIssue>,
 }
@@ -585,6 +594,44 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             "activeCooling",
         ));
     }
+    if !input.lighting.is_empty() {
+        if residential {
+            // 14.2.1: W_L;spec = 0 for the indicators of dwellings.
+            issues.push(issue("residential_lighting_must_be_omitted", "lighting"));
+        }
+        if input
+            .declared_uses
+            .iter()
+            .any(|item| item.service == Service::Lighting)
+        {
+            issues.push(issue("lighting_double_count", "lighting"));
+        }
+        let zones: Vec<(&str, f64)> = std::iter::once(&input.space_heating.demand)
+            .chain(
+                input
+                    .space_heating
+                    .additional_zones
+                    .iter()
+                    .map(|zone| &zone.demand),
+            )
+            .map(|zone| (zone.zone_id.as_str(), zone.usable_floor_area_m2))
+            .collect();
+        let mut seen = HashSet::new();
+        for (index, item) in input.lighting.iter().enumerate() {
+            let path = format!("lighting[{index}]");
+            match zones.iter().find(|zone| zone.0 == item.zone_id) {
+                Some((_, area)) if seen.insert(item.zone_id.as_str()) => issues.extend(
+                    validate_lighting(item, *area, &path)
+                        .into_iter()
+                        .map(|found| issue(found.code, found.path)),
+                ),
+                _ => issues.push(issue("lighting_zone_unknown", format!("{path}.zoneId"))),
+            }
+        }
+        if seen.len() != zones.len() {
+            issues.push(issue("lighting_zone_missing", "lighting"));
+        }
+    }
     if let Some(system) = &input.hot_water {
         issues.extend(
             validate_hot_water(system, hot_water_context(input), "hotWater")
@@ -701,6 +748,30 @@ pub fn assess_building_performance(
     } else {
         None
     };
+    let lighting: Vec<ZoneLightingResult> = if issues.is_empty() {
+        let window_area: f64 = std::iter::once(&input.space_heating.demand)
+            .chain(
+                input
+                    .space_heating
+                    .additional_zones
+                    .iter()
+                    .map(|zone| &zone.demand),
+            )
+            .flat_map(|zone| zone.windows.iter())
+            .map(|window| window.area_m2)
+            .sum();
+        let context = LightingContext {
+            total_usable_floor_area_m2: input.total_usable_floor_area_m2,
+            total_window_area_m2: window_area,
+        };
+        input
+            .lighting
+            .iter()
+            .map(|zone| assess_zone_lighting(zone, context))
+            .collect()
+    } else {
+        Vec::new()
+    };
     let hot_water = match (&input.hot_water, issues.is_empty()) {
         (Some(system), true) => match assess_hot_water(system, hot_water_context(input)) {
             Ok(result) => Some(result),
@@ -717,6 +788,7 @@ pub fn assess_building_performance(
             &heating,
             cooling.as_ref(),
             hot_water.as_ref(),
+            &lighting,
             &mut carriers,
             &mut balance,
         ));
@@ -886,6 +958,7 @@ pub fn assess_building_performance(
             }),
         bbl_check: bbl,
         space_heating: heating,
+        lighting: if valid { lighting } else { Vec::new() },
         indicators: indicators.filter(|_| valid),
         issues,
     }
@@ -897,6 +970,7 @@ fn compute(
     heating: &SpaceHeatingChainAssessment,
     cooling: Option<&CoolingAssessment>,
     hot_water: Option<&HotWaterAssessment>,
+    lighting: &[ZoneLightingResult],
     carriers: &mut Vec<CarrierMonth>,
     balance: &mut Vec<ElectricityBalanceMonth>,
 ) -> (f64, f64, f64, f64) {
@@ -955,6 +1029,11 @@ fn compute(
             used_dc += bacs * month_row.district_cold_kwh;
             ambient_cold = month_row.ambient_cold_kwh;
         }
+        // Chapter 14 lighting (electricity, months by t_mi/t_an).
+        used_el += lighting
+            .iter()
+            .map(|zone| zone.monthly_kwh[index])
+            .sum::<f64>();
         let mut hot_water_ambient = 0.0;
         if let Some((carrier, months)) = &hot_water {
             let row = &months[index];
@@ -1624,6 +1703,66 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "active_cooling_without_cooling_system"));
+    }
+
+    #[test]
+    fn utility_lighting_adds_electricity_and_is_rejected_for_dwellings() {
+        use crate::lighting::{
+            Daylight, InstalledPower, LightingZone, Occupancy, ParasiticPower, SwitchControl,
+            UseArea, ZoneLighting,
+        };
+        let mut sample = input();
+        let zone_id = sample.space_heating.demand.zone_id.clone();
+        let lighting = ZoneLighting {
+            zone_id,
+            functions: vec![UseArea {
+                function: LabelFunction::Office,
+                area_m2: 100.0,
+            }],
+            lighting_zones: vec![LightingZone {
+                id: "open-plan".into(),
+                area_m2: 100.0,
+                power: InstalledPower::Forfait {
+                    led_from_2017: false,
+                },
+                parasitic: ParasiticPower::Forfait,
+                occupancy: Occupancy {
+                    control: SwitchControl::ManualOrUnknown,
+                    central_on_control: true,
+                    large_office_group: false,
+                },
+                daylight: Daylight::None,
+                extracted_luminaires: false,
+            }],
+            source_reference: "lighting plan".into(),
+        };
+        sample.lighting = vec![lighting];
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "residential_lighting_must_be_omitted"));
+        sample.calculation_scope = CalculationScope::Utility;
+        sample.label_function = Some(LabelFunction::Office);
+        let mut base_input = sample.clone();
+        base_input.lighting.clear();
+        let base = assess_building_performance(&base_input);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // 16 W/m² · 100 m² · (2 200 + 300) h + 2,5 kWh/m² · 100 m².
+        let expected = 1600.0 * 2500.0 / 1000.0 + 250.0;
+        assert!((result.lighting[0].annual_kwh - expected).abs() < 1e-9);
+        let el = |r: &BuildingPerformanceAssessment| -> f64 {
+            r.carriers
+                .iter()
+                .filter(|item| item.carrier == "el")
+                .map(|item| item.used_kwh)
+                .sum()
+        };
+        assert!((el(&result) - el(&base) - expected).abs() < 1e-6);
     }
 
     #[test]

@@ -38,6 +38,7 @@ pub mod heating_emission;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod label_class;
+pub mod lighting;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
 pub mod project_performance;
