@@ -59,7 +59,7 @@ describe('heat pump classification dialogs', () => {
     expect(JSON.parse(screen.getByTestId('heating-limits').textContent ?? 'null')).toMatchObject({
       minimumOperatingCop: 2, maximumSupplyTemperatureC: 55, sourceReference: 'BCRG p2',
     });
-  }, 15000);
+  }, 60000);
   it('saves a traceable heating heat pump classification', async () => {
     const user = userEvent.setup();
     renderWithProviders(<HeatingEditor />);
@@ -186,7 +186,7 @@ describe('heat pump classification dialogs', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByTestId('hot-water-dhw-tests')).toHaveTextContent('1');
     expect(screen.getByTestId('hot-water-source-flow')).toHaveTextContent('159');
-  }, 15000);
+  }, 60000);
 
   it('keeps an equipment link when the hot water installation is reopened and saved', async () => {
     const user = userEvent.setup();

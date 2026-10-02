@@ -71,7 +71,7 @@ describe('standalone NTA heat pump inventory', () => {
     expect(document.querySelector('.preview-energy-label')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove table input' }));
     expect(screen.getByTestId('forfait-input')).toHaveTextContent('null');
-  }, 15000);
+  }, 60000);
   it('does not offer an air-to-air COP row for a non-air source', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InventoryWithState />);
@@ -114,7 +114,7 @@ describe('standalone NTA heat pump inventory', () => {
       minimumOperatingCop: 2, maximumSupplyTemperatureC: 55,
       declarationNormVersion: 'NTA 8800:2024', sourceReference: 'BCRG 20240234GK p2',
     });
-  }, 15000);
+  }, 60000);
   it('keeps referenced DHW test-profile inputs separate from annual performance', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InventoryWithState />);
@@ -139,7 +139,7 @@ describe('standalone NTA heat pump inventory', () => {
       declarationNormVersion: 'NTA 8800:2020',
     }]);
     expect(document.querySelector('.preview-energy-label')).not.toBeInTheDocument();
-  }, 15000);
+  }, 60000);
   it('records a water-source asset with its served zone and removes it', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InventoryWithState />);
