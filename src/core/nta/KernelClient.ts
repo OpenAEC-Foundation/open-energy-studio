@@ -2306,7 +2306,10 @@ export interface ProjectPerformanceAssessment {
   gaps: Array<{ code: string; path: string; detail?: string }>;
   geometry: null | {
     usableFloorAreaM2: number;
+    /** A_ls with f_ls (6.7.3): ground and crawlspace weighted 0,7. */
     lossAreaM2: number;
+    /** Unweighted envelope A_o to outdoor air, ground and unheated spaces. */
+    envelopeAreaM2: number;
     lossAreaRatio: number | null;
     unclassifiedSurfaceCount: number;
   };

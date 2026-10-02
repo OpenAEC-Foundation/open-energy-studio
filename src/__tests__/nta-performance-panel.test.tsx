@@ -32,7 +32,7 @@ describe('NTA performance panel', () => {
       ok: false,
       json: async () => ({
         status: 'incomplete', inputFingerprint: 'sha256:x', attestStatus: 'unattested',
-        geometry: { usableFloorAreaM2: 96, lossAreaM2: 247.2, lossAreaRatio: 2.575, unclassifiedSurfaceCount: 0 },
+        geometry: { usableFloorAreaM2: 96, lossAreaM2: 232.8, envelopeAreaM2: 247.2, lossAreaRatio: 2.425, unclassifiedSurfaceCount: 0 },
         gaps: [{ code: 'nta_calculation_block_missing', path: 'ntaCalculation' },
           { code: 'nta_calculation_block_invalid', path: 'ntaCalculation',
             detail: 'ventilationFlows[0].months[3].conductanceWPerK: invalid type: null' }],
@@ -44,7 +44,7 @@ describe('NTA performance panel', () => {
     const panel = within(await screen.findByRole('region', { name: 'NTA 8800 calculation (Rust kernel)' }));
     expect(await panel.findByText('NTA input block missing')).toBeInTheDocument();
     expect(panel.getByText(/months\[3\]\.conductanceWPerK/)).toBeInTheDocument();
-    expect(panel.getByText(/247\.2 m²/)).toBeInTheDocument();
+    expect(panel.getByText(/232\.8 m²/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/nta8800/project/performance', expect.anything());
     expect(panel.getByText('Unverified')).toBeInTheDocument();
 

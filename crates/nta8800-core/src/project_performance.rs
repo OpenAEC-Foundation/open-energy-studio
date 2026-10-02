@@ -188,11 +188,24 @@ pub struct ProjectPerformanceAssessment {
 pub struct GeometrySummary {
     /// `A_g;tot`: sum of the zone usable floor areas, m².
     pub usable_floor_area_m2: f64,
-    /// `A_ls`: gross surfaces bordering outdoor air, ground or unheated space, m².
+    /// `A_ls` (6.3, 6.7.3): outdoor air and unheated spaces weighted 1,
+    /// ground and crawlspace 0,7, m².
     pub loss_area_m2: f64,
+    /// Unweighted envelope area to outdoor air, ground and unheated
+    /// spaces (`A_o` in ISSO 54), m².
+    pub envelope_area_m2: f64,
     pub loss_area_ratio: Option<f64>,
     /// Surfaces without a thermal boundary are not counted.
     pub unclassified_surface_count: usize,
+}
+
+/// 6.7.3 weighting factor `f_ls`; `None` for boundaries that do not count.
+fn loss_area_weight(boundary: ThermalBoundary) -> Option<f64> {
+    match boundary {
+        ThermalBoundary::Outdoor | ThermalBoundary::UnheatedSpace => Some(1.0),
+        ThermalBoundary::Ground => Some(0.7),
+        ThermalBoundary::AdjacentConditioned | ThermalBoundary::Internal => None,
+    }
 }
 
 /// Geometry of the project without any NTA block; `None` for an unreadable project.
@@ -200,6 +213,7 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
     let project: ProjectInput = serde_json::from_value(project_value.clone()).ok()?;
     let mut floor = 0.0;
     let mut loss = 0.0;
+    let mut envelope = 0.0;
     let mut unclassified = 0;
     for zone in &project.zones {
         floor += zone.floor_area;
@@ -208,14 +222,13 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
                 .get("thermalBoundary")
                 .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
             {
-                Some(
-                    ThermalBoundary::Outdoor
-                    | ThermalBoundary::Ground
-                    | ThermalBoundary::UnheatedSpace,
-                ) => {
-                    loss += surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+                Some(boundary) => {
+                    if let Some(weight) = loss_area_weight(boundary) {
+                        let area = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+                        loss += weight * area;
+                        envelope += area;
+                    }
                 }
-                Some(_) => {}
                 None => unclassified += 1,
             }
         }
@@ -223,6 +236,7 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
     Some(GeometrySummary {
         usable_floor_area_m2: floor,
         loss_area_m2: loss,
+        envelope_area_m2: envelope,
         loss_area_ratio: (floor > 0.0).then(|| loss / floor),
         unclassified_surface_count: unclassified,
     })
@@ -367,11 +381,8 @@ fn derive_input(
                 continue;
             };
             let surface_type = surface.get("type").and_then(Value::as_str).unwrap_or("");
-            if matches!(
-                boundary,
-                ThermalBoundary::Outdoor | ThermalBoundary::Ground | ThermalBoundary::UnheatedSpace
-            ) {
-                loss_area += surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
+            if let Some(weight) = loss_area_weight(boundary) {
+                loss_area += weight * surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
             }
             match boundary {
                 ThermalBoundary::Ground => {
@@ -640,8 +651,8 @@ mod tests {
         assert!(performance
             .primary_fossil_indicator_kwh_per_m2_year
             .is_some());
-        // Walls 110 + roof 52 + ground floor 50 m².
-        assert_eq!(derived.loss_area_m2, Some(212.0));
+        // Walls 110 + roof 52 + 0,7 · ground floor 50 m² (6.7.3).
+        assert!((derived.loss_area_m2.unwrap() - 197.0).abs() < 1e-9);
         assert_eq!(performance.tojuli.len(), 1);
         assert_eq!(performance.tojuli[0].status, "calculated_unverified");
         assert!(performance.tojuli_max_k.is_some());
@@ -769,7 +780,7 @@ mod tests {
         assert!((first.conductance_w_per_k - second.conductance_w_per_k).abs() < 1e-9);
     }
 
-    /// ISSO 54 v2.0 (2022), EP-W001, p. 5: A_g = 96 m² and A_ls = 247,2 m²
+    /// ISSO 54 v2.0 (2022), EP-W001, p. 5: A_g = 96 m² and A_o = 247,2 m²
     /// are the only values of the EDR test set published in the document
     /// itself; the official tolerance is 1 %.
     #[test]
@@ -782,8 +793,11 @@ mod tests {
         assert_eq!(result.status, "incomplete");
         let geometry = result.geometry.unwrap();
         assert!((geometry.usable_floor_area_m2 - 96.0).abs() <= 0.01 * 96.0);
-        assert!((geometry.loss_area_m2 - 247.2).abs() <= 0.01 * 247.2);
-        assert!((geometry.loss_area_ratio.unwrap() - 2.575).abs() < 1e-9);
+        // p. 5 publishes the envelope A_o = 247,2 m²; A_ls weights the
+        // ground floor with f_ls = 0,7 (6.7.3): 199,2 + 0,7 · 48 = 232,8 m².
+        assert!((geometry.envelope_area_m2 - 247.2).abs() <= 0.01 * 247.2);
+        assert!((geometry.loss_area_m2 - 232.8).abs() < 1e-9);
+        assert!((geometry.loss_area_ratio.unwrap() - 2.425).abs() < 1e-9);
         assert_eq!(geometry.unclassified_surface_count, 0);
     }
 

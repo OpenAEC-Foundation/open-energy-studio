@@ -183,7 +183,7 @@ Grondgebonden woning (1e): 55 bij ≤ 1,5; `55 + 30·(x − 1,5)` tot 3,0; `100 
 
 Lid 4 verhoogt de behoefte-eis met 5 kWh/m²·jr bij een gewogen `D_m` ≤ 180 kJ/m²K, maar alleen voor de rijen waar de tabel dat lid aanwijst: 1a, 1e en 7b. Een indicator die niet beschikbaar is, bijvoorbeeld BENG 1 zonder C1-ventilatie, geeft "niet te toetsen". Weging bij gemengde functies (lid 2) is niet geïmplementeerd.
 
-De projectadapter leidt `A_ls` af als som van de bruto vlakken die aan buitenlucht, grond of een onverwarmde ruimte grenzen. Of die definitie exact aansluit op de verliesoppervlakte van NTA 8800 moet de normreview nog bevestigen. De gebruiksfunctie (`bblFunction`) moet de gebruiker zelf kiezen; het sjabloon vult die niet in.
+De projectadapter leidt `A_ls` af volgens 6.3 en 6.7.3: vlakken naar buitenlucht en onverwarmde ruimten wegen 1, vlakken naar de grond 0,7, en scheidingen met aangrenzende verwarmde ruimten 0. Een vloer boven een kruipruimte moet als grondvlak zijn ingevoerd om de factor 0,7 te krijgen. Het ongewogen omhullend oppervlak staat apart als `envelopeAreaM2`. De gebruiksfunctie (`bblFunction`) moet de gebruiker zelf kiezen; het sjabloon vult die niet in.
 
 Relevante bepalingen uit de Omgevingsregeling:
 

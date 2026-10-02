@@ -64,12 +64,12 @@ describe('NTA calculation report', () => {
       status: 'incomplete', targetNormVersion: 'NTA 8800:2025+C1:2026', kernelVersion: '0.1.0',
       inputFingerprint: 'sha256:x', attestStatus: 'unattested',
       gaps: [{ code: 'nta_calculation_block_missing', path: 'ntaCalculation' }],
-      geometry: { usableFloorAreaM2: 96, lossAreaM2: 247.2, lossAreaRatio: 2.575, unclassifiedSurfaceCount: 0 },
+      geometry: { usableFloorAreaM2: 96, lossAreaM2: 232.8, envelopeAreaM2: 247.2, lossAreaRatio: 2.425, unclassifiedSurfaceCount: 0 },
       derivedInput: null, performance: null,
     });
     expect(html).toContain('Geen uitkomst');
     expect(html).toContain('nta_calculation_block_missing');
     expect(html).not.toContain('BENG 2');
-    expect(html).toContain('247.2');
+    expect(html).toContain('232.8');
   });
 });

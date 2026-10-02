@@ -15,7 +15,7 @@ De uitkomst is geen energielabel en geen bewijs voor een omgevingsvergunning. Ee
 4. Leg lineaire en puntkoudebruggen vast, met begrenzing. Bevestig dat de puntbruginventaris compleet is.
 5. Leg onverwarmde ruimtes vast met reductiefactor b en bron, en koppel de vlakken eraan.
 
-Het paneel **NTA 8800-berekening (Rust-kern)** toont daarna direct A_g, A_ls en A_ls/A_g. A_ls is de som van de vlakken die aan buitenlucht, grond of een onverwarmde ruimte grenzen.
+Het paneel **NTA 8800-berekening (Rust-kern)** toont daarna direct A_g, A_ls en A_ls/A_g. A_ls is de gewogen som volgens 6.7.3: vlakken naar buitenlucht of een onverwarmde ruimte tellen volledig, vlakken naar de grond of een kruipruimte voor 0,7.
 
 ## 2. NTA-invoer invullen
 
@@ -69,4 +69,4 @@ Zie het [verificatiedossier](nta8800-verificatiestatus.md) en het [dekkingsregis
 
 - Hoofdstuk 11 (ventilatie, infiltratie, C1) zit in de kern en voedt de maandberekening en de BENG 1-run. De distributie volgens 9.26 is er; het formulier vult die nog niet in.
 - Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn op 2 oktober 2026 nagelopen tegen de normtekst. Hoofdstukken 10 (methode 3), 13, 14 en 16 en §5.7 zijn op dezelfde dag tegen de normtekst herschreven, en hoofdstukken 5 en 9 zijn tegen de doeleditie gecontroleerd. Wat nog ontbreekt, en de open interpretatievragen, staan in het verificatiedossier.
-- Er zijn nog geen uitkomsten uit de EDR-testset (bijlage 2) vergeleken. Alleen A_g en A_ls van EP-W001 zijn getoetst.
+- Er zijn nog geen uitkomsten uit de EDR-testset (bijlage 2) vergeleken. Alleen A_g en het omhullend oppervlak A_o van EP-W001 zijn getoetst.
