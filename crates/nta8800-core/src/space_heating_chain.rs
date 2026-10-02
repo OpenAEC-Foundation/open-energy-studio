@@ -9,6 +9,13 @@
 //! the chapter 7 need here; that coupling belongs to the demand calculation.
 //! All results are unverified.
 
+use crate::annex_m::{
+    boiler_month, validate_product_boiler, BoilerFuel, BoilerMonth, ProductBoiler,
+};
+use crate::annex_n::{
+    heater_month, resolve_heater, validate_local_heater, HeaterMonth, LocalHeater,
+};
+use crate::annex_o::{auxiliary_constants, monthly_auxiliary_kwh, AppliancePowerMeasurements};
 use crate::boiler_forfait_draft::{
     assess_boiler_forfait_monthly_draft, BoilerForfaitDraftInput, BoilerForfaitMonthlyDraftInput,
     BoilerRole,
@@ -244,6 +251,110 @@ pub enum Generator {
     ElectricResistance(ElectricResistanceGenerator),
     /// Solid-biomass stove or boiler, forfait efficiency of table 9.30.
     Biomass(BiomassGenerator),
+    /// Gas, oil or biomass boiler with product values (annex M; 9.6.2.2 and
+    /// 9.6.5.2 method 1).
+    ProductBoiler(Box<ProductBoilerGenerator>),
+    /// Local heater, air heater, radiant heater or stove with product or
+    /// default values (annex N).
+    LocalHeater(Box<LocalHeaterGenerator>),
+    /// Table 9.25 "overige systemen": local gas or oil heating and
+    /// direct-fired air heaters (forfait).
+    ForfaitHeater(ForfaitHeaterGenerator),
+}
+
+/// Annex M boiler in the chain.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProductBoilerGenerator {
+    pub boiler: ProductBoiler,
+    /// Design temperature class (table 9.14) for `ϑ_H,out` when the
+    /// distribution is not calculated with `distributionSystem`.
+    #[serde(default)]
+    pub design_temperature_class: Option<DesignTemperatureClass>,
+    /// Biomass: appliance of at most 500 kW meeting annex R (bmB).
+    #[serde(default)]
+    pub annex_r_compliant_at_most_500_kw: Option<bool>,
+    #[serde(default)]
+    pub annex_r_reference: Option<String>,
+}
+
+/// Fuel of an annex N heater.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalHeaterFuel {
+    NaturalGas,
+    Oil,
+    /// Solid biomass or wood pellets (carrier `bm`).
+    Biomass,
+}
+
+/// Annex N heater in the chain.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalHeaterGenerator {
+    pub heater: LocalHeater,
+    pub fuel: LocalHeaterFuel,
+    /// Biomass: annex R compliance (bmB) and §9.6.5 sole heating.
+    #[serde(default)]
+    pub annex_r_compliant_at_most_500_kw: Option<bool>,
+    #[serde(default)]
+    pub annex_r_reference: Option<String>,
+    #[serde(default)]
+    pub sole_heating_in_served_rooms: Option<bool>,
+}
+
+/// Table 9.25 rows of "overige systemen".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ForfaitHeaterKind {
+    /// Local gas heating incl. pilot, oil heating or steam boiler with flue: 0,65.
+    LocalWithFlue,
+    /// Without flue (incl. flueless decorative fires): 0,10.
+    LocalWithoutFlue,
+    AirHeaterConventional,
+    AirHeaterVr,
+    AirHeaterHr100,
+    AirHeaterHr104,
+    AirHeaterHr107,
+}
+
+impl ForfaitHeaterKind {
+    /// Table 9.25.
+    pub fn efficiency(self) -> f64 {
+        match self {
+            Self::LocalWithFlue => 0.65,
+            Self::LocalWithoutFlue => 0.10,
+            Self::AirHeaterConventional => 0.75,
+            Self::AirHeaterVr => 0.80,
+            Self::AirHeaterHr100 => 0.90,
+            Self::AirHeaterHr104 => 0.925,
+            Self::AirHeaterHr107 => 0.95,
+        }
+    }
+
+    fn air_heater(self) -> bool {
+        !matches!(self, Self::LocalWithFlue | Self::LocalWithoutFlue)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ForfaitHeaterFuel {
+    NaturalGas,
+    Oil,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ForfaitHeaterGenerator {
+    /// `heaterKind`: `kind` is the generator tag.
+    #[serde(rename = "heaterKind")]
+    pub kind: ForfaitHeaterKind,
+    pub fuel: ForfaitHeaterFuel,
+    pub equipment_reference: String,
+    /// 9.91 inputs (devices and burner power).
+    #[serde(default)]
+    pub auxiliary: Option<OtherGeneratorAuxiliary>,
 }
 
 /// 9.91/9.92 inputs for generators outside 9.85.
@@ -347,7 +458,12 @@ impl Generator {
             Self::GasBoiler(_) => None,
             Self::HeatPumpForfait(generator) => Some((&generator.forfait, generator.source_system)),
             Self::HybridHeatPump(generator) => Some((&generator.forfait, generator.source_system)),
-            Self::ExternalHeat(_) | Self::ElectricResistance(_) | Self::Biomass(_) => None,
+            Self::ExternalHeat(_)
+            | Self::ElectricResistance(_)
+            | Self::Biomass(_)
+            | Self::ProductBoiler(_)
+            | Self::LocalHeater(_)
+            | Self::ForfaitHeater(_) => None,
         }
     }
 
@@ -361,7 +477,12 @@ impl Generator {
             Self::HybridHeatPump(generator) => {
                 generator.forfait.collective_building_installation != Some(true)
             }
-            Self::ExternalHeat(_) | Self::ElectricResistance(_) | Self::Biomass(_) => false,
+            Self::ExternalHeat(_)
+            | Self::ElectricResistance(_)
+            | Self::Biomass(_)
+            | Self::ProductBoiler(_)
+            | Self::LocalHeater(_)
+            | Self::ForfaitHeater(_) => false,
         }
     }
 
@@ -397,6 +518,10 @@ pub struct HybridGenerator {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GasBoilerGenerator {
     pub boiler: BoilerForfaitDraftInput,
+    /// Individual appliances: component measurements of annex O for the
+    /// constants A, B and C of 9.85 (9.86–9.90); absent means the forfait.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auxiliary_measurements: Option<AppliancePowerMeasurements>,
     /// Collective boilers: 9.91 inputs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
@@ -437,6 +562,11 @@ pub struct ChainMonth {
     pub district_heat_kwh: f64,
     /// Solid biomass input, carrier `bm` (9.64).
     pub biomass_kwh: f64,
+    /// Fuel oil input (annex M/N, table 9.25 oil appliances).
+    pub oil_kwh: f64,
+    /// Annex M/N generator losses recoverable in the space (M.16/M.19);
+    /// reported, not fed back into the need.
+    pub generator_recoverable_loss_kwh: f64,
     pub generator_electricity_kwh: f64,
     /// 9.6: generator plus distribution auxiliary energy.
     pub auxiliary_electricity_kwh: Option<f64>,
@@ -1282,6 +1412,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
             &input.generator,
             &mut issues,
         );
+        let conditions = generator_conditions(input, &valid_zones, &distribution);
         // 7.3/7.7: the recoverable losses (9.2.5) reduce the heating need and
         // add to the cooling need; the heating limit (9.28) and the
         // distribution itself use the need without them.
@@ -1359,6 +1490,8 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                     .map(|zone| zone[index])
                     .sum(),
                 collective_source_heat_kwh: 0.0,
+                oil_kwh: 0.0,
+                generator_recoverable_loss_kwh: 0.0,
             });
         }
         zone_recoverable_losses = valid_zones
@@ -1375,6 +1508,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 input,
                 &outputs,
                 building_fraction,
+                &conditions,
                 &mut monthly,
                 &mut issues,
             );
@@ -1497,10 +1631,122 @@ fn measured_heat_pump_auxiliary(
 
 /// Generator step; fills the carrier columns and the generator auxiliary
 /// energy of `monthly` and returns the generation efficiency.
+/// Generator operating conditions of annexes M and N.
+struct GeneratorConditions {
+    /// `t_H;op;si;mi` of table 9.15 at the heating limit (longest over the
+    /// zones); `None` when the heating limit cannot be determined.
+    hours: Option<[f64; 12]>,
+    /// `ϑ_H,out` (9.32), area-weighted over the zones; `None` without a
+    /// design temperature class.
+    return_c: Option<[f64; 12]>,
+    /// Area-weighted heating setpoint, °C.
+    indoor_c: f64,
+}
+
+fn generator_conditions(
+    input: &SpaceHeatingChainInput,
+    zones: &[ZoneTerms],
+    distribution: &DistributionResult,
+) -> GeneratorConditions {
+    let area: f64 = zones.iter().map(|zone| zone.area_m2).sum();
+    let indoor_c = if area > 0.0 {
+        zones
+            .iter()
+            .map(|zone| zone.setpoint_c * zone.area_m2)
+            .sum::<f64>()
+            / area
+    } else {
+        20.0
+    };
+    let limits: Option<Vec<i32>> = match &distribution.summary {
+        Some(summary) => Some(
+            summary
+                .zones
+                .iter()
+                .map(|zone| zone.heating_limit_c)
+                .collect(),
+        ),
+        None => zones
+            .iter()
+            .map(|zone| {
+                let need: [f64; 12] =
+                    std::array::from_fn(|month| zone.need[month] + zone.heating_limit_extra[month]);
+                heating_limit_c(&need, zone.setpoint_c)
+            })
+            .collect(),
+    };
+    let class = input
+        .distribution_system
+        .as_ref()
+        .map(|system| {
+            system
+                .design_temperature_class
+                .unwrap_or(DesignTemperatureClass::C90)
+        })
+        .or(match &input.generator {
+            Generator::ProductBoiler(generator) => generator.design_temperature_class,
+            _ => None,
+        });
+    let hours = limits.as_ref().map(|limits| {
+        std::array::from_fn(|month| {
+            limits
+                .iter()
+                .map(|limit| heating_limit_hours(*limit, month))
+                .fold(0.0, f64::max)
+        })
+    });
+    let return_c = match (&limits, class) {
+        (Some(limits), Some(class)) if area > 0.0 => Some(std::array::from_fn(|month| {
+            zones
+                .iter()
+                .zip(limits)
+                .map(|(zone, limit)| {
+                    let (_, ret) = supply_return_c(
+                        zone.setpoint_c,
+                        class,
+                        *limit,
+                        OUTDOOR_TEMPERATURE_C[month],
+                        zone.increment_k,
+                    );
+                    ret * zone.area_m2
+                })
+                .sum::<f64>()
+                / area
+        })),
+        _ => None,
+    };
+    GeneratorConditions {
+        hours,
+        return_c,
+        indoor_c,
+    }
+}
+
+/// Biomass checks shared by annex M boilers and annex N stoves.
+fn validate_biomass_evidence(
+    compliant: Option<bool>,
+    reference: Option<&String>,
+    issues: &mut Vec<ChainIssue>,
+) {
+    if compliant != Some(true) {
+        issues.push(issue(
+            "biomass_class_unsupported",
+            "generator.annexRCompliantAtMost500Kw",
+        ));
+    }
+    if reference.map_or(true, |value| value.trim().is_empty()) {
+        issues.push(issue(
+            "source_reference_required",
+            "generator.annexRReference",
+        ));
+    }
+}
+
 fn generate(
     input: &SpaceHeatingChainInput,
     outputs: &[MonthlyEnergy],
     building_fraction: f64,
+    conditions: &GeneratorConditions,
     monthly: &mut [ChainMonth],
     issues: &mut Vec<ChainIssue>,
 ) -> Option<f64> {
@@ -1531,6 +1777,27 @@ fn generate(
             for (row, boiler) in monthly.iter_mut().zip(&result.monthly) {
                 row.natural_gas_kwh = boiler.input_natural_gas_kwh;
                 row.auxiliary_electricity_kwh = boiler.auxiliary_electricity_kwh;
+            }
+            if let Some(measurements) = &generator.auxiliary_measurements {
+                if collective {
+                    issues.push(issue(
+                        "boiler_auxiliary_measurements_individual_only",
+                        "generator.auxiliaryMeasurements",
+                    ));
+                } else {
+                    // Annex O and 9.86–9.88 instead of the 9.85 forfait.
+                    match auxiliary_constants(measurements, "generator.auxiliaryMeasurements") {
+                        Ok(constants) => {
+                            for row in monthly.iter_mut() {
+                                row.auxiliary_electricity_kwh =
+                                    Some(monthly_auxiliary_kwh(&constants, row.natural_gas_kwh));
+                            }
+                        }
+                        Err(found) => {
+                            issues.extend(found.into_iter().map(|item| issue(item.code, item.path)))
+                        }
+                    }
+                }
             }
             if result.monthly.len() != 12 && issues.is_empty() {
                 issues.push(issue("generator_result_incomplete", "generator"));
@@ -1811,6 +2078,159 @@ fn generate(
                             });
                     }
                 }
+            }
+        }
+        Generator::ProductBoiler(generator) => {
+            issues.extend(
+                validate_product_boiler(&generator.boiler, "generator.boiler")
+                    .into_iter()
+                    .map(|item| issue(item.code, item.path)),
+            );
+            if generator.boiler.fuel == BoilerFuel::Wood {
+                validate_biomass_evidence(
+                    generator.annex_r_compliant_at_most_500_kw,
+                    generator.annex_r_reference.as_ref(),
+                    issues,
+                );
+            }
+            let Some(hours) = conditions.hours else {
+                issues.push(issue("heating_limit_undetermined", "demand"));
+                return None;
+            };
+            let Some(return_c) = conditions.return_c else {
+                issues.push(issue(
+                    "design_temperature_class_required",
+                    "generator.designTemperatureClass",
+                ));
+                return None;
+            };
+            if !issues.is_empty() {
+                return None;
+            }
+            let mut output_total = 0.0;
+            let mut input_total = 0.0;
+            for (index, row) in monthly.iter_mut().enumerate() {
+                // M.25 uses the output of the whole installation.
+                let result = boiler_month(
+                    &generator.boiler,
+                    BoilerMonth {
+                        heat_output_kwh: row.generator_output_kwh / building_fraction,
+                        operating_hours: hours[index],
+                        month_hours: MONTH_HOURS[index],
+                        return_temperature_c: return_c[index],
+                        outdoor_temperature_c: OUTDOOR_TEMPERATURE_C[index],
+                    },
+                );
+                let fuel = result.input_kwh * building_fraction;
+                match generator.boiler.fuel {
+                    BoilerFuel::NaturalGas => row.natural_gas_kwh = fuel,
+                    BoilerFuel::Oil => row.oil_kwh = fuel,
+                    BoilerFuel::Wood => row.biomass_kwh = fuel,
+                }
+                row.auxiliary_electricity_kwh =
+                    Some(result.auxiliary_electricity_kwh * building_fraction);
+                row.generator_recoverable_loss_kwh =
+                    result.recoverable_to_space_kwh * building_fraction;
+                output_total += row.generator_output_kwh;
+                input_total += fuel;
+            }
+            generation_efficiency = (input_total > 0.0).then(|| output_total / input_total);
+        }
+        Generator::LocalHeater(generator) => {
+            issues.extend(
+                validate_local_heater(&generator.heater, "generator.heater")
+                    .into_iter()
+                    .map(|item| issue(item.code, item.path)),
+            );
+            if generator.fuel == LocalHeaterFuel::Biomass {
+                validate_biomass_evidence(
+                    generator.annex_r_compliant_at_most_500_kw,
+                    generator.annex_r_reference.as_ref(),
+                    issues,
+                );
+                match generator.sole_heating_in_served_rooms {
+                    None => issues.push(issue(
+                        "biomass_sole_heating_confirmation_required",
+                        "generator.soleHeatingInServedRooms",
+                    )),
+                    Some(false) => issues.push(issue(
+                        "biomass_stove_not_sole_heating",
+                        "generator.soleHeatingInServedRooms",
+                    )),
+                    Some(true) => {}
+                }
+            }
+            let Some(hours) = conditions.hours else {
+                issues.push(issue("heating_limit_undetermined", "demand"));
+                return None;
+            };
+            if !issues.is_empty() {
+                return None;
+            }
+            let Ok(resolved) = resolve_heater(&generator.heater, "generator.heater") else {
+                return None;
+            };
+            let mut output_total = 0.0;
+            let mut input_total = 0.0;
+            for (index, row) in monthly.iter_mut().enumerate() {
+                let result = heater_month(
+                    &generator.heater,
+                    &resolved,
+                    HeaterMonth {
+                        heat_required_kwh: row.generator_output_kwh,
+                        operating_hours: hours[index],
+                        indoor_c: conditions.indoor_c,
+                        outdoor_c: OUTDOOR_TEMPERATURE_C[index],
+                    },
+                );
+                if result.shortfall_kwh > 1e-6 {
+                    issues.push(issue(
+                        "local_heater_capacity_insufficient",
+                        format!("monthly[{index}]"),
+                    ));
+                }
+                match generator.fuel {
+                    LocalHeaterFuel::NaturalGas => row.natural_gas_kwh = result.input_kwh,
+                    LocalHeaterFuel::Oil => row.oil_kwh = result.input_kwh,
+                    LocalHeaterFuel::Biomass => row.biomass_kwh = result.input_kwh,
+                }
+                row.auxiliary_electricity_kwh = Some(result.auxiliary_electricity_kwh);
+                output_total += row.generator_output_kwh;
+                input_total += result.input_kwh;
+            }
+            generation_efficiency = (input_total > 0.0).then(|| output_total / input_total);
+        }
+        Generator::ForfaitHeater(generator) => {
+            if generator.equipment_reference.trim().is_empty() {
+                issues.push(issue(
+                    "source_reference_required",
+                    "generator.equipmentReference",
+                ));
+            }
+            if generator.kind.air_heater() && generator.fuel != ForfaitHeaterFuel::NaturalGas {
+                // Table 9.25 defines the air-heater classes for gas only.
+                issues.push(issue("forfait_air_heater_gas_only", "generator.fuel"));
+            }
+            validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+            if !issues.is_empty() {
+                return None;
+            }
+            let efficiency = generator.kind.efficiency();
+            generation_efficiency = Some(efficiency);
+            let auxiliary = generator.auxiliary.as_ref().expect("validated auxiliary");
+            for (index, row) in monthly.iter_mut().enumerate() {
+                let fuel = row.generator_output_kwh / efficiency;
+                match generator.fuel {
+                    ForfaitHeaterFuel::NaturalGas => row.natural_gas_kwh = fuel,
+                    ForfaitHeaterFuel::Oil => row.oil_kwh = fuel,
+                }
+                row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
+                    auxiliary,
+                    OTHER_AUX_GAS_OIL_W_PER_KW,
+                    row.generator_output_kwh,
+                    MONTH_HOURS[index],
+                    building_fraction,
+                ));
             }
         }
     }
@@ -2111,6 +2531,214 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "heat_pump_auxiliary_generator_mismatch"));
+    }
+
+    fn product_boiler() -> ProductBoilerGenerator {
+        serde_json::from_value(json!({
+            "boiler": {
+                "technology": "condensing_gas", "fuel": "natural_gas",
+                "placement": "heated_space", "draught": "fan_assisted",
+                "control": "wall_hung_outdoor_compensated",
+                "product": {
+                    "nominalPowerKw": 24.0,
+                    "fullLoad": {"method": "condensing", "efficiencyAt60": 0.97, "efficiencyAt30": 1.06},
+                    "partLoadEfficiency": 1.08,
+                    "standbyLossFactor": 0.006, "standbyTestTemperatureC": 50.0,
+                    "auxiliaryStandbyW": 3.0, "auxiliaryIntermediateW": 15.0, "auxiliaryFullW": 40.0,
+                    "sourceReference": "product sheet"
+                },
+                "equipmentReference": "type plate"
+            }
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn product_boiler_follows_annex_m_with_table_9_15_hours() {
+        let mut input = boiler_chain();
+        let mut distribution = system(calculated_pump());
+        distribution.installation = Installation::Individual;
+        distribution.design_temperature_class = Some(DesignTemperatureClass::C45);
+        input.distribution_system = Some(distribution);
+        input.generator = Generator::ProductBoiler(Box::new(product_boiler()));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let zone = &result.distribution.as_ref().unwrap().zones[0];
+        let increment = result.emission_temperature_increment_k.unwrap();
+        let Generator::ProductBoiler(generator) = &input.generator else {
+            unreachable!()
+        };
+        for (index, row) in result.monthly.iter().enumerate() {
+            let (_, ret) = supply_return_c(
+                20.0,
+                DesignTemperatureClass::C45,
+                zone.heating_limit_c,
+                OUTDOOR_TEMPERATURE_C[index],
+                increment,
+            );
+            let expected = boiler_month(
+                &generator.boiler,
+                BoilerMonth {
+                    heat_output_kwh: row.generator_output_kwh,
+                    operating_hours: heating_limit_hours(zone.heating_limit_c, index),
+                    month_hours: MONTH_HOURS[index],
+                    return_temperature_c: ret,
+                    outdoor_temperature_c: OUTDOOR_TEMPERATURE_C[index],
+                },
+            );
+            assert!((row.natural_gas_kwh - expected.input_kwh).abs() < 1e-9);
+            let aux =
+                row.auxiliary_electricity_kwh.unwrap() - row.distribution_auxiliary_electricity_kwh;
+            assert!((aux - expected.auxiliary_electricity_kwh).abs() < 1e-9);
+        }
+        // Without a calculated distribution the class must be given.
+        input.distribution_system = None;
+        assert!(codes(&input).contains(&"distribution_pump_input_required"));
+    }
+
+    #[test]
+    fn product_boiler_fixture_calculates() {
+        let input: SpaceHeatingChainInput = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-space-heating-chain-product-boiler-synthetic.json"
+        ))
+        .unwrap();
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let efficiency = result.generation_efficiency.unwrap();
+        // Gross basis (f_Hs/Hi 1,11) with f_prac 0,95 and f_ctr;ls 1,03:
+        // part load 1,08 gives about 1/(1,03·1,11/(0,95·1,08)) ≈ 0,90.
+        assert!(efficiency > 0.8 && efficiency < 0.95, "{efficiency}");
+        assert!(result
+            .monthly
+            .iter()
+            .any(|row| row.generator_recoverable_loss_kwh > 0.0));
+    }
+
+    #[test]
+    fn local_air_heater_follows_annex_n() {
+        let mut input = boiler_chain();
+        input.emission = serde_json::from_value(json!({
+            "system": "local_heater", "balancing": "not_applicable",
+            "control": "main_room_thermostat", "sourceReference": "survey"
+        }))
+        .unwrap();
+        input.generator = serde_json::from_value(json!({
+            "kind": "local_heater",
+            "fuel": "natural_gas",
+            "heater": {
+                "heaterType": "air_heater_fan_burner", "control": "on_off",
+                "productionPeriod": "after2005", "condensing": false, "pilotFlame": false,
+                "ventilation": "none", "location": "heated_space_free", "fan": "axial",
+                "envelopeInsulation": "well_insulated_maintained",
+                "product": {"inputFullKw": 20.0},
+                "sourceReference": "type plate"
+            }
+        }))
+        .unwrap();
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let Generator::LocalHeater(generator) = &input.generator else {
+            unreachable!()
+        };
+        let resolved = resolve_heater(&generator.heater, "h").unwrap();
+        let need: [f64; 12] = std::array::from_fn(|m| result.monthly[m].heating_need_kwh);
+        let limit = heating_limit_c(&need, 20.0).unwrap();
+        let jan = &result.monthly[0];
+        let expected = heater_month(
+            &generator.heater,
+            &resolved,
+            HeaterMonth {
+                heat_required_kwh: jan.generator_output_kwh,
+                operating_hours: heating_limit_hours(limit, 0),
+                indoor_c: 20.0,
+                outdoor_c: OUTDOOR_TEMPERATURE_C[0],
+            },
+        );
+        assert!((jan.natural_gas_kwh - expected.input_kwh).abs() < 1e-9);
+        assert!(jan.natural_gas_kwh > jan.generator_output_kwh);
+    }
+
+    #[test]
+    fn forfait_local_heater_uses_table_9_25() {
+        let mut input = boiler_chain();
+        input.emission = serde_json::from_value(json!({
+            "system": "local_heater", "balancing": "not_applicable",
+            "control": "main_room_thermostat", "sourceReference": "survey"
+        }))
+        .unwrap();
+        input.generator = Generator::ForfaitHeater(ForfaitHeaterGenerator {
+            kind: ForfaitHeaterKind::LocalWithFlue,
+            fuel: ForfaitHeaterFuel::Oil,
+            equipment_reference: "survey".into(),
+            auxiliary: other_aux(1, Some(8.0)),
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!((jan.oil_kwh - jan.generator_output_kwh / 0.65).abs() < 1e-9);
+        // The generator round-trips through JSON despite the `kind` tag.
+        let json = serde_json::to_value(&input.generator).unwrap();
+        assert_eq!(json["kind"], "forfait_heater");
+        assert_eq!(json["heaterKind"], "local_with_flue");
+        let parsed: Generator = serde_json::from_value(json).unwrap();
+        assert!(matches!(parsed, Generator::ForfaitHeater(_)));
+        assert_eq!(jan.natural_gas_kwh, 0.0);
+        input.generator = Generator::ForfaitHeater(ForfaitHeaterGenerator {
+            kind: ForfaitHeaterKind::AirHeaterHr107,
+            fuel: ForfaitHeaterFuel::Oil,
+            equipment_reference: "survey".into(),
+            auxiliary: other_aux(1, Some(8.0)),
+        });
+        assert!(codes(&input).contains(&"forfait_air_heater_gas_only"));
+    }
+
+    #[test]
+    fn individual_boiler_auxiliary_from_annex_o_measurements() {
+        let mut input = boiler_chain();
+        let Generator::GasBoiler(boiler) = &mut input.generator else {
+            unreachable!()
+        };
+        boiler.auxiliary_measurements = Some(
+            serde_json::from_value(json!({
+                "nominalLoadKw": 24.0, "standbyElectronicsW": 2.0, "gasValveW": 5.0,
+                "fan": {"method": "single_speed", "powerW": 20.0},
+                "pump": {"method": "staged", "operationW": 40.0, "prePostRunW": 30.0},
+                "pumpPostRunS": 60.0,
+                "loadCurve": [{"timeS": 200.0, "meanLoad": 0.5}, {"timeS": 300.0, "meanLoad": 0.5}],
+                "sourceReference": "test report"
+            }))
+            .unwrap(),
+        );
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let Generator::GasBoiler(boiler) = &input.generator else {
+            unreachable!()
+        };
+        let constants =
+            auxiliary_constants(boiler.auxiliary_measurements.as_ref().unwrap(), "a").unwrap();
+        let jan = &result.monthly[0];
+        let expected = monthly_auxiliary_kwh(&constants, jan.natural_gas_kwh);
+        assert!((jan.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
     }
 
     fn other_aux(devices: u32, power: Option<f64>) -> Option<OtherGeneratorAuxiliary> {

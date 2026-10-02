@@ -13,6 +13,9 @@ use std::collections::{HashMap, HashSet};
 pub mod annex_a;
 pub mod annex_aa;
 pub mod annex_b;
+pub mod annex_m;
+pub mod annex_n;
+pub mod annex_o;
 pub mod annex_p;
 pub mod bacs_draft;
 pub mod bbl_requirements;
@@ -314,6 +317,10 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_humidification_dehumidification_chapter_12",
             "schematisation_checks_6_4_and_6_5_2",
             "unverified_hot_water_annex_t_gaskeur_and_annex_u_shower_recovery_tests",
+            "unverified_product_value_boilers_annex_m",
+            "unverified_local_air_radiant_heaters_and_stoves_annex_n",
+            "unverified_appliance_auxiliary_from_measurements_annex_o",
+            "unverified_forfait_local_and_air_heaters_table_9_25",
             "unverified_opaque_construction_u_rc_annex_c_e_f",
             "unverified_window_door_shutter_u_8_2_2_3_annex_g_l",
             "forfait_envelope_values_annex_i",

@@ -38,6 +38,23 @@ Interpretatievragen:
 7. Bijlage A: de stap-2-correctiefactoren zijn 1, omdat er geen forfait is.
 8. Bijlage B: een open vrijhangend plafond telt niet mee, voor de weerstand noch voor de massa.
 
+## Stand 2 oktober 2026: bijlagen M, N en O
+
+Toegevoegd uit de gelicentieerde normtekst (p. 359–361, 870–931): ketels met productwaarden (bijlage M), lokale verwarmers, luchtverwarmers, stralers en kachels (bijlage N), hulpenergie van individuele toestellen uit componentmetingen (bijlage O met 9.86–9.90) en de forfaitaire "overige systemen" van tabel 9.25. Het controleren van de forfaitroutes leverde het volgende op: tabel 9.25 (ketels) en tabel 9.30 (biomassa) komen overeen met de code. De luchtverwarmer- en lokale-verwarmingsrijen van tabel 9.25 ontbraken en zijn toegevoegd.
+
+Interpretatievragen:
+
+1. M.15 telt `Q_gen;aux;rbl` op bij het terugwinbare mantelverlies, en M.20 stelt die gelijk aan `Q_H;gen;aux;rvd` (naar het medium). Dat deel is al in M.1 afgetrokken. De kern rapporteert als terugwinbaar naar de ruimte daarom M.16 + M.19 (`Q_H;gen;aux;rbl`).
+2. M.12 noemt `η_gen;Pn` zonder temperatuurcorrectie. Voor condenserende ketels is `η_gen;Pn;60` gebruikt.
+3. `t_H;op;si;mi` in M.6, M.23 en M.25 is "gegeven in tabel 9.15". De kern neemt de uren van tabel 9.15 bij de stookgrens, zonder `f_H;red` en zonder de pompfactor van 9.32a. Bij meerdere zones gelden de langste uren en een oppervlaktegewogen retourtemperatuur.
+4. Een collectieve ketel met productwaarden rekent de deellast met de output van de hele installatie (`/f_gebouw`) en schaalt de uitkomsten terug.
+5. N.37 drukt `Q_lrh;blw;sby` in de teller; gelezen als `Q_lrh;sby;rh` (N.32). N.61 drukt `100 + (1 + …)` in de noemer, terwijl N.37 `100·(1 + …)` heeft; gelezen als `100·`.
+6. N.69 interpoleert tussen `α_ch;ON;Pmin` en `α_ch;ON;Pn`. De kern interpoleert tussen de totale verliezen `α_ON;Pmin` en `α_ON;Pmax` (N.49/N.50), zodat ventilatie-, mantel- en condensatieterm meetellen. In de modulatiestand is de schoorsteencorrectie met β = 1 bepaald.
+7. f_prac 0,95 (N.1.1, N.5) is toegepast als `E_H;gen;in / 0,95`.
+8. Kachels: tabel N.33 verwijst voor `f_corr`, `ϑ_test` en `n` naar "forfaitaire waarden", maar tabel N.20 en N.22 hebben geen kachelrij. De kern gebruikt dan `f_corr` = 0 en `n` = 0, en hulpvermogens 0 tenzij opgegeven.
+9. Een kachel met watergedragen aansluiting levert `Q_H;gen;out;w` (N.80) alleen als rapportage; die warmte wordt niet verrekend met een andere opwekker.
+10. De invoer van bijlage M is op bovenwaarde (`f_Hs/Hi`, tabel M.3); de dragerhoeveelheden van de forfaitroute nemen de rendementen van tabel 9.25 en 9.30 ongewijzigd.
+
 ## Stand 2 oktober 2026: review H7, H8 en H17 tegen de normtekst
 
 Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn nagelopen tegen de gelicentieerde normtekst (NTA 8800:2025+C1:2026, pagina's 164–220, 250–257, 690–715 en 790–795). Tabellen 17.1, 17.2, 17.4 (90°/45°), 7.7 en 7.9 en de meeste constanten klopten. De gevonden afwijkingen zijn hersteld:

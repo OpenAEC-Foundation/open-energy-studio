@@ -88,6 +88,24 @@ Bij één opwekker geeft tabel 9.1 `β = 1`, dus 100% dekking van `Q_H;gen;out` 
   - Een kachel telt alleen als hij de enige verwarming is in de ruimten die hij bedient (§9.6.5). Dat bevestig je met `soleHeatingInServedRooms`; zonder bevestiging volgt een invoergat, en bij `false` volgt weigering.
   - Hulpenergie volgens 9.91: 10 W stand-by, en 10 W/kW bij automatische brandstoftoevoer. Centrale ketels gelden als automatisch gestookt.
 
+- `gas_boiler` met `auxiliaryMeasurements` (alleen individueel): de constanten A, B en C van 9.85 worden uit componentmetingen berekend volgens bijlage O en 9.86–9.90 (p. 359–361, 923–931). Dat omvat de rechte lijnen voor ventilator en modulerende pomp (O.2/O.3, kleinste kwadraten) en de gemiddelde aantijd uit het belastingsverloop (O.1.5: 120 s bij vollast, 1 800 s voor bivalente toestellen).
+- `product_boiler`: ketel met productwaarden volgens bijlage M (methode 1 van 9.6.2.2 en 9.6.5.2, p. 870–879). Brandstof gas, olie of hout; hout vraagt bijlage R (bmB).
+  - Deellastverhouding M.25 over de bedrijfstijd van tabel 9.15 bij de stookgrens (zonder de reductiefactoren van 9.32a).
+  - Temperatuurgecorrigeerde rendementen M.7/M.8/M.10 met tabel M.2/M.4, of M.13/M.14 uit een extra test.
+  - Verliezen M.9/M.11/M.12, lineair geïnterpoleerd (M.4/M.5), bij `ϑ_Hc;mn = ϑ_H,out` van 9.32.
+  - Hulpenergie M.21–M.23, waarvan 0,75 naar het medium gaat (M.18). Invoer M.1 met de regelfactor van tabel M.7.
+  - De retourtemperatuur gebruikt de ontwerpklasse van `distributionSystem` of `designTemperatureClass`. De pomp zit niet in de ketelhulpenergie, dus een watergedragen afgifte vraagt `distributionSystem`.
+  - Terugwinbare verliezen naar de ruimte (M.16/M.19) staan in `generatorRecoverableLossKwh`. Ze worden niet teruggekoppeld naar de behoefte.
+- `local_heater`: lokale verwarmer, luchtverwarmer, straler of kachel volgens bijlage N (p. 880–922).
+  - Aan/uit-toestellen via N.3 met de iteratie N.36/N.37.
+  - Hoog-laag en modulerend via N.4: aan/uit op minimumlast (N.60/N.61) of modulatie (N.65–N.72).
+  - Kachels via N.5, zonder mantelverlies; een watergedragen aansluiting geeft `waterSideHeat` alleen als rapportage.
+  - Ontbrekende productwaarden komen uit tabellen N.20 en N.22–N.30. Waar geen standaardwaarde bestaat, volgt `local_heater_value_required`.
+  - De bedrijfstijd is tabel 9.15 bij de stookgrens van de zonebehoefte. De invoer wordt gedeeld door f_prac 0,95. Onvoldoende vermogen geeft `local_heater_capacity_insufficient`.
+- `forfait_heater`: de "overige systemen" van tabel 9.25. Lokale gas- of olieverwarming met afvoer 0,65, zonder afvoer 0,10, en direct gestookte gasluchtverwarmers van conventioneel 0,75 tot HR-107 0,95. Hulpenergie volgens 9.91 met 10 W stand-by en 1 W/kW branderbedrijf.
+
+Olie-invoer (`oilKwh`) telt in de energieprestatie als drager `oil`, gewogen met f_BACS.
+
 `auxiliaryElectricityKwh` per maand is de som van opwekker- en distributiehulpenergie (9.6). Het distributiedeel staat ook apart in `distributionAuxiliaryElectricityKwh`.
 
 ## Niet meegenomen (`omittedTerms`)
