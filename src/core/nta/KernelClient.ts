@@ -1557,6 +1557,19 @@ export interface SpaceHeatingChainInput {
         /** Pilot flames of gas air heaters (695 kWh/year each, §9.6.2.1). */
         pilotFlames?: number;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
+      }
+    | {
+        /** 9.6.1: several unequal generators split by preference (9.56–9.60, table 9.23). */
+        kind: 'multiple';
+        generators: Array<{
+          preference: number;
+          nominalPowerKw: number;
+          /** Any single generator of this union except `multiple` and `hybrid_heat_pump`. */
+          generator: { kind: string } & Record<string, unknown>;
+        }>;
+        /** 9.58/9.59: renovation with an added preferred generator. */
+        addedPreferredGenerator?: boolean;
+        sourceReference: string;
       };
 }
 

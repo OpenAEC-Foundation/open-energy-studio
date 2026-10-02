@@ -67,7 +67,7 @@ use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
     "9.2.3 node gains from solar thermal systems, AHU, booster heat pumps and delivery sets",
-    "more than two generators, product-specific hybrid switching and domestic hot water priority",
+    "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
     "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
     "annex Q: W_H;aux;hp;an is not booked again as 9.6.3.2 auxiliary energy, because Q.4 already includes it in η_H;gen;hp (COP of 9.63)",
@@ -285,6 +285,57 @@ pub enum Generator {
     /// Table 9.25 "overige systemen": local gas or oil heating and
     /// direct-fired air heaters (forfait).
     ForfaitHeater(ForfaitHeaterGenerator),
+    /// Several unequal generators on one system, split by preference with
+    /// 9.56–9.60 and table 9.23 (9.6.1).
+    Multiple(Box<MultipleGenerators>),
+}
+
+/// 9.6.1: generators with their preference and nominal power.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MultipleGenerators {
+    pub generators: Vec<PreferredGenerator>,
+    /// 9.58/9.59: renovation or a changed installation where a preferred
+    /// generator was added; β then relates the installed power times
+    /// f_gebouw;si;H to Φ_H;tot = Σ Q_H;node;in / 1139.
+    #[serde(default)]
+    pub added_preferred_generator: bool,
+    pub source_reference: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PreferredGenerator {
+    /// 1 is the highest priority (9.2.2.1.3, table 9.1).
+    pub preference: u32,
+    /// Φ_H;gen;i nominal heating power, kW (type plate, NEN-EN 14511-2 for
+    /// heat pumps, at most 40 % of a combi boiler's maximum).
+    pub nominal_power_kw: f64,
+    pub generator: Generator,
+}
+
+/// Table 9.23 f_H;gen;i;mi(β) for β = 0; 0,1; …; 1: October–April and
+/// May–September.
+const TABLE_9_23_WINTER: [f64; 11] = [
+    0.0, 0.20, 0.40, 0.59, 0.75, 0.87, 0.95, 0.98, 0.99, 1.00, 1.00,
+];
+const TABLE_9_23_SUMMER: [f64; 11] = [
+    0.0, 0.57, 0.87, 0.95, 0.98, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00,
+];
+/// 9.59: 0,13 × the year length, rounded.
+const FULL_LOAD_HOURS_9_59: f64 = 1139.0;
+
+/// Table 9.23 with linear interpolation; `month_index` 0 = January.
+pub fn preferred_energy_fraction(beta: f64, month_index: usize) -> f64 {
+    let table = if (4..=8).contains(&month_index) {
+        &TABLE_9_23_SUMMER
+    } else {
+        &TABLE_9_23_WINTER
+    };
+    let x = (beta.clamp(0.0, 1.0)) * 10.0;
+    let low = (x.floor() as usize).min(9);
+    let t = x - low as f64;
+    table[low] + t * (table[low + 1] - table[low])
 }
 
 /// Annex M boiler in the chain.
@@ -506,6 +557,10 @@ impl Generator {
             | Self::ProductBoiler(_)
             | Self::LocalHeater(_)
             | Self::ForfaitHeater(_) => None,
+            Self::Multiple(set) => set
+                .generators
+                .iter()
+                .find_map(|part| part.generator.heat_pump()),
         }
     }
 
@@ -513,6 +568,10 @@ impl Generator {
     pub fn annex_q(&self) -> Option<&AnnexQGenerator> {
         match self {
             Self::HeatPumpAnnexQ(generator) => Some(generator),
+            Self::Multiple(set) => set
+                .generators
+                .iter()
+                .find_map(|part| part.generator.annex_q()),
             _ => None,
         }
     }
@@ -535,6 +594,10 @@ impl Generator {
             | Self::ProductBoiler(_)
             | Self::LocalHeater(_)
             | Self::ForfaitHeater(_) => false,
+            Self::Multiple(set) => set
+                .generators
+                .iter()
+                .all(|part| part.generator.auxiliary_includes_pump()),
         }
     }
 
@@ -546,6 +609,12 @@ impl Generator {
                 Some(10.0)
             }
             Self::ExternalHeat(_) => None,
+            // The preferred generator decides the design spread.
+            Self::Multiple(set) => set
+                .generators
+                .iter()
+                .min_by_key(|part| part.preference)
+                .and_then(|part| part.generator.generator_spread_k()),
             _ => Some(20.0),
         }
     }
@@ -633,7 +702,7 @@ pub struct HeatPumpGenerator {
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChainMonth {
     pub month: u8,
@@ -2342,6 +2411,201 @@ fn boiler_ambient_c(
     }
 }
 
+/// 9.6.1: energy fractions per preference (9.56–9.60, table 9.23) and the
+/// generators run on their share of the node output. Generators with the
+/// same preference share by nominal power; the lowest preference takes the
+/// remainder (note 4: a fictitious identical generator covers missing
+/// power).
+#[allow(clippy::too_many_arguments)]
+fn generate_multiple(
+    input: &SpaceHeatingChainInput,
+    set: &MultipleGenerators,
+    outputs: &[MonthlyEnergy],
+    building_fraction: f64,
+    conditions: &GeneratorConditions,
+    building: HeatPumpBuildingContext,
+    monthly: &mut [ChainMonth],
+    annex_q_result: &mut Option<AnnexQOutput>,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<f64> {
+    let prior = issues.len();
+    if set.generators.len() < 2 {
+        issues.push(issue(
+            "multiple_generators_require_two",
+            "generator.generators",
+        ));
+    }
+    if set.source_reference.trim().is_empty() {
+        issues.push(issue(
+            "source_reference_required",
+            "generator.sourceReference",
+        ));
+    }
+    let mut preferences: Vec<u32> = set.generators.iter().map(|part| part.preference).collect();
+    preferences.sort_unstable();
+    preferences.dedup();
+    if preferences.first() != Some(&1) || preferences.windows(2).any(|pair| pair[1] != pair[0] + 1)
+    {
+        issues.push(issue(
+            "generator_preferences_not_consecutive",
+            "generator.generators",
+        ));
+    }
+    for (index, part) in set.generators.iter().enumerate() {
+        if !part.nominal_power_kw.is_finite() || part.nominal_power_kw <= 0.0 {
+            issues.push(issue(
+                "generator_nominal_power_invalid",
+                format!("generator.generators[{index}].nominalPowerKw"),
+            ));
+        }
+        if matches!(
+            part.generator,
+            Generator::Multiple(_) | Generator::HybridHeatPump(_)
+        ) || part
+            .generator
+            .annex_q()
+            .is_some_and(|generator| generator.backup.is_some())
+        {
+            // These already split the load themselves.
+            issues.push(issue(
+                "generator_nested_split_unsupported",
+                format!("generator.generators[{index}].generator"),
+            ));
+        }
+    }
+    if issues.len() > prior {
+        return None;
+    }
+    let total_power: f64 = set
+        .generators
+        .iter()
+        .map(|part| part.nominal_power_kw)
+        .sum();
+    let power_up_to = |preference: u32| -> f64 {
+        set.generators
+            .iter()
+            .filter(|part| part.preference <= preference)
+            .map(|part| part.nominal_power_kw)
+            .sum()
+    };
+    // 9.56/9.57, or 9.58/9.59 with Φ_H;tot from the node input.
+    let reference = if set.added_preferred_generator {
+        let annual: f64 = outputs.iter().map(|item| item.energy_kwh).sum();
+        annual / FULL_LOAD_HOURS_9_59
+    } else {
+        total_power
+    };
+    let scale = if set.added_preferred_generator {
+        building_fraction
+    } else {
+        1.0
+    };
+    let beta = |preference: u32| -> f64 {
+        if preference == 0 || reference <= 0.0 {
+            0.0
+        } else {
+            power_up_to(preference) * scale / reference
+        }
+    };
+    let last = *preferences.last().expect("validated preferences");
+    // 9.60 per preference and month.
+    let fraction = |preference: u32, month: usize| -> f64 {
+        let below = preferred_energy_fraction(beta(preference - 1), month);
+        if preference == last {
+            1.0 - below
+        } else {
+            (preferred_energy_fraction(beta(preference), month) - below).max(0.0)
+        }
+    };
+    let mut hp_efficiency = None;
+    let mut total_input = 0.0;
+    let mut auxiliary_known = true;
+    for row in monthly.iter_mut() {
+        row.auxiliary_electricity_kwh = Some(0.0);
+    }
+    for (index, part) in set.generators.iter().enumerate() {
+        let same: f64 = set
+            .generators
+            .iter()
+            .filter(|other| other.preference == part.preference)
+            .map(|other| other.nominal_power_kw)
+            .sum();
+        let share = part.nominal_power_kw / same;
+        let sub_outputs: Vec<MonthlyEnergy> = outputs
+            .iter()
+            .enumerate()
+            .map(|(month, item)| MonthlyEnergy {
+                month: item.month,
+                energy_kwh: item.energy_kwh * fraction(part.preference, month) * share,
+            })
+            .collect();
+        let mut sub_rows: Vec<ChainMonth> = monthly
+            .iter()
+            .zip(&sub_outputs)
+            .map(|(row, output)| ChainMonth {
+                month: row.month,
+                generator_output_kwh: output.energy_kwh,
+                ..ChainMonth::default()
+            })
+            .collect();
+        let mut sub_input = input.clone();
+        sub_input.generator = part.generator.clone();
+        let mut sub_issues = Vec::new();
+        let efficiency = generate(
+            &sub_input,
+            &sub_outputs,
+            building_fraction,
+            conditions,
+            building,
+            &mut sub_rows,
+            annex_q_result,
+            &mut sub_issues,
+        );
+        let prefix = format!("generator.generators[{index}].generator.");
+        issues.extend(sub_issues.into_iter().map(|item| ChainIssue {
+            code: item.code,
+            path: match item.path.strip_prefix("generator.") {
+                Some(rest) => format!("{prefix}{rest}"),
+                None => format!("{prefix}{}", item.path),
+            },
+        }));
+        if part.generator.heat_pump().is_some() || part.generator.annex_q().is_some() {
+            hp_efficiency = hp_efficiency.or(efficiency);
+        }
+        for (row, sub) in monthly.iter_mut().zip(&sub_rows) {
+            row.heat_pump_output_kwh += sub.heat_pump_output_kwh;
+            row.natural_gas_kwh += sub.natural_gas_kwh;
+            row.district_heat_kwh += sub.district_heat_kwh;
+            row.biomass_kwh += sub.biomass_kwh;
+            row.oil_kwh += sub.oil_kwh;
+            row.generator_recoverable_loss_kwh += sub.generator_recoverable_loss_kwh;
+            row.generator_electricity_kwh += sub.generator_electricity_kwh;
+            row.collective_source_heat_kwh += sub.collective_source_heat_kwh;
+            match (row.auxiliary_electricity_kwh, sub.auxiliary_electricity_kwh) {
+                (Some(total), Some(value)) => row.auxiliary_electricity_kwh = Some(total + value),
+                _ => auxiliary_known = false,
+            }
+            total_input += sub.natural_gas_kwh
+                + sub.district_heat_kwh
+                + sub.biomass_kwh
+                + sub.oil_kwh
+                + sub.generator_electricity_kwh;
+        }
+    }
+    if !auxiliary_known {
+        for row in monthly.iter_mut() {
+            row.auxiliary_electricity_kwh = None;
+        }
+    }
+    if issues.len() > prior {
+        return None;
+    }
+    // The heat pump's efficiency feeds the ambient heat (5.30/5.31) of its
+    // own output; otherwise the combined output over input.
+    let output: f64 = outputs.iter().map(|item| item.energy_kwh).sum();
+    hp_efficiency.or((total_input > 0.0).then(|| output / total_input))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn generate(
     input: &SpaceHeatingChainInput,
@@ -2355,6 +2619,19 @@ fn generate(
 ) -> Option<f64> {
     let mut generation_efficiency = None;
     match &input.generator {
+        Generator::Multiple(set) => {
+            return generate_multiple(
+                input,
+                set,
+                outputs,
+                building_fraction,
+                conditions,
+                building,
+                monthly,
+                annex_q_result,
+                issues,
+            );
+        }
         Generator::GasBoiler(generator) => {
             let collective = generator.boiler.role == BoilerRole::Collective;
             if collective {
@@ -3030,6 +3307,70 @@ mod tests {
         assert!(result.annual_natural_gas_kwh.unwrap() > 0.0);
         assert_eq!(result.annual_generator_electricity_kwh, Some(0.0));
         assert!(!result.beng_calculation_available);
+    }
+
+    #[test]
+    fn multiple_generators_split_by_table_9_23() {
+        // β per 9.56: heat pump 4 kW of 24 kW → β 1/6; winter
+        // 0,20 + (1/6 − 0,1)·10·0,20 = 1/3; July 0,87 + 0,5·0,08 = 0,91.
+        assert!((preferred_energy_fraction(1.0 / 6.0, 0) - 1.0 / 3.0).abs() < 1e-12);
+        assert!((preferred_energy_fraction(0.25, 6) - 0.91).abs() < 1e-12);
+        assert_eq!(preferred_energy_fraction(1.5, 0), 1.0);
+        let mut input = boiler_chain();
+        let boiler = input.generator.clone();
+        let heat_pump_generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            forfait: heat_pump(),
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own outdoor unit".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        input.generator = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 2,
+                    nominal_power_kw: 20.0,
+                    generator: boiler.clone(),
+                },
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 4.0,
+                    generator: heat_pump_generator.clone(),
+                },
+            ],
+            added_preferred_generator: false,
+            source_reference: "installation survey".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let beta = 4.0 / 24.0;
+        for (month, row) in result.monthly.iter().enumerate() {
+            let f = preferred_energy_fraction(beta, month);
+            assert!((row.heat_pump_output_kwh - f * row.generator_output_kwh).abs() < 1e-6);
+        }
+        // Each part equals its own single-generator chain on that share:
+        // the heat pump's COP is the reported efficiency.
+        let mut alone = boiler_chain();
+        alone.generator = heat_pump_generator;
+        let cop = assess_space_heating_chain(&alone)
+            .generation_efficiency
+            .unwrap();
+        assert!((result.generation_efficiency.unwrap() - cop).abs() < 1e-9);
+        let jan = &result.monthly[0];
+        assert!((jan.generator_electricity_kwh - jan.heat_pump_output_kwh / cop).abs() < 1e-6);
+        assert!(jan.natural_gas_kwh > 0.0);
+        // Preferences must start at 1 and be consecutive.
+        if let Generator::Multiple(set) = &mut input.generator {
+            set.generators[0].preference = 3;
+        }
+        assert!(assess_space_heating_chain(&input)
+            .issues
+            .iter()
+            .any(|item| item.code == "generator_preferences_not_consecutive"));
     }
 
     #[test]

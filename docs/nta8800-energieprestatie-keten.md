@@ -384,3 +384,14 @@ Via **NTA-invoer starten** opent een gestructureerd formulier met secties die de
 Het stilstandsverlies Q_W;hp;ls volgens bijlage W wordt via 13.6.5 opgeteld bij de terugwinbare tapwaterverliezen, in plaats van Q_sto;ls. Bijlage W levert de waarde al in kWh, dus de deling door 3,6 vervalt. De waarde wordt naar beneden afgerond volgens bijlage X.
 
 Dit gebeurt net als bij voorraadvaten alleen bij een gebouw tot 500 m². Interpretatie: de boosterwarmtepomp staat in de verwarmde zone. De forfaitaire route, waarbij het verlies 0 is, bestaat in de kern niet, omdat bijlage W alleen de gemeten route kent.
+
+## Meerdere opwekkers voor ruimteverwarming (9.6.1)
+
+Generator `multiple` bevat twee of meer opwekkers, elk met een preferentie (1 = hoogste prioriteit, oplopend zonder gaten), een nominaal vermogen en een eigen opwekker. Die opwekker kan elk enkelvoudig type uit de keten zijn.
+
+- **β per preferentie:** formule 9.56/9.57 (opgesteld vermogen). Bij `addedPreferredGenerator` (renovatie waarbij een preferente opwekker is bijgeplaatst) gelden 9.58/9.59: Φ·f_gebouw;si;H gedeeld door Φ_H;tot = Σ Q_H;node;in / 1139.
+- **Energiefractie:** F = f(β_pref) − f(β_pref−1) volgens 9.60, met tabel 9.23. Die tabel heeft een kolom voor oktober–april en een voor mei–september, en wordt lineair geïnterpoleerd. De laagste preferentie krijgt het restant. Daarmee dekt de fictieve gelijke opwekker uit opmerking 4 een eventueel vermogenstekort.
+- **Zelfde preferentie:** opwekkers met dezelfde preferentie verdelen hun aandeel naar nominaal vermogen. Dit is een interpretatie.
+- **Berekening per opwekker:** elke opwekker rekent zijn eigen route op F·Q_H;gen;out. Daarna worden de dragers en de hulpenergie opgeteld.
+- **Rendement:** het gerapporteerde opwekkingsrendement is dat van de warmtepomp. Daarmee volgt de omgevingswarmte (5.30/5.31) uit de warmtepompoutput. Zonder warmtepomp is het output/input.
+- **Niet toegestaan:** geneste splitsingen. Dat zijn `multiple` of `hybrid_heat_pump` als onderdeel, en een bijlage-Q-warmtepomp met eigen backup.
