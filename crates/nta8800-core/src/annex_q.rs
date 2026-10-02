@@ -474,10 +474,10 @@ pub fn validate_annex_q(
 ) -> Vec<AnnexQIssue> {
     let mut issues = Vec::new();
     let tests = &pump.maximum_power;
-    let required: &[(u8, Option<&MeasuredPoint>)] = match pump.source {
-        AnnexQSource::ExhaustAirWater => &[(2, tests.condition2.as_ref())],
-        AnnexQSource::AirAir => &[(3, tests.condition3.as_ref())],
-        _ => &[
+    let required: Vec<(u8, Option<&MeasuredPoint>)> = match pump.source {
+        AnnexQSource::ExhaustAirWater => vec![(2, tests.condition2.as_ref())],
+        AnnexQSource::AirAir => vec![(3, tests.condition3.as_ref())],
+        _ => vec![
             (2, tests.condition2.as_ref()),
             (3, tests.condition3.as_ref()),
         ],
