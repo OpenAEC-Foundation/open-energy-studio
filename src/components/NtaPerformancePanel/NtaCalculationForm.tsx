@@ -1,77 +1,22 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
+import {
+  CheckField, NumberField, read, Section, SelectField, TextField, write, type Draft, type Path,
+} from './NtaFormFields';
+import { NtaVentilationSection } from './NtaVentilationSection';
+import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
+import {
+  buildVentilationDraft, removeVentilation, syncVentilation, utilityInternalGains,
+} from '../../core/nta/NtaFormModels';
 
 // The block is edited as plain JSON data; the Rust kernel is the validator.
 
 /** ρ_a·c_a/3600 with 1,205 kg/m³ and 1 005 J/(kg·K) (9.29), in W per (m³/h)·K. */
 const AIR_HEAT_CAPACITY_W_PER_M3H_K = (1.205 * 1005) / 3600;
-type Draft = Record<string, unknown>;
 /** Usage functions of tables 7.13–7.15. */
 const USAGE_FUNCTIONS = ['residential', 'office', 'education', 'retail', 'other_assembly', 'assembly_child_care',
   'other_healthcare', 'healthcare_with_beds', 'lodging', 'cell', 'sport'] as const;
-type Path = Array<string | number>;
-
-function read(source: unknown, path: Path): unknown {
-  return path.reduce<unknown>((value, key) => (value == null ? undefined : (value as Record<string | number, unknown>)[key]), source);
-}
-
-function write(source: Draft, path: Path, value: unknown): Draft {
-  const clone = structuredClone(source) as Record<string | number, unknown>;
-  let cursor = clone;
-  path.slice(0, -1).forEach((key, index) => {
-    const next = cursor[key];
-    if (next == null || typeof next !== 'object') {
-      cursor[key] = typeof path[index + 1] === 'number' ? [] : {};
-    }
-    cursor = cursor[key] as Record<string | number, unknown>;
-  });
-  cursor[path[path.length - 1]] = value;
-  return clone as Draft;
-}
-
-interface FieldProps {
-  draft: Draft;
-  path: Path;
-  label: string;
-  onChange: (path: Path, value: unknown) => void;
-}
-
-function NumberField({ draft, path, label, onChange, step = 'any' }: FieldProps & { step?: string }) {
-  const value = read(draft, path);
-  return <label>{label}
-    <input type="number" step={step} value={typeof value === 'number' ? value : ''}
-      onChange={(event) => onChange(path, event.target.value === '' ? null : Number(event.target.value))} />
-  </label>;
-}
-
-function TextField({ draft, path, label, onChange }: FieldProps) {
-  const value = read(draft, path);
-  return <label>{label}
-    <input value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(path, event.target.value)} />
-  </label>;
-}
-
-function SelectField({ draft, path, label, onChange, options }: FieldProps & { options: Array<[string, string]> }) {
-  const value = read(draft, path);
-  return <label>{label}
-    <select value={value == null ? '' : String(value)} onChange={(event) => onChange(path, event.target.value || null)}>
-      <option value="">—</option>
-      {options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}
-    </select>
-  </label>;
-}
-
-function CheckField({ draft, path, label, onChange }: FieldProps) {
-  return <label className="nta-form-check">
-    <input type="checkbox" checked={read(draft, path) === true} onChange={(event) => onChange(path, event.target.checked)} />
-    {label}
-  </label>;
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <fieldset className="nta-form-section"><legend>{title}</legend><div className="nta-form-grid">{children}</div></fieldset>;
-}
 
 export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   project: IProject;
@@ -84,6 +29,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   const change = (path: Path, value: unknown) => setDraft((current) => write(current, path, value));
   const field = { draft, onChange: change };
   const residential = read(draft, ['calculationScope']) === 'residential';
+  const chapter11 = read(draft, ['ventilation']) != null;
   const surfaces = project.zones.flatMap((zone) => zone.surfaces);
   const tilts = (read(draft, ['surfaceTilts']) as Draft[] | undefined) ?? [];
   const ground = (read(draft, ['groundFloors']) as Draft[] | undefined) ?? [];
@@ -96,7 +42,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   const setConstantVentilation = (value: number | null) => change(['ventilationFlows', 0, 'months'],
     Array.from({ length: 12 }, (_, index) => ({ ...(months[index] ?? {}), month: index + 1, conductanceWPerK: value })));
 
-  return <form className="nta-form" aria-label={t('nta.form.title')} onSubmit={(event) => { event.preventDefault(); onSave(draft); }}>
+  return <form className="nta-form" aria-label={t('nta.form.title')} onSubmit={(event) => { event.preventDefault(); onSave(syncVentilation(draft, project)); }}>
     <p>{t('nta.form.help')}</p>
     <Section title={t('nta.form.general')}>
       <SelectField {...field} path={['calculationScope']} label={t('nta.form.scope')}
@@ -149,7 +95,16 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.internalGains')}>
       {residential
         ? <NumberField {...field} path={['internalGains', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
-        : <NumberField {...field} path={['internalGains', 'heatFluxWPerM2']} label={t('nta.form.heatFlux')} />}
+        : <>
+          <SelectField {...field} path={['internalGains', 'method']} label={t('nta.gains.method')}
+            options={[['utility', t('nta.gains.method.utility')], ['declared', t('nta.gains.method.declared')]]}
+            onChange={(_, value) => change(['internalGains'], value === 'utility'
+              ? { ...utilityInternalGains(), sourceReference: read(draft, ['internalGains', 'sourceReference']) ?? '' }
+              : { method: 'declared', heatFluxWPerM2: null, sourceReference: read(draft, ['internalGains', 'sourceReference']) ?? '' })} />
+          {read(draft, ['internalGains', 'method']) === 'utility'
+            ? <NtaUtilityGainsFields draft={draft} change={change} />
+            : <NumberField {...field} path={['internalGains', 'heatFluxWPerM2']} label={t('nta.form.heatFlux')} />}
+        </>}
       <TextField {...field} path={['internalGains', 'sourceReference']} label={t('nta.form.source')} />
     </Section>
     <Section title={t('nta.form.windows')}>
@@ -207,19 +162,31 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       </div>)}
     </Section>}
     <Section title={t('nta.form.ventilation')}>
-      <label>{t('nta.form.ventilationConstant')}
-        <input type="number" step="any" value={typeof constantConductance === 'number' ? constantConductance : ''}
-          onChange={(event) => setConstantVentilation(event.target.value === '' ? null : Number(event.target.value))} />
+      <label>{t('nta.vent.mode')}
+        <select value={chapter11 ? 'chapter11' : 'explicit'} onChange={(event) => setDraft((current) => event.target.value === 'chapter11'
+          ? syncVentilation({ ...current, ventilation: buildVentilationDraft(current, project) }, project)
+          : removeVentilation(current))}>
+          <option value="chapter11">{t('nta.vent.mode.chapter11')}</option>
+          <option value="explicit">{t('nta.vent.mode.explicit')}</option>
+        </select>
       </label>
-      <label>{t('nta.form.ventilationFlow')}
-        <input type="number" step="any" value={typeof constantConductance === 'number'
-          ? Math.round((constantConductance / AIR_HEAT_CAPACITY_W_PER_M3H_K) * 100) / 100 : ''}
-          onChange={(event) => setConstantVentilation(event.target.value === ''
-            ? null : Number(event.target.value) * AIR_HEAT_CAPACITY_W_PER_M3H_K)} />
-      </label>
-      <TextField {...field} path={['ventilationFlows', 0, 'sourceReference']} label={t('nta.form.source')} />
-      <p className="nta-form-note">{t('nta.form.ventilationNote')}</p>
+      {!chapter11 && <>
+        <label>{t('nta.form.ventilationConstant')}
+          <input type="number" step="any" value={typeof constantConductance === 'number' ? constantConductance : ''}
+            onChange={(event) => setConstantVentilation(event.target.value === '' ? null : Number(event.target.value))} />
+        </label>
+        <label>{t('nta.form.ventilationFlow')}
+          <input type="number" step="any" value={typeof constantConductance === 'number'
+            ? Math.round((constantConductance / AIR_HEAT_CAPACITY_W_PER_M3H_K) * 100) / 100 : ''}
+            onChange={(event) => setConstantVentilation(event.target.value === ''
+              ? null : Number(event.target.value) * AIR_HEAT_CAPACITY_W_PER_M3H_K)} />
+        </label>
+        <TextField {...field} path={['ventilationFlows', 0, 'sourceReference']} label={t('nta.form.source')} />
+        <p className="nta-form-note">{t('nta.form.ventilationNote')}</p>
+      </>}
+      {chapter11 && project.zones.length > 1 && <p className="nta-form-note">{t('nta.vent.multiZone')}</p>}
     </Section>
+    {chapter11 && <NtaVentilationSection draft={draft} change={change} />}
     <Section title={t('nta.form.emission')}>
       <SelectField {...field} path={['emission', 'system']} label={t('nta.form.emissionSystem')} options={[
         ['radiators_or_convectors', t('nta.form.emission.radiators')], ['floor_heating', t('nta.form.emission.floor')],
@@ -232,6 +199,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         ['individual_room_thermostats', t('nta.form.control.individual')], ['other_or_unknown', t('nta.form.unknown')]]} />
       <TextField {...field} path={['emission', 'sourceReference']} label={t('nta.form.source')} />
       <TextField {...field} path={['distribution', 'sourceReference']} label={t('nta.form.distributionSource')} />
+      <NtaDistributionFields draft={draft} change={change} />
     </Section>
     <Section title={t('nta.form.generator')}>
       <label>{t('nta.form.generatorKind')}
@@ -404,6 +372,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         </>}
       </>}
     </Section>
+    {!residential && <NtaLightingSection draft={draft} change={change} project={project} />}
     {pv.length > 0 && <Section title={t('nta.form.pv')}>
       {pv.map((item, index) => <div key={String(item.id)} className="nta-form-row">
         <SelectField {...field} path={['pvSystems', index, 'peakPower', 'method']} label={`${String(item.id)} — ${t('nta.form.pvPeak')}`}
@@ -436,7 +405,9 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <TextField {...field} path={['bacsSourceReference']} label={t('nta.form.source')} />
       <CheckField {...field} path={['useInventoryComplete']} label={t('nta.form.useInventory')} />
       <CheckField {...field} path={['productionInventoryComplete']} label={t('nta.form.productionInventory')} />
-      <CheckField {...field} path={['demandUsesFixedC1Ventilation']} label={t('nta.form.c1')} />
+      {chapter11
+        ? <p className="nta-form-note">{t('nta.vent.c1Automatic')}</p>
+        : <CheckField {...field} path={['demandUsesFixedC1Ventilation']} label={t('nta.form.c1')} />}
       <CheckField {...field} path={['batteryStoragePresent']} label={t('nta.form.battery')} />
       {read(draft, ['batteryStoragePresent']) === true && <>
         <NumberField {...field} path={['storage', 'buildingBoundElectricalKwh']} label={t('nta.form.storageElectrical')} />
