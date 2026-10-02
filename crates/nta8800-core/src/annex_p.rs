@@ -419,10 +419,54 @@ pub enum SystemDistribution {
     },
 }
 
+/// P.6.6.4.3 insulation classes for the forfait `η_WD;gen;sto`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WdStorageInsulation {
+    /// At least 20 mm around storage, pipes and any external exchanger: 0,90.
+    AtLeast20Mm,
+    /// At least 10 mm around storage and pipes, exchanger uninsulated: 0,80.
+    AtLeast10Mm,
+    /// No insulation: 0,50.
+    None,
+}
+
+impl WdStorageInsulation {
+    pub fn efficiency(self) -> f64 {
+        match self {
+            Self::AtLeast20Mm => 0.90,
+            Self::AtLeast10Mm => 0.80,
+            Self::None => 0.50,
+        }
+    }
+}
+
+/// `η_WD;gen;sto` of a collective hot-water circulation system (P.34/P.35).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WdStorage {
+    /// P.35 with the annual losses of P.6.6.4.1 (storage) and P.6.6.4.2
+    /// (pipes and external exchanger).
+    Losses {
+        #[serde(rename = "storageLossKwh")]
+        storage_loss_kwh: f64,
+        #[serde(rename = "pipeLossKwh")]
+        pipe_loss_kwh: f64,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
+    /// P.6.6.4.3 forfait value.
+    Forfait { insulation: WdStorageInsulation },
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CalculatedSystem {
     pub function: SystemFunction,
+    /// `η_WD;gen;sto` (P.34); required for hot water (WD), not allowed
+    /// otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hot_water_storage: Option<WdStorage>,
     /// `Q_XD;out;tot` (P.8), kWh per year.
     pub delivered_kwh: f64,
     pub distribution: SystemDistribution,
@@ -485,8 +529,11 @@ pub struct SystemResult {
     pub factors: SupplyFactors,
     /// `η_XD;dis` (P.10); `None` for declared values.
     pub distribution_efficiency: Option<f64>,
-    /// `f_XD;gen;tot` (P.19).
+    /// `f_XD;gen;tot` (P.19, or P.34 for WD including `η_WD;gen;sto`).
     pub generation_primary_factor: Option<f64>,
+    /// `η_WD;gen;sto` (P.35 or P.6.6.4.3) for hot water.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_efficiency: Option<f64>,
     pub generators: Vec<GeneratorResult>,
 }
 
@@ -543,17 +590,10 @@ fn generator_factors(
                 ));
                 return None;
             }
-            // 5.43/5.45/5.46 (and 5.51/5.53/5.54).
-            let renewable = match carrier {
-                SystemCarrier::Biogas | SystemCarrier::BiomassAbove500Kw => 1.0,
-                SystemCarrier::BiofuelMix { biofuel_share } => *biofuel_share,
-                SystemCarrier::WasteIncineration => 1.0 - carrier.primary_factor(),
-                _ => 0.0,
-            };
             Some((
                 carrier.primary_factor() / efficiency,
                 carrier.co2() / efficiency,
-                renewable,
+                carrier_renewable(carrier),
             ))
         }
         GeneratorKind::HeatPump { efficiency, drive } => {
@@ -580,7 +620,8 @@ fn generator_factors(
                             format!("{path}.kind.drive"),
                         ));
                     }
-                    if function == SystemFunction::Cooling {
+                    // P.6.6.5.4: no forfait values for hot water.
+                    if function != SystemFunction::Heating {
                         issues.push(issue(
                             "table_p5_heating_only",
                             format!("{path}.kind.efficiency"),
@@ -648,12 +689,13 @@ fn generator_factors(
                 ));
                 return None;
             }
-            // P.26/P.27.
+            // P.26/P.27 (P.27 has no MAX(0): a renewable fuel gives a
+            // negative K_CO2), renewable share 5.45/5.46.
             Some((
                 (carrier.primary_factor() - electrical_efficiency * F_P_EL).max(0.0)
                     / thermal_efficiency,
                 (carrier.co2() - electrical_efficiency * K_CO2_EL) / thermal_efficiency,
-                0.0,
+                carrier_renewable(carrier),
             ))
         }
         GeneratorKind::ChpWithLoss {
@@ -683,15 +725,12 @@ fn generator_factors(
                 ));
                 return None;
             }
-            // P.28/P.30; AVI heat uses f_P;del;wi (P.6.5.4.6).
-            let renewable = match carrier {
-                SystemCarrier::WasteIncineration => 0.5,
-                _ => 0.0,
-            };
+            // P.28/P.30; AVI heat uses f_P;del;wi (P.6.5.4.6); renewable
+            // share 5.45/5.46.
             Some((
                 carrier.primary_factor() * ratio * F_P_EL,
                 carrier.co2() * ratio * F_P_EL,
-                renewable,
+                carrier_renewable(carrier),
             ))
         }
         GeneratorKind::ResidualHeat {
@@ -764,6 +803,17 @@ fn generator_factors(
             }
             Some((*primary_factor, *co2_kg_per_kwh, *renewable_factor))
         }
+    }
+}
+
+/// `f_Pren;XD;gi` of a fuel-fired generator or CHP: 5.43, 5.45 (note 6: a
+/// fully biogenic fuel counts 1), 5.46 (and 5.51/5.53/5.54).
+fn carrier_renewable(carrier: &SystemCarrier) -> f64 {
+    match carrier {
+        SystemCarrier::Biogas | SystemCarrier::BiomassAbove500Kw => 1.0,
+        SystemCarrier::BiofuelMix { biofuel_share } => *biofuel_share,
+        SystemCarrier::WasteIncineration => 1.0 - carrier.primary_factor(),
+        _ => 0.0,
     }
 }
 
@@ -868,6 +918,15 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
                     format!("{path}.distribution.otherLossKwh"),
                 ));
             }
+            // Table P.0 footnote b: WD systems use 90/60.
+            if system.function == SystemFunction::HotWater
+                && design_temperature.is_some_and(|t| t != NetworkTemperature::T90To60)
+            {
+                issues.push(issue(
+                    "hot_water_small_system_requires_90_60",
+                    format!("{path}.distribution.designTemperature"),
+                ));
+            }
             let temperature = design_temperature.unwrap_or(NetworkTemperature::T90To60);
             Some(
                 out + table_p0(temperature, *connection_type) * f64::from(*connections)
@@ -896,6 +955,49 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
             ));
         }
     }
+    // P.34/P.35 and P.6.6.4.3.
+    let storage_efficiency = match (&system.hot_water_storage, system.function) {
+        (None, SystemFunction::HotWater) => {
+            issues.push(issue(
+                "hot_water_storage_efficiency_required",
+                format!("{path}.hotWaterStorage"),
+            ));
+            None
+        }
+        (None, _) => Some(1.0),
+        (Some(_), SystemFunction::Heating | SystemFunction::Cooling) => {
+            issues.push(issue(
+                "hot_water_storage_only_for_hot_water",
+                format!("{path}.hotWaterStorage"),
+            ));
+            None
+        }
+        (Some(WdStorage::Forfait { insulation }), _) => Some(insulation.efficiency()),
+        (
+            Some(WdStorage::Losses {
+                storage_loss_kwh,
+                pipe_loss_kwh,
+                source_reference,
+            }),
+            _,
+        ) => {
+            reference(
+                source_reference,
+                format!("{path}.hotWaterStorage.sourceReference"),
+                &mut issues,
+            );
+            let valid = |value: f64| value.is_finite() && value >= 0.0;
+            match input {
+                Some(input) if input > 0.0 && valid(*storage_loss_kwh) && valid(*pipe_loss_kwh) => {
+                    Some(input / (input + storage_loss_kwh + pipe_loss_kwh))
+                }
+                _ => {
+                    issues.push(issue("value_invalid", format!("{path}.hotWaterStorage")));
+                    None
+                }
+            }
+        }
+    };
     if system.generators.is_empty() {
         issues.push(issue("generator_required", format!("{path}.generators")));
     }
@@ -926,6 +1028,7 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
         return Err(issues);
     }
     let input = input.expect("validated");
+    let storage_efficiency = storage_efficiency.expect("validated");
     let efficiency = out / input;
     // P.19/P.21.
     let mut f_gen = 0.0;
@@ -936,7 +1039,8 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
         let (f, k, pren) = factor.expect("validated");
         f_gen += generator.energy_fraction * f;
         k_gen += generator.energy_fraction * k;
-        let heat = generator.energy_fraction * input;
+        // P.34: for WD the generators also cover the storage and pipe losses.
+        let heat = generator.energy_fraction * input / storage_efficiency;
         // 5.42/5.49/5.50: Q_gen;gi·f_Pren;gi + W_gen;ren·f_Pren;elec.
         renewable_energy += heat * pren
             + renewable_drive(&generator.kind, heat, efficiency_of(&generator.kind)) * F_PREN_ELEC;
@@ -948,6 +1052,9 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
             heat_kwh: heat,
         });
     }
+    // P.34: f_WD;gen;tot = f_WD;gen;tot;ex / η_WD;gen;sto (1 for HD/CD).
+    let f_gen = f_gen / storage_efficiency;
+    let k_gen = k_gen / storage_efficiency;
     let aux = system.auxiliary_electricity_kwh;
     let aux_share = system.auxiliary_renewable_share;
     renewable_energy += aux * aux_share * F_PREN_ELEC;
@@ -968,6 +1075,8 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
         },
         distribution_efficiency: Some(efficiency),
         generation_primary_factor: Some(f_gen),
+        storage_efficiency: (system.function == SystemFunction::HotWater)
+            .then_some(storage_efficiency),
         generators,
     })
 }
@@ -1038,6 +1147,7 @@ fn measured(system: &MeasuredSystem, path: &str) -> Result<SystemResult, Vec<Ann
         },
         distribution_efficiency: None,
         generation_primary_factor: None,
+        storage_efficiency: None,
         generators: Vec::new(),
     })
 }
@@ -1081,6 +1191,7 @@ pub fn assess_route(
                 },
                 distribution_efficiency: None,
                 generation_primary_factor: None,
+                storage_efficiency: None,
                 generators: Vec::new(),
             })
         }
@@ -1190,6 +1301,7 @@ mod tests {
     fn system(generators: Vec<SystemGenerator>) -> CalculatedSystem {
         CalculatedSystem {
             function: SystemFunction::Heating,
+            hot_water_storage: None,
             delivered_kwh: 1_000_000.0,
             distribution: SystemDistribution::Flows {
                 input_kwh: None,
@@ -1436,5 +1548,148 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    fn boiler(fraction: f64, carrier: SystemCarrier) -> SystemGenerator {
+        SystemGenerator {
+            id: "boiler".into(),
+            energy_fraction: fraction,
+            kind: GeneratorKind::Combustion {
+                carrier,
+                efficiency: 0.9,
+                efficiency_reference: "test".into(),
+            },
+        }
+    }
+
+    #[test]
+    fn hot_water_storage_efficiency_divides_the_generation_factor() {
+        let mut wd = system(vec![boiler(1.0, SystemCarrier::NaturalGas)]);
+        wd.function = SystemFunction::HotWater;
+        wd.auxiliary_electricity_kwh = 0.0;
+        // Required for WD.
+        let codes: Vec<_> = calculated(&wd, "p")
+            .unwrap_err()
+            .iter()
+            .map(|i| i.code)
+            .collect();
+        assert!(codes.contains(&"hot_water_storage_efficiency_required"));
+        // P.6.6.4.3 forfait 0,90 (P.34).
+        wd.hot_water_storage = Some(WdStorage::Forfait {
+            insulation: WdStorageInsulation::AtLeast20Mm,
+        });
+        let result = calculated(&wd, "p").unwrap();
+        close(result.storage_efficiency.unwrap(), 0.9);
+        close(result.generation_primary_factor.unwrap(), 1.0 / 0.9 / 0.9);
+        // P.10: η_dis = 1 000 000 / 1 250 000.
+        close(
+            result.factors.primary_factor,
+            round_up(1.0 / 0.9 / 0.9 / 0.8),
+        );
+        // P.35 from the losses.
+        wd.hot_water_storage = Some(WdStorage::Losses {
+            storage_loss_kwh: 100_000.0,
+            pipe_loss_kwh: 150_000.0,
+            source_reference: "P.43/P.45".into(),
+        });
+        let result = calculated(&wd, "p").unwrap();
+        close(
+            result.storage_efficiency.unwrap(),
+            1_250_000.0 / 1_500_000.0,
+        );
+        close(result.generators[0].heat_kwh, 1_500_000.0);
+        // Not allowed for heat supply.
+        let mut hd = system(vec![boiler(1.0, SystemCarrier::NaturalGas)]);
+        hd.hot_water_storage = wd.hot_water_storage.clone();
+        assert!(calculated(&hd, "p").is_err());
+    }
+
+    #[test]
+    fn hot_water_small_system_forfait_requires_90_60() {
+        let mut wd = system(vec![boiler(1.0, SystemCarrier::NaturalGas)]);
+        wd.function = SystemFunction::HotWater;
+        wd.hot_water_storage = Some(WdStorage::Forfait {
+            insulation: WdStorageInsulation::AtLeast20Mm,
+        });
+        wd.distribution = SystemDistribution::SmallSystemForfait {
+            connections: 10,
+            connection_type: ConnectionType::WithinBuilding,
+            design_temperature: Some(NetworkTemperature::T35To25),
+            other_loss_kwh: 0.0,
+        };
+        let codes: Vec<_> = calculated(&wd, "p")
+            .unwrap_err()
+            .iter()
+            .map(|i| i.code)
+            .collect();
+        assert_eq!(codes, vec!["hot_water_small_system_requires_90_60"]);
+        if let SystemDistribution::SmallSystemForfait {
+            design_temperature, ..
+        } = &mut wd.distribution
+        {
+            *design_temperature = None;
+        }
+        let result = calculated(&wd, "p").unwrap();
+        close(
+            result.distribution_efficiency.unwrap(),
+            1_000_000.0 / (1_000_000.0 + 17_500.0),
+        );
+    }
+
+    #[test]
+    fn table_p5_and_chp_renewable_rules() {
+        // P.6.6.5.4: no table P.5 for hot water.
+        let mut wd = system(vec![SystemGenerator {
+            id: "hp".into(),
+            energy_fraction: 1.0,
+            kind: GeneratorKind::HeatPump {
+                efficiency: HeatPumpEfficiency::TableP5 {
+                    source: TableP5Source::ElectricGroundwaterBelow15C,
+                    supply_temperature_c: 70.0,
+                },
+                drive: SystemCarrier::Electricity {
+                    direct_renewable_share: 0.0,
+                },
+            },
+        }]);
+        wd.function = SystemFunction::HotWater;
+        wd.hot_water_storage = Some(WdStorage::Forfait {
+            insulation: WdStorageInsulation::AtLeast20Mm,
+        });
+        let codes: Vec<_> = calculated(&wd, "p")
+            .unwrap_err()
+            .iter()
+            .map(|i| i.code)
+            .collect();
+        assert!(codes.contains(&"table_p5_heating_only"));
+        // 5.45 note 6: a biogas CHP counts fully renewable.
+        let mut issues = Vec::new();
+        let (_, co2, pren) = generator_factors(
+            &GeneratorKind::ChpWithoutLoss {
+                carrier: SystemCarrier::Biogas,
+                thermal_efficiency: 0.5,
+                electrical_efficiency: 0.36,
+                efficiency_reference: "test".into(),
+            },
+            SystemFunction::Heating,
+            "g",
+            &mut issues,
+        )
+        .unwrap();
+        close(pren, 1.0);
+        assert!(co2 < 0.0);
+        let (_, _, pren) = generator_factors(
+            &GeneratorKind::ChpWithLoss {
+                carrier: SystemCarrier::BiofuelMix { biofuel_share: 0.4 },
+                loss_ratio: None,
+                loss_ratio_reference: None,
+            },
+            SystemFunction::Heating,
+            "g",
+            &mut issues,
+        )
+        .unwrap();
+        close(pren, 0.4);
+        assert!(issues.is_empty());
     }
 }

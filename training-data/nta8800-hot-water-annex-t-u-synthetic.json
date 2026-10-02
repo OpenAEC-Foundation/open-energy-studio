@@ -12,7 +12,7 @@
       {
         "unit": "annex_u",
         "test": {
-          "class": "class2",
+          "class": "class3",
           "runs": [
             { "method": "energies", "recoveredKj": 2870.0, "showerKj": 5880.0 },
             { "method": "energies", "recoveredKj": 2905.0, "showerKj": 5880.0 },
@@ -37,7 +37,8 @@
       "fullLoadEfficiency": 0.97,
       "fuel": "natural_gas",
       "sourceReference": "synthetic: Gaskeur CW test report"
-    }
+    },
+    "annexTConditions": { "typeSuppliedBefore2021": true, "applianceIndoors": true }
   },
   "equipmentReference": "synthetic fixture, not a real appliance"
 }

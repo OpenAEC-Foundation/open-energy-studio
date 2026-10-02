@@ -1178,8 +1178,10 @@ pub fn assess_building_performance(
 ) -> BuildingPerformanceAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
-    let heating =
-        assess_space_heating_chain(&with_hot_water_gains(input, with_lighting_gains(input)));
+    // The chain input with chapter 14 lighting (7.28) and hot-water (7.29)
+    // gains filled in; TOjuli uses the same zone inputs.
+    let chain_input = with_hot_water_gains(input, with_lighting_gains(input));
+    let heating = assess_space_heating_chain(&chain_input);
     let mut issues: Vec<PerformanceIssue> = heating
         .issues
         .iter()
@@ -1332,7 +1334,8 @@ pub fn assess_building_performance(
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
     // a_C;red follows the zone's usage function (monthly_demand, 7.74/7.75).
     let tojuli: Vec<TojuliAssessment> = if valid {
-        zone_demands()
+        std::iter::once(&chain_input.demand)
+            .chain(chain_input.additional_zones.iter().map(|zone| &zone.demand))
             .enumerate()
             .map(|(zone_index, zone)| {
                 assess_tojuli(
@@ -1351,6 +1354,8 @@ pub fn assess_building_performance(
                             .find(|item| item.zone_id == zone.zone_id)
                             .and_then(|item| item.monthly_kwh.get(6).copied())
                             .unwrap_or(0.0),
+                        // Q_C;ls;rbl: chapter 10 has no recoverable cooling
+                        // losses (L_C;zi = 0, pump heat goes to the load).
                         cooling_recoverable_july_kwh: 0.0,
                     },
                 )
@@ -1535,6 +1540,9 @@ fn compute(
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
         let mut used_dh = bacs * row.district_heat_kwh;
+        // 5.39g: the renewable share counts Q_H;gen;out of external heat and
+        // Q_C;gen;out of absorption chillers on it, without f_BACS.
+        let mut renewable_dh_basis = row.district_heat_kwh;
         let mut used_dc = 0.0;
         let mut used_dw = 0.0;
         for item in &input.declared_uses {
@@ -1570,6 +1578,7 @@ fn compute(
             used_el += bacs * (month_row.electricity_kwh + month_row.auxiliary_electricity_kwh);
             used_gas += bacs * month_row.natural_gas_kwh;
             used_dh += bacs * month_row.district_heat_kwh;
+            renewable_dh_basis += month_row.district_heat_cold_kwh;
             used_dc += bacs * month_row.district_cold_kwh;
             ambient_cold = month_row.ambient_cold_kwh;
         }
@@ -1716,7 +1725,7 @@ fn compute(
             0.0
         };
         // 5.39: external supply at f_Pren;dX and the collective source.
-        renewable += used_dh * dh.renewable_factor
+        renewable += renewable_dh_basis * dh.renewable_factor
             + used_dw * dw.renewable_factor
             + used_dc * dc.renewable_factor
             + source.map_or(0.0, |item| source_heat * item.renewable_factor);
@@ -2026,6 +2035,21 @@ mod tests {
             [ScenarioKind::EmgDeclaration, ScenarioKind::EmgForfait]
         );
         assert!(!forfait.external_supply.unwrap().quality_declaration_used);
+        // 5.39g: the renewable share counts Q_H;gen;out, not weighted by f_BACS.
+        sample.calculation_scope = CalculationScope::Utility;
+        let plain = assess_building_performance(&sample);
+        sample.bacs_factor = 1.05;
+        let weighted = assess_building_performance(&sample);
+        assert_eq!(weighted.status, "calculated_unverified");
+        assert!(
+            (weighted.annual_renewable_primary_kwh.unwrap()
+                - plain.annual_renewable_primary_kwh.unwrap())
+            .abs()
+                < 1e-6
+        );
+        assert!(
+            weighted.annual_primary_fossil_kwh.unwrap() > plain.annual_primary_fossil_kwh.unwrap()
+        );
     }
 
     #[test]
@@ -2275,6 +2299,7 @@ mod tests {
                 kitchen_only: false,
                 declared: None,
                 annex_t: None,
+                annex_t_conditions: None,
             },
             collective: None,
             equipment_reference: "plate".into(),

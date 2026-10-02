@@ -415,7 +415,8 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             window.orientation,
             window.tilt_deg,
             window.area_m2,
-            window.area_m2 * window.u_value_w_per_m2k,
+            // Annex A: U_jul of a dynamic window (A.1).
+            window.area_m2 * window.u_for_month(usize::from(JULY) - 1),
             window_solar_kwh(window, JULY, Balance::Cooling),
         );
     }

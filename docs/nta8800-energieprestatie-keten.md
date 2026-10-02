@@ -44,8 +44,10 @@ Bron is het [openbare consultatieconcept van hoofdstuk 5](https://www.internetco
     - `declared`: de waarden op de kwaliteitsverklaring;
     - `calculated`: P.7/P.9 met het distributierendement P.10–P.12 (twee van de drie jaarstromen) of het forfaitaire verlies per aansluiting (tabel P.0; koude 15 % onder 10 °C). De opwekkerfactoren volgen P.19–P.22 voor brandstoffen en warmtepompen (tabel P.5 of opgegeven rendement), P.26–P.30 voor WKK, P.6.5.4.7 voor restwarmte (0,07 kWh_e/kWh) en P.6.5.4.8 voor geothermie (`η = 20·Δθ/40`). Daarbij komt `f_Pren;dX` volgens 5.42/5.49/5.50 met 5.43–5.56;
     - `measured`: P.6 met gemeten jaarstromen.
+  - Tapwater (`calculated` met `function: hot_water`) vraagt `hotWaterStorage`: `η_WD;gen;sto` volgens P.35 (verliezen van voorraad en leidingwerk, P.6.6.4.1/P.6.6.4.2) of forfaitair 0,90 / 0,80 / 0,50 naar isolatie (P.6.6.4.3). `f_WD;gen;tot` wordt daardoor gedeeld (P.34) en de opwekkers leveren `Q_in/η_sto`. Het kleine-systeemforfait voor tapwater rekent alleen met 90/60 (tabel P.0 voetnoot b; `hot_water_small_system_requires_90_60`). Tabel P.5 geldt niet voor tapwater (P.6.6.5.4 kent geen forfait; `table_p5_heating_only`).
+  - WKK op biogas of biomassa telt `f_Pren` 1, op een bio-mengsel het biogene aandeel en op AVI 0,5 (5.45 met opmerking 6, 5.46). `K_CO2` volgt P.27 letterlijk zonder MAX(0) en kan bij een hernieuwbare brandstof negatief worden.
   - `f_P;XD;tot` wordt naar boven afgerond op 0,01 en `f_Pren;dX` naar beneden.
-  - Hernieuwbare energie telt per drager als geleverde energie maal `f_Pren;dX` (5.39).
+  - Hernieuwbare energie telt per drager als geleverde energie maal `f_Pren;dX` (5.39). Voor externe warmte gebruikt 5.39g `Q_H;gen;out` zonder f_BACS (f_BACS weegt wel EP_Tot), en voor een absorptiekoelmachine op externe warmte `Q_C;gen;out × f_Pren;dh` (de koudeproductie, niet de warmte-input `Q/ζ`; `districtHeatColdKwh` in de koelmaand).
   - Met een kwaliteitsverklaring rekent de kern twee keer (§5.3.1): EMGverklaring (de hoofduitkomst en het eerste scenario in `indicators`) en EMGforf met de forfaitaire waarden. `externalSupply` in de uitvoer geeft beide factorsets en EP_Tot, EP_ren en CO2 van EMGforf.
   - Bij een `ExternalHeat`-opwekker moet `qualityDeclarationPresent` overeenkomen met `externalSupply.heating` (`external_heat_declaration_mismatch`).
 - **Collectieve warmtepompbron** (5.20, 9.6.8.1.1.2.3):
@@ -82,7 +84,7 @@ Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 
 1. **Nettobehoefte.**
    - Woningen: 13.15–13.18, 856 kWh per bewoner.
    - Utiliteit: 13.19 met tabel 13.1 per gebruiksfunctie (`areas`).
-2. **Douche-WTW.** 13.51/13.52 met tabellen 13.7 en 13.8. Het rendement is het gemiddelde over alle douches (13.53); een douche zonder unit telt als 0. Per douche: forfait (verticaal, horizontaal, onbekend), een opgegeven rendement, of een testrapport volgens bijlage U (`annex_u`): drie runs per klasse (tabel U.1), als energieën of als meetreeks met dichtheid en enthalpie volgens U.5/U.6. Het gemiddelde wordt naar beneden afgerond op 0,025.
+2. **Douche-WTW.** 13.51/13.52 met tabellen 13.7 en 13.8. Het rendement is het gemiddelde over alle douches (13.53); een douche zonder unit telt als 0. Per douche: forfait (verticaal, horizontaal, onbekend), een opgegeven rendement, of een testrapport volgens bijlage U (`annex_u`): drie runs per klasse (tabel U.1), als energieën of als meetreeks met dichtheid en enthalpie volgens U.5/U.6. Het gemiddelde wordt naar beneden afgerond op 0,025; een opgegeven rendement ook. De klasse moet passen (§13.5.3, `annex_u_test_class_mismatch`): woningen de toepassingsklasse van het tapwatertoestel (klasse 4 als die onbekend is), utiliteit altijd klasse 4. Tabel U.1 kent geen klasse 1; een klasse 1-toestel gebruikt de meting bij klasse 2 (interpretatie). Bij een opgegeven rendement wordt de klasse alleen getoetst als `testClass` is ingevuld.
 3. **Afgifte.** `Q_W;em = Q_W;nd/η_W;em − Q_W;rcd` (13.9). De terugwinning gaat er dus ná het afgifterendement af. `η_W;em` komt uit tabel 13.2 (woningen, 13.21–13.23) of tabel 13.3 (utiliteit).
 4. **Circulatie.**
    - Verlies 13.26, met Ψ uit tabel 13.4 (dichtstbijzijnde diameter) en de diameter uit tabel 13.29 als die onbekend is.
@@ -105,7 +107,7 @@ Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 
    - een combitoestel met forfaitaire omrekening van het winterrendement: T.15–T.17 met `K_f` = 0,5, alleen bij een tapwaterzijdig rendement van ten minste 0,40 op bovenwaarde (CW);
    - een combitoestel met gemeten zomer- en winterrendement: T.12–T.14.
 
-   Het resultaat gaat met tabel T.7 naar bovenwaarde. Het rapport vraagt de gemeten klasse; `c_W;gen` (tabel 13.26) werkt daarna zoals bij een verklaring.
+   Het resultaat gaat met tabel T.7 naar bovenwaarde. Het rapport vraagt de gemeten klasse; `c_W;gen` (tabel 13.26) werkt daarna zoals bij een verklaring, ook voor een toestel zonder Gaskeur of van onbekend type (tabel 13.25 opmerking 3 d: elke gemeten waarde hoort bij een klasse). De route vraagt `annexTConditions` (§13.8.4.3): het type werd al vóór 2021 geleverd en het toestel staat binnen; anders `annex_t_not_applicable`.
 
    Verklaarde rendementen worden naar beneden afgerond op 0,025 (gas) of 0,05 (elektrisch). Een warmtepomp mag niet in een hogere toepassingsklasse rekenen dan waarin hij is gemeten (`hot_water_heat_pump_class_exceeded`).
 8. **Hulpenergie.** 13.181 voor opwekkers waarvan de hulpenergie niet in het rendement zit.
@@ -243,9 +245,12 @@ Module `tojuli` bepaalt formule 5.40 per oriëntatie met een eigen koudebalans v
 
 De module vereist de `components`-transmissieroute, waarin ramen en opake vlakken precies de directe elementgeleiding dekken. Een afwijking geeft `tojuli_envelope_inconsistent`.
 
+TO-juli rekent met dezelfde zone-invoer als de verwarmingsketen: de interne winst van hoofdstuk 14-verlichting (7.28) en de terugwinbare tapwaterverliezen (7.29) zijn daarin al ingevuld. Een dynamisch raam (bijlage A) telt in juli met `U_jul` in `H_C;D` en met `g_jul` in de zonwinst; bijlage AA gebruikt eveneens `g_gl;C;juli` (AA.6b) en `U_jul`. `Q_C;ls;rbl` is 0: hoofdstuk 10 kent geen terugwinbare koudeverliezen (`L_C;zi` = 0, pompwarmte gaat naar de last).
+
+De nominale `g_gl;n` wordt overal naar beneden afgerond op 0,05 (§7.6.6.1.2 onder 7.40). De maandwaarde van een dynamisch raam (A.2) wordt niet afgerond.
+
 **Nog niet uitgewerkt:**
 
-- terugwinbare systeemverliezen (`Q_H/C;ls;rbl`); die zitten nog niet in hoofdstuk 7;
 - het geveldeel aan een aangrenzende onverwarmde serre (AOS);
 - de geprojecteerde oppervlakte van hellende vlakken (nu bruto).
 
