@@ -64,6 +64,7 @@ pub mod project_performance;
 pub mod pv;
 pub mod reference;
 pub mod registration;
+pub mod relabel;
 pub mod significant_figures;
 pub mod solar_shading;
 pub mod space_cooling;

@@ -5,7 +5,13 @@ export function cleanRegistration(registration: NtaRegistration): NtaRegistratio
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(registration)) {
     let value: unknown = typeof raw === 'string' ? raw.trim() : raw;
-    if (typeof value === 'object' && value !== null) {
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+    } else if (key === 'detailSurveyTriggers' && typeof value === 'object' && value !== null) {
+      const set = Object.entries(value).filter(([, flag]) => flag === true);
+      if (set.length === 0) continue;
+      value = Object.fromEntries(set);
+    } else if (typeof value === 'object' && value !== null) {
       const advisor = value as { name: string; competenceNumber: string };
       value = { name: advisor.name.trim(), competenceNumber: advisor.competenceNumber.trim() };
       if (!advisor.name.trim() && !advisor.competenceNumber.trim()) continue;

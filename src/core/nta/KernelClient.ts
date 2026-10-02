@@ -2468,6 +2468,8 @@ export interface ResidentialSurvey {
   storage?: OpnameStorage | null;
   coolingPresent?: boolean;
   sourceReference: string;
+  /** Adviser's reason per applied default (path or rule) for the forfait ("inklappen", BRL 9500 §4.2.2). */
+  inklapRedenen?: Record<string, string>;
 }
 
 export interface OpnameVerticalPipe {
@@ -2485,7 +2487,7 @@ export interface OpnameAssessment {
   status: 'calculated_unverified' | 'derived_input_rejected' | 'invalid';
   scope: string;
   source: string;
-  appliedDefaults: Array<{ rule: string; path: string; value: string; source: string }>;
+  appliedDefaults: Array<{ rule: string; path: string; value: string; source: string; inklapReden?: string }>;
   warnings: Array<{ code: string; path: string; note: string }>;
   issues: Array<{ code: string; path: string }>;
   derivedInput: BuildingPerformanceInput | null;
@@ -2630,6 +2632,8 @@ export interface UtilitySurvey {
   };
   storage?: OpnameStorage | null;
   sourceReference: string;
+  /** Adviser's reason per applied default (path or rule) for the forfait (BRL 9500 §4.2.2). */
+  inklapRedenen?: Record<string, string>;
 }
 
 export async function assessUtilitySurveyWithRust(survey: UtilitySurvey): Promise<OpnameAssessment> {
@@ -3313,6 +3317,77 @@ export interface NtaRegistration {
   relabel?: boolean;
   originalKernelVersion?: string;
   epOnlineNumber?: string;
+  /** Opleverdatum, YYYY-MM-DD (§3.1: completed after 1-1-2021 needs a detailed survey). */
+  completionDate?: string;
+  /** BRL 9500 §3.1 situations that make the detailed survey mandatory. */
+  detailSurveyTriggers?: NtaDetailSurveyTriggers;
+  /** Evidence register of the project dossier (BRL 9500 Bijlage 3). */
+  evidence?: NtaEvidenceItem[];
+}
+
+export interface NtaDetailSurveyTriggers {
+  rebuiltAfterDemolition?: boolean;
+  fullRenovationWithNewBuildRequirements?: boolean;
+  energyPerformanceFee?: boolean;
+  bengRequirementProof?: boolean;
+  previousDetailedRegistration?: boolean;
+  addedAfter2021?: boolean;
+}
+
+export type NtaEvidenceKind =
+  | 'photo_overview' | 'photo_detail' | 'invoice' | 'drawing' | 'datasheet'
+  | 'declaration_of_performance' | 'quality_declaration' | 'client_statement' | 'other';
+
+/** One evidence file; `evidence:<id>` in a `…Reference` field links input to it. */
+export interface NtaEvidenceItem {
+  id: string;
+  kind: NtaEvidenceKind;
+  fileName: string;
+  /** SHA-256, lowercase hex. */
+  sha256: string;
+  /** YYYY-MM-DD. */
+  date?: string;
+  gps?: { latitude: number; longitude: number };
+  sourceParty?: string;
+  checkedBy?: string;
+  description?: string;
+  /** JSON pointers into the project, e.g. `/zones/0/surfaces/2`. */
+  linkedPaths?: string[];
+  /** Local copy in the desktop app's data folder. */
+  storedPath?: string;
+}
+
+export interface RelabelChange {
+  path: string;
+  before: unknown;
+  after: unknown;
+  verdict: 'allowed' | 'not_allowed' | 'review';
+  cluster: string;
+  note?: string;
+}
+
+/** BRL 9500 Bijlage 6a/6b classification of the changes since the original label. */
+export interface RelabelAssessment {
+  source: string;
+  allowed: boolean;
+  needsReview: boolean;
+  changes: RelabelChange[];
+}
+
+export async function assessRelabelWithRust(original: unknown, current: unknown): Promise<RelabelAssessment> {
+  if (isTauri()) {
+    return invoke<RelabelAssessment>('assess_relabel', { original, current });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/relabel/assess', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ original, current }),
+    });
+    if (!response.ok) throw new Error(`Rust API: HTTP ${response.status}`);
+    return response.json() as Promise<RelabelAssessment>;
+  }
+  throw new Error('Relabel classification is available in the desktop app and local development server.');
 }
 
 export interface RegistrationAssessment {

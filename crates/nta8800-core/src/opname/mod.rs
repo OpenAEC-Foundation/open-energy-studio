@@ -45,6 +45,43 @@ pub struct AppliedDefault {
     pub path: String,
     pub value: String,
     pub source: &'static str,
+    /// The adviser's reason for falling back on this forfait ("inklappen",
+    /// BRL 9500-W §4.2.2 p. 19 and Bijlage 3 p. 61), from the survey's
+    /// `inklapRedenen` by path or rule.
+    #[serde(rename = "inklapReden", skip_serializing_if = "Option::is_none")]
+    pub collapse_reason: Option<String>,
+}
+
+/// Attaches the adviser's collapse reasons to the applied defaults; a key
+/// matches the default's path or its rule. Unmatched keys are warned.
+pub(crate) fn apply_collapse_reasons(
+    recorder: &mut Recorder,
+    reasons: &std::collections::BTreeMap<String, String>,
+) {
+    for item in recorder.applied.iter_mut() {
+        item.collapse_reason = reasons
+            .get(&item.path)
+            .or_else(|| reasons.get(item.rule))
+            .map(|reason| reason.trim().to_string())
+            .filter(|reason| !reason.is_empty());
+    }
+    let unmatched: Vec<String> = reasons
+        .keys()
+        .filter(|key| {
+            !recorder
+                .applied
+                .iter()
+                .any(|item| &item.path == *key || item.rule == key.as_str())
+        })
+        .cloned()
+        .collect();
+    for key in unmatched {
+        recorder.warning(
+            "collapse_reason_unmatched",
+            &format!("inklapRedenen.{key}"),
+            "no applied default has this path or rule",
+        );
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -76,6 +113,7 @@ impl Recorder {
             path: path.to_string(),
             value,
             source,
+            collapse_reason: None,
         });
     }
 
@@ -200,6 +238,10 @@ pub struct ResidentialSurvey {
     #[serde(default)]
     pub cooling_present: bool,
     pub source_reference: String,
+    /// Reason per applied default (path or rule) for falling back on the
+    /// forfait (BRL 9500-W §4.2.2).
+    #[serde(default, rename = "inklapRedenen")]
+    pub collapse_reasons: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -456,6 +498,7 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
         Some(_) => "derived_input_rejected",
         None => "invalid",
     };
+    apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
     OpnameAssessment {
         status,
         scope: "isso_82_1_basisopname_residential_unverified",
@@ -525,6 +568,41 @@ mod tests {
             .primary_fossil_indicator_kwh_per_m2_year
             .unwrap();
         assert!(old_ep > 2.0 * new_ep, "{old_ep} vs {new_ep}");
+    }
+
+    #[test]
+    fn collapse_reasons_attach_by_path_or_rule() {
+        let mut survey = fixture("1930");
+        let plain = assess_residential_survey(&survey);
+        let first = plain.applied_defaults[0].clone();
+        let second = plain.applied_defaults.last().unwrap().clone();
+        assert!(first.collapse_reason.is_none());
+        survey
+            .collapse_reasons
+            .insert(first.path.clone(), "niet zichtbaar".into());
+        survey
+            .collapse_reasons
+            .insert(second.rule.to_string(), "geen factuur".into());
+        survey.collapse_reasons.insert("nergens".into(), "x".into());
+        let result = assess_residential_survey(&survey);
+        let applied = &result.applied_defaults;
+        // A path match wins over a rule match.
+        assert_eq!(
+            applied[0].collapse_reason.as_deref(),
+            Some("niet zichtbaar")
+        );
+        assert!(applied.last().unwrap().collapse_reason.is_some());
+        assert!(applied
+            .iter()
+            .filter(|item| item.path != first.path && item.rule != second.rule)
+            .all(|item| item.collapse_reason.is_none()));
+        let json = serde_json::to_value(&applied[0]).unwrap();
+        assert!(json.get("inklapReden").is_some());
+        assert!(result
+            .warnings
+            .iter()
+            .any(|item| item.code == "collapse_reason_unmatched"
+                && item.path == "inklapRedenen.nergens"));
     }
 
     #[test]

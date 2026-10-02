@@ -142,6 +142,14 @@ fn assess_utility_survey(
 }
 
 #[tauri::command]
+fn assess_relabel(
+    original: serde_json::Value,
+    current: serde_json::Value,
+) -> nta8800_core::relabel::RelabelAssessment {
+    nta8800_core::relabel::assess_relabel(&original, &current)
+}
+
+#[tauri::command]
 fn calculate_ventilation(
     input: nta8800_core::ventilation::VentilationInput,
 ) -> nta8800_core::ventilation::VentilationAssessment {
@@ -517,6 +525,7 @@ pub fn run() {
             calculate_ventilation,
             assess_residential_survey,
             assess_utility_survey,
+            assess_relabel,
             calculate_constructions,
             calculate_building_performance,
             calculate_project_performance,

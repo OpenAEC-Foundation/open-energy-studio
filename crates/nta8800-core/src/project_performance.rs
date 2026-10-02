@@ -389,7 +389,10 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
             match serde_path_to_error::deserialize::<_, crate::registration::Registration>(
                 block.clone(),
             ) {
-                Ok(registration) => Some(crate::registration::assess_registration(&registration)),
+                Ok(registration) => Some(crate::registration::assess_project_registration(
+                    &registration,
+                    project_value,
+                )),
                 Err(error) => {
                     gaps.push(InputGap {
                         detail: Some(error.to_string()),

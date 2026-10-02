@@ -552,6 +552,10 @@ pub struct UtilitySurvey {
     #[serde(default)]
     pub storage: Option<super::production::SurveyStorage>,
     pub source_reference: String,
+    /// Reason per applied default (path or rule) for falling back on the
+    /// forfait (BRL 9500-U §4.2.2).
+    #[serde(default, rename = "inklapRedenen")]
+    pub collapse_reasons: std::collections::BTreeMap<String, String>,
 }
 
 /// ISSO 75.1 page for each rule of the shared (ISSO 82.1) translations.
@@ -2289,6 +2293,7 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
         }
     }
     remap_sources(&mut recorder.applied);
+    super::apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
     let status = match &performance {
         Some(_) if !recorder.issues.is_empty() => "invalid",
         Some(result) if result.status == "calculated_unverified" => "calculated_unverified",

@@ -52,6 +52,12 @@ pub struct UtilitySurveyRequest {
 }
 
 #[derive(Deserialize)]
+pub struct RelabelRequest {
+    pub original: Value,
+    pub current: Value,
+}
+
+#[derive(Deserialize)]
 pub struct VentilationRequest {
     pub input: nta8800_core::ventilation::VentilationInput,
 }
@@ -207,6 +213,7 @@ pub fn app() -> Router {
             post(assess_residential_survey),
         )
         .route("/v1/nta8800/opname/utility", post(assess_utility_survey))
+        .route("/v1/nta8800/relabel/assess", post(assess_relabel))
         .route(
             "/v1/nta8800/constructions/calculate",
             post(calculate_constructions),
@@ -441,6 +448,13 @@ async fn assess_residential_survey(
         StatusCode::UNPROCESSABLE_ENTITY
     };
     (status, Json(json!(assessment)))
+}
+
+async fn assess_relabel(Json(request): Json<RelabelRequest>) -> Json<Value> {
+    Json(json!(nta8800_core::relabel::assess_relabel(
+        &request.original,
+        &request.current
+    )))
 }
 
 async fn assess_utility_survey(
@@ -1338,6 +1352,29 @@ mod tests {
         assert!(!result["appliedDefaults"].as_array().unwrap().is_empty());
         assert_eq!(result["performance"]["status"], "calculated_unverified");
         assert_eq!(result["referenceVerified"], false);
+    }
+
+    #[tokio::test]
+    async fn relabel_route_classifies_changes() {
+        let original =
+            json!({"zones": [{"surfaces": [{"area": 10.0}]}], "constructions": [{"rcValue": 0.4}]});
+        let mut current = original.clone();
+        current["constructions"][0]["rcValue"] = json!(3.5);
+        let (status, result) = post_json(
+            "/v1/nta8800/relabel/assess",
+            json!({ "original": original, "current": current }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["allowed"], true);
+        assert_eq!(result["changes"][0]["verdict"], "allowed");
+        current["zones"][0]["surfaces"][0]["area"] = json!(12.0);
+        let (_, result) = post_json(
+            "/v1/nta8800/relabel/assess",
+            json!({ "original": original, "current": current }),
+        )
+        .await;
+        assert_eq!(result["allowed"], false);
     }
 
     #[tokio::test]

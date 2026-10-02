@@ -1,8 +1,11 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { IBENGResultMonthly } from '../../core/energy/types';
-import { useState } from 'react';
-import { downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML } from '../../core/report/ReportGenerator';
+import { useMemo, useState } from 'react';
+import {
+  downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML, downloadProjectDossier,
+} from '../../core/report/ReportGenerator';
+import { checkDossierCompleteness, type DossierItem } from '../../core/report/ProjectDossier';
 import './ReportView.css';
 
 export function ReportView() {
@@ -10,11 +13,24 @@ export function ReportView() {
   const { state } = useEnergy();
   const { project, result } = state;
   const [calculationError, setCalculationError] = useState<string | null>(null);
+  const [exported, setExported] = useState<{ checklist: DossierItem[]; missingEvidence: number } | null>(null);
+  const [dossierBusy, setDossierBusy] = useState(false);
   const exportCalculation = () => {
     setCalculationError(null);
     downloadNtaCalculationReportHTML(project).catch((reason: unknown) =>
       setCalculationError(reason instanceof Error ? reason.message : String(reason)));
   };
+  const exportDossier = () => {
+    setCalculationError(null);
+    setDossierBusy(true);
+    downloadProjectDossier(project)
+      .then((manifest) => setExported({ checklist: manifest.checklist, missingEvidence: manifest.missingEvidence.length }))
+      .catch((reason: unknown) => setCalculationError(reason instanceof Error ? reason.message : String(reason)))
+      .finally(() => setDossierBusy(false));
+  };
+  // Live check without kernel output; the export repeats it with the output.
+  const checklist = useMemo(() => exported?.checklist ?? checkDossierCompleteness({ project }), [exported, project]);
+  const open = checklist.filter((item) => item.status === 'missing' || item.status === 'check');
 
   return (
     <div className="report-view">
@@ -32,7 +48,26 @@ export function ReportView() {
           <p>{t('report.inputDossierScope')}</p>
           <button type="button" onClick={exportCalculation}>{t('report.exportNtaCalculation')}</button>
           <p>{t('report.ntaCalculationScope')}</p>
+          <button type="button" onClick={exportDossier} disabled={dossierBusy}>{t('report.exportProjectDossier')}</button>
+          <p>{t('report.projectDossierScope')}</p>
           {calculationError && <p role="alert">{calculationError}</p>}
+          {exported && exported.missingEvidence > 0 && (
+            <p role="status">{t('report.dossierMissingEvidence', { count: exported.missingEvidence })}</p>
+          )}
+          <details className="report-dossier-checklist">
+            <summary>{t('report.dossierChecklist', { open: open.length, total: checklist.length })}</summary>
+            <table className="report-table">
+              <tbody>
+                {checklist.map((item) => (
+                  <tr key={item.id} data-status={item.status}>
+                    <td>{t(`report.dossierStatus.${item.status}`)}</td>
+                    <td>{item.label}</td>
+                    <td>{item.detail ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
         </div>
 
         {/* Project info */}
