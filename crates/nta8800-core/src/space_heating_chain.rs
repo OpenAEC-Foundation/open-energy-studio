@@ -347,6 +347,8 @@ pub enum ForfaitHeaterFuel {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForfaitHeaterGenerator {
+    /// `heaterKind`: `kind` is the generator tag.
+    #[serde(rename = "heaterKind")]
     pub kind: ForfaitHeaterKind,
     pub fuel: ForfaitHeaterFuel,
     pub equipment_reference: String,
@@ -2592,6 +2594,28 @@ mod tests {
     }
 
     #[test]
+    fn product_boiler_fixture_calculates() {
+        let input: SpaceHeatingChainInput = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-space-heating-chain-product-boiler-synthetic.json"
+        ))
+        .unwrap();
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let efficiency = result.generation_efficiency.unwrap();
+        // Gross basis (f_Hs/Hi 1,11) with f_prac 0,95 and f_ctr;ls 1,03:
+        // part load 1,08 gives about 1/(1,03·1,11/(0,95·1,08)) ≈ 0,90.
+        assert!(efficiency > 0.8 && efficiency < 0.95, "{efficiency}");
+        assert!(result
+            .monthly
+            .iter()
+            .any(|row| row.generator_recoverable_loss_kwh > 0.0));
+    }
+
+    #[test]
     fn local_air_heater_follows_annex_n() {
         let mut input = boiler_chain();
         input.emission = serde_json::from_value(json!({
@@ -2661,6 +2685,12 @@ mod tests {
         );
         let jan = &result.monthly[0];
         assert!((jan.oil_kwh - jan.generator_output_kwh / 0.65).abs() < 1e-9);
+        // The generator round-trips through JSON despite the `kind` tag.
+        let json = serde_json::to_value(&input.generator).unwrap();
+        assert_eq!(json["kind"], "forfait_heater");
+        assert_eq!(json["heaterKind"], "local_with_flue");
+        let parsed: Generator = serde_json::from_value(json).unwrap();
+        assert!(matches!(parsed, Generator::ForfaitHeater(_)));
         assert_eq!(jan.natural_gas_kwh, 0.0);
         input.generator = Generator::ForfaitHeater(ForfaitHeaterGenerator {
             kind: ForfaitHeaterKind::AirHeaterHr107,

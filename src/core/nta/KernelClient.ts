@@ -1341,7 +1341,13 @@ export interface SpaceHeatingChainInput {
   /** Part of a building on a collective installation (`f_gebouw;si;H`). */
   collectiveConnection?: { connectedUsableAreaM2: number; sourceReference: string } | null;
   generator:
-    | { kind: 'gas_boiler'; boiler: BoilerForfaitDraftInput; auxiliary?: NtaOtherGeneratorAuxiliary | null }
+    | {
+        kind: 'gas_boiler';
+        boiler: BoilerForfaitDraftInput;
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
+        /** Annex O component measurements for the 9.85 constants (individual boilers). */
+        auxiliaryMeasurements?: NtaAppliancePowerMeasurements | null;
+      }
     | {
         kind: 'heat_pump_forfait';
         forfait: ForfaitHeatPumpDraftInput;
@@ -1385,7 +1391,136 @@ export interface SpaceHeatingChainInput {
         soleHeatingInServedRooms?: boolean | null;
         automaticFuelFeed?: boolean;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
+      }
+    | {
+        /** Annex M: boiler with product values. */
+        kind: 'product_boiler';
+        boiler: NtaProductBoiler;
+        designTemperatureClass?: NtaDesignTemperatureClass | null;
+        annexRCompliantAtMost500Kw?: boolean | null;
+        annexRReference?: string | null;
+      }
+    | {
+        /** Annex N: local, air or radiant heater or stove. */
+        kind: 'local_heater';
+        heater: NtaLocalHeater;
+        fuel: 'natural_gas' | 'oil' | 'biomass';
+        annexRCompliantAtMost500Kw?: boolean | null;
+        annexRReference?: string | null;
+        soleHeatingInServedRooms?: boolean | null;
+      }
+    | {
+        /** Table 9.25 "overige systemen". */
+        kind: 'forfait_heater';
+        heaterKind:
+          | 'local_with_flue' | 'local_without_flue'
+          | 'air_heater_conventional' | 'air_heater_vr' | 'air_heater_hr100' | 'air_heater_hr104' | 'air_heater_hr107';
+        fuel: 'natural_gas' | 'oil';
+        equipmentReference: string;
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
       };
+}
+
+/** Annex M product values (efficiencies as fractions, auxiliary powers in W). */
+export interface NtaProductBoiler {
+  technology: 'solid_fuel_standard' | 'gas_oil_standard' | 'low_temperature' | 'condensing_gas' | 'condensing_oil';
+  fuel: 'natural_gas' | 'oil' | 'wood';
+  placement: 'outdoors' | 'installation_room' | 'under_roof' | 'heated_space';
+  draught: 'atmospheric' | 'fan_assisted';
+  control: 'floor_standing_outdoor_compensated' | 'wall_hung_outdoor_compensated' | 'wall_hung_room_temperature';
+  product: {
+    nominalPowerKw: number;
+    intermediatePowerKw?: number | null;
+    fullLoad:
+      | {
+          method: 'single';
+          efficiency: number;
+          testTemperatureC?: number | null;
+          additionalTest?: { efficiency: number; testTemperatureC: number } | null;
+        }
+      | { method: 'condensing'; efficiencyAt60: number; efficiencyAt30: number };
+    partLoadEfficiency: number;
+    partLoadTestTemperatureC?: number | null;
+    partLoadAdditionalTest?: { efficiency: number; testTemperatureC: number } | null;
+    standbyLossFactor: number;
+    standbyTestTemperatureC: number;
+    auxiliaryStandbyW: number;
+    auxiliaryIntermediateW: number;
+    auxiliaryFullW: number;
+    sourceReference: string;
+  };
+  equipmentReference: string;
+}
+
+/** Annex N heater; omitted product values take the N.6 defaults where they exist. */
+export interface NtaLocalHeater {
+  heaterType:
+    | 'high_temperature_radiant' | 'radiant_tube_without_flue' | 'radiant_tube_with_flue'
+    | 'air_heater_atmospheric' | 'air_heater_fan_burner' | 'air_heater_modulating_combustion_air'
+    | 'air_heater_modulating_no_combustion_air' | 'air_heater_modulating_evaporative'
+    | 'condensing_air_heater' | 'stove';
+  control: 'on_off' | 'high_low' | 'modulating';
+  productionPeriod: 'after2005' | 'from1990_to2005' | 'before1990';
+  condensing: boolean;
+  pilotFlame: boolean;
+  ventilation: 'required' | 'interlocked' | 'none';
+  location:
+    | 'heated_space_free' | 'heated_space_against_wall_or_roof' | 'boiler_room'
+    | 'under_roof_outside_heated_space' | 'outdoors';
+  fan?: 'centrifugal' | 'axial' | null;
+  envelopeInsulation?:
+    | 'well_insulated_new_high_efficiency' | 'well_insulated_maintained' | 'old_average' | 'old_poor' | 'none'
+    | null;
+  stoveKind?: 'solid_fuel_room_heater' | 'inset_or_open_fire' | 'pellet' | 'accumulating' | 'gas_or_oil' | null;
+  waterConnection?: { outputToAirKw: number; outputToWaterKw: number } | null;
+  roomHeightM?: number | null;
+  product: Partial<{
+    inputFullKw: number;
+    outputFullKw: number;
+    combustionEfficiencyPercent: number;
+    chimneyLossPercent: number;
+    chimneyCorrectionFactor: number;
+    testAirTemperatureC: number;
+    loadExponent: number;
+    auxBurnerKw: number;
+    auxAfterBurnerKw: number;
+    auxStandbyKw: number;
+    envelopeLossPercent: number;
+    pilotLossPercent: number;
+    inputMinKw: number;
+    chimneyLossMinPercent: number;
+    combustionEfficiencyMinPercent: number;
+    auxBurnerMinKw: number;
+    auxAfterBurnerMinKw: number;
+  }>;
+  sourceReference: string;
+}
+
+/** Annex O component measurements (powers in W, times in s). */
+export interface NtaAppliancePowerMeasurements {
+  nominalLoadKw: number;
+  standbyElectronicsW: number;
+  gasValveW?: number;
+  fan:
+    | { method: 'none' }
+    | { method: 'single_speed'; powerW: number }
+    | { method: 'modulating'; points: Array<{ modulation: number; powerW: number }> };
+  pump:
+    | { method: 'none' }
+    | { method: 'staged'; operationW: number; prePostRunW: number }
+    | {
+        method: 'modulating';
+        points: Array<{ modulation: number; powerW: number }>;
+        prePostRunModulation: number;
+      };
+  pumpPreRunS?: number;
+  pumpPostRunS?: number;
+  fanPreRunS?: number;
+  fanPostRunS?: number;
+  loadCurve?: Array<{ timeS: number; meanLoad: number; meanPumpModulation?: number | null }>;
+  bivalent?: boolean;
+  bivalentMeanLoad?: number | null;
+  sourceReference: string;
 }
 
 /** 9.91/9.92 inputs for generators outside 9.85. */
@@ -1493,6 +1628,8 @@ export interface SpaceHeatingChainAssessment {
     naturalGasKwh: number;
     districtHeatKwh: number;
     biomassKwh: number;
+    oilKwh: number;
+    generatorRecoverableLossKwh: number;
     generatorElectricityKwh: number;
     auxiliaryElectricityKwh: number | null;
     distributionAuxiliaryElectricityKwh: number;

@@ -52,6 +52,9 @@ Sinds 2 oktober 2026 is de gelicentieerde pdf lokaal beschikbaar. De modules `sp
 | `domestic_hot_water` | 13.1–13.59, 13.152–13.181, tabellen 13.1–13.9, 13.18, 13.23–13.29, 5.36/5.37 | normtekst p. 525–655, 107 (2 oktober 2026) |
 | `pv` | 16.1–16.4b, tabellen 16.1–16.3 | normtekst p. 678–682 (2 oktober 2026; eerder F3d-4) |
 | `lighting` | 14.1–14.44, tabellen 14.1–14.9, bijlage X, 7.28 | normtekst p. 655–676, 1129, 180 (2 oktober 2026) |
+| `annex_m` | bijlage M (M.1–M.29, tabellen M.2–M.7) | normtekst p. 870–879 (2 oktober 2026) |
+| `annex_n` | bijlage N (N.1–N.80, tabellen N.20–N.32) | normtekst p. 880–922 (2 oktober 2026) |
+| `annex_o` | bijlage O met 9.85–9.90 | normtekst p. 359–361, 923–931 (2 oktober 2026) |
 | `building_performance` | factoren tabel 5.2/5.4 (bevestigd in F3a) | `docs/2026-07-11-f3a-norm-analyse-ep.md` |
 
 De hoofdstukken 5 en 9 volgden eerst het openbare consultatieconcept 2026: <https://www.internetconsultatie.nl/epg2026/document/14147> (H5) en <https://www.internetconsultatie.nl/epg2026/document/14150> (H9). Op 2 oktober 2026 zijn ze vergeleken met de gelicentieerde NTA 8800:2025+C1:2026:
