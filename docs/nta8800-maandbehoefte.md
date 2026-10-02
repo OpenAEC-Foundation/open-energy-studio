@@ -96,7 +96,11 @@ Invoer per vloer:
 - R_bf van de kruipruimte- of keldervloer (0 als ongeïsoleerd);
 - R_bw en U_xw: de gevel erboven (8.34, 8.47 opmerking 3).
 
-De vloerconstructie zelf krijgt aan de onderzijde R_si = 0,17 (C.2). Randisolatie volgens D.7/D.8 hoort alleen bij een vloer direct op de grond. Een verwarmde kelder (8.3.3.2, D.10/D.11) is nog niet ondersteund.
+De vloerconstructie zelf krijgt aan de onderzijde R_si = 0,17 (C.2). Randisolatie volgens D.7/D.8 hoort alleen bij een vloer direct op de grond. Een verwarmde kelder krijgt `heatedBasement` met de werkelijke diepte z en de R_c van de kelderwanden:
+
+- H_g volgens 8.39, met U_fl uit 8.40/8.41 bij diepte z en U_bw uit 8.45;
+- forfaitair volgens 8.38: 0,5·P plus ΔU_for over de wandoppervlakte z·P (ΔU_for opgeven);
+- maandwaarden volgens D.10/D.11.
 
 ## Rekenzone met meerdere gebruiksfuncties (§6.5.3)
 

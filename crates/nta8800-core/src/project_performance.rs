@@ -165,6 +165,9 @@ pub struct GroundFloorData {
     /// Crawlspace or unheated basement below the floor (8.3.4.2).
     #[serde(default)]
     pub below: Option<crate::ground::FloorBelow>,
+    /// Heated room with its floor below ground level (8.3.3.2).
+    #[serde(default)]
+    pub heated_basement: Option<crate::ground::HeatedBasement>,
     pub source_reference: String,
 }
 
@@ -407,6 +410,7 @@ fn derive_input(
                                 edge_thermal_bridges: data.edge_thermal_bridges.clone(),
                                 edge_insulation: data.edge_insulation.clone(),
                                 below: data.below.clone(),
+                                heated_basement: data.heated_basement.clone(),
                                 source_reference: data.source_reference.clone(),
                             });
                         }

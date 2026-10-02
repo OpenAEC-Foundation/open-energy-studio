@@ -437,6 +437,7 @@ export type MonthlyDemandTransmission =
         edgeThermalBridges: NtaGroundEdgeThermalBridges;
         edgeInsulation?: NtaGroundEdgeInsulation[];
         below?: NtaFloorBelow | null;
+        heatedBasement?: NtaHeatedBasement | null;
         sourceReference: string;
       }>;
       groundInventoryConfirmed: boolean;
@@ -461,6 +462,13 @@ export type NtaFloorBelow =
       volumeM3: number;
       airChangesPerHour?: number | null;
     };
+
+/** 8.3.3.2: heated room with its floor below ground level. */
+export interface NtaHeatedBasement {
+  depthM: number;
+  wallResistanceM2kPerW: number;
+  forfaitDeltaUWPerM2k?: number | null;
+}
 
 export interface MonthlyDemandInput {
   zoneId: string;
@@ -2948,6 +2956,7 @@ export interface NtaCalculationInput {
     edgeThermalBridges: NtaGroundEdgeThermalBridges;
     edgeInsulation?: NtaGroundEdgeInsulation[];
     below?: NtaFloorBelow | null;
+    heatedBasement?: NtaHeatedBasement | null;
     sourceReference: string;
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
