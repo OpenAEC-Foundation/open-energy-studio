@@ -12,7 +12,12 @@
 //! - 9.80/9.81 recoverable loss `P_ls;sb · t` in a heated space, 0 otherwise
 //!   and for a collective CHP;
 //! - 9.82/9.83 input `E_gen;in = P_gen;in · t + P_gen;ls;sb · t_sb`;
-//! - 16.15 electricity `P_el;chp;out;H · t_H;op`.
+//! - 16.15 electricity `P_el;chp;out;H · t_H;op`;
+//! - 9.6.6.2.2.8 a storage outside the test configuration
+//!   ([`storage_month`]): loss `H_sto;ls·(ϑ_sto;set − ϑ_amb)·t_mi` supplied by
+//!   the CHP and charging auxiliary energy over the operating time;
+//! - §13.8.4.8 hot water: `t_W;op` of 13.183 ([`hot_water_operating_hours`])
+//!   with the same month calculation.
 //!
 //! Defaults of tables 9.37 (efficiencies) and 9.38 (stand-by loss 0,4 kW,
 //! no pilot) apply per CGN_TYPE when no measured value is given; the ORC
@@ -110,6 +115,22 @@ pub enum MicroChpHydraulics {
     HeatExchanger,
 }
 
+/// 9.6.6.2.2.8: a storage that was not part of the NEN-EN 50465 test
+/// configuration; its loss and charging auxiliary energy are determined
+/// separately.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChpStorage {
+    /// `H_sto;ls`, W/K (the energy-label standing loss S divided by 45).
+    pub loss_w_per_k: f64,
+    /// `ϑ_sto;set`, °C.
+    pub set_temperature_c: f64,
+    /// Charging pump or other auxiliary power while the CHP runs, W.
+    #[serde(default)]
+    pub charging_auxiliary_w: Option<f64>,
+    pub source_reference: String,
+}
+
 /// One NEN-EN 50465 test point of table 9.33.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -157,6 +178,9 @@ pub struct MicroChp {
     /// Only the net power production was measured: 9.72 with P_aux;sb.
     #[serde(default)]
     pub net_production_measured: bool,
+    /// 9.6.6.2.2.8: storage outside the test configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<ChpStorage>,
     pub test_report_reference: String,
 }
 
@@ -291,7 +315,97 @@ pub fn validate_micro_chp(chp: &MicroChp, path: &str) -> Vec<MicroChpIssue> {
     if chp.test_report_reference.trim().is_empty() {
         push("source_reference_required", "testReportReference");
     }
+    if let Some(storage) = &chp.storage {
+        if !storage.loss_w_per_k.is_finite() || storage.loss_w_per_k < 0.0 {
+            push("micro_chp_storage_loss_invalid", "storage.lossWPerK");
+        }
+        if !in_range(storage.set_temperature_c, 20.0, 95.0) {
+            push(
+                "micro_chp_storage_temperature_invalid",
+                "storage.setTemperatureC",
+            );
+        }
+        if storage
+            .charging_auxiliary_w
+            .is_some_and(|v| !v.is_finite() || v < 0.0)
+        {
+            push(
+                "micro_chp_storage_auxiliary_invalid",
+                "storage.chargingAuxiliaryW",
+            );
+        }
+        if storage.source_reference.trim().is_empty() {
+            push("source_reference_required", "storage.sourceReference");
+        }
+    }
     issues
+}
+
+/// Ambient of an unheated installation room or space, °C (as ϑ_sto;amb of
+/// 13.6 without a calculated unheated space).
+const UNHEATED_AMBIENT_C: f64 = 13.0;
+
+/// 9.6.6.2.2.8 per month for the whole installation: (storage loss,
+/// charging auxiliary energy, recoverable part) in kWh. The loss follows
+/// `H_sto;ls·(ϑ_sto;set − ϑ_amb)·t_mi` like 13.58; the CHP supplies it.
+pub fn storage_month(
+    chp: &MicroChp,
+    month_index: usize,
+    operating_hours: f64,
+    heated_ambient_c: f64,
+    collective: bool,
+) -> (f64, f64, f64) {
+    let Some(storage) = &chp.storage else {
+        return (0.0, 0.0, 0.0);
+    };
+    let month_hours = crate::climate::MONTH_HOURS[month_index];
+    let ambient = match chp.location {
+        MicroChpLocation::HeatedSpace => heated_ambient_c,
+        MicroChpLocation::UnheatedSpace | MicroChpLocation::InstallationRoom => UNHEATED_AMBIENT_C,
+        MicroChpLocation::Outdoors => crate::climate::OUTDOOR_TEMPERATURE_C[month_index],
+    };
+    let loss = storage.loss_w_per_k * (storage.set_temperature_c - ambient).max(0.0) * month_hours
+        / 1000.0;
+    let auxiliary = storage.charging_auxiliary_w.unwrap_or(0.0)
+        * operating_hours.clamp(0.0, month_hours)
+        / 1000.0;
+    // 9.7: a storage in the heated space of an individual installation.
+    let recoverable = if !collective && chp.location == MicroChpLocation::HeatedSpace {
+        loss
+    } else {
+        0.0
+    };
+    (loss, auxiliary, recoverable)
+}
+
+/// Full-load thermal efficiency on the gross calorific value with f_prac,
+/// for ordering generators (13.8.2.1).
+pub fn nominal_gross_efficiency(chp: &MicroChp) -> Option<f64> {
+    let full = resolve(&chp.full_load, default_efficiencies(chp.kind).map(|d| d.0))?;
+    Some(PRACTICE_FACTOR * full.thermal_eff / chp.fuel.gross_to_net())
+}
+
+/// 13.183: `t_W;op = MIN(Q_W;gen;out / (f_gebouw·P_th;chp_100+sup_100);
+/// f_func·t_mi)`.
+pub fn hot_water_operating_hours(
+    chp: &MicroChp,
+    output_kwh: f64,
+    building_fraction: f64,
+    functioning_fraction: f64,
+    month_hours: f64,
+) -> f64 {
+    let fraction = if building_fraction > 0.0 {
+        building_fraction
+    } else {
+        1.0
+    };
+    let power = chp.full_load.thermal_power_kw;
+    let full_load_hours = if power > 0.0 {
+        output_kwh.max(0.0) / (fraction * power)
+    } else {
+        0.0
+    };
+    full_load_hours.min(functioning_fraction * month_hours)
 }
 
 /// Monthly result for the assessed building part.
@@ -436,12 +550,46 @@ mod tests {
             standby_electric_kw: None,
             standby_auxiliary_kw: Some(0.01),
             net_production_measured: false,
+            storage: None,
             test_report_reference: "EN 50465 report".into(),
         }
     }
 
     fn close(a: f64, b: f64) {
         assert!((a - b).abs() < 1e-9, "{a} vs {b}");
+    }
+
+    #[test]
+    fn storage_outside_the_test_is_supplied_by_the_chp() {
+        let mut chp = stirling();
+        assert_eq!(storage_month(&chp, 0, 500.0, 20.0, false), (0.0, 0.0, 0.0));
+        chp.storage = Some(ChpStorage {
+            loss_w_per_k: 2.0,
+            set_temperature_c: 60.0,
+            charging_auxiliary_w: Some(30.0),
+            source_reference: "label".into(),
+        });
+        assert!(validate_micro_chp(&chp, "chp").is_empty());
+        // January in a heated space: 2·(60 − 20)·744/1000 = 59,52 kWh;
+        // pump 30 W over 500 h = 15 kWh; recoverable for an individual CHP.
+        let (loss, aux, rbl) = storage_month(&chp, 0, 500.0, 20.0, false);
+        close(loss, 59.52);
+        close(aux, 15.0);
+        close(rbl, 59.52);
+        // Installation room: 13 °C, not recoverable.
+        chp.location = MicroChpLocation::InstallationRoom;
+        let (loss, _, rbl) = storage_month(&chp, 0, 500.0, 20.0, false);
+        close(loss, 2.0 * 47.0 * 744.0 / 1000.0);
+        close(rbl, 0.0);
+        // 13.183: f_func·t_mi caps the full-load hours.
+        close(
+            hot_water_operating_hours(&chp, 400.0, 1.0, 1.0, 744.0),
+            20.0,
+        );
+        close(
+            hot_water_operating_hours(&chp, 40_000.0, 1.0, 0.6, 744.0),
+            0.6 * 744.0,
+        );
     }
 
     #[test]

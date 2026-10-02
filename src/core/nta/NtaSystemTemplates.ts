@@ -8,7 +8,12 @@ type Block = Record<string, unknown>;
 const OTHER_AUX = () => ({ electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' });
 
 /** Single space-heating generator kinds the form can create. */
-export const SPACE_GENERATOR_KINDS = ['gas_boiler', 'external_heat', 'heat_pump_forfait', 'electric_resistance', 'biomass'] as const;
+export const SPACE_GENERATOR_KINDS = ['gas_boiler', 'external_heat', 'heat_pump_forfait', 'electric_resistance', 'biomass', 'chp'] as const;
+
+/** Table 9.31 class of a building CHP (method 2). */
+export function chpClassTemplate(): Block {
+  return { powerKw: null, builtAfter2006: true, hreDeclared: false, lowTemperature: false };
+}
 
 /** A space-heating generator of `kind` in the kernel's `Generator` shape. */
 export function spaceGeneratorTemplate(kind: string, project?: IProject): Block | null {
@@ -29,6 +34,8 @@ export function spaceGeneratorTemplate(kind: string, project?: IProject): Block 
     case 'heat_pump_forfait':
       return { kind, forfait: project?.heatingSystems[0]?.ntaHeatPump?.forfaitHeatPumpDraft ?? null,
         sourceSystem: 'individual', sourceSystemReference: '' };
+    case 'chp':
+      return { kind, chp: chpClassTemplate(), method1: null, auxiliary: OTHER_AUX(), equipmentReference: '' };
     case 'multiple':
       return multipleGeneratorsTemplate(project);
     default:
@@ -61,6 +68,7 @@ export function hotWaterGeneratorTemplate(kind: string): Block {
   if (kind === 'heat_pump') return { kind, exhaustAirSource: false, measuredClass: 'class4' };
   if (kind === 'indirect_boiler') return { kind, boiler: null, oil: false, insideBoundary: true, alsoSpaceHeating: true };
   if (kind === 'measured_two_profiles') return twoProfileTemplate();
+  if (kind === 'chp') return { kind, chp: chpClassTemplate(), alsoSpaceHeating: false, equipmentReference: '' };
   return { kind };
 }
 

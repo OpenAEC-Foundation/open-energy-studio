@@ -692,3 +692,29 @@ Volgens 9.7 hoort het terugwinbare verlies van de opwekker (9.6) bij Q_H;ls;rbl 
 2. Een tweede doorrekening telt het verlies op bij de terugwinbare distributie- en bevochtigerverliezen, verdeeld over de zones naar gebruiksoppervlak.
 
 Interpretatie: de kern doet één substitutiestap. De norm schrijft geen iteratie voor.
+
+## WKK voor warm tapwater (§13.8.4.7.4, §13.8.4.8) en WKK-opslag (9.6.6.2.2.8)
+
+Tapwatergenerator `chp` gebruikt één van twee methoden.
+
+- **Methode 2 (`chp`, tabel 9.31):**
+  - η_W;gen = ε_chp;th uit de HT-kolom (§13.8.4.7.4), ook als `lowTemperature` is gezet.
+  - Elektriciteit volgens 16.13: E_el;chp;out;W = Q_W;gen;out·ε_chp;el/ε_chp;th.
+  - Hulpenergie volgens 13.181, als bij een ketel met indirect verwarmd vat. Zonder stand-by-elektronica als de WKK ook verwarmt (`alsoSpaceHeating`).
+- **Methode 1 (`method1`, §13.8.4.8):**
+  - De micro-WKK-berekening van 9.6.6.2 met Q_W;gen;out en de bedrijfstijd t_W;op = MIN(Q_W;gen;out/(f_gebouw·P_th;chp_100+sup_100); f_func·t_mi). Dat is 13.183, met f_func 0,6 boven 500 m², anders 1.
+  - Het rendement Q/E (13.182) wordt naar beneden afgerond op 0,025.
+  - Hulpenergie en terugwinbaar verlies × f_gebouw (13.8.4.8.3/4). Gemeten hulpvermogens zijn verplicht: `hot_water_chp_auxiliary_required`.
+  - Elektriciteit volgens 16.16 (P_el·t_W;op).
+  - Een voorraadvat volgt 13.6 en hoort daarom niet in `method1.storage` (`hot_water_chp_storage_via_13_6`).
+- **Rangorde (13.8.2.1):** de WKK valt in categorie b).
+- **Stroom:** `chpElectricityKwh` per maand telt samen met de WKK-stroom van de verwarming als eigen productie. Die stroom is niet hernieuwbaar en valt buiten 5.14a.
+- **Combinatie met verwarming:** voor een WKK die ook verwarmt, rekent elke kant alleen met zijn eigen output en invoer. Volgens de opmerking bij 13.8.4.8.1 wordt er niet gecorrigeerd voor gecombineerd gebruik, dus er is geen dubbeltelling.
+
+**Opslag buiten de testopstelling (9.6.6.2.2.8, verwarming, methode 1).** `method1.storage` heeft drie velden: H_sto;ls (W/K), ϑ_sto;set en het laadpompvermogen.
+
+- Het verlies is H_sto;ls·(ϑ_sto;set − ϑ_amb)·t_mi. Dit is een interpretatie volgens 13.58.
+- ϑ_amb is het verwarmingssetpoint in een verwarmde ruimte, 13 °C in een onverwarmde ruimte of technische ruimte, en de buitentemperatuur buiten.
+- De WKK levert dit verlies; het gebouwdeel draagt zijn aandeel f_gebouw.
+- De laadpomp telt als hulpenergie over t_H;op.
+- In de verwarmde ruimte is het verlies bij een individuele installatie terugwinbaar (9.7).

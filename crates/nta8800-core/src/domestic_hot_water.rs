@@ -617,11 +617,42 @@ pub enum HotWaterGenerator {
     /// §13.8.4.2: tested with 24-hour measurements at two tapping
     /// profiles (NEN-EN 13203-2 or NEN-EN 16147), 13.153a–13.160a.
     MeasuredTwoProfiles(Box<TwoProfileTest>),
+    /// §13.8.4.7.4/§13.8.4.8 building CHP with an indirectly heated vessel:
+    /// method 2 (table 9.31, HT column) or method 1 (micro-CHP per
+    /// NEN-EN 15316-4-4 with NEN-EN 50465 test values).
+    Chp(Box<HotWaterChp>),
     /// §13.8.4.9.3: hot water from the (collective) building system for
     /// space heating; `E_W;gen;in;conv;hj = Q_W;gen;out` (13.185) loads the
     /// space-heating node, with no carrier, auxiliary or recoverable loss for
     /// hot water.
     HeatingSystem,
+}
+
+/// Building CHP for hot water.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HotWaterChp {
+    /// Method 2: η_W;gen = ε_chp;th of table 9.31 for an HT system
+    /// (§13.8.4.7.4), electricity per 16.13.
+    #[serde(default)]
+    pub chp: Option<crate::space_cooling::ChpClass>,
+    /// Method 1 (§13.8.4.8): 13.182/13.183 with 9.6.6.2, electricity per
+    /// 16.16.
+    #[serde(default)]
+    pub method1: Option<crate::micro_chp::MicroChp>,
+    /// The CHP also heats the building (13.181: no stand-by electronics).
+    #[serde(default)]
+    pub also_space_heating: bool,
+    pub equipment_reference: String,
+}
+
+impl HotWaterChp {
+    /// Table 9.31 HT factors (ε_chp;th, ε_chp;el) for method 2.
+    fn forfait_factors(&self) -> Option<(f64, f64)> {
+        let mut class = self.chp.clone()?;
+        class.low_temperature = false;
+        class.factors()
+    }
 }
 
 /// Table 13.17 / note 5: tapping profiles of NEN-EN 13203-2 and
@@ -1361,6 +1392,12 @@ impl HotWaterGenerator {
             HotWaterGenerator::MeasuredTwoProfiles(test) if !test.electric() => {
                 HotWaterCarrier::Fuel(Carrier::Gas)
             }
+            HotWaterGenerator::Chp(chp) => {
+                HotWaterCarrier::Fuel(match chp.method1.as_ref().map(|product| product.fuel) {
+                    Some(crate::micro_chp::MicroChpFuel::Oil) => Carrier::Oil,
+                    _ => Carrier::Gas,
+                })
+            }
             _ => HotWaterCarrier::Fuel(Carrier::El),
         }
     }
@@ -1449,6 +1486,8 @@ pub struct HotWaterMonth {
     /// 13.185 `E_W;gen;in;conv;hj`: output of a §13.8.4.9.3 generator,
     /// supplied by the space-heating system, kWh.
     pub heating_system_load_kwh: f64,
+    /// 16.13/16.16 `E_el;chp;out;W`: electricity of a hot-water CHP, kWh.
+    pub chp_electricity_kwh: f64,
 }
 
 fn round_down(value: f64, step: f64) -> f64 {
@@ -1963,6 +2002,47 @@ pub fn validate_hot_water(
 /// Issues of one generator (main or additional), as (code, path).
 fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'static str, String)> {
     let mut issues = Vec::new();
+    if let HotWaterGenerator::Chp(chp) = generator {
+        if chp.equipment_reference.trim().is_empty() {
+            issues.push((
+                "source_reference_required",
+                format!("{prefix}.equipmentReference"),
+            ));
+        }
+        match (&chp.chp, &chp.method1) {
+            (Some(_), None) => {
+                if chp.forfait_factors().is_none() {
+                    issues.push(("chp_class_invalid", format!("{prefix}.chp")));
+                }
+            }
+            (None, Some(product)) => {
+                for item in
+                    crate::micro_chp::validate_micro_chp(product, &format!("{prefix}.method1"))
+                {
+                    issues.push((item.code, item.path));
+                }
+                // 13.8.4.8.3 takes W_H;gen;aux of 9.6.6.2: measured values.
+                let measured_aux = product.net_production_measured
+                    || (product.standby_auxiliary_kw.is_some()
+                        && product.chp_only.auxiliary_power_kw.is_some()
+                        && product.full_load.auxiliary_power_kw.is_some());
+                if !measured_aux {
+                    issues.push((
+                        "hot_water_chp_auxiliary_required",
+                        format!("{prefix}.method1"),
+                    ));
+                }
+                if product.storage.is_some() {
+                    // §13.8.4.8.1: hot-water vessels follow 13.6.
+                    issues.push((
+                        "hot_water_chp_storage_via_13_6",
+                        format!("{prefix}.method1.storage"),
+                    ));
+                }
+            }
+            _ => issues.push(("hot_water_chp_method_required", prefix.to_string())),
+        }
+    }
     if let HotWaterGenerator::GasAppliance {
         appliance,
         measured_class,
@@ -2284,6 +2364,18 @@ fn generation(
         )),
         // 13.8.4.9.3: no hot-water efficiency.
         HotWaterGenerator::HeatingSystem => Ok((1.0, 1.0)),
+        // §13.8.4.7.4: ε_chp;th (HT); method 1 per month in the booking,
+        // here its full-load value serves the ordering.
+        HotWaterGenerator::Chp(chp) => match (&chp.chp, &chp.method1) {
+            (Some(_), None) => chp
+                .forfait_factors()
+                .map(|(thermal, _)| (thermal, 1.0))
+                .ok_or("chp_class_invalid"),
+            (None, Some(product)) => crate::micro_chp::nominal_gross_efficiency(product)
+                .map(|value| (value, 1.0))
+                .ok_or("micro_chp_efficiency_required"),
+            _ => Err("hot_water_chp_method_required"),
+        },
     }
 }
 
@@ -2363,7 +2455,7 @@ fn units(system: &HotWaterSystem) -> Vec<Unit<'_>> {
 }
 
 /// 13.8.2.1 categories: (a) exhaust-air heat pump without outdoor air,
-/// (b) heat pumps (biomass and CHP do not occur here), (c) others.
+/// (b) heat pumps and CHP (biomass boilers do not occur here), (c) others.
 fn category(generator: &HotWaterGenerator) -> u8 {
     match generator {
         HotWaterGenerator::HeatPump {
@@ -2386,7 +2478,8 @@ fn category(generator: &HotWaterGenerator) -> u8 {
         HotWaterGenerator::HeatPump { .. }
         | HotWaterGenerator::HeatPumpEn16147 { .. }
         | HotWaterGenerator::IndirectHeatPump { .. }
-        | HotWaterGenerator::BoosterHeatPump(_) => 1,
+        | HotWaterGenerator::BoosterHeatPump(_)
+        | HotWaterGenerator::Chp(_) => 1,
         _ => 2,
     }
 }
@@ -2404,6 +2497,8 @@ struct Booking {
     efficiency_input: [f64; 12],
     /// 13.185: output supplied by the space-heating system.
     heating_system: [f64; 12],
+    /// 16.13/16.16: CHP electricity.
+    chp_electricity: [f64; 12],
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2413,6 +2508,7 @@ fn book_generator(
     context: HotWaterContext,
     extras: &HotWaterExtras,
     f_building: f64,
+    building_area: f64,
     recoverable_counts: bool,
     outputs: &[f64; 12],
     annual_total: f64,
@@ -2506,6 +2602,14 @@ fn book_generator(
                 },
                 1.0,
             ),
+            HotWaterGenerator::Chp(chp) if chp.method1.is_none() => (
+                if chp.also_space_heating {
+                    0.0
+                } else {
+                    STANDBY_ELECTRONICS_W
+                },
+                1.0,
+            ),
             HotWaterGenerator::IndirectHeatPump { also_space_heating } => (
                 if *also_space_heating {
                     0.0
@@ -2579,6 +2683,61 @@ fn book_generator(
             booking.efficiency_input[index] = month.heating_system_heat_kwh + month.electricity_kwh;
             booking.auxiliary[index] += month.electricity_kwh;
             booking.ambient[index] = 0.0;
+        }
+    }
+    // §13.8.4.7.4 and §13.8.4.8: building CHP.
+    if let HotWaterGenerator::Chp(chp) = generator {
+        match (&chp.chp, &chp.method1) {
+            (Some(_), None) => {
+                // 16.13: E_el;chp;out;W = Q_W;gen;out·ε_chp;el/ε_chp;th.
+                let (thermal, electric) = chp.forfait_factors().ok_or("chp_class_invalid")?;
+                for (index, output) in outputs.iter().enumerate() {
+                    booking.chp_electricity[index] = output * electric / thermal;
+                }
+            }
+            (None, Some(product)) => {
+                let collective = system.collective.is_some();
+                let functioning = if building_area > 500.0 { 0.6 } else { 1.0 };
+                for (index, output) in outputs.iter().enumerate() {
+                    if *output <= 0.0 {
+                        booking.input[index] = 0.0;
+                        booking.efficiency_input[index] = 0.0;
+                        continue;
+                    }
+                    // 13.183 and 9.6.6.2 with Q_W;gen;out and t_W;op.
+                    let hours = crate::micro_chp::hot_water_operating_hours(
+                        product,
+                        *output,
+                        f_building,
+                        functioning,
+                        MONTH_HOURS[index],
+                    );
+                    let month = crate::micro_chp::micro_chp_month(
+                        product,
+                        *output,
+                        hours,
+                        MONTH_HOURS[index],
+                        f_building,
+                        collective,
+                    )
+                    .ok_or("micro_chp_efficiency_required")?;
+                    // 13.182 rounded down to 0,025.
+                    let efficiency = round_down(output / month.input_kwh, 0.025);
+                    booking.input[index] = output / efficiency;
+                    booking.efficiency_input[index] = booking.input[index];
+                    // 13.8.4.8.3: W_H;gen;aux × f_gebouw (in the month result).
+                    booking.auxiliary[index] += month
+                        .auxiliary_kwh
+                        .ok_or("hot_water_chp_auxiliary_required")?;
+                    // 13.8.4.8.4, subject to the 500 m² rule of 13.13.
+                    if recoverable_counts {
+                        booking.recoverable[index] += month.recoverable_kwh * f_building;
+                    }
+                    // 16.16: P_el;chp;out;W · t_W;op.
+                    booking.chp_electricity[index] = month.electricity_kwh;
+                }
+            }
+            _ => return Err("hot_water_chp_method_required"),
         }
     }
     // 13.159/13.160 and 13.160a.
@@ -3339,6 +3498,7 @@ pub fn assess_hot_water_with(
             context,
             extras,
             f_building,
+            building_area,
             recoverable_counts,
             unit_outputs,
             annual_output,
@@ -3360,6 +3520,7 @@ pub fn assess_hot_water_with(
             row.auxiliary_electricity_kwh += booking.auxiliary[index];
             row.ambient_heat_kwh += booking.ambient[index];
             row.heating_system_load_kwh += booking.heating_system[index];
+            row.chp_electricity_kwh += booking.chp_electricity[index];
             generator_recoverable[index] += booking.recoverable[index];
             weighted_input[index] += booking.efficiency_input[index];
         }
@@ -3511,6 +3672,117 @@ mod tests {
             collective: None,
             equipment_reference: "plate".into(),
         }
+    }
+
+    fn dhw_chp_class() -> crate::space_cooling::ChpClass {
+        crate::space_cooling::ChpClass {
+            power_kw: 50.0,
+            built_after_2006: true,
+            hre_declared: false,
+            // §13.8.4.7.4 uses the HT column whatever the heating system.
+            low_temperature: true,
+        }
+    }
+
+    #[test]
+    fn hot_water_chp_method_2_uses_the_ht_conversion_factors() {
+        let input = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            chp: Some(dhw_chp_class()),
+            method1: None,
+            also_space_heating: true,
+            equipment_reference: "CHP plate".into(),
+        })));
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        assert_eq!(input.carrier(), HotWaterCarrier::Fuel(Carrier::Gas));
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        // Table 9.31, 20–200 kW after 2006, HT: ε_th 0,49, ε_el 0,30.
+        assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.49).abs() < 1e-9);
+        // 16.13.
+        assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.30 / 0.49).abs() < 1e-9);
+        // No method or both methods are rejected.
+        let neither = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            chp: None,
+            method1: None,
+            also_space_heating: false,
+            equipment_reference: "CHP plate".into(),
+        })));
+        assert!(validate_hot_water(&neither, context(), "hotWater")
+            .iter()
+            .any(|item| item.code == "hot_water_chp_method_required"));
+    }
+
+    #[test]
+    fn hot_water_micro_chp_follows_13_182_and_13_183() {
+        use crate::micro_chp::{
+            hot_water_operating_hours, micro_chp_month, ChpTestPoint, MicroChp, MicroChpFuel,
+            MicroChpLocation, MicroChpType,
+        };
+        let product = MicroChp {
+            kind: MicroChpType::StirlingEngine,
+            fuel: MicroChpFuel::NaturalGas,
+            location: MicroChpLocation::HeatedSpace,
+            hydraulics: None,
+            full_load: ChpTestPoint {
+                thermal_power_kw: 20.0,
+                electric_power_kw: None,
+                thermal_efficiency: None,
+                electric_efficiency: None,
+                auxiliary_power_kw: Some(0.10),
+            },
+            chp_only: ChpTestPoint {
+                thermal_power_kw: 6.0,
+                electric_power_kw: Some(1.0),
+                thermal_efficiency: Some(0.80),
+                electric_efficiency: None,
+                auxiliary_power_kw: Some(0.06),
+            },
+            standby_loss_kw: None,
+            pilot_kw: None,
+            standby_electric_kw: None,
+            standby_auxiliary_kw: Some(0.01),
+            net_production_measured: false,
+            storage: None,
+            test_report_reference: "EN 50465 report".into(),
+        };
+        let input = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            chp: None,
+            method1: Some(product.clone()),
+            also_space_heating: false,
+            equipment_reference: "micro-CHP".into(),
+        })));
+        assert!(
+            validate_hot_water(&input, context(), "hotWater").is_empty(),
+            "{:?}",
+            validate_hot_water(&input, context(), "hotWater")
+        );
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        let output = jan.generator_output_kwh;
+        // 13.183 with f_gebouw 1 and f_func 1: t = MIN(Q/20 kW; 744 h).
+        let hours = hot_water_operating_hours(&product, output, 1.0, 1.0, 744.0);
+        assert!((hours - (output / 20.0).min(744.0)).abs() < 1e-9);
+        let month = micro_chp_month(&product, output, hours, 744.0, 1.0, false).unwrap();
+        // 13.182 rounded down to 0,025.
+        let efficiency = ((output / month.input_kwh) / 0.025 + 1e-9).floor() * 0.025;
+        assert!((jan.natural_gas_kwh - output / efficiency).abs() < 1e-9);
+        // 16.16.
+        assert!((jan.chp_electricity_kwh - month.electricity_kwh).abs() < 1e-9);
+        assert!(jan.chp_electricity_kwh > 0.0);
+        // 13.8.4.8.3: the measured auxiliary energy.
+        assert!(jan.auxiliary_electricity_kwh >= month.auxiliary_kwh.unwrap() - 1e-9);
+        // Without measured auxiliary power the method is rejected.
+        let mut unmeasured = product;
+        unmeasured.full_load.auxiliary_power_kw = None;
+        let input = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            chp: None,
+            method1: Some(unmeasured),
+            also_space_heating: false,
+            equipment_reference: "micro-CHP".into(),
+        })));
+        assert!(validate_hot_water(&input, context(), "hotWater")
+            .iter()
+            .any(|item| item.code == "hot_water_chp_auxiliary_required"));
     }
 
     #[test]

@@ -2271,6 +2271,7 @@ fn compute(
             .map(|zone| zone.monthly_kwh[index])
             .sum::<f64>();
         let mut hot_water_ambient = 0.0;
+        let mut hot_water_chp = 0.0;
         // 5.39d: solar heat for hot water and the space-heating node.
         let mut solar_heat = row.solar_gain_kwh;
         // 13.67: pump energy of standalone space-heating solar systems.
@@ -2287,6 +2288,7 @@ fn compute(
             used_dw += row.district_heat_kwh;
             used_el += row.auxiliary_electricity_kwh;
             hot_water_ambient = row.ambient_heat_kwh;
+            hot_water_chp = row.chp_electricity_kwh;
             solar_heat += row.solar_renewable_kwh;
         }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
@@ -2296,9 +2298,10 @@ fn compute(
             .map(|item| item.monthly_kwh[index])
             .sum::<f64>()
             + pv_yields.iter().map(|yields| yields[index]).sum::<f64>();
-        // 16.11/16.12: heating CHP electricity is own production, not
-        // renewable and outside the 5.14a storage correction (5.14b).
-        let produced = produced_renewable + bacs * row.chp_electricity_kwh;
+        // 16.11–16.13/16.16: heating and hot-water CHP electricity is own
+        // production, not renewable and outside 5.14a (5.14b).
+        let chp_electricity = bacs * row.chp_electricity_kwh + hot_water_chp;
+        let produced = produced_renewable + chp_electricity;
         let self_used = produced.min(used_el);
         // 5.26 summed over producers.
         let exported = produced - self_used;
@@ -2386,7 +2389,7 @@ fn compute(
             zeb_battery,
             used_el,
             produced_renewable,
-            bacs * row.chp_electricity_kwh,
+            chp_electricity,
             used_gas,
             used_oil,
             used_bm,
@@ -3108,6 +3111,79 @@ mod tests {
         let fossil_delta =
             base.annual_primary_fossil_kwh.unwrap() - result.annual_primary_fossil_kwh.unwrap();
         assert!((fossil_delta - pv * 1.45).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hot_water_chp_electricity_is_own_production() {
+        use crate::domestic_hot_water::{
+            HotWaterChp, HotWaterEmission, HotWaterGenerator, HotWaterNeed, ServedTaps,
+        };
+        let mut sample = input();
+        sample.on_site_production.clear();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        sample.hot_water = Some(HotWaterSystem {
+            declared_share: None,
+            need: HotWaterNeed::Residential {
+                dwelling_count: 1,
+                source_reference: "one dwelling".into(),
+            },
+            emission: HotWaterEmission::Residential {
+                served: ServedTaps::KitchenAndBathroom,
+                kitchen_length_m: Some(1.0),
+                bathroom_length_m: Some(1.0),
+                source_reference: "drawing".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: None,
+            storage: Vec::new(),
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator: HotWaterGenerator::Chp(Box::new(HotWaterChp {
+                chp: Some(crate::space_cooling::ChpClass {
+                    power_kw: 50.0,
+                    built_after_2006: true,
+                    hre_declared: false,
+                    low_temperature: false,
+                }),
+                method1: None,
+                also_space_heating: false,
+                equipment_reference: "CHP plate".into(),
+            })),
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
+            collective: None,
+            equipment_reference: "plate".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let hot_water = result.hot_water.as_ref().unwrap();
+        let expected: f64 = result
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| sample.bacs_factor * row.chp_electricity_kwh)
+            .sum::<f64>()
+            + hot_water
+                .months
+                .iter()
+                .map(|month| month.chp_electricity_kwh)
+                .sum::<f64>();
+        assert!(expected > 0.0);
+        let produced: f64 = result
+            .electricity_balance
+            .iter()
+            .map(|month| month.produced_kwh)
+            .sum();
+        assert!((produced - expected).abs() < 1e-6);
     }
 
     #[test]
