@@ -270,7 +270,9 @@ pub(crate) fn loss_area(envelope: &SurveyEnvelope) -> f64 {
         .map(|surface| {
             let weight = match surface.boundary {
                 SurfaceBoundary::Outdoor | SurfaceBoundary::UnheatedSpace { .. } => 1.0,
-                SurfaceBoundary::Ground | SurfaceBoundary::Crawlspace => 0.7,
+                SurfaceBoundary::Ground
+                | SurfaceBoundary::Crawlspace
+                | SurfaceBoundary::UnheatedCellar => 0.7,
                 SurfaceBoundary::AdjacentHeated => 0.0,
             };
             weight * surface.gross_area_m2
@@ -316,7 +318,9 @@ pub fn derive_residential_input(
     let unheated_spaces = survey.envelope.surfaces.iter().any(|surface| {
         matches!(
             surface.boundary,
-            SurfaceBoundary::Crawlspace | SurfaceBoundary::UnheatedSpace { .. }
+            SurfaceBoundary::Crawlspace
+                | SurfaceBoundary::UnheatedCellar
+                | SurfaceBoundary::UnheatedSpace { .. }
         )
     });
     let calculated_distribution =
@@ -572,7 +576,9 @@ mod tests {
             .surfaces
             .iter()
             .map(|s| match s.boundary {
-                SurfaceBoundary::Ground | SurfaceBoundary::Crawlspace => 0.7 * s.gross_area_m2,
+                SurfaceBoundary::Ground
+                | SurfaceBoundary::Crawlspace
+                | SurfaceBoundary::UnheatedCellar => 0.7 * s.gross_area_m2,
                 SurfaceBoundary::AdjacentHeated => 0.0,
                 _ => s.gross_area_m2,
             })
