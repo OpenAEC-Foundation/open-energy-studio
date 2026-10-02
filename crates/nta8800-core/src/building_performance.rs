@@ -28,6 +28,7 @@ use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
 use crate::lighting::{
     assess_zone_lighting, validate_lighting, LightingContext, ZoneLighting, ZoneLightingResult,
 };
+use crate::monthly_demand::{InternalGains, MonthlyDemandInput, UtilityLighting};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_cooling::{
     assess_cooling, validate_cooling, CoolingAssessment, CoolingContext, CoolingGeneratorKind,
@@ -855,12 +856,59 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
     }
 }
 
+fn lighting_context(input: &BuildingPerformanceInput) -> LightingContext {
+    let window_area: f64 = std::iter::once(&input.space_heating.demand)
+        .chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        )
+        .flat_map(|zone| zone.windows.iter())
+        .map(|window| window.area_m2)
+        .sum();
+    LightingContext {
+        total_usable_floor_area_m2: input.total_usable_floor_area_m2,
+        total_window_area_m2: window_area,
+    }
+}
+
+/// 7.28: replace `UtilityLighting::Chapter14` by the internal gain of the
+/// zone's chapter 14 lighting, when that lighting is valid.
+fn with_lighting_gains(input: &BuildingPerformanceInput) -> SpaceHeatingChainInput {
+    let mut chain = input.space_heating.clone();
+    let context = lighting_context(input);
+    let resolve = |demand: &mut MonthlyDemandInput| {
+        if let InternalGains::Utility { lighting, .. } = &mut demand.internal_gains {
+            if matches!(lighting, UtilityLighting::Chapter14) {
+                let zone = input
+                    .lighting
+                    .iter()
+                    .find(|item| item.zone_id == demand.zone_id);
+                if let Some(zone) = zone {
+                    if validate_lighting(zone, demand.usable_floor_area_m2, "").is_empty() {
+                        *lighting = UtilityLighting::Resolved {
+                            gain_w: assess_zone_lighting(zone, context).internal_gain_w,
+                        };
+                    }
+                }
+            }
+        }
+    };
+    resolve(&mut chain.demand);
+    for zone in &mut chain.additional_zones {
+        resolve(&mut zone.demand);
+    }
+    chain
+}
+
 pub fn assess_building_performance(
     input: &BuildingPerformanceInput,
 ) -> BuildingPerformanceAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
-    let heating = assess_space_heating_chain(&input.space_heating);
+    let heating = assess_space_heating_chain(&with_lighting_gains(input));
     let mut issues: Vec<PerformanceIssue> = heating
         .issues
         .iter()
@@ -877,21 +925,7 @@ pub fn assess_building_performance(
         None
     };
     let lighting: Vec<ZoneLightingResult> = if issues.is_empty() {
-        let window_area: f64 = std::iter::once(&input.space_heating.demand)
-            .chain(
-                input
-                    .space_heating
-                    .additional_zones
-                    .iter()
-                    .map(|zone| &zone.demand),
-            )
-            .flat_map(|zone| zone.windows.iter())
-            .map(|window| window.area_m2)
-            .sum();
-        let context = LightingContext {
-            total_usable_floor_area_m2: input.total_usable_floor_area_m2,
-            total_window_area_m2: window_area,
-        };
+        let context = lighting_context(input);
         input
             .lighting
             .iter()
@@ -2116,6 +2150,28 @@ mod tests {
                 .sum()
         };
         assert!((el(&result) - el(&base) - expected).abs() < 1e-6);
+
+        // 7.28: the chapter 14 gain enters the utility internal gains.
+        let demand = &mut sample.space_heating.demand;
+        demand.usage_function = crate::monthly_demand::UsageFunction::Office;
+        demand.dwelling_type = None;
+        demand.setpoints.heating_c = 21.0;
+        demand.internal_gains = InternalGains::Utility {
+            lighting: UtilityLighting::Chapter14,
+            hot_water_recoverable_kwh: Vec::new(),
+            source_reference: "tables 7.2/7.3".into(),
+        };
+        let area = demand.usable_floor_area_m2;
+        let coupled = assess_building_performance(&sample);
+        assert_eq!(
+            coupled.status, "calculated_unverified",
+            "{:?}",
+            coupled.issues
+        );
+        let gain_w = coupled.lighting[0].internal_gain_w;
+        assert!((gain_w - 0.3 * expected * 1000.0 / 8760.0).abs() < 1e-9);
+        let january = coupled.space_heating.demand.monthly[0].internal_gains_kwh;
+        assert!((january - (5.5 * area + gain_w) * 744.0 / 1000.0).abs() < 1e-9);
     }
 
     #[test]

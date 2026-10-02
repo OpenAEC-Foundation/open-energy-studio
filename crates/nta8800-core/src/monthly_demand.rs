@@ -300,11 +300,7 @@ pub enum InternalGains {
     /// 7.2/7.3, recoverable lighting loss from W_t (chapter 14) and
     /// recoverable hot-water losses (13.1.2).
     Utility {
-        /// W_t, kWh per year (14.2.2).
-        #[serde(rename = "lightingAnnualKwh")]
-        lighting_annual_kwh: f64,
-        #[serde(rename = "lightingRecovery")]
-        lighting_recovery: LightingRecovery,
+        lighting: UtilityLighting,
         /// Q_W;ls;rbl per month, kWh; empty means none.
         #[serde(default, rename = "hotWaterRecoverableKwh")]
         hot_water_recoverable_kwh: Vec<f64>,
@@ -317,6 +313,26 @@ pub enum InternalGains {
         heat_flux_w_per_m2: f64,
         #[serde(rename = "sourceReference")]
         source_reference: String,
+    },
+}
+
+/// Φ_int;L of 7.28.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
+pub enum UtilityLighting {
+    /// Taken from the chapter 14 lighting of the same zone by the
+    /// building-performance calculation.
+    Chapter14,
+    /// W_t (14.2.2) with f_L.
+    Declared {
+        #[serde(rename = "annualKwh")]
+        annual_kwh: f64,
+        recovery: LightingRecovery,
+    },
+    /// Φ_int;L in W as resolved from chapter 14.
+    Resolved {
+        #[serde(rename = "gainW")]
+        gain_w: f64,
     },
 }
 
@@ -923,10 +939,9 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             );
         }
         InternalGains::Utility {
-            lighting_annual_kwh,
+            lighting,
             hot_water_recoverable_kwh,
             source_reference,
-            ..
         } => {
             if input.usage_function.is_residential() {
                 issues.push(issue(
@@ -934,11 +949,27 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                     "internalGains.method",
                 ));
             }
-            if !finite_nonneg(*lighting_annual_kwh) {
-                issues.push(issue(
-                    "lighting_energy_invalid",
-                    "internalGains.lightingAnnualKwh",
-                ));
+            match lighting {
+                UtilityLighting::Chapter14 => issues.push(issue(
+                    "lighting_gain_requires_chapter_14",
+                    "internalGains.lighting",
+                )),
+                UtilityLighting::Declared { annual_kwh, .. } => {
+                    if !finite_nonneg(*annual_kwh) {
+                        issues.push(issue(
+                            "lighting_energy_invalid",
+                            "internalGains.lighting.annualKwh",
+                        ));
+                    }
+                }
+                UtilityLighting::Resolved { gain_w } => {
+                    if !finite_nonneg(*gain_w) {
+                        issues.push(issue(
+                            "lighting_energy_invalid",
+                            "internalGains.lighting.gainW",
+                        ));
+                    }
+                }
             }
             if !(hot_water_recoverable_kwh.is_empty() || hot_water_recoverable_kwh.len() == 12)
                 || hot_water_recoverable_kwh
@@ -1297,16 +1328,21 @@ pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64
                 * hours
         }
         InternalGains::Utility {
-            lighting_annual_kwh,
-            lighting_recovery,
+            lighting,
             hot_water_recoverable_kwh,
             ..
         } => {
             // 7.25–7.29; Φ_V and Φ_proc are 0 (7.5.3.5/7.5.3.6).
             let persons_and_appliances =
                 input.usage_function.occupancy_and_appliance_flux_w_per_m2() * area;
-            let lighting =
-                lighting_recovery.factor() * lighting_annual_kwh * 1000.0 / climate::YEAR_HOURS;
+            let lighting = match lighting {
+                UtilityLighting::Chapter14 => 0.0,
+                UtilityLighting::Declared {
+                    annual_kwh,
+                    recovery,
+                } => recovery.factor() * annual_kwh * 1000.0 / climate::YEAR_HOURS,
+                UtilityLighting::Resolved { gain_w } => *gain_w,
+            };
             (persons_and_appliances + lighting) * hours / 1000.0
                 + hot_water_recoverable_kwh
                     .get(month_index)
@@ -1890,8 +1926,10 @@ mod tests {
     fn utility_internal_gains_follow_7_25_to_7_29() {
         let mut input = office();
         input.internal_gains = InternalGains::Utility {
-            lighting_annual_kwh: 876.0,
-            lighting_recovery: LightingRecovery::ForfaitPower,
+            lighting: UtilityLighting::Declared {
+                annual_kwh: 876.0,
+                recovery: LightingRecovery::ForfaitPower,
+            },
             hot_water_recoverable_kwh: vec![10.0; 12],
             source_reference: "synthetic".into(),
         };

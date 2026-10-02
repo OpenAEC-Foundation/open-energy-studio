@@ -419,8 +419,11 @@ export interface MonthlyDemandInput {
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
     | {
         method: 'utility';
-        lightingAnnualKwh: number;
-        lightingRecovery: 'forfait_power' | 'extracted_luminaires' | 'other';
+        /** Φ_int;L (7.28): from chapter 14 lighting, declared W_t, or resolved. */
+        lighting:
+          | { method: 'chapter14' }
+          | { method: 'declared'; annualKwh: number; recovery: 'forfait_power' | 'extracted_luminaires' | 'other' }
+          | { method: 'resolved'; gainW: number };
         hotWaterRecoverableKwh?: number[];
         sourceReference: string;
       }
