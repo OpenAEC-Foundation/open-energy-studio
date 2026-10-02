@@ -2253,6 +2253,8 @@ export interface VentilationResult {
     grillePreheatingElectricityKwh: number;
     /** 9.29 Q_H;ϑHstook;in;air, kWh. */
     heatingLimitAirKwh: number;
+    /** 10.20 Q_C;ϑkoelgrens;in;air for the cooling limit, kWh. */
+    coolingLimitAirKwh: number;
     ahuHeatingKwh: number;
     ahuCoolingKwh: number;
     outdoorAirFraction: number | null;
@@ -2989,8 +2991,36 @@ type NtaHeatRejection =
   | 'air_cooled' | 'closed_cooling_tower' | 'open_cooling_tower' | 'dry_cooler' | 'ground_storage' | 'surface_water';
 type NtaDeclaredEfficiency = { value: number; sourceReference: string };
 type NtaChpClass = { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean };
+type NtaEn14825Point = { partLoadPercent: number; eer: number; evaporatorOutletC: number; condenserInletC: number };
+/** §10.5.4 (method 1, NEN-EN 14825) or §10.5.5 (method 2, NEN-EN 14511) instead of table 10.29. */
+export type NtaCompressionPerformance =
+  | {
+      method: 'en14825';
+      nominalEer: number;
+      nominalCapacityKw: number;
+      minimumCapacityKw: number;
+      /** Conditions A, B, C and D. */
+      testPoints: NtaEn14825Point[];
+      fifthPoint?: NtaEn14825Point | null;
+      condenserInletLimitC?: number | null;
+      requiredOutletC?: number | null;
+      sourceReference: string;
+    }
+  | {
+      method: 'en14511';
+      nominalEer: number;
+      nominalCapacityKw: number;
+      nominalEvaporatorOutletC: number;
+      nominalCondenserInletC: number;
+      /** Table 10.19; required for a room air conditioner. */
+      roomUnitType?: 'split' | 'multi_split_staged' | 'split_inverter' | 'multi_split_inverter' | null;
+      heatRejectionToExhaustAir?: boolean;
+      axialFansWithoutSilencer?: boolean;
+      requiredOutletC?: number | null;
+      sourceReference: string;
+    };
 
-/** Chapter 10 cooling system (NTA 8800 method 3). */
+/** Chapter 10 cooling system (method 3, or methods 1/2 for rated compression generators). */
 export interface NtaCoolingSystem {
   emission: {
     emitter: 'floor_cooling' | 'wall_cooling' | 'fan_coil_or_rac_on_outer_wall' | 'ceiling_cooling'
@@ -3023,8 +3053,13 @@ export interface NtaCoolingSystem {
   generators: Array<{
     id: string;
     generator:
-      | { kind: 'compression'; heatRejection?: NtaHeatRejection | null; declared?: NtaDeclaredEfficiency | null }
-      | { kind: 'room_air_conditioner'; declared?: NtaDeclaredEfficiency | null }
+      | {
+          kind: 'compression';
+          heatRejection?: NtaHeatRejection | null;
+          declared?: NtaDeclaredEfficiency | null;
+          performance?: NtaCompressionPerformance | null;
+        }
+      | { kind: 'room_air_conditioner'; declared?: NtaDeclaredEfficiency | null; performance?: NtaCompressionPerformance | null }
       | { kind: 'unknown_collective' }
       | { kind: 'gas_engine_compression'; gasEngine: NtaChpClass; heatRejection?: NtaHeatRejection | null }
       | { kind: 'gas_absorption'; heatRejection?: NtaHeatRejection | null; declared?: NtaDeclaredEfficiency | null }

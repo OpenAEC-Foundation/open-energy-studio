@@ -129,12 +129,14 @@ Niet in de kern:
 - afleversets op een collectief verwarmingssysteem (13.8.4.9.3);
 - terugwinbare opwekkingsverliezen van warmtepompen en combitoestellen met geïntegreerd vat (13.160a), en de bijlage T-routes voor elektrische toestellen, bivalente warmtepompen en micro-WKK (T.3, T.7–T.10).
 
-## Koeling (hoofdstuk 10, methode 3)
+## Koeling (hoofdstuk 10)
 
 Module `space_cooling` (p. 366–426) rekent per maand `Q_C;gen;in = Σ(Q_C;nd + Q_C;em;ls + Q_C;dis;ls + Q_C;dis;rvd) − Q_C;HP` (10.5, 10.7–10.9). Onderdelen:
 
 - **Afgifteverlies.** 10.10/10.11 en 10.15/10.16, met tabellen 10.35, 10.4, 10.5 en 10.5a (8 K woning, 12 K utiliteit).
 - **Bedrijfsuren.** `t_C;mi` uit de koelgrens (10.19, stappen 1–6) en tabel 10.6.
+  - Stap 1 gebruikt de koudebehoefte zonder terugwinbare verliezen.
+  - De toevoerluchtterm van 10.20 (`coolingLimitAirKwh` van hoofdstuk 11) wordt bij Q_C;ve opgeteld via `cooling_need_with_extra_transfer`.
 - **Watergedragen distributie.**
   - Verlies 10.21/10.22, alleen in niet-gekoelde ruimten. Standaard is dat 15 % van `L_si = 0,64·A_g` bij 19 °C.
   - Ψ uit tabel 10.9, mediumtemperatuur uit tabel 10.8.
@@ -142,7 +144,23 @@ Module `space_cooling` (p. 366–426) rekent per maand `Q_C;gen;in = Σ(Q_C;nd +
   - Bij directe expansie is er geen distributieverlies.
 - **Ventilatorconvectoren.** 10 W per stuk tijdens de bedrijfsuren (10.17/10.18, tabel 10.7).
 - **Verdeling over opwekkers.** Voorrang volgens tabel 10.15. `β` wordt naar boven afgerond op 0,1; de energiefractie komt uit tabel 10.16 (10.49–10.52). Bij meer dan één prioriteit zijn de vermogens verplicht.
-- **Opwekking (methode 3, §10.5.6).**
+- **Opwekking, methode 1 (§10.5.4).** Geldt voor compressiekoeling met directe condensatie tegen de buitenlucht en NEN-EN 14825-meetresultaten.
+  - Invoer: `performance.method = en14825`.
+  - De coëfficiënten C1–C4 en Δϑ_corr volgen uit de vijf lineaire vergelijkingen van 10.63.
+  - Zonder vijfde meetpunt geldt 10.64 met Δϑ_corr = 0.
+  - Per bin van 14–32 °C: f_EER;bn volgens 10.56/10.57, met de deellast volgens 10.58–10.60 en tabel 10.17 (jaarkoude van de opwekker), ϑ_evap volgens 10.61 en ϑ_cond volgens 10.62.
+  - Maandgemiddelde f_EER volgens 10.55 met tabel 10.18. Daarbij wordt gedeeld door de afgedrukte f_t;tot.
+  - EER = EER_n·f_EER·0,9 (10.54); elektriciteit volgens 10.53.
+- **Opwekking, methode 2 (§10.5.5).** Geldt voor compressiekoeling met een NEN-EN 14511-classificatie.
+  - Invoer: `performance.method = en14511`.
+  - E = Q / (PLV·EER_n·f_EER;corr·f_prpr) (10.65).
+  - PLV is f_C;PL;k uit tabel 10.19 (kamerairco, A–D via `roomUnitType`) of tabel 10.21 (koelmachine lucht/water), met de deellasttrap van 10.68/10.69. Onder 5 % geldt 1.
+  - f_EER;corr volgens 10.73 met tabel 10.22 (Δϑ_evap 6/20 K, Δϑ_cond 4/10/20 K).
+  - Referentietemperatuur van de condensor (10.74/10.75): tabel 10.24 bij luchtkoeling. Bij watergekoelde machines tabel 10.26/10.27: natte koeltoren ϑ_wb + 6, droge koeler ϑ_e;kg + 15, bodem of oppervlaktewater 35 °C.
+  - f_prpr = 0,60 bij directe condensatie (kamerairco en luchtgekoelde koelmachine), anders 0,9.
+  - De dekking f_C;PL;cvd (10.70–10.72) wordt per maand gerapporteerd als `partLoadCoverage`.
+  - Voor watergekoelde machines komen er condensorventilatoren bij (10.82, tabel 10.31; standaard met geluidsdemper) en distributie volgens 10.83. Q_hr gebruikt dan de EER zonder f_prpr (10.80).
+- **Opwekking (methode 3, §10.5.6).** Voor alle overige opwekkers.
   - Tabel 10.29: compressie 3,00, en gasmotor 3,00·`η_ge` met `ε_chp;el` uit tabel 9.31.
   - Tabel 10.30: gasabsorptie 0,80, absorptie op externe warmte 0,70.
   - Externe koude (10.78): drager `dc`, `f_P` = 1,45/3, `f_Pren` = 0.
@@ -150,13 +168,24 @@ Module `space_cooling` (p. 366–426) rekent per maand `Q_C;gen;in = Σ(Q_C;nd +
   - Regeneratietoeslag voor een bodemopslag die als warmtepompbron dient (10.84/10.85).
   - Verklaarde EER-waarden worden afgerond op 0,05 (elektrisch) of 0,025 (gas).
 - **Hulpenergie opwekking.** Volgens 10.79:
-  - geen condensorventilator in methode 3;
+  - geen condensorventilator in methode 3 en bij directe condensatie;
   - condensorwaterdistributie volgens tabel 10.33 bij watergekoelde machines;
   - regeling 0,010 kW gedurende alle uren;
   - bij vrije koeling alleen pompenergie.
 - **Omgevingskoude.** 5.34: koude van vrije koeling met EER ≥ 8.
 
-Absorptie op een WKK wordt afgewezen (`cooling_chp_unsupported`), omdat WKK niet in de verwarmingsketen zit. Niet gemodelleerd: koeling in de luchtbehandelingskast (H11), ontvochtiging (H12) en methoden 1 en 2 (meetgegevens volgens EN 14825/14511).
+Koeling in de luchtbehandelingskast (11.116) en ontvochtiging (12.5) komen zonder afgifte- en distributieverlies op de opwekker.
+
+Absorptie op een WKK wordt afgewezen (`cooling_chp_unsupported`), omdat WKK niet in de verwarmingsketen zit. Niet gemodelleerd: methode 2 voor absorptiekoelers (10.66); daarvoor gelden de waarden van methode 3.
+
+Interpretaties (ook in `interpretations` van de koelberekening):
+
+1. ϑ_C;gen;req;out (10.61/10.73) is de aanvoertemperatuur van tabel 10.8 bij koelmachines (6 °C zonder distributie) en 24 °C (10.10) bij verdamping in de ruimte. Een opgegeven `requiredOutletC` gaat voor.
+2. Maanden zonder bins in tabel 10.18 (januari, december) gebruiken de bin van 14 °C.
+3. Een bin met een niet-positief temperatuurverschil krijgt f_EER;bn = 1.
+4. Q_C;gen;in;req van een opwekker in 10.68 is zijn aandeel in de opwekkerskoude (10.52). In 10.65 telt alle koude mee; 10.70–10.72 rapporteren alleen de dekking.
+5. Tabellen 10.24/10.27 hebben geen kolom voor een koelgrens van 14 °C; dan geldt de kolom ≥15.
+6. 10.20 is overgenomen zoals afgedrukt: (ϑ_SUP;dis;out − Δϑ_hr − Δϑ_rca + Δϑ_fan) − ϑ_e, met de temperatuurveranderingen van hoofdstuk 11 met teken. Anders dan bij 9.29 telt de ventilatorwarmte dus twee keer.
 
 ## Verlichting (hoofdstuk 14)
 
