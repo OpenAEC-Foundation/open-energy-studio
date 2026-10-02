@@ -60,7 +60,7 @@ export function generateNtaCalculationReportHTML(
       <td class="n">${num(balance?.producedKwh)}</td><td class="n">${num(balance?.selfUsedKwh)}</td><td class="n">${num(balance?.exportedKwh)}</td></tr>`;
   }).join('');
   const zoneRows = zones.map((zone) => `<tr>${cell(zone.monthly.length ? zone.transmission?.method : '—')}
-    <td class="n">${num(zone.transmission?.conductanceWPerK, 2)}</td><td class="n">${num(zone.transmission?.groundConductanceWPerK, 2)}</td>
+    <td class="n">${num(zone.transmission?.conductanceWPerK, 2)}</td><td class="n">${num(zone.transmission?.groundHeatingAdjustedWPerK, 2)}</td>
     <td class="n">${num(zone.specificHeatCapacityKjPerM2k)}</td><td class="n">${num(zone.annualHeatingNeedKwh)}</td><td class="n">${num(zone.annualCoolingNeedKwh)}</td></tr>`).join('');
   const tojuliRows = performance.tojuli.flatMap((zone) => zone.activeCooling
     ? [`<tr>${cell(zone.zoneId)}${cell('actieve koeling (§5.7.1)')}<td class="n">0,00</td></tr>`]
@@ -97,7 +97,7 @@ export function generateNtaCalculationReportHTML(
     ${tojuliRows ? `<table><thead><tr><th>Zone</th><th>Oriëntatie</th><th>TO<sub>juli</sub> [K]</th></tr></thead><tbody>${tojuliRows}</tbody></table>
       <p>Hoogste waarde: ${num(performance.tojuliMaxK, 2)} K — Bbl 4.149b (≤ 1,20): ${meets(performance.tojuliMeetsBblLimit)}.</p>` : '<p>Niet bepaald.</p>'}
     <h2>Rekenzones</h2>
-    <table><thead><tr><th>Transmissieroute</th><th>H<sub>tr</sub> [W/K]</th><th>H<sub>g</sub> [W/K]</th><th>D<sub>m</sub> [kJ/m²K]</th><th>Q<sub>H;nd</sub> [kWh]</th><th>Q<sub>C;nd</sub> [kWh]</th></tr></thead><tbody>${zoneRows}</tbody></table>
+    <table><thead><tr><th>Transmissieroute</th><th>H<sub>tr</sub> [W/K]</th><th>H<sub>H;g;adj</sub> [W/K]</th><th>D<sub>m</sub> [kJ/m²K]</th><th>Q<sub>H;nd</sub> [kWh]</th><th>Q<sub>C;nd</sub> [kWh]</th></tr></thead><tbody>${zoneRows}</tbody></table>
     <h2>Maandoverzicht [kWh]</h2>
     <table><thead><tr><th>Maand</th><th>Q<sub>H;nd</sub></th><th>Q<sub>C;nd</sub></th><th>Gas</th><th>Warmte (dh)</th><th>Biomassa</th><th>Elektriciteit</th><th>Opwekking</th><th>Eigen gebruik</th><th>Export</th></tr></thead><tbody>${carrierRows}</tbody></table>
     <h2>Niet meegenomen</h2><ul>${limits}</ul>

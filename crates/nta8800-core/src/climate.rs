@@ -27,6 +27,37 @@ pub const OUTDOOR_TEMPERATURE_C: [f64; 12] = [
     2.61, 4.82, 5.91, 9.32, 14.73, 16.12, 18.05, 18.48, 15.63, 10.40, 7.99, 4.00,
 ];
 
+/// Table 17.1, `θ_e;argII;mi` in °C: mean outdoor temperature during
+/// ventilative cooling (11.2.3.3); no value for January and December.
+pub const ARGII_TEMPERATURE_C: [Option<f64>; 12] = [
+    None,
+    Some(13.97),
+    Some(13.00),
+    Some(13.70),
+    Some(16.42),
+    Some(16.76),
+    Some(17.51),
+    Some(18.24),
+    Some(16.74),
+    Some(15.04),
+    Some(13.43),
+    None,
+];
+
+/// Table 17.1, `u_site;mi` in m/s.
+pub const WIND_SPEED_M_PER_S: [f64; 12] = [
+    3.04, 4.15, 2.99, 3.06, 2.97, 2.78, 2.63, 2.51, 2.71, 2.78, 2.83, 2.83,
+];
+
+/// Table 17.1, `θ_ODA;preh;WTWC;mi` in °C: supply air before the heat
+/// recovery unit while it recovers cold (11.106a).
+pub const COLD_RECOVERY_SUPPLY_TEMPERATURE_C: [f64; 12] = [
+    0.0, 0.0, 0.0, 0.0, 25.63, 27.49, 26.34, 27.29, 25.30, 0.0, 0.0, 0.0,
+];
+
+/// §17.2 / annex D.2.1: annual mean outdoor temperature `θ̄_e` (NEN 5060).
+pub const ANNUAL_MEAN_OUTDOOR_TEMPERATURE_C: f64 = 10.67;
+
 /// Tilts of table 17.2 in degrees (0 = facing up, 90 = vertical, 180 = facing down).
 const TILTS_DEG: [f64; 7] = [0.0, 30.0, 45.0, 60.0, 90.0, 135.0, 180.0];
 

@@ -4,18 +4,19 @@
 //! Oriented elements (tilt > 5°, §7.6.6.4) keep their own transmission and
 //! solar gain. Horizontal elements, thermal bridges, unheated-space
 //! transmission, ground, ventilation, internal gains and thermal capacity are
-//! distributed pro rata by `A_T;or / Σ A_T`. Orientations with
-//! `A_T;or ≤ 3 m²` are not assessed. Results are rounded up to 0,01 K; the
-//! Bbl 4.149b limit is 1,20. A zone with sufficient active cooling may use
-//! TOjuli = 0 (§5.7.1). Transcription source: Open Heatloss Studio analysis
-//! F3c (2026-07-11); a review against the norm text is pending.
+//! distributed pro rata by `A_T;or / Σ A_T`. Ground uses the July
+//! `H_gr;an` of annex D.1 in the balance and in 5.40, and `H_C;g;adj` in the
+//! time constant; ventilation uses `H_C;ve` with `b_v`; the need includes
+//! `a_C;red` (7.7). Orientations with `A_T;or ≤ 3 m²` are not assessed.
+//! Results are rounded up to 0,01 K; the Bbl 4.149b limit is 1,20. A zone
+//! with sufficient active cooling may use TOjuli = 0 (§5.7.1).
 
 use crate::climate::{Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::assess_direct_transmission;
 use crate::monthly_demand::{
-    assess_monthly_demand, cooling_utilization, occupants_per_dwelling, opaque_solar_kwh,
-    window_solar_kwh, InternalGains, MonthlyDemandInput, Transmission, A_0,
-    INTERNAL_HEAT_PER_OCCUPANT_W, TAU_0_H,
+    assess_monthly_demand, cooling_reduction_factor, cooling_utilization, occupants_per_dwelling,
+    opaque_solar_kwh, ventilation_conductance, window_solar_kwh, InternalGains, MonthlyDemandInput,
+    Transmission, A_0, INTERNAL_HEAT_PER_OCCUPANT_W, TAU_0_H,
 };
 use crate::solar_shading::Balance;
 use serde::Serialize;
@@ -198,20 +199,15 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
     let setpoint = input.setpoints.cooling_c;
     let pool_conductance =
         horizontal_conductance + bridges + summary.unheated_conductance_w_per_k.unwrap_or(0.0);
-    let ground_conductance = summary.ground_conductance_w_per_k;
-    let ground_july = summary.ground_cooling_kwh[index];
-    let mut ventilation_conductance = 0.0;
-    let mut ventilation_july = 0.0;
-    for flow in &input.ventilation_flows {
-        let row = flow
-            .months
-            .iter()
-            .find(|row| row.month == JULY)
-            .expect("validated months");
-        let supply = row.supply_temperature_c.unwrap_or(outdoor);
-        ventilation_conductance += row.conductance_w_per_k;
-        ventilation_july += row.conductance_w_per_k * (setpoint - supply) * hours / 1000.0;
-    }
+    // 5.40 and step B: H_gr;an;juli in the balance and the denominator; the
+    // time constant (7.58) uses the seasonal H_C;g;adj.
+    let ground_conductance = summary.ground_monthly_conductance_w_per_k[index];
+    let ground_adjusted = summary.ground_cooling_adjusted_w_per_k;
+    let ground_july = summary.ground_kwh(JULY, setpoint);
+    // 7.19 with b_v for the cooling balance.
+    let ventilation_conductance = ventilation_conductance(input, JULY, Balance::Cooling);
+    let ventilation_july = ventilation_conductance * (setpoint - outdoor) * hours / 1000.0;
+    let cooling_reduction = cooling_reduction_factor(input.usage_function);
     let floor_area = input.usable_floor_area_m2;
     let internal_july = match &input.internal_gains {
         InternalGains::Residential { dwelling_count, .. } => {
@@ -237,17 +233,23 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
         let share = area[index] / total_area;
         let direct_or = conductance[index] + share * pool_conductance;
         let total_or = direct_or + share * ground_conductance + share * ventilation_conductance;
+        let tau_conductance = direct_or + share * ground_adjusted + share * ventilation_conductance;
         let heat_transfer = direct_or * (setpoint - outdoor) * hours / 1000.0
             + share * ground_july
             + share * ventilation_july;
         let gains = share * internal_july + solar[index] + share * horizontal_solar;
-        let need = if gains <= 0.0 || total_or <= 0.0 || heat_transfer / gains > 2.0 {
+        // 7.6/7.7 with 7.52–7.54 and 7.58.
+        let gamma = (heat_transfer != 0.0).then(|| gains / heat_transfer);
+        let need = if gains <= 0.0
+            || tau_conductance <= 0.0
+            || gamma.is_some_and(|gamma| gamma > 0.0 && 1.0 / gamma > 2.0)
+        {
             0.0
         } else {
-            let tau = share * capacity / 3600.0 / total_or;
+            let tau = share * capacity / 3600.0 / tau_conductance;
             let a = A_0 + tau / TAU_0_H;
-            let eta = cooling_utilization(gains / heat_transfer, a);
-            (gains - eta * heat_transfer).max(0.0)
+            let eta = gamma.map_or(1.0, |gamma| cooling_utilization(gamma, a));
+            (cooling_reduction * (gains - eta * heat_transfer)).max(0.0)
         };
         let assessed = area[index] > MIN_ORIENTATION_AREA_M2;
         let tojuli =

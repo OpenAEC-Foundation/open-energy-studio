@@ -1,5 +1,22 @@
 # NTA 8800 verificatiestatus — 29 september 2026
 
+## Stand 2 oktober 2026: review H7, H8 en H17 tegen de normtekst
+
+Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn nagelopen tegen de gelicentieerde normtekst (NTA 8800:2025+C1:2026, pagina's 164–220, 250–257, 690–715 en 790–795). Tabellen 17.1, 17.2, 17.4 (90°/45°), 7.7 en 7.9 en de meeste constanten klopten. De gevonden afwijkingen zijn hersteld:
+
+- poort 7.2 (`γ_H > 2` → geen warmtebehoefte), 7.48 (`η_H = 1/γ`) en 7.54 (`η_C = 1` bij `γ_C ≤ 0`, in plaats van een weigering);
+- aparte tijdconstanten `τ_H`/`τ_C` (7.57/7.58) met de seizoenswaarden `H_H;g;adj`/`H_C;g;adj` (D.2/D.3) en de maandelijkse `H_ve` inclusief `b_v` (7.19/7.20);
+- `a_C;red` voor niet-continu koelen (7.7, 7.74/7.75);
+- volledige §7.9: intermitterende verwarming 7.59–7.73 met tabel 7.14/7.15, nivellering woningbouw 7.78/7.79 en de rekentemperatuur in transmissie en ventilatie;
+- bijlage D: maandelijkse grondoverdracht D.1–D.9 met tabel D.1, en de vloerrandterm van 8.36 (of forfait 8.37);
+- tabel 17.4 met alle hellingskolommen (dichtstbijzijnde kolom), tabel 7.7–7.9 met interpolatie en de 180°-kolom, tabel 7.8, en zonwering op de warmtebalans voor utiliteit en niet-ingeregelde automatiek;
+- tabel 17.1-kolommen `θ_e;argII`, `u_site` en `θ_ODA;preh;WTWC` als constanten voor hoofdstuk 11;
+- TO-juli gebruikt de juli-`H_gr;an`, `H_C;g;adj` in de tijdconstante, `H_C;ve` met `b_v` en `a_C;red`.
+
+Nieuwe verplichte invoer: `usageFunction` (en bij wonen `dwellingType`) per rekenzone en `edgeThermalBridges` per vloer op grond. De expliciete grondroute vraagt nu twaalf `H_g;an;mi` en de twee seizoenswaarden. Terugwinbare systeemverliezen (7.3–7.5, 7.7–7.9) blijven buiten beschouwing en staan in `omittedCorrections`. De interpretatiepunten staan in [maandbehoefte](nta8800-maandbehoefte.md).
+
+Daarmee zijn interpretatievraag 1 en 8 hieronder beantwoord (zonwering op warmte: zie p. 197; `θ_e;avg;an`: ongewogen gemiddelde, D.4 gebruikt 10,67 °C) en is open punt 6 (`a_H;red`/7.78) opgelost.
+
 ## Stand 1 oktober 2026: rekenruggengraat
 
 Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BENG 1/2/3, TO-juli, Bbl-toets en indicatieve labelklasse. Onderdelen en bronnen:

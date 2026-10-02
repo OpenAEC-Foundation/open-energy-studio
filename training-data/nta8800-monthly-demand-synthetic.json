@@ -2,6 +2,8 @@
   "zoneId": "rz-1",
   "usableFloorAreaM2": 100.0,
   "areaSourceReference": "synthetic plan; not an EDR case",
+  "usageFunction": "residential",
+  "dwellingType": "other",
   "setpoints": {
     "heatingC": 20.0,
     "coolingC": 24.0,

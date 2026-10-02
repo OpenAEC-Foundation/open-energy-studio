@@ -23,13 +23,13 @@ Kies **NTA-invoer starten**. Het formulier vraagt alleen wat het projectmodel no
 
 | Onderdeel | Wat invullen | Normbasis |
 |---|---|---|
-| Algemeen | rekenscope, bron A_g, Bbl-gebruiksfunctie, actieve koeling, vergunningaanvraag na 29 mei 2026 | Bbl tabel 4.148A, Omgevingsregeling 5.11 lid 5 |
-| Setpoints | woning 20/24 °C, utiliteit volgens tabel | tabel 7.13 |
+| Algemeen | rekenscope, bron A_g, gebruiksfunctie van de rekenzone (en bij wonen het woningtype: woongebouw of overige woning), Bbl-gebruiksfunctie, actieve koeling, vergunningaanvraag na 29 mei 2026 | tabel 7.13–7.15, 7.78, Bbl tabel 4.148A, Omgevingsregeling 5.11 lid 5 |
+| Setpoints | woning 20/24 °C, utiliteit volgens tabel; moet gelijk zijn aan tabel 7.13 voor de gebruiksfunctie | tabel 7.13 |
 | Thermische massa | klasse vloer en wand, plafondkolom | tabel 7.10–7.12 |
 | Interne winst | aantal woningen, of W/m² bij utiliteit | 7.21–7.24 |
-| Ramen | kozijnfractie; belemmering (minimaal of opgegeven); beweegbare zonwering met F_c en bediening | 7.32, §17.3, 7.42/7.43 |
+| Ramen | kozijnfractie; belemmering (minimaal of opgegeven); beweegbare zonwering met F_c en bediening (woning handbediend of automatiek volgens ISO 52016-3, overige automatiek, utiliteit handbediend met of zonder lichtwering) | 7.32, §17.3, 7.42/7.43, tabel 7.7–7.9 |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
-| Vloeren op grond | blootgestelde omtrek P en R_si + R_c | 8.30–8.41 |
+| Vloeren op grond | blootgestelde omtrek P, R_si + R_c, vloerrand (ψ per randdeel of forfait 0,5·P) en eventuele randisolatie (via JSON) | 8.30–8.41, bijlage D |
 | Ventilatie | H_ve per maand, of de hoofdstuk 11-invoer via de ventilatieroute (systeemvariant, WTW, infiltratie, ventilatieve koeling, ventilatoren) | hoofdstuk 11, zie [ventilatie](nta8800-ventilatie.md) |
 | Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie alleen in de verwarmde zone | tabel 9.2–9.4, §9.4.1 |
 | Opwekker | gasketel, (hybride) warmtepomp, stadsverwarming, elektrisch of biomassa | §9.6 |
@@ -61,5 +61,5 @@ Zie het [verificatiedossier](nta8800-verificatiestatus.md) en het [dekkingsregis
 
 - Hoofdstuk 11 (ventilatie, infiltratie, C1) staat als aparte route in de kern; de koppeling aan de maandberekening en de BENG 1-run volgt. De distributie volgens 9.26 ontbreekt nog.
 - De rendementen voor tapwater en voor afgifte van koeling worden opgegeven.
-- Hoofdstukken 7, 8, 13, 16 en 17 zijn getranscribeerd uit normanalyses en nog niet onafhankelijk gereviewd tegen de normtekst. Hoofdstukken 5 en 9 volgen het consultatieconcept.
+- Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn op 2 oktober 2026 nagelopen tegen de normtekst; terugwinbare systeemverliezen ontbreken nog. Hoofdstukken 13 en 16 zijn nog niet gereviewd; hoofdstukken 5 en 9 volgen het consultatieconcept.
 - Er zijn nog geen uitkomsten uit de EDR-testset (bijlage 2) vergeleken. Alleen A_g en A_ls van EP-W001 zijn getoetst.

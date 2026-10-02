@@ -307,9 +307,33 @@ export type NtaMassClass = 'light' | 'heavy' | 'very_heavy';
 export type NtaObstruction =
   | { method: 'minimal' }
   | { method: 'declared'; heating: number[]; cooling: number[]; sourceReference: string };
+export type NtaShadingControl =
+  | 'manual_residential'
+  | 'automatic_residential_iso52016'
+  | 'automatic'
+  | 'manual_utility_with_glare_protection'
+  | 'manual_utility_without_glare_protection';
 export interface NtaMovableShading {
   reductionFactor: number;
-  control: 'manual_residential' | 'automatic';
+  control: NtaShadingControl;
+  sourceReference: string;
+}
+
+/** Usage functions of NTA 8800 tables 7.13–7.15. */
+export type NtaUsageFunction =
+  | 'assembly_child_care' | 'other_assembly' | 'cell' | 'healthcare_with_beds'
+  | 'other_healthcare' | 'office' | 'lodging' | 'education' | 'sport' | 'retail'
+  | 'residential';
+/** 7.78 f_mod;sp: 0,5 apartment buildings, 0,6 other dwellings. */
+export type NtaDwellingType = 'apartment_building' | 'other';
+
+export type NtaGroundEdgeThermalBridges =
+  | { method: 'detailed'; bridges: Array<{ lengthM: number; psiWPerMk: number; sourceReference: string }> }
+  | { method: 'forfait' };
+export interface NtaGroundEdgeInsulation {
+  kind: 'horizontal' | 'vertical';
+  resistanceM2kPerW: number;
+  thicknessM: number;
   sourceReference: string;
 }
 
@@ -325,9 +349,9 @@ export type MonthlyDemandTransmission =
       conductanceWPerK: number;
       sourceReference: string;
       ground: null | {
-        adjustedConductanceWPerK: number;
-        heatingKwh: number[];
-        coolingKwh: number[];
+        monthlyConductanceWPerK: number[];
+        heatingAdjustedConductanceWPerK: number;
+        coolingAdjustedConductanceWPerK: number;
         sourceReference: string;
       };
       groundInventoryConfirmed: boolean;
@@ -357,6 +381,8 @@ export type MonthlyDemandTransmission =
         areaM2: number;
         exposedPerimeterM: number;
         constructionResistanceM2kPerW: number;
+        edgeThermalBridges: NtaGroundEdgeThermalBridges;
+        edgeInsulation?: NtaGroundEdgeInsulation[];
         sourceReference: string;
       }>;
       groundInventoryConfirmed: boolean;
@@ -366,12 +392,20 @@ export interface MonthlyDemandInput {
   zoneId: string;
   usableFloorAreaM2: number;
   areaSourceReference: string;
+  usageFunction: NtaUsageFunction;
+  dwellingType?: NtaDwellingType | null;
   setpoints: { heatingC: number; coolingC: number; sourceReference: string };
   transmission: MonthlyDemandTransmission;
   ventilationFlows: Array<{
     id: string;
     sourceReference: string;
-    months: Array<{ month: number; conductanceWPerK: number; supplyTemperatureC?: number | null }>;
+    months: Array<{
+      month: number;
+      conductanceWPerK: number;
+      supplyTemperatureC?: number | null;
+      coolingConductanceWPerK?: number | null;
+      coolingSupplyTemperatureC?: number | null;
+    }>;
   }>;
   thermalMass: {
     floor: NtaMassClass;
@@ -407,6 +441,12 @@ export interface MonthlyDemandInput {
 }
 
 export interface MonthlyDemandBalanceTerms {
+  setpointC: number;
+  reductionFactor: number;
+  calculationTemperatureC: number;
+  ventilationConductanceWPerK: number;
+  timeConstantH: number;
+  a: number;
   transmissionKwh: number;
   ventilationKwh: number;
   heatTransferKwh: number;
@@ -431,19 +471,21 @@ export interface MonthlyDemandAssessment {
     conductanceWPerK: number;
     directConductanceWPerK: number | null;
     unheatedConductanceWPerK: number | null;
-    groundConductanceWPerK: number;
-    annualMeanOutdoorTemperatureC: number | null;
+    groundSteadyConductanceWPerK: number | null;
+    groundMonthlyConductanceWPerK: number[];
+    groundHeatingAdjustedWPerK: number;
+    groundCoolingAdjustedWPerK: number;
+    annualMeanOutdoorTemperatureC: number;
   };
   monthly: Array<{
     month: number;
     hours: number;
     outdoorTemperatureC: number;
-    timeConstantH: number;
-    a: number;
     internalGainsKwh: number;
     windowSolarGainsKwh: number;
     windowSolarCoolingKwh: number;
     opaqueSolarGainsKwh: number;
+    groundConductanceWPerK: number;
     heating: MonthlyDemandBalanceTerms;
     cooling: MonthlyDemandBalanceTerms;
   }>;
@@ -1728,6 +1770,8 @@ export async function calculateBuildingPerformanceWithRust(input: BuildingPerfor
 export interface NtaCalculationInput {
   calculationScope: 'residential' | 'utility';
   areaSourceReference: string;
+  usageFunction: NtaUsageFunction;
+  dwellingType?: NtaDwellingType | null;
   setpoints: MonthlyDemandInput['setpoints'];
   thermalMass: MonthlyDemandInput['thermalMass'];
   internalGains: MonthlyDemandInput['internalGains'];
@@ -1742,6 +1786,8 @@ export interface NtaCalculationInput {
     surfaceId: string;
     exposedPerimeterM: number;
     constructionResistanceM2kPerW: number;
+    edgeThermalBridges: NtaGroundEdgeThermalBridges;
+    edgeInsulation?: NtaGroundEdgeInsulation[];
     sourceReference: string;
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
@@ -1749,6 +1795,8 @@ export interface NtaCalculationInput {
     zoneId: string;
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
     internalGains: MonthlyDemandInput['internalGains'];
+    usageFunction?: NtaUsageFunction | null;
+    dwellingType?: NtaDwellingType | null;
     setpoints?: MonthlyDemandInput['setpoints'];
     thermalMass?: MonthlyDemandInput['thermalMass'];
     emission?: SpaceHeatingChainInput['emission'];

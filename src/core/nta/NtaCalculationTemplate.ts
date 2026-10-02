@@ -15,6 +15,9 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
   return {
     calculationScope: residential ? 'residential' : 'utility',
     areaSourceReference: '',
+    // Tables 7.13–7.15 follow the usage function; 7.78 needs the dwelling type.
+    usageFunction: residential ? 'residential' : null,
+    dwellingType: null,
     setpoints: residential
       ? { heatingC: 20, coolingC: 24, sourceReference: '' }
       : { heatingC: null, coolingC: null, sourceReference: '' },
@@ -37,6 +40,7 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
         surfaceId: surface.id,
         exposedPerimeterM: null,
         constructionResistanceM2kPerW: null,
+        edgeThermalBridges: null,
         sourceReference: '',
       })),
     ventilationFlows: [{
