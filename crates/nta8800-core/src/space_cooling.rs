@@ -6,7 +6,8 @@
 //! - the emission loss follows 10.10/10.11, 10.15/10.16 with tables 10.35,
 //!   10.4, 10.5 and 10.5a (`MAX(…; 0,15)` as printed on p. 376);
 //! - the operating hours `t_C;mi` follow the cooling limit of 10.19 steps 1–6
-//!   and table 10.6;
+//!   and table 10.6; step 1 uses the zone need without recoverable losses
+//!   and with the supply-air term of 10.20 (`limit_need_kwh`);
 //! - a water-based distribution loses 10.21/10.22 in unconditioned spaces
 //!   (cooled spaces have `L = 0`), with `L_si = 0,64·A_g` (10.27), table 10.9
 //!   and the mean water temperature of table 10.8; pump energy follows
@@ -15,25 +16,35 @@
 //! - fan-coil fans use 10.17/10.18 with table 10.7;
 //! - the cold is split over generators by the priority of table 10.15 and
 //!   the β/f(β) rule of 10.49–10.52 with table 10.16;
-//! - generation uses method 3 (§10.5.6): table 10.29 compression (EER 3,00,
+//! - electric compression generators with NEN-EN 14825 part-load results
+//!   use method 1 (§10.5.4: 10.53–10.64 with tables 10.17/10.18), those with
+//!   a NEN-EN 14511 rating method 2 (§10.5.5: 10.65–10.75 with tables
+//!   10.19–10.27 and f_prpr 0,60/0,9);
+//! - other generation uses method 3 (§10.5.6): table 10.29 compression (EER 3,00,
 //!   gas engine 3,00·η_ge with ε_chp;el of table 9.31), table 10.30
 //!   absorption (gas 0,80; external heat 0,70·η_dh; CHP 1,00·ε_chp;th),
 //!   external cold (10.78), free cooling with table 10.34 (10.86) and the
 //!   aquifer/ground regeneration surcharge 10.84/10.85; declared values are
 //!   rounded down to 0,05 (electric) or 0,025 (gas-fired), §10.1;
 //! - generator auxiliaries follow 10.79: no condenser fans in method 3
-//!   (10.5.7.1), condenser-water distribution 10.83 with table 10.33 for
-//!   water-cooled machines, control 0,010 kW for every month (10.87); free
-//!   cooling counts pump energy only (§10.5.7.2.1);
+//!   (10.5.7.1) and table 10.31 fans (10.82) for water-cooled method 2
+//!   machines, condenser-water distribution 10.83 with table 10.33 for
+//!   water-cooled machines (10.80 with the rated EER for methods 1/2),
+//!   control 0,010 kW for every month (10.87); free cooling counts pump
+//!   energy only (§10.5.7.2.1);
 //! - ambient cold (5.34) is the cold of free cooling with `EER ≥ 8`.
 //!
 //! The dehumidification need `Q_C;dhum` (12.5, table 12.2) is added to the
 //! generator load: by the design temperature of the distribution (6/12 °C
 //! for direct expansion or an unknown design), zero for radiant emitters.
 //!
-//! Not modelled (zero): AHU cooling `Q_C;ahu;in;req` (chapter 11), methods 1 and 2 (EN 14825 /
-//! EN 14511 data), recoverable distribution losses (zero because `L_C;zi = 0`
-//! in cooled zones) and the supply-air term of 10.20 in the cooling limit.
+//! AHU cooling coils `Q_C;ahu;in;req` (11.116) are added to the generator
+//! load without emission or distribution loss (`CoolingZoneNeed::ahu_load_kwh`).
+//!
+//! Not modelled: method 2 for absorption chillers (10.66, table values of
+//! method 3 apply) and recoverable distribution losses (zero because
+//! `L_C;zi = 0` in cooled zones). Interpretations are listed in
+//! [`COOLING_INTERPRETATIONS`].
 
 use crate::climate::{MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use serde::{Deserialize, Serialize};
@@ -474,6 +485,113 @@ pub struct DeclaredEfficiency {
     pub source_reference: String,
 }
 
+/// Measured or rated performance of an electric compression generator:
+/// method 1 (§10.5.4, NEN-EN 14825 part-load results, direct condensation
+/// against outdoor air only) or method 2 (§10.5.5, NEN-EN 14511 rating).
+/// Without it method 3 (table 10.29) applies.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum CompressionPerformance {
+    En14825(En14825Performance),
+    En14511(En14511Performance),
+}
+
+/// One NEN-EN 14825 part-load test point (conditions A–D, or the fifth
+/// point of 10.63).
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct En14825Point {
+    /// `f_C;PL` in %.
+    pub part_load_percent: f64,
+    pub eer: f64,
+    /// `ϑ_C;evap;out`, °C.
+    pub evaporator_outlet_c: f64,
+    /// `ϑ_C;cond;in`, °C.
+    pub condenser_inlet_c: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct En14825Performance {
+    /// `EER_n;gi` at the standard rating conditions.
+    pub nominal_eer: f64,
+    /// `Φ_C;gen;gi;n`, kW.
+    pub nominal_capacity_kw: f64,
+    /// `Φ_C;gen;gi;min` in continuous operation, kW.
+    pub minimum_capacity_kw: f64,
+    /// Conditions A, B, C and D.
+    pub test_points: Vec<En14825Point>,
+    /// Fifth point (C part load at the A condenser temperature); omitted
+    /// means 10.64 with `Δϑ_corr = 0`.
+    #[serde(default)]
+    pub fifth_point: Option<En14825Point>,
+    /// `ϑ_cond;in;lim` of 10.62, °C; omitted means the bin temperature.
+    #[serde(default)]
+    pub condenser_inlet_limit_c: Option<f64>,
+    /// `ϑ_C;gen;req;out` (10.61), °C; default: the distribution supply
+    /// temperature of table 10.8, or 24 °C for evaporation in the room.
+    #[serde(default)]
+    pub required_outlet_c: Option<f64>,
+    pub source_reference: String,
+}
+
+/// Table 10.19 room air-conditioning system codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomUnitType {
+    /// AIR_CLG_RAC_A: split system.
+    Split,
+    /// AIR_CLG_RAC_B: multi-split with cylinder switching.
+    MultiSplitStaged,
+    /// AIR_CLG_RAC_C: split system with frequency control.
+    SplitInverter,
+    /// AIR_CLG_RAC_D: multi-split with frequency control (VRF).
+    MultiSplitInverter,
+}
+
+impl RoomUnitType {
+    /// Table 10.19 row.
+    fn part_load_factors(self) -> [f64; 10] {
+        match self {
+            Self::Split => [1.34, 1.34, 1.34, 1.34, 1.27, 1.23, 1.16, 1.09, 1.02, 0.95],
+            Self::MultiSplitStaged => [0.68, 0.73, 0.77, 0.80, 0.86, 0.93, 0.95, 0.97, 0.94, 0.90],
+            Self::SplitInverter => [1.52, 1.54, 1.57, 1.69, 1.45, 1.31, 1.21, 1.09, 1.03, 0.95],
+            Self::MultiSplitInverter => {
+                [0.77, 1.18, 1.42, 1.55, 1.54, 1.46, 1.35, 1.19, 1.06, 0.92]
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct En14511Performance {
+    /// `EER_n;gi` at the standard rating conditions.
+    pub nominal_eer: f64,
+    /// `Φ_C;gen;gi;n`, kW.
+    pub nominal_capacity_kw: f64,
+    /// `ϑ_C;gen;req;out;gi;n`: evaporator outlet at the rating, °C.
+    pub nominal_evaporator_outlet_c: f64,
+    /// `ϑ_C;gen;hr;req;in;gi;n`: condenser inlet at the rating, °C.
+    pub nominal_condenser_inlet_c: f64,
+    /// Table 10.19 code; required for a room air conditioner.
+    #[serde(default)]
+    pub room_unit_type: Option<RoomUnitType>,
+    /// AIR_CLG_HEAT_REJ = INTERNAL (table 10.22, Δϑ_cond 20 K): an
+    /// air-cooled chiller rejecting heat to exhaust air.
+    #[serde(default)]
+    pub heat_rejection_to_exhaust_air: bool,
+    /// Table 10.31: axial fans without silencer; default with silencer or
+    /// unknown.
+    #[serde(default)]
+    pub axial_fans_without_silencer: bool,
+    /// `ϑ_C;gen;req;out;si;mi` of 10.73, °C; default: the distribution supply
+    /// temperature of table 10.8, or 24 °C for evaporation in the room.
+    #[serde(default)]
+    pub required_outlet_c: Option<f64>,
+    pub source_reference: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CoolingGeneratorKind {
@@ -483,11 +601,17 @@ pub enum CoolingGeneratorKind {
         heat_rejection: Option<HeatRejection>,
         #[serde(default)]
         declared: Option<DeclaredEfficiency>,
+        /// Method 1 or 2 (§10.5.4/10.5.5) instead of table 10.29.
+        #[serde(default)]
+        performance: Option<CompressionPerformance>,
     },
     /// Table 10.29 room air conditioner (local, lowest priority).
     RoomAirConditioner {
         #[serde(default)]
         declared: Option<DeclaredEfficiency>,
+        /// Method 1 or 2 (§10.5.4/10.5.5) instead of table 10.29.
+        #[serde(default)]
+        performance: Option<CompressionPerformance>,
     },
     /// Table 10.29: unknown generator in a collective installation; no
     /// generator auxiliaries (§10.5.7).
@@ -592,6 +716,9 @@ pub struct CoolingZoneNeed {
     /// 11.116 Q_C;ahu;in;req of air handling unit cooling coils, kWh,
     /// supplied by the cooling generator without emission or distribution.
     pub ahu_load_kwh: [f64; 12],
+    /// 10.19: Q_C;nd;ϑkoelgrens without recoverable losses and with the
+    /// supply-air term of 10.20, kWh; `None` uses `need_kwh`.
+    pub limit_need_kwh: Option<[f64; 12]>,
 }
 
 /// Context from outside chapter 10.
@@ -640,6 +767,8 @@ pub struct CoolingMonth {
     pub district_cold_kwh: f64,
     pub auxiliary_electricity_kwh: f64,
     pub ambient_cold_kwh: f64,
+    /// 10.72 `f_C;PL;cvd` of method 2 generators.
+    pub part_load_coverage: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -651,6 +780,13 @@ pub struct GeneratorShare {
     pub beta: f64,
     pub share_july_to_september: f64,
     pub share_other_months: f64,
+    /// Generation method 1, 2 or 3 (§10.5.4–10.5.6).
+    pub method: u8,
+    /// Methods 1/2: EER_si;mi of 10.54 or PLV·EER_n·f_EER;corr·f_prpr of
+    /// 10.65 per month.
+    pub monthly_eer: Vec<f64>,
+    /// Method 1: `[C1, C2, C3, C4, Δϑ_corr]` of 10.63.
+    pub en14825_coefficients: Option<Vec<f64>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -662,6 +798,7 @@ pub struct CoolingAssessment {
     pub months: Vec<CoolingMonth>,
     /// `Q_C;HP;zi` per zone and month (10.6), for TOjuli (5.41c).
     pub zone_booster_extraction_kwh: Vec<[f64; 12]>,
+    pub interpretations: Vec<&'static str>,
 }
 
 fn round_down(value: f64, step: f64) -> f64 {
@@ -818,7 +955,7 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
         }
         let declared = match &generator.generator {
             CoolingGeneratorKind::Compression { declared, .. }
-            | CoolingGeneratorKind::RoomAirConditioner { declared }
+            | CoolingGeneratorKind::RoomAirConditioner { declared, .. }
             | CoolingGeneratorKind::GasAbsorption { declared, .. } => declared.as_ref(),
             _ => None,
         };
@@ -834,6 +971,104 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                     "source_reference_required",
                     format!("{base}.generator.declared.sourceReference"),
                 );
+            }
+        }
+        if let Some(rated) = rated(&generator.generator) {
+            let field = format!("{base}.generator.performance");
+            if declared.is_some() {
+                push("cooling_declared_and_performance", field.clone());
+            }
+            let positive = |value: f64| value.is_finite() && value > 0.0;
+            let finite = |value: Option<f64>| value.map_or(true, f64::is_finite);
+            match rated.performance {
+                CompressionPerformance::En14825(performance) => {
+                    if !positive(performance.nominal_eer)
+                        || !positive(performance.nominal_capacity_kw)
+                        || !positive(performance.minimum_capacity_kw)
+                        || performance.minimum_capacity_kw > performance.nominal_capacity_kw
+                        || !finite(performance.condenser_inlet_limit_c)
+                        || !finite(performance.required_outlet_c)
+                    {
+                        push("cooling_performance_invalid", field.clone());
+                    }
+                    if !rated.room_unit && rated.rejection != HeatRejection::AirCooled {
+                        // §10.5.4: direct condensation against outdoor air.
+                        push("cooling_en14825_direct_condensation_only", field.clone());
+                    }
+                    if performance.test_points.len() != 4 {
+                        push(
+                            "cooling_en14825_points_required",
+                            format!("{field}.testPoints"),
+                        );
+                    } else if performance
+                        .test_points
+                        .iter()
+                        .chain(&performance.fifth_point)
+                        .any(|point| {
+                            !positive(point.part_load_percent)
+                                || !positive(point.eer)
+                                || !point.evaporator_outlet_c.is_finite()
+                                || !point.condenser_inlet_c.is_finite()
+                                || point.condenser_inlet_c <= point.evaporator_outlet_c
+                        })
+                    {
+                        push(
+                            "cooling_en14825_point_invalid",
+                            format!("{field}.testPoints"),
+                        );
+                    } else if positive(performance.nominal_eer)
+                        && en14825_coefficients(performance).is_none()
+                    {
+                        push(
+                            "cooling_en14825_points_singular",
+                            format!("{field}.testPoints"),
+                        );
+                    }
+                    if source_missing(&performance.source_reference) {
+                        push(
+                            "source_reference_required",
+                            format!("{field}.sourceReference"),
+                        );
+                    }
+                }
+                CompressionPerformance::En14511(performance) => {
+                    let lift = performance.nominal_condenser_inlet_c
+                        - performance.nominal_evaporator_outlet_c;
+                    if !positive(performance.nominal_eer)
+                        || !positive(performance.nominal_capacity_kw)
+                        || !performance.nominal_evaporator_outlet_c.is_finite()
+                        || !performance.nominal_condenser_inlet_c.is_finite()
+                        || lift + 10.0 <= 0.0
+                        || !finite(performance.required_outlet_c)
+                    {
+                        push("cooling_performance_invalid", field.clone());
+                    }
+                    match (rated.room_unit, performance.room_unit_type) {
+                        (true, None) => push(
+                            "cooling_room_unit_type_required",
+                            format!("{field}.roomUnitType"),
+                        ),
+                        (false, Some(_)) => push(
+                            "cooling_room_unit_type_inconsistent",
+                            format!("{field}.roomUnitType"),
+                        ),
+                        _ => {}
+                    }
+                    if performance.heat_rejection_to_exhaust_air
+                        && (rated.room_unit || rated.rejection != HeatRejection::AirCooled)
+                    {
+                        push(
+                            "cooling_heat_rejection_inconsistent",
+                            format!("{field}.heatRejectionToExhaustAir"),
+                        );
+                    }
+                    if source_missing(&performance.source_reference) {
+                        push(
+                            "source_reference_required",
+                            format!("{field}.sourceReference"),
+                        );
+                    }
+                }
             }
         }
         match &generator.generator {
@@ -913,7 +1148,7 @@ fn drive(kind: &CoolingGeneratorKind) -> Drive {
     };
     match kind {
         CoolingGeneratorKind::Compression { declared: d, .. }
-        | CoolingGeneratorKind::RoomAirConditioner { declared: d } => {
+        | CoolingGeneratorKind::RoomAirConditioner { declared: d, .. } => {
             Drive::Electric(declared(d, 0.05, EER_COMPRESSION_FORFAIT))
         }
         CoolingGeneratorKind::UnknownCollective => Drive::Electric(EER_COMPRESSION_FORFAIT),
@@ -945,6 +1180,564 @@ fn heat_rejection(kind: &CoolingGeneratorKind) -> Option<HeatRejection> {
     }
 }
 
+/// T_0;abs of 10.56, 10.63 and 10.73, K.
+const T0_ABS: f64 = 273.16;
+/// 10.54: f_prpr;si of method 1.
+const PRACTICE_FACTOR_METHOD_1: f64 = 0.9;
+/// §10.5.5.1: f_prpr;si of method 2 with direct condensation against
+/// outdoor air (principle 2), and for other systems.
+const PRACTICE_FACTOR_DIRECT_CONDENSATION: f64 = 0.60;
+const PRACTICE_FACTOR_OTHER: f64 = 0.9;
+
+/// Interpretations of the methods 1/2 and 10.20 routes.
+pub const COOLING_INTERPRETATIONS: &[&str] = &[
+    "10.61/10.73: ϑ_C;gen;req;out is the distribution supply temperature of table 10.8 (6 °C without distribution) for chillers and 24 °C (10.10) for evaporation in the room, unless declared",
+    "10.55: months without bins in table 10.18 (January, December) use the 14 °C bin",
+    "10.56/10.57: a bin with a non-positive temperature lift uses f_EER;gi;bn = 1",
+    "10.68: Q_C;gen;in;req;si;mi of a generator is its share of the generator cold (10.52); method 2 counts all of it in 10.65, 10.70–10.72 only report the coverage",
+    "tables 10.24/10.27 have no column for a cooling limit of 14 °C; the ≥15 column is used",
+    "10.20 as printed: θ_SUP;dis;out − Δθ_hr − Δθ_rca + Δθ_fan, with the signed temperature changes of chapter 11",
+];
+
+/// Table 10.17 `f_Q;C;bn`, rows ϑ_e;bn 14–32 °C, columns cooling limit
+/// ≥14 … ≥25 °C, 1/h.
+const FQC_BIN: [[f64; 12]; 19] = [
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    [
+        0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0002, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0002, 0.0002, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0003, 0.0003, 0.0002, 0.0002, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0004, 0.0004, 0.0004, 0.0003, 0.0002, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0005, 0.0005, 0.0005, 0.0005, 0.0004, 0.0003, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0005, 0.0006, 0.0006, 0.0006, 0.0006, 0.0006, 0.0004, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0006, 0.0007, 0.0007, 0.0008, 0.0008, 0.0008, 0.0007, 0.0005, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0007, 0.0008, 0.0009, 0.001, 0.0011, 0.0011, 0.0011, 0.001, 0.0007, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0008, 0.0009, 0.001, 0.0011, 0.0013, 0.0014, 0.0015, 0.0015, 0.0013, 0.0009, 0.0, 0.0,
+    ],
+    [
+        0.0008, 0.001, 0.0011, 0.0013, 0.0015, 0.0017, 0.0018, 0.002, 0.002, 0.0019, 0.0013, 0.0,
+    ],
+    [
+        0.0009, 0.001, 0.0012, 0.0014, 0.0017, 0.0019, 0.0022, 0.0025, 0.0027, 0.0028, 0.0027,
+        0.0021,
+    ],
+    [
+        0.001, 0.0011, 0.0014, 0.0016, 0.0019, 0.0022, 0.0026, 0.003, 0.0034, 0.0037, 0.004, 0.0041,
+    ],
+    [
+        0.0011, 0.0012, 0.0015, 0.0018, 0.0021, 0.0025, 0.0029, 0.0034, 0.004, 0.0046, 0.0054,
+        0.0062,
+    ],
+    [
+        0.0011, 0.0013, 0.0016, 0.0019, 0.0023, 0.0028, 0.0033, 0.0039, 0.0047, 0.0056, 0.0067,
+        0.0082,
+    ],
+    [
+        0.0012, 0.0014, 0.0017, 0.0021, 0.0025, 0.0031, 0.0037, 0.0044, 0.0054, 0.0065, 0.0081,
+        0.0103,
+    ],
+    [
+        0.0013, 0.0015, 0.0018, 0.0022, 0.0027, 0.0033, 0.0041, 0.0049, 0.006, 0.0074, 0.0094,
+        0.0124,
+    ],
+    [
+        0.0014, 0.0016, 0.002, 0.0024, 0.003, 0.0036, 0.0044, 0.0054, 0.0067, 0.0084, 0.0108,
+        0.0144,
+    ],
+];
+
+/// Table 10.18 `f_t;bn;mi`, rows ϑ_e;bn 14–32 °C, columns January–December.
+const FT_BIN: [[f64; 12]; 19] = [
+    [
+        0.0, 0.025, 0.0296, 0.1014, 0.0444, 0.0847, 0.0986, 0.0887, 0.0264, 0.0094, 0.0223, 0.0,
+    ],
+    [
+        0.0, 0.0014, 0.0403, 0.1292, 0.0712, 0.1048, 0.1125, 0.0645, 0.0236, 0.0121, 0.0134, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0699, 0.1292, 0.078, 0.1022, 0.1222, 0.0524, 0.0167, 0.0108, 0.0164, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0309, 0.1083, 0.086, 0.0981, 0.125, 0.0417, 0.0292, 0.0094, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0309, 0.0889, 0.1304, 0.1089, 0.0792, 0.0376, 0.0153, 0.0054, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0188, 0.0514, 0.1129, 0.0887, 0.0556, 0.0202, 0.0139, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0067, 0.0278, 0.0941, 0.0618, 0.0458, 0.0188, 0.0167, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0081, 0.0194, 0.0672, 0.0538, 0.0264, 0.0134, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.004, 0.0319, 0.0538, 0.043, 0.0236, 0.0161, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0153, 0.0296, 0.0269, 0.0139, 0.0215, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0167, 0.0175, 0.0269, 0.0083, 0.0363, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0153, 0.0188, 0.0161, 0.0097, 0.0349, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0028, 0.0161, 0.0282, 0.0069, 0.0215, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0042, 0.0188, 0.0255, 0.0097, 0.0121, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0014, 0.0121, 0.0175, 0.0042, 0.0094, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0, 0.0134, 0.004, 0.0042, 0.004, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0, 0.0108, 0.0027, 0.0069, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0, 0.0094, 0.0013, 0.0014, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+    [
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0042, 0.0, 0.0, 0.0, 0.0, 0.0,
+    ],
+];
+
+/// Table 10.18 `f_t;tot;mi` as printed.
+const FT_TOTAL: [f64; 12] = [
+    0.0, 0.0264, 0.2392, 0.7431, 0.8844, 0.8952, 0.7583, 0.4933, 0.1417, 0.0470, 0.0521, 0.0,
+];
+
+/// Table 10.24 `ϑ_e;kg;mi`, columns cooling limit ≥15 … ≥25 °C.
+const THETA_E_KG: [[f64; 11]; 12] = [
+    [
+        11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 11.8,
+    ],
+    [
+        15.6, 16.1, 16.4, 16.4, 16.4, 16.4, 16.4, 16.4, 16.4, 16.4, 16.4,
+    ],
+    [
+        16.5, 17.1, 17.6, 18.1, 18.2, 18.2, 18.2, 18.2, 18.2, 18.2, 18.2,
+    ],
+    [
+        17.6, 18.0, 18.6, 19.2, 19.7, 20.2, 20.4, 20.4, 20.4, 20.4, 20.4,
+    ],
+    [
+        20.4, 21.3, 22.3, 23.1, 23.9, 24.2, 24.6, 24.9, 25.2, 25.6, 26.5,
+    ],
+    [
+        18.6, 19.3, 20.3, 21.5, 22.6, 23.5, 24.6, 25.6, 26.8, 27.5, 28.2,
+    ],
+    [
+        19.6, 20.2, 21.0, 21.8, 22.7, 23.5, 24.3, 25.1, 25.7, 26.3, 26.9,
+    ],
+    [
+        19.9, 20.4, 20.8, 21.5, 22.4, 23.4, 24.6, 25.7, 26.7, 27.3, 27.9,
+    ],
+    [
+        18.1, 18.9, 19.8, 20.9, 21.9, 22.6, 23.4, 23.8, 24.6, 25.3, 26.6,
+    ],
+    [
+        17.1, 17.7, 18.7, 19.5, 20.4, 21.0, 21.5, 22.0, 22.0, 22.0, 22.0,
+    ],
+    [
+        14.6, 14.6, 14.6, 14.6, 14.6, 14.6, 14.6, 14.6, 14.6, 14.6, 14.6,
+    ],
+    [
+        12.6, 12.6, 12.6, 12.6, 12.6, 12.6, 12.6, 12.6, 12.6, 12.6, 12.6,
+    ],
+];
+
+/// Table 10.27 `ϑ_C;hr;wb;mi`, columns cooling limit ≥15 … ≥25 °C.
+const THETA_WET_BULB: [[f64; 11]; 12] = [
+    [
+        10.1, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1,
+    ],
+    [
+        11.7, 11.7, 12.4, 12.4, 12.4, 12.4, 12.4, 12.4, 12.4, 12.4, 12.4,
+    ],
+    [
+        10.7, 11.0, 11.7, 12.7, 13.2, 13.2, 13.2, 13.2, 13.2, 13.2, 13.2,
+    ],
+    [
+        11.9, 12.1, 12.2, 12.6, 13.0, 12.6, 15.9, 15.9, 15.9, 15.9, 15.9,
+    ],
+    [
+        14.8, 15.2, 15.6, 16.0, 16.2, 16.4, 16.4, 16.5, 16.6, 16.7, 17.1,
+    ],
+    [
+        14.8, 15.2, 15.7, 16.8, 17.7, 18.4, 19.0, 19.6, 20.2, 20.6, 21.0,
+    ],
+    [
+        16.5, 16.9, 17.4, 17.8, 18.3, 18.8, 19.1, 19.6, 19.8, 20.2, 20.6,
+    ],
+    [
+        17.2, 17.4, 17.7, 18.1, 18.5, 19.1, 19.8, 20.4, 20.9, 21.1, 21.3,
+    ],
+    [
+        15.5, 16.0, 16.7, 17.5, 18.1, 18.4, 19.0, 19.3, 19.8, 20.4, 20.7,
+    ],
+    [
+        15.0, 15.4, 15.8, 16.4, 16.9, 17.5, 17.7, 18.4, 18.4, 18.4, 18.4,
+    ],
+    [
+        12.5, 12.5, 12.5, 12.5, 12.5, 12.5, 12.5, 12.5, 12.5, 12.5, 12.5,
+    ],
+    [
+        11.7, 11.7, 11.7, 11.7, 11.7, 11.7, 11.7, 11.7, 11.7, 11.7, 11.7,
+    ],
+];
+
+/// Table 10.21: chillers with condenser heat to outdoor air / to water.
+const CHILLER_PART_LOAD_AIR: [f64; 10] =
+    [0.83, 0.87, 0.92, 0.95, 0.98, 1.00, 1.01, 1.02, 1.01, 1.00];
+const CHILLER_PART_LOAD_WATER: [f64; 10] =
+    [0.96, 0.94, 0.92, 0.90, 0.90, 0.90, 0.92, 0.94, 0.96, 1.00];
+
+/// Column of tables 10.24/10.27 (≥15 … ≥25) for a cooling limit.
+fn limit_column_from_15(limit_c: f64) -> usize {
+    (limit_c.round().clamp(15.0, 25.0) - 15.0) as usize
+}
+
+/// Table 10.31 `p_hr;el;si` (10.82), kW/kW; zero for direct condensation.
+fn rejection_fan_power(rejection: HeatRejection, without_silencer: bool) -> f64 {
+    match (rejection, without_silencer) {
+        (HeatRejection::OpenCoolingTower, true) => 0.033,
+        (HeatRejection::OpenCoolingTower, false) => 0.040,
+        (HeatRejection::ClosedCoolingTower, true) => 0.018,
+        (HeatRejection::ClosedCoolingTower, false) => 0.021,
+        (HeatRejection::DryCooler, true) => 0.045,
+        (HeatRejection::DryCooler, false) => 0.054,
+        _ => 0.0,
+    }
+}
+
+/// Gaussian elimination with partial pivoting; `None` when singular.
+fn solve_linear(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
+    let n = b.len();
+    for col in 0..n {
+        let pivot = (col..n).max_by(|&i, &j| a[i][col].abs().total_cmp(&a[j][col].abs()))?;
+        if a[pivot][col].abs() < 1e-12 {
+            return None;
+        }
+        a.swap(col, pivot);
+        b.swap(col, pivot);
+        for row in col + 1..n {
+            let factor = a[row][col] / a[col][col];
+            let pivot_row = a[col].clone();
+            for (value, pivot_value) in a[row].iter_mut().zip(&pivot_row).skip(col) {
+                *value -= factor * pivot_value;
+            }
+            b[row] -= factor * b[col];
+        }
+    }
+    let mut x = vec![0.0; n];
+    for row in (0..n).rev() {
+        let sum: f64 = (row + 1..n).map(|k| a[row][k] * x[k]).sum();
+        x[row] = (b[row] - sum) / a[row][row];
+    }
+    x.iter().all(|value| value.is_finite()).then_some(x)
+}
+
+/// 10.63: `[C1, C2, C3, C4, Δϑ_corr]` from the NEN-EN 14825 points; without
+/// a fifth point 10.64 applies with `Δϑ_corr = 0` (its equation repeats C).
+pub fn en14825_coefficients(performance: &En14825Performance) -> Option<[f64; 5]> {
+    if performance.test_points.len() != 4 || performance.nominal_eer <= 0.0 {
+        return None;
+    }
+    let with_fifth = performance.fifth_point.is_some();
+    let points: Vec<En14825Point> = performance
+        .test_points
+        .iter()
+        .copied()
+        .chain(performance.fifth_point)
+        .collect();
+    let mut a = Vec::new();
+    let mut b = Vec::new();
+    for point in &points {
+        let x = point.part_load_percent / 100.0;
+        let ratio = point.eer / performance.nominal_eer;
+        let absolute = T0_ABS + point.evaporator_outlet_c;
+        let mut row = vec![x.powi(3), x.powi(2), x, 1.0];
+        if with_fifth {
+            row.push(-ratio * x / absolute);
+        }
+        a.push(row);
+        b.push(ratio * (point.condenser_inlet_c - point.evaporator_outlet_c) / absolute);
+    }
+    let x = solve_linear(a, b)?;
+    Some([x[0], x[1], x[2], x[3], if with_fifth { x[4] } else { 0.0 }])
+}
+
+/// 10.56/10.57: `f_EER;gi;bn`; part loads in %.
+fn en14825_bin_factor(
+    coefficients: &[f64; 5],
+    part_load_percent: f64,
+    minimum_percent: f64,
+    evaporator_c: f64,
+    condenser_c: f64,
+) -> f64 {
+    let x = part_load_percent.max(minimum_percent) / 100.0;
+    let lift = condenser_c - evaporator_c + x * coefficients[4];
+    if lift <= 0.0 {
+        return 1.0;
+    }
+    let [c1, c2, c3, c4, _] = *coefficients;
+    (T0_ABS + evaporator_c) / lift * (c1 * x.powi(3) + c2 * x.powi(2) + c3 * x + c4)
+}
+
+/// 10.55 with 10.58–10.62: `f_EER;gi;mi` of method 1 for each month, from
+/// the generator's annual cold `Σ Q_C;gen;in;mi` (kWh).
+pub fn en14825_monthly_factor(
+    performance: &En14825Performance,
+    coefficients: &[f64; 5],
+    evaporator_c: f64,
+    cooling_limit_c: f64,
+    annual_cold_kwh: f64,
+    building_fraction: f64,
+) -> [f64; 12] {
+    let column = (cooling_limit_c.round().clamp(14.0, 25.0) - 14.0) as usize;
+    let minimum = 100.0 * performance.minimum_capacity_kw / performance.nominal_capacity_kw;
+    let bin_factor = |bin: usize| {
+        let outdoor = 14.0 + bin as f64;
+        // 10.60 and 10.58.
+        let net_kw = annual_cold_kwh * FQC_BIN[bin][column] / building_fraction;
+        let part_load = 100.0 * net_kw / performance.nominal_capacity_kw;
+        // 10.62.
+        let condenser = performance
+            .condenser_inlet_limit_c
+            .map_or(outdoor, |limit| limit.max(outdoor));
+        en14825_bin_factor(coefficients, part_load, minimum, evaporator_c, condenser)
+    };
+    std::array::from_fn(|month| {
+        if FT_TOTAL[month] <= 0.0 {
+            return bin_factor(0);
+        }
+        (0..FT_BIN.len())
+            .filter(|&bin| FT_BIN[bin][month] > 0.0)
+            .map(|bin| FT_BIN[bin][month] / FT_TOTAL[month] * bin_factor(bin))
+            .sum()
+    })
+}
+
+/// 10.69 with table 10.19/10.21: `f_C;PL;k`; 1 below 5 %.
+fn part_load_step_factor(table: &[f64; 10], part_load: f64) -> f64 {
+    if part_load.is_nan() || part_load < 0.05 {
+        return 1.0;
+    }
+    let step = ((part_load * 10.0 + 0.5 + 1e-9).floor() as usize).clamp(1, 10);
+    table[step - 1]
+}
+
+/// 10.73: `f_EER;corr`.
+pub fn eer_temperature_correction(
+    required_outlet_c: f64,
+    reference_inlet_c: f64,
+    nominal_outlet_c: f64,
+    nominal_inlet_c: f64,
+    delta_evaporator_k: f64,
+    delta_condenser_k: f64,
+) -> f64 {
+    let carnot = |outlet: f64, inlet: f64| {
+        let cold = T0_ABS + outlet - delta_evaporator_k;
+        cold / ((T0_ABS + inlet + delta_condenser_k) - cold)
+    };
+    carnot(required_outlet_c, reference_inlet_c) / carnot(nominal_outlet_c, nominal_inlet_c)
+}
+
+/// A compression generator with method 1 or 2 data.
+struct Rated<'a> {
+    performance: &'a CompressionPerformance,
+    room_unit: bool,
+    rejection: HeatRejection,
+}
+
+fn rated(kind: &CoolingGeneratorKind) -> Option<Rated<'_>> {
+    match kind {
+        CoolingGeneratorKind::Compression {
+            performance: Some(performance),
+            heat_rejection,
+            ..
+        } => Some(Rated {
+            performance,
+            room_unit: false,
+            rejection: heat_rejection.unwrap_or(HeatRejection::AirCooled),
+        }),
+        CoolingGeneratorKind::RoomAirConditioner {
+            performance: Some(performance),
+            ..
+        } => Some(Rated {
+            performance,
+            room_unit: true,
+            rejection: HeatRejection::AirCooled,
+        }),
+        _ => None,
+    }
+}
+
+/// Monthly efficiencies of a method 1 or 2 generator.
+struct RatedMonths {
+    method: u8,
+    coefficients: Option<[f64; 5]>,
+    /// Effective EER for the drive energy (10.53/10.65).
+    eer: [f64; 12],
+    /// EER in 10.80 (without f_prpr).
+    rejection_eer: [f64; 12],
+    /// 10.70/10.71 cold within the nominal capacity.
+    delivered: [f64; 12],
+    /// Table 10.31 `p_hr;el` (10.82).
+    fan_power: f64,
+}
+
+fn rated_months(
+    rated: &Rated<'_>,
+    cold: &[f64; 12],
+    hours: &[f64; 12],
+    cooling_limit_c: f64,
+    building_fraction: f64,
+    supply_c: f64,
+) -> RatedMonths {
+    let air_cooled = rated.room_unit || rated.rejection == HeatRejection::AirCooled;
+    // Table 10.22.
+    let delta_evaporator = if rated.room_unit { 20.0 } else { 6.0 };
+    let default_outlet = if rated.room_unit {
+        COOLING_INITIAL_TEMPERATURE_C
+    } else {
+        supply_c
+    };
+    match rated.performance {
+        CompressionPerformance::En14825(performance) => {
+            let coefficients = en14825_coefficients(performance).unwrap_or([0.0; 5]);
+            // 10.61.
+            let evaporator =
+                performance.required_outlet_c.unwrap_or(default_outlet) - delta_evaporator;
+            let annual: f64 = cold.iter().sum();
+            let factors = en14825_monthly_factor(
+                performance,
+                &coefficients,
+                evaporator,
+                cooling_limit_c,
+                annual,
+                building_fraction,
+            );
+            let eer = std::array::from_fn(|index| {
+                performance.nominal_eer * factors[index] * PRACTICE_FACTOR_METHOD_1
+            });
+            let rejection_eer =
+                std::array::from_fn(|index| performance.nominal_eer * factors[index]);
+            RatedMonths {
+                method: 1,
+                coefficients: Some(coefficients),
+                eer,
+                rejection_eer,
+                delivered: *cold,
+                // Method 1 applies to direct condensation only (10.82 = 0).
+                fan_power: 0.0,
+            }
+        }
+        CompressionPerformance::En14511(performance) => {
+            let delta_condenser = if !air_cooled {
+                4.0
+            } else if performance.heat_rejection_to_exhaust_air {
+                20.0
+            } else {
+                10.0
+            };
+            let column = limit_column_from_15(cooling_limit_c);
+            let outlet = performance.required_outlet_c.unwrap_or(default_outlet);
+            let table: [f64; 10] = match performance.room_unit_type {
+                Some(kind) if rated.room_unit => kind.part_load_factors(),
+                _ if air_cooled => CHILLER_PART_LOAD_AIR,
+                _ => CHILLER_PART_LOAD_WATER,
+            };
+            let practice = if air_cooled {
+                PRACTICE_FACTOR_DIRECT_CONDENSATION
+            } else {
+                PRACTICE_FACTOR_OTHER
+            };
+            let mut eer = [0.0; 12];
+            let mut rejection_eer = [0.0; 12];
+            let mut delivered = [0.0; 12];
+            for index in 0..12 {
+                // 10.74/10.75 with table 10.26.
+                let reference = if air_cooled {
+                    THETA_E_KG[index][column]
+                } else {
+                    match rated.rejection {
+                        HeatRejection::OpenCoolingTower | HeatRejection::ClosedCoolingTower => {
+                            THETA_WET_BULB[index][column] + 6.0
+                        }
+                        HeatRejection::DryCooler => THETA_E_KG[index][column] + 15.0,
+                        _ => 35.0,
+                    }
+                };
+                let correction = eer_temperature_correction(
+                    outlet,
+                    reference,
+                    performance.nominal_evaporator_outlet_c,
+                    performance.nominal_condenser_inlet_c,
+                    delta_evaporator,
+                    delta_condenser,
+                );
+                // 10.68 and 10.69.
+                let capacity_kwh =
+                    hours[index] * performance.nominal_capacity_kw * building_fraction;
+                let part_load = if capacity_kwh > 0.0 {
+                    cold[index] / capacity_kwh
+                } else if cold[index] > 0.0 {
+                    f64::INFINITY
+                } else {
+                    0.0
+                };
+                let plv = part_load_step_factor(&table, part_load);
+                rejection_eer[index] = performance.nominal_eer * plv * correction;
+                eer[index] = rejection_eer[index] * practice;
+                // 10.70/10.71.
+                delivered[index] = if part_load <= 1.0 {
+                    cold[index]
+                } else {
+                    capacity_kwh
+                };
+            }
+            RatedMonths {
+                method: 2,
+                coefficients: None,
+                eer,
+                rejection_eer,
+                delivered,
+                fan_power: if air_cooled {
+                    0.0
+                } else {
+                    rejection_fan_power(rated.rejection, performance.axial_fans_without_silencer)
+                },
+            }
+        }
+    }
+}
+
 /// Monthly cooling chain; call only after [`validate_cooling`] returned no
 /// issues.
 pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> CoolingAssessment {
@@ -963,12 +1756,20 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         1.0
     };
     let mut total_need = [0.0; 12];
+    let mut limit_need = [0.0; 12];
     for zone in context.zones {
         for (sum, need) in total_need.iter_mut().zip(zone.need_kwh) {
             *sum += need;
         }
+        for (sum, need) in limit_need
+            .iter_mut()
+            .zip(zone.limit_need_kwh.unwrap_or(zone.need_kwh))
+        {
+            *sum += need;
+        }
     }
-    let limit = cooling_limit_c(&total_need);
+    // 10.19 steps 1–6.
+    let limit = cooling_limit_c(&limit_need);
     let hours: [f64; 12] = std::array::from_fn(|index| operating_hours(limit, index));
 
     // Emission (10.10–10.16).
@@ -1120,7 +1921,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             .1;
         priority_share(priority, peak) * generator.capacity_kw.unwrap_or(1.0) / group
     };
-    let shares: Vec<GeneratorShare> = system
+    let mut shares: Vec<GeneratorShare> = system
         .generators
         .iter()
         .map(|generator| GeneratorShare {
@@ -1132,6 +1933,9 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                 .map_or(1.0, |item| item.1),
             share_july_to_september: generator_share(generator, true),
             share_other_months: generator_share(generator, false),
+            method: 3,
+            monthly_eer: Vec::new(),
+            en14825_coefficients: None,
         })
         .collect();
 
@@ -1144,7 +1948,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             .unwrap_or(0.0)
     });
     let mut months = Vec::with_capacity(12);
-    let mut free_cold_by_generator = vec![[0.0; 12]; system.generators.len()];
+    let mut base_auxiliary = [0.0; 12];
     for index in 0..12 {
         let outdoor = OUTDOOR_TEMPERATURE_C[index];
         let combined = outdoor + solar_correction;
@@ -1200,8 +2004,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         // 10.7–10.9: the booster heat pump is limited to the load.
         let extraction = booster[index].min(load);
         let generator_cold = load - extraction;
-        let peak = (6..=8).contains(&index);
-        let mut row = CoolingMonth {
+        let row = CoolingMonth {
             month: index as u8 + 1,
             operating_hours: hours[index],
             need_kwh: need,
@@ -1215,12 +2018,50 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             ..CoolingMonth::default()
         };
         // 10.17/10.18
-        let mut auxiliary =
+        base_auxiliary[index] =
             FAN_COIL_POWER_W * f64::from(system.emission.fan_coil_count) * hours[index] / 1000.0
                 + pump;
+        months.push(row);
+    }
+    // 10.52: cold per generator and month.
+    let generator_cold: Vec<[f64; 12]> = system
+        .generators
+        .iter()
+        .map(|generator| {
+            std::array::from_fn(|index| {
+                generator_share(generator, (6..=8).contains(&index))
+                    * months[index].generator_cold_kwh
+            })
+        })
+        .collect();
+    // Methods 1 and 2 (§10.5.4/10.5.5).
+    let supply_c = system
+        .distribution
+        .as_ref()
+        .map_or(6.0, |item| item.design_temperature.supply_return_c().0);
+    let rated_months: Vec<Option<RatedMonths>> = system
+        .generators
+        .iter()
+        .zip(&generator_cold)
+        .map(|(generator, cold)| {
+            rated(&generator.generator)
+                .map(|rated| rated_months(&rated, cold, &hours, limit, f_building, supply_c))
+        })
+        .collect();
+    for (share, rated) in shares.iter_mut().zip(&rated_months) {
+        if let Some(rated) = rated {
+            share.method = rated.method;
+            share.monthly_eer = rated.eer.to_vec();
+            share.en14825_coefficients = rated.coefficients.map(|values| values.to_vec());
+        }
+    }
+    let mut free_cold_by_generator = vec![[0.0; 12]; system.generators.len()];
+    for (index, row) in months.iter_mut().enumerate() {
+        let mut auxiliary = base_auxiliary[index];
         let mut machine_present = false;
+        let mut coverage: Option<(f64, f64)> = None;
         for (generator_index, generator) in system.generators.iter().enumerate() {
-            let cold = generator_share(generator, peak) * generator_cold;
+            let cold = generator_cold[generator_index][index];
             let rejection =
                 heat_rejection(&generator.generator).unwrap_or(HeatRejection::AirCooled);
             if !matches!(
@@ -1230,6 +2071,21 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                     | CoolingGeneratorKind::ExternalCold
             ) {
                 machine_present = true;
+            }
+            if let Some(rated) = &rated_months[generator_index] {
+                // 10.53/10.65.
+                if rated.eer[index] > 0.0 {
+                    row.electricity_kwh += cold / rated.eer[index];
+                }
+                // 10.80 with 10.82/10.83.
+                let rejected = cold * (1.0 + 1.0 / rated.rejection_eer[index]);
+                auxiliary += rejected * (rejection.distribution_power() + rated.fan_power);
+                if rated.method == 2 {
+                    let (delivered, required) = coverage.get_or_insert((0.0, 0.0));
+                    *delivered += rated.delivered[index];
+                    *required += cold;
+                }
+                continue;
             }
             match drive(&generator.generator) {
                 Drive::Electric(eer) => {
@@ -1280,7 +2136,14 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             auxiliary += CONTROL_POWER_KW * MONTH_HOURS[index];
         }
         row.auxiliary_electricity_kwh = auxiliary;
-        months.push(row);
+        // 10.72.
+        row.part_load_coverage = coverage.map(|(delivered, required)| {
+            if required > 0.0 {
+                (delivered / required).min(1.0)
+            } else {
+                1.0
+            }
+        });
     }
     // 10.84/10.85: regeneration surcharge for ground storage that feeds a
     // heat pump and receives less than 70 % of the extracted heat back.
@@ -1324,6 +2187,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         internal_temperature_shift_k: delta,
         generator_shares: shares,
         months,
+        interpretations: COOLING_INTERPRETATIONS.to_vec(),
         zone_booster_extraction_kwh: zone_booster,
     }
 }
@@ -1369,6 +2233,7 @@ mod tests {
         CoolingGeneratorKind::Compression {
             heat_rejection: None,
             declared: None,
+            performance: None,
         }
     }
 
@@ -1411,6 +2276,7 @@ mod tests {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
             ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
         }];
         let result = assess_cooling(&input, context(&zones));
         let july = &result.months[6];
@@ -1427,6 +2293,7 @@ mod tests {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
             ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
         }];
         let result = assess_cooling(&input, context(&zones));
         // Δϑ = −0,5 + 0 − 1,25 = −1,75; ϑ_int,inc = 22,25.
@@ -1472,6 +2339,7 @@ mod tests {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
             ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
         }];
         assert!(validate_cooling(&input, "cooling").is_empty());
         let result = assess_cooling(&input, context(&zones));
@@ -1516,6 +2384,7 @@ mod tests {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
             ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
         }];
         let result = assess_cooling(&input, context(&zones));
         let shares = &result.generator_shares;
@@ -1557,6 +2426,7 @@ mod tests {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
             ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
         }];
         let mut ctx = context(&zones);
         ctx.heat_pump_source_extraction_kwh = [500.0; 12];
@@ -1579,6 +2449,7 @@ mod tests {
                 value: 4.37,
                 source_reference: "quality statement".into(),
             }),
+            performance: None,
         };
         let Drive::Electric(eer) = drive(&declared) else {
             panic!("electric expected");
@@ -1623,11 +2494,13 @@ mod tests {
                 usable_floor_area_m2: 60.0,
                 need_kwh: summer_need(),
                 ahu_load_kwh: [0.0; 12],
+                limit_need_kwh: None,
             },
             CoolingZoneNeed {
                 usable_floor_area_m2: 40.0,
                 need_kwh: [0.0; 12],
                 ahu_load_kwh: [0.0; 12],
+                limit_need_kwh: None,
             },
         ];
         let result = assess_cooling(&input, context(&zones));
@@ -1668,5 +2541,301 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    fn rac(performance: CompressionPerformance) -> CoolingGeneratorKind {
+        CoolingGeneratorKind::RoomAirConditioner {
+            declared: None,
+            performance: Some(performance),
+        }
+    }
+
+    fn rated_zones() -> [CoolingZoneNeed; 1] {
+        [CoolingZoneNeed {
+            usable_floor_area_m2: 100.0,
+            need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
+        }]
+    }
+
+    #[test]
+    fn bin_tables_match_their_printed_totals() {
+        for month in 0..12 {
+            let sum: f64 = FT_BIN.iter().map(|row| row[month]).sum();
+            assert!((sum - FT_TOTAL[month]).abs() < 2.5e-4, "month {month}");
+        }
+        // Table 10.17: limit ≥ 25 has no demand below 26 °C.
+        assert_eq!(FQC_BIN[11][11], 0.0);
+        assert_eq!(FQC_BIN[18][11], 0.0144);
+    }
+
+    fn point(part_load: f64, condenser: f64, coefficients: [f64; 5], nominal: f64) -> En14825Point {
+        // 10.56 evaluated at the point gives EER/EER_n.
+        let x = part_load / 100.0;
+        let [c1, c2, c3, c4, delta] = coefficients;
+        let ratio = (T0_ABS + 7.0) / (condenser - 7.0 + x * delta)
+            * (c1 * x.powi(3) + c2 * x.powi(2) + c3 * x + c4);
+        En14825Point {
+            part_load_percent: part_load,
+            eer: ratio * nominal,
+            evaporator_outlet_c: 7.0,
+            condenser_inlet_c: condenser,
+        }
+    }
+
+    fn en14825(coefficients: [f64; 5], fifth: bool) -> En14825Performance {
+        En14825Performance {
+            nominal_eer: 4.0,
+            nominal_capacity_kw: 10.0,
+            minimum_capacity_kw: 2.0,
+            test_points: vec![
+                point(100.0, 35.0, coefficients, 4.0),
+                point(74.0, 30.0, coefficients, 4.0),
+                point(47.0, 25.0, coefficients, 4.0),
+                point(21.0, 20.0, coefficients, 4.0),
+            ],
+            fifth_point: fifth.then(|| point(47.0, 35.0, coefficients, 4.0)),
+            condenser_inlet_limit_c: None,
+            required_outlet_c: None,
+            source_reference: "EN 14825 report".into(),
+        }
+    }
+
+    #[test]
+    fn en14825_coefficients_solve_10_63() {
+        let truth = [0.2, -0.5, 0.3, 0.9, 3.0];
+        let solved = en14825_coefficients(&en14825(truth, true)).unwrap();
+        for (a, b) in solved.iter().zip(truth) {
+            assert!((a - b).abs() < 1e-8, "{solved:?}");
+        }
+        // Without the fifth point: 10.64 with Δϑ_corr = 0.
+        let truth = [0.1, -0.2, 0.15, 0.95, 0.0];
+        let solved = en14825_coefficients(&en14825(truth, false)).unwrap();
+        for (a, b) in solved.iter().zip(truth) {
+            assert!((a - b).abs() < 1e-8, "{solved:?}");
+        }
+        // Four identical points are singular.
+        let mut singular = en14825(truth, false);
+        let first = singular.test_points[0];
+        singular.test_points = vec![first; 4];
+        assert!(en14825_coefficients(&singular).is_none());
+    }
+
+    #[test]
+    fn en14825_monthly_factor_follows_10_55_to_10_62() {
+        let mut performance = en14825([0.0; 5], false);
+        performance.condenser_inlet_limit_c = Some(40.0);
+        // C4 only: f_EER;bn = (273,16 + 1)/(40 − 1)·0,05 in every bin.
+        let constant = 274.16 / 39.0 * 0.05;
+        let factors = en14825_monthly_factor(
+            &performance,
+            &[0.0, 0.0, 0.0, 0.05, 0.0],
+            1.0,
+            18.0,
+            0.0,
+            1.0,
+        );
+        // April: Σ f_t;bn = 0,7432 against the printed total 0,7431.
+        assert!((factors[3] - 0.7432 / 0.7431 * constant).abs() < 1e-12);
+        // January has no bins: the 14 °C bin.
+        assert!((factors[0] - constant).abs() < 1e-12);
+        // C3 only: without demand the minimum part load (20 %) applies
+        // (10.57); in July Σ f_t;bn equals the printed 0,7583.
+        let factors = en14825_monthly_factor(
+            &performance,
+            &[0.0, 0.0, 1.0, 0.0, 0.0],
+            1.0,
+            18.0,
+            0.0,
+            1.0,
+        );
+        assert!((factors[6] - 274.16 / 39.0 * 0.2).abs() < 1e-12);
+        // 10.60/10.58: 10 000 kWh, limit 18 °C, bin 25 °C: 15 kW → 150 %.
+        let bin = en14825_bin_factor(&[0.0, 0.0, 1.0, 0.0, 0.0], 150.0, 20.0, 1.0, 40.0);
+        assert!((bin - 274.16 / 39.0 * 1.5).abs() < 1e-12);
+        let net = 10_000.0 * FQC_BIN[11][4];
+        assert!((net - 15.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn method_1_room_unit_uses_en14825_eer() {
+        let truth = [0.1, -0.2, 0.15, 0.95, 0.0];
+        let performance = en14825(truth, false);
+        let input = system(vec![generator(
+            rac(CompressionPerformance::En14825(performance.clone())),
+            None,
+        )]);
+        assert!(validate_cooling(&input, "cooling").is_empty());
+        let zones = rated_zones();
+        let result = assess_cooling(&input, context(&zones));
+        assert_eq!(result.generator_shares[0].method, 1);
+        let coefficients = en14825_coefficients(&performance).unwrap();
+        let annual: f64 = result.months.iter().map(|row| row.generator_cold_kwh).sum();
+        // 10.61: 24 °C in the room minus Δϑ_evap 20 K.
+        let factors = en14825_monthly_factor(
+            &performance,
+            &coefficients,
+            4.0,
+            result.cooling_limit_c,
+            annual,
+            1.0,
+        );
+        let july = &result.months[6];
+        let eer = 4.0 * factors[6] * 0.9;
+        assert!((july.electricity_kwh - july.generator_cold_kwh / eer).abs() < 1e-9);
+        assert!((result.generator_shares[0].monthly_eer[6] - eer).abs() < 1e-12);
+        // Direct condensation: no condenser auxiliaries, control only.
+        assert!((july.auxiliary_electricity_kwh - 7.44).abs() < 1e-9);
+    }
+
+    #[test]
+    fn method_2_room_unit_follows_10_65_to_10_74() {
+        let input = system(vec![generator(
+            rac(CompressionPerformance::En14511(En14511Performance {
+                nominal_eer: 4.0,
+                nominal_capacity_kw: 2.0,
+                nominal_evaporator_outlet_c: 24.0,
+                nominal_condenser_inlet_c: 35.0,
+                room_unit_type: Some(RoomUnitType::SplitInverter),
+                heat_rejection_to_exhaust_air: false,
+                axial_fans_without_silencer: false,
+                required_outlet_c: None,
+                source_reference: "EN 14511 datasheet".into(),
+            })),
+            None,
+        )]);
+        assert!(validate_cooling(&input, "cooling").is_empty());
+        let zones = rated_zones();
+        let result = assess_cooling(&input, context(&zones));
+        let july = &result.months[6];
+        let column = limit_column_from_15(result.cooling_limit_c);
+        let reference = THETA_E_KG[6][column];
+        // 10.73 with ϑ_req;out = 24 °C, Δϑ_evap 20 K, Δϑ_cond 10 K:
+        // both cold sides are 277,16 K, so f = (35 + 6)/(ϑ_e;kg + 6).
+        let correction = 41.0 / (reference + 6.0);
+        // 10.68/10.69 with table 10.19 row C.
+        let part_load = july.generator_cold_kwh / (july.operating_hours * 2.0);
+        let row = [1.52, 1.54, 1.57, 1.69, 1.45, 1.31, 1.21, 1.09, 1.03, 0.95];
+        let plv = if part_load < 0.05 {
+            1.0
+        } else {
+            row[((part_load * 10.0 + 0.5).floor() as usize).clamp(1, 10) - 1]
+        };
+        // §10.5.5.1: f_prpr 0,60 for direct condensation.
+        let eer = plv * 4.0 * correction * 0.60;
+        assert!((july.electricity_kwh - july.generator_cold_kwh / eer).abs() < 1e-9);
+        let coverage = (july.operating_hours * 2.0 / july.generator_cold_kwh).min(1.0);
+        assert!((july.part_load_coverage.unwrap() - coverage).abs() < 1e-12);
+        assert_eq!(result.generator_shares[0].method, 2);
+    }
+
+    #[test]
+    fn method_2_water_cooled_chiller_adds_condenser_auxiliaries() {
+        let input = system(vec![generator(
+            CoolingGeneratorKind::Compression {
+                heat_rejection: Some(HeatRejection::OpenCoolingTower),
+                declared: None,
+                performance: Some(CompressionPerformance::En14511(En14511Performance {
+                    nominal_eer: 5.0,
+                    nominal_capacity_kw: 50.0,
+                    nominal_evaporator_outlet_c: 7.0,
+                    nominal_condenser_inlet_c: 30.0,
+                    room_unit_type: None,
+                    heat_rejection_to_exhaust_air: false,
+                    axial_fans_without_silencer: false,
+                    required_outlet_c: None,
+                    source_reference: "EN 14511 datasheet".into(),
+                })),
+            },
+            None,
+        )]);
+        assert!(validate_cooling(&input, "cooling").is_empty());
+        let zones = rated_zones();
+        let result = assess_cooling(&input, context(&zones));
+        let july = &result.months[6];
+        let column = limit_column_from_15(result.cooling_limit_c);
+        // Table 10.26: wet cooling tower ϑ_wb + 6; ϑ_req;out 6 °C without
+        // distribution; Δϑ_evap 6 K, Δϑ_cond 4 K.
+        let reference = THETA_WET_BULB[6][column] + 6.0;
+        let carnot = |outlet: f64, inlet: f64| (T0_ABS + outlet - 6.0) / (inlet + 10.0 - outlet);
+        let correction = carnot(6.0, reference) / carnot(7.0, 30.0);
+        let part_load = july.generator_cold_kwh / (july.operating_hours * 50.0);
+        let row = [0.96, 0.94, 0.92, 0.90, 0.90, 0.90, 0.92, 0.94, 0.96, 1.00];
+        let plv = if part_load < 0.05 {
+            1.0
+        } else {
+            row[((part_load * 10.0 + 0.5).floor() as usize).clamp(1, 10) - 1]
+        };
+        let cold = july.generator_cold_kwh;
+        let eer = plv * 5.0 * correction * 0.9;
+        assert!((july.electricity_kwh - cold / eer).abs() < 1e-9);
+        // 10.80 without f_prpr; 10.83 open system 0,018; 10.82 table 10.31
+        // open circuit with silencer 0,040; control 7,44 kWh.
+        let rejected = cold * (1.0 + 1.0 / (plv * 5.0 * correction));
+        let auxiliary = 7.44 + rejected * (0.018 + 0.040);
+        assert!((july.auxiliary_electricity_kwh - auxiliary).abs() < 1e-9);
+    }
+
+    #[test]
+    fn rated_generators_are_validated() {
+        let rated = CompressionPerformance::En14511(En14511Performance {
+            nominal_eer: 4.0,
+            nominal_capacity_kw: 2.0,
+            nominal_evaporator_outlet_c: 24.0,
+            nominal_condenser_inlet_c: 35.0,
+            room_unit_type: None,
+            heat_rejection_to_exhaust_air: true,
+            axial_fans_without_silencer: false,
+            required_outlet_c: None,
+            source_reference: String::new(),
+        });
+        let input = system(vec![
+            generator(rac(rated), None),
+            generator(
+                CoolingGeneratorKind::Compression {
+                    heat_rejection: Some(HeatRejection::DryCooler),
+                    declared: Some(DeclaredEfficiency {
+                        value: 4.0,
+                        source_reference: "statement".into(),
+                    }),
+                    performance: Some(CompressionPerformance::En14825(en14825(
+                        [0.1, -0.2, 0.15, 0.95, 0.0],
+                        false,
+                    ))),
+                },
+                None,
+            ),
+        ]);
+        let codes: Vec<_> = validate_cooling(&input, "cooling")
+            .into_iter()
+            .map(|item| item.code)
+            .collect();
+        for code in [
+            "cooling_room_unit_type_required",
+            "cooling_heat_rejection_inconsistent",
+            "source_reference_required",
+            "cooling_declared_and_performance",
+            "cooling_en14825_direct_condensation_only",
+        ] {
+            assert!(codes.contains(&code), "{code} missing in {codes:?}");
+        }
+    }
+
+    #[test]
+    fn cooling_limit_uses_the_10_19_need() {
+        let input = system(vec![generator(compression(), None)]);
+        let plain = assess_cooling(&input, context(&rated_zones()));
+        let mut zones = rated_zones();
+        // A need that only starts above 20 °C moves the limit up.
+        zones[0].limit_need_kwh = Some(std::array::from_fn(|index| {
+            (40.0 * (OUTDOOR_TEMPERATURE_C[index] - 15.5)).max(0.0)
+        }));
+        let shifted = assess_cooling(&input, context(&zones));
+        assert_ne!(plain.cooling_limit_c, shifted.cooling_limit_c);
+        assert_eq!(
+            shifted.cooling_limit_c,
+            cooling_limit_c(&zones[0].limit_need_kwh.unwrap())
+        );
     }
 }

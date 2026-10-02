@@ -1007,6 +1007,9 @@ pub struct VentilationMonthResult {
     pub grille_preheating_electricity_kwh: f64,
     /// 9.29 Q_H;ϑHstook;in;air of the heating balance, kWh.
     pub heating_limit_air_kwh: f64,
+    /// 10.20 Q_C;ϑkoelgrens;in;air of the cooling balance, kWh: the extra
+    /// ventilation transfer for the cooling limit (10.19).
+    pub cooling_limit_air_kwh: f64,
     /// Q_H;AHU;in;req (11.120) of the heating balance, kWh, for the
     /// space-heating node (9.4).
     pub ahu_heating_kwh: f64,
@@ -2332,6 +2335,8 @@ fn mechanical_supply_temperature(
         dis_out_c: formula_out + coil_k,
         defrost_k: defrost,
         heating_limit_c: oda_preh - duct_outside,
+        // 10.20 as printed: θ_SUP;dis;out − Δθ_hr − Δθ_rca + Δθ_fan.
+        cooling_limit_c: formula_out + coil_k - recovery_rise - recirculation_rise + fan_rise,
         before_coil_c: dis_in - fan_rise,
         coil_k,
         // 11.115/11.119: from ϑ_SUP;RCA or ϑ_SUP;hu (without the fan rise)
@@ -2349,6 +2354,8 @@ struct SupplyTemperature {
     dis_out_c: f64,
     defrost_k: f64,
     heating_limit_c: f64,
+    /// Supply temperature of 10.20 for the cooling limit, °C.
+    cooling_limit_c: f64,
     /// ϑ_SUP;hu or ϑ_SUP;RCA: before the coil and the fan, °C.
     before_coil_c: f64,
     /// Change of ϑ_SUP;dis;out by the AHU coil, K (positive heating).
@@ -2526,6 +2533,7 @@ struct MonthBalance {
     frost_protection_kwh: f64,
     grille_preheating_kwh: f64,
     heating_limit_air_kwh: f64,
+    cooling_limit_air_kwh: f64,
     ahu_heating_kwh: f64,
     ahu_cooling_kwh: f64,
     outdoor_air_fraction: Option<f64>,
@@ -2654,6 +2662,7 @@ fn balance_month(
     let mut supply_flows = Vec::new();
     let mut frost_protection_kwh = 0.0;
     let mut heating_limit_air_kwh = 0.0;
+    let mut cooling_limit_air_kwh = 0.0;
     let mut ahu_heating_kwh = 0.0;
     let mut ahu_cooling_kwh = 0.0;
     for (index, q_supply, unit) in &supply_parts {
@@ -2683,6 +2692,9 @@ fn balance_month(
         let dis_out = oda_eff / (flea_du * flea_ahu);
         heating_limit_air_kwh +=
             dis_out * 1.205 * 1005.0 / 3600.0 * (limit_temperature - outdoor) * hours / 1000.0;
+        // 10.20 with q_V;SUP;dis;out.
+        cooling_limit_air_kwh +=
+            dis_out * 1.205 * 1005.0 / 3600.0 * (supply.cooling_limit_c - outdoor) * hours / 1000.0;
     }
 
     // Mass balance per airflow zone.
@@ -2822,6 +2834,11 @@ fn balance_month(
         grille_preheating_kwh,
         heating_limit_air_kwh: if balance == Balance::Heating {
             heating_limit_air_kwh
+        } else {
+            0.0
+        },
+        cooling_limit_air_kwh: if balance == Balance::Cooling {
+            cooling_limit_air_kwh
         } else {
             0.0
         },
@@ -3018,6 +3035,7 @@ fn calculate_with_policy(
             frost_protection_electricity_kwh: heating.frost_protection_kwh,
             grille_preheating_electricity_kwh: heating.grille_preheating_kwh,
             heating_limit_air_kwh: heating.heating_limit_air_kwh,
+            cooling_limit_air_kwh: cooling.cooling_limit_air_kwh,
             ahu_heating_kwh: heating.ahu_heating_kwh,
             ahu_cooling_kwh: cooling.ahu_cooling_kwh,
             outdoor_air_fraction: heating.outdoor_air_fraction,
@@ -3421,6 +3439,13 @@ mod tests {
         close(
             result.months[6].cooling.mechanical_supply_temperature_c,
             18.05 + 0.4,
+            1e-9,
+        );
+        // 10.20 as printed: (ϑ_SUP;dis;out − 0 − 0 + 0,4) − ϑ_e = 0,8 K.
+        let q = result.months[6].cooling.mechanical_supply_m3_per_h;
+        close(
+            result.months[6].cooling_limit_air_kwh,
+            q * 1.205 * 1005.0 / 3600.0 * 0.8 * 744.0 / 1000.0,
             1e-9,
         );
         // Frost protection 11.105/11.106 in January.

@@ -1618,6 +1618,18 @@ pub fn heating_need_with_extra_transfer(terms: &BalanceTerms, extra_kwh: f64) ->
     (transfer - eta * terms.gains_kwh).max(0.0)
 }
 
+/// 7.6/7.7 with `extra_kwh` added to Q_C;ht, the gains, `a` and `a_C;red`
+/// unchanged (10.19/10.20), without recoverable losses.
+pub fn cooling_need_with_extra_transfer(terms: &BalanceTerms, extra_kwh: f64) -> f64 {
+    let transfer = terms.heat_transfer_kwh + extra_kwh;
+    let gamma = (transfer != 0.0).then(|| terms.gains_kwh / transfer);
+    if terms.gains_kwh <= 0.0 || gamma.is_some_and(|gamma| gamma > 0.0 && 1.0 / gamma > 2.0) {
+        return 0.0;
+    }
+    let eta = gamma.map_or(1.0, |gamma| cooling_utilization(gamma, terms.a));
+    (terms.reduction_factor * (terms.gains_kwh - eta * transfer)).max(0.0)
+}
+
 /// Absorbing opaque surface inside an adjacent unheated sunroom (7.34).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -2268,6 +2280,26 @@ mod tests {
             "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
             "sourceReference": "synthetic"
         })
+    }
+
+    #[test]
+    fn cooling_need_with_extra_transfer_follows_7_6_and_10_19() {
+        let result = valid(&sample());
+        for row in &result.monthly {
+            let terms = &row.cooling;
+            let plain = cooling_need_with_extra_transfer(terms, 0.0);
+            assert!((plain - terms.need_kwh).abs() < 1e-9);
+            // A larger transfer never raises the cooling need.
+            assert!(cooling_need_with_extra_transfer(terms, 50.0) <= plain + 1e-9);
+        }
+        let july = &result.monthly[6].cooling;
+        if july.need_kwh > 0.0 {
+            let extra = 30.0;
+            let transfer = july.heat_transfer_kwh + extra;
+            let eta = cooling_utilization(july.gains_kwh / transfer, july.a);
+            let expected = (july.reduction_factor * (july.gains_kwh - eta * transfer)).max(0.0);
+            assert!((cooling_need_with_extra_transfer(july, extra) - expected).abs() < 1e-9);
+        }
     }
 
     #[test]

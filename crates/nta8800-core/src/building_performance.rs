@@ -602,6 +602,19 @@ fn cooling_assessment(
                     .and_then(|result| result.months.get(index))
                     .map_or(0.0, |month| month.ahu_cooling_kwh)
             }),
+            // 10.19/10.20: without recoverable losses, with the supply-air
+            // term of chapter 11.
+            limit_need_kwh: Some(std::array::from_fn(|index| {
+                let extra = demand
+                    .ventilation
+                    .as_ref()
+                    .and_then(|result| result.months.get(index))
+                    .map_or(0.0, |month| month.cooling_limit_air_kwh);
+                crate::monthly_demand::cooling_need_with_extra_transfer(
+                    &demand.monthly[index].cooling,
+                    extra,
+                )
+            })),
         })
         .collect();
     // 10.84: heat taken from the source by the space-heating heat pump.
