@@ -7,6 +7,8 @@ import {
   type MaatwerkadviesAssessment,
   type MwaMeasure,
   type MwaMeasureCategory,
+  type MwaMeasuredUse,
+  type MwaRenovationPassportInput,
   type MwaPackage,
   type MwaUserProfile,
   type MwaVariantResult,
@@ -36,6 +38,21 @@ function format(value: number | null | undefined, digits = 0): string {
   return value == null || !Number.isFinite(value)
     ? '–'
     : value.toLocaleString('nl-NL', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+/** Monthly values separated by `;` or new lines (decimal comma allowed); `-` or empty is `null`. */
+export function parseMonthly(text: string): Array<number | null> | undefined {
+  if (!text.trim()) return undefined;
+  return text.split(/[;\n]/).map((part) => {
+    const value = part.trim();
+    if (value === '' || value === '-') return null;
+    const parsed = Number(value.replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : null;
+  });
+}
+
+function showMonthly(values: Array<number | null> | undefined): string {
+  return values ? values.map((value) => (value == null ? '-' : String(value))).join('; ') : '';
 }
 
 function nextId(prefix: string, taken: string[]): string {
@@ -154,6 +171,14 @@ export function MaatwerkadviesPanel() {
   }
 
   const use = definition.currentUse ?? { profile: 'nta' as MwaUserProfile, sourceReference: '' };
+  const measuredUse: MwaMeasuredUse = definition.measured ?? {};
+  const setMeasured = (patch: Partial<MwaMeasuredUse>) => update({ ...definition, measured: { ...measuredUse, ...patch } });
+  const passport = definition.renovationPassport;
+  const setPassport = (patch: Partial<MwaRenovationPassportInput>) => {
+    if (passport) update({ ...definition, renovationPassport: { ...passport, ...patch } });
+  };
+  const verdictText = (value: boolean | null | undefined) =>
+    value == null ? t('mwa.verdict.unknown') : value ? t('mwa.verdict.pass') : t('mwa.verdict.fail');
   const setMeasure = (index: number, measure: MwaMeasure) =>
     update({ ...definition, measures: definition.measures.map((item, i) => (i === index ? measure : item)) });
   const removeMeasure = (index: number) => {
@@ -217,6 +242,14 @@ export function MaatwerkadviesPanel() {
             <input type="number" value={use.heatingSetpointC ?? ''}
               onChange={(e) => update({ ...definition, currentUse: { ...use, heatingSetpointC: e.target.value === '' ? undefined : Number(e.target.value) } })} />
           </label>
+          <label>{t('mwa.persons')}
+            <input type="number" value={use.persons ?? ''}
+              onChange={(e) => update({ ...definition, currentUse: { ...use, persons: e.target.value === '' ? undefined : Number(e.target.value) } })} />
+          </label>
+          <label>{t('mwa.lightingHours')}
+            <input type="number" step="0.05" value={use.lightingHoursFactor ?? ''}
+              onChange={(e) => update({ ...definition, currentUse: { ...use, lightingHoursFactor: e.target.value === '' ? undefined : Number(e.target.value) } })} />
+          </label>
           <label className="mwa-wide">{t('mwa.source')}
             <input value={use.sourceReference} onChange={(e) => update({ ...definition, currentUse: { ...use, sourceReference: e.target.value } })} />
           </label>
@@ -249,6 +282,43 @@ export function MaatwerkadviesPanel() {
           <label className="mwa-wide">{t('mwa.source')}
             <input value={definition.tariffs.sourceReference}
               onChange={(e) => update({ ...definition, tariffs: { ...definition.tariffs, sourceReference: e.target.value } })} />
+          </label>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('mwa.measured')}</summary>
+        <div className="mwa-grid">
+          <label>{t('mwa.measured.gas')}
+            <input type="number" value={measuredUse.annualGasM3 ?? ''}
+              onChange={(e) => setMeasured({ annualGasM3: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <label>{t('mwa.measured.electricity')}
+            <input type="number" value={measuredUse.annualElectricityKwh ?? ''}
+              onChange={(e) => setMeasured({ annualElectricityKwh: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <label>{t('mwa.measured.heat')}
+            <input type="number" value={measuredUse.annualHeatKwh ?? ''}
+              onChange={(e) => setMeasured({ annualHeatKwh: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <label className="mwa-wide">{t('mwa.measured.monthlyGas')}
+            <input defaultValue={showMonthly(measuredUse.monthlyGasM3)}
+              onBlur={(e) => setMeasured({ monthlyGasM3: parseMonthly(e.target.value) })} />
+          </label>
+          <label className="mwa-wide">{t('mwa.measured.monthlyElectricity')}
+            <input defaultValue={showMonthly(measuredUse.monthlyElectricityKwh)}
+              onBlur={(e) => setMeasured({ monthlyElectricityKwh: parseMonthly(e.target.value) })} />
+          </label>
+          <label className="mwa-wide">{t('mwa.measured.monthlyHeat')}
+            <input defaultValue={showMonthly(measuredUse.monthlyHeatKwh)}
+              onBlur={(e) => setMeasured({ monthlyHeatKwh: parseMonthly(e.target.value) })} />
+          </label>
+          <label className="mwa-wide">{t('mwa.measured.temperature')}
+            <input defaultValue={showMonthly(measuredUse.monthlyOutdoorTemperatureC)}
+              onBlur={(e) => setMeasured({ monthlyOutdoorTemperatureC: parseMonthly(e.target.value) })} />
+          </label>
+          <label className="mwa-wide">{t('mwa.source')}
+            <input value={measuredUse.sourceReference ?? ''} onChange={(e) => setMeasured({ sourceReference: e.target.value })} />
           </label>
         </div>
       </details>
@@ -302,6 +372,62 @@ export function MaatwerkadviesPanel() {
         </label>
       </details>
 
+      <details>
+        <summary>{t('mwa.passport')}</summary>
+        <label className="mwa-check">
+          <input type="checkbox" checked={definition.renovationPassport != null}
+            onChange={(e) => update({
+              ...definition,
+              renovationPassport: e.target.checked
+                ? { demandPackageId: '', systemsPackageId: '', productionPackageId: '', overheatingMeasureIds: [] }
+                : undefined,
+            })} />
+          {t('mwa.passport.enable')}
+        </label>
+        {passport && <div className="mwa-grid">
+          {(['demandPackageId', 'systemsPackageId', 'productionPackageId'] as const).map((key) => (
+            <label key={key}>{t(`mwa.passport.${key}`)}
+              <select value={passport[key]} onChange={(e) => setPassport({ [key]: e.target.value })}>
+                <option value="">–</option>
+                {definition.packages.map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}
+              </select>
+            </label>
+          ))}
+          <label className="mwa-check">
+            <input type="checkbox" checked={passport.insulationStandardMet ?? false}
+              onChange={(e) => setPassport({ insulationStandardMet: e.target.checked })} />
+            {t('mwa.passport.insulationStandard')}
+          </label>
+          <label className="mwa-check">
+            <input type="checkbox" checked={passport.prewarStandard ?? false}
+              onChange={(e) => setPassport({ prewarStandard: e.target.checked })} />
+            {t('mwa.passport.prewar')}
+          </label>
+          {passport.prewarStandard && <label className="mwa-wide">{t('mwa.passport.prewarMotivation')}
+            <input value={passport.prewarMotivation ?? ''} onChange={(e) => setPassport({ prewarMotivation: e.target.value })} />
+          </label>}
+          <label className="mwa-check">
+            <input type="checkbox" checked={passport.storageConsidered ?? false}
+              onChange={(e) => setPassport({ storageConsidered: e.target.checked })} />
+            {t('mwa.passport.storage')}
+          </label>
+          <div className="mwa-wide mwa-checks">
+            <em>{t('mwa.passport.overheating')}</em>
+            {definition.measures.map((measure) => (
+              <label key={measure.id} className="mwa-check">
+                <input type="checkbox" checked={(passport.overheatingMeasureIds ?? []).includes(measure.id)}
+                  onChange={(e) => setPassport({
+                    overheatingMeasureIds: e.target.checked
+                      ? [...(passport.overheatingMeasureIds ?? []), measure.id]
+                      : (passport.overheatingMeasureIds ?? []).filter((id) => id !== measure.id),
+                  })} />
+                {measure.name || measure.id}
+              </label>
+            ))}
+          </div>
+        </div>}
+      </details>
+
       <div className="nta-performance-actions mwa-actions">
         <button type="button" onClick={calculate} disabled={busy}>{busy ? t('mwa.calculating') : t('mwa.calculate')}</button>
         <button type="button" onClick={() => { void downloadMaatwerkadviesReportHTML(project).catch((reason: unknown) => setError(String(reason))); }}>
@@ -338,6 +464,22 @@ export function MaatwerkadviesPanel() {
               <strong>{t('mwa.advice')}: {chosen?.name ?? '–'} ({advice.chosenBy === 'adviser' ? t('mwa.advised.adviser') : t('mwa.advised.automatic')})</strong>
               {advice.warnings.length > 0 && <><em>{t('mwa.warnings')}</em><ul>{advice.warnings.map((item) => <li key={item}>{item}</li>)}</ul></>}
               {advice.specialistNotes.length > 0 && <><em>{t('mwa.specialist')}</em><ul>{advice.specialistNotes.map((item) => <li key={item}>{item}</li>)}</ul></>}
+              {chosen && chosen.systemChecks.some((check) => check.limit != null) && <><em>{t('mwa.systemChecks')}</em><ul>
+                {chosen.systemChecks.filter((check) => check.limit != null).map((check) => (
+                  <li key={check.system}>{t(`mwa.system.${check.system}`)}: {format(check.value, 2)} / {format(check.limit, 2)} {check.unit} — {verdictText(check.meets)}</li>
+                ))}
+              </ul></>}
+            </div>
+          )}
+          {assessment.fitCheck && (
+            <p className="mwa-fit">{t('mwa.fitCriteria')}: <strong>{verdictText(assessment.fitCheck.criteria.withinCriteria)}</strong></p>
+          )}
+          {assessment.renovationPassport && (
+            <div className="nta-performance-bbl">
+              <strong>{t('mwa.passport')}: {verdictText(assessment.renovationPassport.eligible)}</strong>
+              <ul>{assessment.renovationPassport.requirements.map((item) => (
+                <li key={item.code}>{t(`mwa.passport.req.${item.code}`)}: {verdictText(item.met)}</li>
+              ))}</ul>
             </div>
           )}
         </div>

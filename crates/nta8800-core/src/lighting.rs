@@ -359,6 +359,11 @@ pub struct ZoneLighting {
     pub functions: Vec<UseArea>,
     pub lighting_zones: Vec<LightingZone>,
     pub source_reference: String,
+    /// Maatwerkadvies only (ISSO 75.2 table 2.7): factor on the table 14.1
+    /// burning hours t_D and t_N (0,8 energy-conscious, 1,2 not
+    /// energy-conscious). Never set for the energy label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub burning_hours_factor: Option<f64>,
 }
 
 /// Building data for the forfait daylight method (14.44).
@@ -421,6 +426,15 @@ pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> 
             path: format!("{path}.{field}"),
         })
     };
+    if zone
+        .burning_hours_factor
+        .is_some_and(|factor| !factor.is_finite() || factor <= 0.0)
+    {
+        push(
+            "lighting_burning_hours_factor_invalid",
+            "burningHoursFactor".into(),
+        );
+    }
     let tolerance = 1e-6 * zone_area_m2.max(1.0);
     let function_area: f64 = zone.functions.iter().map(|item| item.area_m2).sum();
     if zone.functions.is_empty()
@@ -703,8 +717,9 @@ fn sector_geometry(sector: &DaylightSector) -> Option<(f64, f64)> {
 
 /// Annual lighting per calculation zone; call after [`validate_lighting`].
 pub fn assess_zone_lighting(zone: &ZoneLighting, context: LightingContext) -> ZoneLightingResult {
-    let t_day = weighted(&zone.functions, |function| burning_hours(function).0);
-    let t_night = weighted(&zone.functions, |function| burning_hours(function).1);
+    let hours_factor = zone.burning_hours_factor.unwrap_or(1.0);
+    let t_day = weighted(&zone.functions, |function| burning_hours(function).0) * hours_factor;
+    let t_night = weighted(&zone.functions, |function| burning_hours(function).1) * hours_factor;
     let absence_day = weighted(&zone.functions, |function| absence_factors(function).0);
     let absence_night = weighted(&zone.functions, |function| absence_factors(function).1);
     let mut lighting_zones = Vec::with_capacity(zone.lighting_zones.len());
@@ -838,6 +853,7 @@ mod tests {
             }],
             lighting_zones,
             source_reference: "lighting plan".into(),
+            burning_hours_factor: None,
         }
     }
 
@@ -859,6 +875,23 @@ mod tests {
             },
             extracted_luminaires: false,
         }
+    }
+
+    #[test]
+    fn maatwerkadvies_burning_hours_factor_scales_t_d_and_t_n() {
+        let zone = office(vec![forfait_zone(200.0)]);
+        let base = assess_zone_lighting(&zone, context());
+        let mut busy = zone.clone();
+        busy.burning_hours_factor = Some(1.2);
+        assert!(validate_lighting(&busy, 200.0, "lighting").is_empty());
+        let result = assess_zone_lighting(&busy, context());
+        let (a, b) = (&base.lighting_zones[0], &result.lighting_zones[0]);
+        assert!((b.lighting_kwh - 1.2 * a.lighting_kwh).abs() < 1e-9);
+        assert!((b.parasitic_kwh - a.parasitic_kwh).abs() < 1e-9);
+        busy.burning_hours_factor = Some(0.0);
+        assert!(validate_lighting(&busy, 200.0, "lighting")
+            .iter()
+            .any(|item| item.code == "lighting_burning_hours_factor_invalid"));
     }
 
     #[test]

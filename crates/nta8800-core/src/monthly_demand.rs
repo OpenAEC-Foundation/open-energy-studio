@@ -467,7 +467,13 @@ impl LightingRecovery {
 impl UsageFunction {
     /// Tables 7.2 and 7.3: q_Oc·f_τ + q_A, W/m².
     pub fn occupancy_and_appliance_flux_w_per_m2(self) -> f64 {
-        let (q_oc, f_tau, q_a) = match self {
+        let (q_oc, f_tau, q_a) = self.occupancy_table();
+        q_oc * f_tau + q_a
+    }
+
+    /// Tables 7.2 and 7.3: (q_Oc W/m², f_τ, q_A W/m²).
+    pub fn occupancy_table(self) -> (f64, f64, f64) {
+        match self {
             Self::AssemblyChildCare => (10.0, 0.30, 1.0),
             Self::OtherAssembly => (10.0, 0.15, 1.0),
             Self::Cell => (3.0, 0.80, 2.0),
@@ -479,8 +485,7 @@ impl UsageFunction {
             Self::Sport => (3.0, 0.30, 1.0),
             Self::Retail => (3.0, 0.40, 3.0),
             Self::Residential => (0.0, 0.0, 0.0),
-        };
-        q_oc * f_tau + q_a
+        }
     }
 
     /// §5.4.2: fixed lighting flux q_L for the BENG 1 run, W/m².
@@ -1841,6 +1846,26 @@ pub fn sunroom_gains_kwh(input: &MonthlyDemandInput, month_index: usize, balance
             (1.0 - room.reduction_factor) * room.distribution_factor * cap * gains
         })
         .sum()
+}
+
+/// Area-weighted (f_τ, q_A) of tables 7.2/7.3 for a zone (§6.5.3).
+pub fn occupancy_time_and_appliances(input: &MonthlyDemandInput) -> (f64, f64) {
+    if input.function_areas.is_empty() {
+        let (_, f_tau, q_a) = input.usage_function.occupancy_table();
+        return (f_tau, q_a);
+    }
+    let total: f64 = input.function_areas.iter().map(|part| part.area_m2).sum();
+    if total <= 0.0 {
+        return (0.0, 0.0);
+    }
+    input
+        .function_areas
+        .iter()
+        .fold((0.0, 0.0), |(f_tau, q_a), part| {
+            let (_, f, q) = part.function.occupancy_table();
+            let share = part.area_m2 / total;
+            (f_tau + share * f, q_a + share * q)
+        })
 }
 
 /// Monthly internal gains Q_int (7.21–7.29), kWh; `month_index` 0–11.

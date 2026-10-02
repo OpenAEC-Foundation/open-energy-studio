@@ -3646,8 +3646,18 @@ export interface MwaUsageProfile {
   occupancyApplianceWPerM2?: number;
   hotWaterNeedPerPersonKwh?: number;
   annualHotWaterNeedKwh?: number;
-  /** ISSO 82.2 table 2.7 / 75.2 table 2.8; omitted fields take the standard values (A 0,25, C 0,5, D 0,75; purge and infiltration 0,5). */
+  /** ISSO 82.2 table 2.7 / 75.2 table 2.8; standard values for the standard profiles (A 0,25, C 0,5, D 0,75; purge and infiltration 0,5), none under `nta` unless entered. */
   ventilationPractice?: { system?: number; purge?: number; leakage?: number };
+  /** Utility (75.2 table 2.6): N_p of the building, split over the zones by area. */
+  persons?: number;
+  /** Utility: q_oc;p;usi in W per person (standard 80). */
+  heatPerPersonW?: number;
+  /** Utility: occupancy time fraction f_t (standard NTA table 7.2). */
+  occupancyTimeFraction?: number;
+  /** Utility: q_A in W/m² (standard NTA table 7.3). */
+  applianceWPerM2?: number;
+  /** Utility (75.2 table 2.7): factor on the table 14.1 burning hours (0,8 / 1,0 / 1,2 by profile). */
+  lightingHoursFactor?: number;
   sourceReference: string;
 }
 
@@ -3699,6 +3709,10 @@ export interface MwaEconomics {
   discountRate?: number;
   energyPriceChange?: number;
   horizonYears?: number;
+  /** Calendar year of t = 0; with it a measure's phaseYear delays its investment in the NCW. */
+  baseYear?: number;
+  /** Annual change of maintenance costs (fraction). */
+  maintenancePriceChange?: number;
   sourceReference?: string;
 }
 
@@ -3707,7 +3721,25 @@ export interface MwaMeasuredUse {
   annualElectricityKwh?: number;
   annualHeatKwh?: number;
   monthlyGasM3?: Array<number | null>;
+  /** Net monthly electricity on the main meter (delivered minus exported), kWh. */
+  monthlyElectricityKwh?: Array<number | null>;
+  monthlyHeatKwh?: Array<number | null>;
+  /** Local monthly mean outdoor temperature of the metered period, °C. */
+  monthlyOutdoorTemperatureC?: Array<number | null>;
   sourceReference?: string;
+}
+
+/** ISSO 82.2 §1.10.2 / §4.4: the three stacked steps of a renovation passport. */
+export interface MwaRenovationPassportInput {
+  demandPackageId: string;
+  systemsPackageId: string;
+  productionPackageId: string;
+  prewarStandard?: boolean;
+  prewarMotivation?: string;
+  insulationStandardMet?: boolean;
+  insulationStandardMaxNeedKwhPerM2?: number;
+  overheatingMeasureIds?: string[];
+  storageConsidered?: boolean;
 }
 
 /** The maatwerkadvies definition stored with a project (the base is the project itself). */
@@ -3722,6 +3754,7 @@ export interface NtaMaatwerkadvies {
   advisedPackageId?: string;
   adviceMotivation?: string;
   notes?: Array<{ text: string; packageId?: string }>;
+  renovationPassport?: MwaRenovationPassportInput;
 }
 
 export interface MwaEnergyUse {
@@ -3738,6 +3771,19 @@ export interface MwaEnergyUse {
   co2Kg: number;
   energyCostEur: number;
   monthlyGasM3: number[];
+  monthlyElectricityImportKwh: number[];
+  monthlyHeatKwh: number[];
+  monthlyElectricityExportKwh: number[];
+}
+
+/** Bbl art. 4.248 with Omgevingsregeling bijlage VIII (ISSO 82.2 §5.2). */
+export interface MwaSystemCheck {
+  system: 'space_heating' | 'space_cooling' | 'hot_water' | 'ventilation' | 'lighting';
+  value: number | null;
+  limit: number | null;
+  unit: string;
+  meets: boolean | null;
+  note: string | null;
 }
 
 export interface MwaIssue { code: string; path: string; detail?: string }
@@ -3745,7 +3791,7 @@ export interface MwaIssue { code: string; path: string; detail?: string }
 export interface MwaVariantResult {
   id: string;
   name: string;
-  kind: 'current' | 'measure' | 'package';
+  kind: 'current' | 'measure' | 'package' | 'passport_step';
   measureIds: string[];
   valid: boolean;
   label: {
@@ -3770,6 +3816,7 @@ export interface MwaVariantResult {
   netPresentValueEur: number | null;
   horizonYears: number;
   phasing: Array<{ year: number | null; measureIds: string[] }>;
+  systemChecks: MwaSystemCheck[];
   issues: MwaIssue[];
 }
 
@@ -3797,6 +3844,35 @@ export interface MaatwerkadviesAssessment {
     heatDeviationPercent: number | null;
     measuredGasLine: MwaRegressionLine | null;
     calculatedGasLine: MwaRegressionLine | null;
+    measuredHeatLine: MwaRegressionLine | null;
+    calculatedHeatLine: MwaRegressionLine | null;
+    measuredGasBaseLoad: number | null;
+    calculatedGasBaseLoad: number | null;
+    measuredHeatBaseLoad: number | null;
+    calculatedHeatBaseLoad: number | null;
+    monthlyElectricityDeviationPercent: Array<number | null>;
+    measuredElectricityMonthlyMeanKwh: number | null;
+    calculatedElectricityMonthlyMeanKwh: number | null;
+    measuredElectricityLine: MwaRegressionLine | null;
+    calculatedElectricityLine: MwaRegressionLine | null;
+    measuredElectricityBaseLoad: number | null;
+    calculatedElectricityBaseLoad: number | null;
+    /** ISSO 82.2 Bijlage C.1: annual ±5 %, slope ±5 %, heating limit ±1 °C, base line ±5 %. */
+    criteria: {
+      annualGas: boolean | null;
+      annualElectricity: boolean | null;
+      annualHeat: boolean | null;
+      gasSlope: boolean | null;
+      gasHeatingLimit: boolean | null;
+      gasBaseLine: boolean | null;
+      heatSlope: boolean | null;
+      heatHeatingLimit: boolean | null;
+      heatBaseLine: boolean | null;
+      electricitySlope: boolean | null;
+      electricityHeatingLimit: boolean | null;
+      electricityBaseLine: boolean | null;
+      withinCriteria: boolean | null;
+    };
   } | null;
   advice: {
     packageId: string | null;
@@ -3805,6 +3881,12 @@ export interface MaatwerkadviesAssessment {
     warnings: string[];
     specialistNotes: string[];
     notes: string[];
+  } | null;
+  renovationPassport: {
+    steps: MwaVariantResult[];
+    requirements: Array<{ code: string; met: boolean | null; detail: string | null }>;
+    eligible: boolean | null;
+    requiredStatements: string[];
   } | null;
   interpretations: string[];
   issues: MwaIssue[];
