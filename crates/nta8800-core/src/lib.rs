@@ -10,6 +10,9 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
+pub mod annex_a;
+pub mod annex_aa;
+pub mod annex_b;
 pub mod annex_p;
 pub mod bacs_draft;
 pub mod bbl_requirements;

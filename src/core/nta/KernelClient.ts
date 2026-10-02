@@ -466,6 +466,8 @@ export interface MonthlyDemandInput {
     floor: NtaMassClass;
     wall: NtaMassClass;
     ceiling: 'closed_or_suspended' | 'open_or_none';
+    /** Annex B: elements whose effective heat capacity replaces table 7.10. */
+    annexBElements?: NtaMassElement[];
     sourceReference: string;
   };
   internalGains:
@@ -492,6 +494,8 @@ export interface MonthlyDemandInput {
     uValueWPerM2k: number;
     obstruction: NtaObstruction;
     movableShading?: NtaMovableShading | null;
+    /** Annex A: dynamic g and U per month. */
+    dynamic?: NtaDynamicTransparent | null;
     sourceReference: string;
   }>;
   opaqueInventoryComplete: boolean;
@@ -2171,7 +2175,7 @@ export interface NtaActiveCoolingEvidence {
     | 'external_cold_with_cooling_emitter' | 'split_units_in_every_habitable_room' | 'other_utility';
   capacity:
     | { method: 'dynamic_cooling_load'; sourceReference: string }
-    | { method: 'annex_aa'; sourceReference: string }
+    | { method: 'annex_aa'; calculation?: NtaAnnexAaInput | null; sourceReference: string }
     | { method: 'solar_limitation'; criterion: 'small_window_area' | 'shaded_glazing'; sourceReference: string };
   sourceReference: string;
 }
@@ -2219,11 +2223,77 @@ export interface NtaTojuliAssessment {
     assessed: boolean;
     conductanceWPerK: number;
     coolingNeedJulyKwh: number;
+    boosterHeatPumpJulyKwh: number;
     tojuliK: number | null;
   }>;
   maxTojuliK: number | null;
   meetsBblLimit: boolean | null;
+  annexAa: NtaAnnexAaResult | null;
   issues: Array<{ code: string; path: string }>;
+}
+
+/** Annex AA input per calculation zone (dwellings). */
+export interface NtaAnnexAaInput {
+  constructionYear: number;
+  postInsulated?: boolean;
+  /** B_C;inst;zi in kW; omit when every room has its own generator. */
+  generatorCapacityKw?: number | null;
+  rooms: Array<{
+    id: string;
+    areaM2: number;
+    living: boolean;
+    opaqueInnerAreaM2: number;
+    windows?: Array<{ windowId: string; uWithShutterWPerM2k?: number | null }>;
+    installedCapacityKw: number;
+  }>;
+}
+
+interface NtaAnnexAaLoads {
+  peakHour: number;
+  internalW: number;
+  outdoorAirW: number;
+  opaqueW: number;
+  solarW: number;
+  glazingW: number;
+  needWPerM2: number;
+  requiredKw: number;
+}
+
+export interface NtaAnnexAaResult extends NtaAnnexAaLoads {
+  generatorKw: number | null;
+  rooms: Array<NtaAnnexAaLoads & { id: string; installedKw: number; sufficient: boolean }>;
+  sufficient: boolean;
+}
+
+/** Annex A dynamic transparent element. */
+export type NtaDynamicTransparent =
+  | {
+      method: 'weighted_states';
+      states: Array<{ id: string; gPerpendicular: number; uValueWPerM2k: number }>;
+      /** 12 rows, one weight per state, each row summing to 1. */
+      solarWeights: number[][];
+      temperatureWeights: number[][];
+      sourceReference: string;
+    }
+  | {
+      method: 'single_state';
+      state: { id: string; gPerpendicular: number; uValueWPerM2k: number };
+      sourceReference: string;
+    };
+
+/** Annex B construction element; layers from the zone side outwards. */
+export interface NtaMassElement {
+  id: string;
+  areaM2: number;
+  layers: Array<{
+    thicknessM: number;
+    conductivityWPerMk: number;
+    densityKgPerM3: number;
+    specificHeatJPerKgk: number;
+    openSuspendedCeiling?: boolean;
+  }>;
+  bothSides?: boolean;
+  sourceReference: string;
 }
 
 type NtaHeatRejection =
