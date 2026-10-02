@@ -2093,7 +2093,12 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         recorder,
     );
     let heating = derive_utility_heating(survey, reduction_function, area, recorder);
-    let hot_water = hot_water_value(survey, main, area, recorder);
+    let mut hot_water = hot_water_value(survey, main, area, recorder);
+    super::hot_water::apply_exhaust_air_use(
+        &mut hot_water,
+        survey.ventilation.principle,
+        survey.ventilation.heat_recovery.is_some(),
+    );
     let lighting = lighting_value(survey, main, area, recorder);
     let cooling = survey
         .cooling

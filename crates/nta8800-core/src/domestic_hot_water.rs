@@ -1171,7 +1171,8 @@ pub fn validate_hot_water(
                     &format!("{exhaust_field}.heatingTimeFraction"),
                 );
             }
-        } else if several && exhaust_air_heat_pump(generator) {
+        } else if exhaust_air_heat_pump(generator) {
+            // 13.144a needs the ventilation system, also for one generator.
             push("hot_water_exhaust_air_use_required", &exhaust_field);
         }
     }
@@ -1987,7 +1988,12 @@ fn dispatch(
     }
     let mut shares = vec![[0.0; 12]; units.len()];
     let mut extra = [0.0; 12];
-    if units.len() == 1 && units[0].nominal_power_kw.is_none() {
+    // A single generator delivers everything, except an exhaust-air heat
+    // pump, which keeps the 1,0 kW default of 13.141 and 13.144a.
+    if units.len() == 1
+        && units[0].nominal_power_kw.is_none()
+        && !exhaust_air_heat_pump(units[0].generator)
+    {
         shares[0] = *outputs;
         return (order, shares, extra);
     }
@@ -2507,6 +2513,37 @@ mod tests {
         let loss = crate::significant_figures::round_down(booster[0].standing_loss_heat_kwh);
         assert!(loss > 0.0);
         assert!(jan.recoverable_loss_kwh >= loss - 1e-9);
+    }
+
+    #[test]
+    fn single_exhaust_air_heat_pump_follows_13_144a() {
+        let mut input = system(HotWaterGenerator::HeatPump {
+            exhaust_air_source: true,
+            source_correction: None,
+            measured_class: None,
+            outdoor_air_fraction: None,
+        });
+        // 13.144a needs the ventilation system, also for one generator.
+        assert!(validate_hot_water(&input, context(), "hotWater")
+            .iter()
+            .any(|item| item.code == "hot_water_exhaust_air_use_required"));
+        input.exhaust_air = Some(ExhaustAirUse {
+            ventilation_suitable: false,
+            heating_time_fraction: Vec::new(),
+        });
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        let unsuitable = assess_hot_water(&input, context()).unwrap();
+        // Unsuitable ventilation: Q_W;gen;out;max = 0, the extra electric
+        // heater delivers everything.
+        let jan = &unsuitable.months[0];
+        assert!((jan.extra_electric_output_kwh - jan.generator_output_kwh).abs() < 1e-9);
+        input.exhaust_air = Some(ExhaustAirUse {
+            ventilation_suitable: true,
+            heating_time_fraction: Vec::new(),
+        });
+        let suitable = assess_hot_water(&input, context()).unwrap();
+        // 1,0 kW × 744 h is far above the monthly need: no extra heater.
+        assert_eq!(suitable.months[0].extra_electric_output_kwh, 0.0);
     }
 
     fn combi() -> HotWaterGenerator {

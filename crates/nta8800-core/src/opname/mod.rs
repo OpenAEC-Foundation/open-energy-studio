@@ -373,6 +373,11 @@ pub fn derive_residential_input(
     let calculated_distribution =
         heating::apply_unheated_pipes(&survey.heating, &mut heating, unheated_spaces, recorder);
     let mut hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
+    hot_water::apply_exhaust_air_use(
+        &mut hot_water,
+        survey.ventilation.principle,
+        survey.ventilation.heat_recovery.is_some(),
+    );
     if matches!(
         survey.hot_water.generator,
         hot_water::HotWaterGeneratorAnswer::ElectricBoiler

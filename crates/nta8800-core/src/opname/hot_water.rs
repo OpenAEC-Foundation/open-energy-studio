@@ -202,6 +202,25 @@ pub fn boiler_storage(
     }))
 }
 
+/// 13.144a: an exhaust-air heat pump needs the ventilation system: C
+/// (mechanical extract) or D without heat recovery is suitable.
+pub fn apply_exhaust_air_use(
+    hot_water: &mut Value,
+    principle: super::ventilation::VentilationPrinciple,
+    heat_recovery: bool,
+) {
+    use super::ventilation::VentilationPrinciple as P;
+    if hot_water["generator"]["exhaustAirSource"] != json!(true) {
+        return;
+    }
+    let suitable = match principle {
+        P::MechanicalExtract => true,
+        P::Balanced => !heat_recovery,
+        P::Natural | P::MechanicalSupply => false,
+    };
+    hot_water["exhaustAir"] = json!({ "ventilationSuitable": suitable });
+}
+
 pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Value {
     let reference = survey.source_reference.as_str();
     let generator = match &survey.generator {
