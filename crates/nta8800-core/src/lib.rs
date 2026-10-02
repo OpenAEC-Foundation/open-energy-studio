@@ -35,6 +35,7 @@ pub mod ground;
 pub mod heat_pumps;
 pub mod heating_aux_draft;
 pub mod heating_emission;
+pub mod humidification;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod label_class;
@@ -293,6 +294,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_domestic_hot_water_need_chapter_13_with_declared_efficiencies",
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
+            "unverified_humidification_dehumidification_chapter_12",
         ],
     }
 }
