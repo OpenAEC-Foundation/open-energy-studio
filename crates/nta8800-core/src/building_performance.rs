@@ -19,6 +19,7 @@ use crate::annex_p::{
     assess_route, source_factors, AnnexPRoute, CollectiveHeatPumpSource, ScenarioFactors,
     SupplyFactors, SystemFunction, SystemResult, COLD_FORFAIT, HEAT_FORFAIT,
 };
+use crate::annex_q::AnnexQSource;
 use crate::bbl_requirements::{a0_check, check as bbl_check, A0Check, BblCheck, BblFunction};
 use crate::domestic_hot_water::{
     assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterCarrier, HotWaterContext,
@@ -596,6 +597,7 @@ fn cooling_assessment(
             zones: &zones,
             residential: matches!(input.calculation_scope, CalculationScope::Residential),
             heat_pump_source_extraction_kwh: if input.space_heating.generator.heat_pump().is_some()
+                || input.space_heating.generator.annex_q().is_some()
             {
                 extraction
             } else {
@@ -1013,13 +1015,55 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 }
             }
         }
-        (None, Some(_)) => {
-            issues.push(issue(
-                "heat_pump_evidence_without_heat_pump",
-                "heatPumpRenewable",
-            ));
-        }
-        (None, None) => {}
+        (None, evidence) => match (input.space_heating.generator.annex_q(), evidence) {
+            (Some(generator), None) => {
+                let _ = generator;
+                issues.push(issue(
+                    "heat_pump_renewable_evidence_required",
+                    "heatPumpRenewable",
+                ));
+            }
+            (Some(generator), Some(evidence)) => {
+                if evidence.source_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "source_reference_required",
+                        "heatPumpRenewable.sourceReference",
+                    ));
+                }
+                // 5.31/5.32 against the annex Q source.
+                let source = generator.heat_pump.source;
+                let consistent = match source {
+                    AnnexQSource::ExhaustAirWater => {
+                        evidence.exhaust_air_source && !evidence.combined_outdoor_and_exhaust_air
+                    }
+                    AnnexQSource::CombinedAirWater => {
+                        evidence.combined_outdoor_and_exhaust_air && !evidence.exhaust_air_source
+                    }
+                    _ => !evidence.exhaust_air_source && !evidence.combined_outdoor_and_exhaust_air,
+                };
+                if !consistent {
+                    issues.push(issue(
+                        "heat_pump_source_contradiction",
+                        "heatPumpRenewable.exhaustAirSource",
+                    ));
+                }
+                if let Some(fraction) = evidence.outdoor_air_heat_fraction {
+                    if !(0.0..=1.0).contains(&fraction) {
+                        issues.push(issue(
+                            "outdoor_air_fraction_invalid",
+                            "heatPumpRenewable.outdoorAirHeatFraction",
+                        ));
+                    }
+                }
+            }
+            (None, Some(_)) => {
+                issues.push(issue(
+                    "heat_pump_evidence_without_heat_pump",
+                    "heatPumpRenewable",
+                ));
+            }
+            (None, None) => {}
+        },
     }
 }
 
@@ -1435,7 +1479,8 @@ fn compute(
     let mut fossil = 0.0;
     let mut renewable = 0.0;
     let mut ambient_total = 0.0;
-    let heat_pump_renewable = input.space_heating.generator.heat_pump().is_some()
+    let heat_pump_renewable = (input.space_heating.generator.heat_pump().is_some()
+        || input.space_heating.generator.annex_q().is_some())
         && input
             .heat_pump_renewable
             .as_ref()

@@ -17,6 +17,9 @@ pub mod annex_m;
 pub mod annex_n;
 pub mod annex_o;
 pub mod annex_p;
+pub mod annex_q;
+pub mod annex_v;
+pub mod annex_w;
 pub mod bacs_draft;
 pub mod bbl_requirements;
 pub mod boiler_forfait_draft;
@@ -321,6 +324,9 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_local_air_radiant_heaters_and_stoves_annex_n",
             "unverified_appliance_auxiliary_from_measurements_annex_o",
             "unverified_forfait_local_and_air_heaters_table_9_25",
+            "unverified_heat_pump_product_data_annex_q",
+            "unverified_source_regeneration_annex_v",
+            "unverified_booster_heat_pump_annex_w",
             "unverified_opaque_construction_u_rc_annex_c_e_f",
             "unverified_window_door_shutter_u_8_2_2_3_annex_g_l",
             "forfait_envelope_values_annex_i",

@@ -80,7 +80,13 @@ Bij één opwekker geeft tabel 9.1 `β = 1`, dus 100% dekking van `Q_H;gen;out` 
 - `heat_pump_forfait`: [forfaitaire warmtepompmodule](nta8800-warmtepomp-maandinvoer-concept.md) (tabellen 9.27/9.29, 9.62).
   - Hulpenergie van een individueel toestel: gemeten (9.85–9.88 via `auxiliaryMeasurements`) of forfaitair 9.85 met A = 43,8 kWh, B = 0,132 kW, C = 0,7 en Bnom = 3 kW over de maandelijkse elektriciteit.
   - Een collectieve warmtepomp gebruikt 9.91 met alleen de stand-by-term.
-  - Een ontwerpaanvoer boven 55 °C wordt geweigerd (`heat_pump_above55_requires_annex_q`). Volgens §9.6.3 (pagina 331) moet dan bijlage Q, ook voor een warmtepomp zonder ketel. Tabel 9.27 heeft wel kolommen tot 70 °C; die tegenstrijdigheid staat in het verificatiedossier.
+  - Een ontwerpaanvoer boven 55 °C wordt geweigerd (`heat_pump_above55_requires_annex_q`). Volgens §9.6.3 (pagina 331) moet dan bijlage Q, ook voor een warmtepomp zonder ketel; gebruik daarvoor `heat_pump_annex_q`. Tabel 9.27 heeft wel kolommen tot 70 °C; die tegenstrijdigheid staat in het verificatiedossier.
+- `heat_pump_annex_q`: individuele elektrische warmtepomp met productgegevens volgens bijlage Q (p. 1027–1069). Zie [bijlagen Q, V en W](nta8800-bijlagen-q-v-w.md).
+  - Uit de NEN-EN 14511-metingen (condities 1–4) en, bij modulerende toestellen, de NEN-EN 14825-deellastreeksen bepaalt de kern per buitentemperatuurklasse van tabel Q.6 het vermogen, de COP, de afschakelcriteria en de bronpomp. Daaruit volgen `η_H;gen;hp` (Q.2) en `F_H;gen` (Q.1).
+  - De ontwerpaanvoer mag tot 75 °C (tabellen Q.5/Q.7).
+  - Bij `F_H;gen < 1` is een `backup` verplicht: `electric_resistance` (COP 1) of `gas_boiler` (tabel 9.25). Die levert `1 − F` van elke maand.
+  - Bronpomp en circulatiepomp zitten in `η_H;gen;hp` (Q.1); de hulpenergie van de warmtepomp is daarom 0 en de distributiepomp mag `included_in_generator_auxiliary` zijn.
+  - Bij een bodemwarmtewisselaar mag `regeneration` (bijlage V) `c_source` afleiden; die vermenigvuldigt het rendement.
 - `hybrid_heat_pump`: warmtepomp met individuele bijverwarmingsketel, gesplitst met de [generatorverdeling](nta8800-generatorverdeling-concept.md) volgens tabel 9.1/9.23 (alleen nieuwbouw). Hulpenergie: ketel 9.85, warmtepomp gemeten of 9.85-forfait.
 - `external_heat`: 9.84 met `η = 1,0` en `f_prac = 1`, drager `dh`. De hulpenergie loopt via 9.91 (§9.6.7.2). Of een afleverset als "toestel" voor de 10 W telt, staat in `electricallyConnectedDevices`; dit is een interpretatie (zie het verificatiedossier). Een kwaliteitsverklaring (bijlage P) wordt geweigerd.
 - `electric_resistance`: COP 1,0 (tabel 9.27). Hulpenergie volgens 9.91: 10 W per toestel of paneel.
@@ -109,6 +115,8 @@ Olie-invoer (`oilKwh`) telt in de energieprestatie als drager `oil`, gewogen met
 `auxiliaryElectricityKwh` per maand is de som van opwekker- en distributiehulpenergie (9.6). Het distributiedeel staat ook apart in `distributionAuxiliaryElectricityKwh`.
 
 ## Niet meegenomen (`omittedTerms`)
+
+- Bijlage Q.5.3: de iteratieve herberekening van de warmtevraag bij overventilatie van een ventilatieluchtwarmtepomp. De tijdfracties (Q.84–Q.93) en het luchtdebiet (Q.94/Q.95) zijn er als functies; de koppeling aan `ventilation.overventilation` gebeurt nog door de gebruiker.
 
 - Zonthermische knooppuntwinst en de overige knooppuntvragen (9.2.3).
 - Terugkoppeling van de terugwinbare verliezen naar de behoefte.

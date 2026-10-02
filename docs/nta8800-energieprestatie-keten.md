@@ -251,6 +251,10 @@ De module vereist de `components`-transmissieroute, waarin ramen en opake vlakke
 
 De zomerventilatie van hoofdstuk 11 moet in de opgegeven ventilatiegeleiding zitten.
 
+## Warmtepomp volgens bijlage Q
+
+Een `heat_pump_annex_q` telt voor 5.30/5.31 net als een forfaitaire warmtepomp: het omgevingswarmte-aandeel is `Q_hp·(1 − 1/η)` met het bijlage Q-rendement, als `heatPumpRenewable` de bron bevestigt. Een bron met alleen ventilatielucht telt niet. Bij gecombineerde bronnen telt alleen het buitenluchtaandeel (5.32). De bronconsistentie wordt gecontroleerd tegen het bijlage Q-brontype. De bronwarmte telt ook mee in de regeneratietoets van 10.84.
+
 ## BENG 1
 
 Volgens §5.4 rekent BENG 1 met een vast ventilatiesysteem C1 (§5.4.3) en, bij utiliteit, met vaste interne warmtelasten (§5.4.2). Als elke zone hoofdstuk 11-invoer heeft (`ventilation`), voert de kern die aparte run zelf uit (`fixedC1` per zone). BENG 1 en `annualHeatingAndCoolingNeedKwh` gebruiken dan de som van die runs. Zonder hoofdstuk 11-invoer verschijnt `needIndicatorKwhPerM2Year` alleen als de aanroeper met `demandUsesFixedC1Ventilation = true` bevestigt dat de opgegeven ventilatie het C1-systeem voorstelt.

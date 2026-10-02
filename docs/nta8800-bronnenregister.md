@@ -75,6 +75,9 @@ De hoofdstukken 5 en 9 volgden eerst het openbare consultatieconcept 2026: <http
 | Module | Formules | Bron |
 |---|---|---|
 | `heating_distribution` | 9.26–9.51, tabel 9.14/9.15/9.16/9.19/9.21/9.22/9.X, 13.9 | NTA 8800:2025+C1:2026 p. 290–321, 570 |
+| `annex_q` | Q.1–Q.95, tabellen Q.1–Q.17 | NTA 8800:2025+C1:2026 p. 1027–1069 |
+| `annex_v` | V.1–V.6, tabellen V.1–V.3 | NTA 8800:2025+C1:2026 p. 1114–1116 |
+| `annex_w` | W.1–W.17 | NTA 8800:2025+C1:2026 p. 1118–1128 |
 
 De wettelijke tabellen zijn letterlijk overgenomen uit de geconsolideerde wetteksten:
 
