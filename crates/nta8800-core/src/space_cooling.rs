@@ -2231,8 +2231,10 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                     let fuel = cold / zeta;
                     row.chp_heat_kwh += fuel;
                     row.chp_electricity_kwh += fuel * electric;
-                    // 10.81 with table 10.30 ζ, or ζ_n·PLV for method 2.
-                    let ratio = rated_heat_ratio(&generator.generator).unwrap_or(zeta);
+                    // 10.81 with the absorber's own heat ratio: the 1,00 of
+                    // table 10.30 (ε_chp;th only converts to CHP fuel), or
+                    // ζ_n·PLV for method 2.
+                    let ratio = rated_heat_ratio(&generator.generator).unwrap_or(1.0);
                     auxiliary += cold * (1.0 + 1.0 / ratio) * rejection.distribution_power();
                 }
                 Drive::DistrictCold => {

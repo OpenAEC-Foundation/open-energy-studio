@@ -1947,15 +1947,13 @@ fn compute(
         }
         // Chapter 10 cooling and its auxiliaries, weighted by f_BACS (5.20/5.21).
         let mut ambient_cold = 0.0;
-        // §9.6.6.1: electricity of a building CHP driving absorption cooling
-        // (ε_chp;el), credited in chapter 16; not renewable (5.14b).
-        let mut chp_electricity = 0.0;
+        // CHP electricity of absorption cooling (ε_chp;el) is reported only:
+        // 16.11–16.13 credit CHP production of heating and hot-water systems.
         if let Some(assessment) = cooling {
             let month_row = &assessment.months[index];
             used_el += bacs * (month_row.electricity_kwh + month_row.auxiliary_electricity_kwh);
             // Table 10.30 with 9.65: CHP fuel (natural gas, gross value).
             used_gas += bacs * (month_row.natural_gas_kwh + month_row.chp_heat_kwh);
-            chp_electricity = bacs * month_row.chp_electricity_kwh;
             used_dh += bacs * month_row.district_heat_kwh;
             renewable_dh_basis += month_row.district_heat_cold_kwh;
             used_dc += bacs * month_row.district_cold_kwh;
@@ -1988,7 +1986,7 @@ fn compute(
             .map(|item| item.monthly_kwh[index])
             .sum::<f64>()
             + pv_yields.iter().map(|yields| yields[index]).sum::<f64>();
-        let produced = produced_renewable + chp_electricity;
+        let produced = produced_renewable;
         let self_used = produced.min(used_el);
         // 5.26 summed over producers.
         let exported = produced - self_used;
@@ -3344,7 +3342,8 @@ mod tests {
         let fuel: f64 = cooling.months.iter().map(|month| month.chp_heat_kwh).sum();
         let bacs = sample.bacs_factor;
         assert!((gas(&chp) - gas(&base) - bacs * fuel).abs() < 1e-6);
-        // The CHP electricity enters the balance but not EP_ren (5.14b).
+        // 16.11–16.13 credit only heating and hot-water CHP: the absorber's
+        // CHP electricity is reported but not produced in the balance.
         let produced: f64 = chp
             .electricity_balance
             .iter()
@@ -3360,7 +3359,8 @@ mod tests {
             .iter()
             .map(|month| month.chp_electricity_kwh)
             .sum();
-        assert!((produced - base_produced - bacs * chp_el).abs() < 1e-6);
+        assert!(chp_el > 0.0);
+        assert!((produced - base_produced).abs() < 1e-6);
         assert_eq!(
             chp.annual_renewable_primary_kwh,
             base.annual_renewable_primary_kwh

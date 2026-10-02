@@ -263,7 +263,7 @@ Module `space_cooling` (p. 366–426) rekent per maand `Q_C;gen;in = Σ(Q_C;nd +
 
 Koeling in de luchtbehandelingskast (11.116) en ontvochtiging (12.5) komen zonder afgifte- en distributieverlies op de opwekker.
 
-Absorptie op een WKK wordt afgewezen (`cooling_chp_unsupported`), omdat WKK niet in de verwarmingsketen zit. Niet gemodelleerd: methode 2 voor absorptiekoelers (10.66); daarvoor gelden de waarden van methode 3.
+Absorptie op een WKK en methode 2 voor absorptiekoelers (10.66) staan in de sectie "Absorptiekoeling: methode 2 en WKK" hieronder.
 
 Interpretaties (ook in `interpretations` van de koelberekening):
 
@@ -532,8 +532,8 @@ Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerder
   - Een opgegeven waarde (§10.1) samen met een `rating` geeft `cooling_declared_and_performance`.
 - **Absorptiekoeling op gebouwgebonden WKK** wordt niet meer afgewezen.
   - Volgens tabel 10.30 is ζ = 1,00 · ε_chp;th. Q_C/ζ is dan de brandstof van de WKK (9.65, op bovenwaarde) en wordt als aardgas geboekt, gewogen met f_BACS.
-  - De WKK-elektriciteit, ε_chp;el · brandstof (§9.6.6.1, tabel 9.31), telt in hoofdstuk 16 als eigen productie. Ze wordt eerst zelf gebruikt; het overschot wordt geëxporteerd tegen f_P;exp;el.
-  - Ze telt niet als hernieuwbaar en valt buiten de opslagcorrectie 5.14a, omdat 5.14b WKK uitsluit.
+  - De WKK-elektriciteit, ε_chp;el · brandstof (§9.6.6.1, tabel 9.31), wordt alleen gerapporteerd (`chpElectricityKwh`). 16.11–16.13 rekenen alleen de WKK-productie van verwarmings- en tapwatersystemen als eigen opwekking, dus voor de absorber telt ze niet mee in de elektriciteitsbalans. Dit is na de onafhankelijke review gecorrigeerd.
+  - De afgevoerde condensorwarmte (10.81) gebruikt de warmteverhouding van de absorber zelf (1,00 uit tabel 10.30). ε_chp;th dient alleen om naar WKK-brandstof om te rekenen.
   - Bij methode 2 vervangt PLV · ζ_n · f_prpr de factor 1,00. Dat is een interpretatie, opgenomen in `COOLING_INTERPRETATIONS`.
 - **Tabel 10.32** kent alleen de rij "niet geregeld" met waarde 1. f_hr;PL;el = 1 is daarmee de volledige tabel.
 - **Meetpunten NEN-EN 14825.** ϑ_C;evap;out is de temperatuur die de verdamper verlaat. Bij lucht-luchttoestellen is dat de uitblaaslucht van het binnendeel, niet de binnentemperatuur van de testconditie. ϑ_C;cond;in is de intredetemperatuur van de condensor; bij luchtgekoelde toestellen is dat de buitenlucht. De kern eist ϑ_C;cond;in > ϑ_C;evap;out, omdat 10.56 en 10.64 door dat verschil delen.
