@@ -269,15 +269,48 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     {read(draft, ['hotWater']) != null && <Section title={t('nta.form.hotWater')}>
       {residential
         ? <NumberField {...field} path={['hotWater', 'need', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
-        : <NumberField {...field} path={['hotWater', 'need', 'specificNeedKwhPerM2Year']} label={t('nta.form.hotWaterNeed')} />}
+        : <>
+          <SelectField {...field} path={['hotWater', 'need', 'areas', 0, 'function']} label={t('nta.form.hotWaterFunction')} options={[
+            ['office', t('nta.form.label.office')], ['education', t('nta.form.label.education')], ['retail', t('nta.form.label.retail')],
+            ['sport', t('nta.form.label.sport')], ['lodging', t('nta.form.label.lodging')], ['cell', t('nta.form.label.cell')],
+            ['assembly_without_day_care', t('nta.form.label.assembly')], ['assembly_with_day_care', t('nta.form.label.dayCare')],
+            ['healthcare_without_beds', t('nta.form.label.healthcare')], ['healthcare_with_beds', t('nta.form.label.healthcareBeds')]]} />
+          <NumberField {...field} path={['hotWater', 'need', 'areas', 0, 'areaM2']} label={t('nta.form.area')} />
+        </>}
       <TextField {...field} path={['hotWater', 'need', 'sourceReference']} label={t('nta.form.source')} />
-      <NumberField {...field} path={['hotWater', 'emissionEfficiency']} label={t('nta.form.hotWaterEmission')} />
-      <NumberField {...field} path={['hotWater', 'distributionEfficiency']} label={t('nta.form.hotWaterDistribution')} />
-      <NumberField {...field} path={['hotWater', 'generationEfficiency']} label={t('nta.form.hotWaterGeneration')} />
-      <SelectField {...field} path={['hotWater', 'carrier']} label={t('nta.form.carrier')}
-        options={[['gas', t('nta.performance.gas')], ['el', t('nta.performance.electricity')], ['oil', t('nta.form.oil')]]} />
-      <CheckField {...field} path={['hotWater', 'renewableHeatPump']} label={t('nta.form.hotWaterHeatPump')} />
-      <TextField {...field} path={['hotWater', 'efficiencySourceReference']} label={t('nta.form.source')} />
+      {residential ? <>
+        <SelectField {...field} path={['hotWater', 'emission', 'served']} label={t('nta.form.hotWaterTaps')} options={[
+          ['kitchen_and_bathroom', t('nta.form.dhwTaps.both')], ['bathroom_only', t('nta.form.dhwTaps.bathroom')], ['kitchen_only', t('nta.form.dhwTaps.kitchen')]]} />
+        <NumberField {...field} path={['hotWater', 'emission', 'kitchenLengthM']} label={t('nta.form.hotWaterKitchenLength')} />
+        <NumberField {...field} path={['hotWater', 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
+      </> : <NumberField {...field} path={['hotWater', 'emission', 'meanLengthM']} label={t('nta.form.hotWaterMeanLength')} />}
+      <TextField {...field} path={['hotWater', 'emission', 'sourceReference']} label={t('nta.form.source')} />
+      <SelectField {...field} path={['hotWater', 'generator', 'kind']} label={t('nta.form.hotWaterGenerator')}
+        options={[['gas_appliance', t('nta.form.dhwGen.gas')], ['heat_pump', t('nta.form.dhwGen.heatPump')],
+          ['electric_instantaneous', t('nta.form.dhwGen.instantaneous')], ['electric_boiler', t('nta.form.dhwGen.electricBoiler')],
+          ['indirect_boiler', t('nta.form.dhwGen.indirectBoiler')], ['external_heat', t('nta.form.dhwGen.external')]]}
+        onChange={(_, kind) => change(['hotWater', 'generator'], kind === 'gas_appliance'
+          ? { kind, appliance: null, measuredClass: 'class4', kitchenOnly: false }
+          : kind === 'heat_pump' ? { kind, exhaustAirSource: false, measuredClass: 'class4' }
+            : kind === 'indirect_boiler' ? { kind, boiler: null, oil: false, insideBoundary: true, alsoSpaceHeating: true }
+              : { kind })} />
+      {read(draft, ['hotWater', 'generator', 'kind']) === 'gas_appliance' && <>
+        <SelectField {...field} path={['hotWater', 'generator', 'appliance']} label={t('nta.form.dhwGas')} options={[
+          ['combi_gaskeur_hr_cw', t('nta.form.dhwGas.combiHrCw')], ['combi_gaskeur', t('nta.form.dhwGas.combi')],
+          ['water_heater_gaskeur_cw', t('nta.form.dhwGas.heaterCw')], ['water_heater_gaskeur', t('nta.form.dhwGas.heater')],
+          ['kitchen_geyser', t('nta.form.dhwGas.geyser')], ['without_gaskeur', t('nta.form.dhwGas.none')], ['unknown', t('nta.form.dhwGas.unknown')]]} />
+        <SelectField {...field} path={['hotWater', 'generator', 'measuredClass']} label={t('nta.form.dhwClass')}
+          options={[['class1', '1 (CW-1+)'], ['class2', '2 (CW-2)'], ['class3', '3 (CW-3)'], ['class4', '4 (CW-4/5/6)']]} />
+      </>}
+      {read(draft, ['hotWater', 'generator', 'kind']) === 'heat_pump' && <>
+        <CheckField {...field} path={['hotWater', 'generator', 'exhaustAirSource']} label={t('nta.form.dhwExhaustAir')} />
+        <SelectField {...field} path={['hotWater', 'generator', 'measuredClass']} label={t('nta.form.dhwClass')}
+          options={[['class1', '1 (CW-1+)'], ['class2', '2 (CW-2)'], ['class3', '3 (CW-3)'], ['class4', '4 (CW-4/5/6)']]} />
+      </>}
+      {read(draft, ['hotWater', 'generator', 'kind']) === 'indirect_boiler' &&
+        <SelectField {...field} path={['hotWater', 'generator', 'boiler']} label={t('nta.form.dhwBoiler')} options={[
+          ['hr107', 'HR 107'], ['hr100_or104', 'HR 100/104'], ['vr', 'VR'], ['conventional_or_unknown', t('nta.form.dhwGas.unknown')]]} />}
+      <TextField {...field} path={['hotWater', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
     </Section>}
     <Section title={t('nta.form.cooling')}>
       <label>{t('nta.form.coolingGenerator')}

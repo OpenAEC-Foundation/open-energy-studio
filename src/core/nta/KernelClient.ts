@@ -1511,18 +1511,69 @@ export interface NtaCoolingSystem {
   collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
 }
 
+type NtaApplicationClass = 'class1' | 'class2' | 'class3' | 'class4';
+type NtaDhwDeclared = { value: number; sourceReference: string };
+
+/** Chapter 13 hot-water system with one generator. */
 export interface NtaHotWaterSystem {
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
-    | { method: 'declared'; specificNeedKwhPerM2Year: number; sourceReference: string };
-  emissionEfficiency: number;
-  distributionEfficiency: number;
-  generationEfficiency: number;
-  carrier: 'el' | 'gas' | 'oil';
-  showerHeatRecoveryKwh?: number[];
-  auxiliaryElectricityKwh?: number[];
-  renewableHeatPump: boolean;
-  efficiencySourceReference: string;
+    | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
+  emission:
+    | { method: 'residential'; served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
+        kitchenLengthM?: number | null; bathroomLengthM?: number | null; sourceReference: string }
+    | { method: 'utility'; meanLengthM: number; sourceReference: string };
+  showerHeatRecovery?: {
+    showers: Array<{ unit: 'none' | 'vertical' | 'horizontal' | 'unknown' } | { unit: 'declared'; efficiency: number; sourceReference: string }>;
+    connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
+    sourceReference: string;
+  } | null;
+  circulation?: {
+    outerDiameterMm?: number | null;
+    insulation: 'none' | 'unknown' | 'mm10' | 'mm15' | 'mm20' | 'mm25';
+    declaredPsiWPerMK?: number | null;
+    fittingsInsulated: boolean;
+    lengthM?: number | null;
+    unheatedLengthM?: number | null;
+    unheatedAmbientC?: number | null;
+    floorCount: number;
+    sportHallAreaM2?: number;
+    connectedDwellings?: number | null;
+    pump: { control: 'uncontrolled_or_unknown' | 'constant_pressure'; labelPowerKw?: number | null; energyEfficiencyIndex?: number | null };
+    sourceReference: string;
+  } | null;
+  storage?: Array<{
+    id: string;
+    volumeL: number;
+    loss:
+      | { method: 'label'; label: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' }
+      | { method: 'unknown_label'; producedFrom2018: boolean }
+      | { method: 'measured'; transmissionWPerK: number };
+    connectionFactor: 1 | 2 | 3 | 4 | 5;
+    inHeatedZone: boolean;
+    unheatedAmbientC?: number | null;
+    sourceReference: string;
+  }>;
+  deliverySets?: { count: number; sourceReference: string } | null;
+  boilingWaterTap?: boolean;
+  generator:
+    | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
+        | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
+        declared?: NtaDhwDeclared | null }
+    | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
+        outdoorAirFraction?: number | null }
+    | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
+        exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null; sourceReference: string }
+    | { kind: 'electric_instantaneous' }
+    | { kind: 'electric_boiler' }
+    | { kind: 'gas_storage_heater'; volumeL: number; measuredStandbyKwhPerDay?: number | null; before1985: boolean; inHeatedZone: boolean }
+    | { kind: 'large_direct_storage'; gasFired: boolean }
+    | { kind: 'indirect_boiler'; boiler: 'conventional_or_unknown' | 'vr' | 'hr100_or104' | 'hr107'; oil: boolean;
+        insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
+    | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
+    | { kind: 'external_heat' };
+  collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
+  equipmentReference: string;
 }
 
 export interface BuildingPerformanceAssessment {

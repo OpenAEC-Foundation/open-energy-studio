@@ -107,13 +107,12 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
     hotWater: {
       need: residential
         ? { method: 'residential', dwellingCount: 1, sourceReference: '' }
-        : { method: 'declared', specificNeedKwhPerM2Year: null, sourceReference: '' },
-      emissionEfficiency: null,
-      distributionEfficiency: null,
-      generationEfficiency: null,
-      carrier: null,
-      renewableHeatPump: false,
-      efficiencySourceReference: '',
+        : { method: 'utility', areas: [{ function: null, areaM2: null }], sourceReference: '' },
+      emission: residential
+        ? { method: 'residential', served: 'kitchen_and_bathroom', kitchenLengthM: null, bathroomLengthM: null, sourceReference: '' }
+        : { method: 'utility', meanLengthM: null, sourceReference: '' },
+      generator: { kind: null },
+      equipmentReference: '',
     },
     labelFunction: residential ? 'residential' : null,
     bblFunction: null,
