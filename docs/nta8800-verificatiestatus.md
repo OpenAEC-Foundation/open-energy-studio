@@ -1,20 +1,31 @@
 # NTA 8800 verificatiestatus — 2 oktober 2026
 
-## Samenvatting stand 2 oktober 2026 (avond)
+## Samenvatting stand 3 oktober 2026 (nacht)
 
-**Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door, van projectinvoer of basisopname tot EP_Tot, EP_ren, RER, BENG 1/2/3, TO-juli, CO2, de indicatieve labelklasse en de Bbl- en A0-toets. Alle onderdelen zijn tegen de gelicentieerde normtekst getranscribeerd, met paginaverwijzingen. De normtekst zelf staat niet in de repository.
+**Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
+- EP_Tot, EP_ren en RER;
+- BENG 1/2/3 en TO-juli;
+- CO2 en de indicatieve labelklasse;
+- de Bbl- en A0-toets, ook voor gemengde functies (art. 4.149 lid 2).
+
+Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met paginaverwijzingen. De normtekst zelf staat niet in de repository.
 
 | Onderdeel | Stand |
 |---|---|
-| H5 indicatoren, CO2 (tabel 5.3), opslag 5.14a, bijlage P | geïmplementeerd |
+| H5 indicatoren, CO2 (tabel 5.3), opslag 5.14a, bijlage P met opslagrendement WD, 5.39g | geïmplementeerd |
 | H6 A_ls met f_ls (6.7.3), zone-indeling §6.4/6.5.2, gemengde rekenzones §6.5.3 | geïmplementeerd |
-| H7 incl. §7.9, bijlage A/B/D, terugwinbare verliezen 7.3–7.8 | geïmplementeerd |
-| H8.2 constructies (bijlage C, E–I, L), H8.3 grond incl. kruipruimte, onverwarmde en verwarmde kelder, H8.4 b_U | geïmplementeerd |
-| H9 afgifte, distributie 9.26–9.51, opwekkers incl. bijlagen M/N/O/Q/V/W, hulpenergie, waakvlam | geïmplementeerd |
-| H10 methode 3, H12, H13 incl. bijlagen T/U/W, H14, H16 | geïmplementeerd |
-| H11 ventilatie met drukbalans, C1-run voor BENG 1, stookgrens 9.29 | geïmplementeerd; na de review gecorrigeerd |
-| §5.7 TO-juli incl. bijlage AA | geïmplementeerd |
-| Basisopname ISSO 82.1 (woningen) en 75.1 (utiliteit) | geïmplementeerd |
+| H7 incl. §7.9, serres (7.30b), bijlagen A/B/D, terugwinbare verliezen 7.3–7.8, leidingdoorvoeren H_p | geïmplementeerd |
+| H8.2 constructies (bijlagen C, E–I, L), H8.3 grond incl. kruipruimte en kelders, H8.4 b_U opgegeven of afgeleid (8.53–8.59) | geïmplementeerd |
+| H9 afgifte incl. ventilatorenergie (9.21/9.22), distributie 9.26–9.51, meerdere opwekkers (9.6.1), bijlagen M/N/O/Q/V/W met f_prac en bovenwaarde | geïmplementeerd |
+| H10 methode 3 en LBK-koeling; methoden 1/2 en de toevoerluchtterm van 10.20 | in uitvoering |
+| H11 ventilatie met drukbalans, C1-run, LBK-naverwarming en -koeling (tabel 11.15), herberekening Q.5.3 | geïmplementeerd |
+| H12 incl. terugwinbaar verlies van stoombevochtigers | geïmplementeerd |
+| H13 incl. bijlagen T/U/W en 13.164; zonne-energie §13.7 en meerdere opwekkers 13.8.2 | in uitvoering |
+| H14, H16, §5.7 TO-juli incl. bijlage AA en dynamische beglazing | geïmplementeerd |
+| §17.3 belemmering: minimaal en opgegeven; situaties 17.3.4–17.3.8 | in uitvoering |
+| Basisopname ISSO 82.1/75.1, incl. renovatieklassen, sterk geventileerde ruimten, leidingen in onverwarmde ruimten | geïmplementeerd |
+| BRL 9500: registratieblok, termijnen, labelgegevens, bewijsregister, dossierexport, detailopname-eis, herlabelen (6a/6b), versiestempel | geïmplementeerd |
+| Maatwerkadvies (BRL 9500-MWA, ISSO 82.2/75.2) | in uitvoering |
 | Bijlage X (afronding) | geïmplementeerd |
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
@@ -30,12 +41,11 @@
 1. **Officiële referentie-uitkomsten.** De BRL 9501-testset of de bijlage van ISSO 54 met verwachte resultaten ontbreekt. De ISSO-boeken bevatten geen volledig doorgerekend voorbeeld. Alle uitkomsten zijn dus `referenceVerified: false`.
 2. **Open interpretatievragen.** Ze staan per module in de documentatie en in de uitvoer `interpretations`. De belangrijkste: de letterlijke lezing van 9.29, de factor 15 % in formule 10.15, en de kolom "Juli/september" van tabel 10.16.
 3. **Niet ondersteund (met expliciete foutcode).**
-   - luchtbehandelingskasten die de toevoerlucht verwarmen of koelen;
-   - koelmethoden 1/2;
-   - collectieve zonneboilers en meerdere tapwateropwekkers;
-   - WKK als hoofdopwekker in sommige routes;
-   - serres (7.30b);
-   - de herberekening bij overventilatie (Q.5.3).
+   - het specifieke gastoestel uit tabel 11.11, voetnoot a (de norm geeft geen rekenwaarden);
+   - een wisselstroomventilator van na 2006 in de forfaitaire methode (tabel 11.23 geeft geen waarde);
+   - absorptiekoeling op gebouw-WKK;
+   - de onderdelen met de status "in uitvoering" in de tabel hierboven.
+   - Registratie in EP-Online vereist de uitwisselspecificatie van RVO.
 4. **Visuele acceptatie** van de desktop-UI en de attestprocedure (BRL 9501:2026, ISSO 54 actuele editie).
 
 
