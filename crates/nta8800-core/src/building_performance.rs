@@ -126,6 +126,8 @@ pub enum Service {
     SpaceCoolingAuxiliary,
     Lighting,
     PvAuxiliary,
+    /// `E_hum;ci` of 5.20 (steam humidifiers, 12.3); not BACS-corrected.
+    Humidification,
 }
 
 impl Service {
@@ -135,7 +137,10 @@ impl Service {
     }
 
     fn electric_only(self) -> bool {
-        !matches!(self, Self::DomesticHotWater | Self::SpaceCooling)
+        !matches!(
+            self,
+            Self::DomesticHotWater | Self::SpaceCooling | Self::Humidification
+        )
     }
 }
 

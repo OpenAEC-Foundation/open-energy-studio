@@ -47,6 +47,11 @@ pub struct ResidentialSurveyRequest {
 }
 
 #[derive(Deserialize)]
+pub struct UtilitySurveyRequest {
+    pub survey: nta8800_core::opname::utility::UtilitySurvey,
+}
+
+#[derive(Deserialize)]
 pub struct VentilationRequest {
     pub input: nta8800_core::ventilation::VentilationInput,
 }
@@ -201,6 +206,7 @@ pub fn app() -> Router {
             "/v1/nta8800/opname/residential",
             post(assess_residential_survey),
         )
+        .route("/v1/nta8800/opname/utility", post(assess_utility_survey))
         .route(
             "/v1/nta8800/constructions/calculate",
             post(calculate_constructions),
@@ -429,6 +435,18 @@ async fn assess_residential_survey(
     Json(request): Json<ResidentialSurveyRequest>,
 ) -> (StatusCode, Json<Value>) {
     let assessment = nta8800_core::opname::assess_residential_survey(&request.survey);
+    let status = if assessment.status == "calculated_unverified" {
+        StatusCode::OK
+    } else {
+        StatusCode::UNPROCESSABLE_ENTITY
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn assess_utility_survey(
+    Json(request): Json<UtilitySurveyRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment = nta8800_core::opname::utility::assess_utility_survey(&request.survey);
     let status = if assessment.status == "calculated_unverified" {
         StatusCode::OK
     } else {
@@ -1320,6 +1338,30 @@ mod tests {
         assert!(!result["appliedDefaults"].as_array().unwrap().is_empty());
         assert_eq!(result["performance"]["status"], "calculated_unverified");
         assert_eq!(result["referenceVerified"], false);
+    }
+
+    #[tokio::test]
+    async fn utility_survey_route_returns_defaults_and_performance() {
+        let survey: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-opname-utility-1970-retail.json"
+        ))
+        .unwrap();
+        let (status, result) =
+            post_json("/v1/nta8800/opname/utility", json!({ "survey": survey })).await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["scope"], "isso_75_1_basisopname_utility_unverified");
+        assert!(!result["appliedDefaults"].as_array().unwrap().is_empty());
+        assert_eq!(result["performance"]["status"], "calculated_unverified");
+        assert_eq!(result["derivedInput"]["bacsFactor"], 1.05);
+        let mut mixed = survey.clone();
+        mixed["functions"] = json!([
+            {"function": "retail", "areaM2": 1500.0},
+            {"function": "office", "areaM2": 1500.0}
+        ]);
+        let (status, result) =
+            post_json("/v1/nta8800/opname/utility", json!({ "survey": mixed })).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(result["issues"][0]["code"], "mixed_functions_require_zones");
     }
 
     #[tokio::test]

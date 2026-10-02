@@ -2386,6 +2386,139 @@ export async function assessResidentialSurveyWithRust(survey: ResidentialSurvey)
   throw new Error('Rust basic survey is available in the desktop app and local development server.');
 }
 
+/** ISSO 75.1 basic survey of an existing utility building (one calculation zone). */
+export interface UtilitySurvey {
+  id: string;
+  constructionYear: number;
+  renovation?: ResidentialSurvey['renovation'];
+  buildingType:
+    | { kind: 'single_layer'; position: 'detached' | 'end_or_corner' | 'terraced'; roof: 'pitched' | 'partly_flat' | 'flat' }
+    | { kind: 'multi_layer_whole' }
+    | { kind: 'multi_layer_part'; level: 'bottom' | 'intermediate' | 'top'; position: 'end_or_corner' | 'middle' | 'whole_storey' };
+  /** Other functions up to 25 % of A_g are merged into the largest one. */
+  functions: Array<{ function: Exclude<NtaLabelFunction, 'residential'>; areaM2: number }>;
+  areaSourceReference: string;
+  buildingHeightM: number;
+  storeys?: number;
+  construction: ResidentialSurvey['construction'];
+  measuredInfiltration?: ResidentialSurvey['measuredInfiltration'];
+  envelope: ResidentialSurvey['envelope'];
+  solarControlWindowIds?: string[];
+  heating: ResidentialSurvey['heating'];
+  heatingInstallation: { collective: boolean; capacityKw?: number | null };
+  cooling?: {
+    generator:
+      | 'compression' | 'room_air_conditioner' | 'gas_absorption' | 'external_cold' | 'unknown_collective'
+      | 'aquifer_before2013' | 'aquifer_from2013' | 'aquifer_year_unknown' | 'surface_water'
+      | 'closed_ground_loop' | 'dew_point_cooling';
+    capacityKw?: number | null;
+    emitter:
+      | 'floor_cooling' | 'concrete_core_activation' | 'wall_cooling' | 'ceiling_cooling'
+      | 'fan_coil_on_outer_wall' | 'fan_coil_on_ceiling' | 'split_indoor_units_on_wall'
+      | 'split_indoor_units_on_ceiling' | 'other';
+    fanCoilCount?: number;
+    waterBased: boolean;
+    designTemperature?: 't6_to12' | 't12_to16' | 't12_to18' | 't17_to21' | null;
+    balanced?: boolean | null;
+    control?: 'standalone' | 'central_with_room_control' | 'other_or_unknown' | null;
+    pipesInsulated?: boolean | null;
+    pipeInsulationYear?: number | null;
+    aquiferPermitYear?: number | null;
+    sourceReference: string;
+  } | null;
+  ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference'> & {
+    ductsLukaAbc?: boolean | null;
+    ahu?: {
+      insideThermalZone?: boolean | null;
+      ductsOutsideThermalZone?: boolean | null;
+      ductLength?: 'at_most20_m' | 'from20_to40_m' | 'at_least40_m' | null;
+      ductsInsulated?: boolean | null;
+    } | null;
+    recirculation?: 'none' | 'present_percent_unknown' | 'unknown' | null;
+    recirculationPercent?: number | null;
+    flowControl?: {
+      method: 'throttle' | 'inlet_vane' | 'blade_pitch' | 'speed_control' | 'other';
+      minimumPercent?: number | null;
+    } | null;
+    sourceReference: string;
+  };
+  humidification?: {
+    humidifier: 'electric_steam' | 'non_electric_steam' | 'adiabatic';
+    absorptionWheel?: boolean;
+    sourceReference: string;
+  } | null;
+  hotWater: {
+    generator:
+      | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' | 'collective_unknown' }
+      | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number }
+      | { kind: 'heat_pump'; exhaustAirSource: boolean }
+      | { kind: 'gas_storage_heater'; volumeL: number; before1985?: boolean | null; inHeatedZone?: boolean | null };
+    meanDrawOffLengthM?: number | null;
+    circulation?: boolean | null;
+    showers?: number;
+    showerHeatRecovery: 'none' | 'vertical' | 'horizontal' | 'unknown';
+    storage?: Array<{
+      id: string;
+      volumeL: number;
+      label?: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | null;
+      producedFrom2018?: boolean | null;
+      connection?: 'fully_insulated' | 'straight_only_four' | 'straight_only_more_than_four' | 'uninsulated' | null;
+      inHeatedZone?: boolean | null;
+      sourceReference: string;
+    }>;
+    sourceReference: string;
+  };
+  lighting: Array<{
+    id: string;
+    areaM2: number;
+    power:
+      | { method: 'luminaires'; luminaires: Array<{ count: number; powerW: number }> }
+      | {
+          method: 'lamps';
+          lamps: Array<{
+            count: number;
+            lampPowerW: number;
+            lampType:
+              | 't12' | 't8_conventional' | 't8_high_frequency' | 't5' | 'led_in_luminaire'
+              | 'cfl_plug_in' | 'cfl_integrated' | 'incandescent_or_halogen' | 'led_lamp' | 'unknown';
+          }>;
+        }
+      | { method: 'unknown'; ledFrom2017?: boolean };
+    presence:
+      | 'none_or_central_on' | 'room_switch' | 'room_switch_with_sweep' | 'sensors_type_unknown'
+      | 'auto_on_dimmed' | 'auto_on_auto_off' | 'manual_on_dimmed' | 'manual_on_auto_off';
+    daylight?: 'none' | 'switching' | 'dimming' | 'unknown';
+    largeOfficeGroup?: boolean;
+    extractedLuminaires?: boolean;
+    sourceReference: string;
+  }>;
+  pv?: ResidentialSurvey['pv'];
+  bacs?: {
+    systemPowerKw?: number | null;
+    servedAreaM2?: number | null;
+    present?: boolean | null;
+    automationClassCOrBetter?: boolean | null;
+    managementClassBOrBetter?: boolean | null;
+    evidenceReference?: string | null;
+  };
+  sourceReference: string;
+}
+
+export async function assessUtilitySurveyWithRust(survey: UtilitySurvey): Promise<OpnameAssessment> {
+  if (isTauri()) {
+    return invoke<OpnameAssessment>('assess_utility_survey', { survey });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/opname/utility', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ survey }),
+    });
+    return response.json() as Promise<OpnameAssessment>;
+  }
+  throw new Error('Rust basic survey is available in the desktop app and local development server.');
+}
+
 export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
   if (isTauri()) {
     return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input });
@@ -2541,7 +2674,7 @@ export interface BuildingPerformanceInput {
     id: string;
     service:
       | 'domestic_hot_water' | 'domestic_hot_water_auxiliary' | 'ventilation_fans'
-      | 'space_cooling' | 'space_cooling_auxiliary' | 'lighting' | 'pv_auxiliary';
+      | 'space_cooling' | 'space_cooling_auxiliary' | 'lighting' | 'pv_auxiliary' | 'humidification';
     carrier: 'el' | 'gas' | 'oil';
     monthlyKwh: number[];
     sourceReference: string;

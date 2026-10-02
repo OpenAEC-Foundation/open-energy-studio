@@ -59,3 +59,76 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 3. ISSO-klasse 70/50 heeft geen rij in NTA-tabel 9.14. De distributie gebruikt 70/60 (gelijke aanvoertemperatuur). De ketel gebruikt de gemiddelde temperatuur 60 °C.
 4. ΔU_for (8.3) wordt niet toegepast op scheidingen met onverwarmde ruimten, omdat H_D;for alleen de buitenlucht betreft.
 5. Een combitoestel met Gaskeur CW zonder HR telt als "combi met Gaskeur" (0,50). Tabel 13.25 kent alleen de combinatie HR + CW als hogere rij.
+
+# Basisopname bestaande utiliteitsgebouwen (ISSO 75.1)
+
+Module: `crates/nta8800-core/src/opname/utility.rs`.
+Route: `POST /v1/nta8800/opname/utility` met `{ "survey": … }`, MCP-tool `assess_utility_survey` en Tauri-command `assess_utility_survey`.
+TS-client: `assessUtilitySurveyWithRust` met het type `UtilitySurvey` in `src/core/nta/KernelClient.ts`.
+Bron: ISSO 75.1, 7e druk (printdatum 11-12-2025). Paginanummers verwijzen naar de pdf; de ISSO-tekst zelf staat niet in de repository. Alleen basisopname-regels zijn toegepast, geen maatwerkadvies (ISSO 75.2).
+
+Status: **ongeverifieerd**, net als de woninglaag.
+
+## Werking
+
+De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envelope.rs`, met bijlage I via `forfait_envelope`), verwarming, tapwatertoestellen, PV, de `Recorder` en de lijst `appliedDefaults`. Regels die ISSO 75.1 gelijk aan ISSO 82.1 voorschrijft, krijgen in de uitvoer de ISSO 75.1-pagina. Utiliteitsspecifiek zijn:
+
+- gebruiksfuncties met oppervlakten;
+- collectieve verwarming;
+- koeling;
+- ventilatie met LBK, recirculatie en debietregeling;
+- bevochtiging;
+- utiliteitstapwater;
+- verlichting;
+- BACS.
+
+**Eén rekenzone.** Het gebouw is één rekenzone met de grootste gebruiksfunctie als hoofdfunctie. Andere functies tot samen 25 % van A_g tellen mee als hoofdfunctie (p. 39–40). Liggen ze daarboven, dan meldt de laag `mixed_functions_require_zones`. Gebouwen met meer functies moeten dus nog per functie als aparte opname (één zone per functie) worden ingevoerd. De kern kan sinds §6.5.3 gemengde zones rekenen, maar de opnamelaag gebruikt dat nog niet.
+
+**Bevochtiging.** Stoombevochtiging wordt in twee stappen berekend. De eerste kernrun levert de mechanische toevoerdebieten uit hoofdstuk 11. Daaruit volgt met 12.1–12.3 de maandelijkse stoomenergie. Die komt als `declaredUses`-post met de nieuwe dienst `humidification` (E_hum van 5.20, zonder f_BACS) in een tweede run. Adiabatische bevochtiging geeft de waarschuwing `adiabatic_humidification_load_not_in_heating_chain`: de latente last hoort bij de verwarming, maar de keten neemt die nog niet op. Ontvochtiging (tabel 12.2) is nog niet gekoppeld.
+
+## Geïmplementeerde regels
+
+| Onderdeel | Regel | ISSO 75.1 |
+|---|---|---|
+| Functies | Andere functies tot 25 % van A_g worden samengevoegd met de hoofdfunctie. Een woonfunctie hoort in de woningopname | p. 39–40 |
+| Gebouwtype | Eén- of meerlaags, ligging en daktype bepalen de rij van NTA-tabel 11.14. "Deels plat" geldt alleen bij vrijstaande gebouwen | p. 55–56 |
+| Toestel- en renovatiejaar | Zoals bij woningen | p. 30, 57–59 |
+| Zonwerende beglazing | Zichtbaar zonwerend glas of folie → g = 0,4 | p. 96 (tabel 8.14) |
+| BACS | Is het vermogen onbekend, dan geldt een systeem dat meer dan 2.500 m² bedient als systeem boven 290 kW. BACS onbekend → afwezig. Automatisering onbekend → klasse D. Beheer onbekend → klasse C/D. Een systeem boven 290 kW zonder conform BACS krijgt f_BACS = 1,05 | p. 62–63 (tabel 7.3) |
+| Grote installatie | Bedient een installatie meer dan 500 m², dan staat de technische ruimte (ketel, LBK) per definitie buiten de thermische zone | p. 17, 117 |
+| Collectieve verwarming | Ketelrol collectief, met het nominale vermogen voor de hulpenergie (9.91). Warmtepomp in de utiliteitsscope van tabel 9.27. Berekende distributie (9.26–9.51) met forfaitaire pomp, leidingen ongeïsoleerd en warmtemeter aanwezig | p. 108–123 |
+| Koeling | Vermogen onbekend → forfait. Ontwerptemperatuur onbekend → 6/12, bij alleen stralingskoeling 17/21. Inregeling onbekend → niet ingeregeld. Leidingen onbekend → ongeïsoleerd, isolatiejaar = bouwjaar. Koudemeters onbekend → aanwezig. Betonkernactivering telt als vloerkoeling. Binnendelen van split/VRF tellen als ventilatorconvectoren. Regeling onbekend → overig. WKO met onbekend jaar → vergunningsjaar, anders vóór 2013 | p. 131–138 |
+| Ventilatie | Zelfregelende roosters, regeling, WTW, bypass en kanaaldichtheid zoals bij woningen. Kanaaldichtheid wordt alleen bij bewezen LUKA A–C verlaagd | p. 142–153 |
+| Recirculatie | Aanwezig met onbekend percentage → < 20 % (x = 10). Onbekend of aanwezig → geen. Een bekend percentage wordt naar beneden afgerond op tientallen | p. 148 (tabel 11.7) |
+| Debietregeling | Onbekend → geen. Minimumdebiet onbekend → 80 %. Een bekend percentage wordt naar boven afgerond | p. 149 (tabel 11.8) |
+| LBK-kanalen buiten de zone | Lengte onbekend → ≥ 40 m. Isolatie onbekend → R < 1,0. Situatie volgens NTA-tabel 11.19 | p. 153 (tabel 11.14) |
+| Ventilatoren | Forfait. Motor onbekend → wisselstroom (tot en met 2006) of gelijkstroom (vanaf 2007) | p. 154 |
+| Tapwater | Geen systeem → elektrisch doorstroomtoestel. Gastoestellen zoals bij woningen. Collectieve opwekker onbekend → overige direct verwarmde voorraadvaten. Gasboiler: jaar onbekend → bouwjaar, plaats onbekend → buiten de zone. Tappuntlengte onbekend → > 3 m. Circulatie forfaitair. DWTW alleen bij functies met douches | p. 164–178 |
+| Voorraadvaten | Verplicht bij elektrische en indirect gestookte boilers. Label onbekend → volgt het fabricagejaar. Fabricagejaar onbekend → tot en met 2017. Aansluiting onbekend → ongeïsoleerd (f_sto;dis;ls = 5; elektroboilers 2). Plaats onbekend → buiten de zone | p. 172–173 (tabel 13.10) |
+| Verlichting | Vermogen onbekend → forfait tabel 14.5. Bij forfait geldt centraal aan en geen daglichtregeling. Het forfait geldt dan voor alle verlichtingszones (NTA 14.3.4). Alleen ruimteschakelaars → handmatig. Sensoren van onbekend type → automatisch aan, gedimd. Daglichtregeling van onbekend type → schakelend. Lamptype onbekend → toeslag 20 %. Parasitair vermogen forfaitair | p. 182–189 |
+| Bevochtiging | Type stoom (elektrisch of niet-elektrisch) of adiabatisch. Terugwinning alleen bij een sorptiewiel | p. 161 |
+| PV | Zoals bij woningen | p. 196–197 |
+
+## Niet ondersteund
+
+- Meer dan één rekenzone, en functiemengsels boven 25 %.
+- Koeling via de LBK (DX of watergevoerd), passieve koeling met bypass, en koeling met warmtepompen die ook verwarmen.
+- Ontvochtiging en de latente last van adiabatische bevochtiging.
+- Meerdere opwekkers per dienst, WKK, zonneboilers, warmtapwater via afleversets en luchtverwarming via de LBK.
+- Daglichtsectoren. Een bekende daglichtregeling rekent met de forfaitaire daglichtmethode.
+
+## Interpretatievragen
+
+1. Hoeveel elektrisch aangesloten toestellen heeft een collectieve opwekker (9.91)? De laag neemt er één per opgenomen opwekker.
+2. Staat een LBK binnen of buiten de thermische zone als dat onbekend is en de installatie klein is? De laag kiest buiten, als conservatieve keuze; ISSO geeft alleen de regel voor installaties boven 500 m².
+3. Is "80 % of meer" bij een onbekend minimumdebiet (tabel 11.8) op te vatten als x = 80 in NTA 11.61? De laag doet dat.
+4. Wordt de stoomenergie (E_hum) niet met f_BACS vermenigvuldigd? Formule 5.20 past f_BACS alleen toe op E_H en E_C; de laag volgt dat.
+5. Moet de forfaitaire circulatie (p. 174–175) bij een onbekende aanwezigheid worden opgenomen? De laag neemt geen circulatie op en geeft de waarschuwing `circulation_unknown_not_entered`.
+
+## Fixtures
+
+Synthetische opnames in `training-data/` (geen echte gebouwen):
+
+- `nta8800-opname-utility-1985-office.json`: kantoor met kantine, collectieve HR-104, WTW-LBK met recirculatie.
+- `nta8800-opname-utility-2005-school.json`: school met mechanische afzuiging, sensoren en PV.
+- `nta8800-opname-utility-1970-retail.json`: winkel met veel onbekenden, koeling, stoombevochtiging en een onbekend BACS-vermogen.
