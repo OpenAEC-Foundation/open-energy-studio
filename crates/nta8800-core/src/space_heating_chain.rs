@@ -665,6 +665,8 @@ pub struct ChainMonth {
     pub auxiliary_electricity_kwh: Option<f64>,
     /// 9.51.
     pub distribution_auxiliary_electricity_kwh: f64,
+    /// 9.21/9.22 W_H;em;aux of room fans, kWh.
+    pub emission_fan_electricity_kwh: f64,
     /// 9.7: recoverable losses summed over the zones.
     pub recoverable_loss_kwh: f64,
     pub collective_source_heat_kwh: f64,
@@ -858,6 +860,8 @@ struct ZoneTerms {
     /// Declared or zero loss; `None` for the calculated route.
     fixed_loss: Option<[f64; 12]>,
     heating_limit_extra: [f64; 12],
+    /// Σ P_fan·n_fan of 9.22, W.
+    fan_power_w: f64,
 }
 
 /// Validates one zone; `None` when invalid.
@@ -888,12 +892,38 @@ fn zone_terms(
             format!("{prefix}emission.balancing"),
         ));
     }
-    if emission.system == EmissionSystem::FanAssistedRadiatorsOrConvectors {
-        // 9.21 fan energy is required for this emitter and is not modelled.
-        issues.push(issue(
-            "emission_fan_energy_unsupported",
-            format!("{prefix}emission.system"),
-        ));
+    // 9.21/9.22: room fans need their count and type (table 9.11).
+    match &emission.fans {
+        None if emission.system == EmissionSystem::FanAssistedRadiatorsOrConvectors => {
+            issues.push(issue(
+                "emission_fans_required",
+                format!("{prefix}emission.fans"),
+            ));
+        }
+        Some(fans) => {
+            if fans.count == 0 {
+                issues.push(issue(
+                    "emission_fan_count_invalid",
+                    format!("{prefix}emission.fans.count"),
+                ));
+            }
+            if fans
+                .tested_power_w
+                .is_some_and(|power| !power.is_finite() || power < 0.0)
+            {
+                issues.push(issue(
+                    "emission_fan_power_invalid",
+                    format!("{prefix}emission.fans.testedPowerW"),
+                ));
+            }
+            if fans.source_reference.trim().is_empty() {
+                issues.push(issue(
+                    "source_reference_required",
+                    format!("{prefix}emission.fans.sourceReference"),
+                ));
+            }
+        }
+        None => {}
     }
     let mut extra = [0.0; 12];
     let (fixed_loss, reference) = match distribution {
@@ -993,6 +1023,10 @@ fn zone_terms(
         emission_loss,
         fixed_loss,
         heating_limit_extra: extra,
+        fan_power_w: emission
+            .fans
+            .as_ref()
+            .map_or(0.0, |fans| fans.power_w() * f64::from(fans.count)),
     })
 }
 
@@ -1697,6 +1731,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 generator_electricity_kwh: 0.0,
                 auxiliary_electricity_kwh: None,
                 distribution_auxiliary_electricity_kwh: distribution.pump_electricity[index],
+                emission_fan_electricity_kwh: 0.0,
                 recoverable_loss_kwh: distribution
                     .zone_recoverable
                     .iter()
@@ -1743,11 +1778,35 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 &mut issues,
             );
         }
-        // 9.6: total auxiliary energy includes the distribution pump.
+        // 9.22 with t_H;op;si;mi (9.32a): the longest operating time of the
+        // zones on the system.
+        let fan_power: f64 = valid_zones.iter().map(|zone| zone.fan_power_w).sum();
+        if fan_power > 0.0 {
+            let limits: Vec<i32> = valid_zones
+                .iter()
+                .filter_map(|zone| {
+                    let need: [f64; 12] = std::array::from_fn(|month| {
+                        zone.need[month] + zone.heating_limit_extra[month]
+                    });
+                    heating_limit_c(&need, zone.setpoint_c)
+                })
+                .collect();
+            for (index, row) in monthly.iter_mut().enumerate() {
+                let hours = limits
+                    .iter()
+                    .map(|limit| heating_limit_hours(*limit, index))
+                    .fold(0.0_f64, f64::max);
+                row.emission_fan_electricity_kwh = fan_power * hours / 1000.0;
+            }
+        }
+        // 9.6: total auxiliary energy includes the distribution pump and the
+        // emission fans (9.21).
         for row in monthly.iter_mut() {
-            row.auxiliary_electricity_kwh = row
-                .auxiliary_electricity_kwh
-                .map(|value| value + row.distribution_auxiliary_electricity_kwh);
+            row.auxiliary_electricity_kwh = row.auxiliary_electricity_kwh.map(|value| {
+                value
+                    + row.distribution_auxiliary_electricity_kwh
+                    + row.emission_fan_electricity_kwh
+            });
         }
     }
     let valid = issues.is_empty();
@@ -3014,13 +3073,47 @@ mod tests {
     }
 
     #[test]
-    fn rejects_fan_assisted_and_inconsistent_balancing_without_numbers() {
+    fn fan_assisted_emitters_need_fans_and_inconsistent_balancing_is_rejected() {
         let mut input = boiler_chain();
         input.emission.system = EmissionSystem::FanAssistedRadiatorsOrConvectors;
         let result = assess_space_heating_chain(&input);
         assert_eq!(result.status, "invalid");
         assert!(result.monthly.is_empty());
         assert!(result.annual_natural_gas_kwh.is_none());
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "emission_fans_required"));
+        // 9.22 with table 9.11: 4 fan convectors of 10 W over t_H;op.
+        input.emission.fans = Some(crate::heating_emission::EmissionFans {
+            kind: crate::heating_emission::EmissionFanKind::FanConvector,
+            count: 4,
+            tested_power_w: None,
+            source_reference: "survey".into(),
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!(jan.emission_fan_electricity_kwh > 0.0);
+        assert!(jan.emission_fan_electricity_kwh <= 40.0 * 744.0 / 1000.0 + 1e-9);
+        let mut plain = input.clone();
+        if let Some(fans) = plain.emission.fans.as_mut() {
+            fans.tested_power_w = Some(0.0);
+        }
+        let plain = assess_space_heating_chain(&plain);
+        let extra = result.annual_auxiliary_electricity_kwh.unwrap()
+            - plain.annual_auxiliary_electricity_kwh.unwrap();
+        let fans: f64 = result
+            .monthly
+            .iter()
+            .map(|row| row.emission_fan_electricity_kwh)
+            .sum();
+        assert!((extra - fans).abs() < 1e-6);
+        input.emission.fans = None;
         input.emission.system = EmissionSystem::AirHeating;
         let result = assess_space_heating_chain(&input);
         assert!(result

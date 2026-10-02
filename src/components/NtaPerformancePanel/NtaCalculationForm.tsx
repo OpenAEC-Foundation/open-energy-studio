@@ -190,7 +190,22 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.emission')}>
       <SelectField {...field} path={['emission', 'system']} label={t('nta.form.emissionSystem')} options={[
         ['radiators_or_convectors', t('nta.form.emission.radiators')], ['floor_heating', t('nta.form.emission.floor')],
+        ['fan_assisted_radiators_or_convectors', t('nta.form.emission.fanAssisted')],
         ['air_heating', t('nta.form.emission.air')], ['local_heater', t('nta.form.emission.local')], ['other_or_unknown', t('nta.form.unknown')]]} />
+      <label className="nta-form-check">
+        <input type="checkbox" checked={read(draft, ['emission', 'fans']) != null}
+          onChange={(event) => change(['emission', 'fans'], event.target.checked
+            ? { kind: 'fan_convector', count: 1, sourceReference: '' } : undefined)} />
+        {t('nta.form.emission.fans')}
+      </label>
+      {read(draft, ['emission', 'fans']) != null && <>
+        <SelectField {...field} path={['emission', 'fans', 'kind']} label={t('nta.form.emission.fanKind')} options={[
+          ['fan_convector', t('nta.form.emission.fanKind.convector')], ['electric_heating', t('nta.form.emission.fanKind.electric')],
+          ['dynamic_storage', t('nta.form.emission.fanKind.storage')], ['unknown', t('nta.form.unknown')]]} />
+        <NumberField {...field} path={['emission', 'fans', 'count']} label={t('nta.form.emission.fanCount')} step="1" />
+        <NumberField {...field} path={['emission', 'fans', 'testedPowerW']} label={t('nta.form.emission.fanTestedPower')} />
+        <TextField {...field} path={['emission', 'fans', 'sourceReference']} label={t('nta.form.source')} />
+      </>}
       <SelectField {...field} path={['emission', 'balancing']} label={t('nta.form.balancing')} options={[
         ['none_or_unknown', t('nta.form.unknown')], ['static', t('nta.form.balancing.static')],
         ['dynamic', t('nta.form.balancing.dynamic')], ['not_applicable', t('nta.form.balancing.na')]]} />

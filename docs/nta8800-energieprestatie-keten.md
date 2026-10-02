@@ -365,3 +365,16 @@ Via **NTA-invoer starten** opent een gestructureerd formulier met secties die de
   - Een vernevelaar levert zijn latente warmte als last aan het knooppunt van de verwarmingsketen (9.4).
   - Een stoombevochtiger gebruikt elektriciteit (η 0,8) of gas (η 0,6).
   - Het terugwinbare verlies van stoombevochtiging (12.4) wordt nog niet teruggekoppeld naar de behoefte.
+
+## Ventilatoren in de afgifte (9.21/9.22, tabel 9.11)
+
+`emission.fans` beschrijft de ventilatoren voor luchtcirculatie in de ruimte. Bij `fan_assisted_radiators_or_convectors` is dit veld verplicht; zonder het veld geeft de kern `emission_fans_required`. Voor andere afgiftesystemen, zoals fancoils of de binnenunit van een split, is het optioneel.
+
+- **Vermogen per ventilator** volgt tabel 9.11:
+  - 10 W voor een ventilatorconvector of elektrische verwarming;
+  - 12 W voor dynamische warmteopslag;
+  - 12 W bij onbekend type (de hoogste waarde).
+- **Getest vermogen**: een volgens NEN-EN 16430 getest vermogen (`testedPowerW`) vervangt de tabelwaarde.
+- **Energie**: W_fan = Σ P·n·t_H;op;si;mi / 1000.
+- **Bedrijfstijd**: t_H;op;si;mi is de langste bedrijfstijd (9.32a) van de zones op het systeem.
+- **Boeking**: de energie komt in `emissionFanElectricityKwh` en telt mee in de hulpenergie van de verwarming.

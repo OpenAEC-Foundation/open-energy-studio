@@ -1447,6 +1447,14 @@ export interface SpaceHeatingChainInput {
     balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
     control: 'main_room_thermostat' | 'central_with_room_valves' | 'individual_room_thermostats' | 'other_or_unknown';
     sourceReference: string;
+    /** Room fans (9.21/9.22, table 9.11); required for fan-assisted emitters. */
+    fans?: {
+      kind: 'fan_convector' | 'electric_heating' | 'dynamic_storage' | 'unknown';
+      count: number;
+      /** NEN-EN 16430 tested power per fan, W. */
+      testedPowerW?: number;
+      sourceReference: string;
+    };
   };
   distribution:
     | { method: 'heated_zone_only_space_heating'; sourceReference: string }

@@ -53,6 +53,52 @@ pub struct EmissionInput {
     pub balancing: HydronicBalancing,
     pub control: EmissionControl,
     pub source_reference: String,
+    /// Fans for air circulation in the room (9.21/9.22, table 9.11);
+    /// required for fan-assisted radiators or convectors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fans: Option<EmissionFans>,
+}
+
+/// Table 9.11 decisive property of the room fans.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmissionFanKind {
+    /// Fan convector (fancoil), also the indoor unit of a (multi-)split.
+    FanConvector,
+    ElectricHeating,
+    /// Local dynamic heat storage (soapstone, PCM).
+    DynamicStorage,
+    /// Not known: the highest value of table 9.11.
+    Unknown,
+}
+
+impl EmissionFanKind {
+    /// Table 9.11, W per fan.
+    pub fn power_w(self) -> f64 {
+        match self {
+            Self::FanConvector | Self::ElectricHeating => 10.0,
+            Self::DynamicStorage | Self::Unknown => 12.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EmissionFans {
+    pub kind: EmissionFanKind,
+    /// n_fan;zi of 9.22.
+    pub count: u32,
+    /// Fan power of an assembly tested to NEN-EN 16430, W per fan; replaces
+    /// table 9.11.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tested_power_w: Option<f64>,
+    pub source_reference: String,
+}
+
+impl EmissionFans {
+    pub fn power_w(&self) -> f64 {
+        self.tested_power_w.unwrap_or_else(|| self.kind.power_w())
+    }
 }
 
 pub fn system_correction_k(system: EmissionSystem) -> f64 {
@@ -132,6 +178,7 @@ mod tests {
             balancing,
             control,
             source_reference: "test".into(),
+            fans: None,
         }
     }
 
