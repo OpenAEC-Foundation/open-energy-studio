@@ -63,10 +63,14 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
   add('survey_type', 'general', 'Basis- of detailopname', registration.surveyType != null);
   add('client_information', 'general', 'Bewijs van het informeren van de opdrachtgever en van door de opdrachtgever aangereikte gegevens',
     has(evidence, 'client_statement'));
+  add('delivered_report', 'general', 'Het aan de opdrachtgever geleverde energieprestatie-rapport', assessment != null);
 
   // Bouwkundige gegevens
   add('floor_plan', 'building', 'Plattegrond met maatvoering en indeling', has(evidence, 'drawing'));
   add('section', 'building', 'Doorsnede of foto met de hoogte van het gebouw', has(evidence, 'drawing', 'photo_overview'));
+  const surfaces = (project.zones ?? []).flatMap((zone) => zone.surfaces ?? []);
+  add('entered_areas', 'building', 'Ingevoerde oppervlakten van vloer, dak, gevels, ramen en panelen',
+    surfaces.length > 0 && surfaces.every((surface) => (surface.area ?? 0) > 0));
   add('construction_year', 'building', 'Bouwjaar en eventueel renovatiejaar', registration.constructionYear != null);
   add('roof_type', 'building', 'Type dak (tekening of foto)', has(evidence, 'drawing', 'photo_overview', 'photo_detail'));
 
@@ -88,11 +92,28 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
       registration.surveyType === 'basic' ? 'geen basisopname-uitvoer meegegeven' : undefined);
   }
   add('schematisation', 'elaboration', 'Onderbouwing schematisering en rekenzones', has(evidence, 'drawing'));
+  add('thermal_properties', 'elaboration', 'Beschrijving van de bepaling van de thermische eigenschappen (materiaal en dikte, of bouwjaarklasse)',
+    opname != null || has(evidence, 'datasheet', 'declaration_of_performance', 'photo_detail', 'drawing'));
+  attention('parameters_used', 'elaboration', 'Onderbouwing welke elementen, parameters en gegevens zijn gebruikt',
+    'leg vast in het dossier; de kernuitvoer en de invoer tonen de gebruikte waarden');
+  attention('isso_calculations', 'elaboration', 'Berekeningen en aanvullende gegevens die volgens ISSO 82.1/75.1 in het dossier horen',
+    'bijvoorbeeld de onderbouwing van koudebruggen, beschaduwing en bijzondere constructies');
+  if (bbl) {
+    attention('apartment_labels', 'elaboration', 'Onderbouwing als individuele appartementen geen energielabel krijgen',
+      'alleen van toepassing bij toets Bbl van een woongebouw');
+  }
 
   // Representativiteit
   const representative = registration.representation != null && registration.representation !== 'unique';
-  add('representativity', 'representativity', 'Onderbouwing representativiteit en deelverzameling',
-    representative ? registration.representation !== 'similar' || filled(registration.referenceObjectId) : null);
+  // Both reference and similar objects need the substantiation, the subset
+  // overview, the visited objects and the characteristics (Bijlage 3).
+  const representativityEvidence = evidence.some((item) =>
+    (item.linkedPaths ?? []).some((path) => path.startsWith('/registration/representation')));
+  add('representativity', 'representativity', 'Onderbouwing representativiteit, deelverzameling, bezochte objecten en kenmerken',
+    representative
+      ? representativityEvidence && (registration.representation !== 'similar' || filled(registration.referenceObjectId))
+      : null,
+    representative && !representativityEvidence ? 'koppel bewijs aan /registration/representation' : undefined);
 
   // Resultaat berekening
   const surveyor = registration.surveyingAdvisor;
@@ -104,10 +125,17 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
   const registrar = registration.registeringAdvisor;
   add('registration_data', 'result', 'Registratiedatum, registrerende adviseur en EP-Online-nummer',
     filled(registration.registrationDate) && filled(registrar?.name) && filled(registration.epOnlineNumber));
+  add('electronic_files', 'result', 'Elektronische bestanden van de energieprestatieberekening', assessment != null);
+  if (bbl || delivery) {
+    attention('gto_cooling_load', 'result', 'GTO- en koellastberekeningen, indien gemaakt', 'opnemen als ze zijn gemaakt');
+  }
+  // New buildings over 1000 m² tested against the Bbl from 1-1-2028, and
+  // their later delivery (BRL 9500-W p. 21 and Bijlage 3 p. 62).
   const area = assessment?.geometry?.usableFloorAreaM2 ?? 0;
-  if ((bbl || delivery) && area > 1000) {
-    attention('wlc_gwp', 'result', 'WLC-GWP-berekening (nieuwbouw > 1000 m²)',
-      'verplicht bij oplevering, bij toets Bbl vanaf 1-1-2028 (BRL 9500 §4.2.2)');
+  const dated = registration.registrationDate ?? registration.surveyDate ?? '';
+  if ((bbl || delivery) && area > 1000 && dated >= '2028-01-01') {
+    attention('wlc_gwp', 'result', 'WLC-GWP-berekening (nieuwe gebouwen > 1000 m²)',
+      'verplicht bij toets Bbl vanaf 1-1-2028 en bij de daaropvolgende oplevering (BRL 9500-W p. 21, Bijlage 3 p. 62)');
   }
 
   // Bewijsmateriaal
@@ -122,6 +150,16 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
     bbl ? has(evidence, 'quality_declaration', 'declaration_of_performance') : null);
   add('photos', 'evidence', 'Leesbare foto\'s van typeaanduiding en maatvoering',
     bbl ? null : has(evidence, 'photo_detail'));
+  add('invoices', 'evidence', 'Facturen op naam en/of adres', bbl ? null : has(evidence, 'invoice'));
+  if (has(evidence, 'datasheet', 'declaration_of_performance', 'quality_declaration')) {
+    add('product_documentation', 'evidence', 'Productdocumentatie van de fabrikant met kwaliteitsverklaring en/of DoP', true);
+  } else {
+    attention('product_documentation', 'evidence', 'Productdocumentatie van de fabrikant met kwaliteitsverklaring en/of DoP',
+      'bij fabrieksmatig geproduceerde elementen, indien van toepassing');
+  }
+  if (bbl) {
+    attention('forfait_justification', 'evidence', 'Onderbouwing van gebruikte forfaitaire waarden', 'alleen bij toets Bbl');
+  }
 
   // Herlabelen
   if (registration.relabel) {
@@ -132,6 +170,7 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
       attention('relabel_review', 'relabel', 'Wijzigingen die beoordeling vragen', `${relabel.changes.filter((c) => c.verdict === 'review').length} wijziging(en)`);
     }
     add('relabel_invoice', 'relabel', 'Offerte en opdracht of gespecificeerde factuur van de verbetering', has(evidence, 'invoice'));
+    add('relabel_improvement_date', 'relabel', 'Datum van de verbetering binnen 24 maanden na de opname', filled(registration.improvementDate));
     const production = relabel?.changes.some((change) => /pv|solar|production/i.test(change.path)) ?? false;
     add('relabel_production_photos', 'relabel', 'Foto\'s van PV of zonthermie, met beschaduwing',
       production ? has(evidence, 'photo_overview', 'photo_detail') : null);

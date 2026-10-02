@@ -18,13 +18,14 @@ const buildingFunctions: BuildingFunction[] = [
 
 type TextKey = 'referenceObjectId' | 'bagObjectId' | 'postcode' | 'houseNumber' | 'houseNumberAddition'
   | 'buildingType' | 'client' | 'certificateNumber' | 'surveyDate' | 'registrationDate'
-  | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate';
+  | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate' | 'improvementDate';
 
 const textFields: Array<{ key: TextKey; type?: 'date' }> = [
   { key: 'bagObjectId' }, { key: 'postcode' }, { key: 'houseNumber' }, { key: 'houseNumberAddition' },
   { key: 'buildingType' }, { key: 'client' }, { key: 'certificateNumber' },
   { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' }, { key: 'completionDate', type: 'date' },
-  { key: 'referenceObjectId' }, { key: 'originalKernelVersion' }, { key: 'epOnlineNumber' },
+  { key: 'referenceObjectId' }, { key: 'originalKernelVersion' }, { key: 'improvementDate', type: 'date' },
+  { key: 'epOnlineNumber' },
 ];
 
 /** BRL 9500 §3.1 situations that require a detailed survey. */

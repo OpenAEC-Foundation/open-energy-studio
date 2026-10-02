@@ -71,7 +71,7 @@ export function RelabelPanel() {
               </table>
             </div>
           )}
-          <small>{result.source}</small>
+          <small>{result.scheme === 'u' ? 'BRL 9500-U' : 'BRL 9500-W'} · {result.source}</small>
         </>
       )}
     </section>

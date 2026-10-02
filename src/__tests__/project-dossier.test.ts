@@ -73,6 +73,7 @@ describe('project dossier', () => {
     const bbl = checkDossierCompleteness({
       project: project({
         purpose: 'bbl_check', surveyType: 'detailed', postcode: '1011AB', houseNumber: '1',
+        registrationDate: '2028-03-01',
         evidence: [evidence('ev-1', 'drawing', 'A'), evidence('ev-2', 'datasheet')],
       }),
       assessment,
@@ -85,11 +86,35 @@ describe('project dossier', () => {
     expect(status('evidence_checked')).toBe('missing');
     expect(status('output_file')).toBe('ok');
     expect(status('wlc_gwp')).toBe('check');
+    expect(status('delivered_report')).toBe('ok');
+    expect(status('electronic_files')).toBe('ok');
+    expect(status('gto_cooling_load')).toBe('check');
+    expect(status('product_documentation')).toBe('ok');
+    expect(status('forfait_justification')).toBe('check');
+    expect(status('apartment_labels')).toBe('check');
+    expect(status('entered_areas')).toBe('missing');
+
+    // WLC-GWP: only for toets Bbl from 1-1-2028 (BRL 9500-W p. 21).
+    const before2028 = checkDossierCompleteness({
+      project: project({ purpose: 'bbl_check', registrationDate: '2027-12-31' }),
+      assessment,
+    });
+    expect(before2028.some((item) => item.id === 'wlc_gwp')).toBe(false);
+
+    // A reference object needs linked representativity evidence.
+    const reference = (linked: boolean) => checkDossierCompleteness({
+      project: project({
+        representation: 'reference',
+        evidence: [{ ...evidence('ev-3', 'other', 'A'), ...(linked ? { linkedPaths: ['/registration/representation'] } : {}) }],
+      }),
+    }).find((item) => item.id === 'representativity')?.status;
+    expect(reference(false)).toBe('missing');
+    expect(reference(true)).toBe('ok');
 
     const relabel = checkDossierCompleteness({
       project: project({ relabel: true, evidence: [evidence('ev-1', 'invoice', 'A')] }),
       relabel: {
-        source: 'x', allowed: false, needsReview: true,
+        source: 'x', scheme: 'w', allowed: false, needsReview: true,
         changes: [{ path: '/pvSystems/0', before: null, after: {}, verdict: 'review', cluster: 'x' }],
       },
     });
@@ -97,6 +122,7 @@ describe('project dossier', () => {
     expect(relabelStatus('relabel_changes')).toBe('missing');
     expect(relabelStatus('relabel_review')).toBe('check');
     expect(relabelStatus('relabel_invoice')).toBe('ok');
+    expect(relabelStatus('relabel_improvement_date')).toBe('missing');
     expect(relabelStatus('relabel_production_photos')).toBe('missing');
   });
 
