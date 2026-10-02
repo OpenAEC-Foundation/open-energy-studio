@@ -55,7 +55,7 @@ pub enum SurfaceBoundary {
     /// Adjacent heated space or other dwelling: no transmission (8.5).
     AdjacentHeated,
     /// Strongly ventilated space, such as a garage (NTA 3.134, 6.3; ISSO
-    /// 82.1 §6.3.4 with WD 2025 afb. 6.x): losses as towards outdoor air,
+    /// 82.1 §6.3.4 p. 41 with WD 2025 p. 22–24): losses as towards outdoor air,
     /// without solar gains on the parts facing it.
     StronglyVentilated,
     /// Opening of the ground floor to an unheated cellar (not a cellar
@@ -619,7 +619,7 @@ pub fn derive_envelope(
                         orientation,
                         tilt,
                         outdoor: exterior,
-                    solar,
+                        solar,
                         in_mean: false,
                         reference: panel.source_reference.clone(),
                     },
@@ -882,7 +882,7 @@ pub fn derive_envelope(
                             orientation,
                             tilt,
                             outdoor: exterior,
-                    solar,
+                            solar,
                             in_mean: true,
                             reference: format!(
                                 "{}; basisopname R_c {} ({})",

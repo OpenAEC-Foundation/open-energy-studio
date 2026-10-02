@@ -2557,10 +2557,9 @@ mod tests {
         assert!(system.get("unheatedPipeLengthM").is_none());
         assert!(applied(&recorder, "unheated_pipes_unknown_present"));
         // A measured length is passed on.
-        survey.heating.unheated_pipes =
-            Some(super::super::heating::UnheatedPipesAnswer::Present {
-                length_m: Some(12.0),
-            });
+        survey.heating.unheated_pipes = Some(super::super::heating::UnheatedPipesAnswer::Present {
+            length_m: Some(12.0),
+        });
         let mut recorder = Recorder::default();
         let input = derive_utility_input(&survey, &mut recorder).unwrap();
         assert_eq!(

@@ -25,8 +25,11 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | Algemeen | Jaar van een toestel: fabricagejaar, dan installatiejaar, dan bouwjaar | p. 28 |
 | Renovatiejaar | Beslisschema afb. 7.3. Is het jaar onbekend, dan geldt het eerste jaar van de volgende jaarklasse | p. 52–55 |
 | Woningtype | Een niet in te delen eengezinswoning is een hoekwoning. "Deels plat" geldt alleen bij vrijstaande woningen. Daarmee volgt het type van NTA-tabel 11.14 | p. 51–52 |
-| Thermische massa | Tabellen 7.5/7.6 (erratum §2) worden omgezet naar de klassen van NTA-tabel 7.10 | p. 62 |
+| Thermische massa | Tabellen 7.5/7.6 (erratum §2) worden omgezet naar de klassen van NTA-tabel 7.10. Een gesloten of verlaagd plafond (`closedOrSuspendedCeiling`) kiest de eerste kolom bij elk vloertype; `lighterCeiling` doet dat voor een (zeer) zware vloer met een lichter plafond | p. 62 |
 | Opake constructies | R_c volgens bouwjaar en isolatiestaat via NTA-bijlage I (`forfait_envelope`). Een nageïsoleerde spouw met onbekende breedte volgt tabel 8.26 (40/70/100 mm) | p. 84–93 |
+| Renovatie of aanbouw | Bij "aanwezig, dikte onbekend" met `renovation`: is het jaar bekend en is er bewijs dat aan de eis van dat jaar is voldaan, dan geldt de jaarklasse van dat jaar. Is het jaar bekend zonder dat bewijs, dan de klasse ervóór, ten hoogste "1992 tot 2014" (R_c 2,5). Is het jaar onbekend, dan de klasse na die van het bouwjaar; vóór 1965 de kolom "(na)geïsoleerd". Zonder `renovation` blijft de jaarklasse van het bouwjaar gelden (§8.7.2, prioriteit 3) | p. 84–85 (§8.7.2.1, afb. 8.14) |
+| Scheiding met onverwarmde ruimte | R_se is de R_si van de onverwarmde ruimte bij dezelfde warmtestroomrichting (0,13 / 0,10 / 0,17), niet 0,04 | NTA 8.4.2.1 |
+| Sterk geventileerde ruimte | Een garage of andere sterk geventileerde ruimte (`strongly_ventilated`) telt voor het verlies als buitenlucht (zelfde R_c-rij, R_se, f_ls 1, ΔU_for), maar zonder zoninstraling op de delen die eraan grenzen | p. 41 (§6.3.4); WD 2025 p. 22–24; NTA 3.134, 6.3 |
 | Beglazing | Gelijkstellingen: dubbel + voorzetraam = HR, enzovoort. U- en g-waarde uit tabel 8.14/8.15. Een raam zonder kozijn telt als hout/kunststof. Kozijnfractie 0,25 (NTA 7.6.6.2, methode B) | p. 93–95 |
 | Deuren en panelen | Een deur met minder dan 65 % glas wordt gesplitst in een raam- en een deurdeel. Is niet vast te stellen of de deur geïsoleerd is, dan geldt ongeïsoleerd. Panelen volgen tabel 8.18–8.21 | p. 70, 95–97 |
 | Koudebruggen | Forfaitair voor de hele woning: ΔU_for (NTA 8.2/8.3) op alle buitenvlakken; vloeren op grond krijgen 0,5·P | p. 79 |
@@ -43,7 +46,7 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | Biomassa | Bijlage R onbekend → niet conform | p. 111–112, p. 28 |
 | Distributie bij externe warmte, elektrisch of biomassa met watergedragen afgifte | Pomp forfaitair, leidingen ongeïsoleerd. Geen warmtemeter: tabel 9.16a geldt alleen voor collectieve installaties | p. 117–122 |
 | Leidingen in onverwarmde ruimten | Bevat het gebouw een kruipruimte, kelder of andere onverwarmde ruimte en is niet vastgesteld dat er geen cv-leidingen lopen, dan zijn ze aanwezig met de forfaitaire lengte (15 % van L, 9.26). De distributie gaat dan naar de berekende route (9.26–9.40) | p. 120 (afb. 9.1), p. 121 |
-| Tapwater | Geen systeem → elektrisch doorstroomtoestel. Gastoestel onbekend → badgeiser. Gaskeur onbekend → geen. CW-klasse onbekend → CW-4/5/6. Keukengeiser boven 13 kW → badgeiser. DWTW onbekend → niet aangesloten | p. 164–180 |
+| Tapwater | Geen systeem → elektrisch doorstroomtoestel. Gastoestel onbekend → badgeiser. Gaskeur onbekend → geen. CW-klasse (`cwClass`, alleen met Gaskeur): aanrecht/CW-1 → klasse 1, CW-2, CW-3, CW-4/5/6 of onbekend → klasse 4 (`measuredClass`). Keukengeiser boven 13 kW → badgeiser. DWTW onbekend → niet aangesloten | p. 164–180 (tabel 13.6) |
 | Elektrische boiler | Vat via `boilerVessel`: volume verplicht, behalve een keukenkastboiler (10 l). Label onbekend → fabricagejaar; jaar onbekend → bouwjaar; plaats onbekend → buiten de zone; aansluitfactor 2 | p. 172–174 (tabel 13.10) |
 | Ventilatie | Zelfregelende roosters (tabel 11.3/11.5). Sturing onbekend → geen. WTW onbekend → geen. Tegenstroom met onbekend materiaal → aluminium. Toevoerkanaal en bypass volgens tabel 11.10–11.12. Kanaaldichtheid onbekend → 1,1. Ventilatormotor onbekend → wisselstroom (tot en met 2006) of gelijkstroom (vanaf 2007). Fabricagejaar ventilator onbekend → bouwjaar (tabel 11.15 gaat voor de algemene regel van p. 28) | p. 142–154 |
 | PV | Kristallijn type bekend, jaar onbekend → bouwjaar (vóór 2001 telt als 2000). Type onbekend → polykristallijn met het installatiejaar, of "geplaatst vóór 2001" als ook dat onbekend is. Montage onbekend → niet geventileerd | p. 191 (tabel 15.7) |
@@ -60,6 +63,8 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 - Koeling: geeft de fout `cooling_not_supported_in_basisopname`.
 - Collectieve installaties, WKK, zonneboilers en meerdere opwekkers.
 - Serres (AOS), daklichten en woonboten/woonwagens.
+- Situaties van overstekken, balkons en galerijen (tabel 8.24/8.25): de kern kent nog alleen "minimale belemmering" en opgegeven maandfactoren (§17.3-tabellen ontbreken).
+- Het nominale vermogen van een tapwaterwarmtepomp (§13.3.2.5): de kern toetst de capaciteit van tapwatertoestellen (13.8.2) nog niet.
 - Een afvoerluchtwarmtepomp: die vraagt een tweede opwekker (WD p. 43), en de opname kent één opwekker.
 - Detailopname-routes en kwaliteitsverklaringen. De uitzondering is een gemeten q_v10.
 
@@ -74,6 +79,8 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 7. Leidingdoorvoeren (tabel 7.7): het aantal leidingen is het aantal bouwlagen, en elke leiding telt volgens 7.17 met alle bouwlagen van de zone. Een woning van twee bouwlagen krijgt dus 2 × 2 × 1,8 = 7,2 W/K.
 8. Een nageïsoleerde spouw van vóór 1930 met onbekende breedte krijgt 40 mm. Tabel 8.26 begint bij 1930.
 9. Een deels plat dak bij een niet-vrijstaande woning telt als hellend dak; ISSO kent deels plat alleen bij vrijstaande woningen.
+10. Renovatie zonder bewijs volgt afb. 8.14 letterlijk, ook als de klasse vóór het renovatiejaar lager is dan die van het bouwjaar (bijvoorbeeld bij een aanbouw). "Aanwezig, dikte onbekend" zonder `renovation` geldt vanaf 1965 als oorspronkelijke isolatie (jaarklasse van het bouwjaar).
+11. Een raam in een wand naar een sterk geventileerde ruimte telt in H_D als buitenraam (U voor buiten), zonder zonwinst.
 
 # Basisopname bestaande utiliteitsgebouwen (ISSO 75.1)
 
@@ -113,6 +120,8 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 | Grote installatie | Bedient een installatie meer dan 500 m², dan staat de technische ruimte (ketel, LBK) per definitie buiten de thermische zone | p. 17, 117 |
 | Collectieve verwarming | Ketelrol collectief, met het nominale vermogen voor de hulpenergie (9.91). Warmtepomp in de utiliteitsscope van tabel 9.27 (zonder c_source en zonder rij 9.28). Berekende distributie (9.26–9.51) met forfaitaire pomp, leidingen ongeïsoleerd en warmtemeter aanwezig (tabel 9.16a, alleen collectief) | p. 108–123 |
 | Leidingdoorvoeren | Onbekend → één ongeïsoleerde leiding per toiletgroep (`toiletStacks`) door alle bouwlagen. Zonder opgave van toiletgroepen rekent de laag met één groep | p. 68 (tabel 7.8) |
+| Leidingen in onverwarmde ruimten | Zoals bij woningen (afb. 9.1): met een kruipruimte, kelder of onverwarmde ruimte en zonder vastgestelde afwezigheid zijn de leidingen aanwezig met de forfaitaire lengte (15 % van L). Zijn ze afwezig, of is er geen onverwarmde ruimte, dan geeft de laag 0 m door; anders zou de berekende distributie 15 % van L in onverwarmde ruimte aannemen | p. 121–122 (afb. 9.1, tabel 9.14) |
+| Renovatie, R_se naar onverwarmde ruimten, sterk geventileerde ruimten, thermische massa | Zoals bij woningen | p. 66 (tabel 7.5), 88–89 |
 | Koeling | Vermogen onbekend → forfait. Ontwerptemperatuur onbekend → 6/12, bij alleen stralingskoeling 17/21. Inregeling onbekend → niet ingeregeld. Leidingen onbekend → ongeïsoleerd, isolatiejaar = bouwjaar. Koudemeters onbekend → aanwezig. Betonkernactivering telt als vloerkoeling. Binnendelen van split/VRF tellen als ventilatorconvectoren. Regeling onbekend → overig. WKO met onbekend jaar → vergunningsjaar, anders vóór 2013 | p. 131–138 |
 | Ventilatie | Zelfregelende roosters, regeling, WTW, bypass en kanaaldichtheid zoals bij woningen. Kanaaldichtheid wordt alleen bij bewezen LUKA A–C verlaagd | p. 142–153 |
 | Recirculatie | Aanwezig met onbekend percentage → de NTA-waarde x = 20 (11.60). Onbekend of aanwezig → geen. Een aangetoond hoger percentage wordt naar beneden afgerond op tientallen; lager dan 20 telt niet | p. 148 (tabel 11.7); NTA 11.60 |
@@ -141,7 +150,7 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 3. Is "80 % of meer" bij een onbekend minimumdebiet (tabel 11.8) op te vatten als x = 80 in NTA 11.61? De laag doet dat.
 4. Wordt de stoomenergie (E_hum) niet met f_BACS vermenigvuldigd? Formule 5.20 past f_BACS alleen toe op E_H en E_C; de laag volgt dat.
 5. Moet de forfaitaire circulatie (p. 174–175) bij een onbekende aanwezigheid worden opgenomen? De laag neemt geen circulatie op en geeft de waarschuwing `circulation_unknown_not_entered`.
-6. Leidingen in onverwarmde ruimten (afb. 9.1) zijn alleen in de woningopname uitgewerkt; de utiliteitsopname gaat nog uit van leidingen in de verwarmde zone.
+6. De utiliteitsopname kent geen CW-klasse voor gastoestellen; die gaat altijd naar klasse 4.
 
 ## Fixtures
 
