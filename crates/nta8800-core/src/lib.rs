@@ -39,6 +39,7 @@ pub mod heat_pumps;
 pub mod heating_aux_draft;
 pub mod heating_distribution;
 pub mod heating_emission;
+pub mod hot_water_tests;
 pub mod humidification;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
@@ -306,6 +307,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
             "unverified_humidification_dehumidification_chapter_12",
+            "unverified_hot_water_annex_t_gaskeur_and_annex_u_shower_recovery_tests",
             "unverified_opaque_construction_u_rc_annex_c_e_f",
             "unverified_window_door_shutter_u_8_2_2_3_annex_g_l",
             "forfait_envelope_values_annex_i",

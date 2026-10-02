@@ -1748,6 +1748,7 @@ mod tests {
                 measured_class: Some(crate::domestic_hot_water::ApplicationClass::Class1),
                 kitchen_only: false,
                 declared: None,
+                annex_t: None,
             },
             collective: None,
             equipment_reference: "plate".into(),
