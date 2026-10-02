@@ -47,6 +47,7 @@ pub mod lighting;
 pub mod materials;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
+pub mod opname;
 pub mod project_performance;
 pub mod pv;
 pub mod reference;
@@ -306,6 +307,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
             "unverified_humidification_dehumidification_chapter_12",
+            "unverified_isso_82_1_basisopname_residential",
             "unverified_opaque_construction_u_rc_annex_c_e_f",
             "unverified_window_door_shutter_u_8_2_2_3_annex_g_l",
             "forfait_envelope_values_annex_i",

@@ -1,0 +1,43 @@
+{
+  "id": "synthetisch-1975-portiekflat",
+  "constructionYear": 1975,
+  "dwelling": {"kind": "apartment", "floor": "ground_or_intermediate", "side": "middle"},
+  "usableFloorAreaM2": 75.0,
+  "areaSourceReference": "synthetic: NEN 2580 measurement",
+  "buildingHeightM": 12.0,
+  "construction": {"floor": "heavy", "wall": "heavy", "lighterCeiling": false, "sourceReference": "synthetic: hollow-core floors, masonry"},
+  "envelope": {
+    "surfaces": [
+      {"id": "gevel-zuid", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 22.0, "orientation": "south", "cavity": true, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-noord", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 22.0, "orientation": "north", "cavity": true, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "wand-trappenhuis", "element": "facade", "boundary": {"kind": "unheated_space", "spaceId": "trappenhuis"}, "grossAreaM2": 12.0, "orientation": "east", "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "vloer", "element": "floor", "boundary": {"kind": "adjacent_heated"}, "grossAreaM2": 75.0, "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"}
+    ],
+    "windows": [
+      {"id": "ramen-zuid", "surfaceId": "gevel-zuid", "areaM2": 9.0, "glass": "hr", "frame": "wood_or_plastic", "sourceReference": "synthetic survey: spacer marking"},
+      {"id": "ramen-noord", "surfaceId": "gevel-noord", "areaM2": 6.0, "glass": "double", "frame": "metal", "sourceReference": "synthetic survey"}
+    ],
+    "doors": [
+      {"id": "voordeur", "surfaceId": "wand-trappenhuis", "areaM2": 2.0, "insulated": false, "frame": "wood_or_plastic", "sourceReference": "synthetic survey"}
+    ],
+    "unheatedSpaces": [{"id": "trappenhuis", "description": "unheated common stairwell"}]
+  },
+  "heating": {
+    "generator": {"kind": "boiler", "boilerType": "hr107", "pilotFlame": false, "insideThermalBoundary": true, "installationYear": 2012},
+    "emitters": "radiators",
+    "balanced": false,
+    "control": "room_thermostat",
+    "storeys": 1,
+    "sourceReference": "synthetic survey: type plate"
+  },
+  "hotWater": {
+    "generator": {"kind": "gas_appliance", "applianceType": "combi", "gaskeur": "gaskeur_cw"},
+    "served": "kitchen_and_bathroom",
+    "kitchenLengthM": 2.0,
+    "bathroomLengthM": 4.0,
+    "showerHeatRecovery": "none",
+    "sourceReference": "synthetic survey"
+  },
+  "ventilation": {"principle": "mechanical_extract", "sourceReference": "synthetic survey: roof fan"},
+  "sourceReference": "synthetic fixture, not a real dwelling"
+}

@@ -1,0 +1,43 @@
+{
+  "id": "synthetisch-1930-tussenwoning",
+  "constructionYear": 1930,
+  "dwelling": {"kind": "single_family", "position": "terraced", "roofType": "pitched"},
+  "usableFloorAreaM2": 95.0,
+  "areaSourceReference": "synthetic: NEN 2580 measurement",
+  "buildingHeightM": 9.5,
+  "construction": {"floor": "light", "wall": "heavy", "lighterCeiling": false, "sourceReference": "synthetic: timber floors, load-bearing masonry"},
+  "envelope": {
+    "surfaces": [
+      {"id": "voorgevel", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 30.0, "orientation": "south", "cavity": true, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "achtergevel", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 30.0, "orientation": "north", "cavity": true, "insulation": {"kind": "cavity_filled_unknown_width"}, "sourceReference": "synthetic survey: invoice cavity fill"},
+      {"id": "dak-zuid", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 35.0, "orientation": "south", "tiltDeg": 45.0, "cavity": false, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "dak-noord", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 35.0, "orientation": "north", "tiltDeg": 45.0, "cavity": false, "insulation": {"kind": "present_unknown_thickness"}, "sourceReference": "synthetic survey"},
+      {"id": "vloer", "element": "floor", "boundary": {"kind": "crawlspace"}, "grossAreaM2": 48.0, "cavity": false, "insulation": {"kind": "none_or_unknown"}, "exposedPerimeterM": 12.0, "sourceReference": "synthetic survey"},
+      {"id": "woningscheidend-links", "element": "facade", "boundary": {"kind": "adjacent_heated"}, "grossAreaM2": 50.0, "orientation": "east", "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"}
+    ],
+    "windows": [
+      {"id": "ramen-voor", "surfaceId": "voorgevel", "areaM2": 9.0, "glass": "single", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"},
+      {"id": "ramen-achter", "surfaceId": "achtergevel", "areaM2": 8.0, "glass": "double_with_secondary", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"}
+    ],
+    "doors": [
+      {"id": "voordeur", "surfaceId": "voorgevel", "areaM2": 2.0, "glassFraction": 0.2, "glass": "single", "frame": "wood_or_plastic", "sourceReference": "synthetic survey"}
+    ]
+  },
+  "heating": {
+    "generator": {"kind": "boiler", "boilerType": "conventional", "pilotFlame": false, "insideThermalBoundary": true},
+    "emitters": "radiators",
+    "control": "unknown",
+    "storeys": 2,
+    "sourceReference": "synthetic survey: type plate unreadable"
+  },
+  "hotWater": {
+    "generator": {"kind": "gas_appliance", "applianceType": "unknown", "gaskeur": "unknown"},
+    "served": "kitchen_and_bathroom",
+    "kitchenLengthM": 3.0,
+    "bathroomLengthM": 6.0,
+    "showerHeatRecovery": "unknown",
+    "sourceReference": "synthetic survey"
+  },
+  "ventilation": {"principle": "natural", "sourceReference": "synthetic survey: windows and a bathroom fan on the light switch"},
+  "sourceReference": "synthetic fixture, not a real dwelling"
+}
