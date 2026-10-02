@@ -1511,7 +1511,10 @@ fn resolve_transmission(
                     issues.push(issue("vertical_pipe_id_invalid", format!("{path}.id")));
                 }
                 if pipe.storeys == 0 {
-                    issues.push(issue("vertical_pipe_storeys_invalid", format!("{path}.storeys")));
+                    issues.push(issue(
+                        "vertical_pipe_storeys_invalid",
+                        format!("{path}.storeys"),
+                    ));
                 }
                 if pipe.shared_zones == 0 {
                     issues.push(issue(

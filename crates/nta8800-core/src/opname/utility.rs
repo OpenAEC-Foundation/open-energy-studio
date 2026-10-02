@@ -1790,8 +1790,8 @@ fn lighting_value(
         }),
         _ => false,
     });
-    let whole_forfait = (!forfait_led.is_empty())
-        .then(|| forfait_led.iter().all(|led| *led) && measured_led);
+    let whole_forfait =
+        (!forfait_led.is_empty()).then(|| forfait_led.iter().all(|led| *led) && measured_led);
     if whole_forfait.is_some() && forfait_led.len() < survey.lighting.len() {
         recorder.record(
             "lighting_forfait_whole_zone",
@@ -2061,7 +2061,10 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
             recorder.record(
                 "vertical_pipes_unknown_one_per_toilet_group",
                 "verticalPipes",
-                format!("{stacks} uninsulated pipe(s) through {} storey(s)", survey.storeys.max(1)),
+                format!(
+                    "{stacks} uninsulated pipe(s) through {} storey(s)",
+                    survey.storeys.max(1)
+                ),
                 "ISSO 75.1 p. 68 (table 7.8); NTA 8800 7.3.3",
             );
             stacks

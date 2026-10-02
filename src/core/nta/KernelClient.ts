@@ -441,6 +441,8 @@ export type MonthlyDemandTransmission =
         sourceReference: string;
       }>;
       groundInventoryConfirmed: boolean;
+      /** 7.3.3 vertical pipes through the envelope (H_p, table 7.1). */
+      verticalPipes?: Array<{ id: string; storeys: number; insulated: boolean; sharedZones?: number; sourceReference: string }>;
     };
 
 /** 8.3.4.2: crawlspace or unheated basement below a ground floor. */
@@ -596,6 +598,7 @@ export interface MonthlyDemandAssessment {
     conductanceWPerK: number;
     directConductanceWPerK: number | null;
     unheatedConductanceWPerK: number | null;
+    verticalPipeConductanceWPerK: number | null;
     groundSteadyConductanceWPerK: number | null;
     groundMonthlyConductanceWPerK: number[];
     groundHeatingAdjustedWPerK: number;
@@ -2301,12 +2304,16 @@ export interface ResidentialSurvey {
     sourceReference: string;
   };
   measuredInfiltration?: { qv10Dm3PerSM2: number; sourceReference: string } | null;
+  /** Storeys of the dwelling; absent: the storeys served by the heating. */
+  storeys?: number | null;
+  /** §7.2.4 vertical pipes; absent: one uninsulated pipe per storey, empty: none. */
+  verticalPipes?: OpnameVerticalPipe[] | null;
   envelope: {
     surfaces: Array<{
       id: string;
       element: 'facade' | 'roof' | 'floor';
       boundary:
-        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' }
+        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' | 'unheated_cellar' }
         | { kind: 'unheated_space'; spaceId: string };
       grossAreaM2: number;
       orientation?: NtaOrientation;
@@ -2314,6 +2321,8 @@ export interface ResidentialSurvey {
       cavity: boolean;
       insulation: OpnameInsulation;
       thermalCushions?: boolean;
+      /** Reed thatch measured at the underside, mm (ISSO 82.1 afb. 8.16). */
+      reedThicknessMm?: number | null;
       exposedPerimeterM?: number;
       crawlspaceBottomInsulated?: boolean | null;
       sourceReference: string;
@@ -2353,15 +2362,17 @@ export interface ResidentialSurvey {
   heating: {
     generator:
       | { kind: 'boiler'; boilerType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'hydrogen'; pilotFlame?: boolean | null; insideThermalBoundary: boolean; manufactureYear?: number; installationYear?: number }
-      | { kind: 'heat_pump'; source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water' | 'water_based_unknown'; airSink?: boolean; highTemperature?: boolean; capacityKw?: number }
+      | { kind: 'heat_pump'; source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water' | 'water_based_unknown'; airSink?: boolean; highTemperature?: boolean; capacityKw?: number; sourceRegenerationFactor?: number | null; highEfficiencyEvidence?: unknown }
       | { kind: 'district_heat' }
       | { kind: 'electric'; connectedDevices: number }
-      | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean }
+      | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean; annexRCompliant?: boolean | null }
       | { kind: 'none_present' };
     emitters: 'radiators' | 'low_temperature_radiators' | 'floor_heating' | 'floor_heating_and_radiators' | 'air_heating' | 'local_heaters';
     designClass?: 'c45_40' | 'c55_47' | 'c70_50' | 'c90_70' | null;
     balanced?: boolean | null;
     control: 'room_thermostat' | 'central_with_radiator_valves' | 'individual_room_control' | 'unknown';
+    /** Afb. 9.1; absent: present with the forfait length when unheated spaces exist. */
+    unheatedPipes?: { kind: 'absent' } | { kind: 'present'; lengthM?: number | null } | null;
     storeys?: number;
     sourceReference: string;
   };
@@ -2375,6 +2386,14 @@ export interface ResidentialSurvey {
     bathroomLengthM?: number;
     showers?: number;
     showerHeatRecovery: 'none' | 'vertical' | 'horizontal' | 'unknown';
+    /** Vessel of an electric boiler (§13.4). */
+    boilerVessel?: {
+      volumeL?: number | null;
+      kitchenCabinet?: boolean;
+      label?: string | null;
+      manufactureYear?: number | null;
+      inHeatedZone?: boolean | null;
+    } | null;
     sourceReference: string;
   };
   ventilation: {
@@ -2400,7 +2419,20 @@ export interface ResidentialSurvey {
     obstructionFactors?: number[];
     sourceReference: string;
   }>;
+  /** Building-bound storage (§15.5); requires PV. */
+  storage?: OpnameStorage | null;
   coolingPresent?: boolean;
+  sourceReference: string;
+}
+
+export interface OpnameVerticalPipe {
+  insulated?: boolean | null;
+  sharedZones?: number | null;
+}
+
+export interface OpnameStorage {
+  electricalKwh?: number;
+  thermalKwh?: number;
   sourceReference: string;
 }
 
@@ -2449,6 +2481,9 @@ export interface UtilitySurvey {
   storeys?: number;
   construction: ResidentialSurvey['construction'];
   measuredInfiltration?: ResidentialSurvey['measuredInfiltration'];
+  /** Toilet groups, stacked groups once (ISSO 75.1 table 7.8). */
+  toiletStacks?: number | null;
+  verticalPipes?: OpnameVerticalPipe[] | null;
   envelope: ResidentialSurvey['envelope'];
   solarControlWindowIds?: string[];
   heating: ResidentialSurvey['heating'];
@@ -2548,6 +2583,7 @@ export interface UtilitySurvey {
     managementClassBOrBetter?: boolean | null;
     evidenceReference?: string | null;
   };
+  storage?: OpnameStorage | null;
   sourceReference: string;
 }
 

@@ -362,12 +362,18 @@ fn thatch_rc(
     recorder: &mut Recorder,
 ) -> Option<crate::forfait_envelope::ForfaitOpaqueResult> {
     if surface.element == SurfaceElement::Floor || !measured_mm.is_finite() {
-        recorder.issue("reed_thatch_roof_or_facade_only", format!("{path}.reedThicknessMm"));
+        recorder.issue(
+            "reed_thatch_roof_or_facade_only",
+            format!("{path}.reedThicknessMm"),
+        );
         return None;
     }
     let reed_mm = ((measured_mm - 35.0) / 50.0 + 1e-9).round() * 50.0;
     if !(100.0..=400.0).contains(&reed_mm) {
-        recorder.issue("reed_thickness_out_of_range", format!("{path}.reedThicknessMm"));
+        recorder.issue(
+            "reed_thickness_out_of_range",
+            format!("{path}.reedThicknessMm"),
+        );
         return None;
     }
     let insulation_mm = match &surface.insulation {
@@ -381,7 +387,10 @@ fn thatch_rc(
             );
             Some(40.0)
         }
-        InsulationAnswer::Thickness { thickness_mm, proven } => Some(if *proven {
+        InsulationAnswer::Thickness {
+            thickness_mm,
+            proven,
+        } => Some(if *proven {
             *thickness_mm
         } else {
             (thickness_mm / 10.0).round() * 10.0
@@ -392,9 +401,17 @@ fn thatch_rc(
         None => reed,
         Some(d) => d / 1000.0 / 0.045 + reed_mm / 1000.0 / 0.105,
     };
-    let r_si = if surface.element == SurfaceElement::Facade { 0.13 } else { 0.10 };
+    let r_si = if surface.element == SurfaceElement::Facade {
+        0.13
+    } else {
+        0.10
+    };
     let u_c = crate::materials::round_half_up(1.0 / (r_c + r_si + 0.04), 2);
-    let route = if insulation_mm.is_some() { "ISSO 8.5" } else { "ISSO table 8.12" };
+    let route = if insulation_mm.is_some() {
+        "ISSO 8.5"
+    } else {
+        "ISSO table 8.12"
+    };
     recorder.record(
         "thatch_reed_thickness",
         &format!("{path}.reedThicknessMm"),
@@ -635,7 +652,10 @@ pub fn derive_envelope(
             recorder.record(
                 "surface_table_row_by_boundary",
                 &path,
-                format!("{element:?} row, R_si {:.2}", r_si_override.unwrap_or_default()),
+                format!(
+                    "{element:?} row, R_si {:.2}",
+                    r_si_override.unwrap_or_default()
+                ),
                 "ISSO 82.1 p. 88–90 (tables 8.9/8.10); NTA I.4, table C.2",
             );
         }
@@ -658,7 +678,10 @@ pub fn derive_envelope(
             }
         } else {
             if surface.thermal_cushions {
-                recorder.issue("thermal_cushions_floor_only", format!("{path}.thermalCushions"));
+                recorder.issue(
+                    "thermal_cushions_floor_only",
+                    format!("{path}.thermalCushions"),
+                );
             }
             match insulation {
                 InsulationState::KnownThickness {
@@ -1172,7 +1195,11 @@ mod tests {
     fn floor_to_outdoor_air_and_thermal_cushions() {
         let mut recorder = Recorder::default();
         let mut cushions = surface("kussen", SurfaceElement::Floor, SurfaceBoundary::Crawlspace);
-        let mut cellar = surface("kelder", SurfaceElement::Floor, SurfaceBoundary::UnheatedCellar);
+        let mut cellar = surface(
+            "kelder",
+            SurfaceElement::Floor,
+            SurfaceBoundary::UnheatedCellar,
+        );
         cellar.exposed_perimeter_m = None;
         cellar.gross_area_m2 = 6.0;
         cushions.thermal_cushions = true;
@@ -1209,9 +1236,15 @@ mod tests {
         let rule = recorder
             .applied
             .iter()
-            .find(|item| item.rule == "opaque_rc_forfait_annex_i" && item.path == "envelope.surfaces[1]")
+            .find(|item| {
+                item.rule == "opaque_rc_forfait_annex_i" && item.path == "envelope.surfaces[1]"
+            })
             .unwrap();
-        assert!(rule.value.starts_with(&format!("R_c {:.2}", roof_row.r_c)), "{}", rule.value);
+        assert!(
+            rule.value.starts_with(&format!("R_c {:.2}", roof_row.r_c)),
+            "{}",
+            rule.value
+        );
         assert!(overhang.is_object());
         // p. 93: thermal cushions give R_c 1,95 whatever the insulation answer.
         let floor = &derived.ground_floors[0];

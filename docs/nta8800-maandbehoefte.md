@@ -54,10 +54,14 @@ Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldig
 
 Per balans: setpoint na nivellering, reductiefactor (`a_H;red` of `a_C;red`), rekentemperatuur, `H_ve` met `b_v`, tijdconstante, `a`, transmissie, ventilatie, warmteoverdracht, winst, `γ`, benutting en behoefte. Daarnaast de maandelijkse `H_g;an;mi`. De transmissiesamenvatting geeft `H_g` stationair, de twaalf maandwaarden en de seizoenswaarden.
 
+## Verticale leidingen (7.3.3)
+
+`transmission.verticalPipes` (route `components`) geeft per leiding het aantal bouwlagen van de zone, geïsoleerd of niet en het aantal zones waarlangs de leiding loopt. `H_p = Σ N_bouwlaag;j · H_p;spec;j / n_zones` met tabel 7.1 (1,8 W/K ongeïsoleerd, 0,5 W/K geïsoleerd). `H_p` telt mee in `H_tr` (7.16) en staat apart in de transmissiesamenvatting (`verticalPipeConductanceWPerK`).
+
 ## Niet toegepast (altijd meegeleverd als `omittedCorrections`)
 
 - terugwinbare systeemverliezen `Q_H;ls;rbl`/`Q_C;ls;rbl` en de Δη-termen van 7.3–7.5 en 7.7–7.9 (komen uit hoofdstuk 9 en 10);
-- `H_p` (verticale leidingen, 7.3.3) en `H_A` (aangrenzende verwarmde ruimten, 8.5);
+- `H_A` (aangrenzende verwarmde ruimten, 8.5);
 - belemmeringssituaties b–g van §17.3 worden opgegeven, niet afgeleid;
 - voetnoot c van tabel 7.10: de kolomkeuze ligt bij de aanroeper;
 - bijlage D voor andere vloeren dan vloer op grond (kruipruimte, kelder);

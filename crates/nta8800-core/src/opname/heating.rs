@@ -472,7 +472,10 @@ pub fn derive_heating(
                             "1.0".into(),
                             "ISSO 82.1 p. 110; NTA table 9.27 footnote a",
                         );
-                        (json!(1.0), json!("NTA 8800 table 9.27 footnote a: no regeneration"))
+                        (
+                            json!(1.0),
+                            json!("NTA 8800 table 9.27 footnote a: no regeneration"),
+                        )
                     }
                 }
             } else {
@@ -739,7 +742,10 @@ mod tests {
             high_efficiency_evidence: None,
         };
         let derived = derive_heating(&heating(hp, Emitters::Radiators), 2015, &mut recorder);
-        assert_eq!(derived.generator["forfait"]["sourceCorrectionFactor"], Value::Null);
+        assert_eq!(
+            derived.generator["forfait"]["sourceCorrectionFactor"],
+            Value::Null
+        );
         assert_eq!(
             recorder.issues[0].code,
             "exhaust_air_heat_pump_second_generator_required"

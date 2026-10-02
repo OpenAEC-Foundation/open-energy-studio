@@ -569,10 +569,15 @@ mod tests {
         ] {
             let result = assess_residential_survey(&fixture(name));
             let performance = result.performance.unwrap();
-            let ep2 = performance.primary_fossil_indicator_kwh_per_m2_year.unwrap();
+            let ep2 = performance
+                .primary_fossil_indicator_kwh_per_m2_year
+                .unwrap();
             assert!((low..high).contains(&ep2), "{name}: EP2 {ep2}");
             let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
-            assert_eq!(input["spaceHeating"]["distribution"]["method"], distribution, "{name}");
+            assert_eq!(
+                input["spaceHeating"]["distribution"]["method"], distribution,
+                "{name}"
+            );
         }
     }
 
