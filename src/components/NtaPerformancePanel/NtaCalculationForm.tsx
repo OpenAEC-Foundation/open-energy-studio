@@ -7,6 +7,9 @@ import { useI18n } from '../../i18n/i18n';
 /** ρ_a·c_a/3600 with 1,205 kg/m³ and 1 005 J/(kg·K) (9.29), in W per (m³/h)·K. */
 const AIR_HEAT_CAPACITY_W_PER_M3H_K = (1.205 * 1005) / 3600;
 type Draft = Record<string, unknown>;
+/** Usage functions of tables 7.13–7.15. */
+const USAGE_FUNCTIONS = ['residential', 'office', 'education', 'retail', 'other_assembly', 'assembly_child_care',
+  'other_healthcare', 'healthcare_with_beds', 'lodging', 'cell', 'sport'] as const;
 type Path = Array<string | number>;
 
 function read(source: unknown, path: Path): unknown {
@@ -99,6 +102,11 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <SelectField {...field} path={['calculationScope']} label={t('nta.form.scope')}
         options={[['residential', t('nta.form.scope.residential')], ['utility', t('nta.form.scope.utility')]]} />
       <TextField {...field} path={['areaSourceReference']} label={t('nta.form.areaSource')} />
+      <SelectField {...field} path={['usageFunction']} label={t('nta.form.usageFunction')}
+        options={USAGE_FUNCTIONS.map((key) => [key, t(`nta.form.usage.${key}`)])} />
+      {read(draft, ['usageFunction']) === 'residential' && <SelectField {...field} path={['dwellingType']}
+        label={t('nta.form.dwellingType')} options={[
+          ['apartment_building', t('nta.form.dwellingType.apartment')], ['other', t('nta.form.dwellingType.other')]]} />}
       <SelectField {...field} path={['bblFunction']} label={t('nta.form.bblFunction')} options={[
         ['other_residential', t('nta.form.bbl.other_residential')], ['residential_building', t('nta.form.bbl.residential_building')],
         ['office', t('nta.form.bbl.office')], ['education', t('nta.form.bbl.education')], ['retail', t('nta.form.bbl.retail')],
@@ -145,7 +153,10 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
             : null)}>
           <option value="">{t('nta.form.shading.none')}</option>
           <option value="manual_residential">{t('nta.form.shading.manual')}</option>
+          <option value="automatic_residential_iso52016">{t('nta.form.shading.automaticResidential')}</option>
           <option value="automatic">{t('nta.form.shading.automatic')}</option>
+          <option value="manual_utility_with_glare_protection">{t('nta.form.shading.manualUtilityGlare')}</option>
+          <option value="manual_utility_without_glare_protection">{t('nta.form.shading.manualUtility')}</option>
         </select>
       </label>
       {read(draft, ['windowSolar', 'movableShading']) != null && <>
@@ -164,6 +175,16 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       {ground.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">
         <NumberField {...field} path={['groundFloors', index, 'exposedPerimeterM']} label={`${surfaceName(item.surfaceId)} — ${t('nta.form.perimeter')}`} />
         <NumberField {...field} path={['groundFloors', index, 'constructionResistanceM2kPerW']} label={t('nta.form.floorResistance')} />
+        <label>{t('nta.form.edgeBridges')}
+          <select value={String(read(draft, ['groundFloors', index, 'edgeThermalBridges', 'method']) ?? '')} onChange={(event) => change(
+            ['groundFloors', index, 'edgeThermalBridges'], event.target.value === 'forfait'
+              ? { method: 'forfait' }
+              : event.target.value === 'detailed' ? { method: 'detailed', bridges: [] } : null)}>
+            <option value="">—</option>
+            <option value="forfait">{t('nta.form.edgeBridges.forfait')}</option>
+            <option value="detailed">{t('nta.form.edgeBridges.detailed')}</option>
+          </select>
+        </label>
         <TextField {...field} path={['groundFloors', index, 'sourceReference']} label={t('nta.form.source')} />
       </div>)}
     </Section>}
