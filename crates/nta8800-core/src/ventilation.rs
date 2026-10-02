@@ -991,6 +991,8 @@ pub struct DemandFlowMonth {
     pub heating_supply_temperature_c: f64,
     pub cooling_conductance_w_per_k: f64,
     pub cooling_supply_temperature_c: f64,
+    /// Heating supply temperature for the heating limit (9.29), °C.
+    pub heating_limit_supply_temperature_c: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2155,13 +2157,13 @@ struct SupplyContext<'a> {
 }
 
 /// 11.103/11.104 for a mechanical supply unit; returns (θ_SUP;dis;out,
-/// ΔT_defrost applied).
+/// ΔT_defrost applied, θ_SUP;dis;out − Δθ_hr − Δθ_rca − Δθ_fan of 9.29).
 fn mechanical_supply_temperature(
     unit: &SystemUnit,
     context: &SupplyContext<'_>,
     oda_eff_m3_per_h: f64,
     flea_du: f64,
-) -> (f64, f64) {
+) -> (f64, f64, f64) {
     let input = context.input;
     let m = context.month_index;
     let op = unit.variant.op();
@@ -2247,7 +2249,9 @@ fn mechanical_supply_temperature(
         }
     }
     let dis_in = oda_preh + recovery_rise + recirculation_rise + fan_rise;
-    (dis_in - duct_outside, defrost)
+    // 9.29: the supply temperature without heat recovery, recirculation and
+    // fan heat, for the heating limit.
+    (dis_in - duct_outside, defrost, oda_preh - duct_outside)
 }
 
 /// 11.123/11.124 for the heating balance.
@@ -2406,6 +2410,8 @@ struct MonthBalance {
     pressures: Vec<f64>,
     /// (flow id, q, θ_sup) per chapter 7 flow.
     demand_flows: Vec<(String, f64, f64)>,
+    /// θ_sup per flow for the heating limit (9.29).
+    limit_temperatures: Vec<f64>,
     frost_protection_kwh: f64,
     grille_preheating_kwh: f64,
     outdoor_air_fraction: Option<f64>,
@@ -2533,14 +2539,14 @@ fn balance_month(
     let mut frost_protection_kwh = 0.0;
     for (index, q_supply, unit) in &supply_parts {
         let oda_eff = required * parts(&input.system)[*index].fraction;
-        let (temperature, defrost) =
+        let (temperature, defrost, limit_temperature) =
             mechanical_supply_temperature(unit, &context, oda_eff, flea_du);
         if balance == Balance::Heating && defrost > 0.0 {
             // 11.105/11.106.
             let power = oda_eff * 1.205 * 1006.0 / 3600.0 * defrost;
             frost_protection_kwh += power * hours / 1000.0;
         }
-        supply_flows.push((*index, *q_supply, temperature));
+        supply_flows.push((*index, *q_supply, temperature, limit_temperature));
     }
 
     // Mass balance per airflow zone.
@@ -2551,7 +2557,10 @@ fn balance_month(
     };
     let old_crawlspace = input.floor_above_crawlspace && input.construction_year < 1992;
     let zones = airflow_zones(input.building_height_m, old_crawlspace, coefficients);
-    let supply_mass: f64 = supply_flows.iter().map(|(_, q, t)| density(*t) * q).sum();
+    let supply_mass: f64 = supply_flows
+        .iter()
+        .map(|(_, q, t, _)| density(*t) * q)
+        .sum();
     let extract_mass = density(indoor) * extract;
     let fixed_total = supply_mass + extract_mass - density(indoor) * combustion_out
         + density(argii_temperature) * argii_in
@@ -2621,9 +2630,10 @@ fn balance_month(
         ),
         ("combustion".to_string(), effective.combustion_in, outdoor),
     ];
+    let mut limit_temperatures: Vec<f64> = demand_flows.iter().map(|(_, _, t)| *t).collect();
     let mut supply_total = 0.0;
     let mut supply_weighted = 0.0;
-    for (index, q, temperature) in &supply_flows {
+    for (index, q, temperature, limit_temperature) in &supply_flows {
         let id = match &input.system {
             VentilationSystem::Single { .. } => "mechanical_supply".to_string(),
             VentilationSystem::Combined { .. } if *index == 0 => {
@@ -2632,6 +2642,7 @@ fn balance_month(
             VentilationSystem::Combined { .. } => "mechanical_supply_other".to_string(),
         };
         demand_flows.push((id, *q, *temperature));
+        limit_temperatures.push(*limit_temperature);
         supply_total += q;
         supply_weighted += q * temperature;
     }
@@ -2664,6 +2675,7 @@ fn balance_month(
         },
         pressures,
         demand_flows,
+        limit_temperatures,
         frost_protection_kwh,
         grille_preheating_kwh,
         outdoor_air_fraction,
@@ -2810,8 +2822,11 @@ fn calculate_with_policy(
     for m in 0..12 {
         let heating = balance_month(input, &constants, m, Balance::Heating, policy);
         let cooling = balance_month(input, &constants, m, Balance::Cooling, policy);
-        for ((id, q_h, t_h), (_, q_c, t_c)) in
-            heating.demand_flows.iter().zip(&cooling.demand_flows)
+        for (((id, q_h, t_h), (_, q_c, t_c)), t_limit) in heating
+            .demand_flows
+            .iter()
+            .zip(&cooling.demand_flows)
+            .zip(&heating.limit_temperatures)
         {
             let factor = VOLUMETRIC_HEAT_CAPACITY / 3600.0;
             let row = DemandFlowMonth {
@@ -2820,6 +2835,7 @@ fn calculate_with_policy(
                 heating_supply_temperature_c: *t_h,
                 cooling_conductance_w_per_k: q_c * factor,
                 cooling_supply_temperature_c: *t_c,
+                heating_limit_supply_temperature_c: *t_limit,
             };
             match flow_rows.iter_mut().find(|(existing, _)| existing == id) {
                 Some((_, rows)) => rows.push(row),
@@ -2875,6 +2891,26 @@ fn calculate_with_policy(
 }
 
 impl VentilationResult {
+    /// The flows for the heating-limit need of 9.28/9.29: mechanical supply
+    /// without heat recovery, recirculation and fan heat.
+    pub fn heating_limit_flows(&self, source_reference: &str) -> Vec<VentilationFlow> {
+        let mut flows = self.monthly_demand_flows(source_reference);
+        for (flow, source) in flows.iter_mut().zip(&self.demand_flows) {
+            for (row, values) in flow.months.iter_mut().zip(&source.months) {
+                row.supply_temperature_c = Some(values.heating_limit_supply_temperature_c);
+            }
+        }
+        flows
+    }
+
+    /// E_V;eldf + E_V;elvv per month (9.28), kWh.
+    pub fn heating_limit_electricity_kwh(&self) -> Vec<f64> {
+        self.months
+            .iter()
+            .map(|row| row.frost_protection_electricity_kwh + row.grille_preheating_electricity_kwh)
+            .collect()
+    }
+
     /// The effective flows as chapter 7 ventilation flows (7.19/7.20).
     pub fn monthly_demand_flows(&self, source_reference: &str) -> Vec<VentilationFlow> {
         self.demand_flows

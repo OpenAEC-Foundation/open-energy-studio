@@ -622,9 +622,21 @@ fn zone_terms(
                         "heating_limit_extra_invalid",
                         format!("{prefix}distribution.heatingLimitExtraKwh"),
                     ));
+                } else if !demand.heating_limit_need_kwh.is_empty() {
+                    // Chapter 11 already yields the 9.28/9.29 terms.
+                    issues.push(issue(
+                        "heating_limit_extra_and_chapter_11_exclusive",
+                        format!("{prefix}distribution.heatingLimitExtraKwh"),
+                    ));
                 } else {
                     extra = std::array::from_fn(|index| values[index]);
                 }
+            } else if demand.heating_limit_need_kwh.len() == 12 {
+                // 9.28/9.29 from the chapter 11 flows.
+                extra = std::array::from_fn(|index| {
+                    (demand.heating_limit_need_kwh[index] - demand.monthly[index].heating.need_kwh)
+                        .max(0.0)
+                });
             }
             (None, source_reference)
         }

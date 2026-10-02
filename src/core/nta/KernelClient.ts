@@ -507,6 +507,8 @@ export interface MonthlyDemandAssessment {
   annualHeatingNeedWithoutRecoverableKwh: number | null;
   annualCoolingNeedWithoutRecoverableKwh: number | null;
   ventilation: VentilationResult | null;
+  /** 9.28/9.29 heating-limit need per month (chapter 11 input only). */
+  heatingLimitNeedKwh: number[];
   /** §5.4.2 need with the fixed C1 system (BENG 1). */
   fixedC1: {
     status: 'calculated_unverified' | 'invalid' | 'unavailable';
@@ -1860,6 +1862,7 @@ export interface VentilationResult {
       heatingSupplyTemperatureC: number;
       coolingConductanceWPerK: number;
       coolingSupplyTemperatureC: number;
+      heatingLimitSupplyTemperatureC: number;
     }>;
   }>;
   annualFanElectricityKwh: number;

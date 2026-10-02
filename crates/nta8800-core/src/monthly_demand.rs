@@ -451,6 +451,9 @@ pub struct MonthlyDemandAssessment {
     pub ventilation: Option<crate::ventilation::VentilationResult>,
     /// §5.4.2 need with the fixed C1 system, for BENG 1.
     pub fixed_c1: Option<FixedC1Demand>,
+    /// 9.28/9.29: monthly heating need for the heating limit, kWh (with
+    /// chapter 11 input only).
+    pub heating_limit_need_kwh: Vec<f64>,
     pub issues: Vec<DemandIssue>,
 }
 
@@ -1457,6 +1460,21 @@ pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessm
     let (resolved, ventilation, c1_flows) = resolve_ventilation(input, &mut issues);
     let mut assessment = assess_resolved(&resolved, fingerprint, issues);
     if assessment.status == "calculated_unverified" {
+        if let Some(result) = &ventilation {
+            // 9.28/9.29: the need for the heating limit.
+            let mut limit_input = resolved.clone();
+            limit_input.ventilation_flows = result.heating_limit_flows(CHAPTER_11_SOURCE);
+            let limit = assess_resolved(&limit_input, String::new(), Vec::new());
+            if limit.status == "calculated_unverified" {
+                let electricity = result.heating_limit_electricity_kwh();
+                assessment.heating_limit_need_kwh = limit
+                    .monthly
+                    .iter()
+                    .zip(&electricity)
+                    .map(|(row, extra)| row.heating.need_kwh + extra)
+                    .collect();
+            }
+        }
         assessment.ventilation = ventilation;
         if let Some(flows) = c1_flows {
             assessment.fixed_c1 = Some(match fixed_c1_input(&resolved, flows) {
@@ -1538,6 +1556,7 @@ fn assess_resolved(
         annual_cooling_need_without_recoverable_kwh: annual_cooling,
         ventilation: None,
         fixed_c1: None,
+        heating_limit_need_kwh: Vec::new(),
         issues,
     }
 }
@@ -1879,6 +1898,9 @@ mod tests {
             assert!((a.heating.need_kwh - b.heating.need_kwh).abs() < 1e-9);
             assert!((a.cooling.need_kwh - b.cooling.need_kwh).abs() < 1e-9);
         }
+        // 9.29: without fan heat the heating-limit need is higher.
+        assert_eq!(result.heating_limit_need_kwh.len(), 12);
+        assert!(result.heating_limit_need_kwh[0] > result.monthly[0].heating.need_kwh);
         // The fixed C1 run ventilates more than demand-controlled D.5c.
         let c1 = result.fixed_c1.as_ref().unwrap();
         assert_eq!(c1.status, "calculated_unverified", "{:?}", c1.issues);
