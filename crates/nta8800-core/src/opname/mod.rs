@@ -11,9 +11,8 @@
 //!
 //! Not covered (rejected with a code or reported as a warning): cooling,
 //! collective installations, CHP, solar water heating, several heating
-//! generators,
-//! pipes in unheated spaces, sunrooms (AOS), detail-survey (detailopname)
-//! routes and quality declarations other than a measured q_v10.
+//! generators, sunrooms (AOS), detail-survey (detailopname) routes and
+//! quality declarations other than a measured q_v10.
 
 pub mod envelope;
 pub mod general;
@@ -313,7 +312,15 @@ pub fn derive_residential_input(
             .map(|item| item.qv10_dm3_per_s_m2),
         recorder,
     );
-    let heating = heating::derive_heating(&survey.heating, year, recorder);
+    let mut heating = heating::derive_heating(&survey.heating, year, recorder);
+    let unheated_spaces = survey.envelope.surfaces.iter().any(|surface| {
+        matches!(
+            surface.boundary,
+            SurfaceBoundary::Crawlspace | SurfaceBoundary::UnheatedSpace { .. }
+        )
+    });
+    let calculated_distribution =
+        heating::apply_unheated_pipes(&survey.heating, &mut heating, unheated_spaces, recorder);
     let mut hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
     if matches!(
         survey.hot_water.generator,
@@ -384,7 +391,7 @@ pub fn derive_residential_input(
     let mut chain = json!({
         "demand": demand,
         "emission": heating.emission,
-        "distribution": {"method": "heated_zone_only_space_heating", "sourceReference": format!("{reference}; basisopname: pipes in the heated zone")},
+        "distribution": calculated_distribution.unwrap_or_else(|| json!({"method": "heated_zone_only_space_heating", "sourceReference": format!("{reference}; basisopname: pipes in the heated zone")})),
         "generator": heating.generator,
     });
     if let Some(system) = heating.distribution_system {
@@ -536,6 +543,25 @@ mod tests {
         let input = derive_residential_input(&survey, &mut recorder).unwrap();
         let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
         assert!(pipes.as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn fixture_indicators_stay_plausible() {
+        // EP2 ranges typical for the labels of these dwellings (F–G, B–C,
+        // A++ and better); crawlspaces without inspection carry heating
+        // pipes in unheated spaces (afb. 9.1).
+        for (name, low, high, distribution) in [
+            ("1930", 250.0, 450.0, "calculated"),
+            ("1975", 140.0, 240.0, "calculated"),
+            ("2015", 20.0, 80.0, "heated_zone_only_space_heating"),
+        ] {
+            let result = assess_residential_survey(&fixture(name));
+            let performance = result.performance.unwrap();
+            let ep2 = performance.primary_fossil_indicator_kwh_per_m2_year.unwrap();
+            assert!((low..high).contains(&ep2), "{name}: EP2 {ep2}");
+            let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+            assert_eq!(input["spaceHeating"]["distribution"]["method"], distribution, "{name}");
+        }
     }
 
     #[test]

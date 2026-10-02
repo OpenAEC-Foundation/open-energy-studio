@@ -198,6 +198,10 @@ pub struct SurveyHeating {
     #[serde(default)]
     pub balanced: Option<bool>,
     pub control: ControlAnswer,
+    /// Pipes in unheated spaces (afb. 9.1); `None`: spaces not inspectable
+    /// and unknown whether pipes run there → present, forfait length.
+    #[serde(default)]
+    pub unheated_pipes: Option<UnheatedPipesAnswer>,
     /// Storeys served by the distribution (9.37).
     #[serde(default = "one")]
     pub storeys: u32,
@@ -248,6 +252,23 @@ pub struct DerivedHeating {
     pub generator: Value,
     pub distribution_system: Option<Value>,
     pub heat_pump_renewable: Option<Value>,
+    /// Water-based emission (a distribution system exists).
+    pub hydronic: bool,
+    /// NTA table 9.14 class of the distribution.
+    pub design_class: &'static str,
+}
+
+/// Pipes in unheated spaces (afb. 9.1, p. 120).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum UnheatedPipesAnswer {
+    /// No central-heating pipes or manifolds in unheated spaces.
+    Absent,
+    /// Present; `lengthM` the supply plus return length there, else forfait.
+    Present {
+        #[serde(default, rename = "lengthM")]
+        length_m: Option<f64>,
+    },
 }
 
 pub fn derive_heating(
@@ -580,7 +601,63 @@ pub fn derive_heating(
         generator: generator_value,
         distribution_system,
         heat_pump_renewable,
+        hydronic,
+        design_class: design.kernel(),
     }
+}
+
+/// Afb. 9.1 (p. 120): heating pipes in unheated spaces turn the
+/// distribution into the calculated route (9.26–9.40) with the 15 %
+/// forfait share of 9.26 unless a length is given.
+pub fn apply_unheated_pipes(
+    heating: &SurveyHeating,
+    derived: &mut DerivedHeating,
+    unheated_spaces_present: bool,
+    recorder: &mut Recorder,
+) -> Option<Value> {
+    if !derived.hydronic || !unheated_spaces_present {
+        return None;
+    }
+    let length = match heating.unheated_pipes {
+        Some(UnheatedPipesAnswer::Absent) => return None,
+        Some(UnheatedPipesAnswer::Present { length_m }) => length_m,
+        None => {
+            recorder.record(
+                "unheated_pipes_unknown_present",
+                "heating.unheatedPipes",
+                "present, forfait length (15 % of L, 9.26)".into(),
+                "ISSO 82.1 p. 120 (afb. 9.1), p. 121 (table 9.14)",
+            );
+            None
+        }
+    };
+    let reference = heating.source_reference.as_str();
+    let mut system = derived.distribution_system.take().unwrap_or_else(|| {
+        recorder.record(
+            "pipe_insulation_unknown_uninsulated",
+            "heating.distribution",
+            "uninsulated".into(),
+            "ISSO 82.1 p. 118 (table 9.12)",
+        );
+        json!({
+            "designTemperatureClass": derived.design_class,
+            "installation": "individual",
+            "usageFunction": "residential",
+            "connectedStoreys": heating.storeys.max(1),
+            "pipeTransmittance": {"method": "forfait", "insulation": {"state": "uninsulated"}},
+            "valvesInsulated": false,
+            "pump": {"method": "included_in_generator_auxiliary"},
+            "sourceReference": format!("{reference}; basisopname"),
+        })
+    });
+    if let Some(length) = length {
+        system["unheatedPipeLengthM"] = json!(length);
+    }
+    derived.distribution_system = Some(system);
+    Some(json!({
+        "method": "calculated",
+        "sourceReference": format!("{reference}; basisopname: pipes in unheated spaces (afb. 9.1)"),
+    }))
 }
 
 #[cfg(test)]
@@ -594,6 +671,7 @@ mod tests {
             design_class: None,
             balanced: None,
             control: ControlAnswer::Unknown,
+            unheated_pipes: None,
             storeys: 2,
             source_reference: "survey".into(),
         }
