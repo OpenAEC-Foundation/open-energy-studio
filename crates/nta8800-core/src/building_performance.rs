@@ -24,8 +24,8 @@ use crate::bbl_requirements::{
     a0_check, check_mixed as bbl_check_mixed, A0Check, BblCheck, BblFunction, BblFunctionArea,
 };
 use crate::domestic_hot_water::{
-    assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterCarrier, HotWaterContext,
-    HotWaterSystem,
+    assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterContext, HotWaterSystem,
+    SolarSpaceHeating,
 };
 use crate::final_energy_draft::DRAFT_SOURCE;
 use crate::forfait_heat_pump_draft::TableSource;
@@ -485,6 +485,9 @@ pub struct BuildingPerformanceAssessment {
     /// A0 designation check; only with a Bbl check and a qualifying permit date.
     pub a0_check: Option<A0Check>,
     pub space_heating: SpaceHeatingChainAssessment,
+    /// Chapter 13, when calculated (generators, solar systems).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_water: Option<HotWaterAssessment>,
     /// Chapter 14 per zone, with the 7.28 internal gain for chapter 7.
     pub lighting: Vec<ZoneLightingResult>,
     pub indicators: Option<IndicatorsDraftAssessment>,
@@ -571,7 +574,54 @@ fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
         residential: matches!(input.calculation_scope, CalculationScope::Residential),
         usable_floor_area_m2: input.total_usable_floor_area_m2,
         heated_ambient_c: if area > 0.0 { weighted / area } else { 20.0 },
+        space_heating: None,
     }
+}
+
+/// 13.7.2.2.3 inputs of solar combi systems from a chain run without solar
+/// gains: `Q_H;nod;out + Q_H;nod;ls`, `f_gebouw;si;H` and the design
+/// temperatures of table 9.14 (class of the distribution system, else of a
+/// product boiler, else 90/70 as in §9.4).
+fn solar_space_heating(
+    input: &BuildingPerformanceInput,
+    heating: &SpaceHeatingChainAssessment,
+) -> Option<SolarSpaceHeating> {
+    if heating.monthly.len() != 12 {
+        return None;
+    }
+    let chain = &input.space_heating;
+    let zone_area: f64 = std::iter::once(&chain.demand)
+        .chain(chain.additional_zones.iter().map(|zone| &zone.demand))
+        .map(|demand| demand.usable_floor_area_m2)
+        .sum();
+    let building_fraction = chain
+        .collective_connection
+        .as_ref()
+        .filter(|connection| connection.connected_usable_area_m2 > 0.0)
+        .map_or(1.0, |connection| {
+            (zone_area / connection.connected_usable_area_m2).min(1.0)
+        });
+    let class = chain
+        .distribution_system
+        .as_ref()
+        .and_then(|system| system.design_temperature_class)
+        .or(match &chain.generator {
+            crate::space_heating_chain::Generator::ProductBoiler(generator) => {
+                generator.design_temperature_class
+            }
+            _ => None,
+        })
+        .unwrap_or(crate::heating_distribution::DesignTemperatureClass::C90);
+    let (supply, spread) = class.design();
+    Some(SolarSpaceHeating {
+        node_kwh: std::array::from_fn(|index| {
+            let row = &heating.monthly[index];
+            row.generator_output_kwh + row.solar_gain_kwh
+        }),
+        building_fraction,
+        design_supply_c: supply,
+        design_return_c: supply - spread,
+    })
 }
 
 /// Chapter 10 for all zones on the one cooling system.
@@ -1150,12 +1200,12 @@ fn with_lighting_gains(input: &BuildingPerformanceInput) -> SpaceHeatingChainInp
 /// split by usable floor area, when that system is valid.
 fn with_hot_water_gains(
     input: &BuildingPerformanceInput,
+    context: HotWaterContext,
     mut chain: SpaceHeatingChainInput,
 ) -> SpaceHeatingChainInput {
     let Some(system) = &input.hot_water else {
         return chain;
     };
-    let context = hot_water_context(input);
     if !validate_hot_water(system, context, "hotWater").is_empty() {
         return chain;
     }
@@ -1168,6 +1218,18 @@ fn with_hot_water_gains(
         .sum();
     if total_area <= 0.0 {
         return chain;
+    }
+    // 9.2.3.4: solar combi systems supply the space-heating node.
+    if result
+        .months
+        .iter()
+        .any(|month| month.solar_space_heating_kwh > 0.0)
+    {
+        chain.solar_heating_kwh = result
+            .months
+            .iter()
+            .map(|month| month.solar_space_heating_kwh)
+            .collect();
     }
     let fill = |demand: &mut MonthlyDemandInput| {
         let share = demand.usable_floor_area_m2 / total_area;
@@ -1199,8 +1261,26 @@ pub fn assess_building_performance(
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     // The chain input with chapter 14 lighting (7.28) and hot-water (7.29)
     // gains filled in; TOjuli uses the same zone inputs.
-    let chain_input = with_hot_water_gains(input, with_lighting_gains(input));
-    let heating = assess_space_heating_chain(&chain_input);
+    let mut hot_water_context = hot_water_context(input);
+    let mut chain_input =
+        with_hot_water_gains(input, hot_water_context, with_lighting_gains(input));
+    let mut heating = assess_space_heating_chain(&chain_input);
+    // 13.7.2.2.3: solar combi systems need the node output of a run without
+    // solar gains; the second run takes their node gain (9.2.3.4).
+    let combi = input.hot_water.as_ref().is_some_and(|system| {
+        system
+            .solar
+            .iter()
+            .any(|heater| heater.solar_use == crate::solar_thermal::SolarUse::Combi)
+    });
+    if combi {
+        if let Some(space_heating) = solar_space_heating(input, &heating) {
+            hot_water_context.space_heating = Some(space_heating);
+            chain_input =
+                with_hot_water_gains(input, hot_water_context, with_lighting_gains(input));
+            heating = assess_space_heating_chain(&chain_input);
+        }
+    }
     let mut issues: Vec<PerformanceIssue> = heating
         .issues
         .iter()
@@ -1227,7 +1307,7 @@ pub fn assess_building_performance(
         Vec::new()
     };
     let hot_water = match (&input.hot_water, issues.is_empty()) {
-        (Some(system), true) => match assess_hot_water(system, hot_water_context(input)) {
+        (Some(system), true) => match assess_hot_water(system, hot_water_context) {
             Ok(result) => Some(result),
             Err(error) => {
                 issues.push(issue(error.code, error.path));
@@ -1471,6 +1551,7 @@ pub fn assess_building_performance(
             }),
         bbl_check: bbl,
         space_heating: heating,
+        hot_water,
         lighting: if valid { lighting } else { Vec::new() },
         indicators: indicators.filter(|_| valid),
         external_supply: valid.then_some(external),
@@ -1555,11 +1636,7 @@ fn compute(
         .iter()
         .map(|system| monthly_yield_kwh(system, input.total_usable_floor_area_m2))
         .collect();
-    let hot_water = input
-        .hot_water
-        .as_ref()
-        .zip(hot_water)
-        .map(|(system, result)| (system.carrier(), &result.months));
+    let hot_water = hot_water.map(|result| &result.months);
     for index in 0..12 {
         let month = (index + 1) as u8;
         let row = &heating.monthly[index];
@@ -1619,17 +1696,19 @@ fn compute(
             .map(|zone| zone.monthly_kwh[index])
             .sum::<f64>();
         let mut hot_water_ambient = 0.0;
-        if let Some((carrier, months)) = &hot_water {
+        // 5.39d: solar heat for hot water and the space-heating node.
+        let mut solar_heat = row.solar_gain_kwh;
+        if let Some(months) = &hot_water {
             let row = &months[index];
-            match carrier {
-                HotWaterCarrier::Fuel(Carrier::El) => used_el += row.carrier_input_kwh,
-                HotWaterCarrier::Fuel(Carrier::Gas) => used_gas += row.carrier_input_kwh,
-                HotWaterCarrier::Fuel(Carrier::Oil) => used_oil += row.carrier_input_kwh,
-                // Table 5.2 or annex P: external heat for hot water (dw).
-                HotWaterCarrier::DistrictHeat => used_dw += row.carrier_input_kwh,
-            }
+            // 13.1/13.3 per generator carrier; table 5.2 or annex P for
+            // external heat (dw).
+            used_el += row.electricity_kwh;
+            used_gas += row.natural_gas_kwh;
+            used_oil += row.oil_kwh;
+            used_dw += row.district_heat_kwh;
             used_el += row.auxiliary_electricity_kwh;
             hot_water_ambient = row.ambient_heat_kwh;
+            solar_heat += row.solar_renewable_kwh;
         }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
         let produced: f64 = input
@@ -1760,7 +1839,7 @@ fn compute(
             + used_dw * dw.renewable_factor
             + used_dc * dc.renewable_factor
             + source.map_or(0.0, |item| source_heat * item.renewable_factor);
-        renewable += (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT
+        renewable += (ambient + declared_heat + hot_water_ambient + solar_heat) * F_PREN_RENHEAT
             + biomass_heat * F_PREN_BIOMASS_B
             + ambient_cold * F_PREN_RENCOLD
             + produced * F_PREN_RENELECT;
@@ -2332,6 +2411,11 @@ mod tests {
                 annex_t: None,
                 annex_t_conditions: None,
             },
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
         };
@@ -2359,6 +2443,91 @@ mod tests {
         // Short draw-off lines (η_em = 1) and class 1 (c_W;gen = 1).
         let expected = result.space_heating.annual_natural_gas_kwh.unwrap() + 856.0 * 2.28 / 0.675;
         assert!((gas - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn solar_water_heating_counts_as_renewable_and_combi_feeds_the_node() {
+        use crate::domestic_hot_water::{
+            GasAppliance, HotWaterEmission, HotWaterGenerator, HotWaterNeed, ServedTaps,
+        };
+        let mut sample = input();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let mut system = HotWaterSystem {
+            need: HotWaterNeed::Residential {
+                dwelling_count: 1,
+                source_reference: "one dwelling".into(),
+            },
+            emission: HotWaterEmission::Residential {
+                served: ServedTaps::KitchenAndBathroom,
+                kitchen_length_m: Some(1.0),
+                bathroom_length_m: Some(1.0),
+                source_reference: "drawing".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: None,
+            storage: Vec::new(),
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator: HotWaterGenerator::GasAppliance {
+                appliance: GasAppliance::CombiGaskeurHrCw,
+                measured_class: Some(crate::domestic_hot_water::ApplicationClass::Class1),
+                kitchen_only: false,
+                declared: None,
+                annex_t: None,
+                annex_t_conditions: None,
+            },
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
+            collective: None,
+            equipment_reference: "plate".into(),
+        };
+        sample.hot_water = Some(system.clone());
+        let plain = assess_building_performance(&sample);
+        assert_eq!(plain.status, "calculated_unverified", "{:?}", plain.issues);
+        let heater: crate::solar_thermal::SolarWaterHeater =
+            serde_json::from_value(serde_json::json!({
+                "id": "roof", "solarUse": "water_heating",
+                "method": {"method": "calculated", "solarType": "preheater",
+                    "collectors": {"moduleAreaM2": 2.0, "moduleCount": 2, "orientation": "south",
+                        "tiltDeg": 45.0, "obstruction": {"method": "minimal"},
+                        "efficiency": {"method": "forfait", "collector": "glazed"},
+                        "loopPipes": {"method": "forfait"}},
+                    "storage": {"totalVolumeL": 200.0, "loss": {"method": "label", "label": "b"}}},
+                "sourceReference": "datasheet"
+            }))
+            .unwrap();
+        system.solar = vec![heater.clone()];
+        sample.hot_water = Some(system.clone());
+        let solar = assess_building_performance(&sample);
+        assert_eq!(solar.status, "calculated_unverified", "{:?}", solar.issues);
+        let hot_water = solar.hot_water.as_ref().unwrap();
+        let solar_heat = hot_water.annual_solar_renewable_kwh;
+        assert!(solar_heat > 0.0);
+        // 5.39d: f_Pren;renheat on the solar heat; the pump adds electricity.
+        let gain = solar.annual_renewable_primary_kwh.unwrap()
+            - plain.annual_renewable_primary_kwh.unwrap();
+        assert!((gain - solar_heat * F_PREN_RENHEAT).abs() < 1e-6);
+        // A combi system also supplies the space-heating node (9.2.3.4).
+        let mut combi = heater;
+        combi.solar_use = crate::solar_thermal::SolarUse::Combi;
+        system.solar = vec![combi];
+        sample.hot_water = Some(system);
+        let combi = assess_building_performance(&sample);
+        assert_eq!(combi.status, "calculated_unverified", "{:?}", combi.issues);
+        let march = &combi.space_heating.monthly[2];
+        assert!(march.solar_gain_kwh > 0.0);
+        assert!(march.generator_output_kwh < plain.space_heating.monthly[2].generator_output_kwh);
+        assert!(
+            (march.solar_gain_kwh
+                - combi.hot_water.as_ref().unwrap().months[2].solar_space_heating_kwh)
+                .abs()
+                < 1e-9
+        );
     }
 
     #[test]
@@ -2415,6 +2584,11 @@ mod tests {
             delivery_sets: None,
             boiling_water_tap: false,
             generator: HotWaterGenerator::ElectricBoiler,
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
         });

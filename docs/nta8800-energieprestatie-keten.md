@@ -79,7 +79,7 @@ Helling en oriëntatie werken alleen via `I_sol` uit tabel 17.2. PV loopt via `p
 
 ## Tapwater (hoofdstuk 13)
 
-Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 525–655). Per maand:
+Module `domestic_hot_water` rekent één tapwatersysteem met één of meer opwekkers en eventuele zonneboilers (p. 525–655). Per maand:
 
 1. **Nettobehoefte.**
    - Woningen: 13.15–13.18, 856 kWh per bewoner.
@@ -93,7 +93,7 @@ Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 
    - Distributierendement 13.25.
 5. **Voorraadvat.** 13.58 (gemeten `H_sto;ls`) of 13.59 (label, tabel 13.9). Zonder label: C vanaf 2018, anders G.
 6. **Afleversets.** Verlies 13.24/13.24a en elektronica 13.46.
-7. **Opwekking.** `E = Q_W;dis/(f_prac·η_W;gen)` (13.3, 13.152). Ondersteunde opwekkers:
+7. **Opwekking.** `E = Q_W;dis;nren·F_W;gen/(f_prac·η_W;gen)` per opwekker en energiedrager (13.1, 13.3, 13.152). Ondersteunde opwekkers:
    - gastoestellen met tabel 13.25 en `c_W;gen` uit tabel 13.26;
    - warmtepompen 1,4·`c_source` met tabel 13.27, of een EN 16147-meting bij één tappatroon (13.160b, tabel 13.18);
    - elektrisch doorstroomtoestel (0,95) en elektroboiler (1,0);
@@ -116,17 +116,104 @@ Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 
     - circulatie met `f_W;dis;rbl` = 1 als alle leidingen in verwarmde zones liggen, anders 0,85 (13.47);
     - afleversets, met `f_W;conv;rbl` = 1;
     - 20 % van de circulatiepompenergie (13.49);
-    - voorraadvaten in een verwarmde zone (13.63), maar niet bij een gebouw boven 500 m²;
+    - voorraadvaten in een verwarmde zone (13.63);
     - het opwekkingsverlies van een elektrisch doorstroomtoestel (13.179).
+
+    Boven 500 m² A_g;gebouw zijn de terugwinbare verliezen van voorraadvaten, opwekkers (13.164, 13.179) en zonneboilers (13.68) 0 (13.13, p. 535). Dat geldt niet voor systemen van individuele toestellen die elk minder dan 500 m² bedienen, zoals keukenboilers, doorstroomtoestellen, boosterwarmtepompen en individuele zonneboilers. De kern behandelt een systeem zonder `collective` als individuele toestellen: bij woningen één per woning (A_g/aantal woningen), bij utiliteit één voor de beoordeelde oppervlakte (interpretatie).
 
     Bij een utiliteitszone met `internalGains.method = utility` en een lege `hotWaterRecoverableKwh` vult de energieprestatieketen deze verliezen in als Φ_int;W (7.29), verdeeld naar gebruiksoppervlakte (13.14).
 
+    Daarnaast komen de terugwinbare verliezen van zonneboilers (13.68) en het stilstandsverlies van een boosterwarmtepomp (13.164) hierbij.
+
+### Zonneboilers en zonnecombisystemen (§13.7)
+
+Module `solar_thermal`, ingevoerd als `hotWater.solar`. Elk systeem heeft:
+
+- `solarUse`: alleen tapwater (`water_heating`, SOL_USE = WHS) of tapwater en verwarming (`combi`);
+- `count`: het aantal identieke fysieke systemen (N_soli);
+- een rekenroute (`method`);
+- eventueel `pvt`.
+
+De zonnebijdrage wordt altijd eerst benut (13.4/13.4a). Q_W;dis;nren = Q_W;dis − MIN(Q_W;dis; Σ Q_W;ren;prac). De opwekkers leveren alleen dat restant.
+
+**Berekende route (13.7.2.2, NEN-EN 15316-4-3 methode 2), per dienst:**
+
+- **Verdeling over de diensten.** `f_W;use` (13.77) bij een combisysteem.
+- **Effectieve waarden per dienst.** Oppervlak, volume, back-upvolume, verliescoëfficiënt en pompvermogen volgens 13.78–13.81 en 13.86–13.89.
+- **Back-upvolume.** Het forfait van 13.80 geldt bij een geïntegreerde naverwarming en onbekend V_sto;bu. Een voorverwarmer heeft geen back-updeel.
+- **Verliescoëfficiënt van het vat.** H_sto;ls;tot is de gemeten UA, naar boven afgerond volgens bijlage X. Anders volgt hij uit het label (13.82) of uit het productiejaar (C vanaf 2018, anders G).
+- **Collectorcircuit.**
+  - η_loop volgens 13.72, met H_hx uit 13.73 als die ontbreekt.
+  - H_loop;p volgens 13.74, 13.75 (tabel 13.10) of als opgave.
+  - Pompvermogen volgens 13.76 (tabel 13.11), naar boven afgerond volgens bijlage X.
+  - Collectorparameters uit opgave of tabel 13.14.
+- **Correlatie.** X en Y volgens 13.97–13.99 (X tussen 0 en 18), met de instraling op het collectorvlak (17.2) en F_sh;obst (17.3). Daarna 13.100 met f_app = 1,08 en tabel 13.15, f_tmp volgens 13.101 en het opslagverlies volgens 13.102.
+- **Zonnebijdrage.** Q_W;ren volgens 13.103/13.104, per maand naar beneden afgerond volgens bijlage X. Het back-upverlies volgt 13.95 (0 als het rendement van de naverwarmer het vatverlies al bevat) en telt via 13.8 mee in Q_W;dis.
+- **Hulpenergie.** Pompenergie volgens 13.108/13.109: 1500 h per jaar bij WHS, 2000 h bij COMBI, over de maanden verdeeld naar de instraling.
+- **Terugwinbaar verlies.** 13.107, met f_rbl = 1: het vat staat in een verwarmde ruimte (13.69). De 500 m²-regel van 13.13 geldt ook hier.
+- **Verwarmingsdeel van een combisysteem.** Analoog volgens 13.85–13.127:
+  - ϑ_H;ref = 0,75·ϑ_rtn + 55;
+  - ϑ_H;high = ϑ_rtn en ϑ_H;bu;set = ϑ_H,a;ontw uit tabel 9.14;
+  - Q_H;bu;sto;ls telt mee in het gebruik (13.114).
+
+**Getest systeem (13.7.2.3, methode 1), alleen tapwater:**
+
+- **Interpolatie.** Lineair over de jaarvraag (13.130), met ten minste twee testpunten. Buiten het geteste bereik geeft de kern `solar_test_out_of_range`; er wordt niet geëxtrapoleerd.
+- **Verdeling over de maanden.** Met f_dis volgens 13.128, ten opzichte van zuid 45°.
+- **Voorverwarmer.** 13.131/13.132.
+- **Geïntegreerde naverwarming.** 13.133/13.134, met een negatieve maandwaarde begrensd op 0.
+- **Hulpenergie.** 13.135.
+- **Opslagverliezen voor de terugwinning.** 13.136–13.140.
+
+**Systeemniveau:**
+
+- **Praktijkwaarde per systeem.** Q_W;ren;prac = f_gebouw;si;W·0,95·Q_W;ren·f_PVT·N_soli (13.66), en hetzelfde voor verwarming met f_gebouw;si;H (13.66a).
+- **PVT-factor.** f_PVT;th is 0,9 voor onafgedekte PVT, volgt tabel 13.16 bij enkel glas (alleen bij de berekende route), en is 1 bij een test volgens ISO 9806.
+- **Hulpenergie en terugwinbare verliezen.** 13.67 en 13.68, maal f_gebouw;si;W.
+- **Verdeling bij meerdere verschillende systemen.** De vraag wordt verdeeld naar V_sto;tot (13.77).
+
+**Koppeling met de energieprestatie:**
+
+- Bij een combisysteem rekent de keten de ruimteverwarming eerst zonder zonnewinst. Q_H;nod;out + Q_H;nod;ls van die run is Q_H;sol;us (13.85).
+- f_gebouw;si;H volgt uit `collectiveConnection`.
+- De ontwerptemperaturen komen uit de klasse van het distributiesysteem, anders van een productketel, anders 90/70.
+- Q_H;ren;prac gaat als knooppuntwinst (9.2.3.4, `solarHeatingKwh`, begrensd op Q_H;nod;out + Q_H;nod;ls) de tweede run in.
+- Er is geen verdere iteratie: de terugwinbare tapwaterverliezen van de eerste run bevatten de zonneverliezen van het verwarmingsdeel nog niet.
+- Het hernieuwbare aandeel telt Q_W;ren;sol,prac en Q_H;ren;sol,prac met f_Pren;renheat (5.39d).
+
+### Meerdere opwekkers (13.8.2)
+
+`additionalGenerators` voegt opwekkers toe. Elke opwekker heeft:
+
+- `nominalPowerKw` (P_nom);
+- eventueel `exhaustAir`;
+- een eigen `equipmentReference`.
+
+Het hoofdtoestel krijgt `nominalPowerKw` en `exhaustAir` op systeemniveau.
+
+**Volgorde (13.8.2.1).** Eerst een afvoerluchtwarmtepomp zonder buitenlucht. Daarna warmtepompen (biomassa en WKK komen in de tapwatermodule niet voor). Daarna de overige toestellen. Binnen een categorie gaat het hoogste rendement f_prac·η_W;gen voor.
+
+**Maximale output:**
+
+- 13.141: f_gebouw;si;W·f_func·P_nom·t, met f_func = 0,6 boven 500 m²;
+- 13.142: externe warmtelevering is onbegrensd;
+- een individuele afvoerluchtwarmtepomp zonder P_nom krijgt 1,0 kW;
+- 13.144a: een afvoerluchtwarmtepomp levert ×(1 − f_combi) bij ventilatie C of D zonder WTW, en anders niets.
+
+**Cascade.** 13.143a/13.145. Een restant dat de laatste opwekker niet kan leveren gaat naar een extra elektrisch doorstroomtoestel (η 0,95, met 13.179 en 13.181). Het aandeel per opwekker is F_W;gen (13.150), te zien in `generators`.
+
+**Serieopstelling (`series`):**
+
+- `hotfill_electric_boiler`: een individueel systeem met een elektroboiler achter een ander toestel. Het eerste toestel levert ten hoogste 80 % (13.141a).
+- `collective_first_also_heating`: f_pref;serie volgens 13.141b–d, met de maandelijkse maximale aanvoertemperatuur.
+
+**Boeking.** Elke opwekker boekt op zijn eigen energiedrager: `electricityKwh`, `naturalGasKwh`, `oilKwh` en `districtHeatKwh` per maand. De energieprestatie telt die per drager op.
+
 Niet in de kern:
 
-- zonneboilers (§13.7, `Q_W;ren;sol = 0`);
-- meerdere opwekkers per systeem (13.8.2);
-- boosterwarmtepompen (bijlage W);
 - afleversets op een collectief verwarmingssysteem (13.8.4.9.3);
+- een energetische bijdrage F_W;gen uit een kwaliteitsverklaring (13.146);
+- de tijdfractie f_W;t;hp-on en het ventilatiedebiet van afvoerluchtwarmtepompen voor tapwater (13.148/13.149);
 - terugwinbare opwekkingsverliezen van warmtepompen en combitoestellen met geïntegreerd vat (13.160a), en de bijlage T-routes voor elektrische toestellen, bivalente warmtepompen en micro-WKK (T.3, T.7–T.10).
 
 ## Koeling (hoofdstuk 10)
