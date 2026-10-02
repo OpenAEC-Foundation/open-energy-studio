@@ -378,3 +378,9 @@ Via **NTA-invoer starten** opent een gestructureerd formulier met secties die de
 - **Energie**: W_fan = Σ P·n·t_H;op;si;mi / 1000.
 - **Bedrijfstijd**: t_H;op;si;mi is de langste bedrijfstijd (9.32a) van de zones op het systeem.
 - **Boeking**: de energie komt in `emissionFanElectricityKwh` en telt mee in de hulpenergie van de verwarming.
+
+## Terugwinbaar verlies van een boosterwarmtepomp (13.164)
+
+Het stilstandsverlies Q_W;hp;ls volgens bijlage W wordt via 13.6.5 opgeteld bij de terugwinbare tapwaterverliezen, in plaats van Q_sto;ls. Bijlage W levert de waarde al in kWh, dus de deling door 3,6 vervalt. De waarde wordt naar beneden afgerond volgens bijlage X.
+
+Dit gebeurt net als bij voorraadvaten alleen bij een gebouw tot 500 m². Interpretatie: de boosterwarmtepomp staat in de verwarmde zone. De forfaitaire route, waarbij het verlies 0 is, bestaat in de kern niet, omdat bijlage W alleen de gemeten route kent.

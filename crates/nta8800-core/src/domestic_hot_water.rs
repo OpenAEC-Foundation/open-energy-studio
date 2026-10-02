@@ -1630,6 +1630,15 @@ pub fn assess_hot_water(
             } => *generation_efficiency,
         };
         for (row, month) in months.iter_mut().zip(booster) {
+            // 13.6.5 with 13.164: the booster's standing loss Q_W;hp;ls
+            // (annex W, already in kWh) replaces Q_sto;ls, rounded down per
+            // annex X. Like a vessel, it counts only up to 500 m² (above,
+            // generators sit in a separate zone); the booster is taken to
+            // stand in the heated zone.
+            if building_area <= 500.0 {
+                row.recoverable_loss_kwh +=
+                    crate::significant_figures::round_down(month.standing_loss_heat_kwh);
+            }
             row.carrier_input_kwh = month.heating_system_heat_kwh / source_efficiency;
             row.auxiliary_electricity_kwh += month.electricity_kwh;
             let input = month.heating_system_heat_kwh + month.electricity_kwh;
@@ -1718,6 +1727,10 @@ mod tests {
         assert!((jan.carrier_input_kwh - booster[0].heating_system_heat_kwh / 0.9).abs() < 1e-9);
         assert!(jan.auxiliary_electricity_kwh >= booster[0].electricity_kwh);
         assert_eq!(jan.ambient_heat_kwh, 0.0);
+        // 13.164: the standing loss joins the recoverable losses.
+        let loss = crate::significant_figures::round_down(booster[0].standing_loss_heat_kwh);
+        assert!(loss > 0.0);
+        assert!(jan.recoverable_loss_kwh >= loss - 1e-9);
     }
 
     fn combi() -> HotWaterGenerator {
