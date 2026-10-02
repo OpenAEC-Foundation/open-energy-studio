@@ -950,18 +950,6 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         }) {
             issues.push(issue("cooling_double_count", "cooling"));
         }
-        for (index, generator) in system.generators.iter().enumerate() {
-            if matches!(
-                generator.generator,
-                CoolingGeneratorKind::AbsorptionChp { .. }
-            ) {
-                // Building CHP is not modelled in the heating chain.
-                issues.push(issue(
-                    "cooling_chp_unsupported",
-                    format!("cooling.generators[{index}].generator"),
-                ));
-            }
-        }
         if let Some(evidence) = &input.active_cooling {
             if !active_cooling_matches(evidence.system, system) {
                 issues.push(issue(
@@ -1768,10 +1756,15 @@ fn compute(
         }
         // Chapter 10 cooling and its auxiliaries, weighted by f_BACS (5.20/5.21).
         let mut ambient_cold = 0.0;
+        // §9.6.6.1: electricity of a building CHP driving absorption cooling
+        // (ε_chp;el), credited in chapter 16; not renewable (5.14b).
+        let mut chp_electricity = 0.0;
         if let Some(assessment) = cooling {
             let month_row = &assessment.months[index];
             used_el += bacs * (month_row.electricity_kwh + month_row.auxiliary_electricity_kwh);
-            used_gas += bacs * month_row.natural_gas_kwh;
+            // Table 10.30 with 9.65: CHP fuel (natural gas, gross value).
+            used_gas += bacs * (month_row.natural_gas_kwh + month_row.chp_heat_kwh);
+            chp_electricity = bacs * month_row.chp_electricity_kwh;
             used_dh += bacs * month_row.district_heat_kwh;
             renewable_dh_basis += month_row.district_heat_cold_kwh;
             used_dc += bacs * month_row.district_cold_kwh;
@@ -1798,12 +1791,13 @@ fn compute(
             solar_heat += row.solar_renewable_kwh;
         }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
-        let produced: f64 = input
+        let produced_renewable: f64 = input
             .on_site_production
             .iter()
             .map(|item| item.monthly_kwh[index])
             .sum::<f64>()
             + pv_yields.iter().map(|yields| yields[index]).sum::<f64>();
+        let produced = produced_renewable + chp_electricity;
         let self_used = produced.min(used_el);
         // 5.26 summed over producers.
         let exported = produced - self_used;
@@ -1888,9 +1882,10 @@ fn compute(
         // 5.10 and 5.13: exported electricity is subtracted at f_P;exp;el.
         fossil -= exported * F_P_ELECTRICITY;
         co2 -= exported * K_CO2_ELECTRICITY;
-        // 5.14a/5.14b: all modelled producers are renewable (no CHP); the
+        // 5.14a/5.14b: renewable production only (CHP excluded); the
         // correction is left out of the CO2 emission (§5.5.6.1).
-        let correction = produced.min(used_el) * STORAGE_CORRECTION_FACTOR * storage_factor;
+        let correction =
+            produced_renewable.min(used_el) * STORAGE_CORRECTION_FACTOR * storage_factor;
         fossil -= correction;
         storage_correction += correction;
         balance.push(ElectricityBalanceMonth {
@@ -1929,7 +1924,7 @@ fn compute(
         renewable += (ambient + declared_heat + hot_water_ambient + solar_heat) * F_PREN_RENHEAT
             + biomass_heat * F_PREN_BIOMASS_B
             + ambient_cold * F_PREN_RENCOLD
-            + produced * F_PREN_RENELECT;
+            + produced_renewable * F_PREN_RENELECT;
     }
     let zone_demands = || std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
     // §5.4.2: the fixed C1 run, when chapter 11 supplied it for every zone.
@@ -2893,7 +2888,7 @@ mod tests {
     }
 
     #[test]
-    fn external_cold_uses_forfait_factor_and_chp_absorption_is_rejected() {
+    fn external_cold_uses_forfait_factor_and_chp_absorption_books_gas_and_electricity() {
         let mut sample = input();
         let base = assess_building_performance(&sample);
         sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
@@ -2925,11 +2920,49 @@ mod tests {
                 low_temperature: false,
             },
             heat_rejection: None,
+            rating: None,
         }));
-        assert!(assess_building_performance(&sample)
-            .issues
+        let chp = assess_building_performance(&sample);
+        assert_eq!(chp.status, "calculated_unverified", "{:?}", chp.issues);
+        let cooling = cooling_assessment(&sample, &chp.space_heating).unwrap();
+        // Table 9.31, 20–200 kW after 2006 HT: ε_th 0,49, ε_el 0,30; table
+        // 10.30: fuel = cold / (1,00·0,49).
+        let july = &cooling.months[6];
+        assert!(july.chp_heat_kwh > 0.0);
+        assert!((july.chp_heat_kwh - july.generator_cold_kwh / 0.49).abs() < 1e-6);
+        assert!((july.chp_electricity_kwh - 0.30 * july.chp_heat_kwh).abs() < 1e-9);
+        let gas = |result: &BuildingPerformanceAssessment| -> f64 {
+            result
+                .carriers
+                .iter()
+                .filter(|item| item.carrier == "gas")
+                .map(|item| item.used_kwh)
+                .sum()
+        };
+        let fuel: f64 = cooling.months.iter().map(|month| month.chp_heat_kwh).sum();
+        let bacs = sample.bacs_factor;
+        assert!((gas(&chp) - gas(&base) - bacs * fuel).abs() < 1e-6);
+        // The CHP electricity enters the balance but not EP_ren (5.14b).
+        let produced: f64 = chp
+            .electricity_balance
             .iter()
-            .any(|item| item.code == "cooling_chp_unsupported"));
+            .map(|month| month.produced_kwh)
+            .sum();
+        let base_produced: f64 = base
+            .electricity_balance
+            .iter()
+            .map(|month| month.produced_kwh)
+            .sum();
+        let chp_el: f64 = cooling
+            .months
+            .iter()
+            .map(|month| month.chp_electricity_kwh)
+            .sum();
+        assert!((produced - base_produced - bacs * chp_el).abs() < 1e-6);
+        assert_eq!(
+            chp.annual_renewable_primary_kwh,
+            base.annual_renewable_primary_kwh
+        );
     }
 
     #[test]

@@ -1905,7 +1905,7 @@ export const nl: Record<string, string> = {
   'nta.form.cool.nominalCapacity': "Nominaal vermogen, kW",
   'nta.form.cool.minimumCapacity': "Minimaal continu vermogen, kW",
   'nta.form.cool.partLoad': "deellast, %",
-  'nta.form.cool.evapOut': "Verdamperuittrede, °C",
+  'nta.form.cool.evapOut': "Verdamperuittrede, °C (bij lucht-lucht: uitblaaslucht binnendeel, niet de binnentemperatuur)",
   'nta.form.cool.condIn': "Condensorintrede, °C",
   'nta.form.cool.fifthPoint': "Vijfde testpunt (10.63)",
   'nta.form.cool.condLimit': "Grens condensorintrede, °C (optioneel)",

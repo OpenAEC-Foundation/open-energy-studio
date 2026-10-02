@@ -41,9 +41,15 @@
 //! AHU cooling coils `Q_C;ahu;in;req` (11.116) are added to the generator
 //! load without emission or distribution loss (`CoolingZoneNeed::ahu_load_kwh`).
 //!
-//! Not modelled: method 2 for absorption chillers (10.66, table values of
-//! method 3 apply) and recoverable distribution losses (zero because
-//! `L_C;zi = 0` in cooled zones). Interpretations are listed in
+//! Absorption chillers with a NEN-EN 14511 rating use method 2 (10.66:
+//! PLV 0,95 · ζ_n · f_prpr) and 10.81 with ζ_n·0,95 for the rejected heat.
+//! Absorption on building CHP books the CHP fuel (table 10.30 with 9.65,
+//! ε_chp;th) and its electricity (ε_chp;el, §9.6.6.1) for chapter 16.
+//! Table 10.32 has only the "not controlled" row (1), so f_hr;PL;el = 1 is
+//! the complete table.
+//!
+//! Not modelled: recoverable distribution losses (zero because `L_C;zi = 0`
+//! in cooled zones). Interpretations are listed in
 //! [`COOLING_INTERPRETATIONS`].
 
 use crate::climate::{MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
@@ -477,6 +483,18 @@ impl ChpClass {
     }
 }
 
+/// Method 2 (§10.5.5, 10.66) of an absorption chiller: the nominal heat
+/// ratio `ζ_n` at the NEN-EN 14511 standard rating conditions; PLV = 0,95.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AbsorptionRating {
+    pub nominal_heat_ratio: f64,
+    pub source_reference: String,
+}
+
+/// 10.67: part-load value of absorption chillers in method 2.
+const ABSORPTION_PLV: f64 = 0.95;
+
 /// A quality-statement value replacing a table value (§10.1).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -504,9 +522,15 @@ pub struct En14825Point {
     /// `f_C;PL` in %.
     pub part_load_percent: f64,
     pub eer: f64,
-    /// `ϑ_C;evap;out`, °C.
+    /// `ϑ_C;evap;out` (10.63): the temperature leaving the evaporator, °C.
+    /// For air-to-air units this is the leaving (supply) air temperature of
+    /// the indoor unit, not the indoor air temperature of the test
+    /// condition; it must lie below `ϑ_C;cond;in` (10.56/10.64 divide by the
+    /// difference).
     pub evaporator_outlet_c: f64,
-    /// `ϑ_C;cond;in`, °C.
+    /// `ϑ_C;cond;in` (10.63): the temperature entering the condenser, for
+    /// air-cooled units the outdoor air temperature of the test condition,
+    /// °C.
     pub condenser_inlet_c: f64,
 }
 
@@ -629,17 +653,28 @@ pub enum CoolingGeneratorKind {
         heat_rejection: Option<HeatRejection>,
         #[serde(default)]
         declared: Option<DeclaredEfficiency>,
+        /// Method 2 (10.66) instead of table 10.30.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rating: Option<AbsorptionRating>,
     },
     /// Table 10.30 absorption on forfait external heat (η_dh = 1).
     AbsorptionExternalHeat {
         #[serde(default, rename = "heatRejection")]
         heat_rejection: Option<HeatRejection>,
+        /// Method 2 (10.66) instead of table 10.30.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rating: Option<AbsorptionRating>,
     },
-    /// Table 10.30 absorption on building CHP heat, ζ = ε_chp;th.
+    /// Table 10.30 absorption on building CHP heat, ζ = 1,00·ε_chp;th: the
+    /// CHP fuel follows 9.65 (ε_chp;th of table 9.31) and its electricity
+    /// (ε_chp;el) is credited in chapter 16 (§9.6.6.1).
     AbsorptionChp {
         chp: ChpClass,
         #[serde(default, rename = "heatRejection")]
         heat_rejection: Option<HeatRejection>,
+        /// Method 2 (10.66) instead of table 10.30.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rating: Option<AbsorptionRating>,
     },
     /// 10.78 external cold without an annex P declaration.
     ExternalCold,
@@ -761,8 +796,12 @@ pub struct CoolingMonth {
     /// `Q_C;gen;out` of absorption chillers driven by external heat, for
     /// the renewable share (5.39g), kWh.
     pub district_heat_cold_kwh: f64,
-    /// Heat from building CHP for absorption chillers.
+    /// Gas input of the building CHP driving absorption chillers (table
+    /// 10.30 with 9.65), kWh.
     pub chp_heat_kwh: f64,
+    /// Electricity of that CHP (ε_chp;el · fuel, §9.6.6.1), credited in
+    /// chapter 16, kWh.
+    pub chp_electricity_kwh: f64,
     /// External cold delivery (carrier dc).
     pub district_cold_kwh: f64,
     pub auxiliary_electricity_kwh: f64,
@@ -973,6 +1012,27 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                 );
             }
         }
+        let absorption_rating = match &generator.generator {
+            CoolingGeneratorKind::GasAbsorption { rating, .. }
+            | CoolingGeneratorKind::AbsorptionExternalHeat { rating, .. }
+            | CoolingGeneratorKind::AbsorptionChp { rating, .. } => rating.as_ref(),
+            _ => None,
+        };
+        if let Some(rating) = absorption_rating {
+            let field = format!("{base}.generator.rating");
+            if declared.is_some() {
+                push("cooling_declared_and_performance", field.clone());
+            }
+            if !rating.nominal_heat_ratio.is_finite() || rating.nominal_heat_ratio <= 0.0 {
+                push("cooling_performance_invalid", field.clone());
+            }
+            if source_missing(&rating.source_reference) {
+                push(
+                    "source_reference_required",
+                    format!("{field}.sourceReference"),
+                );
+            }
+        }
         if let Some(rated) = rated(&generator.generator) {
             let field = format!("{base}.generator.performance");
             if declared.is_some() {
@@ -1134,7 +1194,11 @@ enum Drive {
     Electric(f64),
     Gas(f64),
     DistrictHeat(f64),
-    ChpHeat(f64),
+    /// Fuel ratio ζ = heat ratio · ε_chp;th and ε_chp;el.
+    ChpHeat {
+        zeta: f64,
+        electric: f64,
+    },
     DistrictCold,
     FreeCooling(f64),
 }
@@ -1155,17 +1219,64 @@ fn drive(kind: &CoolingGeneratorKind) -> Drive {
         CoolingGeneratorKind::GasEngineCompression { gas_engine, .. } => Drive::Gas(
             EER_COMPRESSION_FORFAIT * gas_engine.factors().map_or(0.0, |factors| factors.1),
         ),
-        CoolingGeneratorKind::GasAbsorption { declared: d, .. } => {
-            Drive::Gas(declared(d, 0.025, ZETA_GAS_ABSORPTION))
-        }
-        CoolingGeneratorKind::AbsorptionExternalHeat { .. } => {
-            Drive::DistrictHeat(ZETA_EXTERNAL_HEAT_FACTOR)
-        }
-        CoolingGeneratorKind::AbsorptionChp { chp, .. } => {
-            Drive::ChpHeat(chp.factors().map_or(0.0, |factors| factors.0))
+        CoolingGeneratorKind::GasAbsorption {
+            declared: d,
+            rating,
+            heat_rejection,
+        } => Drive::Gas(
+            absorption_method_2(rating.as_ref(), *heat_rejection)
+                .unwrap_or_else(|| declared(d, 0.025, ZETA_GAS_ABSORPTION)),
+        ),
+        CoolingGeneratorKind::AbsorptionExternalHeat {
+            rating,
+            heat_rejection,
+        } => Drive::DistrictHeat(
+            absorption_method_2(rating.as_ref(), *heat_rejection)
+                .unwrap_or(ZETA_EXTERNAL_HEAT_FACTOR),
+        ),
+        CoolingGeneratorKind::AbsorptionChp {
+            chp,
+            rating,
+            heat_rejection,
+        } => {
+            let (thermal, electric) = chp.factors().unwrap_or((0.0, 0.0));
+            // Table 10.30: ζ = 1,00·ε_chp;th, so cold/ζ is the CHP fuel;
+            // method 2 replaces the 1,00 by PLV·ζ_n·f_prpr (10.66).
+            let heat_ratio = absorption_method_2(rating.as_ref(), *heat_rejection).unwrap_or(1.0);
+            Drive::ChpHeat {
+                zeta: heat_ratio * thermal,
+                electric,
+            }
         }
         CoolingGeneratorKind::ExternalCold => Drive::DistrictCold,
         CoolingGeneratorKind::FreeCooling { source, .. } => Drive::FreeCooling(source.eer()),
+    }
+}
+
+/// 10.66: `PLV·ζ_n·f_prpr` with PLV 0,95 (10.67) and f_prpr 0,60 for direct
+/// condensation against outdoor air, 0,9 otherwise (§10.5.5.1).
+fn absorption_method_2(
+    rating: Option<&AbsorptionRating>,
+    heat_rejection: Option<HeatRejection>,
+) -> Option<f64> {
+    let rating = rating?;
+    let practice = if heat_rejection == Some(HeatRejection::AirCooled) {
+        PRACTICE_FACTOR_DIRECT_CONDENSATION
+    } else {
+        PRACTICE_FACTOR_OTHER
+    };
+    Some(ABSORPTION_PLV * rating.nominal_heat_ratio * practice)
+}
+
+/// 10.81 for method 2 absorption: `ζ_n·f_C;PL` with f_C;PL = 0,95.
+fn rated_heat_ratio(kind: &CoolingGeneratorKind) -> Option<f64> {
+    match kind {
+        CoolingGeneratorKind::GasAbsorption { rating, .. }
+        | CoolingGeneratorKind::AbsorptionExternalHeat { rating, .. }
+        | CoolingGeneratorKind::AbsorptionChp { rating, .. } => rating
+            .as_ref()
+            .map(|rating| ABSORPTION_PLV * rating.nominal_heat_ratio),
+        _ => None,
     }
 }
 
@@ -1174,7 +1285,7 @@ fn heat_rejection(kind: &CoolingGeneratorKind) -> Option<HeatRejection> {
         CoolingGeneratorKind::Compression { heat_rejection, .. }
         | CoolingGeneratorKind::GasEngineCompression { heat_rejection, .. }
         | CoolingGeneratorKind::GasAbsorption { heat_rejection, .. }
-        | CoolingGeneratorKind::AbsorptionExternalHeat { heat_rejection }
+        | CoolingGeneratorKind::AbsorptionExternalHeat { heat_rejection, .. }
         | CoolingGeneratorKind::AbsorptionChp { heat_rejection, .. } => *heat_rejection,
         _ => None,
     }
@@ -1191,6 +1302,8 @@ const PRACTICE_FACTOR_OTHER: f64 = 0.9;
 
 /// Interpretations of the methods 1/2 and 10.20 routes.
 pub const COOLING_INTERPRETATIONS: &[&str] = &[
+    "10.66 with an absorption chiller on building CHP: the table 10.30 factor 1,00 is replaced by PLV·ζ_n·f_prpr, so the CHP fuel is Q_C/(PLV·ζ_n·f_prpr·ε_chp;th)",
+    "absorption method 2: f_prpr 0,60 only for an air-cooled absorber (direct condensation, principle 2), 0,9 otherwise or when the heat rejection is not given",
     "10.61/10.73: ϑ_C;gen;req;out is the distribution supply temperature of table 10.8 (6 °C without distribution) for chillers and 24 °C (10.10) for evaporation in the room, unless declared",
     "10.55: months without bins in table 10.18 (January, December) use the 14 °C bin",
     "10.56/10.57: a bin with a non-positive temperature lift uses f_EER;gi;bn = 1",
@@ -2103,7 +2216,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                     ) {
                         EER_COMPRESSION_FORFAIT
                     } else {
-                        efficiency
+                        rated_heat_ratio(&generator.generator).unwrap_or(efficiency)
                     };
                     // 10.80b/10.81 and 10.83.
                     auxiliary += cold * (1.0 + 1.0 / ratio) * rejection.distribution_power();
@@ -2111,11 +2224,16 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                 Drive::DistrictHeat(zeta) => {
                     row.district_heat_kwh += cold / zeta;
                     row.district_heat_cold_kwh += cold;
-                    auxiliary += cold * (1.0 + 1.0 / zeta) * rejection.distribution_power();
+                    let ratio = rated_heat_ratio(&generator.generator).unwrap_or(zeta);
+                    auxiliary += cold * (1.0 + 1.0 / ratio) * rejection.distribution_power();
                 }
-                Drive::ChpHeat(zeta) => {
-                    row.chp_heat_kwh += cold / zeta;
-                    auxiliary += cold * (1.0 + 1.0 / zeta) * rejection.distribution_power();
+                Drive::ChpHeat { zeta, electric } => {
+                    let fuel = cold / zeta;
+                    row.chp_heat_kwh += fuel;
+                    row.chp_electricity_kwh += fuel * electric;
+                    // 10.81 with table 10.30 ζ, or ζ_n·PLV for method 2.
+                    let ratio = rated_heat_ratio(&generator.generator).unwrap_or(zeta);
+                    auxiliary += cold * (1.0 + 1.0 / ratio) * rejection.distribution_power();
                 }
                 Drive::DistrictCold => {
                     // 10.78 with η = 1 and f_prpr = 1 (forfait f_P;del;dc).
@@ -2269,6 +2387,7 @@ mod tests {
         let input = system(vec![generator(
             CoolingGeneratorKind::AbsorptionExternalHeat {
                 heat_rejection: None,
+                rating: None,
             },
             None,
         )]);
@@ -2284,6 +2403,55 @@ mod tests {
         assert!(july.district_heat_cold_kwh > 0.0);
         assert!((july.district_heat_cold_kwh - july.generator_cold_kwh).abs() < 1e-9);
         assert!(july.district_heat_kwh > july.district_heat_cold_kwh);
+    }
+
+    #[test]
+    fn absorption_method_2_follows_10_66() {
+        let rated = |rejection: HeatRejection| {
+            system(vec![generator(
+                CoolingGeneratorKind::GasAbsorption {
+                    heat_rejection: Some(rejection),
+                    declared: None,
+                    rating: Some(AbsorptionRating {
+                        nominal_heat_ratio: 1.2,
+                        source_reference: "EN 14511 report".into(),
+                    }),
+                },
+                None,
+            )])
+        };
+        let zones = [CoolingZoneNeed {
+            usable_floor_area_m2: 100.0,
+            need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
+        }];
+        let tower = rated(HeatRejection::OpenCoolingTower);
+        assert!(validate_cooling(&tower, "cooling").is_empty());
+        let result = assess_cooling(&tower, context(&zones));
+        let july = &result.months[6];
+        // 10.66: Q_H = Q_C / (PLV 0,95 · ζ_n 1,2 · f_prpr 0,9).
+        assert!((july.natural_gas_kwh - july.generator_cold_kwh / (0.95 * 1.2 * 0.9)).abs() < 1e-9);
+        // Direct condensation against outdoor air: f_prpr 0,60.
+        let air = assess_cooling(&rated(HeatRejection::AirCooled), context(&zones));
+        let july_air = &air.months[6];
+        assert!(
+            (july_air.natural_gas_kwh - july_air.generator_cold_kwh / (0.95 * 1.2 * 0.6)).abs()
+                < 1e-9
+        );
+        // A declared value and a rating together are rejected.
+        let mut both = rated(HeatRejection::OpenCoolingTower);
+        if let CoolingGeneratorKind::GasAbsorption { declared, .. } =
+            &mut both.generators[0].generator
+        {
+            *declared = Some(DeclaredEfficiency {
+                value: 0.9,
+                source_reference: "statement".into(),
+            });
+        }
+        assert!(validate_cooling(&both, "cooling")
+            .iter()
+            .any(|item| item.code == "cooling_declared_and_performance"));
     }
 
     #[test]

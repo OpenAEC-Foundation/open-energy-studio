@@ -83,9 +83,15 @@ pub struct SurveyPv {
     pub azimuth_deg: f64,
     pub tilt_deg: f64,
     pub mounting: MountingAnswer,
-    /// F_sh;obst (one or twelve values); absent: 1,0.
+    /// F_sh;obst (one or twelve values); exclusive with `shading`.
     #[serde(default)]
     pub obstruction_factors: Option<Vec<f64>>,
+    /// ISSO 82.1 §15.4.7 / 75.1 §15.4.7 with table 16.1: minimal, side
+    /// obstruction(s), roof edges (flat roofs), full or other obstruction,
+    /// or factors of the extended method (NTA 17.3.8). Absent without
+    /// `obstructionFactors`: minimal (table 16.1, nothing present).
+    #[serde(default)]
+    pub shading: Option<crate::solar_shading::CollectorObstruction>,
     pub source_reference: String,
 }
 
@@ -162,20 +168,86 @@ pub fn derive_pv(pv: &SurveyPv, construction_year: i32, recorder: &mut Recorder)
             "not_ventilated"
         }
     };
-    json!({
+    let mut value = json!({
         "id": pv.id,
         "peakPower": {"method": "table16_1", "moduleType": module, "panelAreaM2": pv.panel_area_m2},
         "azimuthDeg": pv.azimuth_deg,
         "tiltDeg": pv.tilt_deg,
         "mounting": mounting,
-        "obstructionFactors": pv.obstruction_factors.clone().unwrap_or_else(|| vec![1.0]),
         "sourceReference": pv.source_reference,
-    })
+    });
+    match (&pv.shading, &pv.obstruction_factors) {
+        (Some(_), Some(_)) => {
+            recorder.issue("pv_shading_declared_twice", format!("{path}.shading"))
+        }
+        (Some(shading), None) => {
+            value["obstruction"] = serde_json::to_value(shading).expect("serializable");
+        }
+        (None, Some(factors)) => value["obstructionFactors"] = json!(factors),
+        (None, None) => {
+            recorder.record(
+                "pv_shading_not_entered_minimal",
+                &path,
+                "minimal".into(),
+                "ISSO 82.1 p. 195-196 (table 16.1)",
+            );
+            value["obstruction"] = json!({"method": "minimal"});
+        }
+    }
+    value
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pv_shading_maps_onto_the_collector_situations() {
+        use crate::solar_shading::CollectorObstruction;
+        let survey = |shading: Option<CollectorObstruction>, factors: Option<Vec<f64>>| SurveyPv {
+            id: "pv".into(),
+            panel_area_m2: 10.0,
+            module_type: PvTypeAnswer::Unknown,
+            installation_year: Some(2020),
+            azimuth_deg: 180.0,
+            tilt_deg: 15.0,
+            mounting: MountingAnswer::NotVentilated,
+            obstruction_factors: factors,
+            shading,
+            source_reference: "survey".into(),
+        };
+        // Nothing entered: minimal obstruction (table 16.1).
+        let mut recorder = Recorder::default();
+        let value = derive_pv(&survey(None, None), 2000, &mut recorder);
+        assert_eq!(value["obstruction"]["method"], "minimal");
+        assert!(value.get("obstructionFactors").is_none());
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "pv_shading_not_entered_minimal"));
+        // A roof edge of 0,8 m at 0,5 m passes to the kernel unchanged.
+        let edge = CollectorObstruction::RoofEdge {
+            height_m: 0.8,
+            distance_m: 0.5,
+        };
+        let mut recorder = Recorder::default();
+        let value = derive_pv(&survey(Some(edge), None), 2000, &mut recorder);
+        assert_eq!(value["obstruction"]["method"], "roof_edge");
+        assert_eq!(value["obstruction"]["heightM"], 0.8);
+        let system: crate::pv::PvSystem = serde_json::from_value(value).unwrap();
+        assert!(crate::pv::validate_pv(&system, "pv").is_empty());
+        // Both routes at once are an issue.
+        let mut recorder = Recorder::default();
+        derive_pv(
+            &survey(Some(CollectorObstruction::Full), Some(vec![0.9])),
+            2000,
+            &mut recorder,
+        );
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "pv_shading_declared_twice"));
+    }
 
     #[test]
     fn storage_requires_pv() {
@@ -205,6 +277,7 @@ mod tests {
             tilt_deg: 35.0,
             mounting: MountingAnswer::Unknown,
             obstruction_factors: None,
+            shading: None,
             source_reference: "survey".into(),
         };
         let value = derive_pv(&pv, 1995, &mut recorder);
@@ -215,7 +288,8 @@ mod tests {
         assert_eq!(value["mounting"], "not_ventilated");
         let system: crate::pv::PvSystem = serde_json::from_value(value).unwrap();
         assert!((system.peak_power.kw() - 115.0 * 16.0 / 1000.0).abs() < 1e-9);
-        assert_eq!(recorder.applied.len(), 2);
+        // Type and year, mounting and the minimal shading of table 16.1.
+        assert_eq!(recorder.applied.len(), 3);
         // Type and year unknown: placed before 2001, whatever the
         // construction year.
         let newer = derive_pv(&pv, 2015, &mut recorder);
