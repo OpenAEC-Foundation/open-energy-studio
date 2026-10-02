@@ -109,6 +109,12 @@ pub struct SurveySurface {
     /// (table 8.13, p. 93); `None`/false: uninsulated.
     #[serde(default)]
     pub crawlspace_bottom_insulated: Option<bool>,
+    /// Insulated at a renovation or in a later extension, thickness not
+    /// determinable (§8.7.2.1, afb. 8.14, p. 84–85); only with
+    /// `presentUnknownThickness`. Without it, a building from 1965 on keeps
+    /// its own year class (§8.7.2, priority 3).
+    #[serde(default)]
+    pub renovation: Option<crate::forfait_envelope::Renovation>,
     pub source_reference: String,
 }
 
@@ -700,6 +706,31 @@ pub fn derive_envelope(
                 other => other,
             }
         };
+        let renovation = match (&surface.renovation, &surface.insulation) {
+            (None, _) => None,
+            (Some(renovation), InsulationAnswer::PresentUnknownThickness) => {
+                recorder.record(
+                    "renovation_insulation_year_class",
+                    &format!("{path}.renovation"),
+                    match (renovation.year, renovation.meets_requirements_of_year) {
+                        (Some(year), true) => format!("year class of {year}"),
+                        (Some(year), false) => {
+                            format!("year class before {year}, at most R_c 2,5")
+                        }
+                        (None, _) => "year class after the construction year".into(),
+                    },
+                    "ISSO 82.1 §8.7.2.1, afb. 8.14 (p. 84–85); ISSO 75.1 p. 88–89",
+                );
+                Some(renovation.clone())
+            }
+            (Some(_), _) => {
+                recorder.issue(
+                    "renovation_requires_present_unknown_thickness",
+                    format!("{path}.renovation"),
+                );
+                None
+            }
+        };
         let cellar = matches!(surface.boundary, SurfaceBoundary::UnheatedCellar);
         let insulation = if cellar {
             recorder.record(
@@ -726,6 +757,12 @@ pub fn derive_envelope(
             // The flat 1,95 (= 0,15 + 1,8) has no cavity term.
             cavity: surface.cavity && !cushions && !cellar,
             r_si_override: if cellar { None } else { r_si_override },
+            // 8.4.2.1: R_se becomes the R_si of the unheated space.
+            towards_unheated_space: matches!(
+                surface.boundary,
+                SurfaceBoundary::UnheatedSpace { .. }
+            ),
+            renovation: renovation.clone(),
         };
         let result = if let Some(reed) = surface.reed_thickness_mm {
             match thatch_rc(surface, reed, &path, recorder) {
@@ -1039,6 +1076,7 @@ mod tests {
             reed_thickness_mm: None,
             exposed_perimeter_m: Some(16.0),
             crawlspace_bottom_insulated: None,
+            renovation: None,
             source_reference: "survey".into(),
         }
     }
@@ -1144,13 +1182,61 @@ mod tests {
         assert_eq!(derived.windows.len(), 2);
         assert_eq!(derived.ground_floors.len(), 1);
         let space = &derived.unheated.unwrap()["spaces"][0];
-        let h_iu = 40.0 * 0.68;
+        // 8.4.2.1: towards the garage R_se is R_si 0,13 → 1/(1,30 + 0,26).
+        let h_iu = 40.0 * 0.64;
         let b = 200.0 / (200.0 + h_iu);
         assert!((space["reductionFactor"].as_f64().unwrap() - b).abs() < 1e-9);
         assert!(recorder
             .applied
             .iter()
             .any(|item| item.rule == "door_insulation_unknown_uninsulated"));
+    }
+
+    #[test]
+    fn renovation_with_unknown_year_takes_the_next_year_class() {
+        let mut facade = surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor);
+        facade.insulation = InsulationAnswer::PresentUnknownThickness;
+        facade.renovation = Some(crate::forfait_envelope::Renovation {
+            year: None,
+            meets_requirements_of_year: false,
+        });
+        let envelope = SurveyEnvelope {
+            surfaces: vec![facade.clone()],
+            windows: Vec::new(),
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+        };
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1985, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "renovation_insulation_year_class"));
+        // 1983–1988 → next class 1988–1992: R_c 2,0, U = 1/(2,0 + 0,17).
+        let wall = &derived.direct_elements[0];
+        let u = wall["uValueWPerM2k"].as_f64().unwrap() - delta_u_forfait(0.46);
+        assert!((u - 0.46).abs() < 1e-9, "{u}");
+
+        // Renovation with another insulation answer is rejected.
+        facade.insulation = InsulationAnswer::NoneOrUnknown;
+        let mut recorder = Recorder::default();
+        derive_envelope(
+            &SurveyEnvelope {
+                surfaces: vec![facade],
+                windows: Vec::new(),
+                doors: Vec::new(),
+                panels: Vec::new(),
+                unheated_spaces: Vec::new(),
+            },
+            1985,
+            &mut recorder,
+        );
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "renovation_requires_present_unknown_thickness"));
     }
 
     #[test]
@@ -1181,6 +1267,8 @@ mod tests {
             insulation: InsulationState::AbsentOrUnknown,
             cavity: true,
             r_si_override: None,
+            towards_unheated_space: false,
+            renovation: None,
         }
         .calculate();
         assert_eq!(r_bw, facade.r_c);
@@ -1226,6 +1314,8 @@ mod tests {
             insulation: InsulationState::AbsentOrUnknown,
             cavity: true,
             r_si_override: Some(0.17),
+            towards_unheated_space: false,
+            renovation: None,
         }
         .calculate();
         let overhang = derived
