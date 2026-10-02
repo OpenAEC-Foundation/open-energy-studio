@@ -537,6 +537,11 @@ impl AirtightnessType {
     }
 }
 
+/// Table 11.8 q_usi;spec, dm³/(s·m²).
+pub fn specific_capacity(function: VentilationFunction) -> f64 {
+    function.specific_capacity()
+}
+
 /// Table 11.13 f_y.
 pub fn year_factor(year: i32) -> f64 {
     match year {

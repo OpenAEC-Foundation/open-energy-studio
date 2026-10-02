@@ -58,6 +58,7 @@ pub mod tojuli;
 pub mod unheated_transmission;
 pub mod ventilation;
 pub mod window_u;
+pub mod zoning;
 use direct_transmission::{DirectElement, DirectTransmissionInput, LinearBridge, PointBridge};
 use heat_pumps::{
     AuxiliaryMeasurementBoundary, HeatPumpInput, HeatSink, HeatSource, InputEnergyCarrier,
@@ -306,6 +307,7 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
             "unverified_humidification_dehumidification_chapter_12",
+            "schematisation_checks_6_4_and_6_5_2",
             "unverified_opaque_construction_u_rc_annex_c_e_f",
             "unverified_window_door_shutter_u_8_2_2_3_annex_g_l",
             "forfait_envelope_values_annex_i",
