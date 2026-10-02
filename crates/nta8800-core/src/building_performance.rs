@@ -1986,7 +1986,9 @@ fn compute(
             .map(|item| item.monthly_kwh[index])
             .sum::<f64>()
             + pv_yields.iter().map(|yields| yields[index]).sum::<f64>();
-        let produced = produced_renewable;
+        // 16.11/16.12: heating CHP electricity is own production, not
+        // renewable and outside the 5.14a storage correction (5.14b).
+        let produced = produced_renewable + bacs * row.chp_electricity_kwh;
         let self_used = produced.min(used_el);
         // 5.26 summed over producers.
         let exported = produced - self_used;
@@ -2616,6 +2618,57 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn heating_chp_electricity_is_non_renewable_own_production() {
+        use crate::space_heating_chain::{ChpGenerator, OtherGeneratorAuxiliary};
+        let mut sample = input();
+        sample.on_site_production.clear();
+        let base = assess_building_performance(&sample);
+        sample.space_heating.generator = Generator::Chp(ChpGenerator {
+            chp: crate::space_cooling::ChpClass {
+                power_kw: 50.0,
+                built_after_2006: true,
+                hre_declared: false,
+                low_temperature: false,
+            },
+            auxiliary: Some(OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: Some(80.0),
+                source_reference: "datasheet".into(),
+            }),
+            equipment_reference: "CHP datasheet".into(),
+        });
+        // Air heating: no hydronic pump input needed for this booking test.
+        sample.space_heating.emission.system = crate::heating_emission::EmissionSystem::AirHeating;
+        sample.space_heating.emission.balancing =
+            crate::heating_emission::HydronicBalancing::NotApplicable;
+        let chp = assess_building_performance(&sample);
+        assert_eq!(chp.status, "calculated_unverified", "{:?}", chp.issues);
+        let produced: f64 = chp
+            .electricity_balance
+            .iter()
+            .map(|month| month.produced_kwh)
+            .sum();
+        let expected: f64 = chp
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| sample.bacs_factor * row.chp_electricity_kwh)
+            .sum();
+        assert!(expected > 0.0);
+        assert!((produced - expected).abs() < 1e-6);
+        // 5.14b: CHP electricity is not renewable.
+        assert_eq!(
+            chp.annual_renewable_primary_kwh,
+            base.annual_renewable_primary_kwh
+                .map(|_| chp.annual_renewable_primary_kwh.unwrap())
+        );
+        assert!(
+            chp.annual_renewable_primary_kwh.unwrap()
+                <= base.annual_renewable_primary_kwh.unwrap() + 1e-9
+        );
     }
 
     #[test]

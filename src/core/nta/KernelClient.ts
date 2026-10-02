@@ -1578,6 +1578,13 @@ export interface SpaceHeatingChainInput {
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
       }
     | {
+        /** 9.6.6.1 building CHP, method 2 (table 9.31), gas; electricity per 16.12. */
+        kind: 'chp';
+        chp: { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean };
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
+        equipmentReference: string;
+      }
+    | {
         /** 9.6.1: several unequal generators split by preference (9.56–9.60, table 9.23). */
         kind: 'multiple';
         generators: Array<{

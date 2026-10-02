@@ -293,9 +293,23 @@ pub enum Generator {
     /// Table 9.25 "overige systemen": local gas or oil heating and
     /// direct-fired air heaters (forfait).
     ForfaitHeater(ForfaitHeaterGenerator),
+    /// Building CHP with heat-led operation, method 2 (9.6.6.1, table 9.31),
+    /// gas.
+    Chp(ChpGenerator),
     /// Several unequal generators on one system, split by preference with
     /// 9.56–9.60 and table 9.23 (9.6.1).
     Multiple(Box<MultipleGenerators>),
+}
+
+/// 9.6.6.1 building CHP (gas, forfait conversion factors of table 9.31).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChpGenerator {
+    pub chp: crate::space_cooling::ChpClass,
+    /// 9.6.8.2 (9.91) inputs.
+    #[serde(default)]
+    pub auxiliary: Option<OtherGeneratorAuxiliary>,
+    pub equipment_reference: String,
 }
 
 /// 9.6.1: generators with their preference and nominal power.
@@ -564,7 +578,8 @@ impl Generator {
             | Self::Biomass(_)
             | Self::ProductBoiler(_)
             | Self::LocalHeater(_)
-            | Self::ForfaitHeater(_) => None,
+            | Self::ForfaitHeater(_)
+            | Self::Chp(_) => None,
             Self::Multiple(set) => set
                 .generators
                 .iter()
@@ -601,7 +616,8 @@ impl Generator {
             | Self::Biomass(_)
             | Self::ProductBoiler(_)
             | Self::LocalHeater(_)
-            | Self::ForfaitHeater(_) => false,
+            | Self::ForfaitHeater(_)
+            | Self::Chp(_) => false,
             Self::Multiple(set) => set
                 .generators
                 .iter()
@@ -755,6 +771,8 @@ pub struct ChainMonth {
     pub humidification_fuel_kwh: f64,
     /// 11.120 Q_H;AHU;in;req of air handling unit reheating coils, kWh.
     pub ahu_heating_load_kwh: f64,
+    /// 16.12 E_el;chp;out;H: electricity of a heating CHP, kWh.
+    pub chp_electricity_kwh: f64,
     /// 13.185 hot-water load from §13.8.4.9.3, kWh.
     pub hot_water_load_kwh: f64,
 }
@@ -1944,6 +1962,7 @@ fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessm
                 generator_recoverable_loss_kwh: 0.0,
                 humidification_load_kwh: humidification[index][0],
                 ahu_heating_load_kwh: ahu_heating[index],
+                chp_electricity_kwh: 0.0,
                 hot_water_load_kwh: hot_water_load,
                 humidification_electricity_kwh: humidification[index][1],
                 humidification_fuel_kwh: humidification[index][2],
@@ -2670,6 +2689,7 @@ fn generate_multiple(
             row.generator_recoverable_loss_kwh += sub.generator_recoverable_loss_kwh;
             row.generator_electricity_kwh += sub.generator_electricity_kwh;
             row.collective_source_heat_kwh += sub.collective_source_heat_kwh;
+            row.chp_electricity_kwh += sub.chp_electricity_kwh;
             match (row.auxiliary_electricity_kwh, sub.auxiliary_electricity_kwh) {
                 (Some(total), Some(value)) => row.auxiliary_electricity_kwh = Some(total + value),
                 _ => auxiliary_known = false,
@@ -2720,6 +2740,37 @@ fn generate(
                 annex_q_result,
                 issues,
             );
+        }
+        Generator::Chp(generator) => {
+            validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+            if generator.equipment_reference.trim().is_empty() {
+                issues.push(issue(
+                    "source_reference_required",
+                    "generator.equipmentReference",
+                ));
+            }
+            let Some((thermal, electric)) = generator.chp.factors() else {
+                issues.push(issue("chp_class_invalid", "generator.chp"));
+                return None;
+            };
+            if !issues.is_empty() {
+                return None;
+            }
+            // 9.65 with η = ε_chp;th (gross value) and f_prac = 1.
+            generation_efficiency = Some(thermal);
+            let auxiliary = generator.auxiliary.as_ref().expect("validated auxiliary");
+            for (index, row) in monthly.iter_mut().enumerate() {
+                row.natural_gas_kwh = row.generator_output_kwh / thermal;
+                // 16.12: credited in chapter 16.
+                row.chp_electricity_kwh = row.generator_output_kwh * electric / thermal;
+                row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
+                    auxiliary,
+                    OTHER_AUX_GAS_OIL_W_PER_KW,
+                    row.generator_output_kwh,
+                    MONTH_HOURS[index],
+                    building_fraction,
+                ));
+            }
         }
         Generator::GasBoiler(generator) => {
             let collective = generator.boiler.role == BoilerRole::Collective;
@@ -3398,6 +3449,38 @@ mod tests {
         assert!(result.annual_natural_gas_kwh.unwrap() > 0.0);
         assert_eq!(result.annual_generator_electricity_kwh, Some(0.0));
         assert!(!result.beng_calculation_available);
+    }
+
+    #[test]
+    fn chp_generator_follows_9_65_and_16_12() {
+        let mut input = boiler_chain();
+        input.generator = Generator::Chp(ChpGenerator {
+            chp: crate::space_cooling::ChpClass {
+                power_kw: 50.0,
+                built_after_2006: true,
+                hre_declared: false,
+                low_temperature: false,
+            },
+            auxiliary: Some(OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: Some(80.0),
+                source_reference: "datasheet".into(),
+            }),
+            equipment_reference: "CHP datasheet".into(),
+        });
+        // A CHP's 9.91 auxiliary energy excludes the circulation pump.
+        input.distribution_system = Some(system(calculated_pump()));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // Table 9.31, 20–200 kW after 2006 HT: ε_th 0,49, ε_el 0,30.
+        let jan = &result.monthly[0];
+        assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.49).abs() < 1e-9);
+        assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.30 / 0.49).abs() < 1e-9);
+        assert_eq!(result.generation_efficiency, Some(0.49));
     }
 
     #[test]

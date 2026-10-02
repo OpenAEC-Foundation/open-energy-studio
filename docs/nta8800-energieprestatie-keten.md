@@ -577,3 +577,15 @@ Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerder
 - **5.57/5.58:** `finalEnergyByCarrier` en `annualFinalEnergyKwh` zijn per energiedrager de som van E_EPus over de maanden. Zelf opgewekte elektriciteit wordt daarbij niet verrekend.
 - **5.60:** `annualFinalEnergyEedKwh` telt daar de zonnewarmte bij op, Q_H;ren;sol,prac en Q_W;ren;sol,prac. Dit is de definitie voor de Europese Energy Efficiency Directive (EED).
 - **16.17:** de opbrengst van windenergie kan met de NTA nog niet worden bepaald en is daarom 0. Een opgegeven windproductie groter dan 0 geeft `wind_production_not_determinable`.
+
+## WKK als opwekker voor ruimteverwarming (9.6.6.1, 16.4.2)
+
+Generator `chp` volgt methode 2: forfaitaire omzettingsgetallen uit tabel 9.31, met gas als brandstof.
+- **Brandstof:** E = Q_H;gen;out / ε_chp;th op bovenwaarde (9.65, f_prac = 1).
+- **Hulpenergie:** volgens 9.91, als bij een overig toestel.
+- **Terugwinbaar verlies:** 0.
+- **Elektriciteit:** E_el;chp;out;H = Q_H;gen;out · ε_chp;el/ε_chp;th (16.12), gewogen met f_BACS zoals het gasverbruik. Deze stroom telt als eigen productie: eerst zelf verbruikt, het overschot wordt geëxporteerd. Ze is niet hernieuwbaar en valt buiten de opslagcorrectie 5.14a (5.14b).
+- **Pomp:** de circulatiepomp zit niet in de hulpenergie, dus bij een watervoerend systeem is een distributiepomp verplicht.
+- **Combinatie met een piekketel:** gebruik `multiple`, met de WKK op preferentie 1.
+
+Methode 1 (NEN-EN 15316-4-4 met NEN-EN 50465-meetwaarden) en WKK voor tapwater (13.8.4.8, 16.13) volgen nog.
