@@ -26,7 +26,9 @@ use crate::space_cooling::{cooling_month, validate_cooling, CoolingSystem};
 use crate::space_heating_chain::{
     assess_space_heating_chain, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
-use crate::tojuli::{assess_tojuli, TojuliAssessment};
+use crate::tojuli::{
+    assess_tojuli, cooling_reduction_factor, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions,
+};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -171,9 +173,10 @@ pub struct BuildingPerformanceInput {
     /// buildings use annex IX and may omit it.
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
-    /// §5.7.1: a zone with sufficient active cooling may use TOjuli = 0.
+    /// §5.7.1: an active cooling system with demonstrated capacity; then
+    /// TOjuli = 0.
     #[serde(default)]
-    pub active_cooling_present: bool,
+    pub active_cooling: Option<ActiveCoolingEvidence>,
     /// Permit application after 29 May 2026: the A0 designation may apply.
     #[serde(default, rename = "permitApplicationAfter20260529")]
     pub permit_application_after_2026_05_29: bool,
@@ -431,7 +434,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             "declaredRenewableHeat",
         ));
     }
-    if input.active_cooling_present
+    if input.active_cooling.is_some()
         && input.cooling.is_none()
         && !input
             .declared_uses
@@ -441,7 +444,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         // §5.7.1: TOjuli = 0 needs an active cooling system.
         issues.push(issue(
             "active_cooling_without_cooling_system",
-            "activeCoolingPresent",
+            "activeCooling",
         ));
     }
     if let Some(system) = &input.hot_water {
@@ -622,9 +625,26 @@ pub fn assess_building_performance(
             f64::INFINITY
         }
     };
+    let residential = matches!(input.calculation_scope, CalculationScope::Residential);
+    let use_function = if residential {
+        Some(LabelFunction::Residential)
+    } else {
+        input.label_function
+    };
     let tojuli: Vec<TojuliAssessment> = if valid {
         zone_demands()
-            .map(|zone| assess_tojuli(zone, input.active_cooling_present))
+            .map(|zone| match use_function {
+                Some(function) => assess_tojuli(
+                    zone,
+                    TojuliOptions {
+                        residential,
+                        active_cooling: input.active_cooling.as_ref(),
+                        cooling_reduction_factor: cooling_reduction_factor(function),
+                        booster_heat_pump_july_kwh: 0.0,
+                    },
+                ),
+                None => crate::tojuli::use_function_required(&zone.zone_id),
+            })
             .collect()
     } else {
         Vec::new()
@@ -1316,7 +1336,13 @@ mod tests {
         assert!((delta - 0.05 * heat * 0.9).abs() < 1e-6, "{delta}");
 
         let mut cooled = input();
-        cooled.active_cooling_present = true;
+        cooled.active_cooling = Some(ActiveCoolingEvidence {
+            system: crate::tojuli::ActiveCoolingSystem::SplitUnitsInEveryHabitableRoom,
+            capacity: crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                source_reference: "annex AA".into(),
+            },
+            source_reference: "design".into(),
+        });
         assert!(assess_building_performance(&cooled)
             .issues
             .iter()

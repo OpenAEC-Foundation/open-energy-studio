@@ -35,6 +35,26 @@ pub struct LinearBridge {
     pub length_m: f64,
     pub psi_w_per_mk: f64,
     pub source_reference: String,
+    /// Construction parts the bridge belongs to, for the TOjuli split of
+    /// §5.7.2 step 2 (equal shares). Empty means "other" (pro rata).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub orientations: Vec<EnvelopeSide>,
+}
+
+/// Orientation of a construction part for §5.7.2; `Horizontal` parts are
+/// distributed pro rata over the orientations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvelopeSide {
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
+    Horizontal,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -43,6 +63,9 @@ pub struct PointBridge {
     pub id: String,
     pub chi_w_per_k: f64,
     pub source_reference: String,
+    /// As for [`LinearBridge::orientations`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub orientations: Vec<EnvelopeSide>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -245,11 +268,13 @@ mod tests {
                 length_m: 3.0,
                 psi_w_per_mk: 0.05,
                 source_reference: "detail-1".into(),
+                orientations: Vec::new(),
             }],
             point_bridges: vec![PointBridge {
                 id: "junction".into(),
                 chi_w_per_k: 0.02,
                 source_reference: "detail-2".into(),
+                orientations: Vec::new(),
             }],
         }
     }

@@ -129,8 +129,8 @@ impl PeakPower {
                 panel_peak_power_w,
                 panel_count,
             } => {
-                let rounded = (panel_peak_power_w / PANEL_POWER_STEP_W + 1e-9).floor()
-                    * PANEL_POWER_STEP_W;
+                let rounded =
+                    (panel_peak_power_w / PANEL_POWER_STEP_W + 1e-9).floor() * PANEL_POWER_STEP_W;
                 rounded * f64::from(*panel_count) / 1000.0
             }
         }

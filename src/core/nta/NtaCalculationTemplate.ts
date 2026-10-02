@@ -117,7 +117,7 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
     },
     labelFunction: residential ? 'residential' : null,
     bblFunction: null,
-    activeCoolingPresent: false,
+    activeCooling: null,
     demandUsesFixedC1Ventilation: false,
     batteryStoragePresent: false,
   };

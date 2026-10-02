@@ -1607,6 +1607,33 @@ pub(crate) fn unheated_zone_input(
     Some(UnheatedTransmissionInput { spaces })
 }
 
+/// Optional `orientations` of a project thermal bridge (project codes
+/// N, NE, …, NW, horizontal) for the TOjuli split of §5.7.2 step 2.
+fn bridge_sides(bridge: &Value) -> Option<Vec<direct_transmission::EnvelopeSide>> {
+    use direct_transmission::EnvelopeSide;
+    let Some(items) = bridge.get("orientations") else {
+        return Some(Vec::new());
+    };
+    items
+        .as_array()?
+        .iter()
+        .map(|item| {
+            Some(match item.as_str()? {
+                "N" => EnvelopeSide::North,
+                "NE" => EnvelopeSide::NorthEast,
+                "E" => EnvelopeSide::East,
+                "SE" => EnvelopeSide::SouthEast,
+                "S" => EnvelopeSide::South,
+                "SW" => EnvelopeSide::SouthWest,
+                "W" => EnvelopeSide::West,
+                "NW" => EnvelopeSide::NorthWest,
+                "horizontal" => EnvelopeSide::Horizontal,
+                _ => return None,
+            })
+        })
+        .collect()
+}
+
 pub(crate) fn direct_boundary_input(
     project: &ProjectInput,
     target: ThermalBoundary,
@@ -1696,6 +1723,7 @@ pub(crate) fn direct_boundary_input_zone(
                 length_m: bridge.get("length")?.as_f64()?,
                 psi_w_per_mk: bridge.get("psiValue")?.as_f64()?,
                 source_reference: format!("project:thermalBridge:{id}.psiValue"),
+                orientations: bridge_sides(bridge)?,
             });
         }
         for bridge in zone.point_thermal_bridges.as_deref()? {
@@ -1712,6 +1740,7 @@ pub(crate) fn direct_boundary_input_zone(
                 id: format!("point:{id}"),
                 chi_w_per_k: bridge.get("chiValue")?.as_f64()?,
                 source_reference: bridge.get("sourceReference")?.as_str()?.to_owned(),
+                orientations: bridge_sides(bridge)?,
             });
         }
     }

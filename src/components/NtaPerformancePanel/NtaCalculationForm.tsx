@@ -105,7 +105,25 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         ['other_assembly', t('nta.form.bbl.other_assembly')], ['other_healthcare', t('nta.form.bbl.other_healthcare')],
         ['sport', t('nta.form.bbl.sport')], ['other_lodging', t('nta.form.bbl.other_lodging')],
       ]} />
-      <CheckField {...field} path={['activeCoolingPresent']} label={t('nta.form.activeCooling')} />
+      <SelectField {...field} path={['activeCooling', 'system']} label={t('nta.form.activeCooling')} options={[
+        ['compression_table10_29', t('nta.form.ac.compression')], ['absorption_table10_30', t('nta.form.ac.absorption')],
+        ['free_cooling_table10_34', t('nta.form.ac.free')], ['dew_point_cooling_humidified_exhaust', t('nta.form.ac.dewPoint')],
+        ['heat_pump_with_cooling_emitter', t('nta.form.ac.heatPump')], ['external_cold_with_cooling_emitter', t('nta.form.ac.external')],
+        ['split_units_in_every_habitable_room', t('nta.form.ac.split')], ['other_utility', t('nta.form.ac.other')]]}
+        onChange={(path, value) => value == null
+          ? change(['activeCooling'], null)
+          : read(draft, ['activeCooling']) == null
+            ? change(['activeCooling'], { system: value, capacity: { method: 'annex_aa', sourceReference: '' }, sourceReference: '' })
+            : change(path, value)} />
+      {read(draft, ['activeCooling']) != null && <>
+        <SelectField {...field} path={['activeCooling', 'capacity', 'method']} label={t('nta.form.ac.capacity')} options={[
+          ['dynamic_cooling_load', t('nta.form.ac.dynamic')], ['annex_aa', t('nta.form.ac.annexAa')], ['solar_limitation', t('nta.form.ac.solar')]]} />
+        {read(draft, ['activeCooling', 'capacity', 'method']) === 'solar_limitation' &&
+          <SelectField {...field} path={['activeCooling', 'capacity', 'criterion']} label={t('nta.form.ac.criterion')} options={[
+            ['small_window_area', t('nta.form.ac.smallWindows')], ['shaded_glazing', t('nta.form.ac.shaded')]]} />}
+        <TextField {...field} path={['activeCooling', 'capacity', 'sourceReference']} label={t('nta.form.source')} />
+        <TextField {...field} path={['activeCooling', 'sourceReference']} label={t('nta.form.source')} />
+      </>}
       <CheckField {...field} path={['permitApplicationAfter20260529']} label={t('nta.form.permitAfter')} />
     </Section>
     <Section title={t('nta.form.setpoints')}>

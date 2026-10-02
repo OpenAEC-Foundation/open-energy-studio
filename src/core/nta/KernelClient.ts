@@ -1387,6 +1387,19 @@ export interface BuildingPerformanceInput {
   batteryStoragePresent: boolean;
 }
 
+/** Active cooling with demonstrated capacity (NTA 8800 §5.7.1). */
+export interface NtaActiveCoolingEvidence {
+  system:
+    | 'compression_table10_29' | 'absorption_table10_30' | 'free_cooling_table10_34'
+    | 'dew_point_cooling_humidified_exhaust' | 'heat_pump_with_cooling_emitter'
+    | 'external_cold_with_cooling_emitter' | 'split_units_in_every_habitable_room' | 'other_utility';
+  capacity:
+    | { method: 'dynamic_cooling_load'; sourceReference: string }
+    | { method: 'annex_aa'; sourceReference: string }
+    | { method: 'solar_limitation'; criterion: 'small_window_area' | 'shaded_glazing'; sourceReference: string };
+  sourceReference: string;
+}
+
 /** P_pk route of NTA 8800 16.4a/16.4b. */
 export type NtaPvPeakPower =
   | { method: 'table16_1'; moduleType: string; panelAreaM2: number }
@@ -1566,7 +1579,7 @@ export interface NtaCalculationInput {
   cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
-  activeCoolingPresent?: boolean;
+  activeCooling?: NtaActiveCoolingEvidence | null;
   permitApplicationAfter20260529?: boolean;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
