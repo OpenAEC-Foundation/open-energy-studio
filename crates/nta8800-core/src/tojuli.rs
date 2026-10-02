@@ -14,9 +14,9 @@
 use crate::climate::{Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::assess_direct_transmission;
 use crate::monthly_demand::{
-    assess_monthly_demand, cooling_reduction_factor, cooling_utilization, occupants_per_dwelling,
-    opaque_solar_kwh, ventilation_conductance, window_solar_kwh, InternalGains, MonthlyDemandInput,
-    Transmission, A_0, INTERNAL_HEAT_PER_OCCUPANT_W, TAU_0_H,
+    assess_monthly_demand, cooling_reduction_factor, cooling_utilization, internal_gains_kwh,
+    opaque_solar_kwh, ventilation_conductance, window_solar_kwh, with_resolved_ventilation,
+    MonthlyDemandInput, Transmission, A_0, TAU_0_H,
 };
 use crate::solar_shading::Balance;
 use serde::Serialize;
@@ -102,6 +102,8 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
             vec![issue("tojuli_demand_invalid", "demand")],
         );
     }
+    let resolved = with_resolved_ventilation(input, &demand);
+    let input = &resolved;
     let Transmission::Components(components) = &input.transmission else {
         return invalid(
             &input.zone_id,
@@ -209,19 +211,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, active_cooling: bool) -> Tojuli
     let ventilation_july = ventilation_conductance * (setpoint - outdoor) * hours / 1000.0;
     let cooling_reduction = cooling_reduction_factor(input.usage_function);
     let floor_area = input.usable_floor_area_m2;
-    let internal_july = match &input.internal_gains {
-        InternalGains::Residential { dwelling_count, .. } => {
-            let dwellings = f64::from(*dwelling_count);
-            INTERNAL_HEAT_PER_OCCUPANT_W
-                * dwellings
-                * occupants_per_dwelling(floor_area / dwellings)
-                * 0.001
-                * hours
-        }
-        InternalGains::Declared {
-            heat_flux_w_per_m2, ..
-        } => heat_flux_w_per_m2 * floor_area * hours / 1000.0,
-    };
+    let internal_july = internal_gains_kwh(input, usize::from(JULY - 1));
     let capacity = demand
         .specific_heat_capacity_kj_per_m2k
         .expect("valid demand")

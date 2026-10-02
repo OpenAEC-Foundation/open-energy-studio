@@ -407,6 +407,8 @@ export interface MonthlyDemandInput {
       coolingSupplyTemperatureC?: number | null;
     }>;
   }>;
+  /** Chapter 11 input; leave `ventilationFlows` empty when given. */
+  ventilation?: VentilationInput | null;
   thermalMass: {
     floor: NtaMassClass;
     wall: NtaMassClass;
@@ -415,6 +417,13 @@ export interface MonthlyDemandInput {
   };
   internalGains:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
+    | {
+        method: 'utility';
+        lightingAnnualKwh: number;
+        lightingRecovery: 'forfait_power' | 'extracted_luminaires' | 'other';
+        hotWaterRecoverableKwh?: number[];
+        sourceReference: string;
+      }
     | { method: 'declared'; heatFluxWPerM2: number; sourceReference: string };
   windowInventoryComplete: boolean;
   windows: Array<{
@@ -491,6 +500,16 @@ export interface MonthlyDemandAssessment {
   }>;
   annualHeatingNeedKwh: number | null;
   annualCoolingNeedKwh: number | null;
+  ventilation: VentilationResult | null;
+  /** §5.4.2 need with the fixed C1 system (BENG 1). */
+  fixedC1: {
+    status: 'calculated_unverified' | 'invalid' | 'unavailable';
+    monthlyHeatingNeedKwh: number[];
+    monthlyCoolingNeedKwh: number[];
+    annualHeatingNeedKwh: number | null;
+    annualCoolingNeedKwh: number | null;
+    issues: Array<{ code: string; path: string }>;
+  } | null;
   issues: Array<{ code: string; path: string }>;
 }
 
@@ -1791,9 +1810,11 @@ export interface NtaCalculationInput {
     sourceReference: string;
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
+  ventilation?: VentilationInput | null;
   zoneData?: Array<{
     zoneId: string;
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
+    ventilation?: VentilationInput | null;
     internalGains: MonthlyDemandInput['internalGains'];
     usageFunction?: NtaUsageFunction | null;
     dwellingType?: NtaDwellingType | null;

@@ -33,7 +33,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::climate::{MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
+use crate::climate::{
+    ARGII_TEMPERATURE_C as VENTILATIVE_COOLING_TEMPERATURE_C, COLD_RECOVERY_SUPPLY_TEMPERATURE_C,
+    MONTH_HOURS, OUTDOOR_TEMPERATURE_C, WIND_SPEED_M_PER_S,
+};
+use crate::monthly_demand::{VentilationFlow, VentilationMonth};
 
 /// ρ_a;ref, kg/m³ (11.1).
 pub const AIR_DENSITY_REF: f64 = 1.205;
@@ -52,30 +56,6 @@ pub const EXPONENT_LEAKAGE: f64 = 0.67;
 pub const EXPONENT_VENT: f64 = 0.5;
 pub const EXPONENT_PURGE: f64 = 0.5;
 pub const EXPONENT_COMBUSTION: f64 = 0.5;
-
-/// Table 17.1 u_site;mi, m/s.
-pub const WIND_SPEED_M_PER_S: [f64; 12] = [
-    3.04, 4.15, 2.99, 3.06, 2.97, 2.78, 2.63, 2.51, 2.71, 2.78, 2.83, 2.83,
-];
-/// Table 17.1 ϑ_e;argII;mi, °C (no value in January and December).
-pub const VENTILATIVE_COOLING_TEMPERATURE_C: [Option<f64>; 12] = [
-    None,
-    Some(13.97),
-    Some(13.00),
-    Some(13.70),
-    Some(16.42),
-    Some(16.76),
-    Some(17.51),
-    Some(18.24),
-    Some(16.74),
-    Some(15.04),
-    Some(13.43),
-    None,
-];
-/// Table 17.1 ϑ_ODA;preh;WTWC;mi, °C.
-pub const COLD_RECOVERY_SUPPLY_TEMPERATURE_C: [f64; 12] = [
-    0.0, 0.0, 0.0, 0.0, 25.63, 27.49, 26.34, 27.29, 25.30, 0.0, 0.0, 0.0,
-];
 
 /// Table 11.7 temperature-weighted time fractions.
 pub const TAU_SYS_C: [f64; 12] = [
@@ -2892,6 +2872,30 @@ fn calculate_with_policy(
         demand_flows,
         interpretations: INTERPRETATIONS.to_vec(),
     })
+}
+
+impl VentilationResult {
+    /// The effective flows as chapter 7 ventilation flows (7.19/7.20).
+    pub fn monthly_demand_flows(&self, source_reference: &str) -> Vec<VentilationFlow> {
+        self.demand_flows
+            .iter()
+            .map(|flow| VentilationFlow {
+                id: flow.id.clone(),
+                source_reference: source_reference.to_string(),
+                months: flow
+                    .months
+                    .iter()
+                    .map(|row| VentilationMonth {
+                        month: row.month,
+                        conductance_w_per_k: row.heating_conductance_w_per_k,
+                        supply_temperature_c: Some(row.heating_supply_temperature_c),
+                        cooling_conductance_w_per_k: Some(row.cooling_conductance_w_per_k),
+                        cooling_supply_temperature_c: Some(row.cooling_supply_temperature_c),
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
 }
 
 /// Chapter 11 with the zone's actual ventilation system.

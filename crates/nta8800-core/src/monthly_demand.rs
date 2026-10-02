@@ -58,6 +58,7 @@ pub const OMITTED_CORRECTIONS: &[&str] = &[
     "table 7.10 footnote c is the caller's column choice",
     "annex D for floors other than slab on ground (crawlspace, basement)",
     "one usage function per calculation zone (tables 7.13–7.15)",
+    "7.30b solar gains through adjacent unheated sunrooms (serres)",
 ];
 
 const SCOPE: &str = "nta8800_chapter_7_monthly_need_single_zone_unverified";
@@ -75,7 +76,12 @@ pub struct MonthlyDemandInput {
     pub dwelling_type: Option<DwellingType>,
     pub setpoints: Setpoints,
     pub transmission: Transmission,
+    /// Explicit H_ve flows; leave empty when `ventilation` is given.
+    #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
+    /// Chapter 11 input; the kernel derives the flows and the fixed C1 run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ventilation: Option<crate::ventilation::VentilationInput>,
     pub thermal_mass: ThermalMass,
     pub internal_gains: InternalGains,
     pub window_inventory_complete: bool,
@@ -290,6 +296,21 @@ pub enum InternalGains {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+    /// 7.25–7.29 for utility functions: persons and appliances from tables
+    /// 7.2/7.3, recoverable lighting loss from W_t (chapter 14) and
+    /// recoverable hot-water losses (13.1.2).
+    Utility {
+        /// W_t, kWh per year (14.2.2).
+        #[serde(rename = "lightingAnnualKwh")]
+        lighting_annual_kwh: f64,
+        #[serde(rename = "lightingRecovery")]
+        lighting_recovery: LightingRecovery,
+        /// Q_W;ls;rbl per month, kWh; empty means none.
+        #[serde(default, rename = "hotWaterRecoverableKwh")]
+        hot_water_recoverable_kwh: Vec<f64>,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
     /// Utility functions: flux per m² from the applicable table, W/m².
     Declared {
         #[serde(rename = "heatFluxWPerM2")]
@@ -297,6 +318,61 @@ pub enum InternalGains {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+}
+
+/// f_L of 7.28.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LightingRecovery {
+    /// P_n determined forfaitarily (14.3.4): 0,3.
+    ForfaitPower,
+    /// At least 70 % of the luminaires (by P_n) extracted: 0,5.
+    ExtractedLuminaires,
+    /// 1,0.
+    Other,
+}
+
+impl LightingRecovery {
+    fn factor(self) -> f64 {
+        match self {
+            Self::ForfaitPower => 0.3,
+            Self::ExtractedLuminaires => 0.5,
+            Self::Other => 1.0,
+        }
+    }
+}
+
+impl UsageFunction {
+    /// Tables 7.2 and 7.3: q_Oc·f_τ + q_A, W/m².
+    pub fn occupancy_and_appliance_flux_w_per_m2(self) -> f64 {
+        let (q_oc, f_tau, q_a) = match self {
+            Self::AssemblyChildCare => (10.0, 0.30, 1.0),
+            Self::OtherAssembly => (10.0, 0.15, 1.0),
+            Self::Cell => (3.0, 0.80, 2.0),
+            Self::HealthcareWithBeds => (5.0, 0.80, 4.0),
+            Self::OtherHealthcare => (5.0, 0.30, 3.0),
+            Self::Office => (5.0, 0.30, 4.0),
+            Self::Lodging => (3.0, 0.40, 2.0),
+            Self::Education => (10.0, 0.30, 2.0),
+            Self::Sport => (3.0, 0.30, 1.0),
+            Self::Retail => (3.0, 0.40, 3.0),
+            Self::Residential => (0.0, 0.0, 0.0),
+        };
+        q_oc * f_tau + q_a
+    }
+
+    /// §5.4.2: fixed lighting flux q_L for the BENG 1 run, W/m².
+    pub fn fixed_lighting_flux_w_per_m2(self) -> f64 {
+        match self {
+            Self::AssemblyChildCare | Self::OtherAssembly | Self::HealthcareWithBeds => 2.5,
+            Self::Cell => 2.25,
+            Self::OtherHealthcare | Self::Office => 1.25,
+            Self::Lodging => 1.75,
+            Self::Education => 1.0,
+            Self::Sport | Self::Retail => 3.0,
+            Self::Residential => 0.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -348,6 +424,23 @@ pub struct MonthlyDemandAssessment {
     pub specific_heat_capacity_kj_per_m2k: Option<f64>,
     pub transmission: Option<TransmissionSummary>,
     pub monthly: Vec<MonthResult>,
+    pub annual_heating_need_kwh: Option<f64>,
+    pub annual_cooling_need_kwh: Option<f64>,
+    /// Chapter 11 result when the zone gives `ventilation`.
+    pub ventilation: Option<crate::ventilation::VentilationResult>,
+    /// §5.4.2 need with the fixed C1 system, for BENG 1.
+    pub fixed_c1: Option<FixedC1Demand>,
+    pub issues: Vec<DemandIssue>,
+}
+
+/// §5.4.2: Q_H;nd and Q_C;nd with the fixed C1 ventilation (§5.4.3) and,
+/// for utility functions, Φ_int;W = 0 and the fixed lighting flux q_L.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FixedC1Demand {
+    pub status: &'static str,
+    pub monthly_heating_need_kwh: Vec<f64>,
+    pub monthly_cooling_need_kwh: Vec<f64>,
     pub annual_heating_need_kwh: Option<f64>,
     pub annual_cooling_need_kwh: Option<f64>,
     pub issues: Vec<DemandIssue>,
@@ -824,6 +917,40 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 issues,
             );
         }
+        InternalGains::Utility {
+            lighting_annual_kwh,
+            hot_water_recoverable_kwh,
+            source_reference,
+            ..
+        } => {
+            if input.usage_function.is_residential() {
+                issues.push(issue(
+                    "internal_gains_function_mismatch",
+                    "internalGains.method",
+                ));
+            }
+            if !finite_nonneg(*lighting_annual_kwh) {
+                issues.push(issue(
+                    "lighting_energy_invalid",
+                    "internalGains.lightingAnnualKwh",
+                ));
+            }
+            if !(hot_water_recoverable_kwh.is_empty() || hot_water_recoverable_kwh.len() == 12)
+                || hot_water_recoverable_kwh
+                    .iter()
+                    .any(|value| !finite_nonneg(*value))
+            {
+                issues.push(issue(
+                    "hot_water_recoverable_invalid",
+                    "internalGains.hotWaterRecoverableKwh",
+                ));
+            }
+            check_reference(
+                source_reference,
+                "internalGains.sourceReference".into(),
+                issues,
+            );
+        }
         InternalGains::Declared {
             heat_flux_w_per_m2,
             source_reference,
@@ -1151,10 +1278,185 @@ fn resolve_transmission(
     }
 }
 
+/// Monthly internal gains Q_int (7.21–7.29), kWh; `month_index` 0–11.
+pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64 {
+    let area = input.usable_floor_area_m2;
+    let hours = MONTH_HOURS[month_index];
+    match &input.internal_gains {
+        InternalGains::Residential { dwelling_count, .. } => {
+            let dwellings = f64::from(*dwelling_count);
+            INTERNAL_HEAT_PER_OCCUPANT_W
+                * dwellings
+                * occupants_per_dwelling(area / dwellings)
+                * 0.001
+                * hours
+        }
+        InternalGains::Utility {
+            lighting_annual_kwh,
+            lighting_recovery,
+            hot_water_recoverable_kwh,
+            ..
+        } => {
+            // 7.25–7.29; Φ_V and Φ_proc are 0 (7.5.3.5/7.5.3.6).
+            let persons_and_appliances =
+                input.usage_function.occupancy_and_appliance_flux_w_per_m2() * area;
+            let lighting =
+                lighting_recovery.factor() * lighting_annual_kwh * 1000.0 / climate::YEAR_HOURS;
+            (persons_and_appliances + lighting) * hours / 1000.0
+                + hot_water_recoverable_kwh
+                    .get(month_index)
+                    .copied()
+                    .unwrap_or(0.0)
+        }
+        InternalGains::Declared {
+            heat_flux_w_per_m2, ..
+        } => heat_flux_w_per_m2 * area * hours / 1000.0,
+    }
+}
+
+/// The input with the chapter 11 flows of an assessment filled in, for
+/// callers (TOjuli) that read `ventilation_flows` directly.
+pub fn with_resolved_ventilation(
+    input: &MonthlyDemandInput,
+    assessment: &MonthlyDemandAssessment,
+) -> MonthlyDemandInput {
+    let mut resolved = input.clone();
+    if let Some(ventilation) = &assessment.ventilation {
+        resolved.ventilation = None;
+        resolved.ventilation_flows = ventilation.monthly_demand_flows(CHAPTER_11_SOURCE);
+    }
+    resolved
+}
+
+const CHAPTER_11_SOURCE: &str = "NTA 8800 chapter 11, derived by the kernel";
+
+/// Replace `ventilation` by its chapter 7 flows; returns the resolved input,
+/// the chapter 11 result and the C1 flows.
+fn resolve_ventilation(
+    input: &MonthlyDemandInput,
+    issues: &mut Vec<DemandIssue>,
+) -> (
+    MonthlyDemandInput,
+    Option<crate::ventilation::VentilationResult>,
+    Option<Vec<VentilationFlow>>,
+) {
+    let mut resolved = input.clone();
+    let Some(ventilation) = input.ventilation.as_ref() else {
+        return (resolved, None, None);
+    };
+    resolved.ventilation = None;
+    if !input.ventilation_flows.is_empty() {
+        issues.push(issue(
+            "ventilation_flows_and_chapter_11_exclusive",
+            "ventilationFlows",
+        ));
+    }
+    if (ventilation.usable_floor_area_m2 - input.usable_floor_area_m2).abs() > 1e-6 {
+        issues.push(issue(
+            "ventilation_area_mismatch",
+            "ventilation.usableFloorAreaM2",
+        ));
+    }
+    if (ventilation.heating_setpoint_c - input.setpoints.heating_c).abs() > 1e-9
+        || (ventilation.cooling_setpoint_c - input.setpoints.cooling_c).abs() > 1e-9
+    {
+        issues.push(issue(
+            "ventilation_setpoint_mismatch",
+            "ventilation.heatingSetpointC",
+        ));
+    }
+    let assessment = crate::ventilation::assess_ventilation(ventilation);
+    issues.extend(
+        assessment
+            .issues
+            .into_iter()
+            .map(|item| issue(item.code, format!("ventilation.{}", item.path))),
+    );
+    let (Some(actual), Some(fixed)) = (assessment.actual, assessment.fixed_c1) else {
+        return (resolved, None, None);
+    };
+    resolved.ventilation_flows = actual.monthly_demand_flows(CHAPTER_11_SOURCE);
+    let c1_flows = fixed.monthly_demand_flows(CHAPTER_11_SOURCE);
+    (resolved, Some(actual), Some(c1_flows))
+}
+
+/// §5.4.2 conditions on an already resolved input.
+fn fixed_c1_input(
+    resolved: &MonthlyDemandInput,
+    flows: Vec<VentilationFlow>,
+) -> Result<MonthlyDemandInput, DemandIssue> {
+    let mut c1 = resolved.clone();
+    c1.ventilation_flows = flows;
+    c1.internal_gains = match &resolved.internal_gains {
+        InternalGains::Residential { .. } => resolved.internal_gains.clone(),
+        InternalGains::Utility {
+            source_reference, ..
+        } => {
+            let function = resolved.usage_function;
+            InternalGains::Declared {
+                heat_flux_w_per_m2: function.occupancy_and_appliance_flux_w_per_m2()
+                    + function.fixed_lighting_flux_w_per_m2(),
+                source_reference: format!("{source_reference}; §5.4.2 fixed q_L, Φ_int;W = 0"),
+            }
+        }
+        InternalGains::Declared { .. } => {
+            return Err(issue(
+                "fixed_c1_requires_utility_internal_gain_split",
+                "internalGains.method",
+            ))
+        }
+    };
+    Ok(c1)
+}
+
 pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     let mut issues = Vec::new();
+    let (resolved, ventilation, c1_flows) = resolve_ventilation(input, &mut issues);
+    let mut assessment = assess_resolved(&resolved, fingerprint, issues);
+    if assessment.status == "calculated_unverified" {
+        assessment.ventilation = ventilation;
+        if let Some(flows) = c1_flows {
+            assessment.fixed_c1 = Some(match fixed_c1_input(&resolved, flows) {
+                Ok(c1_input) => {
+                    let c1 = assess_resolved(&c1_input, String::new(), Vec::new());
+                    FixedC1Demand {
+                        status: c1.status,
+                        monthly_heating_need_kwh: c1
+                            .monthly
+                            .iter()
+                            .map(|row| row.heating.need_kwh)
+                            .collect(),
+                        monthly_cooling_need_kwh: c1
+                            .monthly
+                            .iter()
+                            .map(|row| row.cooling.need_kwh)
+                            .collect(),
+                        annual_heating_need_kwh: c1.annual_heating_need_kwh,
+                        annual_cooling_need_kwh: c1.annual_cooling_need_kwh,
+                        issues: c1.issues,
+                    }
+                }
+                Err(problem) => FixedC1Demand {
+                    status: "unavailable",
+                    monthly_heating_need_kwh: Vec::new(),
+                    monthly_cooling_need_kwh: Vec::new(),
+                    annual_heating_need_kwh: None,
+                    annual_cooling_need_kwh: None,
+                    issues: vec![problem],
+                },
+            });
+        }
+    }
+    assessment
+}
+
+fn assess_resolved(
+    input: &MonthlyDemandInput,
+    fingerprint: String,
+    mut issues: Vec<DemandIssue>,
+) -> MonthlyDemandAssessment {
     validate(input, &mut issues);
     let transmission = resolve_transmission(input, &mut issues);
 
@@ -1190,6 +1492,8 @@ pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessm
         monthly,
         annual_heating_need_kwh: annual_heating,
         annual_cooling_need_kwh: annual_cooling,
+        ventilation: None,
+        fixed_c1: None,
         issues,
     }
 }
@@ -1216,19 +1520,7 @@ fn compute(
         let outdoor = OUTDOOR_TEMPERATURE_C[index];
         let ground_monthly = transmission.ground_monthly_conductance_w_per_k[index];
 
-        let internal = match &input.internal_gains {
-            InternalGains::Residential { dwelling_count, .. } => {
-                let dwellings = f64::from(*dwelling_count);
-                INTERNAL_HEAT_PER_OCCUPANT_W
-                    * dwellings
-                    * occupants_per_dwelling(area / dwellings)
-                    * 0.001
-                    * hours
-            }
-            InternalGains::Declared {
-                heat_flux_w_per_m2, ..
-            } => heat_flux_w_per_m2 * area * hours / 1000.0,
-        };
+        let internal = internal_gains_kwh(input, index);
         let window_solar: f64 = input
             .windows
             .iter()
@@ -1440,6 +1732,89 @@ mod tests {
             source_reference: "synthetic utility gains".into(),
         };
         input
+    }
+
+    fn chapter_11(input: &MonthlyDemandInput, function: &str, variant: &str) -> serde_json::Value {
+        let category = if function == "residential" {
+            "residential"
+        } else {
+            "utility"
+        };
+        json!({
+            "zoneId": input.zone_id,
+            "usableFloorAreaM2": input.usable_floor_area_m2,
+            "category": category,
+            "functions": [{"function": function, "areaM2": input.usable_floor_area_m2}],
+            "dwellingCount": if category == "residential" { 1 } else { 0 },
+            "buildingHeightM": 9.0,
+            "constructionYear": 2020,
+            "heatingSetpointC": input.setpoints.heating_c,
+            "coolingSetpointC": input.setpoints.cooling_c,
+            "system": {"kind": "single", "unit": {"variant": variant, "ducts": "luka_a_b_c", "equipmentReference": "synthetic"}},
+            "infiltration": {"method": "measured", "qv10DmPerSM2": 0.4, "sourceReference": "synthetic"},
+            "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
+            "sourceReference": "synthetic"
+        })
+    }
+
+    #[test]
+    fn chapter_11_route_matches_explicit_flows_and_adds_the_c1_run() {
+        let mut input = sample();
+        input.ventilation_flows.clear();
+        input.ventilation =
+            Some(serde_json::from_value(chapter_11(&input, "residential", "d5c")).unwrap());
+        let result = valid(&input);
+        let ventilation = result.ventilation.as_ref().unwrap();
+        let mut explicit = input.clone();
+        explicit.ventilation = None;
+        explicit.ventilation_flows = ventilation.monthly_demand_flows("test");
+        let reference = valid(&explicit);
+        for (a, b) in result.monthly.iter().zip(&reference.monthly) {
+            assert!((a.heating.need_kwh - b.heating.need_kwh).abs() < 1e-9);
+            assert!((a.cooling.need_kwh - b.cooling.need_kwh).abs() < 1e-9);
+        }
+        // The fixed C1 run ventilates more than demand-controlled D.5c.
+        let c1 = result.fixed_c1.as_ref().unwrap();
+        assert_eq!(c1.status, "calculated_unverified", "{:?}", c1.issues);
+        assert!(c1.annual_heating_need_kwh.unwrap() > result.annual_heating_need_kwh.unwrap());
+        // Explicit flows and chapter 11 together are rejected.
+        let mut both = input.clone();
+        both.ventilation_flows = reference_flows();
+        assert!(assess_monthly_demand(&both)
+            .issues
+            .iter()
+            .any(|item| item.code == "ventilation_flows_and_chapter_11_exclusive"));
+    }
+
+    fn reference_flows() -> Vec<VentilationFlow> {
+        sample().ventilation_flows
+    }
+
+    #[test]
+    fn utility_internal_gains_follow_7_25_to_7_29() {
+        let mut input = office();
+        input.internal_gains = InternalGains::Utility {
+            lighting_annual_kwh: 876.0,
+            lighting_recovery: LightingRecovery::ForfaitPower,
+            hot_water_recoverable_kwh: vec![10.0; 12],
+            source_reference: "synthetic".into(),
+        };
+        // Office: 5·0,30 + 4 = 5,5 W/m²; lighting 0,3·876·1000/8760 = 30 W.
+        let expected = (5.5 * 100.0 + 30.0) * 744.0 / 1000.0 + 10.0;
+        assert!((internal_gains_kwh(&input, 0) - expected).abs() < 1e-9);
+        input.ventilation_flows.clear();
+        input.ventilation =
+            Some(serde_json::from_value(chapter_11(&input, "office", "c1")).unwrap());
+        let result = valid(&input);
+        let c1 = result.fixed_c1.unwrap();
+        assert_eq!(c1.status, "calculated_unverified", "{:?}", c1.issues);
+        // Declared utility gains cannot be split for §5.4.2.
+        input.internal_gains = InternalGains::Declared {
+            heat_flux_w_per_m2: 6.0,
+            source_reference: "synthetic".into(),
+        };
+        let declared = valid(&input);
+        assert_eq!(declared.fixed_c1.unwrap().status, "unavailable");
     }
 
     fn valid(input: &MonthlyDemandInput) -> MonthlyDemandAssessment {

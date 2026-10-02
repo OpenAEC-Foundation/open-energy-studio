@@ -49,7 +49,11 @@ pub struct NtaCalculationInput {
     pub window_solar: WindowSolarDefaults,
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
+    #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
+    /// Chapter 11 input (single-zone projects; per zone in `zoneData`).
+    #[serde(default)]
+    pub ventilation: Option<crate::ventilation::VentilationInput>,
     /// Required for every zone when the project has more than one zone.
     #[serde(default)]
     pub zone_data: Vec<ZoneNtaData>,
@@ -92,7 +96,10 @@ pub struct NtaCalculationInput {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ZoneNtaData {
     pub zone_id: String,
+    #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
+    #[serde(default)]
+    pub ventilation: Option<crate::ventilation::VentilationInput>,
     pub internal_gains: InternalGains,
     #[serde(default)]
     pub usage_function: Option<UsageFunction>,
@@ -503,6 +510,10 @@ fn derive_input(
             ventilation_flows: data
                 .map(|item| item.ventilation_flows.clone())
                 .unwrap_or_else(|| nta.ventilation_flows.clone()),
+            ventilation: match data {
+                Some(item) => item.ventilation.clone(),
+                None => nta.ventilation.clone(),
+            },
             thermal_mass: data
                 .and_then(|item| item.thermal_mass.clone())
                 .unwrap_or_else(|| nta.thermal_mass.clone()),

@@ -58,4 +58,7 @@ Deze keuzes staan ook in de uitvoer (`interpretations`) en in het verificatiedos
 
 ## Koppeling
 
-De koppeling aan hoofdstuk 7 (`monthly_demand`, met aparte warmte- en koudewaarden per stroom) en aan de energieprestatieketen (ventilatorenergie, vorstbeveiliging en de aparte BENG 1-run) volgt zodra de herziening van hoofdstuk 7 is samengevoegd.
+- **Maandberekening:** `MonthlyDemandInput.ventilation` (en `ntaCalculation.ventilation` of `zoneData[].ventilation` in het project) vervangt de expliciete `ventilationFlows`. De kern rekent hoofdstuk 11 door en zet de stromen om naar H_ve per stroom en balans. Een zone met beide geeft de fout `ventilation_flows_and_chapter_11_exclusive`. Oppervlakte en setpoints moeten gelijk zijn aan die van de maandberekening.
+- **BENG 1:** met hoofdstuk 11-invoer levert de maandberekening `fixedC1`. Dat is Q_H;nd en Q_C;nd met het vaste C1-systeem en, bij utiliteit, de vaste verlichtingswarmte q_L en Φ_int;W = 0 (§5.4.2). Bij utiliteit moet de interne warmte via de methode `utility` opgegeven zijn (tabellen 7.2/7.3, W_t, Q_W;ls;rbl). Met `declared` is de C1-run niet beschikbaar (`fixed_c1_requires_utility_internal_gain_split`).
+- **TO-juli:** rekent met de werkelijke ventilatie uit hoofdstuk 11.
+- **Nog te koppelen:** de ventilatorenergie, de vorstbeveiliging en de voorverwarming in roosters in de energieprestatieketen, en het gebruik van `fixedC1` voor de BENG 1-indicator. Dat volgt na de herziening van hoofdstuk 5/9.
