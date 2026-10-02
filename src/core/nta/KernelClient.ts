@@ -1888,7 +1888,11 @@ export interface SpaceHeatingChainAssessment {
     };
     demandClass: 'residential_low' | 'residential_high' | 'utility_low' | 'utility_high';
     regenerationDegree: number | null;
+    /** Always 1: 9.63 (method 1) has no c_source. */
     sourceCorrection: number;
+    /** 9.63 f_prac (0,95). */
+    practiceFactor: number;
+    /** COP · f_prac. */
     correctedEfficiency: number;
   } | null;
   demand: MonthlyDemandAssessment;

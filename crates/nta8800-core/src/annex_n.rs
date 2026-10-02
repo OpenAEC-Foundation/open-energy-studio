@@ -10,7 +10,18 @@
 //!
 //! Losses α are in % of the heat input at full load, as in the annex. The
 //! performance values are multiplied by f_prac 0,95 (N.1.1/N.5); the kernel
-//! applies that as `E_H;gen;in / 0,95`.
+//! applies that as `E_H;gen;in / 0,95`. The result is on the net
+//! calorific value; the chain converts it with N.3.
+//!
+//! Interpretations (recorded in `INTERPRETATIONS`):
+//! - N.69 prints only the chimney losses α_ch;ON;Pmin and α_ch;ON;Pn; the
+//!   kernel interpolates the total losses α_ON;Pmin (N.50) and α_ON;Pn
+//!   (N.49), because N.73 states that the envelope losses are part of the
+//!   modulating calculation;
+//! - in modulation (β_cmb;min > 1) the burner runs for the whole t_gen, so
+//!   N.52 is evaluated with β_cmb;min = 1, as N.4.4.3.8 does at Pn;
+//! - N.61 prints the denominator as "100 + (1 + Q_br/Q)"; the kernel uses
+//!   100·(1 + Q_br/Q) as in N.37.
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +35,13 @@ pub const DEFAULT_GRADIENT_K_PER_M: f64 = 0.3;
 /// Table N.24.
 pub const PILOT_LOSS_PERCENT: f64 = 2.0;
 const CONVERGENCE: f64 = 0.001;
+
+pub const INTERPRETATIONS: &[&str] = &[
+    "N.69 interpolates the total losses α_ON (N.49/N.50), not only the chimney losses (N.73)",
+    "N.52 in modulation evaluated with β_cmb;min = 1 (burner on for the whole t_gen)",
+    "N.61 denominator read as 100·(1 + Q_br/Q), as in N.37",
+    "f_prac applied as E_H;gen;in / 0,95 (N.1.1/N.5)",
+];
 
 /// Table N.12 types (rows of tables N.20, N.22, N.26).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -623,8 +641,9 @@ pub fn heater_month(heater: &LocalHeater, r: &ResolvedHeater, month: HeaterMonth
     let l = losses(heater, r, &month);
     let air = month.indoor_c;
     if month.heat_required_kwh <= 0.0 || t_gen <= 0.0 {
-        // Stand-by only.
-        let standby = r.aux_standby * t_gen;
+        // Burner off for the whole t_gen: W_blw (N.29) and W_sby (N.31)
+        // with t_ON = 0.
+        let standby = (r.aux_standby + r.aux_after) * t_gen.max(0.0);
         return HeaterResult {
             heat_output_kwh: 0.0,
             shortfall_kwh: month.heat_required_kwh.max(0.0),
@@ -729,6 +748,7 @@ pub fn heater_month(heater: &LocalHeater, r: &ResolvedHeater, month: HeaterMonth
     let w_blw_min = r.aux_after_min * t_gen;
     let alpha_full =
         chimney_corrected(r, r.chimney, air, 1.0) + l.vent_on + l.envelope - r.condensation;
+    // N.50/N.52 with β_cmb;min = 1 (see the module notes).
     let alpha_min = chimney_corrected(r, r.chimney_min, air, 1.0)
         + (l.vent_on + l.envelope) / r.k_mod
         - r.condensation_min;
@@ -853,6 +873,26 @@ mod tests {
         );
         assert!(high.modulating);
         assert!(high.input_kwh > 20000.0 / 0.95);
+    }
+
+    #[test]
+    fn zero_demand_month_keeps_after_burner_and_standby_auxiliary() {
+        let heater = air_heater();
+        let r = resolve_heater(&heater, "h").unwrap();
+        let result = heater_month(
+            &heater,
+            &r,
+            HeaterMonth {
+                heat_required_kwh: 0.0,
+                operating_hours: 100.0,
+                indoor_c: 20.0,
+                outdoor_c: 15.0,
+            },
+        );
+        assert_eq!(result.input_kwh, 0.0);
+        // N.29 and N.31 with t_ON = 0.
+        let expected = (r.aux_after + r.aux_standby) * 100.0;
+        assert!((result.auxiliary_electricity_kwh - expected).abs() < 1e-12);
     }
 
     #[test]
