@@ -95,12 +95,13 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
     productionInventoryComplete: false,
     pvSystems: project.solarPV.map((pv) => ({
       id: pv.id,
-      peakPowerKw: pv.peakPower,
+      peakPower: pv.area > 0
+        ? { method: 'declared_specific', peakPowerWPerM2: Math.round((pv.peakPower * 1000 / pv.area) * 100) / 100, panelAreaM2: pv.area }
+        : { method: 'panels', panelPeakPowerW: null, panelCount: null },
       azimuthDeg: null,
       tiltDeg: pv.tilt,
-      performanceFactor: null,
-      shadingCorrection: null,
-      obstructionFactor: null,
+      mounting: 'unknown',
+      obstructionFactors: [null],
       sourceReference: '',
     })),
     hotWater: {

@@ -296,14 +296,28 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     </Section>
     {pv.length > 0 && <Section title={t('nta.form.pv')}>
       {pv.map((item, index) => <div key={String(item.id)} className="nta-form-row">
-        <NumberField {...field} path={['pvSystems', index, 'peakPowerKw']} label={`${String(item.id)} — ${t('nta.form.pvPeak')}`} />
+        <SelectField {...field} path={['pvSystems', index, 'peakPower', 'method']} label={`${String(item.id)} — ${t('nta.form.pvPeak')}`}
+          options={[['panels', t('nta.form.pvPeak.panels')], ['declared_specific', t('nta.form.pvPeak.declared')], ['table16_1', t('nta.form.pvPeak.table')]]} />
+        {read(draft, ['pvSystems', index, 'peakPower', 'method']) === 'panels' ? <>
+          <NumberField {...field} path={['pvSystems', index, 'peakPower', 'panelPeakPowerW']} label={t('nta.form.pvPanelPower')} />
+          <NumberField {...field} path={['pvSystems', index, 'peakPower', 'panelCount']} label={t('nta.form.pvPanelCount')} />
+        </> : <>
+          {read(draft, ['pvSystems', index, 'peakPower', 'method']) === 'table16_1'
+            ? <SelectField {...field} path={['pvSystems', index, 'peakPower', 'moduleType']} label={t('nta.form.pvModuleType')} options={[
+              ['monocrystalline_from2018', 'mono ≥ 2018'], ['monocrystalline2015_to2017', 'mono 2015–2017'],
+              ['monocrystalline2011_to2014', 'mono 2011–2014'], ['monocrystalline2001_to2010', 'mono 2001–2010'],
+              ['monocrystalline_before2001', 'mono < 2001'], ['multicrystalline_from2018', 'multi ≥ 2018'],
+              ['multicrystalline2015_to2017', 'multi 2015–2017'], ['multicrystalline2011_to2014', 'multi 2011–2014'],
+              ['multicrystalline2001_to2010', 'multi 2001–2010'], ['multicrystalline_before2001', 'multi < 2001'],
+              ['amorphous_single_junction', 'a-Si'], ['amorphous_multi_junction', 'a-Si multi'], ['cigs', 'CIGS'], ['cd_te', 'CdTe']]} />
+            : <NumberField {...field} path={['pvSystems', index, 'peakPower', 'peakPowerWPerM2']} label={t('nta.form.pvSpecificPeak')} />}
+          <NumberField {...field} path={['pvSystems', index, 'peakPower', 'panelAreaM2']} label={t('nta.form.pvArea')} />
+        </>}
         <NumberField {...field} path={['pvSystems', index, 'azimuthDeg']} label={t('nta.form.pvAzimuth')} />
         <NumberField {...field} path={['pvSystems', index, 'tiltDeg']} label={t('nta.form.tilt')} />
-        <SelectField {...field} path={['pvSystems', index, 'performanceFactor']} label={t('nta.form.pvPerformance')}
-          options={[['0.76', '0,76'], ['0.8', '0,80'], ['0.82', '0,82']]}
-          onChange={(path, value) => change(path, value == null ? null : Number(value))} />
-        <NumberField {...field} path={['pvSystems', index, 'shadingCorrection']} label={t('nta.form.pvShading')} />
-        <NumberField {...field} path={['pvSystems', index, 'obstructionFactor']} label={t('nta.form.obstruction')} />
+        <SelectField {...field} path={['pvSystems', index, 'mounting']} label={t('nta.form.pvPerformance')}
+          options={[['unknown', t('nta.form.pvMount.unknown')], ['not_ventilated', '0,76'], ['moderately_ventilated', '0,80'], ['strongly_ventilated', '0,82']]} />
+        <NumberField {...field} path={['pvSystems', index, 'obstructionFactors', 0]} label={t('nta.form.obstruction')} />
         <TextField {...field} path={['pvSystems', index, 'sourceReference']} label={t('nta.form.source')} />
       </div>)}
     </Section>}

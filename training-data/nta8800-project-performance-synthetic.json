@@ -337,12 +337,11 @@
     "pvSystems": [
       {
         "id": "pv",
-        "peakPowerKw": 3.0,
+        "peakPower": {"method": "panels", "panelPeakPowerW": 300.0, "panelCount": 10},
         "azimuthDeg": 180.0,
         "tiltDeg": 45.0,
-        "performanceFactor": 0.8,
-        "shadingCorrection": 1.0,
-        "obstructionFactor": 1.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [1.0],
         "sourceReference": "synthetic datasheet"
       }
     ],

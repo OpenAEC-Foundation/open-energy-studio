@@ -1373,18 +1373,25 @@ export interface BuildingPerformanceInput {
   onSiteProduction: Array<{ id: string; kind: 'pv' | 'pvt' | 'wind'; monthlyKwh: number[]; sourceReference: string }>;
   pvSystems?: Array<{
     id: string;
-    peakPowerKw: number;
+    peakPower: NtaPvPeakPower;
     azimuthDeg: number;
     tiltDeg: number;
-    performanceFactor: 0.76 | 0.8 | 0.82;
-    shadingCorrection: number;
-    obstructionFactor: number;
+    mounting?: 'not_ventilated' | 'moderately_ventilated' | 'strongly_ventilated' | 'unknown';
+    /** F_sh;obst;mi: one value or twelve monthly values (§17.3). */
+    obstructionFactors: number[];
+    collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
 }
+
+/** P_pk route of NTA 8800 16.4a/16.4b. */
+export type NtaPvPeakPower =
+  | { method: 'table16_1'; moduleType: string; panelAreaM2: number }
+  | { method: 'declared_specific'; peakPowerWPerM2: number; panelAreaM2: number }
+  | { method: 'panels'; panelPeakPowerW: number; panelCount: number };
 
 export type NtaLabelFunction =
   | 'residential' | 'office' | 'assembly_without_day_care' | 'assembly_with_day_care'

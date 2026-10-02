@@ -724,7 +724,11 @@ fn compute(
             .as_ref()
             .is_some_and(|evidence| evidence.source_below_20_c && !evidence.exhaust_air_source);
     let cop = heating.generation_efficiency.unwrap_or(0.0);
-    let pv_yields: Vec<[f64; 12]> = input.pv_systems.iter().map(monthly_yield_kwh).collect();
+    let pv_yields: Vec<[f64; 12]> = input
+        .pv_systems
+        .iter()
+        .map(|system| monthly_yield_kwh(system, input.total_usable_floor_area_m2))
+        .collect();
     let hot_water = input.hot_water.as_ref().map(|system| {
         (
             system.carrier,
@@ -1069,12 +1073,15 @@ mod tests {
         let base = assess_building_performance(&sample);
         sample.pv_systems.push(PvSystem {
             id: "roof-pv".into(),
-            peak_power_kw: 3.0,
+            peak_power: crate::pv::PeakPower::Panels {
+                panel_peak_power_w: 300.0,
+                panel_count: 10,
+            },
             azimuth_deg: 180.0,
             tilt_deg: 35.0,
-            performance_factor: 0.80,
-            shading_correction: 1.0,
-            obstruction_factor: 1.0,
+            mounting: crate::pv::PvMounting::ModeratelyVentilated,
+            obstruction_factors: vec![1.0],
+            collective: None,
             source_reference: "datasheet".into(),
         });
         let result = assess_building_performance(&sample);
@@ -1083,7 +1090,7 @@ mod tests {
             "{:?}",
             result.issues
         );
-        let pv: f64 = monthly_yield_kwh(&sample.pv_systems[0]).iter().sum();
+        let pv: f64 = monthly_yield_kwh(&sample.pv_systems[0], 100.0).iter().sum();
         let delta = result.annual_renewable_primary_kwh.unwrap()
             - base.annual_renewable_primary_kwh.unwrap();
         assert!((delta - pv * 1.45).abs() < 1e-6);
@@ -1321,12 +1328,15 @@ mod tests {
         let mut sample = input();
         sample.pv_systems.push(PvSystem {
             id: "roof-pv".into(),
-            peak_power_kw: 3.0,
+            peak_power: crate::pv::PeakPower::Panels {
+                panel_peak_power_w: 300.0,
+                panel_count: 10,
+            },
             azimuth_deg: 180.0,
             tilt_deg: 35.0,
-            performance_factor: 0.80,
-            shading_correction: 1.0,
-            obstruction_factor: 1.0,
+            mounting: crate::pv::PvMounting::ModeratelyVentilated,
+            obstruction_factors: vec![1.0],
+            collective: None,
             source_reference: "datasheet".into(),
         });
         assert!(assess_building_performance(&sample)
