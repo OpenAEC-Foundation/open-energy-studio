@@ -1963,6 +1963,126 @@ export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChai
   throw new Error('Rust heating chain calculation is available in the desktop app and local development server.');
 }
 
+/** Table 5.2/5.5 carriers delivered to the generators of a collective system. */
+export type NtaAnnexPCarrier =
+  | { kind: 'natural_gas' }
+  | { kind: 'oil' }
+  | { kind: 'electricity'; directRenewableShare?: number }
+  | { kind: 'biogas' }
+  | { kind: 'biomass_above500_kw' }
+  | { kind: 'waste_incineration' }
+  | { kind: 'biofuel_mix'; biofuelShare: number };
+
+export type NtaTableP5Source =
+  | 'electric_ground' | 'electric_outdoor_air' | 'electric_groundwater_below15_c'
+  | 'electric_surface_water' | 'electric_source15_to20_c' | 'electric_source20_to40_c'
+  | 'electric_source_at_least40_c' | 'gas_ground_or_outdoor_air' | 'gas_groundwater' | 'gas_surface_water';
+
+export type NtaAnnexPGenerator =
+  | { kind: 'combustion'; carrier: NtaAnnexPCarrier; efficiency: number; efficiencyReference: string }
+  | {
+      kind: 'heat_pump';
+      efficiency:
+        | { method: 'declared'; value: number; sourceReference: string }
+        | { method: 'table_p5'; source: NtaTableP5Source; supplyTemperatureC: number };
+      drive: NtaAnnexPCarrier;
+    }
+  | {
+      kind: 'chp_without_loss';
+      carrier: NtaAnnexPCarrier;
+      thermalEfficiency: number;
+      electricalEfficiency: number;
+      efficiencyReference: string;
+    }
+  | { kind: 'chp_with_loss'; carrier: NtaAnnexPCarrier; lossRatio?: number; lossRatioReference?: string }
+  | { kind: 'residual_heat'; auxiliarySpecific?: number; auxiliaryReference?: string }
+  | { kind: 'geothermal'; sourceTemperatureC: number; returnTemperatureC: number }
+  | { kind: 'declared'; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; sourceReference: string };
+
+export type NtaAnnexPFunction = 'heating' | 'hot_water' | 'cooling';
+
+/** NTA 8800 §5.8 / annex P: external heat, hot-water or cold supply values. */
+export type NtaAnnexPRoute =
+  | {
+      method: 'declared';
+      primaryFactor: number;
+      renewableFactor: number;
+      co2KgPerKwh: number;
+      declarationReference: string;
+    }
+  | {
+      method: 'calculated';
+      function: NtaAnnexPFunction;
+      deliveredKwh: number;
+      distribution:
+        | { method: 'flows'; inputKwh?: number; lossKwh?: number; sourceReference: string }
+        | {
+            method: 'small_system_forfait';
+            connections: number;
+            connectionType: 'ground_bound' | 'within_building';
+            designTemperature?: 't90_to60' | 't90_to50' | 't70_to40' | 't50_to40' | 't35_to25';
+            otherLossKwh?: number;
+          }
+        | { method: 'small_cold_forfait'; supplyBelow10C: boolean };
+      generators: Array<{ id: string; energyFraction: number; kind: NtaAnnexPGenerator }>;
+      auxiliaryElectricityKwh: number;
+      auxiliaryRenewableShare?: number;
+      sourceReference: string;
+    }
+  | {
+      method: 'measured';
+      function: NtaAnnexPFunction;
+      deliveredKwh: number;
+      inputs: Array<{ carrier: NtaAnnexPCarrier; kwh: number; chpLossElectrical?: number }>;
+      exportedElectricityKwh?: number;
+      renewableFactor: number;
+      sourceReference: string;
+    };
+
+export interface NtaExternalSupply {
+  heating?: NtaAnnexPRoute | null;
+  hotWater?: NtaAnnexPRoute | null;
+  cooling?: NtaAnnexPRoute | null;
+  collectiveHeatPumpSource?: {
+    temperatureClass: 'below20_c' | 'at_least20_c_or_surface_water_or_unknown';
+    supplierReference: string;
+    annexP?: NtaAnnexPRoute | null;
+  } | null;
+}
+
+export interface NtaSupplyFactors {
+  primaryFactor: number;
+  renewableFactor: number;
+  co2KgPerKwh: number;
+}
+
+export interface NtaCarrierFactors {
+  districtHeat: NtaSupplyFactors;
+  districtHotWater: NtaSupplyFactors;
+  districtCold: NtaSupplyFactors;
+  heatPumpSource: NtaSupplyFactors | null;
+}
+
+export interface NtaAnnexPSystemResult {
+  factors: NtaSupplyFactors;
+  distributionEfficiency: number | null;
+  generationPrimaryFactor: number | null;
+  generators: Array<{ id: string; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; heatKwh: number }>;
+}
+
+export interface NtaExternalSupplyResult {
+  declared: NtaCarrierFactors;
+  forfait: NtaCarrierFactors;
+  qualityDeclarationUsed: boolean;
+  heating: NtaAnnexPSystemResult | null;
+  hotWater: NtaAnnexPSystemResult | null;
+  cooling: NtaAnnexPSystemResult | null;
+  heatPumpSource: NtaAnnexPSystemResult | null;
+  forfaitPrimaryFossilKwh: number | null;
+  forfaitRenewablePrimaryKwh: number | null;
+  forfaitCo2Kg: number | null;
+}
+
 export interface BuildingPerformanceInput {
   calculationScope: 'residential' | 'utility';
   totalUsableFloorAreaM2: number;
@@ -2008,6 +2128,8 @@ export interface BuildingPerformanceInput {
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
   storage?: NtaEnergyStorage | null;
+  /** NTA 8800 §5.8 / annex P values for external supply. */
+  externalSupply?: NtaExternalSupply;
 }
 
 /** 5.14a: building-bound storage capacities for `f_BAT;cor`. */
@@ -2243,7 +2365,12 @@ export interface BuildingPerformanceAssessment {
   referenceVerified: false;
   attestStatus: 'unattested';
   labelAvailable: false;
-  carriers: Array<{ carrier: 'el' | 'gas' | 'oil' | 'dh' | 'bm'; month: number; usedKwh: number; deliveredKwh: number }>;
+  carriers: Array<{
+    carrier: 'el' | 'gas' | 'oil' | 'dh' | 'dw' | 'dc' | 'dh_hp_source' | 'bm';
+    month: number;
+    usedKwh: number;
+    deliveredKwh: number;
+  }>;
   electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; selfUsedKwh: number; exportedKwh: number }>;
   annualPrimaryFossilKwh: number | null;
   annualRenewablePrimaryKwh: number | null;
@@ -2272,6 +2399,8 @@ export interface BuildingPerformanceAssessment {
   tojuliMeetsBblLimit: boolean | null;
   spaceHeating: SpaceHeatingChainAssessment;
   lighting?: Array<{ zoneId: string; annualKwh: number; monthlyKwh: number[]; internalGainW: number }>;
+  /** Factors of the external supply and the EMGforf totals (§5.8). */
+  externalSupply?: NtaExternalSupplyResult | null;
   issues: Array<{ code: string; path: string }>;
 }
 
@@ -2352,6 +2481,8 @@ export interface NtaCalculationInput {
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
   storage?: NtaEnergyStorage | null;
+  /** NTA 8800 §5.8 / annex P values for external supply. */
+  externalSupply?: NtaExternalSupply;
 }
 
 export interface ProjectPerformanceAssessment {

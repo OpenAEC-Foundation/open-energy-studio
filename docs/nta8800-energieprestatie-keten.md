@@ -37,7 +37,23 @@ Bron is het [openbare consultatieconcept van hoofdstuk 5](https://www.internetco
   - Factoren in kg/kWh: elektriciteit 0,268 (afgenomen en geëxporteerd), aardgas 0,218 (ook voor waterstof), stookolie 0,326, biomassa bmB 0,5 × 0,104 en externe warmte zonder verklaring 0,09.
   - `m_CO2` volgt de opbouw van 5.10 met `K_CO2` in plaats van `f_P;del`, zonder de opslagcorrectie.
   - Uitvoer: `annualCo2Kg` en `co2KgPerM2`.
-  - Waarden met een verklaring volgens bijlage P (tabel 5.6) en externe koude zijn niet aangesloten, omdat die routes geweigerd worden.
+  - Externe koude zonder verklaring telt met `K_CO2;el / 3`. Met een verklaring of een berekening volgens bijlage P gelden de waarden uit `externalSupply` (zie hieronder).
+- **Externe warmte, tapwater en koude** (§5.8 en bijlage P, module `annex_p`):
+  - Per drager (`dh` verwarming, `dw` tapwater, `dc` koude) gelden zonder verklaring de forfaitaire waarden: dh/dw `f_P` 0,9, `f_Pren` 0 en `K_CO2` 0,09; dc `f_P;el/3`, `f_Pren` 0 en `K_CO2;el/3`.
+  - Met `externalSupply.heating`, `.hotWater` of `.cooling` gelden waarden volgens bijlage P, via drie routes:
+    - `declared`: de waarden op de kwaliteitsverklaring;
+    - `calculated`: P.7/P.9 met het distributierendement P.10–P.12 (twee van de drie jaarstromen) of het forfaitaire verlies per aansluiting (tabel P.0; koude 15 % onder 10 °C). De opwekkerfactoren volgen P.19–P.22 voor brandstoffen en warmtepompen (tabel P.5 of opgegeven rendement), P.26–P.30 voor WKK, P.6.5.4.7 voor restwarmte (0,07 kWh_e/kWh) en P.6.5.4.8 voor geothermie (`η = 20·Δθ/40`). Daarbij komt `f_Pren;dX` volgens 5.42/5.49/5.50 met 5.43–5.56;
+    - `measured`: P.6 met gemeten jaarstromen.
+  - `f_P;XD;tot` wordt naar boven afgerond op 0,01 en `f_Pren;dX` naar beneden.
+  - Hernieuwbare energie telt per drager als geleverde energie maal `f_Pren;dX` (5.39).
+  - Met een kwaliteitsverklaring rekent de kern twee keer (§5.3.1): EMGverklaring (de hoofduitkomst en het eerste scenario in `indicators`) en EMGforf met de forfaitaire waarden. `externalSupply` in de uitvoer geeft beide factorsets en EP_Tot, EP_ren en CO2 van EMGforf.
+  - Bij een `ExternalHeat`-opwekker moet `qualityDeclarationPresent` overeenkomen met `externalSupply.heating` (`external_heat_declaration_mismatch`).
+- **Collectieve warmtepompbron** (5.20, 9.6.8.1.1.2.3):
+  - Een warmtepomp met een collectieve bron vraagt `externalSupply.collectiveHeatPumpSource` met de temperatuurklasse en een factuur of ontwerpbron.
+  - De kern telt `Q_HD;hp;in;bron = Q_out·(1 − 1/COP)` per maand. Die energie telt zonder f_BACS tegen de factoren van de bron mee (drager `dh_hp_source`).
+  - Onder 20 °C gelden forfaitair `f_P;el/23`, `K_CO2;el/23` en `f_Pren` 0,95, of de waarden volgens bijlage P. Dezelfde waarde geldt dan ook in EMGforf.
+  - Vanaf 20 °C, bij oppervlaktewater of een onbekende bron, gelden tabel 5.2–5.4.
+  - De omgevingswarmte van de warmtepomp telt dan niet nog eens als `renheat`.
 - **Warmtepomp op buitenlucht én ventilatieretourlucht** (5.32):
   - Je geeft `combinedOutdoorAndExhaustAir` op, waarbij de bron in de COP-tabel buitenlucht moet zijn (tabel 9.27 voetnoot c).
   - Alleen het buitenluchtaandeel `f_H;buitenlucht` telt als omgevingswarmte. Zonder kwaliteitsverklaring is dat aandeel 0.

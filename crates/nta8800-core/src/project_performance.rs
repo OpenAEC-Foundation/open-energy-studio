@@ -101,6 +101,9 @@ pub struct NtaCalculationInput {
     pub battery_storage_present: bool,
     #[serde(default)]
     pub storage: Option<EnergyStorage>,
+    /// External heat, hot-water and cold supply with annex P values.
+    #[serde(default)]
+    pub external_supply: crate::building_performance::ExternalSupply,
 }
 
 /// Per-zone data for projects with more than one calculation zone. Omitted
@@ -608,6 +611,7 @@ fn derive_input(
         demand_uses_fixed_c1_ventilation: nta.demand_uses_fixed_c1_ventilation,
         battery_storage_present: nta.battery_storage_present,
         storage: nta.storage,
+        external_supply: nta.external_supply,
     })
 }
 

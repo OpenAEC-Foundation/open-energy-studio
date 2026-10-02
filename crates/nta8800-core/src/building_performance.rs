@@ -7,11 +7,18 @@
 //!
 //! Checked against NTA 8800:2025+C1:2026 chapter 5: storage correction
 //! 5.14a/5.14b (page 85), `f_BACS` (§5.5.8, page 100) and the operational
-//! CO2 emission of §5.5.6.1 with table 5.3 (page 97). Exported heat,
-//! external cold, annex P declarations and collective heat-pump sources are
-//! rejected because they are not wired. Non-EP electricity is fixed at 0 as
+//! CO2 emission of §5.5.6.1 with table 5.3 (page 97). External heat, hot
+//! water and cold use the forfait factors of tables 5.2–5.4 or annex P
+//! values (§5.8, `annex_p`); with a quality declaration EP_Tot and RER are
+//! calculated twice (EMGverklaring and EMGforf, §5.3.1). A collective
+//! heat-pump source adds `Q_HD;hp;in;bron` at its own factors (5.20,
+//! 9.6.8.1.1.2.3). Exported heat is rejected because it is not wired. Non-EP electricity is fixed at 0 as
 //! required for the indicators (5.27).
 
+use crate::annex_p::{
+    assess_route, source_factors, AnnexPRoute, CollectiveHeatPumpSource, ScenarioFactors,
+    SupplyFactors, SystemFunction, SystemResult, COLD_FORFAIT, HEAT_FORFAIT,
+};
 use crate::bbl_requirements::{a0_check, check as bbl_check, A0Check, BblCheck, BblFunction};
 use crate::domestic_hot_water::{
     assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterCarrier, HotWaterContext,
@@ -35,7 +42,7 @@ use crate::space_cooling::{
     CoolingSystem, CoolingZoneNeed, FreeCoolingSource,
 };
 use crate::space_heating_chain::{
-    assess_space_heating_chain, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
+    assess_space_heating_chain, Generator, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
 use crate::tojuli::{assess_tojuli, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -258,6 +265,142 @@ pub struct BuildingPerformanceInput {
     /// Capacities for `f_BAT;cor`; required when storage is present.
     #[serde(default)]
     pub storage: Option<EnergyStorage>,
+    /// External heat, hot-water and cold supply (§5.8, annex P).
+    #[serde(default)]
+    pub external_supply: ExternalSupply,
+}
+
+/// Annex P values per external supply carrier; absent means the forfait
+/// values of tables 5.2–5.4.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExternalSupply {
+    /// Carrier dh: external heat for space heating.
+    #[serde(default)]
+    pub heating: Option<AnnexPRoute>,
+    /// Carrier dw: external heat for hot water.
+    #[serde(default)]
+    pub hot_water: Option<AnnexPRoute>,
+    /// Carrier dc: external cold.
+    #[serde(default)]
+    pub cooling: Option<AnnexPRoute>,
+    /// Collective heat-pump source (9.6.8.1.1.2.3).
+    #[serde(default)]
+    pub collective_heat_pump_source: Option<CollectiveHeatPumpSource>,
+}
+
+/// Factors per external carrier for one scenario.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CarrierFactors {
+    pub district_heat: SupplyFactors,
+    pub district_hot_water: SupplyFactors,
+    pub district_cold: SupplyFactors,
+    pub heat_pump_source: Option<SupplyFactors>,
+}
+
+const FORFAIT_FACTORS: CarrierFactors = CarrierFactors {
+    district_heat: HEAT_FORFAIT,
+    district_hot_water: HEAT_FORFAIT,
+    district_cold: COLD_FORFAIT,
+    heat_pump_source: None,
+};
+
+/// Resolved annex P values and the EMGforf scenario.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalSupplyResult {
+    /// Factors of the main calculation (EMGverklaring when declared).
+    pub declared: CarrierFactors,
+    /// Factors of the EMGforf calculation.
+    pub forfait: CarrierFactors,
+    pub quality_declaration_used: bool,
+    pub heating: Option<SystemResult>,
+    pub hot_water: Option<SystemResult>,
+    pub cooling: Option<SystemResult>,
+    pub heat_pump_source: Option<SystemResult>,
+    /// EP_Tot and EP_ren of the EMGforf calculation, kWh.
+    pub forfait_primary_fossil_kwh: Option<f64>,
+    pub forfait_renewable_primary_kwh: Option<f64>,
+    pub forfait_co2_kg: Option<f64>,
+}
+
+fn resolve_external(
+    input: &BuildingPerformanceInput,
+    issues: &mut Vec<PerformanceIssue>,
+) -> ExternalSupplyResult {
+    let supply = &input.external_supply;
+    let mut resolve = |route: &Option<AnnexPRoute>, function, path: &str| {
+        route
+            .as_ref()
+            .and_then(|route| match assess_route(route, function, path) {
+                Ok(result) => Some(result),
+                Err(found) => {
+                    issues.extend(found.into_iter().map(|item| issue(item.code, item.path)));
+                    None
+                }
+            })
+    };
+    let heating = resolve(
+        &supply.heating,
+        SystemFunction::Heating,
+        "externalSupply.heating",
+    );
+    let hot_water = resolve(
+        &supply.hot_water,
+        SystemFunction::HotWater,
+        "externalSupply.hotWater",
+    );
+    let cooling = resolve(
+        &supply.cooling,
+        SystemFunction::Cooling,
+        "externalSupply.cooling",
+    );
+    let mut source_result = None;
+    let source: Option<ScenarioFactors> =
+        supply
+            .collective_heat_pump_source
+            .as_ref()
+            .and_then(|source| {
+                match source_factors(source, "externalSupply.collectiveHeatPumpSource") {
+                    Ok((factors, result)) => {
+                        source_result = result;
+                        Some(factors)
+                    }
+                    Err(found) => {
+                        issues.extend(found.into_iter().map(|item| issue(item.code, item.path)));
+                        None
+                    }
+                }
+            });
+    let declared = CarrierFactors {
+        district_heat: heating.as_ref().map_or(HEAT_FORFAIT, |item| item.factors),
+        district_hot_water: hot_water.as_ref().map_or(HEAT_FORFAIT, |item| item.factors),
+        district_cold: cooling.as_ref().map_or(COLD_FORFAIT, |item| item.factors),
+        heat_pump_source: source.map(|item| item.declared),
+    };
+    let forfait = CarrierFactors {
+        heat_pump_source: source.map(|item| item.forfait),
+        ..FORFAIT_FACTORS
+    };
+    ExternalSupplyResult {
+        declared,
+        forfait,
+        quality_declaration_used: supply.heating.is_some()
+            || supply.hot_water.is_some()
+            || supply.cooling.is_some()
+            || supply
+                .collective_heat_pump_source
+                .as_ref()
+                .is_some_and(|source| source.annex_p.is_some()),
+        heating,
+        hot_water,
+        cooling,
+        heat_pump_source: source_result,
+        forfait_primary_fossil_kwh: None,
+        forfait_renewable_primary_kwh: None,
+        forfait_co2_kg: None,
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -333,6 +476,8 @@ pub struct BuildingPerformanceAssessment {
     /// Chapter 14 per zone, with the 7.28 internal gain for chapter 7.
     pub lighting: Vec<ZoneLightingResult>,
     pub indicators: Option<IndicatorsDraftAssessment>,
+    /// Factors of the external supply and the EMGforf totals (§5.8).
+    pub external_supply: Option<ExternalSupplyResult>,
     pub issues: Vec<PerformanceIssue>,
 }
 
@@ -461,6 +606,26 @@ fn cooling_assessment(
 }
 
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
+    let collective_source = input
+        .space_heating
+        .generator
+        .heat_pump()
+        .is_some_and(|(_, source)| source != SourceSystem::Individual);
+    if input.external_supply.collective_heat_pump_source.is_some() && !collective_source {
+        issues.push(issue(
+            "collective_heat_pump_source_unused",
+            "externalSupply.collectiveHeatPumpSource",
+        ));
+    }
+    if let Generator::ExternalHeat(generator) = &input.space_heating.generator {
+        if generator.quality_declaration_present != input.external_supply.heating.is_some() {
+            // §5.8: a declared supply needs its annex P values, and back.
+            issues.push(issue(
+                "external_heat_declaration_mismatch",
+                "externalSupply.heating",
+            ));
+        }
+    }
     if !input.total_usable_floor_area_m2.is_finite() || input.total_usable_floor_area_m2 <= 0.0 {
         issues.push(issue("usable_floor_area_invalid", "totalUsableFloorAreaM2"));
     }
@@ -778,11 +943,13 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         &input.heat_pump_renewable,
     ) {
         (Some((forfait, source_system)), evidence) => {
-            if source_system != SourceSystem::Individual {
-                // 5.20/5.30 collective source terms need the dh factor route.
+            if source_system != SourceSystem::Individual
+                && input.external_supply.collective_heat_pump_source.is_none()
+            {
+                // 5.20/9.6.8.1.1.2.3: the source needs its class and evidence.
                 issues.push(issue(
-                    "collective_heat_pump_source_unsupported",
-                    "spaceHeating.generator.sourceSystem",
+                    "collective_heat_pump_source_data_required",
+                    "externalSupply.collectiveHeatPumpSource",
                 ));
             }
             match evidence {
@@ -992,6 +1159,8 @@ pub fn assess_building_performance(
         },
         _ => None,
     };
+    let mut external = resolve_external(input, &mut issues);
+    let mut forfait_totals = None;
     if issues.is_empty() {
         totals = Some(compute(
             input,
@@ -999,10 +1168,27 @@ pub fn assess_building_performance(
             cooling.as_ref(),
             hot_water.as_ref(),
             &lighting,
+            external.declared,
             &mut carriers,
             &mut balance,
         ));
+        if external.quality_declaration_used {
+            // §5.3.1: EwePTot;EMGforf and RERPrenTot;EMGforf.
+            forfait_totals = Some(compute(
+                input,
+                &heating,
+                cooling.as_ref(),
+                hot_water.as_ref(),
+                &lighting,
+                external.forfait,
+                &mut Vec::new(),
+                &mut Vec::new(),
+            ));
+        }
     }
+    external.forfait_primary_fossil_kwh = forfait_totals.map(|item| item.fossil);
+    external.forfait_renewable_primary_kwh = forfait_totals.map(|item| item.renewable);
+    external.forfait_co2_kg = forfait_totals.map(|item| item.co2_kg);
     let mut indicators = None;
     if let Some(Totals {
         fossil,
@@ -1011,18 +1197,31 @@ pub fn assess_building_performance(
         ..
     }) = totals
     {
+        let mut scenarios = vec![AnnualScenario {
+            kind: if forfait_totals.is_some() {
+                ScenarioKind::EmgDeclaration
+            } else {
+                ScenarioKind::Ordinary
+            },
+            annual_primary_fossil_kwh: fossil,
+            annual_renewable_kwh: renewable,
+            source_reference: "derived by building_performance".into(),
+        }];
+        if let Some(forfait) = forfait_totals {
+            scenarios.push(AnnualScenario {
+                kind: ScenarioKind::EmgForfait,
+                annual_primary_fossil_kwh: forfait.fossil,
+                annual_renewable_kwh: forfait.renewable,
+                source_reference: "derived by building_performance (tables 5.2–5.4)".into(),
+            });
+        }
         let result = assess_indicators_draft(&IndicatorsDraftInput {
             calculation_scope: input.calculation_scope,
             total_usable_floor_area_m2: input.total_usable_floor_area_m2,
             area_source_reference: input.area_source_reference.clone(),
             annual_need_c1_kwh: need,
             need_source_reference: "derived by monthly_demand".into(),
-            scenarios: vec![AnnualScenario {
-                kind: ScenarioKind::Ordinary,
-                annual_primary_fossil_kwh: fossil,
-                annual_renewable_kwh: renewable,
-                source_reference: "derived by building_performance".into(),
-            }],
+            scenarios,
         });
         issues.extend(
             result
@@ -1174,6 +1373,7 @@ pub fn assess_building_performance(
         space_heating: heating,
         lighting: if valid { lighting } else { Vec::new() },
         indicators: indicators.filter(|_| valid),
+        external_supply: valid.then_some(external),
         issues,
     }
 }
@@ -1209,12 +1409,14 @@ fn storage_correction_factor(input: &BuildingPerformanceInput) -> f64 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn compute(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
     cooling: Option<&CoolingAssessment>,
     hot_water: Option<&HotWaterAssessment>,
     lighting: &[ZoneLightingResult],
+    factors: CarrierFactors,
     carriers: &mut Vec<CarrierMonth>,
     balance: &mut Vec<ElectricityBalanceMonth>,
 ) -> Totals {
@@ -1239,6 +1441,14 @@ fn compute(
             evidence.outdoor_air_heat_fraction.unwrap_or(0.0)
         });
     let cop = heating.generation_efficiency.unwrap_or(0.0);
+    // 9.6.8.1.1.2.3: heat taken from a collective heat-pump source.
+    let source = factors.heat_pump_source.filter(|_| {
+        input
+            .space_heating
+            .generator
+            .heat_pump()
+            .is_some_and(|(_, system)| system != SourceSystem::Individual)
+    });
     let pv_yields: Vec<[f64; 12]> = input
         .pv_systems
         .iter()
@@ -1261,6 +1471,7 @@ fn compute(
         // 5.20: f_BACS applies to space heating on every carrier.
         let mut used_dh = bacs * row.district_heat_kwh;
         let mut used_dc = 0.0;
+        let mut used_dw = 0.0;
         for item in &input.declared_uses {
             let factor = if item.service.bacs_weighted() {
                 bacs
@@ -1306,8 +1517,8 @@ fn compute(
                 HotWaterCarrier::Fuel(Carrier::El) => used_el += row.carrier_input_kwh,
                 HotWaterCarrier::Fuel(Carrier::Gas) => used_gas += row.carrier_input_kwh,
                 HotWaterCarrier::Fuel(Carrier::Oil) => used_oil += row.carrier_input_kwh,
-                // Table 5.2: forfait external heat for hot water (dw).
-                HotWaterCarrier::DistrictHeat => used_dh += row.carrier_input_kwh,
+                // Table 5.2 or annex P: external heat for hot water (dw).
+                HotWaterCarrier::DistrictHeat => used_dw += row.carrier_input_kwh,
             }
             used_el += row.auxiliary_electricity_kwh;
             hot_water_ambient = row.ambient_heat_kwh;
@@ -1338,8 +1549,29 @@ fn compute(
                 delivered_kwh: delivered,
             });
         }
-        fossil += used_dh * F_P_DISTRICT_HEAT_FORFAIT;
-        co2 += used_dh * K_CO2_DISTRICT_HEAT_FORFAIT;
+        // Tables 5.2/5.3 or annex P (§5.8) for external heat and hot water.
+        let dh = factors.district_heat;
+        let dw = factors.district_hot_water;
+        fossil += used_dh * dh.primary_factor + used_dw * dw.primary_factor;
+        co2 += used_dh * dh.co2_kg_per_kwh + used_dw * dw.co2_kg_per_kwh;
+        // 5.20 and 9.6.8.1.1.2.3: Q_HD;hp;in;bron at the source factors,
+        // not weighted by f_BACS.
+        let source_heat = match source {
+            Some(_) if cop >= 1.0 => row.heat_pump_output_kwh * (1.0 - 1.0 / cop),
+            _ => 0.0,
+        };
+        if let Some(source) = source {
+            fossil += source_heat * source.primary_factor;
+            co2 += source_heat * source.co2_kg_per_kwh;
+            if source_heat > 0.0 {
+                carriers.push(CarrierMonth {
+                    carrier: "dh_hp_source",
+                    month,
+                    used_kwh: source_heat,
+                    delivered_kwh: source_heat,
+                });
+            }
+        }
         let used_bm = bacs * row.biomass_kwh;
         fossil += used_bm * F_P_BIOMASS_B;
         co2 += used_bm * K_CO2_BIOMASS_B;
@@ -1359,8 +1591,18 @@ fn compute(
                 delivered_kwh: used_dh,
             });
         }
-        // Table 5.2/5.4: forfait external cold, f_Pren;dcforf = 0.
-        fossil += used_dc * F_P_DISTRICT_COLD_FORFAIT;
+        if used_dw > 0.0 {
+            carriers.push(CarrierMonth {
+                carrier: "dw",
+                month,
+                used_kwh: used_dw,
+                delivered_kwh: used_dw,
+            });
+        }
+        // Tables 5.2–5.4 or annex P: external cold.
+        let dc = factors.district_cold;
+        fossil += used_dc * dc.primary_factor;
+        co2 += used_dc * dc.co2_kg_per_kwh;
         if used_dc > 0.0 {
             carriers.push(CarrierMonth {
                 carrier: "dc",
@@ -1386,7 +1628,8 @@ fn compute(
         });
 
         // 5.30/5.31: ambient heat of the space-heating heat pump.
-        let ambient = if heat_pump_renewable && cop >= 1.0 {
+        // A collective source counts through f_Pren;dh;hp;in;bron instead.
+        let ambient = if heat_pump_renewable && source.is_none() && cop >= 1.0 {
             row.heat_pump_output_kwh * (1.0 - 1.0 / cop) * outdoor_share
         } else {
             0.0
@@ -1404,6 +1647,11 @@ fn compute(
         } else {
             0.0
         };
+        // 5.39: external supply at f_Pren;dX and the collective source.
+        renewable += used_dh * dh.renewable_factor
+            + used_dw * dw.renewable_factor
+            + used_dc * dc.renewable_factor
+            + source.map_or(0.0, |item| source_heat * item.renewable_factor);
         renewable += (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT
             + biomass_heat * F_PREN_BIOMASS_B
             + ambient_cold * F_PREN_RENCOLD
@@ -1450,7 +1698,8 @@ fn compute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::space_heating_chain::{Generator, HeatPumpGenerator};
+    use crate::annex_p::{AnnexPRoute, CollectiveHeatPumpSource};
+    use crate::space_heating_chain::HeatPumpGenerator;
     use serde_json::json;
 
     fn chain() -> SpaceHeatingChainInput {
@@ -1622,6 +1871,167 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "ventilation_fans_double_count"));
+    }
+
+    fn external_heat_sample(declared: bool) -> BuildingPerformanceInput {
+        use crate::space_heating_chain::ExternalHeatGenerator;
+        let mut sample = input();
+        sample.space_heating.generator = Generator::ExternalHeat(ExternalHeatGenerator {
+            supplier_reference: "contract".into(),
+            quality_declaration_present: declared,
+            auxiliary: Some(crate::space_heating_chain::OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: None,
+                source_reference: "delivery set".into(),
+            }),
+        });
+        sample.space_heating.distribution_system = Some(none_on_site_system());
+        sample
+    }
+
+    #[test]
+    fn annex_p_fixture_resolves_all_carriers() {
+        let supply: ExternalSupply = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-annex-p-synthetic.json"
+        ))
+        .unwrap();
+        let mut sample = input();
+        sample.external_supply = supply;
+        let mut issues = Vec::new();
+        let result = resolve_external(&sample, &mut issues);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert!(result.quality_declaration_used);
+        let heat = result.declared.district_heat;
+        assert!(heat.primary_factor > 0.0 && heat.primary_factor < 0.9);
+        assert!(heat.renewable_factor > 0.5);
+        assert_eq!(result.declared.district_hot_water.primary_factor, 0.55);
+        // EER 20 ≥ 8: fully renewable generator (5.49).
+        let cold = result.cooling.as_ref().unwrap();
+        assert_eq!(cold.generators[0].renewable_factor, 1.0);
+        assert_eq!(result.forfait.district_heat, HEAT_FORFAIT);
+        assert_eq!(result.forfait.district_cold, COLD_FORFAIT);
+    }
+
+    #[test]
+    fn annex_p_declaration_gives_two_scenarios() {
+        let forfait = assess_building_performance(&external_heat_sample(false));
+        let mut sample = external_heat_sample(true);
+        let mismatch = assess_building_performance(&sample);
+        assert!(mismatch
+            .issues
+            .iter()
+            .any(|item| item.code == "external_heat_declaration_mismatch"));
+        sample.external_supply.heating = Some(AnnexPRoute::Declared {
+            primary_factor: 0.42,
+            renewable_factor: 0.35,
+            co2_kg_per_kwh: 0.05,
+            declaration_reference: "BCRG EMG-verklaring".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let heat = result.space_heating.annual_district_heat_kwh.unwrap();
+        let ep = result.annual_primary_fossil_kwh.unwrap();
+        let ep_forfait = forfait.annual_primary_fossil_kwh.unwrap();
+        assert!((ep - (ep_forfait - heat * 0.9 + heat * 0.42)).abs() < 1e-6);
+        let ren = result.annual_renewable_primary_kwh.unwrap();
+        let ren_forfait = forfait.annual_renewable_primary_kwh.unwrap();
+        assert!((ren - (ren_forfait + heat * 0.35)).abs() < 1e-6);
+        let co2 = result.annual_co2_kg.unwrap();
+        assert!((co2 - (forfait.annual_co2_kg.unwrap() - heat * 0.09 + heat * 0.05)).abs() < 1e-6);
+        let external = result.external_supply.as_ref().unwrap();
+        assert!(external.quality_declaration_used);
+        assert!((external.forfait_primary_fossil_kwh.unwrap() - ep_forfait).abs() < 1e-6);
+        let kinds: Vec<_> = result
+            .indicators
+            .as_ref()
+            .unwrap()
+            .scenarios
+            .iter()
+            .map(|item| item.kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            [ScenarioKind::EmgDeclaration, ScenarioKind::EmgForfait]
+        );
+        assert!(!forfait.external_supply.unwrap().quality_declaration_used);
+    }
+
+    #[test]
+    fn collective_heat_pump_source_uses_its_own_factors() {
+        use crate::annex_p::SourceTemperatureClass;
+        let mut sample = input();
+        let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            generator_id: "hp".into(),
+            classification_source_reference: "system design".into(),
+            scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
+            source: TableSource::Ground,
+            sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
+            design_supply_temperature_c: Some(35.0),
+            source_correction_factor: Some(1.0),
+            source_correction_reference: Some("table V.1".into()),
+            thermal_capacity_kw: Some(8.0),
+            capacity_source_reference: Some("rated".into()),
+            collective_building_installation: Some(false),
+            row_variant: crate::forfait_heat_pump_draft::TableRowVariant::Base,
+            high_efficiency_evidence: None,
+            source_temperature_c: None,
+            source_temperature_evidence_reference: None,
+            source_quality_declaration_reference: None,
+        };
+        sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            forfait,
+            source_system: SourceSystem::CollectiveGround,
+            source_system_reference: "district ground loop".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        sample.heat_pump_renewable = Some(HeatPumpRenewableEvidence {
+            source_below_20_c: true,
+            exhaust_air_source: false,
+            source_reference: "ground loop".into(),
+            combined_outdoor_and_exhaust_air: false,
+            outdoor_air_heat_fraction: None,
+            outdoor_air_fraction_reference: None,
+        });
+        let missing = assess_building_performance(&sample);
+        assert!(missing
+            .issues
+            .iter()
+            .any(|item| item.code == "collective_heat_pump_source_data_required"));
+        sample.external_supply.collective_heat_pump_source = Some(CollectiveHeatPumpSource {
+            temperature_class: SourceTemperatureClass::Below20C,
+            supplier_reference: "invoice".into(),
+            annex_p: None,
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let cop = result.space_heating.generation_efficiency.unwrap();
+        let source: f64 = result
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| row.heat_pump_output_kwh * (1.0 - 1.0 / cop))
+            .sum();
+        assert!(source > 0.0);
+        let listed: f64 = result
+            .carriers
+            .iter()
+            .filter(|item| item.carrier == "dh_hp_source")
+            .map(|item| item.used_kwh)
+            .sum();
+        assert!((listed - source).abs() < 1e-6);
+        // The ambient heat counts through f_Pren;dh;hp;in;bron (0,95).
+        assert_eq!(result.annual_heat_pump_ambient_heat_kwh, Some(0.0));
+        // Below 20 °C: no paired forfait scenario changes (one value in both).
+        assert!(!result.external_supply.unwrap().quality_declaration_used);
     }
 
     #[test]

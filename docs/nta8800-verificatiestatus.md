@@ -1,5 +1,25 @@
 # NTA 8800 verificatiestatus — 29 september 2026
 
+## Stand 2 oktober 2026: externe levering volgens §5.8 en bijlage P
+
+De weigering van kwaliteitsverklaringen voor externe warmte en koude en van collectieve warmtepompbronnen is vervangen door de route van §5.8 en bijlage P (pagina's 128–138 en 940–1012), module `annex_p`:
+
+- per drager dh, dw en dc een verklaarde, berekende (P.7/P.9) of gemeten (P.6) waarde voor `f_P;del`, `f_Pren` en `K_CO2`, met de afrondingen van P.6.1.2.1 en §5.8.3;
+- EMGverklaring en EMGforf (§5.3.1) als scenariopaar in de indicatoren;
+- collectieve warmtepompbron met `Q_HD;hp;in;bron` volgens 9.6.8.1.1.2.3 en de forfaits `f_P;el/23`, `K_CO2;el/23` en `f_Pren` 0,95 onder 20 °C;
+- externe koude telt nu ook in de CO2-emissie (`K_CO2;el/3`), en tapwater uit een warmtenet heeft een eigen drager `dw`.
+
+Interpretatievragen:
+
+1. Formule 5.48 geeft `f_Pren` = 0,95 voor geothermie bij `η` = 20. De kern past `1 − 1/η` toe met het `η` van P.6.5.4.8 (`20·Δθ/40`), net als bij warmtepompen (5.44).
+2. P.6.5.4.6 noemt voor warmte uit een AVI met elektriciteitsproductie `f_P;del;wi`. De kern gebruikt daar de WKK-met-derving-route met `f_P;del;wi` = 0,5 en `f_Pren` = 0,5 (5.46). Bij een stoomketel zonder elektriciteitsproductie gebruikt hij de verbrandingsroute.
+3. Bij een gedeeltelijk directe hernieuwbare elektriciteitsvoorziening worden `f_P;del;el` en `K_CO2;el` naar het aandeel gewogen (P.4.5 "gewogen waarde"). Het aandeel telt als `W_gen;ren` en `W_aux;ren` in 5.42.
+4. `Q_HD;hp;in;bron` gebruikt de jaargemiddelde COP van de keten in plaats van een COP per maand.
+5. EMGforf voor een collectieve bron vanaf 20 °C met verklaring gebruikt tabel 5.2–5.4. De uitzondering in §5.3.1 geldt alleen onder 20 °C.
+6. P.6 noemt geen `f_Pren`. Bij de gemeten route wordt `f_Pren;dX` opgegeven, volgens 5.42/5.49/5.50 zoals vastgelegd voor het systeem.
+
+Niet getranscribeerd: energiefracties met β-factor (P.6.5.3, P.6.7.3; fracties worden opgegeven), leidingverliezen P.13–P.18, de forfaitaire ketel- en koelrendementen van P.6.5.4.2/P.6.7.4, collectieve zonnecollectoren, flexmodus en de behoefte van het gebied (P.8). Deze onderdelen kunnen worden opgegeven als `declared`-opwekker.
+
 ## Stand 2 oktober 2026: review H7, H8 en H17 tegen de normtekst
 
 Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn nagelopen tegen de gelicentieerde normtekst (NTA 8800:2025+C1:2026, pagina's 164–220, 250–257, 690–715 en 790–795). Tabellen 17.1, 17.2, 17.4 (90°/45°), 7.7 en 7.9 en de meeste constanten klopten. De gevonden afwijkingen zijn hersteld:
