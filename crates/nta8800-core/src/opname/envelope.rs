@@ -54,6 +54,10 @@ pub enum SurfaceBoundary {
     },
     /// Adjacent heated space or other dwelling: no transmission (8.5).
     AdjacentHeated,
+    /// Strongly ventilated space, such as a garage (NTA 3.134, 6.3; ISSO
+    /// 82.1 §6.3.4 with WD 2025 afb. 6.x): losses as towards outdoor air,
+    /// without solar gains on the parts facing it.
+    StronglyVentilated,
     /// Opening of the ground floor to an unheated cellar (not a cellar
     /// cupboard): a fictitious uninsulated ground floor, perimeter 0,01 m
     /// when it has none, R_bw from the façade above the rest of the floor
@@ -331,6 +335,8 @@ struct OpaquePart {
     orientation: Orientation,
     tilt: f64,
     outdoor: bool,
+    /// Receives solar gains (not when facing a strongly ventilated space).
+    solar: bool,
     /// Counts in Ū of 8.3 (opaque, not a panel, not a ground floor).
     in_mean: bool,
     reference: String,
@@ -344,6 +350,8 @@ struct WindowPart {
     orientation: Orientation,
     tilt: f64,
     obstruction: Value,
+    /// Receives solar gains (not when facing a strongly ventilated space).
+    solar: bool,
     reference: String,
 }
 
@@ -436,7 +444,9 @@ fn thatch_rc(
 fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
     match (surface.element, &surface.boundary) {
         (SurfaceElement::Facade, _) => (ElementType::Facade, None),
-        (SurfaceElement::Floor, SurfaceBoundary::Outdoor) => (ElementType::Roof, Some(0.17)),
+        (SurfaceElement::Floor, SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated) => {
+            (ElementType::Roof, Some(0.17))
+        }
         (SurfaceElement::Floor, _) => (ElementType::Floor, None),
         (SurfaceElement::Roof, SurfaceBoundary::UnheatedSpace { .. }) => {
             (ElementType::AtticFloor, None)
@@ -465,7 +475,11 @@ pub fn derive_envelope(
             recorder.issue("surface_area_invalid", format!("{path}.grossAreaM2"));
             continue;
         }
-        let exterior = matches!(surface.boundary, SurfaceBoundary::Outdoor);
+        let exterior = matches!(
+            surface.boundary,
+            SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated
+        );
+        let solar = matches!(surface.boundary, SurfaceBoundary::Outdoor);
         let orientation = match (surface.orientation, surface.element) {
             (Some(orientation), _) => orientation,
             (None, SurfaceElement::Facade) => {
@@ -512,6 +526,7 @@ pub fn derive_envelope(
                     orientation,
                     tilt,
                     obstruction: obstruction(window.obstruction.as_ref()),
+                    solar,
                     reference: window.source_reference.clone(),
                 },
             );
@@ -565,6 +580,7 @@ pub fn derive_envelope(
                         orientation,
                         tilt,
                         obstruction: obstruction(None),
+                        solar,
                         reference: door.source_reference.clone(),
                     },
                 );
@@ -577,6 +593,7 @@ pub fn derive_envelope(
                     orientation,
                     tilt,
                     outdoor: exterior,
+                    solar,
                     in_mean: false,
                     reference: door.source_reference.clone(),
                 };
@@ -602,6 +619,7 @@ pub fn derive_envelope(
                         orientation,
                         tilt,
                         outdoor: exterior,
+                    solar,
                         in_mean: false,
                         reference: panel.source_reference.clone(),
                     },
@@ -864,6 +882,7 @@ pub fn derive_envelope(
                             orientation,
                             tilt,
                             outdoor: exterior,
+                    solar,
                             in_mean: true,
                             reference: format!(
                                 "{}; basisopname R_c {} ({})",
@@ -932,10 +951,12 @@ pub fn derive_envelope(
             "id": part.id, "areaM2": part.area, "uValueWPerM2k": u,
             "sourceReference": part.reference,
         }));
-        opaque_elements.push(json!({
-            "id": part.id, "areaM2": part.area, "orientation": part.orientation,
-            "tiltDeg": part.tilt, "uValueWPerM2k": u, "sourceReference": part.reference,
-        }));
+        if part.solar {
+            opaque_elements.push(json!({
+                "id": part.id, "areaM2": part.area, "orientation": part.orientation,
+                "tiltDeg": part.tilt, "uValueWPerM2k": u, "sourceReference": part.reference,
+            }));
+        }
     }
     for window in &windows {
         let u = window.u + delta_u;
@@ -943,6 +964,9 @@ pub fn derive_envelope(
             "id": window.id, "areaM2": window.area, "uValueWPerM2k": u,
             "sourceReference": window.reference,
         }));
+        if !window.solar {
+            continue;
+        }
         window_values.push(json!({
             "id": window.id, "areaM2": window.area, "orientation": window.orientation,
             "tiltDeg": window.tilt, "gPerpendicular": window.g,
@@ -1035,7 +1059,7 @@ fn push_window_or_partition(
     part: WindowPart,
 ) {
     match &surface.boundary {
-        SurfaceBoundary::Outdoor => windows.push(part),
+        SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated => windows.push(part),
         SurfaceBoundary::UnheatedSpace { space_id } => {
             partitions.push((space_id.clone(), part.area, part.u, part.reference))
         }
@@ -1050,7 +1074,7 @@ fn push_opaque_or_partition(
     part: OpaquePart,
 ) {
     match &surface.boundary {
-        SurfaceBoundary::Outdoor => opaque.push(part),
+        SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated => opaque.push(part),
         SurfaceBoundary::UnheatedSpace { space_id } => {
             partitions.push((space_id.clone(), part.area, part.u, part.reference))
         }
@@ -1190,6 +1214,64 @@ mod tests {
             .applied
             .iter()
             .any(|item| item.rule == "door_insulation_unknown_uninsulated"));
+    }
+
+    #[test]
+    fn strongly_ventilated_garage_loses_like_outdoor_without_sun() {
+        let envelope = SurveyEnvelope {
+            surfaces: vec![
+                surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+                surface(
+                    "garagewand",
+                    SurfaceElement::Facade,
+                    SurfaceBoundary::StronglyVentilated,
+                ),
+            ],
+            windows: vec![SurveyWindow {
+                id: "garageraam".into(),
+                surface_id: "garagewand".into(),
+                area_m2: 2.0,
+                glass: GlassAnswer::Double,
+                frame: FrameAnswer::WoodOrPlastic,
+                obstruction: None,
+                source_reference: "survey".into(),
+            }],
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+        };
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1975, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        let ids = |values: &[Value]| -> Vec<String> {
+            values
+                .iter()
+                .map(|v| v["id"].as_str().unwrap().to_string())
+                .collect()
+        };
+        let direct = ids(&derived.direct_elements);
+        // Transmission as towards outdoor air (same U as the façade).
+        assert!(direct.iter().any(|id| id.contains("garagewand")));
+        assert!(direct.iter().any(|id| id == "garageraam"));
+        let wall_u = |id: &str| {
+            derived
+                .direct_elements
+                .iter()
+                .find(|v| v["id"].as_str().unwrap().contains(id))
+                .unwrap()["uValueWPerM2k"]
+                .as_f64()
+                .unwrap()
+        };
+        assert_eq!(wall_u("gevel"), wall_u("garagewand"));
+        // No solar gains on the parts facing the garage.
+        assert!(!ids(&derived.windows).contains(&"garageraam".to_string()));
+        assert!(!ids(&derived.opaque_elements)
+            .iter()
+            .any(|id| id.contains("garagewand")));
+        assert!(ids(&derived.opaque_elements)
+            .iter()
+            .any(|id| id.contains("gevel")));
+        assert!((super::super::loss_area(&envelope) - 80.0).abs() < 1e-9);
     }
 
     #[test]
