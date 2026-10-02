@@ -331,8 +331,9 @@ pub fn biomass_efficiency(appliance: BiomassAppliance, location: BiomassLocation
 pub struct ExternalHeatGenerator {
     /// Invoice, contract or other proof of external supply (9.6.7.1).
     pub supplier_reference: String,
-    /// A quality declaration (annex P) needs a paired forfait scenario and is
-    /// not supported yet; only the fixed factor route is calculated.
+    /// A quality declaration (annex P); its values are given in the
+    /// building performance input (`externalSupply.heating`), which also
+    /// calculates the paired forfait scenario (§5.3.1).
     pub quality_declaration_present: bool,
     /// §9.6.7.2 routes the auxiliary energy through 9.91.
     #[serde(default)]
@@ -1697,12 +1698,6 @@ fn generate(
                     "generator.supplierReference",
                 ));
             }
-            if generator.quality_declaration_present {
-                issues.push(issue(
-                    "external_heat_declaration_unsupported",
-                    "generator.qualityDeclarationPresent",
-                ));
-            }
             validate_other_auxiliary(generator.auxiliary.as_ref(), false, issues);
             // 9.84 with η = 1,0 and f_prac = 1 for the fixed factor 0,9.
             generation_efficiency = Some(1.0);
@@ -2188,7 +2183,7 @@ mod tests {
             auxiliary: None,
         });
         let found = codes(&input);
-        assert!(found.contains(&"external_heat_declaration_unsupported"));
+        assert!(!found.contains(&"external_heat_declaration_unsupported"));
         assert!(found.contains(&"source_reference_required"));
         assert!(found.contains(&"generator_auxiliary_input_required"));
         input.distribution_system = Some(system(DistributionPump::IncludedInGeneratorAuxiliary));
