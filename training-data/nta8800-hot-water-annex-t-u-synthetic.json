@@ -1,0 +1,43 @@
+{
+  "need": { "method": "residential", "dwellingCount": 1, "sourceReference": "synthetic: one dwelling" },
+  "emission": {
+    "method": "residential",
+    "served": "kitchen_and_bathroom",
+    "kitchenLengthM": 2.5,
+    "bathroomLengthM": 4.0,
+    "sourceReference": "synthetic: draw-off lengths from drawing"
+  },
+  "showerHeatRecovery": {
+    "showers": [
+      {
+        "unit": "annex_u",
+        "test": {
+          "class": "class2",
+          "runs": [
+            { "method": "energies", "recoveredKj": 2870.0, "showerKj": 5880.0 },
+            { "method": "energies", "recoveredKj": 2905.0, "showerKj": 5880.0 },
+            { "method": "energies", "recoveredKj": 2850.0, "showerKj": 5880.0 }
+          ],
+          "sourceReference": "synthetic: annex U test report"
+        }
+      }
+    ],
+    "connection": "mixer_and_heater",
+    "sourceReference": "synthetic: installation drawing"
+  },
+  "generator": {
+    "kind": "gas_appliance",
+    "appliance": "combi_gaskeur_hr_cw",
+    "measuredClass": "class3",
+    "annexT": {
+      "method": "combi_forfait",
+      "usefulMj": 34.0,
+      "fuelInputMj": 40.5,
+      "electricityKwh": 0.12,
+      "fullLoadEfficiency": 0.97,
+      "fuel": "natural_gas",
+      "sourceReference": "synthetic: Gaskeur CW test report"
+    }
+  },
+  "equipmentReference": "synthetic fixture, not a real appliance"
+}

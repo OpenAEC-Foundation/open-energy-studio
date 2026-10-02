@@ -1873,6 +1873,19 @@ mod tests {
     }
 
     #[test]
+    fn annex_t_u_fixture_is_valid() {
+        let system: HotWaterSystem = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-hot-water-annex-t-u-synthetic.json"
+        ))
+        .unwrap();
+        assert!(validate_hot_water(&system, context(), "dhw").is_empty());
+        let shower = &system.shower_heat_recovery.as_ref().unwrap().showers[0];
+        // (2870 + 2905 + 2850)/3/5880 = 0,4890 → 0,475.
+        assert!((shower.efficiency() - 0.475).abs() < 1e-9);
+        assert!(assess_hot_water(&system, context()).is_ok());
+    }
+
+    #[test]
     fn recoverable_losses_follow_13_13() {
         let mut input = system(HotWaterGenerator::ElectricBoiler);
         input.storage.push(StorageVessel {

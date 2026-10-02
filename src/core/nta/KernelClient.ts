@@ -1,6 +1,59 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { IProject, INtaHeatPumpInput } from '../energy/types';
 
+/** Annex T Gaskeur test report (gas water heaters and combi appliances). */
+export type NtaAnnexTTest =
+  | {
+      method: 'water_heater';
+      usefulMj: number;
+      fuelInputMj: number;
+      electricityKwh: number;
+      fuel: 'natural_gas' | 'propane' | 'butane';
+      sourceReference: string;
+    }
+  | {
+      method: 'combi_forfait';
+      usefulMj: number;
+      fuelInputMj: number;
+      electricityKwh: number;
+      fullLoadEfficiency: number;
+      fuel: 'natural_gas' | 'propane' | 'butane';
+      sourceReference: string;
+    }
+  | {
+      method: 'combi_measured';
+      summerUsefulMjPerDay: number;
+      summerFuelMjPerDay: number;
+      winterUsefulMjPerDay: number;
+      winterFuelMjPerDay: number;
+      heatingFuelMjPerDay: number;
+      fullLoadEfficiency: number;
+      summerElectricityKwhPerDay: number;
+      electronicsKwhPerDay: number;
+      fuel: 'natural_gas' | 'propane' | 'butane';
+      sourceReference: string;
+    };
+
+/** Annex U shower heat recovery test: three runs at one class. */
+export interface NtaAnnexUTest {
+  class: 'class2' | 'class3' | 'class4';
+  runs: Array<
+    | { method: 'energies'; recoveredKj: number; showerKj: number }
+    | {
+        method: 'samples';
+        sampleTimeS: number;
+        samples: Array<{
+          coldFlowM3PerS: number;
+          coldInC: number;
+          coldOutC: number;
+          showerFlowM3PerS: number;
+          showerC: number;
+        }>;
+      }
+  >;
+  sourceReference: string;
+}
+
 export interface KernelIssue {
   severity: 'error' | 'warning';
   code: string;
@@ -2122,7 +2175,11 @@ export interface NtaHotWaterSystem {
         kitchenLengthM?: number | null; bathroomLengthM?: number | null; sourceReference: string }
     | { method: 'utility'; meanLengthM: number; sourceReference: string };
   showerHeatRecovery?: {
-    showers: Array<{ unit: 'none' | 'vertical' | 'horizontal' | 'unknown' } | { unit: 'declared'; efficiency: number; sourceReference: string }>;
+    showers: Array<
+      | { unit: 'none' | 'vertical' | 'horizontal' | 'unknown' }
+      | { unit: 'declared'; efficiency: number; sourceReference: string }
+      | { unit: 'annex_u'; test: NtaAnnexUTest }
+    >;
     connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
     sourceReference: string;
   } | null;
@@ -2157,7 +2214,7 @@ export interface NtaHotWaterSystem {
   generator:
     | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
         | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
-        declared?: NtaDhwDeclared | null }
+        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null }
     | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
         outdoorAirFraction?: number | null }
     | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
