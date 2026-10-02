@@ -23,6 +23,7 @@ pub mod direct_transmission;
 pub mod domestic_hot_water;
 pub mod epus_draft;
 pub mod final_energy_draft;
+pub mod forfait_envelope;
 pub mod forfait_heat_pump_draft;
 pub mod forfait_heat_pump_monthly_draft;
 pub mod gas_collective_source_draft;
