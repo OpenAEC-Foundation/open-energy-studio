@@ -39,6 +39,45 @@
 4. **Visuele acceptatie** van de desktop-UI en de attestprocedure (BRL 9501:2026, ISSO 54 actuele editie).
 
 
+## Tweede onafhankelijke review (2 oktober 2026, nacht)
+
+Vier leesreviews hebben de kern opnieuw tegen de normtekst gelegd, zonder de code te wijzigen. Elke review rekende eigen voorbeelden onafhankelijk na in Python.
+
+- **Constructies, bijlagen C, E, F, G, H, I en L.** Alle tabellen komen cel voor cel overeen, en alle uitgewerkte constructies zijn gelijk tot 1e-15. Wel zijn er afwijkingen gevonden:
+  - R1 en RT voor ΔU bij samengestelde constructies;
+  - de verouderingsfactor van in-situ isolatie;
+  - de afronding van U in 8.1;
+  - R_se bij een opwaartse warmtestroom;
+  - de afronding van R_calc;
+  - R_si van zoldervloeren;
+  - thermische kussens;
+  - een aantal ontbrekende validaties.
+- **Bijlagen P, T, U, AA, A en B.** Alle tabellen en formules kloppen. De afwijkingen zitten in:
+  - het opslagrendement van WD;
+  - de forfaitaire voorwaarden van P.0 en P.5;
+  - het hernieuwbare aandeel volgens 5.39g (absorptiekoeling en f_BACS);
+  - WKK op biogas;
+  - de klassecontroles van bijlage U en T;
+  - dynamische beglazing in AA en TOjuli;
+  - de interne warmte in TOjuli.
+- **Bijlagen Q, V, W, M, N en O.** De modules zijn gelijk tot 1e-9. De afwijkingen zitten in de koppeling:
+  - f_prac 0,95 ontbreekt in 9.63;
+  - de brandstof van bijlage N staat op onderwaarde in plaats van bovenwaarde;
+  - de dekkingstolerantie van Q.6;
+  - de hulpenergie van de warmtepomp;
+  - c_source;
+  - 13.164;
+  - de omgevingstemperatuur in M.12;
+  - N.69.
+- **Basisopname ISSO 82.1 en 75.1.** Zes fixtures geven plausibele labels. De drie belangrijkste fouten:
+  - water- en bodemwarmtepompen worden afgewezen;
+  - een elektrische boiler wordt afgewezen;
+  - een vloer boven buitenlucht krijgt de verkeerde Rc-rij.
+
+  Daarnaast ontbreken nog boekregels, zoals leidingdoorvoeren H_p, leidingen in onverwarmde ruimten en het naïsolatiejaar.
+
+Elke review wordt in een eigen werkboom hersteld en via de poort samengevoegd. In deze ronde zijn ook toegevoegd: de LBK met naverwarmer en koelbatterij (tabel 11.15, 11.114–11.121) en een expliciete fout wanneer de drukbalans van 11.2.1.6 niet convergeert.
+
 ## Stand 2 oktober 2026: externe levering volgens §5.8 en bijlage P
 
 De weigering van kwaliteitsverklaringen voor externe warmte en koude en van collectieve warmtepompbronnen is vervangen door de route van §5.8 en bijlage P (pagina's 128–138 en 940–1012), module `annex_p`:
