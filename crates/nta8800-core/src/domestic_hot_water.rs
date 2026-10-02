@@ -26,16 +26,22 @@
 //! - ambient heat of heat pumps 5.36/5.37;
 //! - quality-statement contributions `F_W;gen;gi` (13.146), delivered first;
 //! - appliances tested at two tapping profiles (13.8.4.2: 13.153a–13.160,
-//!   recoverable losses 13.160a), with `E_W;gen;in;PFHRD = 0` and
-//!   `C_W;mixed air = 1`;
+//!   recoverable losses 13.160a), with the monthly mixed-air correction
+//!   13.153b/d–i and the PFHRD contribution 13.156a/b from
+//!   [`HotWaterExtras`]; below the lower limit of 13.154 heat pumps fall
+//!   back to 13.160b with table 13.18;
 //! - hot water from the space-heating system (13.8.4.9.3, 13.185): no
 //!   carrier here, the output loads the space-heating node;
-//! - 13.149 time fraction of an exhaust-air heat pump for 13.148/11.2.2.1.2.
+//! - 13.149 time fraction of an exhaust-air heat pump for 13.148/11.2.2.1.2;
+//! - circulation (13.26) and vessel losses (13.58) with the levelled
+//!   `ϑ_int;set;H;zi,mi` of 7.9.4 when known;
+//! - standalone space-heating solar systems (SHS) via
+//!   [`assess_standalone_solar`].
 //!
 //! Not modelled: series of more than two generators (not allowed by
-//! 13.141b), the PFHRD contribution (13.156a/b, needs the combi's space-
-//! heating energy), the mixed-air correction 13.153d–i and the winter test
-//! method 13.153. The recoverable losses of 13.13 (13.47, 13.49, 13.63,
+//! 13.141b). The winter test method 13.153 is offered as
+//! [`winter_gas_consumption_kwh`]; its combination into `Q_gas;p(i)` follows
+//! NEN-EN 13203-2. The recoverable losses of 13.13 (13.47, 13.49, 13.63,
 //! 13.68, 13.160a, 13.164, 13.179) are reported per month. Annex T and U
 //! test reports are evaluated in [`crate::hot_water_tests`].
 
@@ -43,7 +49,7 @@ use crate::annex_w::{
     calculate_booster, validate_booster, BoosterHeatPump, BoosterHeatSource, BoosterSourceCarrier,
 };
 use crate::building_performance::Carrier;
-use crate::climate::MONTH_HOURS;
+use crate::climate::{MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::hot_water_tests::{AnnexTTest, AnnexUTest};
 use crate::label_class::LabelFunction;
 use crate::monthly_demand::occupants_per_dwelling;
@@ -711,7 +717,183 @@ pub struct TwoProfileTest {
     /// (`f_prac` 0,95 instead of 0,9 for storage appliances, 13.152).
     #[serde(default)]
     pub legionella_cycle_tested: bool,
+    /// 13.153b/13.153d–i: combi heat pump on a mix of outdoor and
+    /// ventilation return air.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mixed_air: Option<MixedAirCorrection>,
+    /// 13.156a/b: passive flue heat recovery device of a gas combi
+    /// (prEN 13203-7, 24-hour method).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pfhrd: Option<PfhrdTest>,
     pub source_reference: String,
+}
+
+/// `C_W;mixed air;mi` of 13.153b.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
+pub enum MixedAirCorrection {
+    /// Twelve monthly factors from a quality declaration.
+    Declared {
+        #[serde(rename = "monthlyFactors")]
+        monthly_factors: Vec<f64>,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
+    /// 13.153d–i from the NEN-EN 14511 result at condition 2 (A7/W55,
+    /// table Q.11) and the minimum evaporator air flow `q_V;hp;W`.
+    En14511 {
+        /// `COP_H;hp;2` at maximum power.
+        #[serde(rename = "copCondition2")]
+        cop_condition_2: f64,
+        /// `ϑ_cond;out;2`, °C.
+        #[serde(rename = "condenserOutC")]
+        condenser_out_c: f64,
+        /// `ϑ_evap;in;2`, °C.
+        #[serde(rename = "evaporatorInC")]
+        evaporator_in_c: f64,
+        /// `ϑ_evap;out;2`, °C.
+        #[serde(rename = "evaporatorOutC")]
+        evaporator_out_c: f64,
+        /// `q_V;hp;W`, m³/h.
+        #[serde(rename = "minimumAirFlowM3PerH")]
+        minimum_air_flow_m3_per_h: f64,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
+}
+
+/// 13.156b inputs, both on the net calorific value, kWh/day.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PfhrdTest {
+    /// `Q_gas;indirect`.
+    pub indirect_gas_kwh_per_day: f64,
+    /// `Q_gas;CH;test`.
+    pub heating_gas_kwh_per_day: f64,
+    pub source_reference: String,
+}
+
+/// Data from outside chapter 13 for the final hot-water run.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct HotWaterExtras {
+    /// 13.156a: `Σ E_H;gen;gi;in` of the combi appliance for space heating,
+    /// gross calorific value, kWh per year.
+    pub combi_space_heating_gas_kwh: Option<f64>,
+    /// 13.153h/i per month.
+    pub mixed_air: Option<MixedAirVentilation>,
+}
+
+/// 13.153h/i inputs: `Σ q_V;ODA;req;zi,mi` of the zones whose return air
+/// feeds the heat pump and `ϑ_ETA;dis;out;zi,mi` (11.130), flow-weighted.
+#[derive(Debug, Clone, Copy)]
+pub struct MixedAirVentilation {
+    pub required_outdoor_air_m3_per_h: [f64; 12],
+    pub extract_air_c: [f64; 12],
+}
+
+/// 13.153: alternative winter consumption of gas combis
+/// (`Q_gas;w = Q_gas;s − 13,5 × 1,21·P_s / η_100`, net calorific value),
+/// replacing formula (5) of NEN-EN 13203-2; kWh/day. The combination into
+/// `Q_gas;p(i)` follows NEN-EN 13203-2.
+pub fn winter_gas_consumption_kwh(
+    summer_gas_kwh_per_day: f64,
+    standby_loss_kw: f64,
+    full_load_efficiency: f64,
+) -> Option<f64> {
+    (summer_gas_kwh_per_day.is_finite()
+        && standby_loss_kw.is_finite()
+        && standby_loss_kw >= 0.0
+        && full_load_efficiency > 0.0)
+        .then(|| summer_gas_kwh_per_day - 13.5 * 1.21 * standby_loss_kw / full_load_efficiency)
+}
+
+impl MixedAirCorrection {
+    /// `C_W;mixed air;mi`; 1 when the ventilation data are missing.
+    pub fn factor(&self, month_index: usize, ventilation: Option<&MixedAirVentilation>) -> f64 {
+        match self {
+            Self::Declared {
+                monthly_factors, ..
+            } => monthly_factors.get(month_index).copied().unwrap_or(1.0),
+            Self::En14511 {
+                cop_condition_2,
+                condenser_out_c,
+                evaporator_in_c,
+                evaporator_out_c,
+                minimum_air_flow_m3_per_h,
+                ..
+            } => {
+                let Some(ventilation) = ventilation else {
+                    return 1.0;
+                };
+                // 13.153f/g.
+                let theoretical =
+                    (condenser_out_c + 273.15 + 2.0) / (condenser_out_c - evaporator_out_c + 7.0);
+                let carnot = cop_condition_2 / theoretical;
+                // 13.153i/h.
+                let outdoor_share = (1.0
+                    - ventilation.required_outdoor_air_m3_per_h[month_index]
+                        / minimum_air_flow_m3_per_h)
+                    .max(0.0);
+                let mixed = (OUTDOOR_TEMPERATURE_C[month_index] - 3.7) * outdoor_share
+                    + ventilation.extract_air_c[month_index] * (1.0 - outdoor_share);
+                // 13.153e (the two minus signs cancel).
+                let cop = carnot * (condenser_out_c + 273.15 + 2.0)
+                    / (condenser_out_c - (mixed - (evaporator_in_c - evaporator_out_c)) + 7.0);
+                // 13.153d.
+                cop / cop_condition_2
+            }
+        }
+    }
+
+    fn issues(&self, prefix: &str) -> Vec<(&'static str, String)> {
+        let mut issues = Vec::new();
+        match self {
+            Self::Declared {
+                monthly_factors,
+                source_reference,
+            } => {
+                if monthly_factors.len() != 12
+                    || monthly_factors.iter().any(|value| !positive(*value))
+                {
+                    issues.push((
+                        "hot_water_mixed_air_invalid",
+                        format!("{prefix}.monthlyFactors"),
+                    ));
+                }
+                if source_reference.trim().is_empty() {
+                    issues.push((
+                        "source_reference_required",
+                        format!("{prefix}.sourceReference"),
+                    ));
+                }
+            }
+            Self::En14511 {
+                cop_condition_2,
+                condenser_out_c,
+                evaporator_in_c,
+                evaporator_out_c,
+                minimum_air_flow_m3_per_h,
+                source_reference,
+            } => {
+                if !positive(*cop_condition_2)
+                    || !positive(*minimum_air_flow_m3_per_h)
+                    || ![condenser_out_c, evaporator_in_c, evaporator_out_c]
+                        .iter()
+                        .all(|value| value.is_finite())
+                    || condenser_out_c <= evaporator_out_c
+                {
+                    issues.push(("hot_water_mixed_air_invalid", prefix.to_string()));
+                }
+                if source_reference.trim().is_empty() {
+                    issues.push((
+                        "source_reference_required",
+                        format!("{prefix}.sourceReference"),
+                    ));
+                }
+            }
+        }
+        issues
+    }
 }
 
 /// 13.146: the energetic contribution `F_W;gen;gi` from a quality
@@ -739,8 +921,14 @@ impl TwoProfileTest {
     }
 
     /// `E_W;gen;in;test;i`: 13.153a (gas to the gross calorific value) or
-    /// 13.153b/13.153c (SCF and set temperature; `C_W;mixed air` = 1).
+    /// 13.153b/13.153c (SCF and set temperature) with `C_W;mixed air` = 1.
+    #[cfg(test)]
     fn corrected_input(&self, test: &ProfileTest) -> f64 {
+        self.corrected_input_with(test, 1.0)
+    }
+
+    /// As [`Self::corrected_input`] with `C_W;mixed air;mi` (13.153b).
+    fn corrected_input_with(&self, test: &ProfileTest, mixed_air: f64) -> f64 {
         match self.standard {
             TwoProfileStandard::En13203Gas => GAS_GROSS_PER_NET * test.input_kwh_per_day,
             TwoProfileStandard::En16147HeatPump => {
@@ -750,9 +938,32 @@ impl TwoProfileTest {
                     .unwrap_or(0.0);
                 let tested = test.max_test_temperature_c.unwrap_or(55.0);
                 let design = self.design_set_temperature_c.unwrap_or(55.0);
-                test.input_kwh_per_day * (1.0 - smart) * (1.0 + (55.0 - tested) * 0.02)
+                test.input_kwh_per_day * (1.0 - smart) / mixed_air * (1.0 + (55.0 - tested) * 0.02)
                     / (1.0 + (55.0 - design) * 0.02)
             }
+        }
+    }
+
+    /// 13.156a/b: `E_W;gen;in;PFHRD`, kWh/day.
+    fn pfhrd_daily(&self, extras: &HotWaterExtras) -> f64 {
+        match (&self.pfhrd, extras.combi_space_heating_gas_kwh) {
+            (Some(test), Some(annual)) if test.heating_gas_kwh_per_day > 0.0 => {
+                annual / 365.0 * test.indirect_gas_kwh_per_day / test.heating_gas_kwh_per_day
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// §13.8.4.2 lower limit of `Q_W;b;d` (only for i2 = XXL, 3XL, 4XL).
+    fn lower_bound_kwh_per_day(&self) -> f64 {
+        use TestProfile::*;
+        let q = |profile: TestProfile| profile.reference_kwh_per_day();
+        match (self.low.profile, self.high.profile) {
+            (_, FourXl) => (q(Xxl) + q(ThreeXl)) / 2.0,
+            (_, ThreeXl) => q(Xl),
+            (Xl, Xxl) => q(L),
+            (L, Xxl) => q(M),
+            _ => 0.0,
         }
     }
 
@@ -760,13 +971,7 @@ impl TwoProfileTest {
     fn range_issue(&self, daily_kwh: f64) -> Option<&'static str> {
         use TestProfile::*;
         let q = |profile: TestProfile| profile.reference_kwh_per_day();
-        let lower = match (self.low.profile, self.high.profile) {
-            (_, FourXl) => (q(Xxl) + q(ThreeXl)) / 2.0,
-            (_, ThreeXl) => q(Xl),
-            (Xl, _) => q(L),
-            (L, _) => q(M),
-            _ => 0.0,
-        };
+        let lower = self.lower_bound_kwh_per_day();
         let upper = if self.electric() {
             match self.high.profile {
                 L => (q(L) + q(Xl)) / 2.0,
@@ -779,35 +984,76 @@ impl TwoProfileTest {
             .then_some("hot_water_two_profile_out_of_range")
     }
 
-    /// 13.154/13.154a with `E_W;gen;in;PFHRD = 0`, kWh/day.
-    fn daily_input(&self, daily_kwh: f64) -> f64 {
+    /// 13.154/13.154a, kWh/day, with `C_W;mixed air;mi` and
+    /// `E_W;gen;in;PFHRD`.
+    fn daily_input(&self, daily_kwh: f64, mixed_air: f64, pfhrd: f64) -> f64 {
         let (q1, q2) = (
             self.low.delivered_kwh_per_day,
             self.high.delivered_kwh_per_day,
         );
         let (e1, e2) = (
-            self.corrected_input(&self.low),
-            self.corrected_input(&self.high),
+            self.corrected_input_with(&self.low, mixed_air),
+            self.corrected_input_with(&self.high, mixed_air),
         );
         let linear = e1 + (e2 - e1) * (daily_kwh - q1) / (q2 - q1);
         if daily_kwh < q1 && (linear <= 0.0 || daily_kwh / linear > q1 / e1) {
-            e1 / q1 * daily_kwh
+            e1 / q1 * daily_kwh - pfhrd
         } else {
-            linear
+            linear - pfhrd
         }
     }
 
     /// 13.158 rounded down to 0,025 (gas) or 0,05 (electric).
     fn efficiency(&self, daily_kwh: f64) -> Result<f64, &'static str> {
+        self.efficiency_with(daily_kwh, 1.0, 0.0)
+    }
+
+    /// 13.158 with `C_W;mixed air;mi` and `E_W;gen;in;PFHRD`.
+    fn efficiency_with(
+        &self,
+        daily_kwh: f64,
+        mixed_air: f64,
+        pfhrd: f64,
+    ) -> Result<f64, &'static str> {
+        if daily_kwh + 1e-9 < self.lower_bound_kwh_per_day() {
+            return self.below_range_efficiency(daily_kwh, mixed_air);
+        }
         if let Some(code) = self.range_issue(daily_kwh) {
             return Err(code);
         }
-        let input = self.daily_input(daily_kwh);
+        let input = self.daily_input(daily_kwh, mixed_air, pfhrd);
         if input <= 0.0 || daily_kwh <= 0.0 {
             return Err("hot_water_two_profile_out_of_range");
         }
         let step = if self.electric() { 0.05 } else { 0.025 };
         Ok(round_down(daily_kwh / input, step))
+    }
+
+    /// Below the §13.8.4.2 lower limit: for heat pumps 13.160b with the
+    /// i1 test and `c_W,EU;gen` of table 13.18 over `Q_W;dis;nren;an`
+    /// (taken as 365·`Q_W;b;d`); table 13.18 covers individual heat pumps
+    /// only, so other appliances are rejected.
+    fn below_range_efficiency(&self, daily_kwh: f64, mixed_air: f64) -> Result<f64, &'static str> {
+        let profile = match self.low.profile {
+            TestProfile::S => TappingProfile::S,
+            TestProfile::M => TappingProfile::M,
+            TestProfile::L => TappingProfile::L,
+            TestProfile::Xl => TappingProfile::Xl,
+            _ => return Err("hot_water_two_profile_below_range"),
+        };
+        if !self.electric() {
+            return Err("hot_water_two_profile_below_range");
+        }
+        let correction = european_profile_correction(profile, 365.0 * daily_kwh)
+            .ok_or("hot_water_two_profile_below_range")?;
+        let input = self.corrected_input_with(&self.low, mixed_air);
+        if input <= 0.0 {
+            return Err("hot_water_two_profile_below_range");
+        }
+        Ok(round_down(
+            self.low.delivered_kwh_per_day * correction / input,
+            0.05,
+        ))
     }
 
     /// 13.152: NEN-EN 16147 storage appliances 0,9 unless the test
@@ -834,11 +1080,13 @@ impl TwoProfileTest {
         (w1 + (w2 - w1) * (daily_kwh - q1) / (q2 - q1)).max(0.0)
     }
 
-    /// 13.160a per day: exhaust-air heat pumps and combis with an
-    /// integrated vessel; 0 for other appliances.
+    /// 13.160a per day: exhaust-air heat pumps and combis (gas or electric)
+    /// with an integrated vessel; 0 for other appliances. `E_W;gen;in;test`
+    /// is only corrected for summer and winter (gross value for gas), not
+    /// with 13.153b/c.
     fn daily_recoverable(&self) -> f64 {
-        let applies = (self.electric() && self.exhaust_air_source)
-            || (!self.electric() && self.combi && self.integrated_vessel);
+        let applies =
+            (self.electric() && self.exhaust_air_source) || (self.combi && self.integrated_vessel);
         if !applies {
             return 0.0;
         }
@@ -846,10 +1094,11 @@ impl TwoProfileTest {
             self.low.delivered_kwh_per_day,
             self.high.delivered_kwh_per_day,
         );
-        let (e1, e2) = (
-            self.corrected_input(&self.low),
-            self.corrected_input(&self.high),
-        );
+        let summer_winter = |test: &ProfileTest| match self.standard {
+            TwoProfileStandard::En13203Gas => GAS_GROSS_PER_NET * test.input_kwh_per_day,
+            TwoProfileStandard::En16147HeatPump => test.input_kwh_per_day,
+        };
+        let (e1, e2) = (summer_winter(&self.low), summer_winter(&self.high));
         (q1 / e1 * (e2 - (e2 - e1) / (q2 - q1) * q2)).max(0.0)
     }
 
@@ -920,6 +1169,34 @@ impl TwoProfileTest {
                 "hot_water_outdoor_fraction_invalid",
                 format!("{prefix}.outdoorAirFraction"),
             ));
+        }
+        if let Some(mixed) = &self.mixed_air {
+            // 13.153b: combi heat pumps on outdoor and return air only.
+            if !(self.electric() && self.combi && self.exhaust_air_source) {
+                issues.push((
+                    "hot_water_mixed_air_not_applicable",
+                    format!("{prefix}.mixedAir"),
+                ));
+            }
+            issues.extend(mixed.issues(&format!("{prefix}.mixedAir")));
+        }
+        if let Some(pfhrd) = &self.pfhrd {
+            // 13.156a: gas combis only.
+            if self.electric() || !self.combi {
+                issues.push(("hot_water_pfhrd_not_applicable", format!("{prefix}.pfhrd")));
+            }
+            if !positive(pfhrd.heating_gas_kwh_per_day)
+                || !pfhrd.indirect_gas_kwh_per_day.is_finite()
+                || pfhrd.indirect_gas_kwh_per_day < 0.0
+            {
+                issues.push(("hot_water_pfhrd_invalid", format!("{prefix}.pfhrd")));
+            }
+            if pfhrd.source_reference.trim().is_empty() {
+                issues.push((
+                    "source_reference_required",
+                    format!("{prefix}.pfhrd.sourceReference"),
+                ));
+            }
         }
         if self.source_reference.trim().is_empty() {
             issues.push((
@@ -1533,6 +1810,20 @@ pub fn validate_hot_water(
                     &format!("{exhaust_field}.declaredFlowM3PerH"),
                 );
             }
+            // 13.148 note 3: with measured efficiencies the flow comes from
+            // the declaration with the measurements.
+            if exhaust.declared_flow_m3_per_h.is_none()
+                && matches!(
+                    generator,
+                    HotWaterGenerator::HeatPumpEn16147 { .. }
+                        | HotWaterGenerator::MeasuredTwoProfiles(_)
+                )
+            {
+                push(
+                    "hot_water_exhaust_air_declared_flow_required",
+                    &format!("{exhaust_field}.declaredFlowM3PerH"),
+                );
+            }
             let fractions = &exhaust.heating_time_fraction;
             if !fractions.is_empty()
                 && (fractions.len() != 12 || fractions.iter().any(|v| !(0.0..=1.0).contains(v)))
@@ -2120,6 +2411,7 @@ fn book_generator(
     generator: &HotWaterGenerator,
     system: &HotWaterSystem,
     context: HotWaterContext,
+    extras: &HotWaterExtras,
     f_building: f64,
     recoverable_counts: bool,
     outputs: &[f64; 12],
@@ -2132,12 +2424,24 @@ fn book_generator(
         booking.heating_system = *outputs;
         return Ok(booking);
     }
+    // 13.157 with the appliance's own output; per month with
+    // `C_W;mixed air;mi` (13.153b) and `E_W;gen;in;PFHRD` (13.156a).
+    let mut monthly_two_profile: Option<[f64; 12]> = None;
     let (base, practical) = match generator {
-        // 13.157 with the appliance's own output.
         HotWaterGenerator::MeasuredTwoProfiles(test) => {
             let daily = outputs.iter().sum::<f64>() / (365.0 * f_building);
             if daily > 0.0 {
-                (test.efficiency(daily)?, test.practical_factor())
+                let pfhrd = test.pfhrd_daily(extras);
+                let mut monthly = [0.0; 12];
+                for (index, value) in monthly.iter_mut().enumerate() {
+                    let mixed = test
+                        .mixed_air
+                        .as_ref()
+                        .map_or(1.0, |item| item.factor(index, extras.mixed_air.as_ref()));
+                    *value = test.efficiency_with(daily, mixed, pfhrd)?;
+                }
+                monthly_two_profile = Some(monthly);
+                (monthly[0], test.practical_factor())
             } else {
                 (1.0, 1.0)
             }
@@ -2146,7 +2450,7 @@ fn book_generator(
     };
     for index in 0..12 {
         let output = outputs[index];
-        let mut efficiency = base;
+        let mut efficiency = monthly_two_profile.map_or(base, |values| values[index]);
         if let HotWaterGenerator::GasStorageHeater {
             volume_l,
             measured_standby_kwh_per_day,
@@ -2286,8 +2590,9 @@ fn book_generator(
         for (index, hours) in MONTH_HOURS.iter().enumerate() {
             let days = 365.0 * hours / year;
             booking.auxiliary[index] += auxiliary * days * f_building;
+            // 13.160a: × A_g;zi,si / A_g;si;W summed over the zones.
             if recoverable_counts {
-                booking.recoverable[index] += recoverable * days;
+                booking.recoverable[index] += recoverable * days * f_building;
             }
         }
     }
@@ -2316,6 +2621,10 @@ fn solar_storage_ambient(system: &HotWaterSystem, context: HotWaterContext) -> [
     let exhaust_air = units(system)
         .iter()
         .any(|unit| exhaust_air_heat_pump(unit.generator));
+    solar_ambient(exhaust_air, context)
+}
+
+fn solar_ambient(exhaust_air: bool, context: HotWaterContext) -> [f64; 12] {
     std::array::from_fn(|index| {
         if exhaust_air {
             context
@@ -2331,23 +2640,25 @@ fn solar_storage_ambient(system: &HotWaterSystem, context: HotWaterContext) -> [
 
 /// §13.7 for all solar systems; `before` is `Q_W;dis` without the backup
 /// losses of solar vessels (`Q_W;sol;us`, 13.77).
+#[allow(clippy::too_many_arguments)]
 fn solar_contribution(
-    system: &HotWaterSystem,
+    heaters: &[SolarWaterHeater],
+    storage_ambient: [f64; 12],
     context: HotWaterContext,
     f_building: f64,
     hot_water_c: f64,
     before: &[f64; 12],
+    path: &str,
 ) -> Result<SolarTotals, HotWaterIssue> {
     let mut totals = SolarTotals::default();
-    if system.solar.is_empty() {
+    if heaters.is_empty() {
         return Ok(totals);
     }
     // 13.77/13.96: different systems share a demand by V_sto;tot, identical
     // ones per physical system; a space-heating-only system (SHS) takes no
     // hot water and a water-only system no space heating.
     let weight = |water: bool| -> f64 {
-        system
-            .solar
+        heaters
             .iter()
             .filter(|heater| match heater.solar_use {
                 SolarUse::WaterHeating => water,
@@ -2358,8 +2669,7 @@ fn solar_contribution(
             .sum()
     };
     let (water_weight, heating_weight) = (weight(true), weight(false));
-    let storage_ambient = solar_storage_ambient(system, context);
-    for (position, heater) in system.solar.iter().enumerate() {
+    for (position, heater) in heaters.iter().enumerate() {
         let count = f64::from(heater.count);
         let volume = heater.method.total_volume_l() * count;
         let space_only = heater.solar_use == SolarUse::SpaceHeating;
@@ -2471,7 +2781,7 @@ fn solar_contribution(
                 )
                 .ok_or_else(|| HotWaterIssue {
                     code: "solar_test_out_of_range",
-                    path: format!("hotWater.solar[{position}].method.testPoints"),
+                    path: format!("{path}[{position}].method.testPoints"),
                 })?;
                 (water, [ServiceMonth::default(); 12])
             }
@@ -2493,6 +2803,76 @@ fn solar_contribution(
         }
     }
     Ok(totals)
+}
+
+/// Monthly result of solar systems for space heating only that are not
+/// part of a hot-water system (SHS, 13.85 with `f_H;use = 1`).
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandaloneSolarHeating {
+    /// 13.66a `Q_H;ren;prac` for the space-heating node (9.2.3.4), kWh.
+    pub space_heating_kwh: Vec<f64>,
+    /// 13.67 pump energy, kWh.
+    pub auxiliary_kwh: Vec<f64>,
+    /// 13.68 recoverable losses (reported), kWh.
+    pub recoverable_kwh: Vec<f64>,
+}
+
+/// Validation of standalone space-heating solar systems.
+pub fn validate_standalone_solar(heaters: &[SolarWaterHeater], path: &str) -> Vec<HotWaterIssue> {
+    let mut issues = Vec::new();
+    for (index, heater) in heaters.iter().enumerate() {
+        let prefix = format!("{path}[{index}]");
+        if heater.solar_use != SolarUse::SpaceHeating {
+            issues.push(HotWaterIssue {
+                code: "solar_standalone_space_heating_only",
+                path: format!("{prefix}.solarUse"),
+            });
+        }
+        if !matches!(heater.method, SolarMethod::Calculated { .. }) {
+            // 13.7.2.3 tested systems cover hot water only.
+            issues.push(HotWaterIssue {
+                code: "solar_tested_water_only",
+                path: format!("{prefix}.method"),
+            });
+        }
+        issues.extend(
+            crate::solar_thermal::validate_solar(heater, &prefix)
+                .into_iter()
+                .map(|item| HotWaterIssue {
+                    code: item.code,
+                    path: item.path,
+                }),
+        );
+    }
+    issues
+}
+
+/// §13.7 for space-heating-only solar systems without a hot-water system;
+/// `context.space_heating` carries the node of a chain run without solar
+/// gains. Call after [`validate_standalone_solar`] returned no issues.
+pub fn assess_standalone_solar(
+    heaters: &[SolarWaterHeater],
+    context: HotWaterContext,
+    path: &str,
+) -> Result<StandaloneSolarHeating, HotWaterIssue> {
+    let fraction = context
+        .space_heating
+        .map_or(1.0, |heating| heating.building_fraction);
+    let totals = solar_contribution(
+        heaters,
+        solar_ambient(false, context),
+        context,
+        fraction,
+        60.0,
+        &[0.0; 12],
+        path,
+    )?;
+    Ok(StandaloneSolarHeating {
+        space_heating_kwh: totals.space_heating.to_vec(),
+        auxiliary_kwh: totals.auxiliary.to_vec(),
+        recoverable_kwh: totals.recoverable.to_vec(),
+    })
 }
 
 /// Result of the 13.8.2 dispatch.
@@ -2686,7 +3066,24 @@ pub fn assess_hot_water(
     system: &HotWaterSystem,
     context: HotWaterContext,
 ) -> Result<HotWaterAssessment, HotWaterIssue> {
+    assess_hot_water_with(system, context, &HotWaterExtras::default())
+}
+
+/// [`assess_hot_water`] with data from the space-heating and ventilation
+/// results (PFHRD 13.156a, mixed air 13.153h/i).
+pub fn assess_hot_water_with(
+    system: &HotWaterSystem,
+    context: HotWaterContext,
+    extras: &HotWaterExtras,
+) -> Result<HotWaterAssessment, HotWaterIssue> {
     let area = context.usable_floor_area_m2;
+    // 13.26 (ϑ_W;amb) and 13.58 (ϑ_sto;amb): ϑ_int;set;H;zi,mi of 7.9.4,
+    // after levelling when known.
+    let heated_ambient = |index: usize| {
+        context
+            .levelled_setpoint_c
+            .map_or(context.heated_ambient_c, |values| values[index])
+    };
     let building_area = system
         .collective
         .as_ref()
@@ -2757,7 +3154,7 @@ pub fn assess_hot_water(
         for (index, loss) in circulation_loss.iter_mut().enumerate() {
             *loss = f_building * MONTH_HOURS[index] / 1000.0
                 * psi
-                * ((CIRCULATION_MEAN_C - context.heated_ambient_c) * equivalent(heated)
+                * ((CIRCULATION_MEAN_C - heated_ambient(index)) * equivalent(heated)
                     + (CIRCULATION_MEAN_C - unheated_ambient) * equivalent(unheated));
         }
         let floors = f64::from(circulation.floor_count.max(1));
@@ -2803,17 +3200,19 @@ pub fn assess_hot_water(
     // 13.63: losses of vessels in a heated zone are recoverable.
     let mut heated_storage_loss = [0.0; 12];
     for vessel in &system.storage {
-        let ambient = if vessel.in_heated_zone {
-            context.heated_ambient_c
-        } else {
-            vessel.unheated_ambient_c.unwrap_or(UNHEATED_AMBIENT_C)
+        let ambient = |index: usize| {
+            if vessel.in_heated_zone {
+                heated_ambient(index)
+            } else {
+                vessel.unheated_ambient_c.unwrap_or(UNHEATED_AMBIENT_C)
+            }
         };
         let factor = f64::from(vessel.connection_factor);
         let label_c = StorageLabel::C.standing_loss_w(vessel.volume_l);
-        let watts = match vessel.loss {
+        let watts = |index: usize| match vessel.loss {
             StorageLoss::Measured {
                 transmission_w_per_k,
-            } => transmission_w_per_k * (set_temperature - ambient),
+            } => transmission_w_per_k * (set_temperature - ambient(index)),
             StorageLoss::Label { label } => {
                 let standing = label.standing_loss_w(vessel.volume_l);
                 let connection = match label {
@@ -2832,7 +3231,7 @@ pub fn assess_hot_water(
             }
         };
         for (index, loss) in storage_loss.iter_mut().enumerate() {
-            let value = f_building * MONTH_HOURS[index] / 1000.0 * watts;
+            let value = f_building * MONTH_HOURS[index] / 1000.0 * watts(index);
             *loss += value;
             if vessel.in_heated_zone {
                 heated_storage_loss[index] += value;
@@ -2885,7 +3284,15 @@ pub fn assess_hot_water(
     } else {
         60.0
     };
-    let solar = solar_contribution(system, context, f_building, hot_water_c, &before_solar)?;
+    let solar = solar_contribution(
+        &system.solar,
+        solar_storage_ambient(system, context),
+        context,
+        f_building,
+        hot_water_c,
+        &before_solar,
+        "hotWater.solar",
+    )?;
     let mut outputs = [0.0; 12];
     for (index, row) in months.iter_mut().enumerate() {
         let distributed = before_solar[index] + solar.backup_storage_loss[index];
@@ -2930,6 +3337,7 @@ pub fn assess_hot_water(
             unit.generator,
             system,
             context,
+            extras,
             f_building,
             recoverable_counts,
             unit_outputs,
@@ -3204,6 +3612,8 @@ mod tests {
             smart_control_factor: None,
             design_set_temperature_c: None,
             legionella_cycle_tested: false,
+            mixed_air: None,
+            pfhrd: None,
             source_reference: "test report".into(),
         }
     }
@@ -3267,6 +3677,15 @@ mod tests {
             heating_time_fraction: Vec::new(),
             declared_flow_m3_per_h: None,
         });
+        // 13.148 note 3: measured efficiency → the declared flow is needed.
+        assert!(validate_hot_water(&input, context(), "hotWater")
+            .iter()
+            .any(|item| item.code == "hot_water_exhaust_air_declared_flow_required"));
+        input.exhaust_air = Some(ExhaustAirUse {
+            ventilation_suitable: true,
+            heating_time_fraction: Vec::new(),
+            declared_flow_m3_per_h: Some(150.0),
+        });
         assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
         let result = assess_hot_water(&input, context()).unwrap();
         let jan = &result.months[0];
@@ -3310,6 +3729,76 @@ mod tests {
         test.low.max_test_temperature_c = Some(52.0);
         test.design_set_temperature_c = Some(50.0);
         assert!((test.corrected_input(&test.low) - 2.6 * 1.06 / 1.1).abs() < 1e-12);
+        // 13.160a uses E_test without the 13.153b/c corrections.
+        test.smart_control_factor = Some(0.2);
+        assert!((test.daily_recoverable() - standing).abs() < 1e-12);
+    }
+
+    #[test]
+    fn two_profile_13_160a_covers_electric_combis_with_a_vessel() {
+        let mut test = two_profile(TwoProfileStandard::En16147HeatPump);
+        test.combi = true;
+        test.integrated_vessel = true;
+        let standing = 5.845 / 2.6 * (4.4 - 1.8 / (11.655 - 5.845) * 11.655);
+        assert!((test.daily_recoverable() - standing).abs() < 1e-12);
+        test.integrated_vessel = false;
+        assert_eq!(test.daily_recoverable(), 0.0);
+    }
+
+    #[test]
+    fn two_profile_mixed_air_and_pfhrd_lower_the_input() {
+        // 13.153d–i by hand: condition 2 A7/W55 with ϑ_evap 7 → 3 °C,
+        // COP 3,0; q_V;hp;W 300 m³/h against 150 m³/h ventilation.
+        let mixed = MixedAirCorrection::En14511 {
+            cop_condition_2: 3.0,
+            condenser_out_c: 55.0,
+            evaporator_in_c: 7.0,
+            evaporator_out_c: 3.0,
+            minimum_air_flow_m3_per_h: 300.0,
+            source_reference: "EN 14511 report".into(),
+        };
+        let ventilation = MixedAirVentilation {
+            required_outdoor_air_m3_per_h: [150.0; 12],
+            extract_air_c: [20.0; 12],
+        };
+        let carnot = 3.0 / ((55.0 + 275.15) / (55.0 - 3.0 + 7.0));
+        let theta = (OUTDOOR_TEMPERATURE_C[0] - 3.7) * 0.5 + 20.0 * 0.5;
+        let cop = carnot * (55.0 + 275.15) / (55.0 - (theta - 4.0) + 7.0);
+        let expected = cop / 3.0;
+        assert!((mixed.factor(0, Some(&ventilation)) - expected).abs() < 1e-12);
+        assert_eq!(mixed.factor(0, None), 1.0);
+        let mut test = two_profile(TwoProfileStandard::En16147HeatPump);
+        assert!((test.corrected_input_with(&test.low, expected) - 2.6 / expected).abs() < 1e-12);
+        // Mixed air is for combi heat pumps on return air only.
+        test.mixed_air = Some(mixed.clone());
+        assert!(test
+            .issues("g")
+            .iter()
+            .any(|(code, _)| *code == "hot_water_mixed_air_not_applicable"));
+        test.combi = true;
+        test.exhaust_air_source = true;
+        assert!(test.issues("g").is_empty(), "{:?}", test.issues("g"));
+        // 13.156a/b: 3650 kWh gas for heating, f_PFHRD = 0,5 / 10.
+        let mut gas = two_profile(TwoProfileStandard::En13203Gas);
+        gas.combi = true;
+        gas.pfhrd = Some(PfhrdTest {
+            indirect_gas_kwh_per_day: 0.5,
+            heating_gas_kwh_per_day: 10.0,
+            source_reference: "prEN 13203-7".into(),
+        });
+        assert!(gas.issues("g").is_empty(), "{:?}", gas.issues("g"));
+        let extras = HotWaterExtras {
+            combi_space_heating_gas_kwh: Some(3650.0),
+            mixed_air: None,
+        };
+        assert!((gas.pfhrd_daily(&extras) - 0.5).abs() < 1e-12);
+        let daily = 8.0;
+        let plain = gas.daily_input(daily, 1.0, 0.0);
+        assert!((gas.daily_input(daily, 1.0, 0.5) - (plain - 0.5)).abs() < 1e-12);
+        assert!(gas.efficiency_with(daily, 1.0, 0.5).unwrap() > gas.efficiency(daily).unwrap());
+        // 13.153: Q_gas;w = Q_gas;s − 13,5 × 1,21 × P_s / η_100.
+        let winter = winter_gas_consumption_kwh(12.0, 0.1, 0.9).unwrap();
+        assert!((winter - (12.0 - 13.5 * 1.21 * 0.1 / 0.9)).abs() < 1e-12);
     }
 
     #[test]
@@ -3328,14 +3817,32 @@ mod tests {
         let test = two_profile(TwoProfileStandard::En16147HeatPump);
         assert!(test.range_issue(15.36).is_none());
         assert!(test.range_issue(15.37).is_some());
-        // i1 = L requires Q_W;b;d ≥ M; gas has no upper bound.
+        // The lower limits only apply with i2 = XXL (and 3XL/4XL): L/XL has
+        // none, so small dwellings stay within range.
         let mut gas = two_profile(TwoProfileStandard::En13203Gas);
         gas.low.profile = TestProfile::L;
         gas.low.delivered_kwh_per_day = 11.655;
         gas.high.profile = TestProfile::Xl;
         gas.high.delivered_kwh_per_day = 19.07;
-        assert!(gas.range_issue(5.0).is_some());
+        assert!(gas.range_issue(5.0).is_none());
         assert!(gas.range_issue(100.0).is_none());
+        // i1 = L with i2 = XXL requires Q_W;b;d ≥ M; gas below it is
+        // rejected (table 13.18 covers heat pumps only).
+        gas.high.profile = TestProfile::Xxl;
+        gas.high.delivered_kwh_per_day = 24.53;
+        assert_eq!(gas.lower_bound_kwh_per_day(), 5.845);
+        assert_eq!(
+            gas.efficiency(5.0),
+            Err("hot_water_two_profile_below_range")
+        );
+        // Heat pumps below the limit: 13.160b with table 13.18 for i1 = L.
+        let mut pump = gas.clone();
+        pump.standard = TwoProfileStandard::En16147HeatPump;
+        pump.low.input_kwh_per_day = 4.4;
+        pump.high.input_kwh_per_day = 8.0;
+        let c = european_profile_correction(TappingProfile::L, 365.0 * 5.0).unwrap();
+        let eta = ((11.655 * c / 4.4) / 0.05 + 1e-9).floor() * 0.05;
+        assert!((pump.efficiency(5.0).unwrap() - eta).abs() < 1e-12);
     }
 
     #[test]

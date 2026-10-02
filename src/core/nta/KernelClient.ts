@@ -2873,6 +2873,8 @@ export interface BuildingPerformanceInput {
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
+  /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
+  spaceHeatingSolar?: NtaSolarWaterHeater[];
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
   lighting?: NtaZoneLighting[];
   demandUsesFixedC1Ventilation: boolean;
@@ -3192,6 +3194,14 @@ export interface NtaTwoProfileTest {
   smartControlFactor?: number | null;
   designSetTemperatureC?: number | null;
   legionellaCycleTested?: boolean;
+  /** 13.153b/d–i: combi heat pump on a mix of outdoor and return air. */
+  mixedAir?:
+    | { method: 'declared'; monthlyFactors: number[]; sourceReference: string }
+    | { method: 'en14511'; copCondition2: number; condenserOutC: number; evaporatorInC: number;
+        evaporatorOutC: number; minimumAirFlowM3PerH: number; sourceReference: string }
+    | null;
+  /** 13.156a/b: PFHRD of a gas combi (prEN 13203-7, net values, kWh/day). */
+  pfhrd?: { indirectGasKwhPerDay: number; heatingGasKwhPerDay: number; sourceReference: string } | null;
   sourceReference: string;
 }
 
@@ -3384,6 +3394,11 @@ export interface BuildingPerformanceAssessment {
   spaceHeating: SpaceHeatingChainAssessment;
   /** Chapter 13 when calculated. */
   hotWater?: NtaHotWaterAssessment;
+  /** 13.184: part of the space-heating carriers used for hot water (reported only). */
+  hotWaterFromHeating?: Array<{ month: number; share: number; naturalGasKwh: number; oilKwh: number;
+    biomassKwh: number; districtHeatKwh: number; electricityKwh: number }>;
+  /** Standalone space-heating solar systems. */
+  standaloneSolar?: { spaceHeatingKwh: number[]; auxiliaryKwh: number[]; recoverableKwh: number[] };
   lighting?: Array<{ zoneId: string; annualKwh: number; monthlyKwh: number[]; internalGainW: number }>;
   /** Factors of the external supply and the EMGforf totals (§5.8). */
   externalSupply?: NtaExternalSupplyResult | null;
@@ -3463,6 +3478,8 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
+  spaceHeatingSolar?: NtaSolarWaterHeater[];
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
   lighting?: NtaZoneLighting[];
   cooling?: NtaCoolingSystem | null;
