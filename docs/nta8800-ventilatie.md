@@ -38,9 +38,18 @@ De uitvoer `demandFlows` geeft per luchtstroom k en per maand de warmteoverdrach
 
 Infiltratie, spuien en de bouwkundige voorzieningen voor ventilatieve koeling blijven gelijk aan de werkelijke situatie.
 
+## Naverwarmen en koelen in de luchtbehandelingskast
+
+`airHandlingUnit.heatingCoil` en `airHandlingUnit.coolingCoil` geven aan of de LBK een naverwarmer en/of een koelbatterij heeft (11.3.2).
+
+- Tabel 11.15 geeft θ_SUP;dis;out: 16 °C het hele jaar voor sport, en voor de overige functies 18 / 18 / 17,5 / 17,5 / 17 / 16,5 / 16,5 / 16,5 / 17 / 17 / 17,5 / 18 °C. Bij gemengde functies wordt naar oppervlakte gewogen.
+- Warmtebalans: met naverwarmer is θ_SUP;dis;out = max(formulewaarde, tabelwaarde). Koelbalans: met koelbatterij is het min(formulewaarde, tabelwaarde), conform 11.100/11.101. Volgens noot 1 kent de koelbalans geen naverwarming en de warmtebalans geen koeling.
+- Energie (11.115/11.116 en 11.119/11.120): Q = q_V;SUP;dis;in·ρ(θ vóór de batterij)·c_a (0,0000279 kWh/(kg·K))·t·|Δθ| / 0,98.
+- De naverwarming komt als extra belasting op het knooppunt van de verwarming (9.4), net als verstuivende bevochtiging. De koeling komt zonder afgifte- en distributieverlies op de koudeopwekker (`ahuCoolingKwh` in de koelmaand).
+- Interpretatie: de dichtheid wordt bepaald bij de temperatuur vóór de batterij.
+
 ## Niet ondersteund (expliciete afwijzing)
 
-- Een luchtbehandelingskast die de toevoerlucht verwarmt of koelt (tabel 11.15, 11.100/11.101, 11.114–11.121). Foutcode: `ahu_supply_air_conditioning_unsupported`.
 - Een specifiek gastoestel met afvoer gelijktijdig met de mechanische afvoer (tabel 11.11, voetnoot a). Foutcode: `specific_gas_appliance_unsupported`.
 - Een wisselstroomventilator van na 2006 in de forfaitaire methode (tabel 11.23 geeft geen waarde). Foutcode: `forfait_fan_ac_after_2006_unsupported`.
 

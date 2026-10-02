@@ -86,6 +86,17 @@ const DUCT_LOSS_SITUATION_3_K: [f64; 12] = [
     5.72, 4.99, 4.63, 3.51, 1.73, 1.28, 0.64, 0.5, 1.44, 3.16, 3.95, 5.26,
 ];
 
+/// Table 11.15 θ_SUP;dis;out of an AHU with heating and cooling, °C, for
+/// functions other than sport (sport: 16 °C all year).
+const AHU_SUPPLY_OTHER_C: [f64; 12] = [
+    18.0, 18.0, 17.5, 17.5, 17.0, 16.5, 16.5, 16.5, 17.0, 17.0, 17.5, 18.0,
+];
+const AHU_SUPPLY_SPORT_C: f64 = 16.0;
+/// η of the AHU heating and cooling coils (11.116, 11.120).
+const AHU_COIL_EFFICIENCY: f64 = 0.98;
+/// c_a for 11.115/11.119, kWh/(kg·K).
+const AIR_HEAT_CAPACITY_KWH: f64 = 0.000_027_9;
+
 /// Interpretation choices where the norm text leaves room; recorded in the
 /// verification dossier.
 pub const INTERPRETATIONS: &[&str] = &[
@@ -353,9 +364,12 @@ impl DuctOutsideSituation {
 pub struct AirHandlingUnit {
     pub inside_thermal_zone: bool,
     pub supply_ducts_outside: DuctOutsideSituation,
-    /// Heating or cooling coils in the supply air (table 11.15 route).
+    /// Reheating coil in the supply air (11.3.2, 11.118–11.121).
     #[serde(default)]
-    pub conditions_supply_air: bool,
+    pub heating_coil: bool,
+    /// Cooling coil in the supply air (11.3.2, 11.114–11.117).
+    #[serde(default)]
+    pub cooling_coil: bool,
 }
 
 /// Table 11.18 exchanger types.
@@ -991,6 +1005,12 @@ pub struct VentilationMonthResult {
     pub grille_preheating_electricity_kwh: f64,
     /// 9.29 Q_H;ϑHstook;in;air of the heating balance, kWh.
     pub heating_limit_air_kwh: f64,
+    /// Q_H;AHU;in;req (11.120) of the heating balance, kWh, for the
+    /// space-heating node (9.4).
+    pub ahu_heating_kwh: f64,
+    /// Q_C;ahu;in;req (11.116) of the cooling balance, kWh, for the cooling
+    /// generator (10.5).
+    pub ahu_cooling_kwh: f64,
     /// f_buitenlucht (11.24) for annex Q, when overventilation applies.
     pub outdoor_air_fraction: Option<f64>,
 }
@@ -1572,19 +1592,11 @@ fn validate_unit(
             ));
         }
     }
-    if let Some(ahu) = &unit.air_handling_unit {
-        if ahu.conditions_supply_air {
-            issues.push(issue(
-                "ahu_supply_air_conditioning_unsupported",
-                format!("{path}.airHandlingUnit.conditionsSupplyAir"),
-            ));
-        }
-        if !matches!(op, VentSysOp::Supply | VentSysOp::Balanced) {
-            issues.push(issue(
-                "ahu_requires_mechanical_supply",
-                format!("{path}.airHandlingUnit"),
-            ));
-        }
+    if unit.air_handling_unit.is_some() && !matches!(op, VentSysOp::Supply | VentSysOp::Balanced) {
+        issues.push(issue(
+            "ahu_requires_mechanical_supply",
+            format!("{path}.airHandlingUnit"),
+        ));
     }
     if op == VentSysOp::Natural && unit.ducts != DuctAirtightness::NoDucts {
         issues.push(issue(
@@ -2209,7 +2221,7 @@ fn mechanical_supply_temperature(
     context: &SupplyContext<'_>,
     oda_eff_m3_per_h: f64,
     flea_du: f64,
-) -> (f64, f64, f64) {
+) -> SupplyTemperature {
     let input = context.input;
     let m = context.month_index;
     let op = unit.variant.op();
@@ -2295,9 +2307,50 @@ fn mechanical_supply_temperature(
         }
     }
     let dis_in = oda_preh + recovery_rise + recirculation_rise + fan_rise;
+    let formula_out = dis_in - duct_outside;
+    // 11.100/11.101 and the heating-only counterpart: the heating balance
+    // has no cooling coil, the cooling balance no reheating (note 1).
+    let mut coil_k = 0.0;
+    if let Some(ahu) = &unit.air_handling_unit {
+        let table = ahu_supply_temperature_c(input, m);
+        match context.balance {
+            Balance::Heating if ahu.heating_coil && table > formula_out => {
+                coil_k = table - formula_out;
+            }
+            Balance::Cooling if ahu.cooling_coil && table < formula_out => {
+                coil_k = table - formula_out;
+            }
+            _ => {}
+        }
+    }
     // 9.29: the supply temperature without heat recovery, recirculation and
     // fan heat, for the heating limit.
-    (dis_in - duct_outside, defrost, oda_preh - duct_outside)
+    SupplyTemperature {
+        dis_out_c: formula_out + coil_k,
+        defrost_k: defrost,
+        heating_limit_c: oda_preh - duct_outside,
+        before_coil_c: dis_in,
+        coil_k,
+    }
+}
+
+/// Mechanical supply temperatures of one unit and month (11.103/11.104).
+struct SupplyTemperature {
+    dis_out_c: f64,
+    defrost_k: f64,
+    heating_limit_c: f64,
+    /// θ_SUP;dis;in without the coil (θ_SUP;hu or θ_SUP;RCA), °C.
+    before_coil_c: f64,
+    /// Temperature change by the AHU coil, K (positive heating).
+    coil_k: f64,
+}
+
+/// Table 11.15, area-weighted between sport and the other functions.
+fn ahu_supply_temperature_c(input: &VentilationInput, month_index: usize) -> f64 {
+    area_weighted(input, |function| match function {
+        VentilationFunction::Sport => AHU_SUPPLY_SPORT_C,
+        _ => AHU_SUPPLY_OTHER_C[month_index],
+    })
 }
 
 /// 11.123/11.124 for the heating balance.
@@ -2461,6 +2514,8 @@ struct MonthBalance {
     frost_protection_kwh: f64,
     grille_preheating_kwh: f64,
     heating_limit_air_kwh: f64,
+    ahu_heating_kwh: f64,
+    ahu_cooling_kwh: f64,
     outdoor_air_fraction: Option<f64>,
 }
 
@@ -2585,10 +2640,28 @@ fn balance_month(
     let mut supply_flows = Vec::new();
     let mut frost_protection_kwh = 0.0;
     let mut heating_limit_air_kwh = 0.0;
+    let mut ahu_heating_kwh = 0.0;
+    let mut ahu_cooling_kwh = 0.0;
     for (index, q_supply, unit) in &supply_parts {
         let oda_eff = required * parts(&input.system)[*index].fraction;
+        let supply = mechanical_supply_temperature(unit, &context, oda_eff, flea_du);
         let (temperature, defrost, limit_temperature) =
-            mechanical_supply_temperature(unit, &context, oda_eff, flea_du);
+            (supply.dis_out_c, supply.defrost_k, supply.heating_limit_c);
+        if supply.coil_k != 0.0 {
+            // 11.115/11.116 and 11.119/11.120 with q_V;SUP;dis;in (11.88).
+            let air = q_supply
+                * flea_du
+                * density(supply.before_coil_c)
+                * AIR_HEAT_CAPACITY_KWH
+                * hours
+                * supply.coil_k.abs()
+                / AHU_COIL_EFFICIENCY;
+            if supply.coil_k > 0.0 {
+                ahu_heating_kwh += air;
+            } else {
+                ahu_cooling_kwh += air;
+            }
+        }
         if balance == Balance::Heating && defrost > 0.0 {
             // 11.105/11.106.
             let power = oda_eff * 1.205 * 1006.0 / 3600.0 * defrost;
@@ -2735,6 +2808,8 @@ fn balance_month(
         } else {
             0.0
         },
+        ahu_heating_kwh,
+        ahu_cooling_kwh,
         outdoor_air_fraction,
     }
 }
@@ -2918,6 +2993,8 @@ fn calculate_with_policy(
             frost_protection_electricity_kwh: heating.frost_protection_kwh,
             grille_preheating_electricity_kwh: heating.grille_preheating_kwh,
             heating_limit_air_kwh: heating.heating_limit_air_kwh,
+            ahu_heating_kwh: heating.ahu_heating_kwh,
+            ahu_cooling_kwh: cooling.ahu_cooling_kwh,
             outdoor_air_fraction: heating.outdoor_air_fraction,
         });
     }
@@ -3332,6 +3409,84 @@ mod tests {
         close(
             result.months[0].fan_electricity_kwh,
             0.45 / 3.6 * 2.0 * q * 744.0 / 0.9 / 1000.0,
+            1e-9,
+        );
+    }
+
+    #[test]
+    fn ahu_coils_clamp_to_table_11_15() {
+        let mut office = dwelling(SystemVariant::D2);
+        office.category = Category::Utility;
+        office.functions[0].function = VentilationFunction::Office;
+        office.dwelling_count = 0;
+        let base = calculate_ventilation(&office).unwrap();
+        let set_coils = |input: &mut VentilationInput, heating: bool, cooling: bool| {
+            if let VentilationSystem::Single { unit } = &mut input.system {
+                unit.air_handling_unit = Some(AirHandlingUnit {
+                    inside_thermal_zone: true,
+                    supply_ducts_outside: DuctOutsideSituation::None,
+                    heating_coil: heating,
+                    cooling_coil: cooling,
+                });
+            }
+        };
+        let mut plain = office.clone();
+        set_coils(&mut plain, false, false);
+        let plain = calculate_ventilation(&plain).unwrap();
+        let mut coils = office.clone();
+        set_coils(&mut coils, true, true);
+        let coils = calculate_ventilation(&coils).unwrap();
+        // Without coils the AHU changes nothing here.
+        close(
+            plain.months[0].heating.mechanical_supply_temperature_c,
+            base.months[0].heating.mechanical_supply_temperature_c,
+            1e-9,
+        );
+        assert_eq!(plain.months[0].ahu_heating_kwh, 0.0);
+        // January heating: reheated to 18 °C (table 11.15).
+        let before = plain.months[0].heating.mechanical_supply_temperature_c;
+        assert!(before < 18.0);
+        close(
+            coils.months[0].heating.mechanical_supply_temperature_c,
+            18.0,
+            1e-9,
+        );
+        // 11.119/11.120 with q_SUP;dis;in ≥ q_SUP;dis;out.
+        let q_out = coils.months[0].heating.mechanical_supply_m3_per_h;
+        let per_flow = density(before) * 0.000_027_9 * 744.0 * (18.0 - before) / 0.98;
+        let flow = coils.months[0].ahu_heating_kwh / per_flow;
+        assert!(
+            flow >= q_out - 1e-9 && flow <= q_out * 1.2,
+            "{flow} vs {q_out}"
+        );
+        // July cooling: cooled to 16,5 °C; no reheating in the cooling balance.
+        let july = plain.months[6].cooling.mechanical_supply_temperature_c;
+        assert!(july > 16.5);
+        close(
+            coils.months[6].cooling.mechanical_supply_temperature_c,
+            16.5,
+            1e-9,
+        );
+        assert!(coils.months[6].ahu_cooling_kwh > 0.0);
+        assert_eq!(coils.months[6].ahu_heating_kwh, 0.0);
+        // Heating coil only: the cooling balance keeps the formula value.
+        let mut heat_only = office.clone();
+        set_coils(&mut heat_only, true, false);
+        let heat_only = calculate_ventilation(&heat_only).unwrap();
+        close(
+            heat_only.months[6].cooling.mechanical_supply_temperature_c,
+            july,
+            1e-9,
+        );
+        assert_eq!(heat_only.months[6].ahu_cooling_kwh, 0.0);
+        // Sport: 16 °C all year.
+        let mut hall = office.clone();
+        hall.functions[0].function = VentilationFunction::Sport;
+        set_coils(&mut hall, true, true);
+        let hall = calculate_ventilation(&hall).unwrap();
+        close(
+            hall.months[6].cooling.mechanical_supply_temperature_c,
+            16.0,
             1e-9,
         );
     }

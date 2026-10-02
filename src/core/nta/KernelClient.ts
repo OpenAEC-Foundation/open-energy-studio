@@ -2086,7 +2086,10 @@ export interface VentilationSystemUnit {
   airHandlingUnit?: {
     insideThermalZone: boolean;
     supplyDuctsOutside: 'none' | 'situation1' | 'situation2' | 'situation3';
-    conditionsSupplyAir?: boolean;
+    /** Reheating coil (11.118–11.121, table 11.15). */
+    heatingCoil?: boolean;
+    /** Cooling coil (11.114–11.117, table 11.15). */
+    coolingCoil?: boolean;
   };
   equipmentReference: string;
 }
@@ -2215,6 +2218,8 @@ export interface VentilationResult {
     grillePreheatingElectricityKwh: number;
     /** 9.29 Q_H;ϑHstook;in;air, kWh. */
     heatingLimitAirKwh: number;
+    ahuHeatingKwh: number;
+    ahuCoolingKwh: number;
     outdoorAirFraction: number | null;
   }>;
   demandFlows: Array<{

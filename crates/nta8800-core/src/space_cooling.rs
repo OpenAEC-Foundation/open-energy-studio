@@ -589,6 +589,9 @@ pub struct CoolingSystem {
 pub struct CoolingZoneNeed {
     pub usable_floor_area_m2: f64,
     pub need_kwh: [f64; 12],
+    /// 11.116 Q_C;ahu;in;req of air handling unit cooling coils, kWh,
+    /// supplied by the cooling generator without emission or distribution.
+    pub ahu_load_kwh: [f64; 12],
 }
 
 /// Context from outside chapter 10.
@@ -619,6 +622,8 @@ pub struct CoolingMonth {
     pub booster_extraction_kwh: f64,
     /// `Q_C;dhum` (12.5), kWh.
     pub dehumidification_kwh: f64,
+    /// 11.116 load of air handling unit cooling coils, kWh.
+    pub ahu_cooling_kwh: f64,
     /// `Q_C;gen;in`.
     pub generator_cold_kwh: f64,
     /// Drive energy of compression chillers and free-cooling pumps.
@@ -1179,11 +1184,16 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             };
             design.fraction(index) * need
         };
-        let has_load = need + emission + distribution + dehumidification > 0.0;
+        let ahu: f64 = context
+            .zones
+            .iter()
+            .map(|zone| zone.ahu_load_kwh[index])
+            .sum();
+        let has_load = need + emission + distribution + dehumidification + ahu > 0.0;
         let pump = if has_load { pump_energy[index] } else { 0.0 };
         // 10.45
         let recovered = (1.0 - PUMP_RECOVERABLE_FACTOR) * pump;
-        let load = need + emission + distribution + recovered + dehumidification;
+        let load = need + emission + distribution + recovered + dehumidification + ahu;
         // 10.7–10.9: the booster heat pump is limited to the load.
         let extraction = booster[index].min(load);
         let generator_cold = load - extraction;
@@ -1197,6 +1207,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             pump_recovered_kwh: recovered,
             booster_extraction_kwh: extraction,
             dehumidification_kwh: dehumidification,
+            ahu_cooling_kwh: ahu,
             generator_cold_kwh: generator_cold,
             ..CoolingMonth::default()
         };
@@ -1390,6 +1401,7 @@ mod tests {
         let zones = [CoolingZoneNeed {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
         }];
         let result = assess_cooling(&input, context(&zones));
         // Δϑ = −0,5 + 0 − 1,25 = −1,75; ϑ_int,inc = 22,25.
@@ -1434,6 +1446,7 @@ mod tests {
         let zones = [CoolingZoneNeed {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
         }];
         assert!(validate_cooling(&input, "cooling").is_empty());
         let result = assess_cooling(&input, context(&zones));
@@ -1477,6 +1490,7 @@ mod tests {
         let zones = [CoolingZoneNeed {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
         }];
         let result = assess_cooling(&input, context(&zones));
         let shares = &result.generator_shares;
@@ -1517,6 +1531,7 @@ mod tests {
         let zones = [CoolingZoneNeed {
             usable_floor_area_m2: 100.0,
             need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
         }];
         let mut ctx = context(&zones);
         ctx.heat_pump_source_extraction_kwh = [500.0; 12];
@@ -1582,10 +1597,12 @@ mod tests {
             CoolingZoneNeed {
                 usable_floor_area_m2: 60.0,
                 need_kwh: summer_need(),
+                ahu_load_kwh: [0.0; 12],
             },
             CoolingZoneNeed {
                 usable_floor_area_m2: 40.0,
                 need_kwh: [0.0; 12],
+                ahu_load_kwh: [0.0; 12],
             },
         ];
         let result = assess_cooling(&input, context(&zones));

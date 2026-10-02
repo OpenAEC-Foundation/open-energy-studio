@@ -654,6 +654,8 @@ pub struct ChainMonth {
     /// 12.3: steam humidifier energy, kWh.
     pub humidification_electricity_kwh: f64,
     pub humidification_fuel_kwh: f64,
+    /// 11.120 Q_H;AHU;in;req of air handling unit reheating coils, kWh.
+    pub ahu_heating_load_kwh: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1620,6 +1622,16 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 }
             }
         }
+        // 9.4: reheating coils of air handling units (11.120) also draw on
+        // the node.
+        let ahu_heating: [f64; 12] = std::array::from_fn(|index| {
+            std::iter::once(&demand)
+                .chain(&additional_zone_demands)
+                .filter_map(|zone| zone.ventilation.as_ref())
+                .filter_map(|result| result.months.get(index))
+                .map(|month| month.ahu_heating_kwh)
+                .sum()
+        });
         let mut outputs = Vec::with_capacity(12);
         for index in 0..12 {
             let mut need = 0.0;
@@ -1640,8 +1652,10 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
             }
             // 9.5 node: generator output covers all zones plus the buffer loss.
             // 9.4: the node also supplies atomising humidification (12.1).
-            let generator_output =
-                distribution_input + distribution.node_loss[index] + humidification[index][0];
+            let generator_output = distribution_input
+                + distribution.node_loss[index]
+                + humidification[index][0]
+                + ahu_heating[index];
             let month = index as u8 + 1;
             outputs.push(MonthlyEnergy {
                 month,
@@ -1672,6 +1686,7 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 oil_kwh: 0.0,
                 generator_recoverable_loss_kwh: 0.0,
                 humidification_load_kwh: humidification[index][0],
+                ahu_heating_load_kwh: ahu_heating[index],
                 humidification_electricity_kwh: humidification[index][1],
                 humidification_fuel_kwh: humidification[index][2],
             });

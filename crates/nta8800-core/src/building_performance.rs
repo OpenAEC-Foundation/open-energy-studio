@@ -589,6 +589,13 @@ fn cooling_assessment(
         .map(|(demand, area)| CoolingZoneNeed {
             usable_floor_area_m2: area,
             need_kwh: std::array::from_fn(|index| demand.monthly[index].cooling.need_kwh),
+            ahu_load_kwh: std::array::from_fn(|index| {
+                demand
+                    .ventilation
+                    .as_ref()
+                    .and_then(|result| result.months.get(index))
+                    .map_or(0.0, |month| month.ahu_cooling_kwh)
+            }),
         })
         .collect();
     // 10.84: heat taken from the source by the space-heating heat pump.

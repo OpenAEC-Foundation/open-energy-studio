@@ -102,7 +102,7 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
     {(op === 'balanced' || op === 'supply') && <label className="nta-form-check">
       <input type="checkbox" checked={ahu != null}
         onChange={(event) => change([...path, 'airHandlingUnit'], event.target.checked
-          ? { insideThermalZone: true, supplyDuctsOutside: 'none', conditionsSupplyAir: false } : undefined)} />
+          ? { insideThermalZone: true, supplyDuctsOutside: 'none' } : undefined)} />
       {t('nta.vent.ahu')}
     </label>}
     {ahu != null && <>
@@ -110,7 +110,8 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
       <SelectField {...field} path={[...path, 'airHandlingUnit', 'supplyDuctsOutside']} label={t('nta.vent.ahuDucts')} options={[
         ['none', t('nta.vent.ahuDucts.none')], ['situation1', t('nta.vent.ahuDucts.1')], ['situation2', t('nta.vent.ahuDucts.2')],
         ['situation3', t('nta.vent.ahuDucts.3')]]} />
-      <CheckField {...field} path={[...path, 'airHandlingUnit', 'conditionsSupplyAir']} label={t('nta.vent.ahuConditions')} />
+      <CheckField {...field} path={[...path, 'airHandlingUnit', 'heatingCoil']} label={t('nta.vent.ahuHeatingCoil')} />
+      <CheckField {...field} path={[...path, 'airHandlingUnit', 'coolingCoil']} label={t('nta.vent.ahuCoolingCoil')} />
     </>}
   </>;
 }
