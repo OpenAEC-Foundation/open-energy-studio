@@ -58,6 +58,7 @@ pub mod label_data;
 pub mod lighting;
 pub mod maatwerkadvies;
 pub mod materials;
+pub mod micro_chp;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
 pub mod opname;

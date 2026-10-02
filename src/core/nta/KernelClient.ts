@@ -1580,7 +1580,10 @@ export interface SpaceHeatingChainInput {
     | {
         /** 9.6.6.1 building CHP, method 2 (table 9.31), gas; electricity per 16.12. */
         kind: 'chp';
-        chp: { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean };
+        /** Method 2 (9.6.6.1, table 9.31); exclusive with `method1`. */
+        chp?: { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean } | null;
+        /** Method 1 (9.6.6.2): micro-CHP with NEN-EN 50465 test values. */
+        method1?: NtaMicroChp | null;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
         equipmentReference: string;
       }
@@ -4018,4 +4021,32 @@ export interface NtaHotWaterAssessment {
   generators: Array<{ index: number; order: number; monthlyOutputKwh: number[]; monthlyShare: number[] }>;
   /** 13.148/13.149 data of an exhaust-air heat pump. */
   exhaustAir?: { timeFraction: number[]; hotWaterOnly: boolean; declaredFlowM3PerH: number | null };
+}
+
+/** 9.6.6.2 test point (table 9.33); omitted efficiencies take table 9.37. */
+export interface NtaChpTestPoint {
+  thermalPowerKw: number;
+  electricPowerKw?: number | null;
+  thermalEfficiency?: number | null;
+  electricEfficiency?: number | null;
+  auxiliaryPowerKw?: number | null;
+}
+
+/** §9.6.6.2 micro-CHP (method 1, NEN-EN 15316-4-4); see crates/nta8800-core/src/micro_chp.rs. */
+export interface NtaMicroChp {
+  kind: 'stirling_engine' | 'pem_fuel_cell' | 'solid_oxide_fuel_cell' | 'gas_engine' | 'diesel_engine' | 'micro_turbine' | 'organic_rankine_cycle';
+  fuel: 'natural_gas' | 'oil';
+  location: 'heated_space' | 'unheated_space' | 'installation_room' | 'outdoors';
+  hydraulics?: 'direct' | 'decoupled' | 'condensation_pump' | 'heat_exchanger' | null;
+  /** CHP_100 %+Sup_100 %. */
+  fullLoad: NtaChpTestPoint;
+  /** CHP_100 %+Sup_0 %. */
+  chpOnly: NtaChpTestPoint;
+  standbyLossKw?: number | null;
+  pilotKw?: number | null;
+  standbyElectricKw?: number | null;
+  standbyAuxiliaryKw?: number | null;
+  /** Only the net power production was measured (9.72). */
+  netProductionMeasured?: boolean;
+  testReportReference: string;
 }

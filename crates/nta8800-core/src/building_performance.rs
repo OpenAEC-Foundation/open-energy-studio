@@ -2956,12 +2956,13 @@ mod tests {
         sample.on_site_production.clear();
         let base = assess_building_performance(&sample);
         sample.space_heating.generator = Generator::Chp(ChpGenerator {
-            chp: crate::space_cooling::ChpClass {
+            chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
                 hre_declared: false,
                 low_temperature: false,
-            },
+            }),
+            method1: None,
             auxiliary: Some(OtherGeneratorAuxiliary {
                 electrically_connected_devices: 1,
                 nominal_power_kw: Some(80.0),

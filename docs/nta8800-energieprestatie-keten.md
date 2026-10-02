@@ -661,3 +661,25 @@ Volgens AB.0 rekent de software de ZEB-indicator altijd mee naast hoofdstuk 5. D
   - De winst gaat naar de verwarmingsknoop (9.2.3.4) en telt mee voor 5.39d.
   - De pompenergie (13.67) telt als elektriciteit.
   - De terugwinbare verliezen (13.68) worden alleen gerapporteerd.
+
+WKK voor tapwater (13.8.4.8, 16.13) volgt nog.
+
+### Methode 1: micro-WKK met NEN-EN 50465-meetwaarden (9.6.6.2)
+
+`chp.method1` beschrijft het toestel met de testpunten CHP_100 %+Sup_100 % en CHP_100 %+Sup_0 % (tabel 9.33). Het type (tabel 9.36) bepaalt de standaardrendementen van tabel 9.37 en het stand-by-verlies van tabel 9.38 (0,4 kW, geen waakvlam) als er geen meetwaarde is. Een ORC heeft geen standaardwaarden.
+
+Per maand, met t = t_H;op;si;mi volgens 9.32a en t_sb = t_mi − t:
+- **Thermisch vermogen:** P_th = min(P_th;100+100, Q/t) (9.66). Bij een collectieve WKK is Q = Q_deel / f_gebouw;si;H.
+- **Interpolatie:** het elektrisch vermogen (9.67/9.68), het hulpvermogen (9.69/9.70) en het verlies (9.78/9.79) worden lineair geïnterpoleerd tussen stand-by (P_th;sb = 0), CHP_100+Sup_0 en CHP_100+Sup_100.
+- **Verliezen bij de testpunten:** volgens 9.74–9.77 met f_prac = 0,95. In stand-by geldt P_ls;sb + P_pilot (9.73).
+- **Input:** E_gen;in = (P_th + P_el + P_ls)·t + P_gen;ls;sb·t_sb (9.82/9.83).
+- **Elektriciteit:** P_el·t (16.15). Ze telt als niet-hernieuwbare eigen productie, zoals bij methode 2.
+- **Hulpenergie:** volgens 9.71. Bij alleen netto gemeten productie geldt 9.72 (P_aux;sb·t_sb·f_gebouw). Zonder gemeten hulpvermogen geldt 9.6.8 via `auxiliary`.
+- **Terugwinbaar verlies:** P_ls;sb·t bij opstelling in een verwarmde ruimte (9.80), anders 0 (9.81). Bij een collectieve WKK is het altijd 0. Het wordt gerapporteerd in `generatorRecoverableLossKwh`.
+
+Interpretaties, vastgelegd in `micro_chp::INTERPRETATIONS`:
+- P_th;sb = 0.
+- De NEN-EN 50465-rendementen gelden op onderwaarde; de input wordt met f_Hs/Hi (1,11 voor gas, 1,06 voor olie) naar bovenwaarde omgerekend.
+- Warmte boven het vollastpunt wordt geboekt met het rendement van CHP_100+Sup_100.
+- De elektriciteit van een collectieve WKK wordt met f_gebouw geschaald.
+- CGN_HCON (tabel 9.39) wordt vastgelegd, maar komt in geen formule voor.
