@@ -17,12 +17,12 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
 | H7 incl. §7.9, serres (7.30b), bijlagen A/B/D, terugwinbare verliezen 7.3–7.8, leidingdoorvoeren H_p | geïmplementeerd |
 | H8.2 constructies (bijlagen C, E–I, L), H8.3 grond incl. kruipruimte en kelders, H8.4 b_U opgegeven of afgeleid (8.53–8.59) | geïmplementeerd |
 | H9 afgifte incl. ventilatorenergie (9.21/9.22), distributie 9.26–9.51, meerdere opwekkers (9.6.1), bijlagen M/N/O/Q/V/W met f_prac en bovenwaarde | geïmplementeerd |
-| H10 methode 3 en LBK-koeling; methoden 1/2 en de toevoerluchtterm van 10.20 | in uitvoering |
+| H10 methoden 1 (NEN-EN 14825), 2 (NEN-EN 14511) en 3, LBK-koeling, toevoerluchtterm 10.20 | geïmplementeerd; methode 2 voor absorptiekoeling volgt tabelwaarden |
 | H11 ventilatie met drukbalans, C1-run, LBK-naverwarming en -koeling (tabel 11.15), herberekening Q.5.3 | geïmplementeerd |
 | H12 incl. terugwinbaar verlies van stoombevochtigers | geïmplementeerd |
-| H13 incl. bijlagen T/U/W en 13.164; zonne-energie §13.7 en meerdere opwekkers 13.8.2 | in uitvoering |
+| H13 incl. bijlagen T/U/W, 13.164, zonneboilers §13.7 (berekend, getest systeem, PVT, zonnecombi) en meerdere opwekkers 13.8.2 | geïmplementeerd |
 | H14, H16, §5.7 TO-juli incl. bijlage AA en dynamische beglazing | geïmplementeerd |
-| §17.3 belemmering: minimaal en opgegeven; situaties 17.3.4–17.3.8 | in uitvoering |
+| §17.3 belemmering, situaties a–g (tabellen 17.4–17.15), ook voor collectoren; 17.3.8 als opgegeven factoren | geïmplementeerd |
 | Basisopname ISSO 82.1/75.1, incl. renovatieklassen, sterk geventileerde ruimten, leidingen in onverwarmde ruimten | geïmplementeerd |
 | BRL 9500: registratieblok, termijnen, labelgegevens, bewijsregister, dossierexport, detailopname-eis, herlabelen (6a/6b), versiestempel | geïmplementeerd |
 | Maatwerkadvies (BRL 9500-MWA, ISSO 82.2/75.2) | in uitvoering |
