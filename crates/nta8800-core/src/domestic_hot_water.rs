@@ -1,4 +1,4 @@
-//! Domestic hot water, NTA 8800:2025+C1:2026 chapter 13 (pages 527–650),
+//! Domestic hot water, NTA 8800:2025+C1:2026 chapter 13 (pages 525–655),
 //! for one hot-water system serving all zones with one generator.
 //!
 //! Chain per month (13.3–13.9):
@@ -164,7 +164,7 @@ pub enum PipeInsulation {
 }
 
 /// Table 13.4 Ψ for copper pipes; the nearest diameter, the smaller
-/// insulation and the larger diameter on a tie (p. 551).
+/// insulation and the larger diameter on a tie (p. 552).
 pub fn table_13_4_psi(outer_diameter_mm: f64, insulation: PipeInsulation) -> f64 {
     const DIAMETERS: [f64; 10] = [10.0, 12.0, 15.0, 22.0, 28.0, 35.0, 42.0, 54.0, 67.0, 80.0];
     const ROWS: [[f64; 6]; 10] = [
@@ -663,7 +663,7 @@ pub fn heat_pump_class_correction(class: ApplicationClass, annual_kwh: f64) -> O
         ],
     };
     let last = points[points.len() - 1].0;
-    // No use in a higher class than measured (p. 643); class 4 is open-ended.
+    // No use in a higher class than measured (p. 644); class 4 is open-ended.
     if class != ApplicationClass::Class4 && annual_kwh > last + 1e-9 {
         return None;
     }

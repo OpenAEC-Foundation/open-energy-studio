@@ -23,7 +23,7 @@ Kies **NTA-invoer starten**. Het formulier vraagt alleen wat het projectmodel no
 
 | Onderdeel | Wat invullen | Normbasis |
 |---|---|---|
-| Algemeen | rekenscope, bron A_g, Bbl-gebruiksfunctie, actieve koeling, vergunningaanvraag na 29 mei 2026 | Bbl tabel 4.148A, Omgevingsregeling 5.11 lid 5 |
+| Algemeen | rekenscope, bron A_g, Bbl-gebruiksfunctie, actieve koeling (systeem plus capaciteitsbewijs), vergunningaanvraag na 29 mei 2026 | Bbl tabel 4.148A, §5.7.1, Omgevingsregeling 5.11 lid 5 |
 | Setpoints | woning 20/24 °C, utiliteit volgens tabel | tabel 7.13 |
 | Thermische massa | klasse vloer en wand, plafondkolom | tabel 7.10–7.12 |
 | Interne winst | aantal woningen, of W/m² bij utiliteit | 7.21–7.24 |
@@ -33,12 +33,20 @@ Kies **NTA-invoer starten**. Het formulier vraagt alleen wat het projectmodel no
 | Ventilatie | H_ve of debiet in m³/h, inclusief infiltratie | (hoofdstuk 11 nog niet in de kern) |
 | Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie alleen in de verwarmde zone | tabel 9.2–9.4, §9.4.1 |
 | Opwekker | gasketel, (hybride) warmtepomp, stadsverwarming, elektrisch of biomassa | §9.6 |
-| Koeling | geen, compressie, gasabsorptie of vrije koeling | §10.5 |
-| Tapwater | aantal woningen of behoefte per m², rendementen, drager | 13.15–13.18 |
-| PV | piekvermogen, azimut, helling, f_perf, c_sh | 16.2/16.3 |
+| Koeling | opwekker; afgifte (type, inregeling, regeling, aantal ventilatorconvectoren); watergedragen distributie (ontwerptemperatuur, leidingen) | tabellen 10.4–10.16, 10.29–10.35 |
+| Tapwater | aantal woningen of gebruiksfunctie met oppervlakte; aangesloten tappunten en lengte van de uittapleidingen; toestel en gemeten toepassingsklasse | tabellen 13.1–13.3, 13.25–13.28 |
+| PV | piekvermogen (panelen, opgegeven K_pk of tabel 16.1), azimut, helling, bevestiging, F_sh;obst | tabellen 16.1–16.3 |
 | Bevestigingen | alle energieposten en alle eigen opwekking opgenomen; f_BACS; C1-ventilatie; batterij | §5.5 |
 
-Maandwaarden, toevoertemperaturen, gegevens per zone (`zoneData` bij meerdere zones), hybride opwekkers en bijzondere belemmeringssituaties vul je in via **Geavanceerd (JSON)**.
+Deze invoer gaat via **Geavanceerd (JSON)**:
+
+- maandwaarden en toevoertemperaturen;
+- gegevens per zone (`zoneData` bij meerdere zones);
+- hybride opwekkers en bijzondere belemmeringssituaties;
+- meerdere koelopwekkers met vermogens;
+- tapwatercirculatie, voorraadvaten en douche-WTW;
+- verlichting bij utiliteit (`lighting`, hoofdstuk 14);
+- oriëntaties van koudebruggen voor TO-juli.
 
 ## 3. Resultaat lezen
 
@@ -60,6 +68,6 @@ Maandwaarden, toevoertemperaturen, gegevens per zone (`zoneData` bij meerdere zo
 Zie het [verificatiedossier](nta8800-verificatiestatus.md) en het [dekkingsregister](nta8800-dekkingsregister.md). In het kort:
 
 - Hoofdstuk 11 (ventilatie, infiltratie, C1) en de distributie volgens 9.26 ontbreken in de kern.
-- De rendementen voor tapwater en voor afgifte van koeling worden opgegeven.
+- Hoofdstukken 10 (methode 3), 13, 14 en 16 en §5.7 zijn op 2 oktober 2026 tegen de normtekst herschreven. Wat daar nog ontbreekt, en de open interpretatievragen, staan in het verificatiedossier.
 - Hoofdstukken 7, 8, 13, 16 en 17 zijn getranscribeerd uit normanalyses en nog niet onafhankelijk gereviewd tegen de normtekst. Hoofdstukken 5 en 9 volgen het consultatieconcept.
 - Er zijn nog geen uitkomsten uit de EDR-testset (bijlage 2) vergeleken. Alleen A_g en A_ls van EP-W001 zijn getoetst.

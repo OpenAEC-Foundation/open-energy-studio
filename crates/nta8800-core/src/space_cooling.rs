@@ -1,4 +1,4 @@
-//! Space cooling, NTA 8800:2025+C1:2026 chapter 10 (pages 362–430), from
+//! Space cooling, NTA 8800:2025+C1:2026 chapter 10 (pages 366–426), from
 //! the chapter 7 cooling need of the zones served by one cooling system.
 //!
 //! The chain is additive (10.5/10.7–10.9): `Q_C;gen;in = Σ_zi (Q_C;nd +
@@ -558,7 +558,7 @@ pub struct CoolingGenerator {
     pub equipment_reference: String,
 }
 
-/// Collective installation for part of a building (f_gebouw;C, p. 363).
+/// Collective installation for part of a building (f_gebouw;C, p. 368).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CollectiveCooling {

@@ -1,5 +1,5 @@
-//! Lighting, NTA 8800:2025+C1:2026 chapter 14 (pages 655–675), with the
-//! significant-figure rounding of annex X (p. 1100).
+//! Lighting, NTA 8800:2025+C1:2026 chapter 14 (pages 655–676), with the
+//! significant-figure rounding of annex X (p. 1129).
 //!
 //! Dwellings: `W_L;spec = 0` for the indicators, `W_P = 0` (14.1–14.3).
 //! Utility zones: per lighting zone `W_t,j = W_L,j + W_P,j` (14.6) with
