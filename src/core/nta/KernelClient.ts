@@ -2666,6 +2666,10 @@ export type NtaAnnexPRoute =
       generators: Array<{ id: string; energyFraction: number; kind: NtaAnnexPGenerator }>;
       auxiliaryElectricityKwh: number;
       auxiliaryRenewableShare?: number;
+      /** P.34/P.35 η_WD;gen;sto; required for hot water (WD). */
+      hotWaterStorage?:
+        | { method: 'losses'; storageLossKwh: number; pipeLossKwh: number; sourceReference: string }
+        | { method: 'forfait'; insulation: 'at_least20_mm' | 'at_least10_mm' | 'none' };
       sourceReference: string;
     }
   | {
@@ -2706,6 +2710,7 @@ export interface NtaAnnexPSystemResult {
   factors: NtaSupplyFactors;
   distributionEfficiency: number | null;
   generationPrimaryFactor: number | null;
+  storageEfficiency?: number;
   generators: Array<{ id: string; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; heatKwh: number }>;
 }
 
@@ -3007,7 +3012,7 @@ export interface NtaHotWaterSystem {
   showerHeatRecovery?: {
     showers: Array<
       | { unit: 'none' | 'vertical' | 'horizontal' | 'unknown' }
-      | { unit: 'declared'; efficiency: number; sourceReference: string }
+      | { unit: 'declared'; efficiency: number; testClass?: 'class2' | 'class3' | 'class4'; sourceReference: string }
       | { unit: 'annex_u'; test: NtaAnnexUTest }
     >;
     connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
@@ -3044,7 +3049,9 @@ export interface NtaHotWaterSystem {
   generator:
     | { kind: 'gas_appliance'; appliance: 'without_gaskeur' | 'water_heater_gaskeur' | 'water_heater_gaskeur_cw' | 'kitchen_geyser'
         | 'combi_gaskeur' | 'combi_gaskeur_hr_cw' | 'unknown'; measuredClass?: NtaApplicationClass | null; kitchenOnly?: boolean;
-        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null }
+        declared?: NtaDhwDeclared | null; annexT?: NtaAnnexTTest | null;
+        /** §13.8.4.3 conditions; required with annexT. */
+        annexTConditions?: { typeSuppliedBefore2021: boolean; applianceIndoors: boolean } | null }
     | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
         outdoorAirFraction?: number | null }
     | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;

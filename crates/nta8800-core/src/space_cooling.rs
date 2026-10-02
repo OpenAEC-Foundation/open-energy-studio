@@ -631,6 +631,9 @@ pub struct CoolingMonth {
     pub natural_gas_kwh: f64,
     /// Heat from external delivery for absorption chillers.
     pub district_heat_kwh: f64,
+    /// `Q_C;gen;out` of absorption chillers driven by external heat, for
+    /// the renewable share (5.39g), kWh.
+    pub district_heat_cold_kwh: f64,
     /// Heat from building CHP for absorption chillers.
     pub chp_heat_kwh: f64,
     /// External cold delivery (carrier dc).
@@ -1251,6 +1254,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                 }
                 Drive::DistrictHeat(zeta) => {
                     row.district_heat_kwh += cold / zeta;
+                    row.district_heat_cold_kwh += cold;
                     auxiliary += cold * (1.0 + 1.0 / zeta) * rejection.distribution_power();
                 }
                 Drive::ChpHeat(zeta) => {
@@ -1393,6 +1397,27 @@ mod tests {
         assert_eq!(operating_hours(15.0, 6), 603.0);
         assert_eq!(operating_hours(10.0, 4), 367.0);
         assert_eq!(operating_hours(30.0, 7), 74.0);
+    }
+
+    #[test]
+    fn absorption_on_external_heat_reports_its_cold_output() {
+        let input = system(vec![generator(
+            CoolingGeneratorKind::AbsorptionExternalHeat {
+                heat_rejection: None,
+            },
+            None,
+        )]);
+        let zones = [CoolingZoneNeed {
+            usable_floor_area_m2: 100.0,
+            need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
+        }];
+        let result = assess_cooling(&input, context(&zones));
+        let july = &result.months[6];
+        // 5.39g counts Q_C;gen;out; the heat input is Q_C;gen;out/ζ.
+        assert!(july.district_heat_cold_kwh > 0.0);
+        assert!((july.district_heat_cold_kwh - july.generator_cold_kwh).abs() < 1e-9);
+        assert!(july.district_heat_kwh > july.district_heat_cold_kwh);
     }
 
     #[test]
