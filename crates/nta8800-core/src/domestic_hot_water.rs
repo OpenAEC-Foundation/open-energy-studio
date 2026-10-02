@@ -20,11 +20,15 @@
 //! Not modelled: solar water heating (§13.7, `Q_W;ren;sol = 0`), several
 //! generators per system (13.8.2, `F_W;gen = 1`), booster heat pumps
 //! (13.8.4.4, annex W), delivery sets on a collective heating system
-//! (13.8.4.9.3), measured multi-pattern tests (13.8.4.2) and recoverable
-//! losses for the space-heating balance (13.13).
+//! (13.8.4.9.3) and measured multi-pattern tests (13.8.4.2). The
+//! recoverable losses of 13.13 (13.47, 13.49, 13.63, 13.179) are reported
+//! per month; generator losses of heat pumps and combis with an integrated
+//! vessel (13.160a) are 0. Annex T and U test reports are evaluated in
+//! [`crate::hot_water_tests`].
 
 use crate::building_performance::Carrier;
 use crate::climate::MONTH_HOURS;
+use crate::hot_water_tests::{AnnexTTest, AnnexUTest};
 use crate::label_class::LabelFunction;
 use crate::monthly_demand::occupants_per_dwelling;
 use serde::{Deserialize, Serialize};
@@ -348,6 +352,10 @@ pub enum ShowerUnit {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+    /// Annex U test report: mean of three runs, rounded down to 0,025.
+    AnnexU {
+        test: AnnexUTest,
+    },
 }
 
 impl ShowerUnit {
@@ -357,6 +365,7 @@ impl ShowerUnit {
             Self::Vertical => 0.40,
             Self::Horizontal | Self::Unknown => 0.20,
             Self::Declared { efficiency, .. } => *efficiency,
+            Self::AnnexU { test } => test.efficiency().unwrap_or(0.0),
         }
     }
 }
@@ -448,6 +457,9 @@ pub enum HotWaterGenerator {
         /// A quality-statement value replacing the table value.
         #[serde(default)]
         declared: Option<DeclaredEfficiency>,
+        /// Annex T test report replacing the table value (Gaskeur coupling).
+        #[serde(default, rename = "annexT", skip_serializing_if = "Option::is_none")]
+        annex_t: Option<AnnexTTest>,
     },
     /// Table 13.25 individual heat pump, 1,4·c_source with table 13.27.
     HeatPump {
@@ -616,6 +628,8 @@ pub struct HotWaterMonth {
     pub carrier_input_kwh: f64,
     pub auxiliary_electricity_kwh: f64,
     pub ambient_heat_kwh: f64,
+    /// Q_W;ls;rbl (13.13) for the zones served, kWh.
+    pub recoverable_loss_kwh: f64,
 }
 
 fn round_down(value: f64, step: f64) -> f64 {
@@ -780,6 +794,11 @@ pub fn validate_hot_water(
             push("hot_water_showers_required", "showerHeatRecovery.showers");
         }
         for (index, unit) in shower.showers.iter().enumerate() {
+            if let ShowerUnit::AnnexU { test } = unit {
+                for code in test.issues() {
+                    push(code, &format!("showerHeatRecovery.showers[{index}].test"));
+                }
+            }
             if let ShowerUnit::Declared {
                 efficiency,
                 source_reference,
@@ -897,6 +916,31 @@ pub fn validate_hot_water(
     }
     if !allows_storage && !system.storage.is_empty() {
         push("hot_water_storage_in_generator_efficiency", "storage");
+    }
+    if let HotWaterGenerator::GasAppliance {
+        appliance,
+        measured_class,
+        declared,
+        annex_t: Some(test),
+        ..
+    } = &system.generator
+    {
+        for code in test.issues() {
+            push(code, "generator.annexT");
+        }
+        if declared.is_some() {
+            push("hot_water_efficiency_declared_twice", "generator.annexT");
+        }
+        if measured_class.is_none() {
+            push("annex_t_measured_class_required", "generator.measuredClass");
+        }
+        let combi = matches!(
+            appliance,
+            GasAppliance::CombiGaskeur | GasAppliance::CombiGaskeurHrCw
+        );
+        if combi != test.is_combi() {
+            push("annex_t_appliance_mismatch", "generator.annexT.method");
+        }
     }
     match &system.generator {
         HotWaterGenerator::GasAppliance { declared, .. }
@@ -1054,11 +1098,17 @@ fn generation(system: &HotWaterSystem, annual_output_kwh: f64) -> Result<(f64, f
             measured_class,
             kitchen_only,
             declared,
+            annex_t,
         } => {
             let (table, corrected) = appliance.table();
-            let base = declared
-                .as_ref()
-                .map_or(table, |item| round_down(item.value, 0.025));
+            let base = match (annex_t, declared) {
+                (Some(test), _) => round_down(
+                    test.efficiency().map_err(|_| "annex_t_value_invalid")?,
+                    0.025,
+                ),
+                (None, Some(item)) => round_down(item.value, 0.025),
+                (None, None) => table,
+            };
             let correction = if *kitchen_only || !corrected {
                 1.0
             } else {
@@ -1270,6 +1320,8 @@ pub fn assess_hot_water(
         60.0
     };
     let mut storage_loss = [0.0; 12];
+    // 13.63: losses of vessels in a heated zone are recoverable.
+    let mut heated_storage_loss = [0.0; 12];
     for vessel in &system.storage {
         let ambient = if vessel.in_heated_zone {
             context.heated_ambient_c
@@ -1300,7 +1352,11 @@ pub fn assess_hot_water(
             }
         };
         for (index, loss) in storage_loss.iter_mut().enumerate() {
-            *loss += f_building * MONTH_HOURS[index] / 1000.0 * watts;
+            let value = f_building * MONTH_HOURS[index] / 1000.0 * watts;
+            *loss += value;
+            if vessel.in_heated_zone {
+                heated_storage_loss[index] += value;
+            }
         }
     }
 
@@ -1442,6 +1498,28 @@ pub fn assess_hot_water(
         if renewable_share > 0.0 && practical_efficiency >= 1.0 {
             row.ambient_heat_kwh = output * (1.0 - 1.0 / practical_efficiency) * renewable_share;
         }
+        // 13.13: recoverable losses for the space-heating balance.
+        // 13.47/13.49: circulation (f_W;dis;rbl), delivery sets and pump.
+        let all_pipes_heated = system
+            .circulation
+            .as_ref()
+            .is_some_and(|item| item.unheated_length_m == Some(0.0));
+        let f_dis = if all_pipes_heated { 1.0 } else { 0.85 };
+        let distribution = f_dis * row.circulation_loss_kwh
+            + row.conversion_loss_kwh
+            + PUMP_RECOVERABLE_FACTOR * pump[index];
+        // Above 500 m² the generator and vessels sit in a separate zone.
+        let storage = if building_area > 500.0 {
+            0.0
+        } else {
+            heated_storage_loss[index]
+        };
+        // 13.179: electric instantaneous heaters (individual appliances).
+        let generation = match &system.generator {
+            HotWaterGenerator::ElectricInstantaneous => output / practical_efficiency - output,
+            _ => 0.0,
+        };
+        row.recoverable_loss_kwh = distribution + storage + generation;
     }
     Ok(HotWaterAssessment {
         annual_net_need_kwh: annual,
@@ -1492,6 +1570,7 @@ mod tests {
             measured_class: Some(ApplicationClass::Class4),
             kitchen_only: false,
             declared: None,
+            annex_t: None,
         }
     }
 
@@ -1732,6 +1811,108 @@ mod tests {
         );
         assert_eq!(table_13_4_psi(30.0, PipeInsulation::Unknown), 0.321);
         assert_eq!(table_13_4_psi(25.0, PipeInsulation::Mm20), 0.219);
+    }
+
+    #[test]
+    fn annex_t_and_annex_u_replace_table_values() {
+        use crate::hot_water_tests::{ShowerRun, ShowerTestClass, TestFuel};
+        let report = AnnexTTest::CombiForfait {
+            useful_mj: 20.0,
+            fuel_input_mj: 25.0,
+            electricity_kwh: 0.0,
+            full_load_efficiency: 0.96,
+            fuel: TestFuel::NaturalGas,
+            source_reference: "Gaskeur report".into(),
+        };
+        let expected = round_down(report.efficiency().unwrap(), 0.025);
+        let mut input = system(HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::CombiGaskeurHrCw,
+            measured_class: Some(ApplicationClass::Class1),
+            kitchen_only: false,
+            declared: None,
+            annex_t: Some(report.clone()),
+        });
+        let run = |r: f64| ShowerRun::Energies {
+            recovered_kj: r,
+            shower_kj: 100.0,
+        };
+        input.shower_heat_recovery = Some(ShowerHeatRecovery {
+            showers: vec![ShowerUnit::AnnexU {
+                test: AnnexUTest {
+                    class: ShowerTestClass::Class2,
+                    runs: vec![run(50.0), run(51.0), run(52.0)],
+                    source_reference: "lab".into(),
+                },
+            }],
+            connection: ShowerConnection::MixerAndHeater,
+            source_reference: "plan".into(),
+        });
+        assert!(validate_hot_water(&input, context(), "dhw").is_empty());
+        let result = assess_hot_water(&input, context()).unwrap();
+        // Class 1 has c_W;gen = 1 at every demand (table 13.26).
+        assert!((result.months[0].generation_efficiency - expected).abs() < 1e-9);
+        assert_eq!(
+            input.shower_heat_recovery.as_ref().unwrap().showers[0].efficiency(),
+            0.5
+        );
+        // A water-heater report does not fit a combi appliance.
+        if let HotWaterGenerator::GasAppliance { annex_t, .. } = &mut input.generator {
+            *annex_t = Some(AnnexTTest::WaterHeater {
+                useful_mj: 20.0,
+                fuel_input_mj: 25.0,
+                electricity_kwh: 0.0,
+                fuel: TestFuel::NaturalGas,
+                source_reference: "x".into(),
+            });
+        }
+        let codes: Vec<_> = validate_hot_water(&input, context(), "dhw")
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert!(codes.contains(&"annex_t_appliance_mismatch"));
+    }
+
+    #[test]
+    fn annex_t_u_fixture_is_valid() {
+        let system: HotWaterSystem = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-hot-water-annex-t-u-synthetic.json"
+        ))
+        .unwrap();
+        assert!(validate_hot_water(&system, context(), "dhw").is_empty());
+        let shower = &system.shower_heat_recovery.as_ref().unwrap().showers[0];
+        // (2870 + 2905 + 2850)/3/5880 = 0,4890 → 0,475.
+        assert!((shower.efficiency() - 0.475).abs() < 1e-9);
+        assert!(assess_hot_water(&system, context()).is_ok());
+    }
+
+    #[test]
+    fn recoverable_losses_follow_13_13() {
+        let mut input = system(HotWaterGenerator::ElectricBoiler);
+        input.storage.push(StorageVessel {
+            id: "vessel".into(),
+            volume_l: 120.0,
+            loss: StorageLoss::Label {
+                label: StorageLabel::B,
+            },
+            connection_factor: 1,
+            in_heated_zone: true,
+            unheated_ambient_c: None,
+            source_reference: "label".into(),
+        });
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        // 13.63: the whole loss of a vessel in a heated zone, below 500 m².
+        assert!((jan.recoverable_loss_kwh - jan.storage_loss_kwh).abs() < 1e-9);
+        input.storage[0].in_heated_zone = false;
+        let outside = assess_hot_water(&input, context()).unwrap();
+        assert_eq!(outside.months[0].recoverable_loss_kwh, 0.0);
+        // 13.179: electric instantaneous heater, Q/η − Q.
+        let instantaneous = system(HotWaterGenerator::ElectricInstantaneous);
+        let result = assess_hot_water(&instantaneous, context()).unwrap();
+        let jan = &result.months[0];
+        let expected =
+            jan.generator_output_kwh / jan.generation_efficiency - jan.generator_output_kwh;
+        assert!((jan.recoverable_loss_kwh - expected).abs() < 1e-9);
     }
 
     #[test]

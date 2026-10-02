@@ -66,7 +66,7 @@ Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 
 1. **Nettobehoefte.**
    - Woningen: 13.15–13.18, 856 kWh per bewoner.
    - Utiliteit: 13.19 met tabel 13.1 per gebruiksfunctie (`areas`).
-2. **Douche-WTW.** 13.51/13.52 met tabellen 13.7 en 13.8. Het rendement is het gemiddelde over alle douches (13.53); een douche zonder unit telt als 0.
+2. **Douche-WTW.** 13.51/13.52 met tabellen 13.7 en 13.8. Het rendement is het gemiddelde over alle douches (13.53); een douche zonder unit telt als 0. Per douche: forfait (verticaal, horizontaal, onbekend), een opgegeven rendement, of een testrapport volgens bijlage U (`annex_u`): drie runs per klasse (tabel U.1), als energieën of als meetreeks met dichtheid en enthalpie volgens U.5/U.6. Het gemiddelde wordt naar beneden afgerond op 0,025.
 3. **Afgifte.** `Q_W;em = Q_W;nd/η_W;em − Q_W;rcd` (13.9). De terugwinning gaat er dus ná het afgifterendement af. `η_W;em` komt uit tabel 13.2 (woningen, 13.21–13.23) of tabel 13.3 (utiliteit).
 4. **Circulatie.**
    - Verlies 13.26, met Ψ uit tabel 13.4 (dichtstbijzijnde diameter) en de diameter uit tabel 13.29 als die onbekend is.
@@ -84,9 +84,24 @@ Module `domestic_hot_water` rekent één tapwatersysteem met één opwekker (p. 
    - ketel of warmtepomp met indirect vat (tabel 13.28, 1,4);
    - externe warmtelevering (η 1,0, drager `dh`).
    
+   Een gastoestel kan in plaats van de tabelwaarde een testrapport volgens bijlage T meekrijgen (`annexT`, de Gaskeur-koppeling, p. 1096–1109):
+   - een warmwatertoestel zonder cv-functie: T.4 en T.5;
+   - een combitoestel met forfaitaire omrekening van het winterrendement: T.15–T.17 met `K_f` = 0,5, alleen bij een tapwaterzijdig rendement van ten minste 0,40 op bovenwaarde (CW);
+   - een combitoestel met gemeten zomer- en winterrendement: T.12–T.14.
+
+   Het resultaat gaat met tabel T.7 naar bovenwaarde. Het rapport vraagt de gemeten klasse; `c_W;gen` (tabel 13.26) werkt daarna zoals bij een verklaring.
+
    Verklaarde rendementen worden naar beneden afgerond op 0,025 (gas) of 0,05 (elektrisch). Een warmtepomp mag niet in een hogere toepassingsklasse rekenen dan waarin hij is gemeten (`hot_water_heat_pump_class_exceeded`).
 8. **Hulpenergie.** 13.181 voor opwekkers waarvan de hulpenergie niet in het rendement zit.
 9. **Omgevingswarmte.** 5.36. Bij een afvoerluchtbron telt alleen het opgegeven buitenluchtdeel mee (5.37).
+10. **Terugwinbare verliezen** `Q_W;ls;rbl` (13.13), per maand in `recoverableLossKwh`:
+    - circulatie met `f_W;dis;rbl` = 1 als alle leidingen in verwarmde zones liggen, anders 0,85 (13.47);
+    - afleversets, met `f_W;conv;rbl` = 1;
+    - 20 % van de circulatiepompenergie (13.49);
+    - voorraadvaten in een verwarmde zone (13.63), maar niet bij een gebouw boven 500 m²;
+    - het opwekkingsverlies van een elektrisch doorstroomtoestel (13.179).
+
+    Bij een utiliteitszone met `internalGains.method = utility` en een lege `hotWaterRecoverableKwh` vult de energieprestatieketen deze verliezen in als Φ_int;W (7.29), verdeeld naar gebruiksoppervlakte (13.14).
 
 Niet in de kern:
 
@@ -94,7 +109,7 @@ Niet in de kern:
 - meerdere opwekkers per systeem (13.8.2);
 - boosterwarmtepompen (bijlage W);
 - afleversets op een collectief verwarmingssysteem (13.8.4.9.3);
-- terugwinbare verliezen voor de verwarmingsbalans (13.13).
+- terugwinbare opwekkingsverliezen van warmtepompen en combitoestellen met geïntegreerd vat (13.160a), en de bijlage T-routes voor elektrische toestellen, bivalente warmtepompen en micro-WKK (T.3, T.7–T.10).
 
 ## Koeling (hoofdstuk 10, methode 3)
 

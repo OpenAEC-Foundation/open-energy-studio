@@ -97,6 +97,27 @@ Een verificatie tegen de gelicentieerde NTA 8800:2025+C1:2026 vond afwijkingen i
 - terugwinbare verliezen in hoofdstuk 7;
 - automatische koppeling van de verlichtingswinst (7.28) aan de interne winst van hoofdstuk 7.
 
+## Stand 2 oktober 2026: bijlagen T en U, terugwinbare tapwaterverliezen
+
+Uit NTA 8800:2025+C1:2026 (p. 525–655 en 1096–1113) zijn toegevoegd:
+
+- **Bijlage T** (module `hot_water_tests`): testrapporten voor gastoestellen.
+  - Warmwatertoestel: T.4/T.5.
+  - Combitoestel met gemeten zomer- en winterrendement: T.12–T.14.
+  - Combitoestel met forfaitaire omrekening: T.15–T.17, `K_f` = 0,5, alleen CW (≥ 0,40 op bovenwaarde).
+  - Omrekening naar bovenwaarde met tabel T.7.
+  - Het resultaat vervangt de tabelwaarde van tabel 13.25, afgerond op 0,025, met de gemeten klasse voor `c_W;gen`.
+- **Bijlage U**: douche-WTW-rendement uit drie runs (U.2–U.6), afgerond op 0,025.
+- **13.13**: terugwinbare tapwaterverliezen per maand (13.47, 13.49, 13.63, 13.179). Ze voeden Φ_int;W (7.29) van utiliteitszones, verdeeld naar oppervlakte (13.14).
+
+Interpretatievragen:
+
+1. Formule 13.63 kent geen zonevoorwaarde. Toch tellen alleen vaten in een verwarmde zone mee; het verlies van een vat in een onverwarmde ruimte komt niet in de rekenzone terecht.
+2. Bijlage T definieert het rendement inclusief de primaire omrekening van hulpelektriciteit (`η_el;ow` = 1/`f_P;del;el` = 1/1,45). Hoofdstuk 13 gebruikt het als `η_W;gen` van het gastoestel, zoals bij een Gaskeur-verklaring. T.3 (elektrische toestellen), T.7/T.8 (bivalente warmtepompen) en T.9/T.10 (micro-WKK) zijn daarom niet als route opgenomen.
+3. De uitzondering van de 500 m²-regel ("meerdere individuele toestellen voor een deel kleiner dan 500 m²") wordt alleen toegepast op het elektrische doorstroomtoestel (13.179). Een individuele keukenboiler in een groot gebouw verliest daardoor ten onrechte zijn terugwinbare vatverlies, totdat de invoer aangeeft dat het om afzonderlijke toestellen gaat.
+4. Bij een collectief systeem wordt het terugwinbare verlies van het beoordeelde deel (al geschaald met `A_g;si`/`A_g;gebouw;W`) over de eigen zones verdeeld naar `A_g;zi`/Σ`A_g` (13.14).
+5. Bijlage U: de testklasse wordt niet getoetst aan de toepassingsklasse van de opwekker (§13.5.3). Dat blijft een controle voor de adviseur.
+
 ## Stand 1 oktober 2026: rekenruggengraat
 
 Er is nu een doorgaande, **onverifieerde** Rust-keten van `.oes`-project tot BENG 1/2/3, TO-juli, Bbl-toets en indicatieve labelklasse. Onderdelen en bronnen:

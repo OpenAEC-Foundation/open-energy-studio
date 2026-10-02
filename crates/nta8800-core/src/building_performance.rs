@@ -903,12 +903,60 @@ fn with_lighting_gains(input: &BuildingPerformanceInput) -> SpaceHeatingChainInp
     chain
 }
 
+/// 7.29 with 13.13/13.14: an empty `hotWaterRecoverableKwh` of a utility
+/// zone takes the recoverable hot-water losses of the building's system,
+/// split by usable floor area, when that system is valid.
+fn with_hot_water_gains(
+    input: &BuildingPerformanceInput,
+    mut chain: SpaceHeatingChainInput,
+) -> SpaceHeatingChainInput {
+    let Some(system) = &input.hot_water else {
+        return chain;
+    };
+    let context = hot_water_context(input);
+    if !validate_hot_water(system, context, "hotWater").is_empty() {
+        return chain;
+    }
+    let Ok(result) = assess_hot_water(system, context) else {
+        return chain;
+    };
+    let total_area: f64 = std::iter::once(&chain.demand)
+        .chain(chain.additional_zones.iter().map(|zone| &zone.demand))
+        .map(|demand| demand.usable_floor_area_m2)
+        .sum();
+    if total_area <= 0.0 {
+        return chain;
+    }
+    let fill = |demand: &mut MonthlyDemandInput| {
+        let share = demand.usable_floor_area_m2 / total_area;
+        if let InternalGains::Utility {
+            hot_water_recoverable_kwh,
+            ..
+        } = &mut demand.internal_gains
+        {
+            if hot_water_recoverable_kwh.is_empty() {
+                *hot_water_recoverable_kwh = result
+                    .months
+                    .iter()
+                    .map(|month| month.recoverable_loss_kwh * share)
+                    .collect();
+            }
+        }
+    };
+    fill(&mut chain.demand);
+    for zone in &mut chain.additional_zones {
+        fill(&mut zone.demand);
+    }
+    chain
+}
+
 pub fn assess_building_performance(
     input: &BuildingPerformanceInput,
 ) -> BuildingPerformanceAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
-    let heating = assess_space_heating_chain(&with_lighting_gains(input));
+    let heating =
+        assess_space_heating_chain(&with_hot_water_gains(input, with_lighting_gains(input)));
     let mut issues: Vec<PerformanceIssue> = heating
         .issues
         .iter()
@@ -1748,6 +1796,7 @@ mod tests {
                 measured_class: Some(crate::domestic_hot_water::ApplicationClass::Class1),
                 kitchen_only: false,
                 declared: None,
+                annex_t: None,
             },
             collective: None,
             equipment_reference: "plate".into(),
@@ -1776,6 +1825,77 @@ mod tests {
         // Short draw-off lines (η_em = 1) and class 1 (c_W;gen = 1).
         let expected = result.space_heating.annual_natural_gas_kwh.unwrap() + 856.0 * 2.28 / 0.675;
         assert!((gas - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn recoverable_hot_water_losses_feed_utility_internal_gains() {
+        use crate::domestic_hot_water::{
+            HotWaterEmission, HotWaterGenerator, HotWaterNeed, StorageLabel, StorageLoss,
+            StorageVessel, UtilityArea,
+        };
+        use crate::monthly_demand::{LightingRecovery, UsageFunction};
+        let mut sample = input();
+        sample.calculation_scope = CalculationScope::Utility;
+        sample.label_function = Some(LabelFunction::Office);
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let demand = &mut sample.space_heating.demand;
+        demand.usage_function = UsageFunction::Office;
+        demand.dwelling_type = None;
+        demand.setpoints.heating_c = 21.0;
+        demand.internal_gains = InternalGains::Utility {
+            lighting: UtilityLighting::Declared {
+                annual_kwh: 0.0,
+                recovery: LightingRecovery::Other,
+            },
+            hot_water_recoverable_kwh: Vec::new(),
+            source_reference: "tables 7.2/7.3".into(),
+        };
+        let area = demand.usable_floor_area_m2;
+        sample.hot_water = Some(HotWaterSystem {
+            need: HotWaterNeed::Utility {
+                areas: vec![UtilityArea {
+                    function: LabelFunction::Office,
+                    area_m2: area,
+                }],
+                source_reference: "plan".into(),
+            },
+            emission: HotWaterEmission::Utility {
+                mean_length_m: 2.0,
+                source_reference: "plan".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: None,
+            storage: vec![StorageVessel {
+                id: "boiler".into(),
+                volume_l: 80.0,
+                loss: StorageLoss::Label {
+                    label: StorageLabel::C,
+                },
+                connection_factor: 1,
+                in_heated_zone: true,
+                unheated_ambient_c: None,
+                source_reference: "label".into(),
+            }],
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator: HotWaterGenerator::ElectricBoiler,
+            collective: None,
+            equipment_reference: "plate".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // 13.63 with table 13.9 label C: S_sto = 14,33 + 7,13·80^0,4 W.
+        let storage = (14.33 + 7.13 * 80f64.powf(0.4)) * 744.0 / 1000.0;
+        // 7.25–7.29 for an office: 5·0,30 + 4 W/m².
+        let expected = 5.5 * area * 744.0 / 1000.0 + storage;
+        let january = result.space_heating.demand.monthly[0].internal_gains_kwh;
+        assert!((january - expected).abs() < 1e-9, "{january} vs {expected}");
     }
 
     #[test]
