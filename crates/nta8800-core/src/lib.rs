@@ -1597,7 +1597,8 @@ pub(crate) fn unheated_zone_input(
         .map(|space| {
             Some(UnheatedSpaceInput {
                 id: space.id.clone(),
-                reduction_factor: space.reduction_factor,
+                reduction_factor: Some(space.reduction_factor),
+                outside: None,
                 factor_source_reference: space.factor_source_reference.clone(),
                 boundary: direct_boundary_input_zone(
                     project,

@@ -338,9 +338,18 @@ export type MonthlyDemandTransmission =
       unheated: null | {
         spaces: Array<{
           id: string;
-          reductionFactor: number;
-          factorSourceReference: string;
+          /** Declared b_U (basic survey, annex I.2.4); exclusive with `outside`. */
+          reductionFactor?: number;
+          factorSourceReference?: string;
           boundary: NtaDirectTransmissionInput;
+          /** Derive b_U from the space's losses to outside (8.53–8.59). */
+          outside?: {
+            transmission: NtaDirectTransmissionInput;
+            ventilation:
+              | { method: 'flow'; airflowM3PerH: number; sourceReference: string }
+              | { method: 'half_of_transmission' };
+            otherZonesConductanceWPerK?: number;
+          };
         }>;
       };
       groundFloors: Array<{
