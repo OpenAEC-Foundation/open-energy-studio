@@ -2363,6 +2363,7 @@ mod tests {
             tilt_deg: 35.0,
             mounting: crate::pv::PvMounting::ModeratelyVentilated,
             obstruction_factors: vec![1.0],
+            obstruction: None,
             collective: None,
             source_reference: "datasheet".into(),
         });
@@ -3015,6 +3016,7 @@ mod tests {
             tilt_deg: 35.0,
             mounting: crate::pv::PvMounting::ModeratelyVentilated,
             obstruction_factors: vec![1.0],
+            obstruction: None,
             collective: None,
             source_reference: "datasheet".into(),
         });

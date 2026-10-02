@@ -2859,8 +2859,10 @@ export interface BuildingPerformanceInput {
     azimuthDeg: number;
     tiltDeg: number;
     mounting?: 'not_ventilated' | 'moderately_ventilated' | 'strongly_ventilated' | 'unknown';
-    /** F_sh;obst;mi: one value or twelve monthly values (§17.3). */
-    obstructionFactors: number[];
+    /** F_sh;obst;mi: one value or twelve monthly values (§17.3); exclusive with `obstruction`. */
+    obstructionFactors?: number[];
+    /** §17.3 collector situation (tables 17.6/17.12/17.15). */
+    obstruction?: NtaCollectorObstruction;
     collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
     sourceReference: string;
   }>;

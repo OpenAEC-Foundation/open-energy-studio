@@ -162,11 +162,26 @@ pub struct PvSystem {
     /// Table 16.2; omitted means unknown (0,76).
     #[serde(default = "unknown_mounting")]
     pub mounting: PvMounting,
-    /// `F_sh;obst;mi` per §17.3: one value for all months or twelve values.
+    /// `F_sh;obst;mi` per §17.3: one value for all months or twelve values;
+    /// exclusive with `obstruction`.
+    #[serde(default)]
     pub obstruction_factors: Vec<f64>,
+    /// §17.3 situation for collectors and PV (tables 17.6/17.12/17.15),
+    /// at the nearest of the eight orientations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obstruction: Option<crate::solar_shading::CollectorObstruction>,
     #[serde(default)]
     pub collective: Option<CollectivePv>,
     pub source_reference: String,
+}
+
+/// Nearest table orientation of an azimuth (0 = north, clockwise).
+fn nearest_orientation(azimuth_deg: f64) -> crate::climate::Orientation {
+    use crate::climate::Orientation::*;
+    let sector = ((azimuth_deg.rem_euclid(360.0) / 45.0).round() as usize) % 8;
+    [
+        North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest,
+    ][sector]
 }
 
 fn unknown_mounting() -> PvMounting {
@@ -175,6 +190,15 @@ fn unknown_mounting() -> PvMounting {
 
 impl PvSystem {
     fn obstruction(&self, index: usize) -> f64 {
+        if let Some(situation) = &self.obstruction {
+            return crate::solar_shading::collector_obstruction_factor(
+                situation,
+                nearest_orientation(self.azimuth_deg),
+                self.tilt_deg,
+                index as u8 + 1,
+            )
+            .unwrap_or(1.0);
+        }
         if self.obstruction_factors.len() == 12 {
             self.obstruction_factors[index]
         } else {
@@ -259,12 +283,33 @@ pub fn validate_pv(system: &PvSystem, path: &str) -> Vec<PvIssue> {
         push("pv_tilt_invalid", "tiltDeg");
     }
     let factors = &system.obstruction_factors;
-    if !(factors.len() == 1 || factors.len() == 12)
-        || factors
-            .iter()
-            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
-    {
-        push("pv_obstruction_factor_invalid", "obstructionFactors");
+    match &system.obstruction {
+        Some(situation) => {
+            if !factors.is_empty() {
+                push("pv_obstruction_declared_twice", "obstruction");
+            }
+            let orientation = nearest_orientation(system.azimuth_deg);
+            if (1..=12).any(|month| {
+                crate::solar_shading::collector_obstruction_factor(
+                    situation,
+                    orientation,
+                    system.tilt_deg,
+                    month,
+                )
+                .is_none()
+            }) {
+                push("pv_obstruction_invalid", "obstruction");
+            }
+        }
+        None => {
+            if !(factors.len() == 1 || factors.len() == 12)
+                || factors
+                    .iter()
+                    .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+            {
+                push("pv_obstruction_factor_invalid", "obstructionFactors");
+            }
+        }
     }
     if let Some(collective) = &system.collective {
         if !positive(collective.building_usable_floor_area_m2) {
@@ -325,9 +370,45 @@ mod tests {
             tilt_deg: 30.0,
             mounting: PvMounting::ModeratelyVentilated,
             obstruction_factors: vec![1.0],
+            obstruction: None,
             collective: None,
             source_reference: "datasheet".into(),
         }
+    }
+
+    #[test]
+    fn collector_obstruction_situation_feeds_16_3() {
+        use crate::solar_shading::{CollectorObstruction, ObstructionSide};
+        let mut shaded = system();
+        shaded.obstruction_factors.clear();
+        shaded.obstruction = Some(CollectorObstruction::Full);
+        assert!(
+            validate_pv(&shaded, "pv").is_empty(),
+            "{:?}",
+            validate_pv(&shaded, "pv")
+        );
+        let open = monthly_yield_kwh(&system(), 100.0);
+        let full = monthly_yield_kwh(&shaded, 100.0);
+        assert!(full[0] < open[0]);
+        // Minimal obstruction for collectors is 1,00 (table 17.6).
+        shaded.obstruction = Some(CollectorObstruction::Minimal);
+        let minimal = monthly_yield_kwh(&shaded, 100.0);
+        assert!((minimal[5] - open[5]).abs() < 1e-9);
+        // Both routes at once are rejected.
+        shaded.obstruction_factors = vec![1.0];
+        shaded.obstruction = Some(CollectorObstruction::SideObstruction {
+            side: ObstructionSide::Both,
+            relative_width: 0.5,
+        });
+        assert!(!validate_pv(&shaded, "pv").is_empty());
+        assert_eq!(
+            nearest_orientation(170.0),
+            crate::climate::Orientation::South
+        );
+        assert_eq!(
+            nearest_orientation(350.0),
+            crate::climate::Orientation::North
+        );
     }
 
     #[test]

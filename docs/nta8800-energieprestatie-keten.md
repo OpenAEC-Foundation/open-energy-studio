@@ -518,3 +518,5 @@ Generator `multiple` bevat twee of meer opwekkers, elk met een preferentie (1 = 
 - 17.15 bij volledige belemmering, een dakrand of situatie g.
 
 Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerdere tussenversie gebruikte voor collectoren ten onrechte de raamtabel 17.4.
+
+**Belemmering van PV-panelen (16.3).** Een PV-systeem kan `obstruction` krijgen met een situatie uit §17.3 voor collectoren (tabellen 17.6/17.12/17.15). Er wordt dan geen `obstructionFactors` opgegeven. De kern gebruikt de dichtstbijzijnde van de acht tabeloriëntaties. Uit de maandfactor volgt ook c_sh;PV volgens tabel 16.3.
