@@ -84,6 +84,8 @@ Deze keuzes staan ook in de uitvoer (`interpretations`):
 13. ΔU_for: ventilatieroosters (8.2.2.2.1) vallen onder §8.2.2.2 en mogen meetellen. Ramen, deuren, panelen en daklichten niet.
 14. R_calc wordt naar beneden afgerond (E.2.1.1): opgegeven R_calc, E.4 met R_D (`declared_resistance`) en foliepakketten d/0,03.
 15. Zoldervloeren (`attic_floor`) gebruiken de vloerrijen van tabel I.4/I.5 met R_si = 0,10 (warmtestroom omhoog). Vloeren boven kruipruimte of op de grond blijven op 0,17.
+16. Forfaitaire constructies naar een onverwarmde ruimte (`towardsUnheatedSpace`): in I.1 wordt R_se vervangen door de R_si van die ruimte bij dezelfde warmtestroomrichting (8.4.2.1).
+17. `renovation` bij "aanwezig, dikte onbekend" volgt ISSO 82.1/75.1 §8.7.2.1 (afb. 8.14) over de jaarklassen van tabel I.5/I.6. Drijvende gebouwen worden afgewezen (`renovation_year_classes_unavailable`). Het renovatiejaar ligt niet vóór het bouwjaar (`renovation_year_invalid`).
 
 ## Open punten
 

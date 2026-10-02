@@ -192,6 +192,20 @@ pub enum InsulationState {
     },
 }
 
+/// Renovation or later extension with insulation of undeterminable
+/// thickness (ISSO 82.1/75.1 §8.7.2.1, afb. 8.14).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Renovation {
+    /// Year of the renovation or extension; `None` when unknown.
+    #[serde(default)]
+    pub year: Option<i32>,
+    /// Evidence (in the project dossier) that the insulation met the R_c
+    /// requirement of that year.
+    #[serde(default)]
+    pub meets_requirements_of_year: bool,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForfaitOpaque {
@@ -204,6 +218,14 @@ pub struct ForfaitOpaque {
     /// Override of R_si when the heat flow differs from the usual one.
     #[serde(default)]
     pub r_si_override: Option<f64>,
+    /// Bordering an unheated space: R_se becomes the space-side R_si of
+    /// table C.2 for the same heat-flow direction (8.4.2.1).
+    #[serde(default)]
+    pub towards_unheated_space: bool,
+    /// Post-insulation at a renovation or in an extension, thickness not
+    /// determinable; only with `PresentUnknownThickness`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub renovation: Option<Renovation>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -235,6 +257,76 @@ fn table_i4(element: ElementType, cavity: bool, insulated: bool) -> Option<f64> 
 }
 
 /// Tables I.5–I.7 for construction years from 1965.
+/// Year classes of tables I.5/I.6 (regular buildings, caravans): start year
+/// and R_c per class.
+fn year_bounds(element: ElementType, building: BuildingKind) -> Option<&'static [(i32, f64)]> {
+    const REGULAR_FACADE: &[(i32, f64)] = &[
+        (1965, 0.43),
+        (1975, 1.3),
+        (1983, 1.3),
+        (1988, 2.0),
+        (1992, 2.5),
+        (2014, 3.5),
+        (2015, 4.5),
+        (2021, 4.7),
+    ];
+    const REGULAR_FLOOR: &[(i32, f64)] = &[
+        (1965, 0.17),
+        (1975, 0.52),
+        (1983, 1.3),
+        (1988, 1.3),
+        (1992, 2.5),
+        (2014, 3.5),
+        (2021, 3.7),
+    ];
+    const REGULAR_ROOF: &[(i32, f64)] = &[
+        (1965, 0.86),
+        (1975, 1.3),
+        (1983, 1.3),
+        (1988, 2.0),
+        (1992, 2.5),
+        (2014, 3.5),
+        (2015, 6.0),
+        (2021, 6.3),
+    ];
+    // 1965–1983: 0,19 for façades (0,04 for panels, see table I.6).
+    const CARAVAN_FACADE: &[(i32, f64)] = &[
+        (1965, 0.19),
+        (1983, 1.3),
+        (1992, 2.0),
+        (2014, 2.5),
+        (2021, 2.6),
+    ];
+    const CARAVAN_FLOOR: &[(i32, f64)] = &[
+        (1965, 0.17),
+        (1983, 1.3),
+        (1992, 2.0),
+        (2014, 2.5),
+        (2021, 2.6),
+    ];
+    const CARAVAN_ROOF: &[(i32, f64)] = &[
+        (1965, 0.22),
+        (1983, 1.3),
+        (1992, 2.0),
+        (2014, 2.5),
+        (2021, 2.6),
+    ];
+    match (building, element.table_row()) {
+        (BuildingKind::Regular, ElementType::Facade) => Some(REGULAR_FACADE),
+        (BuildingKind::Regular, ElementType::Floor) => Some(REGULAR_FLOOR),
+        (BuildingKind::Regular, ElementType::Roof) => Some(REGULAR_ROOF),
+        (BuildingKind::Caravan, ElementType::Facade) => Some(CARAVAN_FACADE),
+        (BuildingKind::Caravan, ElementType::Floor) => Some(CARAVAN_FLOOR),
+        (BuildingKind::Caravan, ElementType::Roof) => Some(CARAVAN_ROOF),
+        _ => None,
+    }
+}
+
+/// Index of the year class containing `year`; `None` before 1965.
+fn year_class(bounds: &[(i32, f64)], year: i32) -> Option<usize> {
+    bounds.iter().rposition(|(from, _)| year >= *from)
+}
+
 fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option<f64> {
     let element = element.table_row();
     let pick = |bounds: &[(i32, f64)]| {
@@ -245,63 +337,9 @@ fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option
             .map(|(_, r)| *r)
     };
     match building {
-        BuildingKind::Regular => match element {
-            ElementType::Facade => pick(&[
-                (1965, 0.43),
-                (1975, 1.3),
-                (1983, 1.3),
-                (1988, 2.0),
-                (1992, 2.5),
-                (2014, 3.5),
-                (2015, 4.5),
-                (2021, 4.7),
-            ]),
-            ElementType::Floor => pick(&[
-                (1965, 0.17),
-                (1975, 0.52),
-                (1983, 1.3),
-                (1988, 1.3),
-                (1992, 2.5),
-                (2014, 3.5),
-                (2021, 3.7),
-            ]),
-            ElementType::Roof => pick(&[
-                (1965, 0.86),
-                (1975, 1.3),
-                (1983, 1.3),
-                (1988, 2.0),
-                (1992, 2.5),
-                (2014, 3.5),
-                (2015, 6.0),
-                (2021, 6.3),
-            ]),
-            ElementType::FloatingHull | ElementType::AtticFloor => None,
-        },
-        BuildingKind::Caravan => match element {
-            // 1965–1983: 0,19 for façades (0,04 for panels, see table I.6).
-            ElementType::Facade => pick(&[
-                (1965, 0.19),
-                (1983, 1.3),
-                (1992, 2.0),
-                (2014, 2.5),
-                (2021, 2.6),
-            ]),
-            ElementType::Floor => pick(&[
-                (1965, 0.17),
-                (1983, 1.3),
-                (1992, 2.0),
-                (2014, 2.5),
-                (2021, 2.6),
-            ]),
-            ElementType::Roof => pick(&[
-                (1965, 0.22),
-                (1983, 1.3),
-                (1992, 2.0),
-                (2014, 2.5),
-                (2021, 2.6),
-            ]),
-            ElementType::FloatingHull | ElementType::AtticFloor => None,
-        },
+        BuildingKind::Regular | BuildingKind::Caravan => {
+            year_bounds(element, building).and_then(pick)
+        }
         BuildingKind::Floating {
             new_berth_since_2018,
         } => {
@@ -410,6 +448,29 @@ impl ForfaitOpaque {
                 path: path.to_string(),
             });
         }
+        if let Some(renovation) = &self.renovation {
+            if !matches!(self.insulation, InsulationState::PresentUnknownThickness) {
+                issues.push(ForfaitIssue {
+                    code: "renovation_requires_present_unknown_thickness",
+                    path: format!("{path}.renovation"),
+                });
+            }
+            if year_bounds(self.element, self.building).is_none() {
+                issues.push(ForfaitIssue {
+                    code: "renovation_year_classes_unavailable",
+                    path: format!("{path}.renovation"),
+                });
+            }
+            if renovation
+                .year
+                .is_some_and(|year| !(self.construction_year..=2100).contains(&year))
+            {
+                issues.push(ForfaitIssue {
+                    code: "renovation_year_invalid",
+                    path: format!("{path}.renovation.year"),
+                });
+            }
+        }
         if self
             .r_si_override
             .is_some_and(|r| ![0.10, 0.13, 0.17].iter().any(|v| (v - r).abs() < 1e-9))
@@ -424,10 +485,38 @@ impl ForfaitOpaque {
 
     fn forfait_rc_from_tables(&self) -> Option<f64> {
         let insulated = matches!(self.insulation, InsulationState::PresentUnknownThickness);
+        if let (true, Some(renovation)) = (insulated, &self.renovation) {
+            return self.renovated_rc(renovation);
+        }
         if self.construction_year < 1965 {
             table_i4(self.element, self.cavity, insulated)
         } else {
             year_table(self.element, self.building, self.construction_year)
+        }
+    }
+
+    /// §8.7.2.1 / afb. 8.14 (ISSO 82.1 p. 84–85, 75.1 p. 88–89):
+    /// - year known, evidence of that year's requirement: its year class;
+    /// - year known, no evidence: the class before it, at most "1992 tot
+    ///   2014" (R_c 2,5);
+    /// - year unknown: the class after the original one; before 1965 the
+    ///   "(na)geïsoleerd" column of table I.4.
+    fn renovated_rc(&self, renovation: &Renovation) -> Option<f64> {
+        let bounds = year_bounds(self.element, self.building)?;
+        let insulated_pre_1965 = || table_i4(self.element, self.cavity, true);
+        match renovation.year {
+            Some(year) if renovation.meets_requirements_of_year => match year_class(bounds, year) {
+                Some(index) => Some(bounds[index].1),
+                None => insulated_pre_1965(),
+            },
+            Some(year) => match year_class(bounds, year) {
+                Some(index) if index > 0 => Some(bounds[index - 1].1.min(2.5)),
+                _ => insulated_pre_1965(),
+            },
+            None => match year_class(bounds, self.construction_year) {
+                Some(index) => Some(bounds[(index + 1).min(bounds.len() - 1)].1),
+                None => insulated_pre_1965(),
+            },
         }
     }
 
@@ -460,6 +549,9 @@ impl ForfaitOpaque {
                 }
                 (r, "I.2.1.4")
             }
+            InsulationState::PresentUnknownThickness if self.renovation.is_some() => {
+                (self.forfait_rc_from_tables().unwrap_or(f64::NAN), "8.7.2.1")
+            }
             _ => (
                 self.forfait_rc_from_tables().unwrap_or(f64::NAN),
                 if self.construction_year < 1965 {
@@ -472,8 +564,14 @@ impl ForfaitOpaque {
         let r_si = self
             .r_si_override
             .unwrap_or_else(|| self.element.default_r_si());
+        // 8.4.2.1: towards an unheated space R_se is the space-side R_si.
+        let r_se = if self.towards_unheated_space {
+            r_si
+        } else {
+            0.04
+        };
         // I.1, rounded to two decimals.
-        let u_c = round_half_up(1.0 / (r_c + r_si + 0.04), 2);
+        let u_c = round_half_up(1.0 / (r_c + r_si + r_se), 2);
         ForfaitOpaqueResult { r_c, u_c, route }
     }
 }
@@ -697,7 +795,69 @@ mod tests {
             insulation,
             cavity: true,
             r_si_override: None,
+            towards_unheated_space: false,
+            renovation: None,
         }
+    }
+
+    #[test]
+    fn renovation_follows_afb_8_14() {
+        let renovated = |year: Option<i32>, evidence: bool| {
+            let mut facade = element(1978, InsulationState::PresentUnknownThickness);
+            facade.renovation = Some(Renovation {
+                year,
+                meets_requirements_of_year: evidence,
+            });
+            assert!(facade.validate("f").is_empty());
+            facade.calculate()
+        };
+        // Without renovation the 1975–1983 class: 1,3.
+        let plain = element(1978, InsulationState::PresentUnknownThickness).calculate();
+        assert_eq!(plain.r_c, 1.3);
+        // Year unknown: the class after 1975–1983 (1983–1988): 1,3;
+        // from 1983 the next class is 1988–1992: 2,0.
+        assert_eq!(renovated(None, false).r_c, 1.3);
+        let mut later = element(1985, InsulationState::PresentUnknownThickness);
+        later.renovation = Some(Renovation {
+            year: None,
+            meets_requirements_of_year: false,
+        });
+        assert_eq!(later.calculate().r_c, 2.0);
+        assert_eq!(later.calculate().route, "8.7.2.1");
+        // 1995 with evidence: 1992–2014 (2,5); without: 1988–1992 (2,0).
+        assert_eq!(renovated(Some(1995), true).r_c, 2.5);
+        assert_eq!(renovated(Some(1995), false).r_c, 2.0);
+        // Without evidence at most "1992 tot 2014": 2,5.
+        assert_eq!(renovated(Some(2022), false).r_c, 2.5);
+        assert_eq!(renovated(Some(2022), true).r_c, 4.7);
+        // Before 1965 with unknown year: the "(na)geïsoleerd" column.
+        let mut old = element(1950, InsulationState::PresentUnknownThickness);
+        old.renovation = Some(Renovation {
+            year: None,
+            meets_requirements_of_year: false,
+        });
+        assert_eq!(old.calculate().r_c, 0.85);
+        // Renovation needs "present, thickness unknown" and a year from
+        // the construction year on.
+        let mut wrong = element(1978, InsulationState::AbsentOrUnknown);
+        wrong.renovation = Some(Renovation {
+            year: Some(1970),
+            meets_requirements_of_year: true,
+        });
+        let codes: Vec<_> = wrong.validate("f").iter().map(|i| i.code).collect();
+        assert!(codes.contains(&"renovation_requires_present_unknown_thickness"));
+        assert!(codes.contains(&"renovation_year_invalid"));
+    }
+
+    #[test]
+    fn unheated_space_side_uses_r_si_for_r_se() {
+        let mut wall = element(1970, InsulationState::AbsentOrUnknown);
+        let outdoor = wall.calculate().u_c;
+        wall.towards_unheated_space = true;
+        let unheated = wall.calculate().u_c;
+        // 8.4.2.1: R_se 0,04 becomes the horizontal R_si 0,13.
+        assert_eq!(outdoor, round_half_up(1.0 / (0.43 + 0.13 + 0.04), 2));
+        assert_eq!(unheated, round_half_up(1.0 / (0.43 + 0.13 + 0.13), 2));
     }
 
     #[test]

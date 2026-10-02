@@ -143,3 +143,7 @@ Een onverwarmde ruimte in het project (`unheatedSpaces`) heeft óf een opgegeven
 Wordt per zone gerekend, dan telt de kern H_zi,j;ztu van de andere projectzones die aan dezelfde ruimte grenzen automatisch op bij Σ_j, bovenop `otherZonesConductanceWPerK`.
 
 Beide velden tegelijk geeft `unheated_factor_declared_and_derived`. Geen van beide geeft `unheated_reduction_factor_required`.
+
+## Leidingdoorvoeren in de projectroute
+
+`ntaCalculation.verticalPipes` geeft de verticale leidingen van 7.3.3 (H_p, 7.17) voor een project met één rekenzone. Bij meer zones staan ze per zone in `zoneData[].verticalPipes`; een projectlijst geeft dan `vertical_pipes_per_zone_required`, zodat dezelfde leiding niet in elke zone wordt meegeteld.

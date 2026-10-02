@@ -314,7 +314,9 @@ pub(crate) fn loss_area(envelope: &SurveyEnvelope) -> f64 {
         .iter()
         .map(|surface| {
             let weight = match surface.boundary {
-                SurfaceBoundary::Outdoor | SurfaceBoundary::UnheatedSpace { .. } => 1.0,
+                SurfaceBoundary::Outdoor
+                | SurfaceBoundary::StronglyVentilated
+                | SurfaceBoundary::UnheatedSpace { .. } => 1.0,
                 SurfaceBoundary::Ground
                 | SurfaceBoundary::Crawlspace
                 | SurfaceBoundary::UnheatedCellar => 0.7,

@@ -291,9 +291,14 @@ pub enum WallConstruction {
 pub struct Construction {
     pub floor: FloorConstruction,
     pub wall: WallConstruction,
-    /// (Very) heavy floor with a lighter (suspended) ceiling.
+    /// (Very) heavy floor with a lighter (suspended) ceiling, or the top
+    /// of a floor heavier than the underside of the floor above (step 3).
     #[serde(default)]
     pub lighter_ceiling: bool,
+    /// Closed or suspended ceiling (less than 15 % open), any floor type:
+    /// the first column of table 7.5 (75.1 p. 66; 82.1 table 7.4).
+    #[serde(default)]
+    pub closed_or_suspended_ceiling: bool,
     pub source_reference: String,
 }
 
@@ -309,7 +314,9 @@ pub fn thermal_mass(construction: &Construction) -> (MassClass, MassClass, Ceili
         WallConstruction::Heavy => MassClass::Heavy,
         WallConstruction::VeryHeavy => MassClass::VeryHeavy,
     };
-    let ceiling = if construction.lighter_ceiling && floor != MassClass::Light {
+    let ceiling = if construction.closed_or_suspended_ceiling
+        || (construction.lighter_ceiling && floor != MassClass::Light)
+    {
         CeilingColumn::ClosedOrSuspended
     } else {
         CeilingColumn::OpenOrNone
@@ -395,10 +402,26 @@ mod tests {
             floor: FloorConstruction::VeryHeavy,
             wall: WallConstruction::Heavy,
             lighter_ceiling: true,
+            closed_or_suspended_ceiling: false,
             source_reference: "survey".into(),
         });
         assert_eq!(floor, MassClass::VeryHeavy);
         assert_eq!(wall, MassClass::Heavy);
         assert_eq!(ceiling, CeilingColumn::ClosedOrSuspended);
+        // A light floor with a suspended ceiling also takes the first
+        // column (table 7.5: light/light 55 instead of 80).
+        let light = |closed: bool, lighter: bool| {
+            thermal_mass(&Construction {
+                floor: FloorConstruction::Light,
+                wall: WallConstruction::Light,
+                lighter_ceiling: lighter,
+                closed_or_suspended_ceiling: closed,
+                source_reference: "survey".into(),
+            })
+            .2
+        };
+        assert_eq!(light(true, false), CeilingColumn::ClosedOrSuspended);
+        assert_eq!(light(false, true), CeilingColumn::OpenOrNone);
+        assert_eq!(light(false, false), CeilingColumn::OpenOrNone);
     }
 }

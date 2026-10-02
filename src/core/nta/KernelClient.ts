@@ -2346,6 +2346,8 @@ export interface ResidentialSurvey {
     floor: 'light' | 'heavy' | 'very_heavy';
     wall: 'light' | 'heavy' | 'very_heavy';
     lighterCeiling?: boolean;
+    /** Closed or suspended ceiling, any floor type (table 7.5 first column). */
+    closedOrSuspendedCeiling?: boolean;
     sourceReference: string;
   };
   measuredInfiltration?: { qv10Dm3PerSM2: number; sourceReference: string } | null;
@@ -2358,7 +2360,7 @@ export interface ResidentialSurvey {
       id: string;
       element: 'facade' | 'roof' | 'floor';
       boundary:
-        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' | 'unheated_cellar' }
+        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' | 'unheated_cellar' | 'strongly_ventilated' }
         | { kind: 'unheated_space'; spaceId: string };
       grossAreaM2: number;
       orientation?: NtaOrientation;
@@ -2370,6 +2372,8 @@ export interface ResidentialSurvey {
       reedThicknessMm?: number | null;
       exposedPerimeterM?: number;
       crawlspaceBottomInsulated?: boolean | null;
+      /** §8.7.2.1: insulated at a renovation or extension (with present_unknown_thickness). */
+      renovation?: { year?: number | null; meetsRequirementsOfYear?: boolean } | null;
       sourceReference: string;
     }>;
     windows?: Array<{
@@ -2424,7 +2428,7 @@ export interface ResidentialSurvey {
   hotWater: {
     generator:
       | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' }
-      | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number }
+      | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number; cwClass?: 'cw1' | 'cw2' | 'cw3' | 'cw4_to6' | 'unknown' | null }
       | { kind: 'heat_pump'; exhaustAirSource: boolean };
     served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
     kitchenLengthM?: number;
@@ -3225,8 +3229,11 @@ export interface NtaCalculationInput {
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
   ventilation?: VentilationInput | null;
+  /** 7.3.3 vertical pipes (single-zone projects; per zone in `zoneData`). */
+  verticalPipes?: Array<{ id: string; storeys: number; insulated: boolean; sharedZones?: number; sourceReference: string }>;
   zoneData?: Array<{
     zoneId: string;
+    verticalPipes?: Array<{ id: string; storeys: number; insulated: boolean; sharedZones?: number; sourceReference: string }>;
     functionAreas?: Array<{ function: NtaUsageFunction; areaM2: number }>;
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
     ventilation?: VentilationInput | null;

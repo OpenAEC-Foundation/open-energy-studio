@@ -40,6 +40,18 @@ pub enum GaskeurAnswer {
     Unknown,
 }
 
+/// CW class of a gas appliance with Gaskeur (table 13.6, p. 168).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CwClassAnswer {
+    /// Kitchen use, CW-1 or CW-1+.
+    Cw1,
+    Cw2,
+    Cw3,
+    Cw4To6,
+    Unknown,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HotWaterGeneratorAnswer {
@@ -52,6 +64,9 @@ pub enum HotWaterGeneratorAnswer {
         /// Burner load on the higher heating value, kW.
         #[serde(default, rename = "burnerLoadKw")]
         burner_load_kw: Option<f64>,
+        /// CW class when a Gaskeur is present; omitted means unknown.
+        #[serde(default, rename = "cwClass")]
+        cw_class: Option<CwClassAnswer>,
     },
     ElectricBoiler,
     ElectricInstantaneous,
@@ -203,6 +218,7 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
             appliance_type,
             gaskeur,
             burner_load_kw,
+            cw_class,
         } => {
             let mut kind = *appliance_type;
             if kind == GasApplianceType::Unknown {
@@ -245,19 +261,37 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
                 (GasApplianceType::Combi, _) => "combi_gaskeur",
                 (GasApplianceType::Unknown, _) => unreachable!("replaced above"),
             };
-            if gaskeur != GaskeurAnswer::None && kind != GasApplianceType::KitchenGeyser {
-                recorder.record(
-                    "cw_class_unknown_cw_4_5_6",
-                    "hotWater.generator",
-                    "class 4".into(),
-                    "ISSO 82.1 p. 168 (table 13.6)",
-                );
-            }
-            json!({
+            // Table 13.6: the CW class counts only with a Gaskeur; unknown
+            // is CW-4/5/6 (the kernel's class 4).
+            let class = if gaskeur != GaskeurAnswer::None && kind != GasApplianceType::KitchenGeyser
+            {
+                match cw_class.unwrap_or(CwClassAnswer::Unknown) {
+                    CwClassAnswer::Cw1 => Some("class1"),
+                    CwClassAnswer::Cw2 => Some("class2"),
+                    CwClassAnswer::Cw3 => Some("class3"),
+                    CwClassAnswer::Cw4To6 => Some("class4"),
+                    CwClassAnswer::Unknown => {
+                        recorder.record(
+                            "cw_class_unknown_cw_4_5_6",
+                            "hotWater.generator.cwClass",
+                            "class 4".into(),
+                            "ISSO 82.1 p. 168 (table 13.6)",
+                        );
+                        Some("class4")
+                    }
+                }
+            } else {
+                None
+            };
+            let mut value = json!({
                 "kind": "gas_appliance",
                 "appliance": appliance,
                 "kitchenOnly": survey.served == TapsServed::KitchenOnly,
-            })
+            });
+            if let Some(class) = class {
+                value["measuredClass"] = json!(class);
+            }
+            value
         }
         HotWaterGeneratorAnswer::ElectricBoiler => json!({"kind": "electric_boiler"}),
         HotWaterGeneratorAnswer::ElectricInstantaneous => {
@@ -359,6 +393,7 @@ mod tests {
                 appliance_type: GasApplianceType::Unknown,
                 gaskeur: GaskeurAnswer::Unknown,
                 burner_load_kw: None,
+                cw_class: None,
             }),
             &mut recorder,
         );
@@ -380,9 +415,46 @@ mod tests {
                 appliance_type: GasApplianceType::KitchenGeyser,
                 gaskeur: GaskeurAnswer::Gaskeur,
                 burner_load_kw: Some(17.0),
+                cw_class: None,
             }),
             &mut recorder,
         );
         assert_eq!(geyser["generator"]["appliance"], "water_heater_gaskeur");
+        assert_eq!(geyser["generator"]["measuredClass"], "class4");
+    }
+
+    #[test]
+    fn cw_class_sets_the_measured_class() {
+        let mut recorder = Recorder::default();
+        let combi = |cw_class| HotWaterGeneratorAnswer::GasAppliance {
+            appliance_type: GasApplianceType::Combi,
+            gaskeur: GaskeurAnswer::GaskeurHrCw,
+            burner_load_kw: None,
+            cw_class,
+        };
+        let known = derive_hot_water(&survey(combi(Some(CwClassAnswer::Cw2))), &mut recorder);
+        assert_eq!(known["generator"]["appliance"], "combi_gaskeur_hr_cw");
+        assert_eq!(known["generator"]["measuredClass"], "class2");
+        assert!(!recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "cw_class_unknown_cw_4_5_6"));
+        let unknown = derive_hot_water(&survey(combi(None)), &mut recorder);
+        assert_eq!(unknown["generator"]["measuredClass"], "class4");
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "cw_class_unknown_cw_4_5_6"));
+        // Without a Gaskeur the CW class is not used.
+        let plain = derive_hot_water(
+            &survey(HotWaterGeneratorAnswer::GasAppliance {
+                appliance_type: GasApplianceType::Combi,
+                gaskeur: GaskeurAnswer::None,
+                burner_load_kw: None,
+                cw_class: Some(CwClassAnswer::Cw2),
+            }),
+            &mut recorder,
+        );
+        assert!(plain["generator"].get("measuredClass").is_none());
     }
 }
