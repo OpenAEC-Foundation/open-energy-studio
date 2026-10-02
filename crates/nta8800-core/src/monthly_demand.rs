@@ -52,7 +52,7 @@ pub const H_INT_SPEC: f64 = 2.0;
 
 pub const OMITTED_CORRECTIONS: &[&str] = &[
     "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl of chapter 10 is still 0",
-    "7.3.3 vertical ducts H_p and 8.5 adjacent heated spaces H_A",
+    "8.5 adjacent heated spaces H_A",
     "§17.3 obstruction situations b–g are declared, not derived",
     "table 7.10 footnote c is the caller's column choice",
     "annex D for floors other than slab on ground (crawlspace, basement)",
@@ -198,6 +198,49 @@ pub struct ComponentTransmission {
     /// Slab-on-ground floors, §8.3.
     pub ground_floors: Vec<SlabOnGround>,
     pub ground_inventory_confirmed: bool,
+    /// 7.3.3 vertical pipes through the thermal envelope open to outdoor
+    /// air (rainwater, sewer and vent stacks), `H_p` of 7.17.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vertical_pipes: Vec<VerticalPipe>,
+}
+
+/// One vertical pipe of 7.3.3.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VerticalPipe {
+    pub id: String,
+    /// N_bouwlaag;j: storeys of the zone (all of them, note 2 of 7.3.3).
+    pub storeys: u32,
+    /// Table 7.1 footnote a: more than 90 % insulated with λ ≤ 0,1.
+    pub insulated: bool,
+    /// Zones or adjacent heated spaces the pipe borders, this zone
+    /// included; H_p is split evenly (7.3.3). Default 1.
+    #[serde(default = "one_zone")]
+    pub shared_zones: u32,
+    pub source_reference: String,
+}
+
+fn one_zone() -> u32 {
+    1
+}
+
+/// Table 7.1, W/K per storey.
+pub const VERTICAL_PIPE_UNINSULATED_W_PER_K: f64 = 1.8;
+pub const VERTICAL_PIPE_INSULATED_W_PER_K: f64 = 0.5;
+
+/// 7.17 with the split over the bordering zones.
+pub fn vertical_pipe_conductance_w_per_k(pipes: &[VerticalPipe]) -> f64 {
+    pipes
+        .iter()
+        .map(|pipe| {
+            let specific = if pipe.insulated {
+                VERTICAL_PIPE_INSULATED_W_PER_K
+            } else {
+                VERTICAL_PIPE_UNINSULATED_W_PER_K
+            };
+            f64::from(pipe.storeys) * specific / f64::from(pipe.shared_zones.max(1))
+        })
+        .sum()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1331,6 +1374,8 @@ pub struct TransmissionSummary {
     pub conductance_w_per_k: f64,
     pub direct_conductance_w_per_k: Option<f64>,
     pub unheated_conductance_w_per_k: Option<f64>,
+    /// 7.3.3 `H_p` (components route), W/K.
+    pub vertical_pipe_conductance_w_per_k: Option<f64>,
     /// Steady `H_g` (8.36/8.37) summed over the slabs (components route), W/K.
     pub ground_steady_conductance_w_per_k: Option<f64>,
     /// Annex D.1 `H_g;an;mi`, W/K.
@@ -1426,6 +1471,7 @@ fn resolve_transmission(
                 conductance_w_per_k: transmission.conductance_w_per_k,
                 direct_conductance_w_per_k: None,
                 unheated_conductance_w_per_k: None,
+                vertical_pipe_conductance_w_per_k: None,
                 ground_steady_conductance_w_per_k: None,
                 ground_monthly_conductance_w_per_k: monthly,
                 ground_heating_adjusted_w_per_k: heating_adjusted,
@@ -1457,6 +1503,27 @@ fn resolve_transmission(
                     "ground_inventory_unconfirmed",
                     "transmission.groundInventoryConfirmed",
                 ));
+            }
+            let mut pipe_ids = HashSet::new();
+            for (index, pipe) in components.vertical_pipes.iter().enumerate() {
+                let path = format!("transmission.verticalPipes[{index}]");
+                if pipe.id.trim().is_empty() || !pipe_ids.insert(pipe.id.as_str()) {
+                    issues.push(issue("vertical_pipe_id_invalid", format!("{path}.id")));
+                }
+                if pipe.storeys == 0 {
+                    issues.push(issue("vertical_pipe_storeys_invalid", format!("{path}.storeys")));
+                }
+                if pipe.shared_zones == 0 {
+                    issues.push(issue(
+                        "vertical_pipe_shared_zones_invalid",
+                        format!("{path}.sharedZones"),
+                    ));
+                }
+                check_reference(
+                    &pipe.source_reference,
+                    format!("{path}.sourceReference"),
+                    issues,
+                );
             }
             let mut slabs = Vec::new();
             let mut ids = HashSet::new();
@@ -1507,11 +1574,16 @@ fn resolve_transmission(
                 input.setpoints.cooling_c,
                 annual_mean,
             );
+            // 7.16: H_p adds to the transfer to outdoor air.
+            let pipes = vertical_pipe_conductance_w_per_k(&components.vertical_pipes);
             Some(TransmissionSummary {
                 method: "components",
-                conductance_w_per_k: direct_conductance + unheated_conductance.unwrap_or(0.0),
+                conductance_w_per_k: direct_conductance
+                    + unheated_conductance.unwrap_or(0.0)
+                    + pipes,
                 direct_conductance_w_per_k: Some(direct_conductance),
                 unheated_conductance_w_per_k: unheated_conductance,
+                vertical_pipe_conductance_w_per_k: Some(pipes),
                 ground_steady_conductance_w_per_k: Some(
                     slabs.iter().map(|slab| slab.steady_w_per_k).sum(),
                 ),
@@ -2891,6 +2963,30 @@ mod tests {
         let jan = &result.monthly[0];
         let tau = 180.0 * 1000.0 * 100.0 / 3600.0 / (26.0 + ground.heating_adjusted_w_per_k + 40.0);
         assert!((jan.heating.time_constant_h - tau).abs() < 1e-9);
+    }
+
+    #[test]
+    fn vertical_pipes_add_h_p_per_table_7_1() {
+        let mut value = serde_json::to_value(sample()).unwrap();
+        value["transmission"] = json!({
+            "method": "components",
+            "direct": {
+                "elements": [{"id": "wall", "areaM2": 100.0, "uValueWPerM2k": 0.2, "sourceReference": "Rc 4.7"}]
+            },
+            "groundFloors": [],
+            "groundInventoryConfirmed": true,
+            "verticalPipes": [
+                {"id": "hwa", "storeys": 3, "insulated": false, "sourceReference": "survey"},
+                {"id": "riool", "storeys": 3, "insulated": true, "sharedZones": 2, "sourceReference": "survey"}
+            ]
+        });
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        let result = valid(&input);
+        let summary = result.transmission.as_ref().unwrap();
+        // 7.17: 3·1,8 + 3·0,5/2.
+        let pipes = 3.0 * 1.8 + 3.0 * 0.5 / 2.0;
+        assert!((summary.vertical_pipe_conductance_w_per_k.unwrap() - pipes).abs() < 1e-12);
+        assert!((summary.conductance_w_per_k - (20.0 + pipes)).abs() < 1e-12);
     }
 
     #[test]

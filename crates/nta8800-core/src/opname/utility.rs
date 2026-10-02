@@ -523,6 +523,14 @@ pub struct UtilitySurvey {
     pub construction: Construction,
     #[serde(default)]
     pub measured_infiltration: Option<MeasuredInfiltration>,
+    /// Toilet groups, stacked groups counted once (table 7.8, p. 68);
+    /// used when `vertical_pipes` is not determinable.
+    #[serde(default)]
+    pub toilet_stacks: Option<u32>,
+    /// Vertical pipes through the envelope (§7.2.4); `None`: not
+    /// determinable, empty: none present.
+    #[serde(default)]
+    pub vertical_pipes: Option<Vec<super::SurveyVerticalPipe>>,
     pub envelope: SurveyEnvelope,
     /// Windows with evident solar-control glass or film (g 0,4, table 8.14).
     #[serde(default)]
@@ -558,6 +566,7 @@ fn utility_source(rule: &str) -> Option<&'static str> {
         | "glazing_leaded_light_single"
         | "glazing_glass_blocks_double" => "ISSO 75.1 p. 96",
         "door_insulation_unknown_uninsulated" => "ISSO 75.1 p. 30 (conservative), p. 97",
+        "vertical_pipe_insulation_unknown_uninsulated" => "ISSO 75.1 p. 68 (table 7.8)",
         "door_split_window_and_door" => "ISSO 75.1 p. 74",
         "cavity_width_unknown_table_8_26" => "ISSO 75.1 p. 88",
         "opaque_rc_forfait_annex_i" => "ISSO 75.1 p. 88–93 (tables 8.9–8.11), NTA annex I",
@@ -2039,6 +2048,29 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         .map(|item| derive_pv(item, year, recorder))
         .collect();
     let (bacs, bacs_reference) = bacs_factor(&survey.bacs, area, recorder);
+    // Table 7.8 (p. 68): one uninsulated pipe per toilet group through all
+    // storeys when the pipes are not determinable.
+    let stacks = match (&survey.vertical_pipes, survey.toilet_stacks) {
+        (Some(_), _) => 0,
+        (None, Some(stacks)) => {
+            recorder.record(
+                "vertical_pipes_unknown_one_per_toilet_group",
+                "verticalPipes",
+                format!("{stacks} uninsulated pipe(s) through {} storey(s)", survey.storeys.max(1)),
+                "ISSO 75.1 p. 68 (table 7.8); NTA 8800 7.3.3",
+            );
+            stacks
+        }
+        (None, None) => {
+            recorder.record(
+                "vertical_pipes_unknown_one_toilet_group",
+                "toiletStacks",
+                "1 uninsulated pipe (interpretation: at least one toilet group)".into(),
+                "ISSO 75.1 p. 68 (table 7.8); NTA 8800 7.3.3",
+            );
+            1
+        }
+    };
     if !recorder.issues.is_empty() {
         return None;
     }
@@ -2054,6 +2086,13 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
             "unheated": envelope.unheated,
             "groundFloors": envelope.ground_floors,
             "groundInventoryConfirmed": true,
+            "verticalPipes": super::vertical_pipes(
+                survey.vertical_pipes.as_deref(),
+                survey.storeys,
+                stacks,
+                &survey.source_reference,
+                recorder,
+            ),
         },
         "ventilationFlows": [],
         "ventilation": ventilation,

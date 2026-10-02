@@ -105,6 +105,63 @@ pub struct MeasuredInfiltration {
     pub source_reference: String,
 }
 
+/// Vertical pipe through the thermal envelope (§7.2.4, table 7.7).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyVerticalPipe {
+    /// `None`: not determinable, uninsulated (table 7.7).
+    #[serde(default)]
+    pub insulated: Option<bool>,
+    /// Zones or adjacent heated spaces along the part bordering this zone,
+    /// this zone included; `None`: not shared (NTA 7.3.3).
+    #[serde(default)]
+    pub shared_zones: Option<u32>,
+}
+
+/// §7.2.4 table 7.7 and NTA 7.3.3: the vertical pipes, with one
+/// uninsulated pipe per storey of the zone when their number is unknown.
+/// `default_count` is the number of uninsulated pipes when the pipes are
+/// not determinable, with the rule recorded by the caller.
+pub(crate) fn vertical_pipes(
+    pipes: Option<&[SurveyVerticalPipe]>,
+    storeys: u32,
+    default_count: u32,
+    reference: &str,
+    recorder: &mut Recorder,
+) -> Vec<Value> {
+    let storeys = storeys.max(1);
+    let defaulted;
+    let pipes = match pipes {
+        Some(pipes) => pipes,
+        None => {
+            defaulted = vec![SurveyVerticalPipe::default(); default_count as usize];
+            &defaulted
+        }
+    };
+    pipes
+        .iter()
+        .enumerate()
+        .map(|(index, pipe)| {
+            let insulated = pipe.insulated.unwrap_or_else(|| {
+                recorder.record(
+                    "vertical_pipe_insulation_unknown_uninsulated",
+                    &format!("verticalPipes[{index}].insulated"),
+                    "false".into(),
+                    "ISSO 82.1 p. 63 (table 7.7)",
+                );
+                false
+            });
+            json!({
+                "id": format!("leiding-{}", index + 1),
+                "storeys": storeys,
+                "insulated": insulated,
+                "sharedZones": pipe.shared_zones.unwrap_or(1),
+                "sourceReference": format!("{reference}; basisopname §7.2.4"),
+            })
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResidentialSurvey {
@@ -123,6 +180,14 @@ pub struct ResidentialSurvey {
     pub construction: Construction,
     #[serde(default)]
     pub measured_infiltration: Option<MeasuredInfiltration>,
+    /// Storeys of the dwelling (zone); `None`: the storeys served by the
+    /// heating distribution.
+    #[serde(default)]
+    pub storeys: Option<u32>,
+    /// Vertical pipes through the envelope (§7.2.4); `None`: not
+    /// determinable (one uninsulated pipe per storey), empty: none present.
+    #[serde(default)]
+    pub vertical_pipes: Option<Vec<SurveyVerticalPipe>>,
     pub envelope: SurveyEnvelope,
     pub heating: SurveyHeating,
     pub hot_water: SurveyHotWater,
@@ -274,6 +339,15 @@ pub fn derive_residential_input(
         return None;
     }
     let area = survey.usable_floor_area_m2;
+    let storeys = survey.storeys.unwrap_or(survey.heating.storeys).max(1);
+    if survey.vertical_pipes.is_none() {
+        recorder.record(
+            "vertical_pipes_unknown_one_per_storey",
+            "verticalPipes",
+            format!("{storeys} uninsulated pipe(s), {storeys} storey(s) each"),
+            "ISSO 82.1 p. 63 (table 7.7); NTA 8800 7.3.3",
+        );
+    }
     let demand = json!({
         "zoneId": "woning",
         "usableFloorAreaM2": area,
@@ -287,6 +361,13 @@ pub fn derive_residential_input(
             "unheated": envelope.unheated,
             "groundFloors": envelope.ground_floors,
             "groundInventoryConfirmed": true,
+            "verticalPipes": vertical_pipes(
+                survey.vertical_pipes.as_deref(),
+                storeys,
+                storeys,
+                reference,
+                recorder,
+            ),
         },
         "ventilationFlows": [],
         "ventilation": ventilation.input,
@@ -437,6 +518,24 @@ mod tests {
         let codes: Vec<_> = result.issues.iter().map(|item| item.code).collect();
         assert!(codes.contains(&"tap_length_required"));
         assert!(codes.contains(&"cooling_not_supported_in_basisopname"));
+    }
+
+    #[test]
+    fn vertical_pipes_default_to_one_per_storey() {
+        let mut survey = fixture("1930");
+        survey.storeys = Some(2);
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
+        assert_eq!(pipes.as_array().unwrap().len(), 2);
+        assert_eq!(pipes[0]["storeys"], 2);
+        assert_eq!(pipes[0]["insulated"], false);
+        // Determined absent: no pipes.
+        survey.vertical_pipes = Some(Vec::new());
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
+        assert!(pipes.as_array().unwrap().is_empty());
     }
 
     #[test]
