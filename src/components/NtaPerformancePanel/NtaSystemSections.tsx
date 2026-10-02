@@ -39,7 +39,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
   const field = { draft, onChange: change };
   const at = (...rest: Path): Path => [...base, ...rest];
   const kind = read(draft, at('kind'));
-  const otherAux = ['external_heat', 'electric_resistance', 'biomass'].includes(String(kind));
+  const otherAux = ['external_heat', 'electric_resistance', 'biomass', 'chp'].includes(String(kind));
   return <>
     <label>{t('nta.form.generatorKind')}
       <select value={typeof kind === 'string' ? kind : ''} onChange={(event) => {
@@ -51,6 +51,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
         <option value="heat_pump_forfait">{t('nta.form.generator.heatPump')}</option>
         <option value="electric_resistance">{t('nta.form.generator.electric')}</option>
         <option value="biomass">{t('nta.form.generator.biomass')}</option>
+        <option value="chp">{t('nta.form.generator.chp')}</option>
         {allowMultiple && <option value="multiple">{t('nta.form.generator.multiple')}</option>}
         {kind === 'hybrid_heat_pump' && <option value="hybrid_heat_pump">{t('nta.form.generator.hybrid')}</option>}
       </select>
@@ -60,6 +61,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <p className="nta-form-note">{t('nta.form.externalNote')}</p>
     </>}
     {kind === 'electric_resistance' && <TextField {...field} path={at('equipmentReference')} label={t('nta.form.source')} />}
+    {kind === 'chp' && <ChpClassFields draft={draft} change={change} base={base} lowTemperature />}
     {kind === 'biomass' && <>
       <SelectField {...field} path={at('appliance')} label={t('nta.form.biomassAppliance')} options={[
         ['freestanding_wood_stove', t('nta.form.biomass.stove')], ['insert_stove', t('nta.form.biomass.insert')],
@@ -97,6 +99,20 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
   </>;
 }
 
+/** Building CHP with the table 9.31 class (method 2). */
+function ChpClassFields({ draft, change, base, lowTemperature = false }: SectionProps & { base: Path; lowTemperature?: boolean }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  return <>
+    <NumberField {...field} path={[...base, 'chp', 'powerKw']} label={t('nta.form.chp.power')} />
+    <CheckField {...field} path={[...base, 'chp', 'builtAfter2006']} label={t('nta.form.chp.after2006')} />
+    <CheckField {...field} path={[...base, 'chp', 'hreDeclared']} label={t('nta.form.chp.hre')} />
+    {lowTemperature && <CheckField {...field} path={[...base, 'chp', 'lowTemperature']} label={t('nta.form.chp.lowTemperature')} />}
+    <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+    <p className="nta-form-note">{t('nta.form.chp.note')}</p>
+  </>;
+}
+
 /** 9.6.1: generators with preference and nominal power (9.56–9.60, table 9.23). */
 function MultipleGeneratorFields({ draft, change, base, project }: SectionProps & { base: Path; project: IProject }) {
   const { t } = useI18n();
@@ -124,7 +140,8 @@ function hotWaterGeneratorOptions(t: Translate): Array<[string, string]> {
   return [['gas_appliance', t('nta.form.dhwGen.gas')], ['heat_pump', t('nta.form.dhwGen.heatPump')],
     ['electric_instantaneous', t('nta.form.dhwGen.instantaneous')], ['electric_boiler', t('nta.form.dhwGen.electricBoiler')],
     ['indirect_boiler', t('nta.form.dhwGen.indirectBoiler')], ['external_heat', t('nta.form.dhwGen.external')],
-    ['measured_two_profiles', t('nta.form.dhwGen.twoProfiles')], ['heating_system', t('nta.form.dhwGen.heatingSystem')]];
+    ['measured_two_profiles', t('nta.form.dhwGen.twoProfiles')], ['heating_system', t('nta.form.dhwGen.heatingSystem')],
+    ['chp', t('nta.form.generator.chp')]];
 }
 
 const PROFILES: Array<[string, string]> = ['s', 'm', 'l', 'xl', 'xxl', '3xl', '4xl'].map((key) => [key, key.toUpperCase()]);
@@ -257,6 +274,10 @@ export function HotWaterGeneratorFields({ draft, change, base }: SectionProps & 
       ['hr107', 'HR 107'], ['hr100_or104', 'HR 100/104'], ['vr', 'VR'], ['conventional_or_unknown', t('nta.form.dhwGas.unknown')]]} />}
     {kind === 'measured_two_profiles' && <TwoProfileFields draft={draft} change={change} base={base} />}
     {kind === 'heating_system' && <p className="nta-form-note">{t('nta.form.dhwGen.heatingSystemNote')}</p>}
+    {kind === 'chp' && <>
+      <ChpClassFields draft={draft} change={change} base={base} />
+      <CheckField {...field} path={[...base, 'alsoSpaceHeating']} label={t('nta.form.chp.alsoHeating')} />
+    </>}
   </>;
 }
 

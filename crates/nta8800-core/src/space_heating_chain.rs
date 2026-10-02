@@ -2863,9 +2863,19 @@ fn generate(
                     let mut output = 0.0;
                     let mut input_total = 0.0;
                     for (index, row) in monthly.iter_mut().enumerate() {
+                        // 9.6.6.2.2.8: a storage outside the test is supplied
+                        // by the CHP; the building part carries its share.
+                        let (storage_loss, storage_aux, storage_rbl) =
+                            crate::micro_chp::storage_month(
+                                product,
+                                index,
+                                hours[index],
+                                input.demand.setpoints.heating_c,
+                                collective,
+                            );
                         let month = crate::micro_chp::micro_chp_month(
                             product,
-                            row.generator_output_kwh,
+                            row.generator_output_kwh + storage_loss * building_fraction,
                             hours[index],
                             MONTH_HOURS[index],
                             building_fraction,
@@ -2880,7 +2890,7 @@ fn generate(
                         }
                         // 16.15.
                         row.chp_electricity_kwh = month.electricity_kwh;
-                        row.generator_recoverable_loss_kwh = month.recoverable_kwh;
+                        row.generator_recoverable_loss_kwh = month.recoverable_kwh + storage_rbl;
                         let auxiliary = match month.auxiliary_kwh {
                             Some(value) => value,
                             None => other_generator_auxiliary_kwh(
@@ -2891,7 +2901,8 @@ fn generate(
                                 building_fraction,
                             ),
                         };
-                        row.auxiliary_electricity_kwh = Some(auxiliary);
+                        row.auxiliary_electricity_kwh =
+                            Some(auxiliary + storage_aux * building_fraction);
                         output += row.generator_output_kwh;
                         input_total += month.input_kwh;
                     }
@@ -3611,6 +3622,7 @@ mod tests {
             standby_electric_kw: None,
             standby_auxiliary_kw: Some(0.01),
             net_production_measured: false,
+            storage: None,
             test_report_reference: "EN 50465 report".into(),
         };
         let mut input = boiler_chain();
@@ -3636,6 +3648,35 @@ mod tests {
         assert!((jan.chp_electricity_kwh - expected.electricity_kwh).abs() < 1e-9);
         assert!(jan.chp_electricity_kwh > 0.0);
         assert!((jan.generator_recoverable_loss_kwh - 0.4 * hours).abs() < 1e-9);
+        // 9.6.6.2.2.8: a storage outside the test raises the CHP input by
+        // its loss and adds the charging auxiliary energy (installation
+        // room: nothing recoverable, so the need stays equal).
+        let mut room = input.clone();
+        if let Generator::Chp(generator) = &mut room.generator {
+            generator.method1.as_mut().unwrap().location =
+                crate::micro_chp::MicroChpLocation::InstallationRoom;
+        }
+        let mut stored = room.clone();
+        if let Generator::Chp(generator) = &mut stored.generator {
+            generator.method1.as_mut().unwrap().storage = Some(crate::micro_chp::ChpStorage {
+                loss_w_per_k: 2.0,
+                set_temperature_c: 60.0,
+                charging_auxiliary_w: Some(30.0),
+                source_reference: "label".into(),
+            });
+        }
+        let room = assess_space_heating_chain(&room);
+        let with_storage = assess_space_heating_chain(&stored);
+        assert_eq!(with_storage.status, "calculated_unverified");
+        let (plain, stored) = (&room.monthly[0], &with_storage.monthly[0]);
+        assert!((plain.heating_need_kwh - stored.heating_need_kwh).abs() < 1e-9);
+        assert!(stored.natural_gas_kwh > plain.natural_gas_kwh);
+        let hours = room.distribution.as_ref().unwrap().zones[0].operating_hours[0];
+        // The charging pump plus the CHP auxiliary at the higher output.
+        assert!(
+            stored.auxiliary_electricity_kwh.unwrap() - plain.auxiliary_electricity_kwh.unwrap()
+                >= 30.0 * hours / 1000.0 - 1e-9
+        );
         // 9.7: the recoverable generator loss lowers the heating need
         // against a pass without it (7.3–7.8).
         let without = assess_chain_pass(&input, None);

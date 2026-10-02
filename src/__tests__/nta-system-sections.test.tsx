@@ -8,8 +8,8 @@ import {
 } from '../components/NtaPerformancePanel/NtaSystemSections';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
 import {
-  collectorObstructionTemplate, coolingPerformanceTemplate, multipleGeneratorsTemplate, solarWaterHeaterTemplate,
-  testedSolarMethod, windowObstructionTemplate,
+  collectorObstructionTemplate, coolingPerformanceTemplate, hotWaterGeneratorTemplate, multipleGeneratorsTemplate,
+  solarWaterHeaterTemplate, spaceGeneratorTemplate, testedSolarMethod, windowObstructionTemplate,
 } from '../core/nta/NtaSystemTemplates';
 import { renderWithProviders, userEvent } from './test-utils';
 
@@ -59,6 +59,12 @@ describe('NTA system templates', () => {
     expect(coolingPerformanceTemplate('en14511', true)).toMatchObject({ method: 'en14511', roomUnitType: 'split_inverter' });
     expect(coolingPerformanceTemplate('en14511', false)).not.toHaveProperty('roomUnitType');
     expect(coolingPerformanceTemplate('', false)).toBeNull();
+    // Building CHP, method 2 (table 9.31), for space heating and hot water.
+    const chpClass = { powerKw: null, builtAfter2006: true, hreDeclared: false, lowTemperature: false };
+    expect(spaceGeneratorTemplate('chp')).toEqual({
+      kind: 'chp', chp: chpClass, method1: null,
+      auxiliary: { electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' }, equipmentReference: '' });
+    expect(hotWaterGeneratorTemplate('chp')).toEqual({ kind: 'chp', chp: chpClass, alsoSpaceHeating: false, equipmentReference: '' });
   });
 });
 

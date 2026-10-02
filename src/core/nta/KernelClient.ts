@@ -3290,7 +3290,9 @@ export type NtaHotWaterGenerator =
     | { kind: 'external_heat' }
     | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump)
     | ({ kind: 'measured_two_profiles' } & NtaTwoProfileTest)
-    | { kind: 'heating_system' };
+    | { kind: 'heating_system' }
+    /** §13.8.4.7.4/§13.8.4.8 building CHP: method 2 (`chp`) or method 1 (`method1`), exclusive. */
+    | { kind: 'chp'; chp?: NtaChpClass | null; method1?: NtaMicroChp | null; alsoSpaceHeating?: boolean; equipmentReference: string };
 
 /** Chapter 13 hot-water system (several generators, solar systems). */
 export interface NtaHotWaterSystem {
@@ -4017,6 +4019,8 @@ export interface NtaHotWaterAssessment {
     extraElectricOutputKwh: number;
     /** 13.185 output supplied by the space-heating system (§13.8.4.9.3). */
     heatingSystemLoadKwh: number;
+    /** 16.13/16.16 electricity of a hot-water CHP, kWh. */
+    chpElectricityKwh: number;
   }>;
   generators: Array<{ index: number; order: number; monthlyOutputKwh: number[]; monthlyShare: number[] }>;
   /** 13.148/13.149 data of an exhaust-air heat pump. */
@@ -4048,5 +4052,7 @@ export interface NtaMicroChp {
   standbyAuxiliaryKw?: number | null;
   /** Only the net power production was measured (9.72). */
   netProductionMeasured?: boolean;
+  /** 9.6.6.2.2.8 storage outside the test configuration (space heating only). */
+  storage?: { lossWPerK: number; setTemperatureC: number; chargingAuxiliaryW?: number | null; sourceReference: string } | null;
   testReportReference: string;
 }
