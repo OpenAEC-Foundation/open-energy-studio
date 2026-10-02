@@ -15,13 +15,16 @@ pub mod bbl_requirements;
 pub mod boiler_forfait_draft;
 pub mod building_performance;
 pub mod climate;
+pub mod constructions;
 pub mod declared_dhw;
 pub mod declared_heating_table;
 pub mod diagnostic_reference;
 pub mod direct_transmission;
 pub mod domestic_hot_water;
+pub mod envelope_elements;
 pub mod epus_draft;
 pub mod final_energy_draft;
+pub mod forfait_envelope;
 pub mod forfait_heat_pump_draft;
 pub mod forfait_heat_pump_monthly_draft;
 pub mod gas_collective_source_draft;
@@ -40,6 +43,7 @@ pub mod humidification;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
 pub mod label_class;
+pub mod materials;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
 pub mod project_performance;
@@ -52,6 +56,7 @@ pub mod space_heating_chain;
 pub mod tojuli;
 pub mod unheated_transmission;
 pub mod ventilation;
+pub mod window_u;
 use direct_transmission::{DirectElement, DirectTransmissionInput, LinearBridge, PointBridge};
 use heat_pumps::{
     AuxiliaryMeasurementBoundary, HeatPumpInput, HeatSink, HeatSource, InputEnergyCarrier,
@@ -299,6 +304,9 @@ pub fn capabilities() -> KernelCapabilities {
             "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
             "unverified_humidification_dehumidification_chapter_12",
+            "unverified_opaque_construction_u_rc_annex_c_e_f",
+            "unverified_window_door_shutter_u_8_2_2_3_annex_g_l",
+            "forfait_envelope_values_annex_i",
         ],
     }
 }

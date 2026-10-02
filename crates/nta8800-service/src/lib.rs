@@ -37,6 +37,11 @@ pub struct MonthlyDemandRequest {
 }
 
 #[derive(Deserialize)]
+pub struct EnvelopeRequest {
+    pub input: nta8800_core::envelope_elements::EnvelopeInput,
+}
+
+#[derive(Deserialize)]
 pub struct VentilationRequest {
     pub input: nta8800_core::ventilation::VentilationInput,
 }
@@ -186,6 +191,10 @@ pub fn app() -> Router {
         .route(
             "/v1/nta8800/ventilation/calculate",
             post(calculate_ventilation),
+        )
+        .route(
+            "/v1/nta8800/constructions/calculate",
+            post(calculate_constructions),
         )
         .route(
             "/v1/nta8800/project/performance",
@@ -387,6 +396,18 @@ async fn calculate_monthly_demand(
     Json(request): Json<MonthlyDemandRequest>,
 ) -> (StatusCode, Json<Value>) {
     let assessment = nta8800_core::monthly_demand::assess_monthly_demand(&request.input);
+    let status = if assessment.status == "invalid" {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn calculate_constructions(
+    Json(request): Json<EnvelopeRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment = nta8800_core::envelope_elements::assess_envelope(&request.input);
     let status = if assessment.status == "invalid" {
         StatusCode::UNPROCESSABLE_ENTITY
     } else {
@@ -1237,6 +1258,29 @@ mod tests {
         assert!(result["annualHeatingNeedKwh"].as_f64().unwrap() > 0.0);
         assert_eq!(result["referenceVerified"], false);
         assert_eq!(result["bengCalculationAvailable"], false);
+    }
+
+    #[tokio::test]
+    async fn constructions_route_returns_element_u_values() {
+        let input: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-constructions-synthetic.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/constructions/calculate",
+            json!({ "input": input }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["status"], "calculated_unverified");
+        assert_eq!(result["elements"].as_array().unwrap().len(), 14);
+        assert_eq!(result["referenceVerified"], false);
+        let (status, _) = post_json(
+            "/v1/nta8800/constructions/calculate",
+            json!({ "input": { "elements": [] } }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]

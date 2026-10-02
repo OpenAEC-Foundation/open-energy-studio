@@ -121,6 +121,13 @@ fn calculate_monthly_demand(
 }
 
 #[tauri::command]
+fn calculate_constructions(
+    input: nta8800_core::envelope_elements::EnvelopeInput,
+) -> nta8800_core::envelope_elements::EnvelopeAssessment {
+    nta8800_core::envelope_elements::assess_envelope(&input)
+}
+
+#[tauri::command]
 fn calculate_ventilation(
     input: nta8800_core::ventilation::VentilationInput,
 ) -> nta8800_core::ventilation::VentilationAssessment {
@@ -494,6 +501,7 @@ pub fn run() {
             calculate_monthly_demand,
             calculate_space_heating_chain,
             calculate_ventilation,
+            calculate_constructions,
             calculate_building_performance,
             calculate_project_performance,
             diagnose_bacs_draft,

@@ -1530,6 +1530,163 @@ export interface SpaceHeatingChainAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
+export type HeatFlowDirection = 'upward' | 'horizontal' | 'downward';
+export type FrameGroup = 'wood_or_plastic' | 'metal_with_thermal_break' | 'metal_without_thermal_break';
+
+/** Design conductivity routes of NTA 8800 annex E/H; see crates/nta8800-core/src/materials.rs. */
+export type MaterialConductivity =
+  | { method: 'calculated'; lambdaCalc: number; sourceReference: string }
+  | {
+      method: 'declared_insulation';
+      lambdaDeclared: number;
+      moisture: string;
+      ageing: { kind: 'factory_made' } | { kind: 'in_situ'; product: string; situation: 'a' | 'b'; practiceTested?: boolean };
+      temperature?: { meanTemperatureC: number; conversionCoefficient: number; sourceReference: string };
+      convectionFactor?: number;
+      sourceReference: string;
+    }
+  | {
+      method: 'forfait_insulation';
+      material: string;
+      moisture: string;
+      ageing: { kind: 'factory_made' } | { kind: 'in_situ'; product: string; situation: 'a' | 'b'; practiceTested?: boolean };
+    }
+  | {
+      method: 'masonry_table';
+      kind: 'brick' | 'concrete' | 'calcium_silicate' | 'aerated_concrete';
+      densityKgM3: number;
+      environment: 'dry_indoor' | 'other';
+      joints: 'glued' | 'mortar';
+    }
+  | {
+      method: 'masonry_declared';
+      kind: 'brick' | 'concrete' | 'calcium_silicate' | 'aerated_concrete';
+      unitLambdaDeclared: number;
+      mortarLambdaDeclared: number;
+      jointAreaFraction: number;
+      environment: 'dry_indoor' | 'other';
+      sourceReference: string;
+    }
+  | { method: 'declared_other'; lambdaDeclared: number; class: 'inorganic' | 'glass' | 'organic' | 'plastic'; densityKgM3: number; sourceReference: string }
+  | { method: 'window_material'; material: string };
+
+export type ConstructionLayer =
+  | { kind: 'material'; thicknessM: number; conductivity: MaterialConductivity }
+  | { kind: 'resistance'; resistanceM2KPerW: number; thicknessM?: number; sourceReference: string }
+  | { kind: 'reflective_foil'; system: { kind: 'foil_layers'; thicknessM: number } | { kind: 'facing' | 'two_foils_with_air_layer' | 'three_foils_with_air_layers' } }
+  | {
+      kind: 'air_cavity';
+      thicknessMm: number;
+      ventilation: { kind: 'unventilated' } | { kind: 'weakly'; openingMm2?: number } | { kind: 'strongly' };
+      reflectiveSurface?: boolean;
+    }
+  | { kind: 'narrow_cavity'; thicknessMm: number; widthMm: number }
+  | { kind: 'tubular_cavity'; thicknessMm: number; widthMm: number; orientation: 'horizontal' | 'vertical' }
+  | { kind: 'attic'; roof: 'tiles_without_underlay' | 'tiles_or_slates_with_underlay' | 'tiles_with_underlay_and_reflective_foil' | 'boarding_and_felt' }
+  | {
+      kind: 'ventilated_unheated_space';
+      separationAreaM2: number;
+      envelopeParts: Array<{ areaM2: number; uValueWPerM2k?: number }>;
+      airChangeRate?: number;
+      volumeM3: number;
+    };
+
+export interface OpaqueConstructionInput {
+  heatFlow: HeatFlowDirection;
+  exteriorAir?: boolean;
+  build:
+    | { kind: 'homogeneous'; layers: ConstructionLayer[] }
+    | {
+        kind: 'composite';
+        sections: Array<{ id: string; area: number; layers: ConstructionLayer[] }>;
+        interruption: 'stony_unshielded' | 'woody_unshielded' | 'metal_one_side_shielded' | 'other';
+      };
+  corrections?: {
+    airVoids?: { level: 'none' | 'weak' | 'strong'; insulationLayer: number };
+    fasteners?: {
+      fasteners:
+        | { method: 'point_bridge'; countPerM2: number; chiWPerK: number; sourceReference: string }
+        | {
+            method: 'formula';
+            countPerM2: number;
+            lambdaWPerMK: number;
+            crossSectionM2: number;
+            penetrationDepthM: number;
+            insulationThicknessM: number;
+          };
+      insulationLayer: number;
+    };
+    invertedRoof?: {
+      drainage: 'xps_green_roof' | 'xps_rebated_edges' | 'xps_straight_edges' | 'xps_with_waterproof_vapour_open_layer' | 'other_insulation';
+      insulationLayer: number;
+    };
+  };
+  unheatedReductionFactor?: number;
+}
+
+/** Element kinds of crates/nta8800-core/src/envelope_elements.rs; window and forfait shapes follow window_u.rs and forfait_envelope.rs. */
+export type EnvelopeElementKind =
+  | { kind: 'opaque'; construction: OpaqueConstructionInput }
+  | { kind: 'tapered_roof'; roof: Record<string, unknown> }
+  | { kind: 'window'; window: { method: Record<string, unknown>; shutter?: Record<string, unknown> } }
+  | { kind: 'forfait_opaque'; element: Record<string, unknown> }
+  | { kind: 'forfait_window'; glass: string; frame: FrameGroup; exterior: boolean }
+  | { kind: 'forfait_door'; insulated: boolean; exterior: boolean; glassFraction?: number; glass?: string; frame?: FrameGroup }
+  | { kind: 'forfait_panel'; insulation: Record<string, unknown>; cavity: boolean; frame: FrameGroup; exterior: boolean }
+  | { kind: 'rooflight'; uRcWPerM2K: number; areaWithUpstandM2: number; sourceReference: string }
+  | { kind: 'ventilation_grille' }
+  | { kind: 'numerical'; couplingWPerK: number; constructionAreaM2: number; deltaUWPerM2K?: number; sourceReference: string };
+
+export interface EnvelopeInput {
+  elements: Array<{ id: string; projectedAreaM2?: number; inForfaitSupplement?: boolean; element: EnvelopeElementKind }>;
+  forfaitBridges?: Array<{
+    id: string;
+    position?: number;
+    variant?: number;
+    column: 'a' | 'b';
+    lengthM: number;
+    shared?: boolean;
+    description: string;
+  }>;
+  forfaitSupplement?: boolean;
+}
+
+export interface EnvelopeAssessment {
+  status: 'calculated_unverified' | 'invalid';
+  scope: string;
+  issues: Array<{ code: string; path: string }>;
+  elements: Array<{
+    id: string;
+    route: string;
+    uValue: number;
+    uRounded: number;
+    rC: number | null;
+    rCRounded: number | null;
+    opaque: Record<string, number | null> | null;
+    window: { uW: number; uWShut: number | null; uEffective: number; uRounded: number } | null;
+    forfait: { rC: number; uC: number; route: string } | null;
+  }>;
+  bridges: Array<{ id: string; psiWPerMk: number; coefficientWPerK: number }>;
+  deltaUForfait: number | null;
+  interpretations: string[];
+  referenceVerified: false;
+}
+
+export async function calculateConstructionsWithRust(input: EnvelopeInput): Promise<EnvelopeAssessment> {
+  if (isTauri()) {
+    return invoke<EnvelopeAssessment>('calculate_constructions', { input });
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/constructions/calculate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    });
+    return response.json() as Promise<EnvelopeAssessment>;
+  }
+  throw new Error('Rust construction calculation is available in the desktop app and local development server.');
+}
+
 export type VentilationSystemVariant =
   | 'a1' | 'a2a' | 'a2b' | 'a2c' | 'b1' | 'b2' | 'b3'
   | 'c1' | 'c2a' | 'c2b' | 'c2c' | 'c3a' | 'c3b' | 'c3c' | 'c4a' | 'c4b' | 'c4c' | 'c5a' | 'c5b'

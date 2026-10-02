@@ -39,6 +39,12 @@ struct MonthlyDemandArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct ConstructionsArgs {
+    /// Envelope elements (layered opaque constructions, tapered roofs, windows/doors with optional shutters, forfait existing-building values, rooflights, grilles, numerical U) plus forfait thermal bridges, with source references.
+    input: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct VentilationArgs {
     /// One zone: use functions, height, system variant (table 11.5), heat recovery, infiltration, combustion appliances, ventilative cooling openings and fans, with source references.
     input: Value,
@@ -540,6 +546,30 @@ impl EnergyMcp {
             )]),
             Ok(input) => {
                 let result = nta8800_core::monthly_demand::assess_monthly_demand(&input);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "invalid" {
+                    CallToolResult::error(vec![content])
+                } else {
+                    CallToolResult::success(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Calculate unverified NTA 8800 8.2 envelope element U- and Rc-values (annexes C, E-I, L): layered and composite constructions with dU corrections, tapered roofs, windows and doors, forfait values for existing buildings, forfait psi and the dU_for supplement"
+    )]
+    fn calculate_constructions(
+        &self,
+        Parameters(args): Parameters<ConstructionsArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::envelope_elements::EnvelopeInput>(args.input) {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_constructions_shape", "message":message.to_string()})
+                    .to_string(),
+            )]),
+            Ok(input) => {
+                let result = nta8800_core::envelope_elements::assess_envelope(&input);
                 let content = ContentBlock::text(json!(result).to_string());
                 if result.status == "invalid" {
                     CallToolResult::error(vec![content])
