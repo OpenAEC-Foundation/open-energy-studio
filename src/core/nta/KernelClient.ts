@@ -1939,12 +1939,25 @@ export type MaterialConductivity =
 export type ConstructionLayer =
   | { kind: 'material'; thicknessM: number; conductivity: MaterialConductivity }
   | { kind: 'resistance'; resistanceM2KPerW: number; thicknessM?: number; sourceReference: string }
+  | {
+      kind: 'declared_resistance';
+      resistanceDeclared: number;
+      moisture: string;
+      ageing: { kind: 'factory_made' } | { kind: 'in_situ'; product: string; situation: 'a' | 'b'; practiceTested?: boolean };
+      temperature?: { meanTemperatureC: number; conversionCoefficient: number; sourceReference: string };
+      convectionFactor?: number;
+      thicknessM?: number;
+      sourceReference: string;
+    }
   | { kind: 'reflective_foil'; system: { kind: 'foil_layers'; thicknessM: number } | { kind: 'facing' | 'two_foils_with_air_layer' | 'three_foils_with_air_layers' } }
   | {
       kind: 'air_cavity';
       thicknessMm: number;
       ventilation: { kind: 'unventilated' } | { kind: 'weakly'; openingMm2?: number } | { kind: 'strongly' };
       reflectiveSurface?: boolean;
+      /** Reflective layer facing up: no bracket value unless hermetically sealed (table C.4 note b). */
+      reflectiveFacingUp?: boolean;
+      hermeticallySealed?: boolean;
     }
   | { kind: 'narrow_cavity'; thicknessMm: number; widthMm: number }
   | { kind: 'tubular_cavity'; thicknessMm: number; widthMm: number; orientation: 'horizontal' | 'vertical' }
@@ -1966,6 +1979,8 @@ export interface OpaqueConstructionInput {
         kind: 'composite';
         sections: Array<{ id: string; area: number; layers: ConstructionLayer[] }>;
         interruption: 'stony_unshielded' | 'woody_unshielded' | 'metal_one_side_shielded' | 'other';
+        /** Section id for R_1/R_T of 8.9/8.11/8.13; default: highest C.3 R_T. */
+        insulationSection?: string;
       };
   corrections?: {
     airVoids?: { level: 'none' | 'weak' | 'strong'; insulationLayer: number };
@@ -2024,8 +2039,10 @@ export interface EnvelopeAssessment {
   elements: Array<{
     id: string;
     route: string;
+    /** Rounded per 8.2.2.1; the value used in H_D and ΔU_for. */
     uValue: number;
     uRounded: number;
+    uUnrounded: number;
     rC: number | null;
     rCRounded: number | null;
     opaque: Record<string, number | null> | null;

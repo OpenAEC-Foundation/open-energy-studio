@@ -164,7 +164,7 @@
                 "areaM2": 1.6,
                 "glazing": { "method": "table_g1", "layers": "triple", "coating": "at_most_0_05", "gapMm": 12, "gas": "argon" },
                 "perimeterM": 5.2,
-                "edge": { "method": "table", "frame": "wood_or_plastic", "spacer": "thermally_improved", "lowE": true }
+                "edge": { "method": "table", "frame": "wood_or_plastic", "spacer": "thermally_improved", "lowE": true, "spacerSourceReference": "synthetic spacer declaration (L.1)" }
               }
             ],
             "frameAreaM2": 0.6,

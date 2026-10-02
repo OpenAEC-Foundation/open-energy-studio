@@ -228,6 +228,21 @@ impl ForfaitMaterial {
     pub fn is_insulation(self) -> bool {
         self.lambda() <= 0.100
     }
+
+    /// Table E.5 product group of materials that are made in situ by
+    /// nature (tables E.10/E.11 "in situ"); these take F_A from E.10.
+    pub fn in_situ_product(self) -> Option<InSituProduct> {
+        use ForfaitMaterial::*;
+        match self {
+            MineralWoolFlakes | CelluloseLoose | FlaxSprayed => {
+                Some(InSituProduct::FibresAndFlakes)
+            }
+            EpsWhiteBeads | EpsGreyBeads => Some(InSituProduct::EpsBeads),
+            PurSprayedOpenCell | PurSprayedClosedCell => Some(InSituProduct::Polyurethane),
+            UreaFormaldehyde => Some(InSituProduct::UreaFormaldehyde),
+            _ => None,
+        }
+    }
 }
 
 /// Table E.1 material classes.
@@ -622,7 +637,27 @@ impl Conductivity {
                     }
                 }
             }
-            Self::ForfaitInsulation { .. } | Self::WindowMaterial { .. } => {}
+            Self::ForfaitInsulation {
+                material, ageing, ..
+            } => {
+                // E.2.1.4.1, table E.5: in-situ products age per E.10; the
+                // group must match, or "other" (1,30) as the conservative
+                // fallback of footnote c.
+                if let Some(expected) = material.in_situ_product() {
+                    match ageing {
+                        Ageing::FactoryMade => {
+                            push("in_situ_material_requires_in_situ_ageing", "ageing")
+                        }
+                        Ageing::InSitu { product, .. }
+                            if *product != expected && *product != InSituProduct::Other =>
+                        {
+                            push("in_situ_product_mismatch", "ageing.product")
+                        }
+                        Ageing::InSitu { .. } => {}
+                    }
+                }
+            }
+            Self::WindowMaterial { .. } => {}
             Self::MasonryTable {
                 kind,
                 density_kg_m3,
@@ -760,7 +795,8 @@ pub enum ReflectiveFoilSystem {
 impl ReflectiveFoilSystem {
     pub fn resistance(self) -> f64 {
         match self {
-            Self::FoilLayers { thickness_m } => thickness_m / 0.03,
+            // E.2.1.1: R_calc rounded down.
+            Self::FoilLayers { thickness_m } => round_resistance_down(thickness_m / 0.03),
             Self::Facing => 0.0,
             Self::TwoFoilsWithAirLayer => 1.80,
             Self::ThreeFoilsWithAirLayers => 2.90,
@@ -884,5 +920,44 @@ mod tests {
             (ReflectiveFoilSystem::FoilLayers { thickness_m: 0.006 }.resistance() - 0.2).abs()
                 < 1e-12
         );
+    }
+
+    #[test]
+    fn in_situ_materials_require_table_e5_ageing() {
+        let uf = |ageing: Ageing| Conductivity::ForfaitInsulation {
+            material: ForfaitMaterial::UreaFormaldehyde,
+            moisture: InsulationMoisture::Regular,
+            ageing,
+        };
+        let codes = |c: &Conductivity| -> Vec<&'static str> {
+            c.validate().iter().map(|i| i.code).collect()
+        };
+        assert!(
+            codes(&uf(Ageing::FactoryMade)).contains(&"in_situ_material_requires_in_situ_ageing")
+        );
+        let in_situ = |product, situation| Ageing::InSitu {
+            product,
+            situation,
+            practice_tested: false,
+        };
+        assert!(
+            codes(&uf(in_situ(InSituProduct::EpsBeads, InSituSituation::A)))
+                .contains(&"in_situ_product_mismatch")
+        );
+        let a = uf(in_situ(InSituProduct::UreaFormaldehyde, InSituSituation::A));
+        assert!(codes(&a).is_empty());
+        // 0,060·1,25 = 0,075; situation B 0,060·1,25·1,15 = 0,08625 → 0,09.
+        assert!((a.lambda_calc() - 0.075).abs() < 1e-12);
+        let b = uf(in_situ(InSituProduct::UreaFormaldehyde, InSituSituation::B));
+        assert!((b.lambda_calc() - 0.09).abs() < 1e-12);
+        // "Other" (1,30) is the conservative fallback of footnote c.
+        assert!(codes(&uf(in_situ(InSituProduct::Other, InSituSituation::A))).is_empty());
+        // Boards stay factory made.
+        let board = Conductivity::ForfaitInsulation {
+            material: ForfaitMaterial::EpsBoard,
+            moisture: InsulationMoisture::Regular,
+            ageing: Ageing::FactoryMade,
+        };
+        assert!(codes(&board).is_empty());
     }
 }

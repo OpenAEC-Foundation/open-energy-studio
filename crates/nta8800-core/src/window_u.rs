@@ -224,6 +224,14 @@ pub enum Spacer {
     ThermallyImproved,
 }
 
+/// One heat-flow path of a spacer for L.1: wall thickness d (m) and λ.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SpacerPath {
+    pub thickness_m: f64,
+    pub lambda_w_per_mk: f64,
+}
+
 /// Formula L.1.
 pub fn is_thermally_improved_spacer(paths: &[(f64, f64)]) -> bool {
     paths.iter().map(|(d, lambda)| d * lambda).sum::<f64>() <= 0.007
@@ -256,6 +264,12 @@ pub enum EdgePsi {
         spacer: Spacer,
         #[serde(rename = "lowE")]
         low_e: bool,
+        /// Heat-flow paths of the spacer for criterion L.1.
+        #[serde(default, rename = "spacerPaths", skip_serializing_if = "Vec::is_empty")]
+        spacer_paths: Vec<SpacerPath>,
+        /// Product statement that the spacer meets L.1.
+        #[serde(default, rename = "spacerSourceReference")]
+        spacer_source_reference: Option<String>,
     },
     /// 8.27/8.28 or NEN-EN-ISO 10077-2.
     Declared {
@@ -273,12 +287,43 @@ impl EdgePsi {
                 frame,
                 spacer,
                 low_e,
+                ..
             } => table_psi_glazing(*frame, *spacer, *low_e),
             Self::Declared { value, .. } => *value,
         }
     }
 
     fn validate(&self, path: &str, issues: &mut Vec<WindowIssue>) {
+        if let Self::Table {
+            spacer: Spacer::ThermallyImproved,
+            spacer_paths,
+            spacer_source_reference,
+            ..
+        } = self
+        {
+            // L.3: table L.2 only for spacers meeting criterion L.1.
+            let paths: Vec<(f64, f64)> = spacer_paths
+                .iter()
+                .map(|p| (p.thickness_m, p.lambda_w_per_mk))
+                .collect();
+            if paths.iter().any(|(d, l)| !(positive(*d) && positive(*l))) {
+                issues.push(issue("spacer_path_invalid", format!("{path}.spacerPaths")));
+            } else if !paths.is_empty() && !is_thermally_improved_spacer(&paths) {
+                issues.push(issue(
+                    "spacer_not_thermally_improved",
+                    format!("{path}.spacerPaths"),
+                ));
+            } else if paths.is_empty()
+                && spacer_source_reference
+                    .as_deref()
+                    .map_or(true, |r| r.trim().is_empty())
+            {
+                issues.push(issue(
+                    "spacer_evidence_required",
+                    format!("{path}.spacerPaths"),
+                ));
+            }
+        }
         if let Self::Declared {
             value,
             source_reference,
@@ -810,6 +855,11 @@ mod tests {
                         frame: FrameGroup::WoodOrPlastic,
                         spacer: Spacer::ThermallyImproved,
                         low_e: true,
+                        spacer_paths: vec![SpacerPath {
+                            thickness_m: 0.001,
+                            lambda_w_per_mk: 0.25,
+                        }],
+                        spacer_source_reference: None,
                     },
                 }],
                 panels: vec![],
@@ -838,6 +888,8 @@ mod tests {
                     frame: FrameGroup::WoodOrPlastic,
                     spacer: Spacer::AluminiumOrSteel,
                     low_e: true,
+                    spacer_paths: Vec::new(),
+                    spacer_source_reference: None,
                 },
             },
             shutter: None,
@@ -923,6 +975,42 @@ mod tests {
                 .filter(|c| **c == "source_reference_required")
                 .count(),
             2
+        );
+    }
+
+    #[test]
+    fn thermally_improved_spacers_need_l1_evidence() {
+        let edge = |paths: Vec<SpacerPath>, reference: Option<&str>| EdgePsi::Table {
+            frame: FrameGroup::WoodOrPlastic,
+            spacer: Spacer::ThermallyImproved,
+            low_e: true,
+            spacer_paths: paths,
+            spacer_source_reference: reference.map(String::from),
+        };
+        let codes = |e: EdgePsi| {
+            let mut issues = Vec::new();
+            e.validate("e", &mut issues);
+            issues.into_iter().map(|i| i.code).collect::<Vec<_>>()
+        };
+        assert_eq!(
+            codes(edge(Vec::new(), None)),
+            vec!["spacer_evidence_required"]
+        );
+        assert!(codes(edge(Vec::new(), Some("product statement"))).is_empty());
+        // Stainless 0,15 mm with λ 17: 0,00255 ≤ 0,007.
+        let steel = SpacerPath {
+            thickness_m: 0.00015,
+            lambda_w_per_mk: 17.0,
+        };
+        assert!(codes(edge(vec![steel, steel], None)).is_empty());
+        // Aluminium 0,4 mm with λ 160 fails L.1.
+        let aluminium = SpacerPath {
+            thickness_m: 0.0004,
+            lambda_w_per_mk: 160.0,
+        };
+        assert_eq!(
+            codes(edge(vec![aluminium], Some("ignored"))),
+            vec!["spacer_not_thermally_improved"]
         );
     }
 }
