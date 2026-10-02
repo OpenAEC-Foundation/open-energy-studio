@@ -2068,7 +2068,7 @@ export interface VentilationInput {
   zoneId: string;
   usableFloorAreaM2: number;
   category: 'residential' | 'utility';
-  functions: Array<{ function: VentilationFunction; areaM2: number }>;
+  functions: Array<{ function: VentilationFunction; areaM2: number; swimmingPool?: boolean }>;
   dwellingCount?: number;
   wholeDwellingAreaM2?: number;
   apartmentBuilding?: boolean;
@@ -2185,6 +2185,8 @@ export interface VentilationResult {
     fanElectricityKwh: number;
     frostProtectionElectricityKwh: number;
     grillePreheatingElectricityKwh: number;
+    /** 9.29 Q_H;ϑHstook;in;air, kWh. */
+    heatingLimitAirKwh: number;
     outdoorAirFraction: number | null;
   }>;
   demandFlows: Array<{

@@ -1833,10 +1833,12 @@ pub struct AnnexQOutput {
     pub corrected_efficiency: f64,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_annex_q(
     generator: &AnnexQGenerator,
     outputs: &[MonthlyEnergy],
     building: HeatPumpBuildingContext,
+    building_fraction: f64,
     monthly: &mut [ChainMonth],
     annex_q_result: &mut Option<AnnexQOutput>,
     issues: &mut Vec<ChainIssue>,
@@ -1950,8 +1952,14 @@ fn generate_annex_q(
                 .monthly
                 .iter()
                 .map(|item| {
+                    // §9.6.2.1: pilot flame scaled with f_gebouw;H when collective.
+                    let pilot_share = if boiler.role == BoilerRole::Collective {
+                        building_fraction
+                    } else {
+                        1.0
+                    };
                     (
-                        item.input_natural_gas_kwh + item.pilot_flame_natural_gas_kwh,
+                        item.input_natural_gas_kwh + pilot_share * item.pilot_flame_natural_gas_kwh,
                         item.auxiliary_electricity_kwh,
                     )
                 })
@@ -2230,6 +2238,7 @@ fn generate(
                 generator,
                 outputs,
                 building,
+                building_fraction,
                 monthly,
                 annex_q_result,
                 issues,

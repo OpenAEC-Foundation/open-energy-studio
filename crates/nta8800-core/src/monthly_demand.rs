@@ -1493,6 +1493,21 @@ fn resolve_transmission(
     }
 }
 
+/// 7.1–7.3 with `extra_kwh` added to Q_H;ht, the gains and `a` unchanged
+/// (9.28/9.29), without recoverable losses.
+pub fn heating_need_with_extra_transfer(terms: &BalanceTerms, extra_kwh: f64) -> f64 {
+    let transfer = terms.heat_transfer_kwh + extra_kwh;
+    if transfer == 0.0 {
+        return 0.0;
+    }
+    let gamma = terms.gains_kwh / transfer;
+    if (gamma <= 0.0 && terms.gains_kwh > 0.0) || gamma > GAMMA_H_MAX {
+        return 0.0;
+    }
+    let eta = heating_utilization(gamma, terms.a, terms.gains_kwh);
+    (transfer - eta * terms.gains_kwh).max(0.0)
+}
+
 /// Monthly internal gains Q_int (7.21–7.29), kWh; `month_index` 0–11.
 pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64 {
     let area = input.usable_floor_area_m2;
@@ -1637,19 +1652,18 @@ pub fn assess_monthly_demand(input: &MonthlyDemandInput) -> MonthlyDemandAssessm
     let mut assessment = assess_resolved(&resolved, fingerprint, issues);
     if assessment.status == "calculated_unverified" {
         if let Some(result) = &ventilation {
-            // 9.28/9.29: the need for the heating limit.
-            let mut limit_input = resolved.clone();
-            limit_input.ventilation_flows = result.heating_limit_flows(CHAPTER_11_SOURCE);
-            let limit = assess_resolved(&limit_input, String::new(), Vec::new());
-            if limit.status == "calculated_unverified" {
-                let electricity = result.heating_limit_electricity_kwh();
-                assessment.heating_limit_need_kwh = limit
-                    .monthly
-                    .iter()
-                    .zip(&electricity)
-                    .map(|(row, extra)| row.heating.need_kwh + extra)
-                    .collect();
-            }
+            // 9.28/9.29, read literally: Q_H;ve plus Q_H;ϑHstook;in;air in
+            // the heat transfer of 7.2.1; H_ve and τ stay as in 7.4.2.
+            assessment.heating_limit_need_kwh = assessment
+                .monthly
+                .iter()
+                .zip(&result.months)
+                .map(|(row, month)| {
+                    heating_need_with_extra_transfer(&row.heating, month.heating_limit_air_kwh)
+                        + month.frost_protection_electricity_kwh
+                        + month.grille_preheating_electricity_kwh
+                })
+                .collect();
         }
         assessment.ventilation = ventilation;
         if let Some(flows) = c1_flows {
@@ -2076,9 +2090,20 @@ mod tests {
             assert!((a.heating.need_kwh - b.heating.need_kwh).abs() < 1e-9);
             assert!((a.cooling.need_kwh - b.cooling.need_kwh).abs() < 1e-9);
         }
-        // 9.29: without fan heat the heating-limit need is higher.
+        // 9.29 literally: Q_air = q·ρc·((θ_SUP − Δθ_fan) − θ_e)·t is 0 here
+        // (no heat recovery, no defrost, no duct loss), so the need is equal.
         assert_eq!(result.heating_limit_need_kwh.len(), 12);
-        assert!(result.heating_limit_need_kwh[0] > result.monthly[0].heating.need_kwh);
+        let ventilation = result.ventilation.as_ref().unwrap();
+        assert!(ventilation.months[0].heating_limit_air_kwh.abs() < 1e-9);
+        assert!(
+            (result.heating_limit_need_kwh[0] - result.monthly[0].heating.need_kwh).abs() < 1e-9
+        );
+        // An extra transfer raises the need through 7.1–7.3 with the same a.
+        let jan = &result.monthly[0].heating;
+        let extra = heating_need_with_extra_transfer(jan, 100.0);
+        let gamma = jan.gains_kwh / (jan.heat_transfer_kwh + 100.0);
+        let eta = heating_utilization(gamma, jan.a, jan.gains_kwh);
+        assert!((extra - (jan.heat_transfer_kwh + 100.0 - eta * jan.gains_kwh)).abs() < 1e-9);
         // The fixed C1 run ventilates more than demand-controlled D.5c.
         let c1 = result.fixed_c1.as_ref().unwrap();
         assert_eq!(c1.status, "calculated_unverified", "{:?}", c1.issues);

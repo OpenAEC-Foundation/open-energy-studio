@@ -78,24 +78,25 @@ pub const TAU_PURGE_DEFAULT: f64 = 0.01;
 pub const DEFROST_RESIDENTIAL_K: [f64; 12] =
     [0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.2, 0.2];
 
-/// Table 11.19 ΔT_SUP;du;nc;in, K (situations 1 and 2; situation 3 is 0).
-const DUCT_LOSS_SITUATION_1_K: [f64; 12] = [
+/// Table 11.19 ΔT_SUP;du;nc;in, K (situations 2 and 3; situation 1 is 0).
+const DUCT_LOSS_SITUATION_2_K: [f64; 12] = [
     2.82, 2.47, 2.29, 1.73, 0.86, 0.63, 0.32, 0.25, 0.71, 1.56, 1.95, 2.6,
 ];
-const DUCT_LOSS_SITUATION_2_K: [f64; 12] = [
+const DUCT_LOSS_SITUATION_3_K: [f64; 12] = [
     5.72, 4.99, 4.63, 3.51, 1.73, 1.28, 0.64, 0.5, 1.44, 3.16, 3.95, 5.26,
 ];
 
 /// Interpretation choices where the norm text leaves room; recorded in the
 /// verification dossier.
 pub const INTERPRETATIONS: &[&str] = &[
-    "table 11.8 f_τ for dwellings uses the mean dwelling area A_g;zi/N_woon",
+    "table 11.8 f_τ for dwellings uses the whole-dwelling area when given, otherwise the mean dwelling area A_g;zi/N_woon",
     "fan energy (11.132) uses q_V;ODA;req of the heating balance",
-    "11.137 is applied literally: f_regfan = Σ f_q;k·t_d;k with table 11.21 values",
     "ventilative cooling flows are computed for the whole zone and split over airflow zones by 11.6–11.10",
     "ΔC_p for cross ventilation uses the table 11.3 class of the building height",
     "the 11.14 accuracy uses zone totals for every airflow zone",
     "at H = 50 m the zone is split into two airflow zones (11.6/11.7)",
+    "9.29 is applied literally: Q_air uses θ_SUP;dis;out − Δθ_hr − Δθ_rca − Δθ_fan, added to Q_H;ve without changing H_ve or τ",
+    "q_V;comb;out counts as an outflow in the mass balance (11.3), although 11.82 defines it as positive",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -172,6 +173,10 @@ impl VentilationFunction {
 pub struct FunctionArea {
     pub function: VentilationFunction,
     pub area_m2: f64,
+    /// Room with a swimming pool: q_usi;spec of the sport function × 2
+    /// (§11.2.2.5.1, p. 470).
+    #[serde(default)]
+    pub swimming_pool: bool,
 }
 
 /// Table 11.5 system variants.
@@ -332,11 +337,13 @@ pub enum DuctOutsideSituation {
 }
 
 impl DuctOutsideSituation {
+    /// Table 11.19 (p. 508): situation 1 gives 0,0 K; situations 2 and 3
+    /// the two monthly columns.
     fn delta_k(self, month_index: usize) -> f64 {
         match self {
-            Self::None | Self::Situation3 => 0.0,
-            Self::Situation1 => DUCT_LOSS_SITUATION_1_K[month_index],
+            Self::None | Self::Situation1 => 0.0,
             Self::Situation2 => DUCT_LOSS_SITUATION_2_K[month_index],
+            Self::Situation3 => DUCT_LOSS_SITUATION_3_K[month_index],
         }
     }
 }
@@ -982,6 +989,8 @@ pub struct VentilationMonthResult {
     pub fan_electricity_kwh: f64,
     pub frost_protection_electricity_kwh: f64,
     pub grille_preheating_electricity_kwh: f64,
+    /// 9.29 Q_H;ϑHstook;in;air of the heating balance, kWh.
+    pub heating_limit_air_kwh: f64,
     /// f_buitenlucht (11.24) for annex Q, when overventilation applies.
     pub outdoor_air_fraction: Option<f64>,
 }
@@ -1080,6 +1089,12 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             ));
         }
         function_area += item.area_m2;
+        if item.swimming_pool && item.function != VentilationFunction::Sport {
+            issues.push(issue(
+                "swimming_pool_requires_sport_function",
+                format!("functions[{index}].swimmingPool"),
+            ));
+        }
         let residential = item.function == VentilationFunction::Residential;
         if residential != (input.category == Category::Residential) {
             issues.push(issue(
@@ -1202,6 +1217,21 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
     }
     for (index, appliance) in input.combustion_appliances.iter().enumerate() {
         let path = format!("combustionAppliances[{index}]");
+        let (_, _, _, _, flueless) = appliance.kind.values();
+        let class_fits = match appliance.class {
+            // Table 11.11: type A and kitchen stoves have no flue.
+            ApplianceClass::GasTypeA | ApplianceClass::KitchenStove => flueless,
+            ApplianceClass::GasTypeB
+            | ApplianceClass::OpenFireplace
+            | ApplianceClass::RoomSealed => !flueless,
+            ApplianceClass::SpecificGasAppliance => true,
+        };
+        if !class_fits {
+            issues.push(issue(
+                "appliance_class_kind_mismatch",
+                format!("{path}.class"),
+            ));
+        }
         if appliance.class == ApplianceClass::SpecificGasAppliance {
             issues.push(issue(
                 "specific_gas_appliance_unsupported",
@@ -1974,13 +2004,24 @@ struct ZoneConstants {
 
 fn zone_constants(input: &VentilationInput, policy: Policy) -> ZoneConstants {
     let area = input.usable_floor_area_m2;
-    let dwelling_area = if input.dwelling_count > 0 {
-        area / f64::from(input.dwelling_count)
-    } else {
-        area
+    // Table 11.8 f_τ for dwellings: the area of the whole dwelling when a
+    // dwelling is split over zones, otherwise the mean dwelling area.
+    let dwelling_area = match (input.whole_dwelling_area_m2, input.dwelling_count) {
+        (Some(whole), _) => whole,
+        (None, count) if count > 0 => area / f64::from(count),
+        _ => area,
     };
     let occupancy_factor = area_weighted(input, |f| f.occupancy_factor(dwelling_area));
-    let specific = area_weighted(input, |f| f.specific_capacity());
+    let total_area: f64 = input.functions.iter().map(|f| f.area_m2).sum();
+    let specific = input
+        .functions
+        .iter()
+        .map(|part| {
+            let pool = if part.swimming_pool { 2.0 } else { 1.0 };
+            pool * part.function.specific_capacity() * part.area_m2
+        })
+        .sum::<f64>()
+        / total_area;
     let mut capacity_dm3_per_s = specific * area;
     if policy.lower_bound && input.category == Category::Residential {
         // 11.63–11.65.
@@ -2419,6 +2460,7 @@ struct MonthBalance {
     limit_temperatures: Vec<f64>,
     frost_protection_kwh: f64,
     grille_preheating_kwh: f64,
+    heating_limit_air_kwh: f64,
     outdoor_air_fraction: Option<f64>,
 }
 
@@ -2542,6 +2584,7 @@ fn balance_month(
     let natural_temperature = outdoor + grille_rise;
     let mut supply_flows = Vec::new();
     let mut frost_protection_kwh = 0.0;
+    let mut heating_limit_air_kwh = 0.0;
     for (index, q_supply, unit) in &supply_parts {
         let oda_eff = required * parts(&input.system)[*index].fraction;
         let (temperature, defrost, limit_temperature) =
@@ -2552,6 +2595,10 @@ fn balance_month(
             frost_protection_kwh += power * hours / 1000.0;
         }
         supply_flows.push((*index, *q_supply, temperature, limit_temperature));
+        // 9.29 with q_V;SUP;dis;out of 11.87.
+        let dis_out = oda_eff / (flea_du * flea_ahu);
+        heating_limit_air_kwh +=
+            dis_out * 1.205 * 1005.0 / 3600.0 * (limit_temperature - outdoor) * hours / 1000.0;
     }
 
     // Mass balance per airflow zone.
@@ -2683,6 +2730,11 @@ fn balance_month(
         limit_temperatures,
         frost_protection_kwh,
         grille_preheating_kwh,
+        heating_limit_air_kwh: if balance == Balance::Heating {
+            heating_limit_air_kwh
+        } else {
+            0.0
+        },
         outdoor_air_fraction,
     }
 }
@@ -2722,7 +2774,7 @@ fn nominal_fan_power(fan: &Fan) -> f64 {
         } => {
             let efficiency = match electrical_input_w {
                 // 11.136, rounded down to a multiple of 0,025.
-                Some(input) => ((motor_power_w / input) / 0.025).floor() * 0.025,
+                Some(input) => ((motor_power_w / input) / 0.025 + 1e-9).floor() * 0.025,
                 None => motor_efficiency(motor_power_w / 1000.0, *manufacture_year),
             }
             .min(1.0);
@@ -2797,7 +2849,10 @@ fn fan_electricity(
         } => {
             let regulation = match control {
                 // 11.137 with table 11.21.
-                FanControl::ResidentialTable => 1.0 * 0.10 + 0.6 * 0.60 + 0.4 * 0.30,
+                // 11.137/11.138 (p. 516): Σ f_q;k²·t_d;k with table 11.21.
+                FanControl::ResidentialTable => {
+                    1.0f64.powi(2) * 0.10 + 0.6f64.powi(2) * 0.60 + 0.4f64.powi(2) * 0.30
+                }
                 FanControl::Declared { monthly, .. } => monthly[month_index],
                 FanControl::FlowControl { control } => {
                     let reduction = input
@@ -2862,6 +2917,7 @@ fn calculate_with_policy(
             fan_electricity_kwh: if policy.use_installed { fan } else { 0.0 },
             frost_protection_electricity_kwh: heating.frost_protection_kwh,
             grille_preheating_electricity_kwh: heating.grille_preheating_kwh,
+            heating_limit_air_kwh: heating.heating_limit_air_kwh,
             outdoor_air_fraction: heating.outdoor_air_fraction,
         });
     }
@@ -2896,18 +2952,6 @@ fn calculate_with_policy(
 }
 
 impl VentilationResult {
-    /// The flows for the heating-limit need of 9.28/9.29: mechanical supply
-    /// without heat recovery, recirculation and fan heat.
-    pub fn heating_limit_flows(&self, source_reference: &str) -> Vec<VentilationFlow> {
-        let mut flows = self.monthly_demand_flows(source_reference);
-        for (flow, source) in flows.iter_mut().zip(&self.demand_flows) {
-            for (row, values) in flow.months.iter_mut().zip(&source.months) {
-                row.supply_temperature_c = Some(values.heating_limit_supply_temperature_c);
-            }
-        }
-        flows
-    }
-
     /// E_V;eldf + E_V;elvv per month (9.28), kWh.
     pub fn heating_limit_electricity_kwh(&self) -> Vec<f64> {
         self.months
@@ -3058,6 +3102,7 @@ mod tests {
             functions: vec![FunctionArea {
                 function: VentilationFunction::Residential,
                 area_m2: 100.0,
+                swimming_pool: false,
             }],
             dwelling_count: 1,
             whole_dwelling_area_m2: None,
@@ -3435,6 +3480,32 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn residential_fan_regulation_and_duct_losses_follow_11_137_and_table_11_19() {
+        let mut input = dwelling(SystemVariant::C1);
+        input.fans = Fans::Declared {
+            fans: vec![Fan {
+                id: "f".into(),
+                power: FanPower::Nominal {
+                    nominal_power_w: 80.0,
+                },
+            }],
+            control: FanControl::ResidentialTable,
+            building_share: 1.0,
+            source_reference: "plate".into(),
+        };
+        let result = calculate_ventilation(&input).unwrap();
+        // Σ f_q²·t_d = 0,1 + 0,216 + 0,048 = 0,364.
+        close(
+            result.months[0].fan_electricity_kwh,
+            80.0 * 0.364 * 744.0 / 0.9 / 1000.0,
+            1e-9,
+        );
+        assert_eq!(DuctOutsideSituation::Situation1.delta_k(0), 0.0);
+        assert_eq!(DuctOutsideSituation::Situation2.delta_k(0), 2.82);
+        assert_eq!(DuctOutsideSituation::Situation3.delta_k(0), 5.72);
     }
 
     #[test]

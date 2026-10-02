@@ -50,11 +50,28 @@ Deze keuzes staan ook in de uitvoer (`interpretations`) en in het verificatiedos
 
 1. Voor woningen gebruikt f_τ (tabel 11.8) de gemiddelde woninggrootte A_g;zi/N_woon. Bij een zone met meerdere woningen zou de totale A_g altijd 0,8 geven.
 2. De ventilatorenergie (11.132) gebruikt q_V;ODA;req van de warmtebehoefte. De norm noemt aparte berekeningen voor warmte en koude, maar levert één energiegebruik op.
-3. Formule 11.137 wordt letterlijk toegepast, met de waarden uit tabel 11.21: f_regfan = Σ f_q;k·t_d;k = 0,58. Opmerking 11.138 suggereert dat de verhoudingen gekwadrateerd worden. Dat geeft 0,364 als f_q de debietverhouding is.
+3. Formule 11.137 heeft op de gerenderde pagina (p. 516) een kwadraat: f_regfan = Σ f_q;k²·t_d;k = 0,364 voor tabel 11.21. Een eerdere versie las de tekstlaag zonder exponent en rekende met 0,58. Dat is hersteld na de onafhankelijke review.
 4. Ventilatieve koeling wordt voor de hele zone berekend. Bij meerdere luchtstroomzones wordt de stroom verdeeld via 11.6–11.10.
 5. ΔC_p bij dwarsventilatie gebruikt de klasse uit tabel 11.3 die hoort bij de gebouwhoogte.
 6. De nauwkeurigheid volgens 11.14 gebruikt zonetotalen, ook per luchtstroomzone.
 7. Bij precies H = 50 m wordt de zone in twee luchtstroomzones verdeeld (11.6/11.7). Tabel 11.1 en 11.8 verschillen op deze grens.
+8. Formule 9.29 voor de stookgrens wordt letterlijk toegepast:
+   - Q_air = q_V;SUP;dis;out·ρ_a·c_a·((θ_SUP;dis;out − Δθ_hr − Δθ_rca − Δθ_fan) − θ_e)·t;
+   - die term komt bij Q_H;ve, terwijl H_ve en τ uit 7.4.2 blijven;
+   - zonder voorverwarming en kanaalverlies is die term vrijwel 0.
+
+   Een ruimere lezing, waarin de stookgrensbehoefte het WTW-voordeel volledig mist, is denkbaar maar staat niet in de tekst. Dit is een open vraag voor NEN.
+9. q_V;comb;out telt in de massabalans als uitgaande stroom. Formule 11.82 definieert de grootheid positief.
+
+## Correcties na de onafhankelijke review (2 oktober 2026)
+
+- **Tabel 11.19:** de kolommen stonden een plaats verschoven. Situatie 1 geeft 0 K, situatie 3 (lang, slecht geïsoleerd of onbekend) het grootste verlies.
+- **Formule 11.137:** kwadraat toegevoegd (zie hierboven).
+- **Formule 11.136:** het rendement wordt naar beneden afgerond op 0,025, nu met epsilon. Een verhouding die precies op een stap valt, zakt niet meer een stap.
+- **Stookgrens 9.29:** letterlijk toegepast (zie hierboven).
+- **Zwembadregel (§11.2.2.5.1):** `swimmingPool` op een sportfunctie verdubbelt q_usi;spec.
+- **f_τ bij een woning verdeeld over zones:** gebruikt de oppervlakte van de hele woning.
+- **Tabel 11.11/11.12:** het toesteltype wordt gecontroleerd tegen de rookgasafvoer (`appliance_class_kind_mismatch`).
 
 ## Koppeling
 
