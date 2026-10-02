@@ -219,14 +219,16 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <label>{t('nta.form.generatorKind')}
         <select value={typeof generatorKind === 'string' ? generatorKind : ''} onChange={(event) => {
           const kind = event.target.value;
-          if (kind === 'external_heat') change(['generator'], { kind, supplierReference: '', qualityDeclarationPresent: false });
+          if (kind === 'external_heat') change(['generator'], { kind, supplierReference: '', qualityDeclarationPresent: false,
+            auxiliary: { electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' } });
           if (kind === 'gas_boiler') change(['generator'], { kind, boiler: {
             generatorId: 'boiler', role: 'individual_main', location: null, kind: null, fuel: 'natural_gas',
             averageDesignEmissionTemperatureC: null, emissionCircuit: null, equipmentReference: '',
             locationReference: '', temperatureAndCircuitReference: '', pilotFlamePresent: false } });
-          if (kind === 'electric_resistance') change(['generator'], { kind, equipmentReference: '' });
+          if (kind === 'electric_resistance') change(['generator'], { kind, equipmentReference: '', auxiliary: { electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' } });
           if (kind === 'biomass') change(['generator'], { kind, appliance: null, location: 'inside_thermal_boundary',
-            annexRCompliantAtMost500Kw: false, annexRReference: '', equipmentReference: '' });
+            annexRCompliantAtMost500Kw: false, annexRReference: '', equipmentReference: '',
+            soleHeatingInServedRooms: null, automaticFuelFeed: false, auxiliary: { electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' } });
           if (kind === 'heat_pump_forfait') change(['generator'], {
             kind, forfait: project.heatingSystems[0]?.ntaHeatPump?.forfaitHeatPumpDraft ?? null,
             sourceSystem: 'individual', sourceSystemReference: '' });
@@ -254,6 +256,14 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         <CheckField {...field} path={['generator', 'annexRCompliantAtMost500Kw']} label={t('nta.form.biomassAnnexR')} />
         <TextField {...field} path={['generator', 'annexRReference']} label={t('nta.form.biomassAnnexRSource')} />
         <TextField {...field} path={['generator', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+        <CheckField {...field} path={['generator', 'soleHeatingInServedRooms']} label={t('nta.form.biomassSoleHeating')} />
+        <CheckField {...field} path={['generator', 'automaticFuelFeed']} label={t('nta.form.biomassAutomaticFeed')} />
+      </>}
+      {['external_heat', 'electric_resistance', 'biomass'].includes(String(generatorKind)) && <>
+        <NumberField {...field} path={['generator', 'auxiliary', 'electricallyConnectedDevices']} label={t('nta.form.auxDevices')} step="1" />
+        <NumberField {...field} path={['generator', 'auxiliary', 'nominalPowerKw']} label={t('nta.form.auxNominalPower')} />
+        <TextField {...field} path={['generator', 'auxiliary', 'sourceReference']} label={t('nta.form.auxSource')} />
+        <p className="nta-form-note">{t('nta.form.distributionSystemNote')}</p>
       </>}
       {generatorKind === 'gas_boiler' ? <>
         <SelectField {...field} path={['generator', 'boiler', 'kind']} label={t('nta.form.boilerKind')} options={[
@@ -335,6 +345,11 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <CheckField {...field} path={['productionInventoryComplete']} label={t('nta.form.productionInventory')} />
       <CheckField {...field} path={['demandUsesFixedC1Ventilation']} label={t('nta.form.c1')} />
       <CheckField {...field} path={['batteryStoragePresent']} label={t('nta.form.battery')} />
+      {read(draft, ['batteryStoragePresent']) === true && <>
+        <NumberField {...field} path={['storage', 'buildingBoundElectricalKwh']} label={t('nta.form.storageElectrical')} />
+        <NumberField {...field} path={['storage', 'buildingBoundThermalKwh']} label={t('nta.form.storageThermal')} />
+        <TextField {...field} path={['storage', 'sourceReference']} label={t('nta.form.source')} />
+      </>}
     </Section>
     <div className="nta-form-actions">
       <button type="button" onClick={onCancel}>{t('dialog.cancel')}</button>

@@ -31,12 +31,12 @@ Kies **NTA-invoer starten**. Het formulier vraagt alleen wat het projectmodel no
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
 | Vloeren op grond | blootgestelde omtrek P, R_si + R_c, vloerrand (ψ per randdeel of forfait 0,5·P) en eventuele randisolatie (via JSON) | 8.30–8.41, bijlage D |
 | Ventilatie | H_ve per maand, of de hoofdstuk 11-invoer via de ventilatieroute (systeemvariant, WTW, infiltratie, ventilatieve koeling, ventilatoren) | hoofdstuk 11, zie [ventilatie](nta8800-ventilatie.md) |
-| Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie alleen in de verwarmde zone | tabel 9.2–9.4, §9.4.1 |
-| Opwekker | gasketel, (hybride) warmtepomp, stadsverwarming, elektrisch of biomassa | §9.6 |
+| Afgifte en distributie | afgiftesysteem, inregeling, regeling; distributie in de verwarmde zone, opgegeven, of berekend met `distributionSystem` (via Geavanceerd) | tabel 9.2–9.4, 9.26–9.51 |
+| Opwekker | gasketel, (hybride) warmtepomp, stadsverwarming, elektrisch of biomassa; bij de laatste drie ook toestellen en vermogen voor de hulpenergie | §9.6, 9.85, 9.91 |
 | Koeling | geen, compressie, gasabsorptie of vrije koeling | §10.5 |
 | Tapwater | aantal woningen of behoefte per m², rendementen, drager | 13.15–13.18 |
 | PV | piekvermogen, azimut, helling, f_perf, c_sh | 16.2/16.3 |
-| Bevestigingen | alle energieposten en alle eigen opwekking opgenomen; f_BACS; C1-ventilatie; batterij | §5.5 |
+| Bevestigingen | alle energieposten en alle eigen opwekking opgenomen; f_BACS (1,05 alleen utiliteit); C1-ventilatie; opslag met capaciteit | §5.5, 5.14a |
 
 Maandwaarden, toevoertemperaturen, gegevens per zone (`zoneData` bij meerdere zones), hybride opwekkers en bijzondere belemmeringssituaties vul je in via **Geavanceerd (JSON)**.
 
@@ -46,7 +46,7 @@ Maandwaarden, toevoertemperaturen, gegevens per zone (`zoneData` bij meerdere zo
 - **Afwijzing:** de kern controleert fysieke grenzen, bronnen en tegenstrijdigheden. Voorbeelden:
   - een warmtepompbron die volgens de tabel afvoerlucht is, maar niet zo is opgegeven;
   - dubbel opgegeven tapwater of koeling;
-  - batterijopslag (nog niet ondersteund).
+  - opslag zonder capaciteit, of `f_BACS` 1,05 bij een woning.
 - **Uitkomst:**
   - BENG 2, BENG 3 en de indicatieve labelklasse;
   - BENG 1 alleen als de ventilatie-invoer het vaste C1-systeem voorstelt (§5.4);
@@ -59,7 +59,7 @@ Maandwaarden, toevoertemperaturen, gegevens per zone (`zoneData` bij meerdere zo
 
 Zie het [verificatiedossier](nta8800-verificatiestatus.md) en het [dekkingsregister](nta8800-dekkingsregister.md). In het kort:
 
-- Hoofdstuk 11 (ventilatie, infiltratie, C1) staat als aparte route in de kern; de koppeling aan de maandberekening en de BENG 1-run volgt. De distributie volgens 9.26 ontbreekt nog.
+- Hoofdstuk 11 (ventilatie, infiltratie, C1) zit in de kern en voedt de maandberekening; de BENG 1-indicator gebruikt de aparte C1-run nog niet. De distributie volgens 9.26 is er; het formulier vult die nog niet in.
 - De rendementen voor tapwater en voor afgifte van koeling worden opgegeven.
 - Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn op 2 oktober 2026 nagelopen tegen de normtekst; terugwinbare systeemverliezen ontbreken nog. Hoofdstukken 13 en 16 zijn nog niet gereviewd; hoofdstukken 5 en 9 volgen het consultatieconcept.
 - Er zijn nog geen uitkomsten uit de EDR-testset (bijlage 2) vergeleken. Alleen A_g en A_ls van EP-W001 zijn getoetst.

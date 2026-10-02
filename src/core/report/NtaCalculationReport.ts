@@ -80,6 +80,8 @@ export function generateNtaCalculationReportHTML(
     <table><tbody>
       <tr><th>Primair fossiel (EPtot)</th><td class="n">${num(performance.annualPrimaryFossilKwh)} kWh</td><th>Hernieuwbaar (EPrenTot)</th><td class="n">${num(performance.annualRenewablePrimaryKwh)} kWh</td></tr>
       <tr><th>Warmte- en koudebehoefte</th><td class="n">${num(performance.annualHeatingAndCoolingNeedKwh)} kWh</td><th>Omgevingswarmte warmtepomp</th><td class="n">${num(performance.annualHeatPumpAmbientHeatKwh)} kWh</td></tr>
+      <tr><th>CO<sub>2</sub>-emissie (§5.5.6.1, tabel 5.3)</th><td class="n">${num(performance.annualCo2Kg)} kg/jr</td><th>Per m² gebruiksoppervlakte</th><td class="n">${num(performance.co2KgPerM2, 1)} kg/m²·jr</td></tr>
+      <tr><th>Opslagcorrectie (5.14a)</th><td class="n">${num(performance.annualStorageCorrectionKwh)} kWh</td><th>Hulpenergie verwarming</th><td class="n">${num(heating.annualAuxiliaryElectricityKwh)} kWh</td></tr>
       <tr><th>Labelbron</th><td colspan="3">${escapeHtml(performance.labelSource)}</td></tr>
     </tbody></table>
     ${bbl ? `<h2>Toets Bbl art. 4.149 (tabel 4.148A)</h2><table><tbody>

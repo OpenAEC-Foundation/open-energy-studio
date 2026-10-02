@@ -7,8 +7,9 @@ De Rust-module `building_performance` sluit de rekenruggengraat af voor een gebo
 3. gedeclareerde overige diensten: tapwater, ventilatoren, koeling, hulpenergie (hoofdstukken 10, 11 en 13 nog niet in Rust);
 4. `E_EPus` per energiedrager (5.20/5.21, met `f_BACS` op verwarming, koeling en hun hulpenergie);
 5. eigen elektriciteitsproductie: eigengebruik en export (5.22–5.26, met `E_nEPus;el = 0` volgens 5.27);
-6. `EPTot` (5.9–5.14, tabel 5.2) en `EPrenTot` (5.29–5.31, 5.39, tabel 5.4);
-7. indicatoren met de afronding van [indicatoren-conceptdiagnose](nta8800-indicatoren-conceptdiagnose.md): BENG 2 naar boven op 0,01, BENG 3 naar beneden op 0,1.
+6. `EPTot` (5.9–5.14a, tabel 5.2) en `EPrenTot` (5.29–5.32, 5.39, tabel 5.4);
+7. de operationele CO2-emissie (§5.5.6.1, tabel 5.3);
+8. indicatoren met de afronding van [indicatoren-conceptdiagnose](nta8800-indicatoren-conceptdiagnose.md): BENG 2 naar boven op 0,01, BENG 3 naar beneden op 0,1.
 
 Status `calculated_unverified`, `attestStatus = unattested`, `labelAvailable = false`.
 
@@ -22,6 +23,24 @@ Bron is het [openbare consultatieconcept van hoofdstuk 5](https://www.internetco
 | `f_P;del` aardgas en stookolie | 1,0 |
 | `f_Pren;renelect` (PV, PVT, wind) | 1,45 |
 | `f_Pren;renheat` (omgevingswarmte) | 1,0 |
+
+## Controle tegen NTA 8800:2025+C1:2026
+
+- **Opslagcorrectie 5.14a/5.14b** (pagina 85):
+  - Per maand geldt `E_P;BAT,out;tot = MIN(E_pr;el;ren;tot; E_EPus;el) · 0,05 · f_BAT;cor`. De term wordt zonder primaire factor afgetrokken in 5.10.
+  - `f_BAT;cor` = 1 als de gebouwgebonden elektrische én thermische opslag samen minstens 5 kWh is, anders 0. Een stekkerbatterij telt niet.
+  - Invoer: `batteryStoragePresent` plus `storage` (capaciteiten in kWh, met bron).
+  - Alle gemodelleerde producenten (PV, PVT, wind) zijn hernieuwbaar; WKK is er niet.
+  - Uitvoer: `annualStorageCorrectionKwh`.
+- **`f_BACS`** (§5.5.8, pagina 100): 1,05 mag alleen bij utiliteitsbouw. Bij woningbouw volgt `bacs_factor_residential_invalid`. De factor weegt de opwekkerenergie en de hulpenergie van verwarming (inclusief distributiepomp) en van koeling.
+- **CO2** (§5.5.6.1, tabel 5.3, peildatum januari 2025):
+  - Factoren in kg/kWh: elektriciteit 0,268 (afgenomen en geëxporteerd), aardgas 0,218 (ook voor waterstof), stookolie 0,326, biomassa bmB 0,5 × 0,104 en externe warmte zonder verklaring 0,09.
+  - `m_CO2` volgt de opbouw van 5.10 met `K_CO2` in plaats van `f_P;del`, zonder de opslagcorrectie.
+  - Uitvoer: `annualCo2Kg` en `co2KgPerM2`.
+  - Waarden met een verklaring volgens bijlage P (tabel 5.6) en externe koude zijn niet aangesloten, omdat die routes geweigerd worden.
+- **Warmtepomp op buitenlucht én ventilatieretourlucht** (5.32):
+  - Je geeft `combinedOutdoorAndExhaustAir` op, waarbij de bron in de COP-tabel buitenlucht moet zijn (tabel 9.27 voetnoot c).
+  - Alleen het buitenluchtaandeel `f_H;buitenlucht` telt als omgevingswarmte. Zonder kwaliteitsverklaring is dat aandeel 0.
 
 Omdat de drie elektriciteitsfactoren gelijk zijn, is het netto resultaat maandonafhankelijk: `(E_EPus;el − E_PV)·1,45`. De test controleert zowel de maandroute als deze identiteit. `EPTot` mag negatief worden; er wordt niet afgekapt.
 
@@ -116,7 +135,7 @@ Volgens §5.4 moet de energiebehoefte voor BENG 1 worden berekend met een vast v
 
 ## Geweigerd of niet ondersteund
 
-- batterijopslag (5.14a bevat in het concept nog een placeholder);
+- opslag zonder opgegeven capaciteit (`storage_capacity_required`);
 - collectieve warmtepompbron (vergt de `dh`-factorroute);
 - externe warmte- en koudelevering, biomassa en export van warmte;
 - verlichting bij woningbouw (volgens de opmerking bij 5.20 op 0);

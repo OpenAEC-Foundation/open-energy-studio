@@ -1,0 +1,201 @@
+{
+  "demand": {
+    "zoneId": "rz-1",
+    "usableFloorAreaM2": 100.0,
+    "areaSourceReference": "synthetic plan; not an EDR case",
+    "usageFunction": "residential",
+    "dwellingType": "apartment_building",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "NTA 8800 table 7.13 residential (transcribed)"
+    },
+    "transmission": {
+      "method": "explicit",
+      "conductanceWPerK": 80.0,
+      "sourceReference": "synthetic envelope",
+      "ground": null,
+      "groundInventoryConfirmed": true
+    },
+    "ventilationFlows": [
+      {
+        "id": "natural",
+        "sourceReference": "synthetic flow",
+        "months": [
+          {
+            "month": 1,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 2,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 3,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 4,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 5,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 6,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 7,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 8,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 9,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 10,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 11,
+            "conductanceWPerK": 40.0
+          },
+          {
+            "month": 12,
+            "conductanceWPerK": 40.0
+          }
+        ]
+      }
+    ],
+    "thermalMass": {
+      "floor": "very_heavy",
+      "wall": "light",
+      "ceiling": "open_or_none",
+      "sourceReference": "synthetic; table 7.10 footnote b"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "single dwelling"
+    },
+    "windowInventoryComplete": true,
+    "windows": [
+      {
+        "id": "w-south",
+        "areaM2": 10.0,
+        "orientation": "south",
+        "tiltDeg": 90.0,
+        "gPerpendicular": 0.6,
+        "frameFraction": 0.25,
+        "uValueWPerM2k": 1.2,
+        "sourceReference": "synthetic window",
+        "obstruction": {
+          "method": "declared",
+          "heating": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "cooling": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "sourceReference": "synthetic: no obstruction"
+        }
+      }
+    ],
+    "opaqueInventoryComplete": true,
+    "opaqueElements": [
+      {
+        "id": "roof",
+        "areaM2": 50.0,
+        "orientation": "south",
+        "tiltDeg": 0.0,
+        "uValueWPerM2k": 0.16,
+        "sourceReference": "synthetic roof"
+      }
+    ]
+  },
+  "emission": {
+    "system": "radiators_or_convectors",
+    "balancing": "none_or_unknown",
+    "control": "main_room_thermostat",
+    "sourceReference": "synthetic survey"
+  },
+  "distribution": {
+    "method": "calculated",
+    "sourceReference": "synthetic: 9.26 with the system data below"
+  },
+  "generator": {
+    "kind": "gas_boiler",
+    "boiler": {
+      "generatorId": "boiler",
+      "role": "collective",
+      "location": "outside_thermal_boundary",
+      "kind": "hr107",
+      "fuel": "natural_gas",
+      "averageDesignEmissionTemperatureC": 45.0,
+      "emissionCircuit": "direct",
+      "equipmentReference": "synthetic type plate",
+      "locationReference": "synthetic plan",
+      "temperatureAndCircuitReference": "synthetic design",
+      "pilotFlamePresent": false,
+      "installationYear": 2020,
+      "installationYearReference": "synthetic invoice"
+    },
+    "auxiliary": {
+      "electricallyConnectedDevices": 1,
+      "nominalPowerKw": 120.0,
+      "sourceReference": "synthetic plant-room type plate"
+    }
+  },
+  "collectiveConnection": {
+    "connectedUsableAreaM2": 1200.0,
+    "sourceReference": "synthetic: area of the whole block on the installation"
+  },
+  "distributionSystem": {
+    "designTemperatureClass": "70_60",
+    "installation": "collective",
+    "usageFunction": "residential",
+    "connectedStoreys": 5,
+    "pipeTransmittance": {
+      "method": "forfait",
+      "insulation": {
+        "state": "insulated",
+        "period": "from1995"
+      }
+    },
+    "valvesInsulated": false,
+    "pump": {
+      "method": "calculated",
+      "heatMeterPresent": true,
+      "sourceReference": "synthetic pump schedule, EEI unknown"
+    },
+    "sourceReference": "synthetic installation survey"
+  }
+}

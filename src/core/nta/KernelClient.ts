@@ -1328,15 +1328,21 @@ export interface SpaceHeatingChainInput {
   };
   distribution:
     | { method: 'heated_zone_only_space_heating'; sourceReference: string }
-    | { method: 'declared'; monthlyLossKwh: number[]; sourceReference: string };
+    | { method: 'declared'; monthlyLossKwh: number[]; sourceReference: string }
+    | { method: 'calculated'; heatingLimitExtraKwh?: number[] | null; sourceReference: string };
+  /** §9.4 hydraulic data: calculated distribution loss and pump energy. */
+  distributionSystem?: NtaDistributionSystem | null;
+  /** Part of a building on a collective installation (`f_gebouw;si;H`). */
+  collectiveConnection?: { connectedUsableAreaM2: number; sourceReference: string } | null;
   generator:
-    | { kind: 'gas_boiler'; boiler: BoilerForfaitDraftInput }
+    | { kind: 'gas_boiler'; boiler: BoilerForfaitDraftInput; auxiliary?: NtaOtherGeneratorAuxiliary | null }
     | {
         kind: 'heat_pump_forfait';
         forfait: ForfaitHeatPumpDraftInput;
         sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
         sourceSystemReference: string;
         auxiliaryMeasurements?: Record<string, unknown> | null;
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
       }
     | {
         kind: 'hybrid_heat_pump';
@@ -1356,8 +1362,13 @@ export interface SpaceHeatingChainInput {
         sourceSystemReference: string;
         declaredOperatingLimitsPresent?: boolean;
       }
-    | { kind: 'external_heat'; supplierReference: string; qualityDeclarationPresent: boolean }
-    | { kind: 'electric_resistance'; equipmentReference: string }
+    | {
+        kind: 'external_heat';
+        supplierReference: string;
+        qualityDeclarationPresent: boolean;
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
+      }
+    | { kind: 'electric_resistance'; equipmentReference: string; auxiliary?: NtaOtherGeneratorAuxiliary | null }
     | {
         kind: 'biomass';
         appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler';
@@ -1365,7 +1376,91 @@ export interface SpaceHeatingChainInput {
         annexRCompliantAtMost500Kw: boolean;
         annexRReference: string;
         equipmentReference: string;
+        soleHeatingInServedRooms?: boolean | null;
+        automaticFuelFeed?: boolean;
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
       };
+}
+
+/** 9.91/9.92 inputs for generators outside 9.85. */
+export interface NtaOtherGeneratorAuxiliary {
+  electricallyConnectedDevices: number;
+  nominalPowerKw?: number | null;
+  sourceReference: string;
+}
+
+export type NtaDesignTemperatureClass =
+  | '30_27' | '35_30' | '40_35' | '45_40' | '50_42' | '55_47'
+  | '60_50' | '65_55' | '70_60' | '75_65' | '80_60' | '90_70';
+
+export type NtaPipeTransmittance =
+  | {
+      method: 'forfait';
+      insulation:
+        | { state: 'insulated'; period: 'from1995' | 'from1980_to1995' | 'before1980_or_unknown' }
+        | { state: 'uninsulated' }
+        | { state: 'unknown' };
+    }
+  | {
+      method: 'insulated_in_air';
+      pipeOuterDiameterM: number;
+      insulatedDiameterM: number;
+      insulationLambdaWPerMK: number;
+      surfaceCoefficientWPerM2K?: number | null;
+    }
+  | {
+      method: 'insulated_embedded';
+      pipeOuterDiameterM: number;
+      insulatedDiameterM: number;
+      insulationLambdaWPerMK: number;
+      embeddingLambdaWPerMK: number;
+      depthM: number;
+    }
+  | {
+      method: 'uninsulated';
+      innerDiameterM: number;
+      outerDiameterM: number;
+      pipeLambdaWPerMK: number;
+      surfaceCoefficientWPerM2K?: number | null;
+    };
+
+export interface NtaDistributionSystem {
+  designTemperatureClass?: NtaDesignTemperatureClass | null;
+  installation: 'individual' | 'collective';
+  usageFunction:
+    | 'residential' | 'assembly' | 'cell' | 'healthcare_with_beds' | 'healthcare_other'
+    | 'office' | 'lodging' | 'education' | 'sport' | 'retail';
+  pipesAlsoForHotWater?: boolean;
+  collectiveHotWaterDeliverySet?: boolean;
+  connectedStoreys: number;
+  pipeTransmittance: NtaPipeTransmittance;
+  unheatedPipeTransmittance?: NtaPipeTransmittance | null;
+  valvesInsulated: boolean;
+  actualPipeLengthM?: number | null;
+  unheatedPipeLengthM?: number | null;
+  unheatedAmbientC?: number[] | null;
+  bufferVessel?: {
+    volumeL: number;
+    standingLossW?: number | null;
+    label?: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | null;
+    producedFrom2018: boolean;
+    inHeatedSpace: boolean;
+    constantTemperature?: boolean;
+    sourceReference: string;
+  } | null;
+  pump:
+    | { method: 'included_in_generator_auxiliary' }
+    | { method: 'none_on_site'; sourceReference: string }
+    | {
+        method: 'calculated';
+        heatMeterPresent: boolean;
+        maxPipeLengthM?: number | null;
+        designFlowM3PerH?: number | null;
+        energyEfficiencyIndex?: number | null;
+        electricPowerKw?: number | null;
+        sourceReference: string;
+      };
+  sourceReference: string;
 }
 
 export interface SpaceHeatingChainAssessment {
@@ -1385,6 +1480,8 @@ export interface SpaceHeatingChainAssessment {
     emissionLossKwh: number;
     emissionInputKwh: number;
     distributionLossKwh: number;
+    distributionAuxiliaryToMediumKwh: number;
+    nodeLossKwh: number;
     generatorOutputKwh: number;
     heatPumpOutputKwh: number;
     naturalGasKwh: number;
@@ -1392,6 +1489,8 @@ export interface SpaceHeatingChainAssessment {
     biomassKwh: number;
     generatorElectricityKwh: number;
     auxiliaryElectricityKwh: number | null;
+    distributionAuxiliaryElectricityKwh: number;
+    recoverableLossKwh: number;
     collectiveSourceHeatKwh: number;
   }>;
   annualNaturalGasKwh: number | null;
@@ -1400,6 +1499,29 @@ export interface SpaceHeatingChainAssessment {
   annualCollectiveSourceHeatKwh: number | null;
   annualDistrictHeatKwh: number | null;
   annualBiomassKwh: number | null;
+  distribution: {
+    designTemperatureClass: NtaDesignTemperatureClass;
+    buildingFraction: number;
+    pipeLengthM: number;
+    unheatedPipeLengthM: number;
+    psiZoneWPerMk: number;
+    psiUnheatedWPerMk: number;
+    zones: Array<{
+      zoneId: string;
+      heatingLimitC: number;
+      operatingHours: number[];
+      meanMediumTemperatureC: number[];
+    }>;
+    pump: {
+      maxPipeLengthM: number;
+      pressureKpa: number;
+      designFlowM3PerH: number;
+      hydraulicPowerKw: number;
+      energyFactor: number;
+      balancingFactor: number;
+    } | null;
+  } | null;
+  zoneRecoverableLosses: Array<{ zoneId: string; monthlyKwh: number[] }>;
   demand: MonthlyDemandAssessment;
   additionalZoneDemands: MonthlyDemandAssessment[];
   issues: Array<{ code: string; path: string }>;
@@ -1627,7 +1749,14 @@ export interface BuildingPerformanceInput {
   totalUsableFloorAreaM2: number;
   areaSourceReference: string;
   spaceHeating: SpaceHeatingChainInput;
-  heatPumpRenewable?: { sourceBelow20C: boolean; exhaustAirSource: boolean; sourceReference: string } | null;
+  heatPumpRenewable?: {
+    sourceBelow20C: boolean;
+    exhaustAirSource: boolean;
+    sourceReference: string;
+    combinedOutdoorAndExhaustAir?: boolean;
+    outdoorAirHeatFraction?: number | null;
+    outdoorAirFractionReference?: string | null;
+  } | null;
   bacsFactor: 1 | 1.05;
   bacsSourceReference: string;
   useInventoryComplete: boolean;
@@ -1656,6 +1785,14 @@ export interface BuildingPerformanceInput {
   hotWater?: NtaHotWaterSystem | null;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
+  storage?: NtaEnergyStorage | null;
+}
+
+/** 5.14a: building-bound storage capacities for `f_BAT;cor`. */
+export interface NtaEnergyStorage {
+  buildingBoundElectricalKwh: number;
+  buildingBoundThermalKwh: number;
+  sourceReference: string;
 }
 
 export type NtaLabelFunction =
@@ -1749,6 +1886,9 @@ export interface BuildingPerformanceAssessment {
   annualRenewablePrimaryKwh: number | null;
   annualHeatPumpAmbientHeatKwh: number | null;
   annualHeatingAndCoolingNeedKwh: number | null;
+  annualStorageCorrectionKwh: number | null;
+  annualCo2Kg: number | null;
+  co2KgPerM2: number | null;
   needIndicatorKwhPerM2Year: number | null;
   primaryFossilIndicatorKwhPerM2Year: number | null;
   renewableSharePercent: number | null;
@@ -1826,6 +1966,8 @@ export interface NtaCalculationInput {
   emission: SpaceHeatingChainInput['emission'];
   distribution: SpaceHeatingChainInput['distribution'];
   generator: SpaceHeatingChainInput['generator'];
+  distributionSystem?: NtaDistributionSystem | null;
+  collectiveConnection?: SpaceHeatingChainInput['collectiveConnection'];
   heatPumpRenewable?: BuildingPerformanceInput['heatPumpRenewable'];
   bacsFactor: 1 | 1.05;
   bacsSourceReference: string;
@@ -1843,6 +1985,7 @@ export interface NtaCalculationInput {
   permitApplicationAfter20260529?: boolean;
   demandUsesFixedC1Ventilation: boolean;
   batteryStoragePresent: boolean;
+  storage?: NtaEnergyStorage | null;
 }
 
 export interface ProjectPerformanceAssessment {

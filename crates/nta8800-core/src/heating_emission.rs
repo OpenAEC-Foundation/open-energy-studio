@@ -1,15 +1,15 @@
 //! Space-heating emission losses, NTA 8800 §9.3 (NEN-EN 15316-2).
 //!
-//! Implements 9.9–9.12 and 9.16 with the forfait temperature corrections of
-//! tables 9.2 (system), 9.3 (hydronic balancing) and 9.4 (control), as given
-//! in the public 2026 consultation draft of chapter 9 (pages 13–15). The
-//! draft is not the verified target edition; results stay unverified.
+//! Implements 9.9–9.12 and 9.12a with the forfait temperature corrections of
+//! tables 9.2 (system), 9.3 (hydronic balancing) and 9.4 (control). Checked
+//! against NTA 8800:2025+C1:2026 pages 296–297: identical to the 2026
+//! consultation draft except that the draft's 9.16 is numbered 9.12a.
 
 use serde::{Deserialize, Serialize};
 
 pub const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
 
-/// 9.16: upper bound of the relative emission loss.
+/// 9.12a: upper bound of the relative emission loss.
 pub const MAX_RELATIVE_LOSS: f64 = 0.15;
 
 /// Table 9.2 rows, emission system in the main room.
@@ -101,14 +101,14 @@ pub fn balancing_consistent(input: &EmissionInput) -> bool {
     non_hydronic == (input.balancing == HydronicBalancing::NotApplicable)
 }
 
-/// 9.16 for one month: `Q_H;em;ls` in kWh for `Q_H;em;out = Q_H;nd`.
+/// 9.12a for one month: `Q_H;em;ls` in kWh for `Q_H;em;out = Q_H;nd`.
 pub fn monthly_loss_kwh(
     heat_output_kwh: f64,
     setpoint_c: f64,
     outdoor_c: f64,
     increment_k: f64,
 ) -> f64 {
-    // 9.16 condition: θ_H;int;ini − θ_e;comb > 0, with θ_e;comb = θ_e;avg;mi.
+    // 9.12a condition: θ_H;int;ini − θ_e;comb > 0, with θ_e;comb = θ_e;avg;mi.
     if setpoint_c - outdoor_c <= 0.0 {
         return 0.0;
     }
