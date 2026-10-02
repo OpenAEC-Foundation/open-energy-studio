@@ -52,6 +52,9 @@ use crate::heating_emission::{
     balancing_consistent, monthly_loss_kwh, temperature_increment_k, EmissionInput, EmissionSystem,
     HydronicBalancing, DRAFT_SOURCE,
 };
+use crate::humidification::{
+    calculate_humidity, HumidityFunction, HumidityFunctionArea, HumidityInput,
+};
 use crate::hybrid_heat_pump_monthly_draft::{
     assess_hybrid_heat_pump_monthly_draft, HybridHeatPumpAuxMeasurements,
     HybridHeatPumpMonthlyDraftInput,
@@ -63,7 +66,8 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
-    "9.2.3 node gains from solar thermal systems, AHU, humidification, booster heat pumps and delivery sets",
+    "9.2.3 node gains from solar thermal systems, AHU, booster heat pumps and delivery sets",
+    "12.2.1 recoverable losses of steam humidifiers (Q_H;hum;rbl) are reported, not fed back into the need",
     "9.21 emission fan energy for fan-assisted emitters",
     "more than two generators, product-specific hybrid switching and domestic hot water priority",
     "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
@@ -82,6 +86,10 @@ pub const OTHER_AUX_AUTOMATIC_BIOMASS_W_PER_KW: f64 = 10.0;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SpaceHeatingChainInput {
+    /// Humidifiers per zone (chapter 12); atomising humidifiers load the
+    /// space-heating node (9.4), steam humidifiers have their own carrier.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub humidifiers: Vec<ZoneHumidifier>,
     pub demand: MonthlyDemandInput,
     pub emission: EmissionInput,
     pub distribution: Distribution,
@@ -635,6 +643,85 @@ pub struct ChainMonth {
     /// 9.7: recoverable losses summed over the zones.
     pub recoverable_loss_kwh: f64,
     pub collective_source_heat_kwh: f64,
+    /// 12.1: latent heat of atomising humidifiers delivered by this
+    /// heating system (in `generator_output_kwh`), kWh.
+    pub humidification_load_kwh: f64,
+    /// 12.3: steam humidifier energy, kWh.
+    pub humidification_electricity_kwh: f64,
+    pub humidification_fuel_kwh: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ZoneHumidifier {
+    pub zone_id: String,
+    pub humidification: crate::humidification::Humidification,
+}
+
+fn humidity_function(function: crate::monthly_demand::UsageFunction) -> HumidityFunction {
+    use crate::monthly_demand::UsageFunction as U;
+    match function {
+        U::Residential => HumidityFunction::Residential,
+        U::Sport => HumidityFunction::Sport,
+        U::HealthcareWithBeds | U::OtherHealthcare => HumidityFunction::Healthcare,
+        _ => HumidityFunction::General,
+    }
+}
+
+/// 12.1–12.4 for one zone with its chapter 11 supply flows.
+fn zone_humidity(
+    humidifier: &ZoneHumidifier,
+    zone_input: &MonthlyDemandInput,
+    zone_demand: &MonthlyDemandAssessment,
+    path: &str,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<Vec<crate::humidification::HumidityMonth>> {
+    let Some(ventilation) = &zone_demand.ventilation else {
+        issues.push(issue(
+            "humidification_requires_chapter_11",
+            path.to_string(),
+        ));
+        return None;
+    };
+    let functions = if zone_input.function_areas.is_empty() {
+        vec![HumidityFunctionArea {
+            function: humidity_function(zone_input.usage_function),
+            area_m2: zone_input.usable_floor_area_m2,
+        }]
+    } else {
+        zone_input
+            .function_areas
+            .iter()
+            .map(|part| HumidityFunctionArea {
+                function: humidity_function(part.function),
+                area_m2: part.area_m2,
+            })
+            .collect()
+    };
+    let input = HumidityInput {
+        zone_id: zone_input.zone_id.clone(),
+        usable_floor_area_m2: zone_input.usable_floor_area_m2,
+        functions,
+        humidification: Some(humidifier.humidification.clone()),
+        supply_flow_m3_per_h: ventilation
+            .months
+            .iter()
+            .map(|month| month.heating.mechanical_supply_m3_per_h)
+            .collect(),
+        cooling_design: None,
+        cooling_need_kwh: Vec::new(),
+    };
+    match calculate_humidity(&input) {
+        Ok(months) => Some(months),
+        Err(found) => {
+            issues.extend(
+                found
+                    .into_iter()
+                    .map(|item| issue(item.code, format!("{path}.{}", item.path))),
+            );
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1506,6 +1593,28 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
         let mut adjusted = adjusted.into_iter();
         demand = adjusted.next().expect("primary zone");
         additional_zone_demands = adjusted.collect();
+        // Chapter 12: humidifiers per zone.
+        let mut humidification = [[0.0_f64; 3]; 12];
+        for (h_index, humidifier) in input.humidifiers.iter().enumerate() {
+            let path = format!("humidifiers[{h_index}]");
+            let found = zone_sources
+                .iter()
+                .zip(std::iter::once(&demand).chain(&additional_zone_demands))
+                .find(|((zone_input, _, _), _)| zone_input.zone_id == humidifier.zone_id);
+            let Some(((zone_input, _, _), zone_demand)) = found else {
+                issues.push(issue("humidifier_zone_unknown", format!("{path}.zoneId")));
+                continue;
+            };
+            if let Some(months) =
+                zone_humidity(humidifier, zone_input, zone_demand, &path, &mut issues)
+            {
+                for (index, month) in months.iter().enumerate() {
+                    humidification[index][0] += month.heating_system_load_kwh;
+                    humidification[index][1] += month.steam_electricity_kwh;
+                    humidification[index][2] += month.steam_fuel_kwh;
+                }
+            }
+        }
         let mut outputs = Vec::with_capacity(12);
         for index in 0..12 {
             let mut need = 0.0;
@@ -1525,7 +1634,9 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 distribution_input += (emission_input + loss - aux).max(0.0);
             }
             // 9.5 node: generator output covers all zones plus the buffer loss.
-            let generator_output = distribution_input + distribution.node_loss[index];
+            // 9.4: the node also supplies atomising humidification (12.1).
+            let generator_output =
+                distribution_input + distribution.node_loss[index] + humidification[index][0];
             let month = index as u8 + 1;
             outputs.push(MonthlyEnergy {
                 month,
@@ -1555,6 +1666,9 @@ pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatin
                 collective_source_heat_kwh: 0.0,
                 oil_kwh: 0.0,
                 generator_recoverable_loss_kwh: 0.0,
+                humidification_load_kwh: humidification[index][0],
+                humidification_electricity_kwh: humidification[index][1],
+                humidification_fuel_kwh: humidification[index][2],
             });
         }
         zone_recoverable_losses = valid_zones
@@ -2532,8 +2646,70 @@ mod tests {
         .unwrap()
     }
 
+    #[test]
+    fn humidifiers_load_the_node_or_use_their_own_carrier() {
+        use crate::humidification::{Humidification, Humidifier, SteamCarrier};
+        let mut input = boiler_chain();
+        let demand = &mut input.demand;
+        demand.usage_function = crate::monthly_demand::UsageFunction::Office;
+        demand.dwelling_type = None;
+        demand.setpoints.heating_c = 21.0;
+        demand.internal_gains = crate::monthly_demand::InternalGains::Declared {
+            heat_flux_w_per_m2: 5.5,
+            source_reference: "tables 7.2/7.3".into(),
+        };
+        demand.ventilation_flows.clear();
+        demand.ventilation = Some(
+            serde_json::from_value(serde_json::json!({
+                "zoneId": demand.zone_id,
+                "usableFloorAreaM2": demand.usable_floor_area_m2,
+                "category": "utility",
+                "functions": [{"function": "office", "areaM2": demand.usable_floor_area_m2}],
+                "buildingHeightM": 9.0,
+                "constructionYear": 2020,
+                "heatingSetpointC": 21.0,
+                "coolingSetpointC": 24.0,
+                "system": {"kind": "single", "unit": {"variant": "d1", "ducts": "luka_a_b_c", "equipmentReference": "ahu"}},
+                "infiltration": {"method": "measured", "qv10DmPerSM2": 0.4, "sourceReference": "test"},
+                "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
+                "sourceReference": "test"
+            }))
+            .unwrap(),
+        );
+        let base = assess_space_heating_chain(&input);
+        assert_eq!(base.status, "calculated_unverified", "{:?}", base.issues);
+        let zone_id = input.demand.zone_id.clone();
+        input.humidifiers = vec![ZoneHumidifier {
+            zone_id: zone_id.clone(),
+            humidification: Humidification {
+                humidifier: Humidifier::Steam {
+                    carrier: SteamCarrier::Electricity,
+                },
+                rotary_wheel: false,
+                equipment_reference: "steam unit".into(),
+            },
+        }];
+        let steam = assess_space_heating_chain(&input);
+        assert_eq!(steam.status, "calculated_unverified", "{:?}", steam.issues);
+        let jan = &steam.monthly[0];
+        let supply = steam.demand.ventilation.as_ref().unwrap().months[0]
+            .heating
+            .mechanical_supply_m3_per_h;
+        let need = 2538.2 * 1.205 * supply / 3600.0 * 0.82;
+        assert!((jan.humidification_electricity_kwh - need / 0.8).abs() < 1e-6);
+        assert!((jan.generator_output_kwh - base.monthly[0].generator_output_kwh).abs() < 1e-9);
+        input.humidifiers[0].humidification.humidifier = Humidifier::Atomising;
+        let atomising = assess_space_heating_chain(&input);
+        let jan = &atomising.monthly[0];
+        assert!((jan.humidification_load_kwh - need).abs() < 1e-6);
+        assert!(
+            (jan.generator_output_kwh - base.monthly[0].generator_output_kwh - need).abs() < 1e-6
+        );
+    }
+
     fn boiler_chain() -> SpaceHeatingChainInput {
         SpaceHeatingChainInput {
+            humidifiers: Vec::new(),
             demand: demand(),
             emission: emission(),
             distribution: Distribution::HeatedZoneOnlySpaceHeating {

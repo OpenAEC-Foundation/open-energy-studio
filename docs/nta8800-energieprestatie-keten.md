@@ -330,3 +330,11 @@ Het paneel **NTA 8800-berekening (Rust-kern)** staat op het project- en resultat
 - jaartotalen, een maandtabel, de weggelaten correcties en de invoervingerafdruk.
 
 Via **NTA-invoer starten** opent een gestructureerd formulier met secties die de rekenvolgorde volgen: algemeen, setpoints, massa, interne winst, ramen, dakhellingen, grondvloeren, ventilatie, afgifte/distributie, opwekker, tapwater, PV en bevestigingen. Een leeg getal wordt `null`, zodat de rekenkern het als invoergat meldt. Maandwaarden, toevoertemperaturen, zoneData en overige details gaan via **Geavanceerd (JSON)**. Beide editors starten vanuit een sjabloon. Daarin zijn alleen normvaste waarden ingevuld, zoals 20/24 °C voor woningbouw en de kolom van tabel 7.10. Projectspecifieke waarden staan op `null` en alle bronvermeldingen zijn leeg, zodat de rekenkern een invoergat blijft melden tot alles is ingevuld en onderbouwd. `training-data/nta8800-project-performance-synthetic.json` is een volledig synthetisch project. Met minimale belemmering (§17.3.2a) levert het via de devserverproxy BENG 2 = 14,37, BENG 3 = 72,9% en een warmtebehoefte van 2.643 kWh op; dat is een consistentiecontrole, geen referentiegeval.
+
+## Bevochtiging en ontvochtiging (hoofdstuk 12)
+
+- **Ontvochtiging:** zit in de koelketen. Q_C;dhum = f_DHU;C · Q_C;nd (12.5, tabel 12.2) komt bij de opwekkerlast. De factor volgt uit de ontwerptemperatuur van de koudedistributie; zonder distributie (directe expansie) of bij een onbekend ontwerp telt 6/12 °C. Bij stralingsafgifte (vloer, wand, plafond) is Q_C;dhum 0.
+- **Bevochtiging:** `humidifiers` per zone, in de verwarmingsketen (of `ntaCalculation.humidifiers`). Vereist hoofdstuk 11-invoer, want 12.1 gebruikt de mechanische toevoer van de warmtebalans.
+  - Een vernevelaar levert zijn latente warmte als last aan het knooppunt van de verwarmingsketen (9.4).
+  - Een stoombevochtiger gebruikt elektriciteit (η 0,8) of gas (η 0,6).
+  - Het terugwinbare verlies van stoombevochtiging (12.4) wordt nog niet teruggekoppeld naar de behoefte.

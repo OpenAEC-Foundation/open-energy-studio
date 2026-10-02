@@ -470,6 +470,16 @@ export interface NtaHeatedBasement {
   forfaitDeltaUWPerM2k?: number | null;
 }
 
+/** Chapter 12 humidifier of one zone (space-heating chain input). */
+export interface NtaZoneHumidifier {
+  zoneId: string;
+  humidification: {
+    humidifier: { kind: 'atomising' } | { kind: 'steam'; carrier: 'electricity' | 'gas_or_oil' };
+    rotaryWheel: boolean;
+    equipmentReference: string;
+  };
+}
+
 export interface MonthlyDemandInput {
   zoneId: string;
   usableFloorAreaM2: number;
@@ -1414,6 +1424,7 @@ export interface SpaceHeatingChainZone {
 }
 
 export interface SpaceHeatingChainInput {
+  humidifiers?: NtaZoneHumidifier[];
   demand: MonthlyDemandInput;
   additionalZones?: SpaceHeatingChainZone[];
   emission: {

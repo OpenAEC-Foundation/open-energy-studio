@@ -1538,6 +1538,9 @@ fn compute(
                 Carrier::Oil => used_oil += value,
             }
         }
+        // Chapter 12: steam humidifiers (12.3), carrier electricity or gas.
+        used_el += heating.monthly[index].humidification_electricity_kwh;
+        used_gas += heating.monthly[index].humidification_fuel_kwh;
         // Chapter 11: fans (11.132), frost protection (11.105) and grille
         // preheating (11.125); not weighted by f_BACS.
         for demand in std::iter::once(&heating.demand).chain(&heating.additional_zone_demands) {

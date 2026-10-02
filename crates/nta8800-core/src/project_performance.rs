@@ -51,6 +51,9 @@ pub struct NtaCalculationInput {
     #[serde(default)]
     pub surface_tilts: Vec<SurfaceTilt>,
     pub window_solar: WindowSolarDefaults,
+    /// Humidifiers per zone (chapter 12).
+    #[serde(default)]
+    pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
     #[serde(default)]
@@ -594,6 +597,7 @@ fn derive_input(
         total_usable_floor_area_m2: total_area,
         area_source_reference: nta.area_source_reference,
         space_heating: SpaceHeatingChainInput {
+            humidifiers: nta.humidifiers.clone(),
             demand: primary.demand,
             emission: primary.emission,
             distribution: primary.distribution,

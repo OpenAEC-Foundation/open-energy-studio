@@ -27,8 +27,11 @@
 //!   cooling counts pump energy only (§10.5.7.2.1);
 //! - ambient cold (5.34) is the cold of free cooling with `EER ≥ 8`.
 //!
-//! Not modelled (zero): AHU cooling `Q_C;ahu;in;req` (chapter 11), the
-//! dehumidification need `Q_C;dhum` (chapter 12), methods 1 and 2 (EN 14825 /
+//! The dehumidification need `Q_C;dhum` (12.5, table 12.2) is added to the
+//! generator load: by the design temperature of the distribution (6/12 °C
+//! for direct expansion or an unknown design), zero for radiant emitters.
+//!
+//! Not modelled (zero): AHU cooling `Q_C;ahu;in;req` (chapter 11), methods 1 and 2 (EN 14825 /
 //! EN 14511 data), recoverable distribution losses (zero because `L_C;zi = 0`
 //! in cooled zones) and the supply-air term of 10.20 in the cooling limit.
 
@@ -614,6 +617,8 @@ pub struct CoolingMonth {
     pub distribution_loss_kwh: f64,
     pub pump_recovered_kwh: f64,
     pub booster_extraction_kwh: f64,
+    /// `Q_C;dhum` (12.5), kWh.
+    pub dehumidification_kwh: f64,
     /// `Q_C;gen;in`.
     pub generator_cold_kwh: f64,
     /// Drive energy of compression chillers and free-cooling pumps.
@@ -1150,11 +1155,35 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                 distribution += distribution_unit[index] * zone.usable_floor_area_m2 / zone_area;
             }
         }
-        let has_load = need + emission + distribution > 0.0;
+        // 12.5 with table 12.2.
+        let dehumidification = if system.emission.emitter.radiant() {
+            0.0
+        } else {
+            let design = match system
+                .distribution
+                .as_ref()
+                .map(|item| item.design_temperature)
+            {
+                Some(CoolingDesignTemperature::T12To16) => {
+                    crate::humidification::CoolingDesignTemperature::From12To16
+                }
+                Some(CoolingDesignTemperature::T12To18) => {
+                    crate::humidification::CoolingDesignTemperature::From12To18
+                }
+                Some(CoolingDesignTemperature::T17To21) => {
+                    crate::humidification::CoolingDesignTemperature::From17To21
+                }
+                Some(CoolingDesignTemperature::T6To12OrUnknown) | None => {
+                    crate::humidification::CoolingDesignTemperature::From6To12
+                }
+            };
+            design.fraction(index) * need
+        };
+        let has_load = need + emission + distribution + dehumidification > 0.0;
         let pump = if has_load { pump_energy[index] } else { 0.0 };
         // 10.45
         let recovered = (1.0 - PUMP_RECOVERABLE_FACTOR) * pump;
-        let load = need + emission + distribution + recovered;
+        let load = need + emission + distribution + recovered + dehumidification;
         // 10.7–10.9: the booster heat pump is limited to the load.
         let extraction = booster[index].min(load);
         let generator_cold = load - extraction;
@@ -1167,6 +1196,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             distribution_loss_kwh: distribution,
             pump_recovered_kwh: recovered,
             booster_extraction_kwh: extraction,
+            dehumidification_kwh: dehumidification,
             generator_cold_kwh: generator_cold,
             ..CoolingMonth::default()
         };
@@ -1369,7 +1399,9 @@ mod tests {
         assert!((july.emission_loss_kwh - 180.0 * ratio).abs() < 1e-9);
         // April: 22,25 − 17,32 > 0, no loss.
         assert_eq!(result.months[3].emission_loss_kwh, 0.0);
-        let cold = july.need_kwh + july.emission_loss_kwh;
+        // 12.5: no distribution (direct expansion) counts as 6/12 °C, July 1,84.
+        assert!((july.dehumidification_kwh - 1.84 * 180.0).abs() < 1e-9);
+        let cold = july.need_kwh + july.emission_loss_kwh + july.dehumidification_kwh;
         assert!((july.electricity_kwh - cold / 3.0).abs() < 1e-9);
         // Control 0,010 kW for 744 h.
         assert!((july.auxiliary_electricity_kwh - 7.44).abs() < 1e-9);
@@ -1559,7 +1591,7 @@ mod tests {
         let result = assess_cooling(&input, context(&zones));
         let july = &result.months[6];
         assert!((july.booster_extraction_kwh - 30.0).abs() < 1e-12);
-        let load = july.need_kwh + july.emission_loss_kwh;
+        let load = july.need_kwh + july.emission_loss_kwh + july.dehumidification_kwh;
         assert!((july.generator_cold_kwh - (load - 30.0)).abs() < 1e-9);
         assert!((result.zone_booster_extraction_kwh[1][6] - 12.0).abs() < 1e-12);
         // January has no load: extraction limited to 0.

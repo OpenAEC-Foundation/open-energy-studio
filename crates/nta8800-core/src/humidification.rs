@@ -117,7 +117,8 @@ pub enum CoolingDesignTemperature {
 }
 
 impl CoolingDesignTemperature {
-    fn fraction(self, month_index: usize) -> f64 {
+    /// Table 12.2 f_DHU;C for month 0–11.
+    pub fn fraction(self, month_index: usize) -> f64 {
         match self {
             Self::From6To12 | Self::DirectExpansion | Self::Unknown => {
                 DEHUMIDIFICATION_6_12[month_index]
