@@ -589,3 +589,44 @@ Generator `chp` volgt methode 2: forfaitaire omzettingsgetallen uit tabel 9.31, 
 - **Combinatie met een piekketel:** gebruik `multiple`, met de WKK op preferentie 1.
 
 Methode 1 (NEN-EN 15316-4-4 met NEN-EN 50465-meetwaarden) en WKK voor tapwater (13.8.4.8, 16.13) volgen nog.
+
+## ZEB-indicator (bijlage AB, informatief)
+
+Volgens AB.0 rekent de software de ZEB-indicator altijd mee naast hoofdstuk 5. De uitkomsten komen nog niet op het label.
+
+| Uitvoer | Wat het is |
+|---|---|
+| `annualZebPrimaryTotalKwh` | E_P,ZEB;Tot;an (AB.9/AB.10), per maand opgeteld |
+| `zebPrimaryTotalIndicatorKwhPerM2` | EweP,ZEB;Tot = E_P,ZEB;Tot;an / A_g;tot (AB.1), naar boven afgerond op 0,01 |
+| `annualZebCo2Kg` | operationele CO2eq volgens AB.3 met tabel AB.3 |
+
+**Elektriciteit per maand.**
+- Direct gebruik van hernieuwbare eigen productie: MAX[f_du·E_pr;ren; 0,3·E_EPus;el], begrensd door het gebruik en de productie (AB.65, AB.67, AB.68).
+- f_du komt uit tabel AB.1, met aparte kolommen voor woningen, onderwijs en overige utiliteit.
+- Batterij: AB.70–AB.73 met η 0,85 en f_BAT = 1 bij een elektrische opslag van minstens 5 kWh.
+- Direct gebruik van WKK-stroom: 0,5·E_pr;nren, begrensd volgens AB.69.
+- Daarmee volgen de afgenomen stroom (AB.15) en de export (AB.61/AB.62).
+
+**Factoren van tabel AB.2.**
+
+| Stroom | Factor |
+|---|---|
+| Afgenomen elektriciteit | 1,35 |
+| Gas, olie en biomassa | 1 |
+| Externe warmte | 1 × weegfactor 0,45 / 0,29 / 0,14 naar aflevertemperatuur (`zebHeatDeliveryTemperature`, onbekend = ≥ 60 °C) |
+| Bronwarmte en externe koude | 1 × 0,04 |
+| Geëxporteerde hernieuwbare stroom | −1 |
+| Geëxporteerde WKK-stroom | weegfactor 0 |
+
+**CO2 volgens tabel AB.3.**
+
+| Stroom | kg CO2eq/kWh |
+|---|---|
+| Elektriciteit | 0,268 |
+| Export van hernieuwbare stroom | −0,268/1,35 |
+| Gas | 0,218 |
+| Olie | 0,326 |
+| Biomassa | 0,104 |
+| Externe warmte | 0,09 / 0,072 / 0,055 |
+| Koude | 0,027 |
+| Bronwarmte | 0,012 |

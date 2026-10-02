@@ -103,6 +103,9 @@ pub struct NtaCalculationInput {
     pub label_function: Option<LabelFunction>,
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
+    /// Annex AB footnote g: delivery temperature of external heat.
+    #[serde(default)]
+    pub zeb_heat_delivery_temperature: Option<crate::building_performance::ZebHeatTemperature>,
     /// Bbl art. 4.149 lid 2: several use functions with their areas.
     #[serde(default)]
     pub bbl_functions: Vec<crate::bbl_requirements::BblFunctionArea>,
@@ -781,6 +784,7 @@ fn derive_input(
         label_function: nta.label_function,
         bbl_function: nta.bbl_function,
         bbl_functions: nta.bbl_functions.clone(),
+        zeb_heat_delivery_temperature: nta.zeb_heat_delivery_temperature,
         active_cooling: nta.active_cooling,
         permit_application_after_2026_05_29: nta.permit_application_after_2026_05_29,
         loss_area_m2: Some(loss_area),

@@ -239,6 +239,10 @@ pub struct BuildingPerformanceInput {
     /// buildings use annex IX and may omit it.
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
+    /// Annex AB table AB.2/AB.3 footnote g: delivery temperature of external
+    /// heat; unknown means ≥ 60 °C.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zeb_heat_delivery_temperature: Option<ZebHeatTemperature>,
     /// §5.7.1: an active cooling system with demonstrated capacity; then
     /// TOjuli = 0.
     #[serde(default)]
@@ -428,6 +432,103 @@ pub struct CarrierMonth {
     pub delivered_kwh: f64,
 }
 
+/// Annex AB footnote g: ϑ_aflever;warmte of external heat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ZebHeatTemperature {
+    AtLeast60,
+    From40To60,
+    From20To40,
+}
+
+impl ZebHeatTemperature {
+    /// Table AB.2 f_P,ZEB;weeg;dh/dw.
+    fn primary_weight(self) -> f64 {
+        match self {
+            Self::AtLeast60 => 0.45,
+            Self::From40To60 => 0.29,
+            Self::From20To40 => 0.14,
+        }
+    }
+    /// Table AB.3 K_CO2;ZEB;del;dh/dw, kg/kWh.
+    fn co2(self) -> f64 {
+        match self {
+            Self::AtLeast60 => 0.09,
+            Self::From40To60 => 0.072,
+            Self::From20To40 => 0.055,
+        }
+    }
+}
+
+/// Table AB.1 f_du;el,ren: dwellings, education, other utility.
+const ZEB_DIRECT_USE: [[f64; 12]; 3] = [
+    [
+        0.75, 0.75, 0.5, 0.25, 0.25, 0.15, 0.15, 0.15, 0.25, 0.50, 0.75, 0.75,
+    ],
+    [
+        0.55, 0.55, 0.35, 0.20, 0.20, 0.15, 0.01, 0.01, 0.20, 0.35, 0.55, 0.55,
+    ],
+    [
+        0.55, 0.55, 0.35, 0.20, 0.20, 0.15, 0.15, 0.15, 0.20, 0.35, 0.55, 0.55,
+    ],
+];
+
+/// Annex AB monthly terms: (E_P,ZEB;Tot, m_CO2;ZEB) in kWh and kg.
+#[allow(clippy::too_many_arguments)]
+fn zeb_month(
+    f_du: f64,
+    battery: bool,
+    used_el: f64,
+    renewable_el: f64,
+    chp_el: f64,
+    fuels: f64,
+    oil: f64,
+    biomass: f64,
+    heat: f64,
+    heat_temperature: ZebHeatTemperature,
+    cold: f64,
+    source_heat: f64,
+) -> (f64, f64) {
+    // AB.65, AB.67, AB.68.
+    let direct_ren = (f_du * renewable_el)
+        .max(0.3 * used_el)
+        .min(used_el)
+        .min(renewable_el);
+    // AB.70–AB.73 with η_BAT 0,85.
+    let battery_in = if battery {
+        (0.3 * renewable_el)
+            .min(used_el - direct_ren)
+            .min(renewable_el - direct_ren)
+            .max(0.0)
+    } else {
+        0.0
+    };
+    let battery_out = 0.85 * battery_in;
+    // AB.66, AB.69.
+    let direct_nren = (0.5 * chp_el).min((used_el - direct_ren - battery_out).max(0.0));
+    // AB.15, AB.61, AB.62.
+    let delivered_el = (used_el - direct_ren - direct_nren - battery_out).max(0.0);
+    let exported_ren = (renewable_el - direct_ren - battery_in).max(0.0);
+    // AB.10–AB.14 with table AB.2 (exported CHP electricity weighs 0).
+    let primary = delivered_el * 1.35
+        + fuels
+        + oil
+        + biomass
+        + heat * heat_temperature.primary_weight()
+        + (cold + source_heat) * 0.04
+        - exported_ren;
+    // AB.3 with table AB.3.
+    let co2 = delivered_el * 0.268
+        + fuels * 0.218
+        + oil * 0.326
+        + biomass * 0.104
+        + heat * heat_temperature.co2()
+        + cold * 0.027
+        + source_heat * 0.012
+        - exported_ren * 0.268 / 1.35;
+    (primary, co2)
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FinalEnergyCarrier {
@@ -477,6 +578,12 @@ pub struct BuildingPerformanceAssessment {
     pub annual_co2_kg: Option<f64>,
     /// 5.57/5.58: final energy `E_Final` per carrier (Σ E_EPus;ci), kWh.
     pub final_energy_by_carrier: Vec<FinalEnergyCarrier>,
+    /// Annex AB (informative) E_P,ZEB;Tot;an, kWh.
+    pub annual_zeb_primary_total_kwh: Option<f64>,
+    /// AB.1 EweP,ZEB;Tot, kWh/m², rounded up to 0,01.
+    pub zeb_primary_total_indicator_kwh_per_m2: Option<f64>,
+    /// AB.3 m_CO2;ZEB, kg CO2eq per year.
+    pub annual_zeb_co2_kg: Option<f64>,
     /// 5.57 `E_Final`, kWh; own electricity production is not netted.
     pub annual_final_energy_kwh: Option<f64>,
     /// 5.60 `E_Final;EED`: `E_Final` plus the solar thermal yields
@@ -1775,6 +1882,14 @@ pub fn assess_building_performance(
         reference_verified: false,
         attest_status: "unattested",
         label_available: false,
+        annual_zeb_primary_total_kwh: totals.map(|item| item.zeb_primary),
+        zeb_primary_total_indicator_kwh_per_m2: totals.and_then(|item| {
+            crate::indicators_draft::ceil_per_area(
+                item.zeb_primary,
+                input.total_usable_floor_area_m2,
+            )
+        }),
+        annual_zeb_co2_kg: totals.map(|item| item.zeb_co2),
         final_energy_by_carrier: final_by_carrier,
         annual_final_energy_kwh: final_energy,
         annual_final_energy_eed_kwh: final_energy.map(|value| value + solar_yield),
@@ -1841,6 +1956,10 @@ struct Totals {
     storage_correction: f64,
     /// §5.5.6.1, kg CO2eq.
     co2_kg: f64,
+    /// Annex AB E_P,ZEB;Tot;an, kWh.
+    zeb_primary: f64,
+    /// Annex AB m_CO2;ZEB, kg CO2eq.
+    zeb_co2: f64,
 }
 
 /// 5.14a: `f_BAT;cor`.
@@ -1874,6 +1993,22 @@ fn compute(
     let mut fossil = 0.0;
     let mut renewable = 0.0;
     let mut ambient_total = 0.0;
+    let mut zeb_primary = 0.0;
+    let mut zeb_co2 = 0.0;
+    let zeb_temperature = input
+        .zeb_heat_delivery_temperature
+        .unwrap_or(ZebHeatTemperature::AtLeast60);
+    // AB.71: f_BAT;el;corr = 1 at 5 kWh or more electrical storage.
+    let zeb_battery = input.battery_storage_present
+        && input
+            .storage
+            .as_ref()
+            .is_some_and(|storage| storage.building_bound_electrical_kwh >= 5.0);
+    let zeb_direct_use = match (input.calculation_scope, input.label_function) {
+        (CalculationScope::Residential, _) => ZEB_DIRECT_USE[0],
+        (_, Some(LabelFunction::Education)) => ZEB_DIRECT_USE[1],
+        _ => ZEB_DIRECT_USE[2],
+    };
     let heat_pump_renewable = (input.space_heating.generator.heat_pump().is_some()
         || input.space_heating.generator.annex_q().is_some())
         && input
@@ -2070,6 +2205,23 @@ fn compute(
                 delivered_kwh: used_dc,
             });
         }
+        // Annex AB (informative): ZEB indicator next to chapter 5.
+        let (zeb_p, zeb_c) = zeb_month(
+            zeb_direct_use[index],
+            zeb_battery,
+            used_el,
+            produced_renewable,
+            bacs * row.chp_electricity_kwh,
+            used_gas,
+            used_oil,
+            used_bm,
+            used_dh + used_dw,
+            zeb_temperature,
+            used_dc,
+            source_heat,
+        );
+        zeb_primary += zeb_p;
+        zeb_co2 += zeb_c;
         // 5.10 and 5.13: exported electricity is subtracted at f_P;exp;el.
         fossil -= exported * F_P_ELECTRICITY;
         co2 -= exported * K_CO2_ELECTRICITY;
@@ -2152,6 +2304,8 @@ fn compute(
         need_from_fixed_c1: fixed_c1_need.is_some(),
         storage_correction,
         co2_kg: co2,
+        zeb_primary,
+        zeb_co2,
     }
 }
 
@@ -2669,6 +2823,49 @@ mod tests {
             chp.annual_renewable_primary_kwh.unwrap()
                 <= base.annual_renewable_primary_kwh.unwrap() + 1e-9
         );
+    }
+
+    #[test]
+    fn zeb_month_follows_annex_ab() {
+        // January dwelling: 300 kWh use, 100 kWh PV, gas 1000 kWh.
+        // AB.65: MAX[0,75·100; 0,3·300] = 90 ≤ 100 → 90; no battery.
+        let (p, c) = zeb_month(
+            0.75,
+            false,
+            300.0,
+            100.0,
+            0.0,
+            1000.0,
+            0.0,
+            0.0,
+            0.0,
+            ZebHeatTemperature::AtLeast60,
+            0.0,
+            0.0,
+        );
+        let delivered = 300.0 - 90.0;
+        let exported = 100.0 - 90.0;
+        assert!((p - (delivered * 1.35 + 1000.0 - exported)).abs() < 1e-9);
+        assert!((c - (delivered * 0.268 + 1000.0 * 0.218 - exported * 0.268 / 1.35)).abs() < 1e-9);
+        // July with a battery: f_du 0,15; direct = MAX[60; 90] → min(400) = 90,
+        // BAT_in = min(0,3·400; 300 − 90; 400 − 90) = 120, out 102.
+        let (p, _) = zeb_month(
+            0.15,
+            true,
+            300.0,
+            400.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            50.0,
+            ZebHeatTemperature::From40To60,
+            0.0,
+            0.0,
+        );
+        let delivered = 300.0 - 90.0 - 102.0;
+        let exported = 400.0 - 90.0 - 120.0;
+        assert!((p - (delivered * 1.35 + 50.0 * 0.29 - exported)).abs() < 1e-9);
     }
 
     #[test]

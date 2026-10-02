@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { useEnergy } from '../context/EnergyContext';
 import { NtaPerformancePanel } from '../components/NtaPerformancePanel/NtaPerformancePanel';
@@ -92,6 +92,8 @@ describe('NTA performance panel', () => {
               { orientation: 'south', areaM2: 82, share: 0.5, assessed: true, conductanceWPerK: 45, coolingNeedJulyKwh: 44, tojuliK: 1.34 },
               { orientation: 'north_east', areaM2: 0, share: 0, assessed: false, conductanceWPerK: 0, coolingNeedJulyKwh: 0, tojuliK: null },
             ] }], annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
+          annualZebPrimaryTotalKwh: 7432.5, zebPrimaryTotalIndicatorKwhPerM2: 77.43,
+          annualZebCo2Kg: 1234.25,
           spaceHeating: {
             omittedTerms: ['9.2.3 node losses and node gains (including solar thermal)'],
             monthly: need.map(month),
@@ -112,6 +114,11 @@ describe('NTA performance panel', () => {
     expect(indicators.getByText('A+')).toBeInTheDocument();
     expect(indicators.getByText('indicative, not registered (Omgevingsregeling annex IX/X)')).toBeInTheDocument();
     expect(indicators.getByText('requires fixed ventilation system C1 (§5.4)')).toBeInTheDocument();
+    const zeb = within(screen.getByRole('region', { name: 'ZEB (Annex AB)' }));
+    expect(zeb.getByText('7432.50 kWh')).toBeInTheDocument();
+    expect(zeb.getByText('77.43 kWh/m²')).toBeInTheDocument();
+    expect(zeb.getByText('1234.25 kg/yr')).toBeInTheDocument();
+    expect(zeb.getByText('Informative results, unattested and not a registered energy label.')).toBeInTheDocument();
     expect(screen.getByText('7.9.2 intermittent heating reduction a_H;red')).toBeInTheDocument();
     expect(screen.getByText('sha256:abc')).toBeInTheDocument();
     const bbl = within(screen.getByRole('group', { name: 'Bbl article 4.149 check (table 4.148A)' }));
@@ -137,16 +144,17 @@ describe('NTA performance panel', () => {
     await user.click(await panel.findByRole('button', { name: 'Start NTA input' }));
     const form = within(panel.getByRole('form', { name: 'NTA input' }));
     expect(form.getByLabelText('Heating setpoint °C')).toHaveValue(20);
-    await user.type(form.getByLabelText('Source of usable floor area'), 'floor plan A-01');
-    await user.type(form.getAllByLabelText('Source')[0], 'table 7.13');
+    fireEvent.change(form.getByLabelText('Source of usable floor area'), { target: { value: 'floor plan A-01' } });
+    fireEvent.change(form.getAllByLabelText('Source')[0], { target: { value: 'table 7.13' } });
     await user.selectOptions(form.getByLabelText('Floors'), 'very_heavy');
-    await user.type(form.getByLabelText('Or: ventilation flow incl. infiltration m³/h (H_ve = q·ρ·c/3600)'), '100');
+    fireEvent.change(form.getByLabelText('Or: ventilation flow incl. infiltration m³/h (H_ve = q·ρ·c/3600)'), { target: { value: '100' } });
     expect(form.getByLabelText('Ventilation conductance H_ve W/K (all months)')).toHaveValue(100 * 1.205 * 1005 / 3600);
     await user.clear(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'));
-    await user.type(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'), '42');
+    fireEvent.change(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'), { target: { value: '42' } });
     await user.selectOptions(form.getByLabelText('Emission system'), 'floor_heating');
+    await user.selectOptions(form.getByLabelText('External heat delivery temperature for ZEB (Annex AB)'), 'from40_to60');
     await user.selectOptions(form.getByLabelText('Generator type'), 'external_heat');
-    await user.type(form.getByLabelText('Proof of supply (invoice/contract)'), 'contract 42');
+    fireEvent.change(form.getByLabelText('Proof of supply (invoice/contract)'), { target: { value: 'contract 42' } });
     await user.click(form.getByLabelText('All energy uses are included'));
     await user.click(form.getByRole('button', { name: 'Save' }));
     const block = JSON.parse(screen.getByTestId('block').textContent ?? 'null');
@@ -155,6 +163,7 @@ describe('NTA performance panel', () => {
     expect(block.ventilationFlows[0].months).toHaveLength(12);
     expect(block.ventilationFlows[0].months.every((month: { conductanceWPerK: number }) => month.conductanceWPerK === 42)).toBe(true);
     expect(block.emission.system).toBe('floor_heating');
+    expect(block.zebHeatDeliveryTemperature).toBe('from40_to60');
     expect(block.useInventoryComplete).toBe(true);
     expect(block.generator).toEqual({
       kind: 'external_heat', supplierReference: 'contract 42', qualityDeclarationPresent: false,

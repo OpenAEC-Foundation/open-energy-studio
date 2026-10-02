@@ -28,7 +28,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   onSave: (block: Draft) => void;
   onCancel: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [draft, setDraft] = useState<Draft>(initial);
   const change = (path: Path, value: unknown) => setDraft((current) => write(current, path, value));
   const field = { draft, onChange: change };
@@ -62,6 +62,14 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         ['other_assembly', t('nta.form.bbl.other_assembly')], ['other_healthcare', t('nta.form.bbl.other_healthcare')],
         ['sport', t('nta.form.bbl.sport')], ['other_lodging', t('nta.form.bbl.other_lodging')],
       ]} />
+      <SelectField {...field} path={['zebHeatDeliveryTemperature']}
+        label={locale === 'nl' ? 'Aflevertemperatuur externe warmte voor ZEB (bijlage AB)' : 'External heat delivery temperature for ZEB (Annex AB)'}
+        options={[
+          ['at_least60', '≥ 60 °C'], ['from40_to60', '40–<60 °C'], ['from20_to40', '20–<40 °C'],
+        ]} />
+      <p className="nta-form-note">{locale === 'nl'
+        ? 'Alleen voor de informatieve ZEB-berekening. Leeg gebruikt de normaanname ≥ 60 °C; leg een lagere klasse alleen vast met bronbewijs.'
+        : 'For the informative ZEB calculation only. Blank uses the standard assumption ≥ 60 °C; record a lower class only with source evidence.'}</p>
       <SelectField {...field} path={['activeCooling', 'system']} label={t('nta.form.activeCooling')} options={[
         ['compression_table10_29', t('nta.form.ac.compression')], ['absorption_table10_30', t('nta.form.ac.absorption')],
         ['free_cooling_table10_34', t('nta.form.ac.free')], ['dew_point_cooling_humidified_exhaust', t('nta.form.ac.dewPoint')],

@@ -103,6 +103,20 @@ fn parse(
     }
 }
 
+/// `value / area` rounded up to 0,01 in decimal arithmetic (as the BENG
+/// indicators).
+pub(crate) fn ceil_per_area(value: f64, area: f64) -> Option<f64> {
+    if !value.is_finite() || !area.is_finite() || area <= 0.0 {
+        return None;
+    }
+    rounded_div(
+        decimal(value)?,
+        decimal(area)?,
+        2,
+        RoundingStrategy::ToPositiveInfinity,
+    )
+}
+
 fn rounded_div(
     numerator: Decimal,
     denominator: Decimal,

@@ -20,7 +20,7 @@ function kwh(value: number | null | undefined): string {
 
 export function NtaPerformancePanel() {
   const { state, dispatch } = useEnergy();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const project = state.project;
   const [assessment, setAssessment] = useState<ProjectPerformanceAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +159,18 @@ export function NtaPerformancePanel() {
           <div><dt>{t('nta.performance.primaryFossil')}</dt><dd>{kwh(performance.annualPrimaryFossilKwh)} kWh</dd></div>
           <div><dt>{t('nta.performance.renewable')}</dt><dd>{kwh(performance.annualRenewablePrimaryKwh)} kWh</dd></div>
         </dl>
+        {(performance.annualZebPrimaryTotalKwh != null || performance.zebPrimaryTotalIndicatorKwhPerM2 != null
+          || performance.annualZebCo2Kg != null) && <section className="nta-performance-bbl" aria-label="ZEB (Annex AB)">
+          <strong>ZEB · {locale === 'nl' ? 'bijlage AB' : 'Annex AB'}</strong>
+          <small>{locale === 'nl'
+            ? 'Informatieve uitkomsten, niet geattesteerd en geen geregistreerd energielabel.'
+            : 'Informative results, unattested and not a registered energy label.'}</small>
+          <dl className="nta-performance-totals">
+            <div><dt>E<sub>P,ZEB;Tot;an</sub></dt><dd>{performance.annualZebPrimaryTotalKwh?.toFixed(2) ?? '–'} kWh</dd></div>
+            <div><dt>E<sub>weP,ZEB;Tot</sub></dt><dd>{performance.zebPrimaryTotalIndicatorKwhPerM2?.toFixed(2) ?? '–'} kWh/m²</dd></div>
+            <div><dt>CO₂eq {locale === 'nl' ? 'operationeel' : 'operational'}</dt><dd>{performance.annualZebCo2Kg?.toFixed(2) ?? '–'} kg/yr</dd></div>
+          </dl>
+        </section>}
         {performance.tojuli.length > 0 && <div className="nta-performance-bbl" role="group" aria-label="TOjuli">
           <strong>TO<sub>juli</sub> (§5.7)</strong>
           <small>{t('nta.performance.tojuliScope')}</small>

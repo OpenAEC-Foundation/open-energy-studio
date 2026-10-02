@@ -3370,6 +3370,12 @@ export interface BuildingPerformanceAssessment {
   annualHeatingAndCoolingNeedKwh: number | null;
   annualStorageCorrectionKwh: number | null;
   annualCo2Kg: number | null;
+  /** Annex AB (informative) E_P,ZEB;Tot;an, kWh. */
+  annualZebPrimaryTotalKwh?: number | null;
+  /** AB.1 EweP,ZEB;Tot, kWh/m² (rounded up to 0,01). */
+  zebPrimaryTotalIndicatorKwhPerM2?: number | null;
+  /** AB.3 operational CO2eq, kg per year. */
+  annualZebCo2Kg?: number | null;
   /** 5.57/5.58 final energy per carrier, kWh. */
   finalEnergyByCarrier: Array<{ carrier: string; annualKwh: number }>;
   /** 5.57 E_Final, kWh (own production not netted). */
@@ -3482,6 +3488,8 @@ export interface NtaCalculationInput {
   cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
   bblFunction?: NtaBblFunction | null;
+  /** Annex AB footnote g: delivery temperature of external heat (unknown = ≥ 60 °C). */
+  zebHeatDeliveryTemperature?: 'at_least60' | 'from40_to60' | 'from20_to40';
   /** Bbl art. 4.149 lid 2: several use functions, limits weighted by area. */
   bblFunctions?: Array<{ function: NtaBblFunction; areaM2: number }>;
   activeCooling?: NtaActiveCoolingEvidence | null;
