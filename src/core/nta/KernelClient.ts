@@ -1901,6 +1901,8 @@ export interface SpaceHeatingChainAssessment {
     regenerationDegree: number | null;
     /** Always 1: 9.63 (method 1) has no c_source. */
     sourceCorrection: number;
+    /** Q.5.3 f_H;t;hp-on;mi(3) used for chapter 11, when derived by the chain. */
+    exhaustAirHeatingTimeFraction?: number[] | null;
     /** 9.63 f_prac (0,95). */
     practiceFactor: number;
     /** COP · f_prac. */
@@ -2163,7 +2165,8 @@ export interface VentilationInput {
     sourceReference: string;
   }>;
   overventilation?: {
-    heatingTimeFraction: number[];
+    /** Q.5.3 f_H;t;hp-on per month; leave out to let an annex Q heat pump chain derive it. */
+    heatingTimeFraction?: number[];
     hotWaterTimeFraction: number[];
     heatingFlowM3PerH?: number;
     heatingAreaShare?: number;

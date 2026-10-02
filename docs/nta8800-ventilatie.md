@@ -90,3 +90,13 @@ Deze keuzes staan ook in de uitvoer (`interpretations`) en in het verificatiedos
 - **BENG 1:** met hoofdstuk 11-invoer levert de maandberekening `fixedC1`. Dat is Q_H;nd en Q_C;nd met het vaste C1-systeem en, bij utiliteit, de vaste verlichtingswarmte q_L en Φ_int;W = 0 (§5.4.2). Bij utiliteit moet de interne warmte via de methode `utility` opgegeven zijn (tabellen 7.2/7.3, W_t, Q_W;ls;rbl). Met `declared` is de C1-run niet beschikbaar (`fixed_c1_requires_utility_internal_gain_split`).
 - **TO-juli:** rekent met de werkelijke ventilatie uit hoofdstuk 11.
 - **Nog te koppelen:** de ventilatorenergie, de vorstbeveiliging en de voorverwarming in roosters in de energieprestatieketen, en het gebruik van `fixedC1` voor de BENG 1-indicator. Dat volgt na de herziening van hoofdstuk 5/9.
+
+## Herberekening bij een afvoerluchtwarmtepomp (bijlage Q.5.3)
+
+Bij een warmtepomp volgens bijlage Q in de verwarmingsketen mag `overventilation.heatingTimeFraction` leeg blijven. De keten voert dan de herberekening van Q.5.3 uit, en elke stap rekent hoofdstuk 7, 9 en 11 opnieuw door:
+
+1. Rekenen met f_H;t;hp-on = 0. Dat geeft Q_H;node,in(1).
+2. Rekenen met de maandfractie volgens Q.90 die bijlage Q uit stap 1 bepaalt. Dat geeft Q_H;node,in(2).
+3. Rekenen met f(3) = f(2) + (Q(2) − Q(1))·f(2)/Q(2) volgens Q.96/Q.97.
+
+De eindfractie f(3) staat in `annexQ.exhaustAirHeatingTimeFraction`. Volgens Q.84 wordt f_H begrensd tot 1 − f_W. f_W (13.8.2.4) blijft invoer. De berekening geldt voor de hoofdzone; extra zones op dezelfde opwekker krijgen geen eigen herberekening.

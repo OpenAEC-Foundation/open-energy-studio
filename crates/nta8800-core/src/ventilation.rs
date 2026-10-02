@@ -676,7 +676,9 @@ pub struct CombustionAppliance {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Overventilation {
-    /// f_H;τ;hp-on;mi from Q.5.3.
+    /// f_H;τ;hp-on;mi from Q.5.3. Left empty, the space-heating chain of an
+    /// annex Q heat pump derives it with the Q.5.3 recalculation.
+    #[serde(default)]
     pub heating_time_fraction: Vec<f64>,
     /// f_W;τ;hp-on;mi from 13.8.2.4.
     pub hot_water_time_fraction: Vec<f64>,

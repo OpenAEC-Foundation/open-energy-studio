@@ -1493,6 +1493,81 @@ pub fn heat_pump_forfait_auxiliary_kwh(electricity_kwh: f64) -> f64 {
 }
 
 pub fn assess_space_heating_chain(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessment {
+    match exhaust_air_recalculation(input) {
+        Some(result) => result,
+        None => assess_chain_once(input),
+    }
+}
+
+/// Q.5.3: an annex Q heat pump using ventilation air whose chapter 11
+/// overventilation leaves `heatingTimeFraction` empty. Steps 1–3 run the
+/// chain with f_H;t;hp-on = 0, with the annex Q fraction of that run
+/// (Q.90), and with the correction of Q.96/Q.97; Q.84 caps f_H + f_W at 1.
+fn exhaust_air_recalculation(
+    input: &SpaceHeatingChainInput,
+) -> Option<SpaceHeatingChainAssessment> {
+    if !matches!(input.generator, Generator::HeatPumpAnnexQ(_)) {
+        return None;
+    }
+    let over = input
+        .demand
+        .ventilation
+        .as_ref()?
+        .overventilation
+        .as_ref()?;
+    if !over.heating_time_fraction.is_empty() || over.hot_water_time_fraction.len() != 12 {
+        return None;
+    }
+    let hot_water = over.hot_water_time_fraction.clone();
+    let cap = |month: usize, value: f64| value.clamp(0.0, (1.0 - hot_water[month]).max(0.0));
+    let run = |fractions: &[f64; 12]| {
+        let mut step = input.clone();
+        if let Some(over) = step
+            .demand
+            .ventilation
+            .as_mut()
+            .and_then(|ventilation| ventilation.overventilation.as_mut())
+        {
+            over.heating_time_fraction = fractions.to_vec();
+        }
+        assess_chain_once(&step)
+    };
+    let node = |result: &SpaceHeatingChainAssessment| -> Option<[f64; 12]> {
+        (result.monthly.len() == 12)
+            .then(|| std::array::from_fn(|month| result.monthly[month].generator_output_kwh))
+    };
+    // Step 1.
+    let first = run(&[0.0; 12]);
+    let (Some(node_1), Some(annex_q)) = (node(&first), first.annex_q.as_ref()) else {
+        return Some(first);
+    };
+    // Step 2 (Q.90 from the step 1 demand).
+    let f_2: [f64; 12] =
+        std::array::from_fn(|month| cap(month, annex_q.annex_q.monthly_on_fraction[month]));
+    let second = run(&f_2);
+    let Some(node_2) = node(&second) else {
+        return Some(second);
+    };
+    // Step 3 (Q.96/Q.97).
+    let f_3: [f64; 12] = std::array::from_fn(|month| {
+        if node_2[month] > 0.0 {
+            let ff = f_2[month] / node_2[month];
+            cap(month, f_2[month] + (node_2[month] - node_1[month]) * ff)
+        } else {
+            f_2[month]
+        }
+    });
+    let mut third = run(&f_3);
+    // The fingerprint identifies the caller's input, not the derived step.
+    third.input_fingerprint =
+        input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
+    if let Some(output) = third.annex_q.as_mut() {
+        output.exhaust_air_heating_time_fraction = Some(f_3.to_vec());
+    }
+    Some(third)
+}
+
+fn assess_chain_once(input: &SpaceHeatingChainInput) -> SpaceHeatingChainAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     let mut issues: Vec<ChainIssue> = Vec::new();
@@ -2043,6 +2118,8 @@ pub struct AnnexQOutput {
     /// `c_source`; always 1, because 9.63 (method 1) has no source
     /// correction.
     pub source_correction: f64,
+    /// Q.5.3 f_H;t;hp-on;mi(3) used for chapter 11, when derived.
+    pub exhaust_air_heating_time_fraction: Option<Vec<f64>>,
     /// 9.63 `f_prac`.
     pub practice_factor: f64,
     /// `COP · f_prac` of 9.63: heat-pump output per unit of electricity.
@@ -2229,6 +2306,7 @@ fn generate_annex_q(
         demand_class,
         regeneration_degree: regeneration.map(|item| item.degree),
         source_correction: correction,
+        exhaust_air_heating_time_fraction: None,
         practice_factor: ANNEX_Q_PRACTICE_FACTOR,
         corrected_efficiency: corrected,
     });
@@ -2970,6 +3048,77 @@ mod tests {
             "../../../training-data/nta8800-space-heating-chain-annex-q-synthetic.json"
         ))
         .unwrap()
+    }
+
+    #[test]
+    fn exhaust_air_heat_pump_recalculates_the_demand_per_q_5_3() {
+        let mut input = annex_q_chain();
+        let demand = &input.demand;
+        let ventilation = json!({
+            "zoneId": demand.zone_id,
+            "usableFloorAreaM2": demand.usable_floor_area_m2,
+            "category": "residential",
+            "functions": [{"function": "residential", "areaM2": demand.usable_floor_area_m2}],
+            "dwellingCount": 1,
+            "buildingHeightM": 9.0,
+            "constructionYear": 2020,
+            "heatingSetpointC": demand.setpoints.heating_c,
+            "coolingSetpointC": demand.setpoints.cooling_c,
+            "system": {"kind": "single", "unit": {"variant": "c1", "ducts": "luka_a_b_c", "equipmentReference": "synthetic"}},
+            "infiltration": {"method": "measured", "qv10DmPerSM2": 0.4, "sourceReference": "synthetic"},
+            "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
+            "overventilation": {
+                "hotWaterTimeFraction": vec![0.1; 12],
+                "heatingFlowM3PerH": 900.0,
+                "hotWaterFlowM3PerH": vec![900.0; 12],
+                "sourceReference": "supplier"
+            },
+            "sourceReference": "synthetic"
+        });
+        input.demand.ventilation_flows.clear();
+        input.demand.ventilation = Some(serde_json::from_value(ventilation).unwrap());
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let fractions = result
+            .annex_q
+            .as_ref()
+            .and_then(|output| output.exhaust_air_heating_time_fraction.clone())
+            .expect("Q.5.3 fractions");
+        assert!(fractions[0] > 0.0);
+        assert!(fractions.iter().all(|f| (0.0..=0.9 + 1e-12).contains(f)));
+        // The used fractions reproduce the result when given explicitly.
+        let mut explicit = input.clone();
+        explicit
+            .demand
+            .ventilation
+            .as_mut()
+            .unwrap()
+            .overventilation
+            .as_mut()
+            .unwrap()
+            .heating_time_fraction = fractions.clone();
+        let again = assess_space_heating_chain(&explicit);
+        assert!(
+            (again.monthly[0].generator_output_kwh - result.monthly[0].generator_output_kwh).abs()
+                < 1e-9
+        );
+        // Overventilation raises the January demand above step 1 (f_H = 0).
+        explicit
+            .demand
+            .ventilation
+            .as_mut()
+            .unwrap()
+            .overventilation
+            .as_mut()
+            .unwrap()
+            .heating_time_fraction = vec![0.0; 12];
+        let step_1 = assess_space_heating_chain(&explicit);
+        assert!(result.monthly[0].heating_need_kwh > step_1.monthly[0].heating_need_kwh);
+        assert_ne!(result.input_fingerprint, again.input_fingerprint);
     }
 
     #[test]
