@@ -25,7 +25,7 @@
 .nta-performance th, .nta-performance td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: right; }
 .nta-performance th[scope="row"], .nta-performance thead th:first-child { text-align: left; }
 .nta-performance-limits ul { margin: 8px 0; padding-left: 18px; }
-.nta-performance-actions { margin-top: 12px; }
+.nta-performance-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
 .nta-performance button { cursor: pointer; }
 .nta-performance-editor { display: grid; gap: 8px; margin-top: 12px; }
 .nta-performance-editor label { display: grid; gap: 4px; font-weight: 600; }

@@ -429,6 +429,16 @@ export const en: Record<string, string> = {
   'preview.monthlyProfile': 'Monthly Energy Profile',
   'preview.month': 'Month',
   'preview.total': 'Total',
+  'preview.heating': 'Heating',
+  'preview.cooling': 'Cooling',
+  'preview.kernelEmpty': 'No NTA 8800 calculation yet. Choose "Start NTA input" in the NTA panel; the preview then shows the Rust kernel results.',
+  'preview.kernelLoading': 'NTA 8800 kernel is calculating…',
+  'preview.kernelIncomplete': 'NTA 8800 input incomplete ({count} missing items); see the NTA panel.',
+  'preview.kernelInvalid': 'NTA 8800 input invalid ({count} issues); see the NTA panel.',
+  'preview.toJuliKernel': 'TOjuli (max. over zones)',
+  'preview.zebIndicator': 'ZEB indicator (annex AB)',
+  'preview.finalEnergy': 'Final energy use',
+  'preview.co2': 'CO2 emission',
   'ribbon.preview': 'Preview',
 
   // Months

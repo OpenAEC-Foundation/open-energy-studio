@@ -429,6 +429,16 @@ export const nl: Record<string, string> = {
   'preview.monthlyProfile': 'Maandelijks energieprofiel',
   'preview.month': 'Maand',
   'preview.total': 'Totaal',
+  'preview.heating': 'Verwarming',
+  'preview.cooling': 'Koeling',
+  'preview.kernelEmpty': 'Nog geen NTA 8800-berekening. Kies in het NTA-paneel "NTA-invoer starten"; de preview toont daarna de uitkomsten van de Rust-rekenkern.',
+  'preview.kernelLoading': 'NTA 8800-rekenkern rekent…',
+  'preview.kernelIncomplete': 'NTA 8800-invoer onvolledig ({count} ontbrekende gegevens); zie het NTA-paneel.',
+  'preview.kernelInvalid': 'NTA 8800-invoer ongeldig ({count} meldingen); zie het NTA-paneel.',
+  'preview.toJuliKernel': 'TOjuli (max. over zones)',
+  'preview.zebIndicator': 'ZEB-indicator (bijlage AB)',
+  'preview.finalEnergy': 'Finaal energiegebruik',
+  'preview.co2': 'CO2-emissie',
   'ribbon.preview': 'Preview',
 
   // Months
