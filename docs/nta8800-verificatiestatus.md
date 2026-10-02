@@ -76,6 +76,14 @@ Vier leesreviews hebben de kern opnieuw tegen de normtekst gelegd, zonder de cod
 
   Daarnaast ontbreken nog boekregels, zoals leidingdoorvoeren H_p, leidingen in onverwarmde ruimten en het naïsolatiejaar.
 
+Het interpretatiedocument NTA 8800:2024/INT-V1:2024 is nagelopen. De correcties staan al in de doeleditie 2025+C1:2026:
+- buffervat zonder terugwinbare verliezen bij 9.5;
+- tabel 9.4 en 9.16;
+- θ_H,max;si,mi in 13.141b;
+- 13.96 en 13.185 zonder de vervallen termen.
+
+Het document is daarom niet apart toegepast.
+
 Elke review wordt in een eigen werkboom hersteld en via de poort samengevoegd. In deze ronde zijn ook toegevoegd: de LBK met naverwarmer en koelbatterij (tabel 11.15, 11.114–11.121) en een expliciete fout wanneer de drukbalans van 11.2.1.6 niet convergeert.
 
 ## Stand 2 oktober 2026: externe levering volgens §5.8 en bijlage P
