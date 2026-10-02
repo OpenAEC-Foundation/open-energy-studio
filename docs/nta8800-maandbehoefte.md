@@ -118,3 +118,13 @@ Voorwaarden:
 - een woonfunctie mag niet met andere functies worden gemengd (§6.5.2).
 
 De toetsen op setpointverschil, ventilatiecapaciteit en warmtecapaciteit staan in `zoning.rs`.
+
+## Aangrenzende onverwarmde serre (7.30b, §7.6.4)
+
+`sunrooms` geeft per serre de gegevens voor de indirecte zonnewinst:
+
+- de absorberende oppervlakken (α, oppervlakte, oriëntatie, helling);
+- g en kozijnfractie van de serrebeglazing, apart voor verwarming en koeling;
+- b_U en H_zi;ztu uit §8.4, en de verdeelfactor (7.36).
+
+De winst is (1 − b_U)·F·f_gn;max·Q_sol;ztu. Q_sol;ztu volgt uit 7.34/7.35 met F_sh;obst = 1. De begrenzing f_gn;max (7.37) geldt alleen in de verwarmingsstand. Het warmteverlies via de serre loopt via de onverwarmde ruimte van §8.4. De vereenvoudigde route uit de norm (de serre negeren) blijft mogelijk door geen `sunrooms` op te geven.

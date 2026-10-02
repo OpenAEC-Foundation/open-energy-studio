@@ -480,6 +480,19 @@ export interface NtaZoneHumidifier {
   };
 }
 
+/** 7.30b adjacent unheated sunroom (AOS). */
+export interface NtaSunroom {
+  id: string;
+  glazingGHeating: number;
+  glazingGCooling: number;
+  exteriorFrameFraction: number;
+  reductionFactor: number;
+  zoneConductanceWPerK: number;
+  distributionFactor?: number;
+  surfaces: Array<{ areaM2: number; absorptance: number; azimuthDeg: number; tiltDeg: number }>;
+  sourceReference: string;
+}
+
 export interface MonthlyDemandInput {
   zoneId: string;
   usableFloorAreaM2: number;
@@ -524,6 +537,8 @@ export interface MonthlyDemandInput {
         sourceReference: string;
       }
     | { method: 'declared'; heatFluxWPerM2: number; sourceReference: string };
+  /** Adjacent unheated sunrooms (7.30b). */
+  sunrooms?: NtaSunroom[];
   windowInventoryComplete: boolean;
   windows: Array<{
     id: string;

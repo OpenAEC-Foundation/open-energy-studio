@@ -54,6 +54,9 @@ pub struct NtaCalculationInput {
     /// Humidifiers per zone (chapter 12).
     #[serde(default)]
     pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
+    /// Adjacent unheated sunrooms (7.30b); per zone in `zoneData`.
+    #[serde(default)]
+    pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
     #[serde(default)]
@@ -118,6 +121,8 @@ pub struct ZoneNtaData {
     /// §6.5.3 functions with areas for a mixed zone.
     #[serde(default)]
     pub function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
+    #[serde(default)]
+    pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
     #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
     #[serde(default)]
@@ -618,6 +623,10 @@ fn derive_input(
             function_areas: data
                 .map(|item| item.function_areas.clone())
                 .unwrap_or_default(),
+            sunrooms: match data {
+                Some(item) => item.sunrooms.clone(),
+                None => nta.sunrooms.clone(),
+            },
             // A zone that overrides the usage function brings its own dwelling type.
             dwelling_type: match data {
                 Some(item) if item.usage_function.is_some() => item.dwelling_type,

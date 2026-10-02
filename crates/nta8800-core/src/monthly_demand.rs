@@ -56,7 +56,6 @@ pub const OMITTED_CORRECTIONS: &[&str] = &[
     "§17.3 obstruction situations b–g are declared, not derived",
     "table 7.10 footnote c is the caller's column choice",
     "annex D for floors other than slab on ground (crawlspace, basement)",
-    "7.30b solar gains through adjacent unheated sunrooms (serres)",
 ];
 
 const SCOPE: &str = "nta8800_chapter_7_monthly_need_single_zone_unverified";
@@ -91,6 +90,9 @@ pub struct MonthlyDemandInput {
     pub windows: Vec<Window>,
     pub opaque_inventory_complete: bool,
     pub opaque_elements: Vec<OpaqueElement>,
+    /// Adjacent unheated sunrooms (7.30b, §7.6.4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sunrooms: Vec<Sunroom>,
 }
 
 /// Usage functions of tables 7.13–7.15.
@@ -1079,6 +1081,35 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         }
     }
 
+    for (index, room) in input.sunrooms.iter().enumerate() {
+        let path = format!("sunrooms[{index}]");
+        let fractions_ok = [
+            room.glazing_g_heating,
+            room.glazing_g_cooling,
+            room.exterior_frame_fraction,
+            room.reduction_factor,
+            room.distribution_factor,
+        ]
+        .iter()
+        .all(|value| value.is_finite() && (0.0..=1.0).contains(value));
+        if !fractions_ok || !finite_nonneg(room.zone_conductance_w_per_k) {
+            issues.push(issue("sunroom_invalid", path.clone()));
+        }
+        if room.surfaces.iter().any(|surface| {
+            !(surface.area_m2.is_finite()
+                && surface.area_m2 > 0.0
+                && (0.0..=1.0).contains(&surface.absorptance)
+                && (0.0..=180.0).contains(&surface.tilt_deg)
+                && surface.azimuth_deg.is_finite())
+        }) {
+            issues.push(issue("sunroom_surface_invalid", format!("{path}.surfaces")));
+        }
+        check_reference(
+            &room.source_reference,
+            format!("{path}.sourceReference"),
+            issues,
+        );
+    }
     check_reference(
         &input.thermal_mass.source_reference,
         "thermalMass.sourceReference".into(),
@@ -1508,6 +1539,85 @@ pub fn heating_need_with_extra_transfer(terms: &BalanceTerms, extra_kwh: f64) ->
     (transfer - eta * terms.gains_kwh).max(0.0)
 }
 
+/// Absorbing opaque surface inside an adjacent unheated sunroom (7.34).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SunroomSurface {
+    pub area_m2: f64,
+    /// α_sol (7.6.6.3).
+    pub absorptance: f64,
+    /// 0 = north, clockwise.
+    pub azimuth_deg: f64,
+    pub tilt_deg: f64,
+}
+
+/// Adjacent unheated sunroom (AOS) for 7.30b and 7.34–7.38.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Sunroom {
+    pub id: String,
+    /// g_gl;ue of the sunroom glazing for the heating and cooling balance
+    /// (7.35; area-weighted, including seasonal shading).
+    pub glazing_g_heating: f64,
+    pub glazing_g_cooling: f64,
+    /// F_fr;ue of the sunroom envelope (7.35a).
+    pub exterior_frame_fraction: f64,
+    /// b_U of the sunroom (8.4.1).
+    pub reduction_factor: f64,
+    /// H_zi;ztu between this zone and the sunroom (8.4.1), W/K.
+    pub zone_conductance_w_per_k: f64,
+    /// F_zi;ztu (7.36): this zone's share when several zones border it.
+    #[serde(default = "one_f64")]
+    pub distribution_factor: f64,
+    pub surfaces: Vec<SunroomSurface>,
+    pub source_reference: String,
+}
+
+fn one_f64() -> f64 {
+    1.0
+}
+
+/// 7.30b: the indirect sunroom gains of a zone for one balance, kWh.
+pub fn sunroom_gains_kwh(input: &MonthlyDemandInput, month_index: usize, balance: Balance) -> f64 {
+    let month = month_index as u8 + 1;
+    let hours = MONTH_HOURS[month_index];
+    input
+        .sunrooms
+        .iter()
+        .map(|room| {
+            let g = match balance {
+                Balance::Heating => room.glazing_g_heating,
+                Balance::Cooling => room.glazing_g_cooling,
+            };
+            // 7.35 and 7.34 with F_sh;obst = 1.
+            let f_sol = g * (1.0 - room.exterior_frame_fraction);
+            let absorbed: f64 = room
+                .surfaces
+                .iter()
+                .map(|surface| {
+                    surface.absorptance
+                        * surface.area_m2
+                        * climate::irradiance_at(surface.azimuth_deg, surface.tilt_deg, month)
+                            .unwrap_or(0.0)
+                })
+                .sum();
+            let gains = f_sol * absorbed * 0.001 * hours;
+            // 7.37: heating only, capped at 1.
+            let cap = match balance {
+                Balance::Heating if gains > 0.0 => (room.reduction_factor
+                    * room.zone_conductance_w_per_k
+                    * (input.setpoints.heating_c - OUTDOOR_TEMPERATURE_C[month_index])
+                    * 0.001
+                    * hours
+                    / gains)
+                    .clamp(0.0, 1.0),
+                _ => 1.0,
+            };
+            (1.0 - room.reduction_factor) * room.distribution_factor * cap * gains
+        })
+        .sum()
+}
+
 /// Monthly internal gains Q_int (7.21–7.29), kWh; `month_index` 0–11.
 pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64 {
     let area = input.usable_floor_area_m2;
@@ -1854,8 +1964,15 @@ fn compute(
             .map(|element| opaque_solar_kwh(element, month))
             .sum();
         // 7.12/7.13 with balance-specific window gains (§17.3, 7.42).
-        let gains = internal + window_solar + opaque_solar;
-        let gains_cooling = internal + window_solar_cooling + opaque_solar;
+        // 7.30b: indirect gains through adjacent unheated sunrooms.
+        let gains = internal
+            + window_solar
+            + opaque_solar
+            + sunroom_gains_kwh(input, index, Balance::Heating);
+        let gains_cooling = internal
+            + window_solar_cooling
+            + opaque_solar
+            + sunroom_gains_kwh(input, index, Balance::Cooling);
 
         // 7.19/7.20 and the time constants 7.57/7.58.
         let h_ve_heating = ventilation_conductance(input, month, Balance::Heating);
@@ -2287,6 +2404,39 @@ mod tests {
         assert!((cooling_utilization(2.0, 2.0) - (1.0 - 0.25) / (1.0 - 0.125)).abs() < 1e-12);
         // 7.54
         assert_eq!(cooling_utilization(-1.0, 2.0), 1.0);
+    }
+
+    #[test]
+    fn sunroom_gains_follow_7_30b_and_7_34_to_7_37() {
+        let mut input = sample();
+        input.sunrooms.push(Sunroom {
+            id: "serre".into(),
+            glazing_g_heating: 0.6,
+            glazing_g_cooling: 0.6,
+            exterior_frame_fraction: 0.2,
+            reduction_factor: 0.8,
+            zone_conductance_w_per_k: 30.0,
+            distribution_factor: 1.0,
+            surfaces: vec![SunroomSurface {
+                area_m2: 12.0,
+                absorptance: 0.6,
+                azimuth_deg: 180.0,
+                tilt_deg: 0.0,
+            }],
+            source_reference: "drawing".into(),
+        });
+        let jan_irradiance = climate::irradiance_at(180.0, 0.0, 1).unwrap();
+        let gains = 0.6 * 0.8 * 0.6 * 12.0 * jan_irradiance * 0.001 * 744.0;
+        let cap = (0.8 * 30.0 * (20.0 - 2.61) * 0.001 * 744.0 / gains).min(1.0);
+        let expected = (1.0 - 0.8) * cap * gains;
+        assert!((sunroom_gains_kwh(&input, 0, Balance::Heating) - expected).abs() < 1e-9);
+        // Cooling: no 7.37 cap.
+        let july_irradiance = climate::irradiance_at(180.0, 0.0, 7).unwrap();
+        let july = 0.2 * 0.6 * 0.8 * 0.6 * 12.0 * july_irradiance * 0.001 * 744.0;
+        assert!((sunroom_gains_kwh(&input, 6, Balance::Cooling) - july).abs() < 1e-9);
+        let base = valid(&sample());
+        let with = valid(&input);
+        assert!(with.monthly[0].heating.need_kwh < base.monthly[0].heating.need_kwh);
     }
 
     #[test]
