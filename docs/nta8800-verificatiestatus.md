@@ -1,4 +1,43 @@
-# NTA 8800 verificatiestatus — 29 september 2026
+# NTA 8800 verificatiestatus — 2 oktober 2026
+
+## Samenvatting stand 2 oktober 2026 (avond)
+
+**Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door, van projectinvoer of basisopname tot EP_Tot, EP_ren, RER, BENG 1/2/3, TO-juli, CO2, de indicatieve labelklasse en de Bbl- en A0-toets. Alle onderdelen zijn tegen de gelicentieerde normtekst getranscribeerd, met paginaverwijzingen. De normtekst zelf staat niet in de repository.
+
+| Onderdeel | Stand |
+|---|---|
+| H5 indicatoren, CO2 (tabel 5.3), opslag 5.14a, bijlage P | geïmplementeerd |
+| H6 A_ls met f_ls (6.7.3), zone-indeling §6.4/6.5.2, gemengde rekenzones §6.5.3 | geïmplementeerd |
+| H7 incl. §7.9, bijlage A/B/D, terugwinbare verliezen 7.3–7.8 | geïmplementeerd |
+| H8.2 constructies (bijlage C, E–I, L), H8.3 grond incl. kruipruimte, onverwarmde en verwarmde kelder, H8.4 b_U | geïmplementeerd |
+| H9 afgifte, distributie 9.26–9.51, opwekkers incl. bijlagen M/N/O/Q/V/W, hulpenergie, waakvlam | geïmplementeerd |
+| H10 methode 3, H12, H13 incl. bijlagen T/U/W, H14, H16 | geïmplementeerd |
+| H11 ventilatie met drukbalans, C1-run voor BENG 1, stookgrens 9.29 | geïmplementeerd; na de review gecorrigeerd |
+| §5.7 TO-juli incl. bijlage AA | geïmplementeerd |
+| Basisopname ISSO 82.1 (woningen) en 75.1 (utiliteit) | geïmplementeerd |
+| Bijlage X (afronding) | geïmplementeerd |
+
+**Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
+
+- tabel 11.19 een kolom verschoven;
+- het kwadraat in 11.137;
+- 9.29 te ruim gelezen;
+- tabelinterpolatie bij zonwering;
+- het ontbreken van §7.9.
+
+**Wat nog ontbreekt voor certificering.**
+
+1. **Officiële referentie-uitkomsten.** De BRL 9501-testset of de bijlage van ISSO 54 met verwachte resultaten ontbreekt. De ISSO-boeken bevatten geen volledig doorgerekend voorbeeld. Alle uitkomsten zijn dus `referenceVerified: false`.
+2. **Open interpretatievragen.** Ze staan per module in de documentatie en in de uitvoer `interpretations`. De belangrijkste: de letterlijke lezing van 9.29, R_se onder een vloer boven een kruipruimte (0,17 of 0,04), de factor 15 % in formule 10.15, en de kolom "Juli/september" van tabel 10.16.
+3. **Niet ondersteund (met expliciete foutcode).**
+   - luchtbehandelingskasten die de toevoerlucht verwarmen of koelen;
+   - koelmethoden 1/2;
+   - collectieve zonneboilers en meerdere tapwateropwekkers;
+   - WKK als hoofdopwekker in sommige routes;
+   - serres (7.30b);
+   - de herberekening bij overventilatie (Q.5.3).
+4. **Visuele acceptatie** van de desktop-UI en de attestprocedure (BRL 9501:2026, ISSO 54 actuele editie).
+
 
 ## Stand 2 oktober 2026: externe levering volgens §5.8 en bijlage P
 
@@ -259,7 +298,9 @@ De volgende interpretatievragen moeten tegen de normtekst of wettekst worden bea
 10. EDR-testset met de uitkomsten uit bijlage 2.
 11. BRL 9501-attest.
 
-## Huidige grens
+## Historische stand (tot 30 september 2026)
+
+De tekst hieronder beschrijft de stand vóór de normtekst beschikbaar kwam en is achterhaald door de samenvatting bovenaan.
 
 Voor de gekoppelde gaswarmtepompketen bestaat nu een getypeerd Rust-referentievergelijkingsharnas. Het eist 25 verwachte deelwaarden met brongegevens, berekeningsbasis en kWh-toleranties; ontbrekende of dubbele maandposten, ongeldige keteninvoer en numerieke overloop blokkeren de vergelijking. HTTP, MCP en Tauri delen dezelfde kern. Het projectscherm heeft nu een JSON-import- en vergelijkingspaneel dat verschillen en foutpaden laat zien en geen uitkomst in het project opslaat. De opnieuw gebouwde release-API gaf via de Vite-proxy `compared_pass` voor 25 synthetische waarden, `compared_fail` bij één gewijzigde verwachting en HTTP 422 met lege vergelijkingslijst bij een ontbrekende post. De release-MCP-server gaf dezelfde drie statussen, met `isError=true` voor de onvolledige case. Het meegeleverde voorbeeld is uitdrukkelijk synthetisch; een match houdt `referenceVerified=false`. De officiële, onafhankelijke resultaten zijn nog niet beschikbaar. Zie [referentieprotocol](nta8800-referentieprotocol.md).
 
@@ -420,9 +461,9 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 
 ## Nog nodig voor inhoudelijke en externe verificatie
 
-1. De volledige [NTA 8800:2025+C1:2026](https://www.nen.nl/nta-8800-2025-c1-2026-nl-349740) via NEN Connect of de kosteloze PDF rechtmatig beschikbaar maken voor het ontwikkelteam. De norm is auteursrechtelijk beschermd; de productpagina alleen bevat geen formules. Per formule/tabel: bron, editie, eenheid, afronding en implementatie-review vastleggen.
+1. ~~De volledige NTA 8800:2025+C1:2026 beschikbaar maken~~: gedaan op 2 oktober 2026 (gelicentieerde PDF, buiten de repository). Per formule en tabel zijn bron en pagina vastgelegd.
 2. Officiële, onafhankelijk vastgestelde referentiegevallen per bouwfysische en installatieroute verkrijgen. Minstens één geval per warmtepompvariant, inclusief hybride, collectief, tapwater, reversibel en kwaliteitsverklaring.
-3. Rust-rekenmodules voor vraag, installaties, primaire/hernieuwbare energie, BENG, TO-juli en label implementeren. Alle adapters blijven dezelfde kernel gebruiken.
+3. ~~Rust-rekenmodules implementeren~~: gedaan, zie de samenvatting bovenaan.
 4. Deelresultaten en grensgevallen toetsen tegen de referentiegevallen, toleranties verklaren en regressie/versieprovenance vastleggen.
 5. Visuele en toetsenbordcontrole van de desktop-UI uitvoeren wanneer UI-toegang beschikbaar is; controleer kleine schermen, kleurcontrast, tabvolgorde en validatiemeldingen.
 6. De toepasselijke editie van ISSO-publicatie 54 vaststellen: [InstallQ](https://installq.nl/controllers/brl) noemt 2024, [BouwZo](https://bouwzo.nl/search?Publisher=ISSO) vermeldt een uitgave van 14 november 2025. Verkrijg die publicatie en de definitieve [BRL 9501:2026](https://bouwzo.nl/reader/publicatie/brl-9501/2026), bevestig de verplichte W/U-testomvang en bereid daarna de attestaanvraag, het kwaliteitsproces en de externe toets voor. Pas na positief attest een geattesteerde scope publiceren. De bronstatus staat in het [bronnenregister](nta8800-bronnenregister.md).
