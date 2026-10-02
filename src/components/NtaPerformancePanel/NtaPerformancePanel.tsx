@@ -171,6 +171,24 @@ export function NtaPerformancePanel() {
             <div><dt>CO₂eq {locale === 'nl' ? 'operationeel' : 'operational'}</dt><dd>{performance.annualZebCo2Kg?.toFixed(2) ?? '–'} kg/yr</dd></div>
           </dl>
         </section>}
+        {(performance.annualFinalEnergyKwh != null || (performance.finalEnergyByCarrier?.length ?? 0) > 0) &&
+          <details className="nta-performance-monthly" aria-label={locale === 'nl' ? 'Finaal energiegebruik' : 'Final energy use'}>
+            <summary>{locale === 'nl' ? 'Finaal energiegebruik (§5.9)' : 'Final energy use (§5.9)'}</summary>
+            <p>{locale === 'nl'
+              ? 'Berekening zonder aftrek van eigen opwekking; uitkomsten zijn niet geattesteerd.'
+              : 'Calculation without netting on-site generation; results are unattested.'}</p>
+            <dl className="nta-performance-totals">
+              <div><dt>E<sub>Final</sub></dt><dd>{performance.annualFinalEnergyKwh?.toFixed(2) ?? '–'} kWh/yr</dd></div>
+              <div><dt>E<sub>Final;EED</sub></dt><dd>{performance.annualFinalEnergyEedKwh?.toFixed(2) ?? '–'} kWh/yr</dd></div>
+            </dl>
+            {(performance.finalEnergyByCarrier?.length ?? 0) > 0 && <div className="nta-performance-table"><table>
+              <thead><tr><th scope="col">{locale === 'nl' ? 'Energiedrager' : 'Energy carrier'}</th>
+                <th scope="col">{locale === 'nl' ? 'Finaal (kWh/jaar)' : 'Final (kWh/year)'}</th></tr></thead>
+              <tbody>{performance.finalEnergyByCarrier.map((item) => <tr key={item.carrier}>
+                <th scope="row">{item.carrier}</th><td>{item.annualKwh.toFixed(2)}</td>
+              </tr>)}</tbody>
+            </table></div>}
+          </details>}
         {performance.tojuli.length > 0 && <div className="nta-performance-bbl" role="group" aria-label="TOjuli">
           <strong>TO<sub>juli</sub> (§5.7)</strong>
           <small>{t('nta.performance.tojuliScope')}</small>

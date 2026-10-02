@@ -72,6 +72,7 @@ describe('NTA performance panel', () => {
   });
 
   it('shows unverified indicators, BENG 1 condition and monthly values', async () => {
+    const user = userEvent.setup();
     const need = [800, 650, 500, 250, 50, 0, 0, 0, 40, 250, 500, 750];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -94,6 +95,8 @@ describe('NTA performance panel', () => {
             ] }], annualPrimaryFossilKwh: 6623.2, annualRenewablePrimaryKwh: 1421,
           annualZebPrimaryTotalKwh: 7432.5, zebPrimaryTotalIndicatorKwhPerM2: 77.43,
           annualZebCo2Kg: 1234.25,
+          annualFinalEnergyKwh: 6080.25, annualFinalEnergyEedKwh: 6330.25,
+          finalEnergyByCarrier: [{ carrier: 'gas', annualKwh: 5900 }, { carrier: 'el', annualKwh: 180.25 }],
           spaceHeating: {
             omittedTerms: ['9.2.3 node losses and node gains (including solar thermal)'],
             monthly: need.map(month),
@@ -119,6 +122,12 @@ describe('NTA performance panel', () => {
     expect(zeb.getByText('77.43 kWh/m²')).toBeInTheDocument();
     expect(zeb.getByText('1234.25 kg/yr')).toBeInTheDocument();
     expect(zeb.getByText('Informative results, unattested and not a registered energy label.')).toBeInTheDocument();
+    await user.click(screen.getByText('Final energy use (§5.9)'));
+    const finalEnergy = within(screen.getByLabelText('Final energy use'));
+    expect(finalEnergy.getByText('6080.25 kWh/yr')).toBeInTheDocument();
+    expect(finalEnergy.getByText('6330.25 kWh/yr')).toBeInTheDocument();
+    expect(finalEnergy.getByRole('row', { name: 'gas 5900.00' })).toBeInTheDocument();
+    expect(finalEnergy.getByRole('row', { name: 'el 180.25' })).toBeInTheDocument();
     expect(screen.getByText('7.9.2 intermittent heating reduction a_H;red')).toBeInTheDocument();
     expect(screen.getByText('sha256:abc')).toBeInTheDocument();
     const bbl = within(screen.getByRole('group', { name: 'Bbl article 4.149 check (table 4.148A)' }));
@@ -130,7 +139,7 @@ describe('NTA performance panel', () => {
     expect(tojuli.getByText('1.34 K')).toBeInTheDocument();
     expect(tojuli.queryByText('North-east')).not.toBeInTheDocument();
     expect(tojuli.getByText('does not meet')).toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(13);
+    expect(screen.getAllByRole('row')).toHaveLength(16);
   });
   it('edits the NTA block through the structured form', async () => {
     const user = userEvent.setup();
