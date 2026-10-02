@@ -40,9 +40,13 @@ pub enum GlazingLayers {
 #[serde(rename_all = "snake_case")]
 pub enum CoatingEmissivity {
     Uncoated,
+    #[serde(rename = "at_most_0_20")]
     AtMost0_20,
+    #[serde(rename = "at_most_0_15")]
     AtMost0_15,
+    #[serde(rename = "at_most_0_10")]
     AtMost0_10,
+    #[serde(rename = "at_most_0_05")]
     AtMost0_05,
 }
 
@@ -52,6 +56,7 @@ pub enum GasFill {
     Air,
     Argon,
     Krypton,
+    #[serde(rename = "sf6")]
     Sf6,
     Xenon,
 }

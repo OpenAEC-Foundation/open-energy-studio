@@ -57,7 +57,9 @@ pub enum InsulationMoisture {
     PerimeterXpsFullyBonded,
     PerimeterXpsPointBonded,
     InvertedRoofGeneral,
+    #[serde(rename = "inverted_roof_xps_slope_up_to_1_percent")]
     InvertedRoofXpsSlopeUpTo1Percent,
+    #[serde(rename = "inverted_roof_xps_slope_above_1_percent")]
     InvertedRoofXpsSlopeAbove1Percent,
     InvertedRoofXpsGreenRoof,
 }
@@ -436,6 +438,7 @@ pub enum WindowMaterial {
     Pmma,
     Polycarbonate,
     Polyamide,
+    #[serde(rename = "polyamide_66_glass_fibre")]
     Polyamide66GlassFibre,
     PolyethyleneHd,
     PolyethyleneLd,
