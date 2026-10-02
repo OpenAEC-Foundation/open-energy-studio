@@ -45,6 +45,12 @@ struct ConstructionsArgs {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct ResidentialSurveyArgs {
+    /// ISSO 82.1 basic survey of one existing dwelling: construction year, dwelling type, envelope surfaces with insulation answers, glazing, heating, hot water, ventilation and PV, with "unknown" options.
+    survey: Value,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct VentilationArgs {
     /// One zone: use functions, height, system variant (table 11.5), heat recovery, infiltration, combustion appliances, ventilative cooling openings and fans, with source references.
     input: Value,
@@ -599,6 +605,29 @@ impl EnergyMcp {
                     CallToolResult::error(vec![content])
                 } else {
                     CallToolResult::success(vec![content])
+                }
+            }
+        }
+    }
+
+    #[tool(
+        description = "Translate an ISSO 82.1 basic survey (basisopname) of an existing dwelling into NTA 8800 kernel input, list every applied default with its ISSO page, and calculate the unverified building performance and indicative label"
+    )]
+    fn assess_residential_survey(
+        &self,
+        Parameters(args): Parameters<ResidentialSurveyArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::opname::ResidentialSurvey>(args.survey) {
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error":"invalid_survey_shape", "message":message.to_string()}).to_string(),
+            )]),
+            Ok(survey) => {
+                let result = nta8800_core::opname::assess_residential_survey(&survey);
+                let content = ContentBlock::text(json!(result).to_string());
+                if result.status == "calculated_unverified" {
+                    CallToolResult::success(vec![content])
+                } else {
+                    CallToolResult::error(vec![content])
                 }
             }
         }

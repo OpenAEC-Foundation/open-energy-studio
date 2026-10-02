@@ -42,6 +42,11 @@ pub struct EnvelopeRequest {
 }
 
 #[derive(Deserialize)]
+pub struct ResidentialSurveyRequest {
+    pub survey: nta8800_core::opname::ResidentialSurvey,
+}
+
+#[derive(Deserialize)]
 pub struct VentilationRequest {
     pub input: nta8800_core::ventilation::VentilationInput,
 }
@@ -191,6 +196,10 @@ pub fn app() -> Router {
         .route(
             "/v1/nta8800/ventilation/calculate",
             post(calculate_ventilation),
+        )
+        .route(
+            "/v1/nta8800/opname/residential",
+            post(assess_residential_survey),
         )
         .route(
             "/v1/nta8800/constructions/calculate",
@@ -412,6 +421,18 @@ async fn calculate_constructions(
         StatusCode::UNPROCESSABLE_ENTITY
     } else {
         StatusCode::OK
+    };
+    (status, Json(json!(assessment)))
+}
+
+async fn assess_residential_survey(
+    Json(request): Json<ResidentialSurveyRequest>,
+) -> (StatusCode, Json<Value>) {
+    let assessment = nta8800_core::opname::assess_residential_survey(&request.survey);
+    let status = if assessment.status == "calculated_unverified" {
+        StatusCode::OK
+    } else {
+        StatusCode::UNPROCESSABLE_ENTITY
     };
     (status, Json(json!(assessment)))
 }
@@ -1281,6 +1302,24 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn residential_survey_route_returns_defaults_and_performance() {
+        let survey: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-opname-1930-terraced.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": survey }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["status"], "calculated_unverified");
+        assert!(!result["appliedDefaults"].as_array().unwrap().is_empty());
+        assert_eq!(result["performance"]["status"], "calculated_unverified");
+        assert_eq!(result["referenceVerified"], false);
     }
 
     #[tokio::test]
