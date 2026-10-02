@@ -899,6 +899,13 @@ fn derive_utility_heating(
     }
     if kind == "heat_pump_forfait" {
         generator["forfait"]["scope"] = json!("utility_collective_or_over25_kw");
+        // c_source (table 9.27 footnote a) and the table 9.28 row are for
+        // the residential table only.
+        generator["forfait"]["sourceCorrectionFactor"] = Value::Null;
+        generator["forfait"]["sourceCorrectionReference"] = Value::Null;
+        recorder
+            .applied
+            .retain(|item| item.rule != "source_regeneration_none_c_source_1");
         generator["forfait"]["collectiveBuildingInstallation"] = json!(installation.collective);
         if let Some(power) = installation.capacity_kw {
             generator["forfait"]["thermalCapacityKw"] = json!(power);
@@ -961,6 +968,9 @@ fn derive_utility_heating(
         } else {
             "individual"
         });
+        // Table 9.16a (heat meter unknown: present) is for collective
+        // installations only.
+        system["pump"]["heatMeterPresent"] = json!(installation.collective);
         system["usageFunction"] = json!(reduction_function);
         system["connectedStoreys"] = json!(survey.storeys.max(1));
         derived.distribution_system = Some(system);
@@ -1552,6 +1562,7 @@ fn hot_water_value(
                 } else {
                     ShowerRecoveryAnswer::None
                 },
+                boiler_vessel: None,
                 source_reference: reference.to_string(),
             },
             recorder,
@@ -2390,6 +2401,8 @@ mod tests {
             air_sink: false,
             high_temperature: false,
             capacity_kw: None,
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
         };
         let (input, _) = derive(&survey);
         let forfait = &input["spaceHeating"]["generator"]["forfait"];

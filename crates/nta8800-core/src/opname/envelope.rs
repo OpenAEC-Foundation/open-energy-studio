@@ -337,11 +337,21 @@ fn default_tilt(surface: &SurveySurface) -> f64 {
     })
 }
 
-fn element_type(surface: &SurveySurface) -> ElementType {
-    match surface.element {
-        SurfaceElement::Facade => ElementType::Facade,
-        SurfaceElement::Roof => ElementType::Roof,
-        SurfaceElement::Floor => ElementType::Floor,
+/// Row of tables 8.9/8.10 (p. 88–90) and the R_si override:
+/// - a floor bordering outdoor air takes the "daken en vloeren grenzend aan
+///   de buitenlucht" row, with R_si 0,17 (downward heat flow, table C.2);
+/// - a ceiling to an unheated space (attic floor, AOR) takes the floor row
+///   ("scheiden van de grond of een AOR"; NTA I.4 zoldervloeren), with
+///   R_si 0,10 (upward heat flow).
+fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
+    match (surface.element, &surface.boundary) {
+        (SurfaceElement::Facade, _) => (ElementType::Facade, None),
+        (SurfaceElement::Floor, SurfaceBoundary::Outdoor) => (ElementType::Roof, Some(0.17)),
+        (SurfaceElement::Floor, _) => (ElementType::Floor, None),
+        (SurfaceElement::Roof, SurfaceBoundary::UnheatedSpace { .. }) => {
+            (ElementType::Floor, Some(0.10))
+        }
+        (SurfaceElement::Roof, _) => (ElementType::Roof, None),
     }
 }
 
@@ -357,7 +367,7 @@ pub fn derive_envelope(
     let mut partitions: Vec<(String, f64, f64, String)> = Vec::new();
     let mut floor_above_crawlspace = false;
     let mut crawl_floors: Vec<usize> = Vec::new();
-    let mut facade_parts: Vec<f64> = Vec::new();
+    let mut facade_parts: Vec<(f64, f64)> = Vec::new();
 
     for (index, surface) in envelope.surfaces.iter().enumerate() {
         let path = format!("envelope.surfaces[{index}]");
@@ -549,13 +559,61 @@ pub fn derive_envelope(
                 thermal_cushions: surface.thermal_cushions,
             },
         };
+        let (element, r_si_override) = element_type(surface);
+        if r_si_override.is_some() {
+            recorder.record(
+                "surface_table_row_by_boundary",
+                &path,
+                format!("{element:?} row, R_si {:.2}", r_si_override.unwrap_or_default()),
+                "ISSO 82.1 p. 88–90 (tables 8.9/8.10); NTA I.4, table C.2",
+            );
+        }
+        // p. 93 (WD p. 37): thermal cushions under a floor give R_c 1,95
+        // for the floor construction, whatever else is answered.
+        let cushions = surface.thermal_cushions && element == ElementType::Floor;
+        let insulation = if cushions {
+            recorder.record(
+                "thermal_cushions_rc_1_95",
+                &format!("{path}.thermalCushions"),
+                "R_c 1,95 m²K/W".into(),
+                "ISSO 82.1 p. 93; WD 2025 p. 37",
+            );
+            InsulationState::KnownThickness {
+                thickness_mm: 0.0,
+                thickness_proven: true,
+                known_lambda_equivalent: None,
+                reed_thickness_m: None,
+                thermal_cushions: true,
+            }
+        } else {
+            if surface.thermal_cushions {
+                recorder.issue("thermal_cushions_floor_only", format!("{path}.thermalCushions"));
+            }
+            match insulation {
+                InsulationState::KnownThickness {
+                    thickness_mm,
+                    thickness_proven,
+                    known_lambda_equivalent,
+                    reed_thickness_m,
+                    ..
+                } => InsulationState::KnownThickness {
+                    thickness_mm,
+                    thickness_proven,
+                    known_lambda_equivalent,
+                    reed_thickness_m,
+                    thermal_cushions: false,
+                },
+                other => other,
+            }
+        };
         let forfait = ForfaitOpaque {
-            element: element_type(surface),
+            element,
             building: BuildingKind::Regular,
             construction_year,
             insulation,
-            cavity: surface.cavity,
-            r_si_override: None,
+            // The flat 1,95 (= 0,15 + 1,8) has no cavity term.
+            cavity: surface.cavity && !cushions,
+            r_si_override,
         };
         let problems = forfait.validate(&path);
         if !problems.is_empty() {
@@ -616,7 +674,7 @@ pub fn derive_envelope(
             }
             _ => {
                 if matches!(surface.element, SurfaceElement::Facade) && exterior {
-                    facade_parts.push(result.u_c);
+                    facade_parts.push((result.u_c, result.r_c));
                 }
                 if net > 1e-9 {
                     push_opaque_or_partition(
@@ -645,15 +703,16 @@ pub fn derive_envelope(
     // Table 8.13 (p. 93): crawlspace wall R_bw = R_c of the façade above
     // (the lowest of several); U_xw = U of that façade (8.47 note 3).
     if !crawl_floors.is_empty() {
+        // The façade with the lowest R_c (highest U); R_bw is its R_c
+        // itself, not one recomputed from the rounded U.
         match facade_parts
             .iter()
             .cloned()
-            .fold(None, |max: Option<f64>, u| {
-                Some(max.map_or(u, |m| m.max(u)))
+            .fold(None, |lowest: Option<(f64, f64)>, part| match lowest {
+                Some(best) if best.1 <= part.1 => Some(best),
+                _ => Some(part),
             }) {
-            Some(u_facade) => {
-                // R_si 0,13 + R_se 0,04 of a façade.
-                let r_c = (1.0 / u_facade - 0.17).max(0.01);
+            Some((u_facade, r_c)) => {
                 for index in &crawl_floors {
                     ground_floors[*index]["below"]["wallResistanceM2kPerW"] = json!(r_c);
                     ground_floors[*index]["below"]["wallUValueWPerM2k"] = json!(u_facade);
@@ -974,10 +1033,68 @@ mod tests {
         assert_eq!(floor["below"]["floorResistanceM2kPerW"], 0.0);
         let u_facade = floor["below"]["wallUValueWPerM2k"].as_f64().unwrap();
         let r_bw = floor["below"]["wallResistanceM2kPerW"].as_f64().unwrap();
-        assert!((r_bw - (1.0 / u_facade - 0.17)).abs() < 1e-9);
+        // R_bw is the façade R_c itself (table 8.13), not 1/U − 0,17.
+        let facade = ForfaitOpaque {
+            element: ElementType::Facade,
+            building: BuildingKind::Regular,
+            construction_year: 1975,
+            insulation: InsulationState::AbsentOrUnknown,
+            cavity: true,
+            r_si_override: None,
+        }
+        .calculate();
+        assert_eq!(r_bw, facade.r_c);
+        assert_eq!(u_facade, facade.u_c);
         // R_si 0,17 is added for the kernel's R_si + R_c.
         let r = floor["constructionResistanceM2kPerW"].as_f64().unwrap();
         assert!(r > 0.17);
         assert!(derived.floor_above_crawlspace);
+    }
+
+    #[test]
+    fn floor_to_outdoor_air_and_thermal_cushions() {
+        let mut recorder = Recorder::default();
+        let mut cushions = surface("kussen", SurfaceElement::Floor, SurfaceBoundary::Crawlspace);
+        cushions.thermal_cushions = true;
+        cushions.exposed_perimeter_m = Some(10.0);
+        let envelope = SurveyEnvelope {
+            surfaces: vec![
+                surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+                surface("overstek", SurfaceElement::Floor, SurfaceBoundary::Outdoor),
+                cushions,
+            ],
+            windows: Vec::new(),
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+        };
+        let derived = derive_envelope(&envelope, 1970, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        // Table 8.10: floors to outdoor air take the roof row.
+        let roof_row = ForfaitOpaque {
+            element: ElementType::Roof,
+            building: BuildingKind::Regular,
+            construction_year: 1970,
+            insulation: InsulationState::AbsentOrUnknown,
+            cavity: true,
+            r_si_override: Some(0.17),
+        }
+        .calculate();
+        let overhang = derived
+            .opaque_elements
+            .iter()
+            .find(|item| item["id"] == "overstek")
+            .unwrap();
+        let rule = recorder
+            .applied
+            .iter()
+            .find(|item| item.rule == "opaque_rc_forfait_annex_i" && item.path == "envelope.surfaces[1]")
+            .unwrap();
+        assert!(rule.value.starts_with(&format!("R_c {:.2}", roof_row.r_c)), "{}", rule.value);
+        assert!(overhang.is_object());
+        // p. 93: thermal cushions give R_c 1,95 whatever the insulation answer.
+        let floor = &derived.ground_floors[0];
+        let r = floor["constructionResistanceM2kPerW"].as_f64().unwrap();
+        assert!((r - (1.95 + 0.17)).abs() < 1e-9, "{r}");
     }
 }

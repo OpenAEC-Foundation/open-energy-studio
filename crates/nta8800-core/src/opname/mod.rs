@@ -249,7 +249,22 @@ pub fn derive_residential_input(
         recorder,
     );
     let heating = heating::derive_heating(&survey.heating, year, recorder);
-    let hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
+    let mut hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
+    if matches!(
+        survey.hot_water.generator,
+        hot_water::HotWaterGeneratorAnswer::ElectricBoiler
+    ) {
+        if let Some(vessel) = hot_water::boiler_storage(
+            survey.hot_water.boiler_vessel.as_ref(),
+            year,
+            &survey.hot_water.source_reference,
+            recorder,
+        ) {
+            hot_water["storage"] = json!([vessel]);
+        }
+    } else if survey.hot_water.boiler_vessel.is_some() {
+        recorder.issue("boiler_vessel_not_applicable", "hotWater.boilerVessel");
+    }
     let pv: Vec<Value> = survey
         .pv
         .iter()
