@@ -305,7 +305,12 @@ pub enum Generator {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChpGenerator {
-    pub chp: crate::space_cooling::ChpClass,
+    /// Method 2 (9.6.6.1): table 9.31 class; exclusive with `method1`.
+    #[serde(default)]
+    pub chp: Option<crate::space_cooling::ChpClass>,
+    /// Method 1 (9.6.6.2): NEN-EN 50465 test values of a micro-CHP.
+    #[serde(default)]
+    pub method1: Option<crate::micro_chp::MicroChp>,
     /// 9.6.8.2 (9.91) inputs.
     #[serde(default)]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
@@ -2175,6 +2180,9 @@ struct GeneratorConditions {
     return_c: Option<[f64; 12]>,
     /// Area-weighted heating setpoint, °C.
     indoor_c: f64,
+    /// `t_H;op;si;mi` per 9.32a (with f_H;red and f_H;red;pmp;op), longest
+    /// over the zones.
+    operating_hours: Option<[f64; 12]>,
 }
 
 fn generator_conditions(
@@ -2249,10 +2257,32 @@ fn generator_conditions(
         })),
         _ => None,
     };
+    // 9.32a from the distribution summary, else table 9.15 with the use
+    // function of the primary zone and an individual installation.
+    let operating_hours = match &distribution.summary {
+        Some(summary) => Some(std::array::from_fn(|month| {
+            summary
+                .zones
+                .iter()
+                .map(|zone| zone.operating_hours[month])
+                .fold(0.0_f64, f64::max)
+        })),
+        None => hours.map(|hours: [f64; 12]| {
+            let function = reduction_function(input.demand.usage_function);
+            let pump = if function == ReductionFunction::Residential {
+                0.10
+            } else {
+                1.0
+            };
+            let factor = function.heating_reduction_factor() * pump;
+            std::array::from_fn(|month| hours[month] * factor)
+        }),
+    };
     GeneratorConditions {
         hours,
         return_c,
         indoor_c,
+        operating_hours,
     }
 }
 
@@ -2742,34 +2772,101 @@ fn generate(
             );
         }
         Generator::Chp(generator) => {
-            validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
             if generator.equipment_reference.trim().is_empty() {
                 issues.push(issue(
                     "source_reference_required",
                     "generator.equipmentReference",
                 ));
             }
-            let Some((thermal, electric)) = generator.chp.factors() else {
-                issues.push(issue("chp_class_invalid", "generator.chp"));
-                return None;
-            };
-            if !issues.is_empty() {
-                return None;
-            }
-            // 9.65 with η = ε_chp;th (gross value) and f_prac = 1.
-            generation_efficiency = Some(thermal);
-            let auxiliary = generator.auxiliary.as_ref().expect("validated auxiliary");
-            for (index, row) in monthly.iter_mut().enumerate() {
-                row.natural_gas_kwh = row.generator_output_kwh / thermal;
-                // 16.12: credited in chapter 16.
-                row.chp_electricity_kwh = row.generator_output_kwh * electric / thermal;
-                row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
-                    auxiliary,
-                    OTHER_AUX_GAS_OIL_W_PER_KW,
-                    row.generator_output_kwh,
-                    MONTH_HOURS[index],
-                    building_fraction,
-                ));
+            match (&generator.chp, &generator.method1) {
+                (Some(class), None) => {
+                    validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+                    let Some((thermal, electric)) = class.factors() else {
+                        issues.push(issue("chp_class_invalid", "generator.chp"));
+                        return None;
+                    };
+                    if !issues.is_empty() {
+                        return None;
+                    }
+                    // 9.65 with η = ε_chp;th (gross value) and f_prac = 1.
+                    generation_efficiency = Some(thermal);
+                    let auxiliary = generator.auxiliary.as_ref().expect("validated auxiliary");
+                    for (index, row) in monthly.iter_mut().enumerate() {
+                        row.natural_gas_kwh = row.generator_output_kwh / thermal;
+                        // 16.12: credited in chapter 16.
+                        row.chp_electricity_kwh = row.generator_output_kwh * electric / thermal;
+                        row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
+                            auxiliary,
+                            OTHER_AUX_GAS_OIL_W_PER_KW,
+                            row.generator_output_kwh,
+                            MONTH_HOURS[index],
+                            building_fraction,
+                        ));
+                    }
+                }
+                (None, Some(product)) => {
+                    issues.extend(
+                        crate::micro_chp::validate_micro_chp(product, "generator.method1")
+                            .into_iter()
+                            .map(|item| issue(item.code, item.path)),
+                    );
+                    let measured_aux = product.net_production_measured
+                        || (product.standby_auxiliary_kw.is_some()
+                            && product.chp_only.auxiliary_power_kw.is_some()
+                            && product.full_load.auxiliary_power_kw.is_some());
+                    // 9.6.8 when NEN-EN 50465 gives no auxiliary power.
+                    if !measured_aux {
+                        validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+                    }
+                    let Some(hours) = conditions.operating_hours else {
+                        issues.push(issue("heating_limit_undetermined", "generator"));
+                        return None;
+                    };
+                    if !issues.is_empty() {
+                        return None;
+                    }
+                    let collective = building_fraction < 1.0;
+                    let mut output = 0.0;
+                    let mut input_total = 0.0;
+                    for (index, row) in monthly.iter_mut().enumerate() {
+                        let month = crate::micro_chp::micro_chp_month(
+                            product,
+                            row.generator_output_kwh,
+                            hours[index],
+                            MONTH_HOURS[index],
+                            building_fraction,
+                            collective,
+                        )
+                        .expect("validated micro-CHP");
+                        match product.fuel {
+                            crate::micro_chp::MicroChpFuel::NaturalGas => {
+                                row.natural_gas_kwh = month.input_kwh
+                            }
+                            crate::micro_chp::MicroChpFuel::Oil => row.oil_kwh = month.input_kwh,
+                        }
+                        // 16.15.
+                        row.chp_electricity_kwh = month.electricity_kwh;
+                        row.generator_recoverable_loss_kwh = month.recoverable_kwh;
+                        let auxiliary = match month.auxiliary_kwh {
+                            Some(value) => value,
+                            None => other_generator_auxiliary_kwh(
+                                generator.auxiliary.as_ref().expect("validated auxiliary"),
+                                OTHER_AUX_GAS_OIL_W_PER_KW,
+                                row.generator_output_kwh,
+                                MONTH_HOURS[index],
+                                building_fraction,
+                            ),
+                        };
+                        row.auxiliary_electricity_kwh = Some(auxiliary);
+                        output += row.generator_output_kwh;
+                        input_total += month.input_kwh;
+                    }
+                    generation_efficiency = (input_total > 0.0).then(|| output / input_total);
+                }
+                _ => {
+                    issues.push(issue("chp_method_required", "generator.chp"));
+                    return None;
+                }
             }
         }
         Generator::GasBoiler(generator) => {
@@ -3452,15 +3549,77 @@ mod tests {
     }
 
     #[test]
+    fn micro_chp_method_1_books_input_electricity_and_aux() {
+        use crate::micro_chp::{
+            micro_chp_month, ChpTestPoint, MicroChp, MicroChpFuel, MicroChpLocation, MicroChpType,
+        };
+        let product = MicroChp {
+            kind: MicroChpType::StirlingEngine,
+            fuel: MicroChpFuel::NaturalGas,
+            location: MicroChpLocation::HeatedSpace,
+            hydraulics: None,
+            full_load: ChpTestPoint {
+                thermal_power_kw: 20.0,
+                electric_power_kw: None,
+                thermal_efficiency: None,
+                electric_efficiency: None,
+                auxiliary_power_kw: Some(0.10),
+            },
+            chp_only: ChpTestPoint {
+                thermal_power_kw: 6.0,
+                electric_power_kw: Some(1.0),
+                thermal_efficiency: Some(0.80),
+                electric_efficiency: None,
+                auxiliary_power_kw: Some(0.06),
+            },
+            standby_loss_kw: None,
+            pilot_kw: None,
+            standby_electric_kw: None,
+            standby_auxiliary_kw: Some(0.01),
+            net_production_measured: false,
+            test_report_reference: "EN 50465 report".into(),
+        };
+        let mut input = boiler_chain();
+        input.generator = Generator::Chp(ChpGenerator {
+            chp: None,
+            method1: Some(product.clone()),
+            auxiliary: None,
+            equipment_reference: "micro-CHP".into(),
+        });
+        input.distribution_system = Some(system(calculated_pump()));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // The chain uses t_H;op of 9.32a from the distribution summary.
+        let hours = result.distribution.as_ref().unwrap().zones[0].operating_hours[0];
+        let jan = &result.monthly[0];
+        let expected =
+            micro_chp_month(&product, jan.generator_output_kwh, hours, 744.0, 1.0, false).unwrap();
+        assert!((jan.natural_gas_kwh - expected.input_kwh).abs() < 1e-9);
+        assert!((jan.chp_electricity_kwh - expected.electricity_kwh).abs() < 1e-9);
+        assert!(jan.chp_electricity_kwh > 0.0);
+        assert!((jan.generator_recoverable_loss_kwh - 0.4 * hours).abs() < 1e-9);
+        // Both methods at once, or none, are rejected.
+        if let Generator::Chp(generator) = &mut input.generator {
+            generator.method1 = None;
+        }
+        assert!(codes(&input).contains(&"chp_method_required"));
+    }
+
+    #[test]
     fn chp_generator_follows_9_65_and_16_12() {
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
-            chp: crate::space_cooling::ChpClass {
+            chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
                 hre_declared: false,
                 low_temperature: false,
-            },
+            }),
+            method1: None,
             auxiliary: Some(OtherGeneratorAuxiliary {
                 electrically_connected_devices: 1,
                 nominal_power_kw: Some(80.0),
