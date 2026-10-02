@@ -179,9 +179,6 @@ pub fn assess_boiler_forfait_draft(
     if input.temperature_and_circuit_reference.trim().is_empty() {
         issues.push(issue("source_required", "temperatureAndCircuitReference"));
     }
-    if input.pilot_flame_present {
-        issues.push(issue("pilot_flame_route_unavailable", "pilotFlamePresent"));
-    }
     if input
         .installation_year
         .is_some_and(|year| !(1900..=2026).contains(&year))
@@ -262,7 +259,14 @@ pub struct BoilerMonth {
     pub generator_output_kwh: f64,
     pub input_natural_gas_kwh: f64,
     pub auxiliary_electricity_kwh: Option<f64>,
+    /// §9.6.2.1: 695 kWh gas per year for a pilot flame, by month length,
+    /// for the whole device (not in `input_natural_gas_kwh`; a collective
+    /// installation scales it with f_gebouw;H).
+    pub pilot_flame_natural_gas_kwh: f64,
 }
+
+/// §9.6.2.1 annual gas use of a pilot flame, kWh.
+pub const PILOT_FLAME_ANNUAL_KWH: f64 = 695.0;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -361,6 +365,12 @@ pub fn assess_boiler_forfait_monthly_draft(
                 generator_output_kwh: thermal,
                 input_natural_gas_kwh: fuel,
                 auxiliary_electricity_kwh: auxiliary,
+                pilot_flame_natural_gas_kwh: if input.boiler.pilot_flame_present {
+                    PILOT_FLAME_ANNUAL_KWH * crate::climate::MONTH_HOURS[index]
+                        / crate::climate::YEAR_HOURS
+                } else {
+                    0.0
+                },
             });
         }
     }
@@ -392,7 +402,7 @@ pub fn assess_boiler_forfait_monthly_draft(
         monthly,
         annual_auxiliary_electricity_kwh: annual_auxiliary,
         generator_output_derived: false,
-        pilot_flame_included: false,
+        pilot_flame_included: issues.is_empty() && input.boiler.pilot_flame_present,
         auxiliaries_included: issues.is_empty() && individual,
         final_edition_verified: false,
         beng_calculation_available: false,
@@ -442,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn equation_961_and_invalid_pilot_do_not_create_partial_fuel() {
+    fn equation_961_auxiliaries_and_pilot_flame() {
         let mut input = BoilerForfaitMonthlyDraftInput {
             boiler: sample(),
             generator_output_kwh: (1..=12)
@@ -478,8 +488,13 @@ mod tests {
         );
         input.boiler.installation_year = None;
         input.boiler.pilot_flame_present = true;
-        let rejected = assess_boiler_forfait_monthly_draft(&input);
-        assert_eq!(rejected.status, "invalid");
-        assert!(rejected.monthly.is_empty());
+        // §9.6.2.1: 695 kWh per year, by month length.
+        let pilot = assess_boiler_forfait_monthly_draft(&input);
+        assert_eq!(pilot.status, "diagnostic_valid");
+        assert!(pilot.pilot_flame_included);
+        assert!(
+            (pilot.monthly[0].pilot_flame_natural_gas_kwh - 695.0 * 744.0 / 8760.0).abs() < 1e-9
+        );
+        assert!((pilot.monthly[0].input_natural_gas_kwh - 250.0 / 0.95).abs() < 1e-9);
     }
 }

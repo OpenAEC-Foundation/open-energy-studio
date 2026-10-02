@@ -51,7 +51,6 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 - Leidingen in onverwarmde ruimten, serres (AOS), daklichten, riet en woonboten/woonwagens.
 - Detailopname-routes en kwaliteitsverklaringen. De uitzondering is een gemeten q_v10.
 - Kruipruimtevloeren worden benaderd als vloer op grond (waarschuwing `crawlspace_floor_approximated_as_slab_on_ground`). De kern mist NTA 8.3.4.2 en bijlage D.2.2.4.
-- Een ketel met waakvlam: de ISSO-standaardwaarde bij een onbekende waakvlam is "met waakvlam", maar de kern verwerpt die route nog (`pilot_flame_route_unavailable`).
 
 ## Interpretatievragen
 

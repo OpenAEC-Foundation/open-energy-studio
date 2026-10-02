@@ -1949,7 +1949,12 @@ fn generate_annex_q(
             assessed
                 .monthly
                 .iter()
-                .map(|item| (item.input_natural_gas_kwh, item.auxiliary_electricity_kwh))
+                .map(|item| {
+                    (
+                        item.input_natural_gas_kwh + item.pilot_flame_natural_gas_kwh,
+                        item.auxiliary_electricity_kwh,
+                    )
+                })
                 .collect(),
         );
     }
@@ -2042,6 +2047,11 @@ fn generate(
                         }
                     }
                 }
+            }
+            // §9.6.2.1 pilot flame, scaled with f_gebouw;H for a collective boiler.
+            let pilot_share = if collective { building_fraction } else { 1.0 };
+            for (row, boiler) in monthly.iter_mut().zip(&result.monthly) {
+                row.natural_gas_kwh += pilot_share * boiler.pilot_flame_natural_gas_kwh;
             }
             if result.monthly.len() != 12 && issues.is_empty() {
                 issues.push(issue("generator_result_incomplete", "generator"));
@@ -2195,7 +2205,8 @@ fn generate(
                     row.generator_electricity_kwh = pump_month.generator_input_electricity_kwh;
                     row.collective_source_heat_kwh = pump_month.collective_source_heat_kwh;
                     row.heat_pump_output_kwh = pump_month.generator_output_kwh;
-                    row.natural_gas_kwh = boiler_month.input_natural_gas_kwh;
+                    row.natural_gas_kwh = boiler_month.input_natural_gas_kwh
+                        + boiler_month.pilot_flame_natural_gas_kwh;
                     // Measured 9.85–9.88 values, otherwise the 9.85 forfait.
                     let pump_aux_month = match pump_aux {
                         Some(months) => months

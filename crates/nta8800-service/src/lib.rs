@@ -1920,7 +1920,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn boiler_endpoints_use_table_925_and_reject_pilot_flame() {
+    async fn boiler_endpoints_use_table_925_and_accept_pilot_flame() {
         let mut boiler = json!({
             "generatorId":"boiler", "role":"individual_supplementary",
             "location":"inside_thermal_boundary", "kind":"hr107", "fuel":"natural_gas",
@@ -1979,7 +1979,8 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        // §9.6.2.1: a pilot flame is counted (695 kWh/year), not rejected.
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]

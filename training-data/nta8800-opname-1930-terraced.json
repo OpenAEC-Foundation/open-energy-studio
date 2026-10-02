@@ -24,7 +24,7 @@
     ]
   },
   "heating": {
-    "generator": {"kind": "boiler", "boilerType": "conventional", "pilotFlame": false, "insideThermalBoundary": true},
+    "generator": {"kind": "boiler", "boilerType": "conventional", "insideThermalBoundary": true},
     "emitters": "radiators",
     "control": "unknown",
     "storeys": 2,
