@@ -1,5 +1,23 @@
 # NTA 8800 verificatiestatus — 29 september 2026
 
+## Stand 2 oktober 2026: bijlagen AA, A en B, en TO-juli stap B
+
+- **Bijlage AA** (`annex_aa`, p. 1135–1147) berekent per verblijfsruimte en per rekenzone de maatgevende koelbehoefte (AA.1–AA.9, tabellen AA.1–AA.3) en toetst de opwekker (AA.10/AA.11) en de afgifte per verblijfsruimte (AA.12/AA.13). Het capaciteitsbewijs `annex_aa` voor actieve koeling (§5.7.1) vraagt nu een `calculation`. Ontbreekt die, dan volgt `annex_aa_calculation_required`. Is de capaciteit onvoldoende, dan volgt `annex_aa_capacity_insufficient`. Het resultaat staat in `annexAa` van de TO-juli-uitkomst.
+- **TO-juli stap B**: de juliwaarden van `Q_H;ls;rbl` (uit de verwarmingsketen) en `Q_C;ls;rbl` worden naar `A_T;or` verdeeld en gaan via 7.7/7.8 met Δη in de behoefte per oriëntatie. `Q_C;ls;rbl` is in de kern nog 0.
+- **Bijlage A** (`annex_a`): dynamische ramen met maandgewogen g en U (methode A, stap 1) of één toestand (methode B).
+- **Bijlage B** (`annex_b`): effectieve interne warmtecapaciteit als alternatief voor tabel 7.10.
+
+Interpretatievragen:
+
+1. AA.2.2.2 noemt `q_v;C;SUP;eff`. Met hoofdstuk 11-invoer gebruikt de kern infiltratie, natuurlijke toevoer en mechanische toevoer van de julikoudebalans. Zonder hoofdstuk 11 gebruikt hij de som van de koelgeleidingen van alle opgegeven stromen, ook spuien en verbrandingslucht.
+2. Stap 1: bij gelijke zoninstraling op meerdere uren neemt de kern het vroegste uur. Een verblijfsruimte zonder ramen gebruikt het piekuur van de zone voor θ_e.
+3. P_gl van de zone (AA.7) gebruikt θ_e op het piekuur van de zone; P_gl per verblijfsruimte gebruikt het eigen piekuur ("analoog").
+4. AA.7: zonder opgegeven `U_w+shut` rekent de kern met `U_w`. Dat is conservatief, omdat θ_e > 24 °C.
+5. AA.6b: `g_gl;C;juli` = F_w·g_gl;n (7.40). `F_C` is de reductiefactor van de beweegbare zonwering zonder de tijdfractie van tabel 7.7 (opmerking 3).
+6. Tabel AA.2 heeft overlappende grenzen (≤ 1975, 1975 ≤ 1992, …). De kern hanteert ≤ 1975, 1976–1992, 1993–2015 en > 2015.
+7. Bijlage A: de stap-2-correctiefactoren zijn 1, omdat er geen forfait is.
+8. Bijlage B: een open vrijhangend plafond telt niet mee, voor de weerstand noch voor de massa.
+
 ## Stand 2 oktober 2026: review H7, H8 en H17 tegen de normtekst
 
 Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn nagelopen tegen de gelicentieerde normtekst (NTA 8800:2025+C1:2026, pagina's 164–220, 250–257, 690–715 en 790–795). Tabellen 17.1, 17.2, 17.4 (90°/45°), 7.7 en 7.9 en de meeste constanten klopten. De gevonden afwijkingen zijn hersteld:

@@ -450,6 +450,7 @@ fn derive_input(
                     u_value_w_per_m2k: u_value,
                     obstruction: nta.window_solar.obstruction.clone(),
                     movable_shading: nta.window_solar.movable_shading.clone(),
+                    dynamic: None,
                     source_reference: format!(
                         "project:window:{window_id}; {}",
                         nta.window_solar.source_reference

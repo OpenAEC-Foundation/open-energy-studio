@@ -43,6 +43,11 @@ De transmissie kent twee routes (`transmission.method`):
 
 Ventilatiestromen hebben per maand een geleiding en optionele toevoertemperatuur voor de warmtebalans, en optioneel `coolingConductanceWPerK` en `coolingSupplyTemperatureC` voor de koudebalans (leeg = gelijk aan de warmtewaarden). Hoofdstuk 11 levert deze straks per balans.
 
+Twee optionele bijlagen (beide met bron):
+
+- **Bijlage B (p. 772)**: `thermalMass.annexBElements` vervangt tabel 7.10. Per constructieonderdeel geef je de oppervlakte en de lagen vanaf de zonezijde (dikte, λ, ρ, c). De werkzame dikte loopt vanaf het binnenoppervlak zolang R < 0,25 m²K/W, met een maximum van 100 mm en van de halve constructiedikte. Een binnenwand met `bothSides` telt van twee kanten. `D_m = Σ ρ·c·d·A / A_g`.
+- **Bijlage A (p. 766–771)**: `windows[].dynamic` geeft een dynamisch transparant element. Methode A (`weighted_states`) middelt g en U per maand over de toestanden. Daarvoor geef je per maand het aandeel van `Σ I_sol·Δt` (A.2) en van `Σ Δθ·Δt` (A.1) per toestand op. Methode B (`single_state`) gebruikt één toestand. De maandelijkse g werkt in de zonwinst; het verschil met de nominale U van het raam wordt per maand bij `H_D` opgeteld.
+
 Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldige waarde, een onbekend veld of een helling buiten 0–180° geeft `invalid` zonder getallen.
 
 ## Uitkomst per maand
@@ -54,7 +59,6 @@ Per balans: setpoint na nivellering, reductiefactor (`a_H;red` of `a_C;red`), re
 - terugwinbare systeemverliezen `Q_H;ls;rbl`/`Q_C;ls;rbl` en de Δη-termen van 7.3–7.5 en 7.7–7.9 (komen uit hoofdstuk 9 en 10);
 - `H_p` (verticale leidingen, 7.3.3) en `H_A` (aangrenzende verwarmde ruimten, 8.5);
 - belemmeringssituaties b–g van §17.3 worden opgegeven, niet afgeleid;
-- detailberekening van de warmtecapaciteit volgens bijlage B;
 - voetnoot c van tabel 7.10: de kolomkeuze ligt bij de aanroeper;
 - bijlage D voor andere vloeren dan vloer op grond (kruipruimte, kelder);
 - één gebruiksfunctie per rekenzone (tabel 7.13–7.15).
@@ -68,6 +72,8 @@ Per balans: setpoint na nivellering, reductiefactor (`a_H;red` of `a_C;red`), re
 5. `b_v` (7.20) is ongedefinieerd als `θ_set;stc = θ_e`; de module neemt dan 1. Met tabel 17.1 en tabel 7.13 komt dat niet voor.
 6. Een maand met `H_tr + H_g;adj + H_ve ≤ 0` (bijvoorbeeld door warme toevoerlucht met negatieve `b_v`) wordt geweigerd; de tijdconstante is dan niet gedefinieerd.
 7. TOjuli (§5.7) gebruikt in de balans en in 5.40 de juliwaarde `H_gr;an`, en in de tijdconstante `H_C;g;adj`.
+8. Bijlage B: een vrijhangend plafond met ten minste 15 % open oppervlak telt niet mee voor de weerstand vanaf het binnenoppervlak. Omdat het geen bouwconstructie is, telt de module ook de massa ervan niet mee.
+9. Bijlage A: de correctiefactoren van stap 2 hebben geen forfaitaire waarde en zijn 1. De kern heeft geen uurklimaat, dus de gewichten van stap 1 worden opgegeven. De nominale U van het raam moet in de transmissie-invoer staan, omdat de module per maand alleen het verschil corrigeert. TOjuli gebruikt per oriëntatie nog de nominale U.
 
 ## Toetsing
 

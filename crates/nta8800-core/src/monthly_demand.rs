@@ -54,7 +54,6 @@ pub const OMITTED_CORRECTIONS: &[&str] = &[
     "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl of chapter 10 is still 0",
     "7.3.3 vertical ducts H_p and 8.5 adjacent heated spaces H_A",
     "§17.3 obstruction situations b–g are declared, not derived",
-    "annex B detailed thermal capacity",
     "table 7.10 footnote c is the caller's column choice",
     "annex D for floors other than slab on ground (crawlspace, basement)",
     "one usage function per calculation zone (tables 7.13–7.15)",
@@ -284,6 +283,22 @@ pub struct ThermalMass {
     pub wall: MassClass,
     pub ceiling: CeilingColumn,
     pub source_reference: String,
+    /// Annex B elements; when given they replace table 7.10.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub annex_b_elements: Vec<crate::annex_b::MassElement>,
+}
+
+impl ThermalMass {
+    /// `D_m` in kJ/(m²·K): table 7.10, or annex B over the zone area.
+    pub fn specific_capacity_kj_per_m2k(&self, usable_floor_area_m2: f64) -> f64 {
+        if self.annex_b_elements.is_empty() {
+            specific_heat_capacity(self.floor, self.wall, self.ceiling)
+        } else {
+            crate::annex_b::zone_capacity_j_per_k(&self.annex_b_elements)
+                / 1000.0
+                / usable_floor_area_m2
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -410,7 +425,37 @@ pub struct Window {
     /// [`ShadingControl`]: crate::solar_shading::ShadingControl
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub movable_shading: Option<MovableShading>,
+    /// Annex A: switchable or otherwise dynamic g and U per month.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dynamic: Option<crate::annex_a::DynamicTransparent>,
     pub source_reference: String,
+}
+
+impl Window {
+    /// Perpendicular g of the month (annex A.2 when dynamic).
+    pub fn g_for_month(&self, month_index: usize) -> f64 {
+        self.dynamic
+            .as_ref()
+            .map_or(self.g_perpendicular, |item| item.g_for_month(month_index))
+    }
+
+    /// U of the month (annex A.1 when dynamic).
+    pub fn u_for_month(&self, month_index: usize) -> f64 {
+        self.dynamic
+            .as_ref()
+            .map_or(self.u_value_w_per_m2k, |item| item.u_for_month(month_index))
+    }
+}
+
+/// Annex A: monthly change of `H_D` from dynamic windows whose nominal U
+/// is part of the transmission input, W/K.
+pub fn dynamic_window_correction_w_per_k(input: &MonthlyDemandInput, month_index: usize) -> f64 {
+    input
+        .windows
+        .iter()
+        .filter(|window| window.dynamic.is_some())
+        .map(|window| window.area_m2 * (window.u_for_month(month_index) - window.u_value_w_per_m2k))
+        .sum()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -765,7 +810,8 @@ pub(crate) fn window_solar_kwh(window: &Window, month: u8, balance: Balance) -> 
         month,
         balance,
     );
-    F_W * window.g_perpendicular
+    let index = usize::from(month - 1);
+    F_W * window.g_for_month(index)
         * window.area_m2
         * (1.0 - window.frame_fraction)
         * obstruction
@@ -775,7 +821,7 @@ pub(crate) fn window_solar_kwh(window: &Window, month: u8, balance: Balance) -> 
         * 0.001
         - sky_loss_kwh(
             window.tilt_deg,
-            window.u_value_w_per_m2k,
+            window.u_for_month(index),
             window.area_m2,
             hours,
         )
@@ -921,6 +967,14 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         "thermalMass.sourceReference".into(),
         issues,
     );
+    issues.extend(
+        crate::annex_b::validate_mass_elements(
+            &input.thermal_mass.annex_b_elements,
+            "thermalMass.annexBElements",
+        )
+        .into_iter()
+        .map(|item| issue(item.code, item.path)),
+    );
     match &input.internal_gains {
         InternalGains::Residential {
             dwelling_count,
@@ -1035,6 +1089,14 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 "window_frame_fraction_invalid",
                 format!("{path}.frameFraction"),
             ));
+        }
+        if let Some(dynamic) = &window.dynamic {
+            issues.extend(
+                dynamic
+                    .validate(&format!("{path}.dynamic"))
+                    .into_iter()
+                    .map(|item| issue(item.code, item.path)),
+            );
         }
         if !window.u_value_w_per_m2k.is_finite() || window.u_value_w_per_m2k <= 0.0 {
             issues.push(issue(
@@ -1502,7 +1564,7 @@ fn assess_resolved(
     let transmission = resolve_transmission(input, &mut issues);
 
     let mass = &input.thermal_mass;
-    let d_m = specific_heat_capacity(mass.floor, mass.wall, mass.ceiling);
+    let d_m = mass.specific_capacity_kj_per_m2k(input.usable_floor_area_m2);
     let mut monthly = Vec::with_capacity(12);
     if let (true, Some(transmission)) = (issues.is_empty(), &transmission) {
         monthly = compute(input, transmission, d_m, &mut issues);
@@ -1625,6 +1687,8 @@ fn compute(
         let hours = MONTH_HOURS[index];
         let outdoor = OUTDOOR_TEMPERATURE_C[index];
         let ground_monthly = transmission.ground_monthly_conductance_w_per_k[index];
+        // Annex A: dynamic window U in H_D.
+        let h_tr = h_tr + dynamic_window_correction_w_per_k(input, index);
 
         let internal = internal_gains_kwh(input, index);
         let window_solar: f64 = input
@@ -1894,6 +1958,64 @@ mod tests {
 
     fn reference_flows() -> Vec<VentilationFlow> {
         sample().ventilation_flows
+    }
+
+    #[test]
+    fn annex_b_capacity_replaces_table_7_10() {
+        let base = valid(&sample());
+        let mut input = sample();
+        input.thermal_mass.annex_b_elements = vec![crate::annex_b::MassElement {
+            id: "floor".into(),
+            area_m2: 100.0,
+            layers: vec![crate::annex_b::MassLayer {
+                thickness_m: 0.2,
+                conductivity_w_per_mk: 2.0,
+                density_kg_per_m3: 2400.0,
+                specific_heat_j_per_kgk: 1000.0,
+                open_suspended_ceiling: false,
+            }],
+            both_sides: false,
+            source_reference: "drawing".into(),
+        }];
+        let result = valid(&input);
+        // 2 400·1 000·0,1·100 J/K over 100 m² = 240 kJ/(m²·K).
+        assert!((result.specific_heat_capacity_kj_per_m2k.unwrap() - 240.0).abs() < 1e-9);
+        assert_ne!(
+            result.specific_heat_capacity_kj_per_m2k,
+            base.specific_heat_capacity_kj_per_m2k
+        );
+    }
+
+    #[test]
+    fn annex_a_dynamic_window_changes_g_and_u() {
+        let base = valid(&sample());
+        let mut input = sample();
+        let window = &mut input.windows[0];
+        window.dynamic = Some(crate::annex_a::DynamicTransparent::SingleState {
+            state: crate::annex_a::DynamicState {
+                id: "tinted".into(),
+                g_perpendicular: 0.3,
+                u_value_w_per_m2k: 1.7,
+            },
+            source_reference: "product".into(),
+        });
+        let result = valid(&input);
+        let window = &input.windows[0];
+        // g halves (0,6 → 0,3); U +0,5 adds 10 m²·0,5 to the sky loss and H_D.
+        let solar_base = window_solar_kwh(&sample().windows[0], 7, Balance::Cooling);
+        let solar = window_solar_kwh(window, 7, Balance::Cooling);
+        assert!(solar < solar_base);
+        assert!((dynamic_window_correction_w_per_k(&input, 0) - 5.0).abs() < 1e-12);
+        // Explicit route: H_tr 80 W/K becomes 85 W/K in January.
+        let theta = result.monthly[0].heating.calculation_temperature_c;
+        assert!(
+            (result.monthly[0].heating.transmission_kwh - 85.0 * (theta - 2.61) * 744.0 / 1000.0)
+                .abs()
+                < 1e-9
+        );
+        assert!(
+            result.monthly[0].heating.transmission_kwh > base.monthly[0].heating.transmission_kwh
+        );
     }
 
     #[test]
