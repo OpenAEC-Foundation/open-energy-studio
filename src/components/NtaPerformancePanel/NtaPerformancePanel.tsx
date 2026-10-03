@@ -288,9 +288,20 @@ export function NtaPerformancePanel() {
           <ul>
             {[...heating.demand.omittedCorrections, ...heating.omittedTerms].map((item) => <li key={item}>{item}</li>)}
           </ul>
-          <p>{t('nta.performance.fingerprint')}: <code>{assessment.inputFingerprint}</code></p>
         </details>
       </>}
+
+      {!loading && assessment && <details className="nta-performance-limits" aria-label={t('kernel.provenance')}>
+        <summary>{t('kernel.provenance')}</summary>
+        <dl className="nta-performance-totals">
+          <div><dt>{t('kernel.targetNorm')}</dt><dd>{assessment.targetNormVersion ?? '–'}</dd></div>
+          <div><dt>{t('kernel.version')}</dt><dd>{assessment.kernelVersion ?? '–'}</dd></div>
+          <div><dt>{t('kernel.inputFingerprint')}</dt><dd><code>{assessment.inputFingerprint}</code></dd></div>
+          <div><dt>{locale === 'nl' ? 'Atteststatus' : 'Attestation status'}</dt>
+            <dd>{assessment.attestStatus === 'unattested'
+              ? (locale === 'nl' ? 'Niet geattesteerd' : 'Unattested') : '–'}</dd></div>
+        </dl>
+      </details>}
 
       <div className="nta-performance-actions">
         {!editing && !formOpen && <>

@@ -31,7 +31,8 @@ describe('NTA performance panel', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       json: async () => ({
-        status: 'incomplete', inputFingerprint: 'sha256:x', attestStatus: 'unattested',
+        status: 'incomplete', targetNormVersion: 'NTA 8800:2025+C1:2026', kernelVersion: 'test-kernel',
+        inputFingerprint: 'sha256:x', attestStatus: 'unattested',
         geometry: { usableFloorAreaM2: 96, lossAreaM2: 232.8, envelopeAreaM2: 247.2, lossAreaRatio: 2.425, unclassifiedSurfaceCount: 0 },
         gaps: [{ code: 'nta_calculation_block_missing', path: 'ntaCalculation' },
           { code: 'nta_calculation_block_invalid', path: 'ntaCalculation',
@@ -47,6 +48,12 @@ describe('NTA performance panel', () => {
     expect(panel.getByText(/232\.8 m²/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/nta8800/project/performance', expect.anything());
     expect(panel.getByText('Unverified')).toBeInTheDocument();
+    await user.click(panel.getByText('Input check provenance'));
+    const provenance = within(panel.getByLabelText('Input check provenance'));
+    expect(provenance.getByText('NTA 8800:2025+C1:2026')).toBeInTheDocument();
+    expect(provenance.getByText('test-kernel')).toBeInTheDocument();
+    expect(provenance.getByText('sha256:x')).toBeInTheDocument();
+    expect(provenance.getByText('Unattested')).toBeInTheDocument();
 
     await user.click(panel.getByRole('button', { name: 'Advanced (JSON)' }));
     const editor = panel.getByLabelText('NTA input block (JSON)') as HTMLTextAreaElement;
