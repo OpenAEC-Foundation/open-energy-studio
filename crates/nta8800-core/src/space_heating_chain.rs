@@ -75,6 +75,13 @@ pub const OMITTED_TERMS: &[&str] = &[
     "annex Q: V.1 hot-water term not needed, because c_source is not applied to method 1",
     "annex N: E_H;gen;in converted to the gross calorific value (N.3) with f_Hs/Hi of table M.3 (biomass as wood 1,08)",
     "annex M: ϑ_brm (M.12) from 9.4.2: heating setpoint for a heated space, ϑ_ztu of the distribution system for an installation room; table M.6 otherwise",
+    "9.6.1 with §9.6.3 (p. 331) and 9.6.3.2 (p. 340): an annex Q heat pump in a multiple set takes F_H;gen;gpref from annex Q on the whole node output instead of table 9.23; it must be the only first preference, and the other generators share 1 − F by 9.60 with their preferences renumbered from 1 (estimated β rebased on the share left by the heat pump)",
+    "annex Q with a gas backup: the 9.6.8.1 auxiliary energy of the backup boiler is booked in every month, also when full coverage leaves the boiler without output (literal stand-by term)",
+    "annex M: LPG, hard coal and lignite of table M.3 are refused (boiler_fuel_without_primary_factor), because tables 5.2/5.3 (p. 94, p. 97) give them no f_P;del or K_CO2",
+    "annex M: β above 1 (M.24/M.25) is refused as a capacity shortfall, as annex N does; the plausibility bounds P_int ≥ 0,05·P_n and f_gen;ls;P0 ≤ 0,1 are program choices",
+    "annex M: stand-by losses (M.4/M.6) burn fuel in every hour of the month even when the 9.7 feedback of recoverable losses brings the generator output to 0 (a grossly oversized boiler in a small zone); the norm is followed literally",
+    "tables 5.2/5.4 (biomass classes): a type-plate power above 500 kW classes the boiler as bmA regardless of the entered 500 kW flag",
+    "annex V, V.1 (p. 1115): η_H;gen is referred to 14.6, which in this edition is the lighting daylight factor; the kernel uses the delivered COP with η_el = 1/f_P;del;el, so extraction is Q·(1 − η_el/COP). Reading η_H;gen as COP·η_el gives Q·(1 − 1/COP) and a higher R; the kernel's reading is the conservative one",
 ];
 
 /// 9.63 `f_prac` for heat pumps with annex Q data (method 1).
@@ -2900,6 +2907,9 @@ enum BiomassClass {
 /// Biomass class of annex M boilers and annex N stoves (method 1, so all
 /// three classes of table 5.2 occur); the annex R evidence is needed for
 /// bmB.
+/// Tables 5.2/5.4: the bmB row covers appliances of at most 500 kW.
+const BIOMASS_CLASS_LIMIT_KW: f64 = 500.0;
+
 fn validate_biomass_evidence(
     compliant: Option<bool>,
     above_500_kw: bool,
@@ -2975,6 +2985,37 @@ fn generate_annex_q(
     annex_q_result: &mut Option<AnnexQOutput>,
     issues: &mut Vec<ChainIssue>,
 ) -> Option<f64> {
+    generate_annex_q_share(
+        generator,
+        outputs,
+        building,
+        building_fraction,
+        regeneration_hot_water,
+        false,
+        monthly,
+        annex_q_result,
+        issues,
+    )
+    .map(|(efficiency, _)| efficiency)
+}
+
+/// Annex Q heat pump; returns `(η corrected, F_H;gen;gpref)`. With
+/// `shared` the heat pump is the first preference of a multiple set
+/// (§9.6.3, p. 331; 9.6.3.2, p. 340): annex Q fixes F on the whole node
+/// input, the rows get only the heat-pump share and the other generators
+/// of the set deliver the rest, so no annex Q backup is required.
+#[allow(clippy::too_many_arguments)]
+fn generate_annex_q_share(
+    generator: &AnnexQGenerator,
+    outputs: &[MonthlyEnergy],
+    building: HeatPumpBuildingContext,
+    building_fraction: f64,
+    regeneration_hot_water: Option<RegenerationHotWater>,
+    shared: bool,
+    monthly: &mut [ChainMonth],
+    annex_q_result: &mut Option<AnnexQOutput>,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<(f64, f64)> {
     let prior = issues.len();
     issues.extend(
         validate_annex_q(
@@ -3067,7 +3108,7 @@ fn generate_annex_q(
         .iter()
         .all(|bin| bin.delivered_kw >= bin.demand_kw * (1.0 - 1e-9));
     let fraction = if covers_all_bins { 1.0 } else { fraction };
-    if fraction < 1.0 - 1e-9 && generator.backup.is_none() {
+    if !shared && fraction < 1.0 - 1e-9 && generator.backup.is_none() {
         // Q.1: without supplementary heating the fraction must be 1.
         issues.push(issue("annex_q_backup_required", "generator.backup"));
         return None;
@@ -3124,6 +3165,10 @@ fn generate_annex_q(
         let pump = fraction * output;
         let backup = output - pump;
         row.heat_pump_output_kwh = pump;
+        if shared {
+            // The rest goes to the other preferences of the set.
+            row.generator_output_kwh = pump;
+        }
         row.generator_electricity_kwh = pump / corrected;
         // 9.6.3.2 (p. 340): W_H;gen;aux;mi = W_H;aux;hp;an/(12·3,6), booked
         // literally although Q.4 (p. 1029) already counts the source pump in
@@ -3150,7 +3195,7 @@ fn generate_annex_q(
         practice_factor: ANNEX_Q_PRACTICE_FACTOR,
         corrected_efficiency: corrected,
     });
-    Some(corrected)
+    Some((corrected, fraction))
 }
 
 impl DistributionSystem {
@@ -3233,11 +3278,259 @@ fn reduction_function(usage: crate::monthly_demand::UsageFunction) -> ReductionF
     }
 }
 
+/// Annex Q (Q.12A/B, Q.24A, Q.57–Q.59): an air/air heat pump heats the room
+/// air directly, so it cannot feed water emitters or pipes.
+fn annex_q_air_air_in_hydronic_chain(
+    input: &SpaceHeatingChainInput,
+    generator: &AnnexQGenerator,
+) -> bool {
+    let water_emitter = |emission: &EmissionInput| {
+        matches!(
+            emission.system,
+            EmissionSystem::RadiatorsOrConvectors
+                | EmissionSystem::FloorHeating
+                | EmissionSystem::FanAssistedRadiatorsOrConvectors
+        )
+    };
+    generator.heat_pump.source == AnnexQSource::AirAir
+        && (input.distribution_system.is_some()
+            || water_emitter(&input.emission)
+            || input
+                .additional_zones
+                .iter()
+                .any(|zone| water_emitter(&zone.emission)))
+}
+
+/// Adds one generator's monthly rows of a multiple set to the system rows;
+/// returns the energy input added (carriers incl. generator electricity).
+fn accumulate_generator_rows(
+    monthly: &mut [ChainMonth],
+    sub_rows: &[ChainMonth],
+    auxiliary_known: &mut bool,
+) -> f64 {
+    let mut input = 0.0;
+    for (row, sub) in monthly.iter_mut().zip(sub_rows) {
+        row.heat_pump_output_kwh += sub.heat_pump_output_kwh;
+        row.natural_gas_kwh += sub.natural_gas_kwh;
+        row.district_heat_kwh += sub.district_heat_kwh;
+        row.biomass_kwh += sub.biomass_kwh;
+        row.biomass_class_a_kwh += sub.biomass_class_a_kwh;
+        row.biomass_output_kwh += sub.biomass_output_kwh;
+        row.biomass_class_c_kwh += sub.biomass_class_c_kwh;
+        row.oil_kwh += sub.oil_kwh;
+        row.generator_recoverable_loss_kwh += sub.generator_recoverable_loss_kwh;
+        row.generator_electricity_kwh += sub.generator_electricity_kwh;
+        row.collective_source_heat_kwh += sub.collective_source_heat_kwh;
+        row.chp_electricity_kwh += sub.chp_electricity_kwh;
+        row.chp_excess_kwh += sub.chp_excess_kwh;
+        row.chp_thermal_output_kwh += sub.chp_thermal_output_kwh;
+        row.chp_operating_hours = row.chp_operating_hours.max(sub.chp_operating_hours);
+        row.chp_input_kwh += sub.chp_input_kwh;
+        row.chp_generator_auxiliary_kwh += sub.chp_generator_auxiliary_kwh;
+        match (row.auxiliary_electricity_kwh, sub.auxiliary_electricity_kwh) {
+            (Some(total), Some(value)) => row.auxiliary_electricity_kwh = Some(total + value),
+            _ => *auxiliary_known = false,
+        }
+        input += sub.natural_gas_kwh
+            + sub.district_heat_kwh
+            + sub.biomass_kwh
+            + sub.biomass_class_a_kwh
+            + sub.biomass_class_c_kwh
+            + sub.oil_kwh
+            + sub.generator_electricity_kwh;
+    }
+    input
+}
+
+/// `generate_multiple` with an annex Q heat pump: it must be the only
+/// generator of preference 1; annex Q runs on the whole node output and
+/// fixes F, the remaining preferences (renumbered from 1) deliver 1 − F.
+#[allow(clippy::too_many_arguments)]
+fn generate_multiple_with_annex_q(
+    input: &SpaceHeatingChainInput,
+    set: &MultipleGenerators,
+    index: usize,
+    count: usize,
+    outputs: &[MonthlyEnergy],
+    building_fraction: f64,
+    conditions: &GeneratorConditions,
+    building: HeatPumpBuildingContext,
+    monthly: &mut [ChainMonth],
+    annex_q_result: &mut Option<AnnexQOutput>,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<f64> {
+    let prior = issues.len();
+    let part = &set.generators[index];
+    let alone_first = part.preference == 1
+        && set
+            .generators
+            .iter()
+            .filter(|other| other.preference == 1)
+            .count()
+            == 1;
+    if count > 1 || !alone_first {
+        issues.push(issue(
+            "annex_q_heat_pump_first_preference",
+            format!("generator.generators[{index}].preference"),
+        ));
+        return None;
+    }
+    let Generator::HeatPumpAnnexQ(generator) = &part.generator else {
+        return None;
+    };
+    let prefix = format!("generator.generators[{index}].generator.");
+    if annex_q_air_air_in_hydronic_chain(input, generator) {
+        issues.push(issue(
+            "annex_q_air_air_hydronic_chain",
+            format!("{prefix}heatPump.source"),
+        ));
+        return None;
+    }
+    let rows_for = |outputs: &[MonthlyEnergy]| -> Vec<ChainMonth> {
+        monthly
+            .iter()
+            .zip(outputs)
+            .map(|(row, output)| ChainMonth {
+                month: row.month,
+                generator_output_kwh: output.energy_kwh,
+                ..ChainMonth::default()
+            })
+            .collect()
+    };
+    let mut pump_rows = rows_for(outputs);
+    let mut pump_issues = Vec::new();
+    let shared = generate_annex_q_share(
+        generator,
+        outputs,
+        building,
+        building_fraction,
+        input.regeneration_hot_water,
+        true,
+        &mut pump_rows,
+        annex_q_result,
+        &mut pump_issues,
+    );
+    let reroute = |items: Vec<ChainIssue>, prefix: &str| -> Vec<ChainIssue> {
+        items
+            .into_iter()
+            .map(|item| ChainIssue {
+                code: item.code,
+                path: match item.path.strip_prefix("generator.") {
+                    Some(rest) => format!("{prefix}{rest}"),
+                    None => format!("{prefix}{}", item.path),
+                },
+            })
+            .collect()
+    };
+    issues.extend(reroute(pump_issues, &prefix));
+    let (efficiency, fraction) = shared?;
+    let rest_outputs: Vec<MonthlyEnergy> = outputs
+        .iter()
+        .map(|item| MonthlyEnergy {
+            month: item.month,
+            energy_kwh: (1.0 - fraction) * item.energy_kwh,
+        })
+        .collect();
+    let rest_indices: Vec<usize> = (0..set.generators.len())
+        .filter(|other| *other != index)
+        .collect();
+    let mut rest_rows = rows_for(&rest_outputs);
+    let mut rest_issues = Vec::new();
+    let mut annex_q_unused = None;
+    if let [only] = rest_indices.as_slice() {
+        let mut sub_input = input.clone();
+        sub_input.generator = set.generators[*only].generator.clone();
+        generate(
+            &sub_input,
+            &rest_outputs,
+            building_fraction,
+            conditions,
+            building,
+            &mut rest_rows,
+            &mut annex_q_unused,
+            &mut rest_issues,
+        );
+        issues.extend(reroute(
+            rest_issues,
+            &format!("generator.generators[{only}].generator."),
+        ));
+    } else {
+        // β of the remaining preferences: estimated values rebased on the
+        // share left by preference 1 (interpretation), else nominal powers.
+        let first = set.estimated_beta.first().copied().unwrap_or(0.0);
+        let estimated_beta = if set.estimated_beta.len() > 1 && first < 1.0 {
+            set.estimated_beta[1..]
+                .iter()
+                .map(|beta| ((beta - first) / (1.0 - first)).clamp(0.0, 1.0))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let rest = MultipleGenerators {
+            generators: rest_indices
+                .iter()
+                .map(|other| {
+                    let mut item = set.generators[*other].clone();
+                    item.preference -= 1;
+                    item
+                })
+                .collect(),
+            added_preferred_generator: set.added_preferred_generator,
+            estimated_beta,
+            source_reference: set.source_reference.clone(),
+        };
+        let mut rest_input = input.clone();
+        rest_input.generator = Generator::Multiple(Box::new(rest.clone()));
+        generate_multiple(
+            &rest_input,
+            &rest,
+            &rest_outputs,
+            building_fraction,
+            conditions,
+            building,
+            &mut rest_rows,
+            &mut annex_q_unused,
+            &mut rest_issues,
+        );
+        issues.extend(rest_issues.into_iter().map(|item| {
+            let mut path = item.path;
+            for (position, original) in rest_indices.iter().enumerate() {
+                let from = format!("generator.generators[{position}]");
+                if path.starts_with(&from) {
+                    path = format!("generator.generators[{original}]{}", &path[from.len()..]);
+                    break;
+                }
+            }
+            ChainIssue {
+                code: item.code,
+                path,
+            }
+        }));
+    }
+    if issues.len() > prior {
+        return None;
+    }
+    for row in monthly.iter_mut() {
+        row.auxiliary_electricity_kwh = Some(0.0);
+    }
+    let mut auxiliary_known = true;
+    accumulate_generator_rows(monthly, &pump_rows, &mut auxiliary_known);
+    accumulate_generator_rows(monthly, &rest_rows, &mut auxiliary_known);
+    if !auxiliary_known {
+        for row in monthly.iter_mut() {
+            row.auxiliary_electricity_kwh = None;
+        }
+    }
+    Some(efficiency)
+}
+
 /// 9.6.1: energy fractions per preference (9.56–9.60, table 9.23) and the
 /// generators run on their share of the node output. Generators with the
 /// same preference share by nominal power; the lowest preference takes the
 /// remainder (note 4: a fictitious identical generator covers missing
 /// power).
+/// An annex Q heat pump in the set takes its own F_H;gen;gpref from annex Q
+/// (§9.6.3, p. 331; 9.6.3.2, p. 340); the other preferences share the rest.
 #[allow(clippy::too_many_arguments)]
 fn generate_multiple(
     input: &SpaceHeatingChainInput,
@@ -3337,6 +3630,31 @@ fn generate_multiple(
     }
     if issues.len() > prior {
         return None;
+    }
+    // §9.6.3 (p. 331) and 9.6.3.2 (p. 340): an annex Q heat pump brings its
+    // own energy fraction F_H;gen;gpref, the same number in every month; the
+    // other preferences share the remaining 1 − F by 9.60.
+    let annex_q_parts: Vec<usize> = set
+        .generators
+        .iter()
+        .enumerate()
+        .filter(|(_, part)| matches!(part.generator, Generator::HeatPumpAnnexQ(_)))
+        .map(|(index, _)| index)
+        .collect();
+    if let Some(&index) = annex_q_parts.first() {
+        return generate_multiple_with_annex_q(
+            input,
+            set,
+            index,
+            annex_q_parts.len(),
+            outputs,
+            building_fraction,
+            conditions,
+            building,
+            monthly,
+            annex_q_result,
+            issues,
+        );
     }
     let total_power: f64 = set
         .generators
@@ -3453,36 +3771,7 @@ fn generate_multiple(
         {
             hp_efficiency = hp_efficiency.or(efficiency);
         }
-        for (row, sub) in monthly.iter_mut().zip(&sub_rows) {
-            row.heat_pump_output_kwh += sub.heat_pump_output_kwh;
-            row.natural_gas_kwh += sub.natural_gas_kwh;
-            row.district_heat_kwh += sub.district_heat_kwh;
-            row.biomass_kwh += sub.biomass_kwh;
-            row.biomass_class_a_kwh += sub.biomass_class_a_kwh;
-            row.biomass_output_kwh += sub.biomass_output_kwh;
-            row.biomass_class_c_kwh += sub.biomass_class_c_kwh;
-            row.oil_kwh += sub.oil_kwh;
-            row.generator_recoverable_loss_kwh += sub.generator_recoverable_loss_kwh;
-            row.generator_electricity_kwh += sub.generator_electricity_kwh;
-            row.collective_source_heat_kwh += sub.collective_source_heat_kwh;
-            row.chp_electricity_kwh += sub.chp_electricity_kwh;
-            row.chp_excess_kwh += sub.chp_excess_kwh;
-            row.chp_thermal_output_kwh += sub.chp_thermal_output_kwh;
-            row.chp_operating_hours = row.chp_operating_hours.max(sub.chp_operating_hours);
-            row.chp_input_kwh += sub.chp_input_kwh;
-            row.chp_generator_auxiliary_kwh += sub.chp_generator_auxiliary_kwh;
-            match (row.auxiliary_electricity_kwh, sub.auxiliary_electricity_kwh) {
-                (Some(total), Some(value)) => row.auxiliary_electricity_kwh = Some(total + value),
-                _ => auxiliary_known = false,
-            }
-            total_input += sub.natural_gas_kwh
-                + sub.district_heat_kwh
-                + sub.biomass_kwh
-                + sub.biomass_class_a_kwh
-                + sub.biomass_class_c_kwh
-                + sub.oil_kwh
-                + sub.generator_electricity_kwh;
-        }
+        total_input += accumulate_generator_rows(monthly, &sub_rows, &mut auxiliary_known);
     }
     if !auxiliary_known {
         for row in monthly.iter_mut() {
@@ -4053,24 +4342,7 @@ fn generate(
             }
         }
         Generator::HeatPumpAnnexQ(generator) => {
-            // Annex Q (Q.12A/B, Q.24A, Q.57–Q.59): an air/air heat pump heats
-            // the room air directly, so it cannot feed water emitters or pipes.
-            let water_emitter = |emission: &EmissionInput| {
-                matches!(
-                    emission.system,
-                    EmissionSystem::RadiatorsOrConvectors
-                        | EmissionSystem::FloorHeating
-                        | EmissionSystem::FanAssistedRadiatorsOrConvectors
-                )
-            };
-            if generator.heat_pump.source == AnnexQSource::AirAir
-                && (input.distribution_system.is_some()
-                    || water_emitter(&input.emission)
-                    || input
-                        .additional_zones
-                        .iter()
-                        .any(|zone| water_emitter(&zone.emission)))
-            {
+            if annex_q_air_air_in_hydronic_chain(input, generator) {
                 issues.push(issue(
                     "annex_q_air_air_hydronic_chain",
                     "generator.heatPump.source",
@@ -4203,10 +4475,21 @@ fn generate(
                     .into_iter()
                     .map(|item| issue(item.code, item.path)),
             );
+            if !generator.boiler.fuel.has_primary_factor() {
+                // Table M.3 lists LPG and coal, but tables 5.2/5.3 (p. 94,
+                // p. 97) give no f_P;del or K_CO2 for them.
+                issues.push(issue(
+                    "boiler_fuel_without_primary_factor",
+                    "generator.boiler.fuel",
+                ));
+            }
             let biomass_class = (generator.boiler.fuel == BoilerFuel::Wood).then(|| {
+                // Tables 5.2/5.4: the class follows the installed thermal
+                // power; the type plate overrides an unticked 500 kW flag.
                 validate_biomass_evidence(
                     generator.annex_r_compliant_at_most_500_kw,
-                    generator.biomass_above_500_kw,
+                    generator.biomass_above_500_kw
+                        || generator.boiler.product.nominal_power_kw > BIOMASS_CLASS_LIMIT_KW,
                     generator.annex_r_reference.as_ref(),
                     issues,
                 )
@@ -4245,11 +4528,25 @@ fn generate(
                         ),
                     },
                 );
+                if result.load_ratio_unclamped > 1.0 + 1e-9 {
+                    // M.24 clamps β at 1: the boiler cannot deliver the
+                    // month's output within t_H;op (as annex N, N.30).
+                    issues.push(issue(
+                        if hours[index] > 0.0 {
+                            "product_boiler_capacity_insufficient"
+                        } else {
+                            "product_boiler_output_without_operating_hours"
+                        },
+                        format!("monthly[{index}]"),
+                    ));
+                }
                 let fuel = result.input_kwh * building_fraction;
                 match generator.boiler.fuel {
                     BoilerFuel::NaturalGas => row.natural_gas_kwh = fuel,
                     BoilerFuel::Oil => row.oil_kwh = fuel,
                     BoilerFuel::Wood => row.biomass_kwh = fuel,
+                    // Refused above; nothing to book.
+                    BoilerFuel::Lpg | BoilerFuel::HardCoal | BoilerFuel::Lignite => {}
                 }
                 row.auxiliary_electricity_kwh =
                     Some(result.auxiliary_electricity_kwh * building_fraction);
@@ -4257,6 +4554,9 @@ fn generate(
                     result.recoverable_to_space_kwh * building_fraction;
                 output_total += row.generator_output_kwh;
                 input_total += fuel;
+            }
+            if !issues.is_empty() {
+                return None;
             }
             generation_efficiency = (input_total > 0.0).then(|| output_total / input_total);
             if let Some(class) = biomass_class {
@@ -5250,6 +5550,87 @@ mod tests {
     }
 
     #[test]
+    fn annex_q_heat_pump_in_a_multiple_set_uses_its_own_energy_fraction() {
+        // §9.6.3 (p. 331) and 9.6.3.2 (p. 340): annex Q fixes F_H;gen;gpref;
+        // table 9.23 would give the heat pump only f(β = 8/28) of January.
+        let mut input = annex_q_chain();
+        let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
+            panic!("annex Q generator expected");
+        };
+        generator.backup = None;
+        let power = &mut generator.heat_pump.maximum_power;
+        power.condition1.heating_power_kw *= 10.0;
+        for condition in [&mut power.condition2, &mut power.condition3]
+            .into_iter()
+            .flatten()
+        {
+            condition.heating_power_kw *= 10.0;
+        }
+        let heat_pump = input.generator.clone();
+        let boiler = boiler_chain().generator;
+        input.generator = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 8.0,
+                    generator: heat_pump,
+                },
+                PreferredGenerator {
+                    preference: 2,
+                    nominal_power_kw: 20.0,
+                    generator: boiler,
+                },
+            ],
+            added_preferred_generator: false,
+            estimated_beta: Vec::new(),
+            source_reference: "design".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!(jan.generator_output_kwh > 0.0);
+        // Full coverage: F = 1, so the boiler burns no gas.
+        assert!((jan.heat_pump_output_kwh - jan.generator_output_kwh).abs() < 1e-9);
+        assert!(jan.natural_gas_kwh.abs() < 1e-6, "{}", jan.natural_gas_kwh);
+        let annual_gas: f64 = result.monthly.iter().map(|row| row.natural_gas_kwh).sum();
+        assert!(annual_gas.abs() < 1e-6);
+
+        // The heat pump must be the only first preference.
+        let mut swapped = input.clone();
+        if let Generator::Multiple(set) = &mut swapped.generator {
+            set.generators[0].preference = 2;
+            set.generators[1].preference = 1;
+        }
+        assert!(codes(&swapped).contains(&"annex_q_heat_pump_first_preference"));
+
+        // Partial coverage: the boiler takes 1 − F of every month.
+        let mut partial = input.clone();
+        if let Generator::Multiple(set) = &mut partial.generator {
+            if let Generator::HeatPumpAnnexQ(generator) = &mut set.generators[0].generator {
+                generator.heat_pump.switch_off.min_evaporator_in_c = Some(3.0);
+            }
+        }
+        let result = assess_space_heating_chain(&partial);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let fraction = result.annex_q.as_ref().unwrap().annex_q.energy_fraction;
+        assert!(fraction < 1.0 && fraction > 0.0);
+        for row in &result.monthly {
+            assert!((row.heat_pump_output_kwh - fraction * row.generator_output_kwh).abs() < 1e-6);
+            if row.generator_output_kwh > 0.0 {
+                assert!(row.natural_gas_kwh > 0.0);
+            }
+        }
+    }
+
+    #[test]
     fn annex_q_without_backup_needs_full_coverage() {
         let mut input = annex_q_chain();
         let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
@@ -5638,6 +6019,47 @@ mod tests {
         // Without a calculated distribution the class must be given.
         input.distribution_system = None;
         assert!(codes(&input).contains(&"distribution_pump_input_required"));
+    }
+
+    #[test]
+    fn product_boiler_capacity_fuel_and_biomass_power_checks() {
+        let base = || {
+            let mut input = boiler_chain();
+            let mut distribution = system(calculated_pump());
+            distribution.installation = Installation::Individual;
+            distribution.design_temperature_class = Some(DesignTemperatureClass::C45);
+            input.distribution_system = Some(distribution);
+            input.generator = Generator::ProductBoiler(Box::new(product_boiler()));
+            input
+        };
+        // An undersized boiler cannot deliver the month in t_H;op (M.24).
+        let mut small = base();
+        if let Generator::ProductBoiler(generator) = &mut small.generator {
+            generator.boiler.product.nominal_power_kw = 0.2;
+        }
+        assert!(codes(&small).contains(&"product_boiler_capacity_insufficient"));
+        // Tables 5.2/5.3 have no factor for LPG.
+        let mut lpg = base();
+        if let Generator::ProductBoiler(generator) = &mut lpg.generator {
+            generator.boiler.fuel = BoilerFuel::Lpg;
+        }
+        assert!(codes(&lpg).contains(&"boiler_fuel_without_primary_factor"));
+        // A 600 kW wood boiler cannot be bmB (≤ 500 kW, tables 5.2/5.4).
+        let mut wood = base();
+        if let Generator::ProductBoiler(generator) = &mut wood.generator {
+            generator.boiler.fuel = BoilerFuel::Wood;
+            generator.boiler.technology = crate::annex_m::BoilerTechnology::SolidFuelStandard;
+            generator.boiler.product.full_load = crate::annex_m::FullLoadEfficiency::Single {
+                efficiency: 0.85,
+                test_temperature_c: None,
+                additional_test: None,
+            };
+            generator.boiler.product.part_load_efficiency = 0.85;
+            generator.boiler.product.nominal_power_kw = 600.0;
+            generator.annex_r_compliant_at_most_500_kw = Some(true);
+            generator.annex_r_reference = Some("annex R test".into());
+        }
+        assert!(codes(&wood).contains(&"biomass_class_conflict"));
     }
 
     #[test]

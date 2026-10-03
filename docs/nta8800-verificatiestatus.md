@@ -96,6 +96,13 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - tapwater uit een combitoestel of afleverset op het verwarmingstoestel (13.184/13.185, p. 653): het aandeel is E_W, zonder f_BACS (5.20a, p. 89); het hulpenergiegebruik van het toestel blijft bij verwarming;
 - opgegeven interne warmteproductie (`internalGains.method = declared`): tabel 7.2/7.3 (p. 179–180) en 7.21 (p. 177) zijn rekenwaarden zonder alternatief. Een afwijkende waarde geeft een waarschuwing en geen blokkade, omdat de opgegeven flux ook de termen van 7.28 en 7.29 kan bevatten. De gebruiksaanpassing van het maatwerkadvies (bijlage Z) wordt niet getoetst.
 
+- bijlage Q in een meervoudige opwekking (§9.6.3, p. 331; 9.6.3.2, p. 340): de warmtepomp krijgt de energiefractie F_H;gen;gpref van bijlage Q op de hele knooplevering, niet die van tabel 9.23; hij moet als enige voorkeur 1 hebben en de overige toestellen delen 1 − F volgens 9.60 (voorkeuren hernummerd, geschatte β herschaald);
+- bijlage Q met een gasketel als bijverwarming: het hulpenergiegebruik van 9.6.8.1 van die ketel wordt elke maand geboekt, ook als de ketel bij volledige dekking niets levert;
+- bijlage M: lpg, steenkool en bruinkool staan in tabel M.3, maar tabel 5.2/5.3 (p. 94, p. 97) geven er geen f_P;del of K_CO2 voor; de keten weigert ze (`boiler_fuel_without_primary_factor`);
+- bijlage M: β boven 1 (M.24/M.25) wordt geweigerd als capaciteitstekort, zoals bij bijlage N; de ondergrens P_int ≥ 0,05·P_n en de bovengrens f_gen;ls;P0 ≤ 0,1 zijn keuzes van dit programma;
+- bijlage M: stand-byverliezen (M.4/M.6) verbruiken brandstof in elk uur van de maand, ook als de terugkoppeling van 9.7 de levering van een sterk overgedimensioneerde ketel tot 0 brengt; de norm wordt letterlijk gevolgd;
+- biomassaklasse (tabel 5.2/5.4): een typeplaatvermogen boven 500 kW geeft bmA, ongeacht het opgegeven 500 kW-vinkje;
+- V.1 (p. 1115) verwijst voor η_H;gen naar 14.6, dat in deze editie de daglichtafhankelijkheid van verlichting is; de kern neemt de geleverde COP met η_el = 1/f_P;del;el (onttrekking Q·(1 − η_el/COP)). Lezen als COP·η_el geeft Q·(1 − 1/COP) en een hogere R; de kernlezing is de behoudende.
 Ze staan per module in `INTERPRETATIONS` en in de docs. `interpretations::kernel_interpretations()` verzamelt de lijsten; de API (`GET /v1/nta8800/interpretations`) en de desktop (`kernel_interpretations`) geven ze door, en het rekenrapport drukt ze af als bijlage.
 
 **Onafhankelijke herberekeningen (3 oktober 2026).** Bij gebrek aan officiële referentiegevallen zijn beide voorbeeldprojecten opnieuw doorgerekend. De agent schreef daarvoor een eigen Python-implementatie, rechtstreeks vanuit de normtekst en de gerenderde pagina's, zonder de Rust-formules te lezen.
@@ -123,6 +130,11 @@ De herberekeningen brachten wel invoer- en validatiepunten aan het licht:
 - onrealistische opgegeven gebruiken in de voorbeelden.
 
 Deze punten zijn afgewerkt in `3eec124`. De herberekende waarden in de tabel gelden voor de voorbeeldinvoer van vóór die correctie. De actuele uitkomsten staan in `docs/nta8800-voorbeeldproject-smoketest-2026-10-03.md`.
+
+**Herberekening van bijlage M, bijlage N, meervoudige opwekking, biomassa en bijlage V, 3 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's (p. 870–923, 324, 331, 340–342, 1114–1116). De rekenkunde van de kern kwam in elk doorgerekend geval overeen. Eén inhoudelijk verschil is gecorrigeerd:
+- **Bijlage Q in een meervoudige opwekking.** Een warmtepomp met bijlage Q naast een gasketel kreeg de energiefractie van tabel 9.23 (januari 0,563 bij β = 8/28, 450 kWh gas). §9.6.3 (p. 331) en 9.6.3.2 (p. 340) laten bijlage Q zowel de energiefractie als het rendement bepalen. De warmtepomp neemt nu F van bijlage Q op de hele knooplevering; bij volledige dekking levert de ketel niets.
+
+Verder toegevoegd: weigering van lpg en kolen (geen factor in tabel 5.2/5.3), van een omgekeerd condenserend rendement, van een onrealistische stand-byverliesfactor of P_int, van β > 1 en van levering zonder bedrijfstijd, en de 500 kW-grens voor biomassa op het typeplaatvermogen.
 
 **Herberekening van ventilatie (H11) en verlichting (H14), 3 oktober 2026.** Ook dit is gedaan met een eigen Python-implementatie vanuit de normpagina's. Getest zijn drie utiliteitsscenario's voor ventilatie (onder meer D5a met CO2-regeling, twee luchtstroomzones, een luchtbehandelingskast met verwarmer en koeler, en gedeclareerde en forfaitaire ventilatoren) en vier voor verlichting (installatie en forfait, daglichtsectoren met verticale ramen en daklichten, de forfaitaire daglichtmethode). Alle vergeleken maandtermen kwamen overeen tot op de rekenprecisie (≤ 1e-14). Wat er is vastgelegd of aangepast:
 - **11.100/11.101 bij een kast met verwarmer en koeler (interpretatie).**

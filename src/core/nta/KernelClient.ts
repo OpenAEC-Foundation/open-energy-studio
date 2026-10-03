@@ -1740,7 +1740,8 @@ export interface SpaceHeatingChainInput {
 /** Annex M product values (efficiencies as fractions, auxiliary powers in W). */
 export interface NtaProductBoiler {
   technology: 'solid_fuel_standard' | 'gas_oil_standard' | 'low_temperature' | 'condensing_gas' | 'condensing_oil';
-  fuel: 'natural_gas' | 'oil' | 'wood';
+  /** Table M.3; LPG and coal have no table 5.2/5.3 factor and are refused by the chain. */
+  fuel: 'natural_gas' | 'oil' | 'wood' | 'lpg' | 'hard_coal' | 'lignite';
   placement: 'outdoors' | 'installation_room' | 'under_roof' | 'heated_space';
   draught: 'atmospheric' | 'fan_assisted';
   control: 'floor_standing_outdoor_compensated' | 'wall_hung_outdoor_compensated' | 'wall_hung_room_temperature';

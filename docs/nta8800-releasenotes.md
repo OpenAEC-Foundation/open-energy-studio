@@ -2,6 +2,22 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — bijlage M, meervoudige opwekking en biomassa na de herberekening
+
+### Uitkomsten die veranderen
+
+- **Warmtepomp met bijlage Q in een meervoudige opwekking** (§9.6.3, p. 331; 9.6.3.2, p. 340). De warmtepomp krijgt de energiefractie van bijlage Q op de hele knooplevering in plaats van tabel 9.23; de overige toestellen leveren de rest. Bij volledige dekking verbruikt een bijgeplaatste ketel geen brandstof meer.
+- **Biomassaketel boven 500 kW** (tabel 5.2/5.4). Het typeplaatvermogen bepaalt de klasse: boven 500 kW is het bmA, ook zonder het vinkje.
+
+### Projecten die nu `incomplete` of ongeldig worden
+
+- `annex_q_heat_pump_first_preference`: een warmtepomp met bijlage Q in een meervoudige opwekking moet als enige voorkeur 1 hebben.
+- `boiler_fuel_without_primary_factor`: een ketel met productgegevens (bijlage M) op lpg, steenkool of bruinkool. Tabel M.3 kent ze, tabel 5.2/5.3 geven er geen factor voor.
+- `boiler_condensing_efficiencies_inverted`: condenserend vollastrendement bij 60 °C hoger dan bij 30 °C (M.8).
+- `boiler_standby_loss_invalid` boven f_gen;ls;P0 = 0,1 en `boiler_power_invalid` voor P_int onder 0,05·P_n.
+- `product_boiler_capacity_insufficient` / `product_boiler_output_without_operating_hours`: de ketel kan de maandlevering niet binnen de bedrijfstijd van tabel 9.15 leveren (M.24/M.25).
+- `biomass_class_conflict`: bijlage R-vinkje bij een typeplaatvermogen boven 500 kW.
+
 ## 3 oktober 2026 — hoofdstuk 12 en bijlage P na de herberekening
 
 ### Uitkomsten die veranderen
