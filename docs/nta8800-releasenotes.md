@@ -2,6 +2,32 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — maatwerkadvies: maatregelsjablonen na review
+
+### Uitkomsten die veranderen
+
+- **Patches altijd vers.** De rapportexport en het dossier rekenden met de patch van de laatste berekening in het paneel. Na een toegevoegd of verwijderd vlak kon die een ander element wijzigen. `buildMaatwerkadviesInput` genereert de sjabloonpatches nu altijd opnieuw.
+- **Ventilatie en verlichting.** Deze sjablonen bewaren alleen hun wijzigingen (systeem, of per verlichtingszone vermogen, parasitair vermogen, aanwezigheid, daglicht en afzuigarmaturen). Latere wijzigingen in het project worden niet meer teruggezet en niet meer als besparing van de maatregel geboekt.
+- **PV.** Nieuwe PV-systemen starten op belemmering situatie e) (tabel 17.3 met opmerking 23, p. 706–707). Situatie a) vraagt een onderbouwing.
+- **Dakisolatie.** Een dak steiler dan 60° krijgt R_si 0,13 (tabel C.2 opmerking 3, p. 778).
+- **Warmtepomp.** De bronvlaggen van 5.31/5.32 volgen uit de gekozen bron; een collectieve bron van 20–40 °C of ≥ 40 °C geeft geen `heat_pump_source_contradiction` meer.
+
+### Maatregelen die nu niet worden doorgerekend
+
+- Een sjabloon met openstaande problemen gaat met `incomplete` naar de kern; elke variant met die maatregel meldt `measure_template_incomplete`. Nieuwe problemen:
+  - `selectionStale`: gekozen vlakken, ramen of verlichtingszones bestaan niet meer;
+  - `supplyTemperatureRequired`: warmtepomp met afgifte via water zonder ontwerpaanvoertemperatuur;
+  - `peakPowerRequired`: PV zonder piekvermogen;
+  - `obstructionEvidenceRequired`: PV met minimale belemmering zonder onderbouwing;
+  - `migrationReview`: verlichtingssjabloon in de oude vorm, tot de adviseur de wijzigingen bevestigt.
+- Gevelwanden tegen de grond worden niet meer als isolatievlak aangeboden.
+
+### Formulier
+
+- Bij forfaitair verlichtingsvermogen is daglichtregeling uitgeschakeld (14.24, p. 667); bij centrale aan-schakeling staat een toelichting (14.16/14.17, p. 664).
+- Wisselen van sjabloonsoort houdt een zelf ingevulde levensduur en categorie.
+- Een investering van 0 € geeft een waarschuwing.
+
 ## 3 oktober 2026 — reviewcorrecties rapportafronding, restset, bouwjaar en setpoints
 
 ### Projecten die nu `incomplete` worden

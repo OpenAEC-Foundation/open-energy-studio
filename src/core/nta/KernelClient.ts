@@ -1,4 +1,4 @@
-import type { MwaMeasureTemplate } from './MwaTemplates';
+import { regenerateTemplatePatches, type LegacyTemplate, type MwaMeasureTemplate } from './MwaTemplates';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { IProject, INtaHeatPumpInput } from '../energy/types';
 import { kernelProject } from './KernelInput';
@@ -4535,7 +4535,13 @@ export interface MwaMeasure {
   phaseYear?: number;
   specialistNote?: string;
   /** Measure template that generated `patch` (editor only; the kernel uses `patch`). */
-  template?: MwaMeasureTemplate | null;
+  template?: MwaMeasureTemplate | LegacyTemplate | null;
+  /**
+   * Open problems of the template (`mwa.template.problem.*` keys), set when
+   * the patch is regenerated; the kernel refuses every variant with this
+   * measure (`measure_template_incomplete`).
+   */
+  incomplete?: string[];
 }
 
 export interface MwaPackage {
@@ -4745,11 +4751,15 @@ export interface MaatwerkadviesAssessment {
   issues: MwaIssue[];
 }
 
-/** Builds the kernel input: the project (without its own MWA block) is the base. */
+/**
+ * Builds the kernel input: the project (without its own MWA block) is the
+ * base. Template measures get their patch rebuilt against this project, so
+ * every caller (panel, report export, dossier) sends fresh array indices.
+ */
 export function buildMaatwerkadviesInput(project: IProject, definition: NtaMaatwerkadvies): Record<string, unknown> {
   const { maatwerkadvies: _omit, ...base } = project as IProject & { maatwerkadvies?: unknown };
   void _omit;
-  return { base: { kind: 'project', project: base }, ...definition };
+  return { base: { kind: 'project', project: base }, ...regenerateTemplatePatches(project, definition) };
 }
 
 export async function assessMaatwerkadviesWithRust(project: IProject, definition: NtaMaatwerkadvies): Promise<MaatwerkadviesAssessment> {

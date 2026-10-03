@@ -20,7 +20,7 @@ import {
 } from '../../core/nta/KernelClient';
 import { downloadMaatwerkadviesReportHTML } from '../../core/report/ReportGenerator';
 import type { IProject } from '../../core/energy/types';
-import { buildTemplatePatch, type MwaTemplateKind } from '../../core/nta/MwaTemplates';
+import { regenerateTemplatePatches, type MwaTemplateKind } from '../../core/nta/MwaTemplates';
 import { applyTemplate, MwaTemplateEditor, TEMPLATE_KINDS, templateMeasure } from './MwaTemplateEditor';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './MaatwerkadviesPanel.css';
@@ -205,14 +205,6 @@ export function MeasurePatchFields({ patch, onChange }: {
   );
 }
 
-/** Measures with a template get their patch regenerated against the current project. */
-export function regenerateTemplatePatches(project: IProject, definition: NtaMaatwerkadvies): NtaMaatwerkadvies {
-  return {
-    ...definition,
-    measures: definition.measures.map((measure) => (measure.template
-      ? { ...measure, patch: buildTemplatePatch(project, measure.template, measure.id).patch } : measure)),
-  };
-}
 
 function MeasureEditor({ project, measure, onChange, onRemove }: {
   project: IProject;
@@ -252,6 +244,8 @@ function MeasureEditor({ project, measure, onChange, onRemove }: {
       <label>{t('mwa.measure.investment')}
         <input type="number" value={measure.investmentEur} onChange={(e) => onChange({ ...measure, investmentEur: Number(e.target.value) })} />
       </label>
+      {measure.investmentEur === 0 && <p className="mwa-wide nta-form-note" data-testid={`mwa-investment-zero-${measure.id}`}>
+        {t('mwa.measure.investmentZero')}</p>}
       <label>{t('mwa.measure.costSource')}
         <input value={measure.costSource} onChange={(e) => onChange({ ...measure, costSource: e.target.value })} />
       </label>
@@ -314,7 +308,9 @@ export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: st
         <td colSpan={11}>
           <ul>{result.issues.map((item, index) => (
             <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} />
-              {item.path && <> <code>{item.path}</code></>}{item.detail && <> {item.detail}</>}</li>
+              {item.path && <> <code>{item.path}</code></>}{item.detail && <> {item.code === 'measure_template_incomplete'
+                ? item.detail.split(', ').map((key) => t(`mwa.template.problem.${key}`)).join(' ')
+                : item.detail}</>}</li>
           ))}</ul>
         </td>
       </tr>

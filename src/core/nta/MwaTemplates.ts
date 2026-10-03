@@ -1,5 +1,5 @@
 import type { IProject } from '../energy/types';
-import type { MwaMeasureCategory, MwaPatchOperation } from './KernelClient';
+import type { MwaMeasure, MwaMeasureCategory, MwaPatchOperation, NtaMaatwerkadvies } from './KernelClient';
 import { hotWaterGeneratorTemplate, solarWaterHeaterTemplate, spaceGeneratorTemplate } from './NtaSystemTemplates';
 import { heatRecoveryTemplate, ventilationUnit } from './NtaFormModels';
 
@@ -21,8 +21,12 @@ export type MwaMeasureTemplate =
   | { kind: 'glazing'; windows: string[]; uValue: number | null; gValue: number | null }
   /** Target q_v10 after sealing (to be verified by a measurement after execution). */
   | { kind: 'airtightness'; qv10DmPerSM2: number | null; sourceReference: string }
-  /** Chapter 11 ventilation: the edited `ventilation` block (system, fans, …). */
-  | { kind: 'ventilation'; ventilation: Block }
+  /**
+   * Chapter 11 ventilation: the new `ventilation.system` (unit, heat
+   * recovery, fans). Only the system is stored, so later changes to the
+   * project's flows, controls or infiltration stay in the variant.
+   */
+  | { kind: 'ventilation'; system: Block }
   /** Space-heating generator replacing the current one (forfait or annex Q product route). */
   | { kind: 'heat_pump'; generator: Block; renewable?: Block | null }
   /** Hot-water generator replacing the current one. */
@@ -33,7 +37,20 @@ export type MwaMeasureTemplate =
   | { kind: 'solar_water_heater'; systems: Block[] }
   /** Shower heat recovery (annex U / §13.6) on the hot-water system. */
   | { kind: 'shower_heat_recovery'; recovery: Block }
-  /** Chapter 14 lighting of a utility building: the edited `lighting` list. */
+  /**
+   * Chapter 14 lighting of a utility building: per lighting zone
+   * (`zoneId/lightingZoneId`) only the changed members (power, parasitic,
+   * occupancy, daylight, extracted luminaires), applied on top of the
+   * project's current lighting.
+   */
+  | { kind: 'lighting'; zones: Record<string, Block> };
+
+/**
+ * Template forms saved before 3 October 2026: ventilation and lighting kept
+ * a snapshot of the whole block. `normalizeTemplate` migrates them.
+ */
+export type LegacyTemplate =
+  | { kind: 'ventilation'; ventilation: Block }
   | { kind: 'lighting'; lighting: Block[] };
 
 export type MwaTemplateKind = MwaMeasureTemplate['kind'];
@@ -74,11 +91,25 @@ export const TEMPLATE_LIFETIME: Record<MwaTemplateKind, number> = {
   lighting: 15,
 };
 
-/** Table C.2 surface resistances: R_si by heat-flow direction, R_se 0,04. */
+/**
+ * Table C.2 surface resistances (p. 778): R_si by heat-flow direction,
+ * R_se 0,04. Note 3: a roof steeper than 60° counts as horizontal heat flow.
+ */
 const R_SI: Record<InsulationPart, number> = { roof: 0.10, facade: 0.13, floor: 0.17 };
+const R_SI_STEEP_ROOF = 0.13;
 const R_SE = 0.04;
 const SURFACE_TYPE: Record<InsulationPart, string> = { roof: 'roof', facade: 'wall', floor: 'floor' };
-const OUTER_BOUNDARIES = new Set(['outdoor', 'ground', 'unheated_space', undefined]);
+/**
+ * Boundaries a part can insulate. A wall against the ground is left out:
+ * the kernel takes a heated basement's walls from
+ * `groundFloors[].heatedBasement.wallResistanceM2kPerW` (8.38), not from the
+ * wall's construction.
+ */
+const OUTER_BOUNDARIES: Record<InsulationPart, Set<string | undefined>> = {
+  roof: new Set(['outdoor', 'unheated_space', undefined]),
+  facade: new Set(['outdoor', 'unheated_space', undefined]),
+  floor: new Set(['outdoor', 'ground', 'unheated_space', undefined]),
+};
 
 function clone<T>(value: T): T {
   return value === undefined ? value : structuredClone(value);
@@ -103,7 +134,7 @@ export interface WindowOption extends SurfaceOption { windowIndex: number }
 /** Surfaces a part can insulate: walls, roofs or floors on the outside, ground or an unheated space. */
 export function insulationOptions(project: IProject, part: InsulationPart): SurfaceOption[] {
   return project.zones.flatMap((zone, zoneIndex) => zone.surfaces.flatMap((surface, surfaceIndex) =>
-    surface.type === SURFACE_TYPE[part] && OUTER_BOUNDARIES.has(surface.thermalBoundary)
+    surface.type === SURFACE_TYPE[part] && OUTER_BOUNDARIES[part].has(surface.thermalBoundary)
       ? [{ key: `${zone.id}/${surface.id}`, label: `${zone.name || zone.id} — ${surface.name || surface.id}`, zoneIndex, surfaceIndex }]
       : []));
 }
@@ -117,13 +148,21 @@ export function windowOptions(project: IProject): WindowOption[] {
     }))));
 }
 
+/** R_si of a surface of `part`: a roof steeper than 60° takes 0,13 (table C.2 note 3). */
+export function insulationRsi(project: IProject, part: InsulationPart, surfaceId?: string): number {
+  if (part !== 'roof' || !surfaceId) return R_SI[part];
+  const tilts = (nta(project)?.surfaceTilts as Block[] | undefined) ?? [];
+  const tilt = tilts.find((item) => item.surfaceId === surfaceId)?.tiltDeg;
+  return typeof tilt === 'number' && tilt > 60 ? R_SI_STEEP_ROOF : R_SI[part];
+}
+
 /** Rc and U of an insulated part: U = 1/(R_si + Rc + R_se), or Rc back from U. */
-export function insulationValues(part: InsulationPart, rcValue: number | null, uValue: number | null): { rc: number; u: number } | null {
+export function insulationValues(part: InsulationPart, rcValue: number | null, uValue: number | null, rsi = R_SI[part]): { rc: number; u: number } | null {
   if (rcValue != null && Number.isFinite(rcValue) && rcValue >= 0) {
-    return { rc: rcValue, u: 1 / (R_SI[part] + rcValue + R_SE) };
+    return { rc: rcValue, u: 1 / (rsi + rcValue + R_SE) };
   }
   if (uValue != null && Number.isFinite(uValue) && uValue > 0) {
-    return { rc: Math.max(0, 1 / uValue - R_SI[part] - R_SE), u: uValue };
+    return { rc: Math.max(0, 1 / uValue - rsi - R_SE), u: uValue };
   }
   return null;
 }
@@ -140,7 +179,7 @@ export function initialTemplate(kind: MwaTemplateKind, project: IProject): MwaMe
     case 'ventilation': {
       const current = (block?.ventilation as Block | undefined) ?? {};
       const unit = { ...ventilationUnit('d2', ((current.system as Block | undefined)?.unit as Block | undefined)), heatRecovery: heatRecoveryTemplate() };
-      return { kind, ventilation: { ...clone(current), system: { kind: 'single', unit } } };
+      return { kind, system: { kind: 'single', unit } };
     }
     case 'heat_pump': return { kind, generator: heatPumpGeneratorTemplate(project), renewable: heatPumpRenewableTemplate() };
     case 'hot_water': return { kind, generator: hotWaterGeneratorTemplate('heat_pump') };
@@ -148,8 +187,68 @@ export function initialTemplate(kind: MwaTemplateKind, project: IProject): MwaMe
     case 'solar_water_heater': return { kind, systems: [solarWaterHeaterTemplate(0)] };
     case 'shower_heat_recovery': return { kind, recovery: {
       showers: [{ unit: 'vertical' }], connection: 'mixer_and_heater', sourceReference: '' } };
-    case 'lighting': return { kind, lighting: clone((block?.lighting as Block[] | undefined) ?? []) };
+    case 'lighting': return { kind, zones: {} };
   }
+}
+
+/** Members of a lighting zone a lighting measure may change (§14.4–14.6). */
+export const LIGHTING_MEASURE_FIELDS = ['power', 'parasitic', 'occupancy', 'daylight', 'extractedLuminaires'] as const;
+
+const lightingKey = (entry: Block, zone: Block) => `${String(entry.zoneId ?? '')}/${String(zone.id ?? '')}`;
+
+/** The current lighting with a lighting template's changes applied (the editor's draft). */
+export function applyLightingChanges(current: Block[], zones: Record<string, Block>): Block[] {
+  return current.map((entry) => ({
+    ...entry,
+    lightingZones: ((entry.lightingZones as Block[] | undefined) ?? []).map((zone) => {
+      const change = zones[lightingKey(entry, zone)];
+      return change ? { ...zone, ...clone(change) } : zone;
+    }),
+  }));
+}
+
+/**
+ * Per lighting zone, the measure members of `edited` that differ from
+ * `current`. Added or removed lighting zones and changed functions or areas
+ * are not part of a lighting measure and are ignored.
+ */
+export function lightingChanges(current: Block[], edited: Block[]): Record<string, Block> {
+  const before = new Map<string, Block>();
+  for (const entry of current) {
+    for (const zone of (entry.lightingZones as Block[] | undefined) ?? []) before.set(lightingKey(entry, zone), zone);
+  }
+  const changes: Record<string, Block> = {};
+  for (const entry of edited) {
+    for (const zone of (entry.lightingZones as Block[] | undefined) ?? []) {
+      const key = lightingKey(entry, zone);
+      const base = before.get(key);
+      if (!base) continue;
+      const changed: Block = {};
+      for (const field of LIGHTING_MEASURE_FIELDS) {
+        if (zone[field] !== undefined && JSON.stringify(zone[field]) !== JSON.stringify(base[field])) changed[field] = clone(zone[field]);
+      }
+      if (Object.keys(changed).length > 0) changes[key] = changed;
+    }
+  }
+  return changes;
+}
+
+/**
+ * The current form of a saved template. A ventilation snapshot keeps only
+ * its `system` (the editor only edited the unit); a lighting snapshot is
+ * converted to its changes against the current project and needs the
+ * adviser's review (`migrationReview`), because the snapshot cannot tell a
+ * measure's change from a later change of the base project.
+ */
+export function normalizeTemplate(project: IProject, template: MwaMeasureTemplate | LegacyTemplate): { template: MwaMeasureTemplate; migrated: boolean } {
+  if (template.kind === 'ventilation' && 'ventilation' in template && !('system' in template)) {
+    return { template: { kind: 'ventilation', system: clone((template.ventilation.system as Block | undefined) ?? {}) }, migrated: false };
+  }
+  if (template.kind === 'lighting' && 'lighting' in template && !('zones' in template)) {
+    const current = (nta(project)?.lighting as Block[] | undefined) ?? [];
+    return { template: { kind: 'lighting', zones: lightingChanges(current, template.lighting) }, migrated: true };
+  }
+  return { template: template as MwaMeasureTemplate, migrated: false };
 }
 
 /** Generator kinds whose renewable heat needs 5.31/5.32 evidence (`heatPumpRenewable`). */
@@ -158,6 +257,28 @@ export const HEAT_PUMP_KINDS = new Set(['heat_pump_forfait', 'heat_pump_annex_q'
 /** 5.31/5.32 source evidence of a heat pump. */
 export function heatPumpRenewableTemplate(): Block {
   return { sourceBelow20C: true, exhaustAirSource: false, sourceReference: '' };
+}
+
+/**
+ * The 5.31/5.32 flags that follow from the generator's own source, or null
+ * when the source does not fix them. Forfait: exhaust air iff the table row
+ * is exhaust air; the collective 20–40 °C and ≥ 40 °C rows are not below
+ * 20 °C. Annex Q: exhaust air iff the source is exhaust-air/water.
+ */
+export function derivedRenewableFlags(generator: Block): { sourceBelow20C?: boolean; exhaustAirSource: boolean } | null {
+  const forfait = generator.forfait as Block | null | undefined;
+  if (generator.kind === 'heat_pump_forfait' && forfait?.source) {
+    const source = String(forfait.source);
+    return {
+      exhaustAirSource: source === 'exhaust_air',
+      sourceBelow20C: source !== 'collective20_to40_c' && source !== 'collective_at_least40_c',
+    };
+  }
+  const annexQ = generator.heatPump as Block | undefined;
+  if (generator.kind === 'heat_pump_annex_q' && annexQ?.source) {
+    return { exhaustAirSource: annexQ.source === 'exhaust_air_water' };
+  }
+  return null;
 }
 
 /** A forfait heat pump (tables 9.27/9.29) with its table row inputs; the adviser completes them. */
@@ -187,10 +308,16 @@ export function pvSystemTemplate(index: number): Block {
     azimuthDeg: 180,
     tiltDeg: 35,
     mounting: 'moderately_ventilated',
-    obstruction: { method: 'minimal' },
+    // Table 17.3 with remark 23 (p. 706–707): situation e) is the
+    // conservative choice for PV; situation a) needs evidence
+    // (`obstructionSourceReference`, template only).
+    obstruction: { method: 'full' },
     sourceReference: '',
   };
 }
+
+/** Template-only member of a PV system: evidence for the minimal-obstruction situation a). */
+export const PV_OBSTRUCTION_SOURCE = 'obstructionSourceReference';
 
 const isObject = (value: unknown): value is Block => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -231,8 +358,9 @@ function append(path: string, current: unknown, items: Block[]): MwaPatchOperati
  */
 function pvObstruction(system: Block): Block {
   const factors = Array.isArray(system.obstructionFactors) ? system.obstructionFactors : [];
-  const { obstruction, obstructionFactors: _drop, ...rest } = system;
+  const { obstruction, obstructionFactors: _drop, [PV_OBSTRUCTION_SOURCE]: _evidence, ...rest } = system;
   void _drop;
+  void _evidence;
   if (factors.length > 0) return { ...rest, obstructionFactors: factors };
   return obstruction == null ? rest : { ...rest, obstruction };
 }
@@ -242,29 +370,43 @@ function withIds(items: Block[], measureId: string, prefix: string): Block[] {
   return items.map((item, index) => ({ ...item, id: `${measureId}-${String(item.id ?? `${prefix}-${index + 1}`)}` }));
 }
 
+/** Whether any leaf of `value` is null (a field the adviser left blank). */
+function hasBlank(value: unknown): boolean {
+  if (value === null) return true;
+  if (Array.isArray(value)) return value.some(hasBlank);
+  if (isObject(value)) return Object.values(value).some(hasBlank);
+  return false;
+}
+
 /** The patch of a template against the current project. */
-export function buildTemplatePatch(project: IProject, template: MwaMeasureTemplate, measureId: string): TemplatePatch {
+export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate | LegacyTemplate, measureId: string): TemplatePatch {
+  const { template, migrated } = normalizeTemplate(project, saved);
   const block = nta(project);
-  const problems: string[] = [];
+  const problems: string[] = migrated ? ['migrationReview'] : [];
   const patch: MwaPatchOperation[] = [];
   switch (template.kind) {
     case 'insulation': {
       const values = insulationValues(template.part, template.rcValue, template.uValue);
       if (!values) problems.push('valueRequired');
-      const options = insulationOptions(project, template.part).filter((option) => template.surfaces.includes(option.key));
+      const all = insulationOptions(project, template.part);
+      const options = all.filter((option) => template.surfaces.includes(option.key));
+      if (template.surfaces.some((key) => !all.some((option) => option.key === key))) problems.push('selectionStale');
       if (options.length === 0) problems.push('selectionRequired');
       if (!values) break;
-      const rc = round(values.rc, 3);
-      const u = round(values.u, 4);
       const created = new Map<string, string>();
       const groundFloors = (block?.groundFloors as Block[] | undefined) ?? [];
       for (const option of options) {
         const surface = project.zones[option.zoneIndex].surfaces[option.surfaceIndex];
         const original = project.constructions.find((item) => item.id === surface.constructionId);
-        const key = surface.constructionId ?? '';
+        const rsi = insulationRsi(project, template.part, surface.id);
+        const steep = rsi !== R_SI[template.part];
+        const surfaceValues = insulationValues(template.part, template.rcValue, template.uValue, rsi)!;
+        const rc = round(surfaceValues.rc, 3);
+        const u = round(surfaceValues.u, 4);
+        const key = `${surface.constructionId ?? ''}${steep ? '#steep' : ''}`;
         let id = created.get(key);
         if (!id) {
-          id = `${measureId}-${key || template.part}`;
+          id = `${measureId}-${surface.constructionId || template.part}${steep ? '-steep' : ''}`;
           created.set(key, id);
           patch.push({ op: 'add', path: '/constructions/-', value: {
             id, name: `${original?.name ?? template.part} (${measureId})`, layers: [], rcValue: rc, uValue: u } });
@@ -281,7 +423,9 @@ export function buildTemplatePatch(project: IProject, template: MwaMeasureTempla
       break;
     }
     case 'glazing': {
-      const options = windowOptions(project).filter((option) => template.windows.includes(option.key));
+      const all = windowOptions(project);
+      const options = all.filter((option) => template.windows.includes(option.key));
+      if (template.windows.some((key) => !all.some((option) => option.key === key))) problems.push('selectionStale');
       if (options.length === 0) problems.push('selectionRequired');
       const u = template.uValue;
       if (u == null || !Number.isFinite(u) || u <= 0) { problems.push('valueRequired'); break; }
@@ -316,17 +460,16 @@ export function buildTemplatePatch(project: IProject, template: MwaMeasureTempla
     case 'ventilation': {
       const current = block?.ventilation as Block | undefined;
       if (!current) { problems.push('ventilationRequired'); break; }
-      // Infiltration belongs to the airtightness template; a package with
-      // both keeps the sealed q_v10.
-      const { infiltration: _skip, ...after } = template.ventilation;
-      void _skip;
-      const { infiltration: _keep, ...before } = current;
-      void _keep;
-      patch.push(...diffOperations(pointer('ntaCalculation', 'ventilation'), before, after, 1));
+      // Only the system is replaced: the project's flows, controls and
+      // infiltration (the airtightness measure) stay as they are.
+      if (JSON.stringify(current.system) !== JSON.stringify(template.system)) {
+        patch.push({ op: current.system === undefined ? 'add' : 'replace', path: pointer('ntaCalculation', 'ventilation', 'system'), value: template.system });
+      }
       ((block?.zoneData as Block[] | undefined) ?? []).forEach((zone, index) => {
         const ventilation = zone.ventilation as Block | undefined;
-        if (ventilation && after.system !== undefined && JSON.stringify(ventilation.system) !== JSON.stringify(after.system)) {
-          patch.push({ op: 'replace', path: pointer('ntaCalculation', 'zoneData', index, 'ventilation', 'system'), value: after.system });
+        if (ventilation && JSON.stringify(ventilation.system) !== JSON.stringify(template.system)) {
+          patch.push({ op: ventilation.system === undefined ? 'add' : 'replace',
+            path: pointer('ntaCalculation', 'zoneData', index, 'ventilation', 'system'), value: template.system });
         }
       });
       if (patch.length === 0) problems.push('noChange');
@@ -336,6 +479,12 @@ export function buildTemplatePatch(project: IProject, template: MwaMeasureTempla
       if (!block) { problems.push('calculationRequired'); break; }
       let generator = template.generator;
       const forfait = generator.forfait as Block | null | undefined;
+      // Hydronic emission needs the design supply temperature (tables
+      // 9.27/9.29 columns; annex Q θ_sup).
+      if ((generator.kind === 'heat_pump_forfait' && forfait?.sink === 'hydronic' && forfait.designSupplyTemperatureC == null)
+        || (generator.kind === 'heat_pump_annex_q' && generator.designSupplyTemperatureC == null)) {
+        problems.push('supplyTemperatureRequired');
+      }
       // An individual heat pump with a stated capacity is not part of a
       // collective building installation (9.6.3 table row choice).
       if (forfait && forfait.thermalCapacityKw != null && forfait.collectiveBuildingInstallation == null) {
@@ -344,7 +493,8 @@ export function buildTemplatePatch(project: IProject, template: MwaMeasureTempla
       patch.push({ op: 'replace', path: pointer('ntaCalculation', 'generator'), value: generator });
       // 5.31/5.32: a heat pump's renewable heat needs the source evidence.
       if (HEAT_PUMP_KINDS.has(String(generator.kind))) {
-        const renewable = template.renewable;
+        const flags = derivedRenewableFlags(generator);
+        const renewable = template.renewable && flags ? { ...template.renewable, ...flags } : template.renewable;
         if (!renewable || !String(renewable.sourceReference ?? '').trim()) problems.push('sourceRequired');
         if (renewable) {
           patch.push({ op: block.heatPumpRenewable == null ? 'add' : 'replace', path: pointer('ntaCalculation', 'heatPumpRenewable'), value: renewable });
@@ -360,6 +510,12 @@ export function buildTemplatePatch(project: IProject, template: MwaMeasureTempla
     case 'pv': {
       if (!block) { problems.push('calculationRequired'); break; }
       if (template.systems.length === 0) problems.push('selectionRequired');
+      for (const system of template.systems) {
+        if (hasBlank(system.peakPower)) problems.push('peakPowerRequired');
+        if (system.azimuthDeg == null || system.tiltDeg == null) problems.push('valueRequired');
+        const obstruction = system.obstruction as Block | undefined;
+        if (obstruction?.method === 'minimal' && !String(system[PV_OBSTRUCTION_SOURCE] ?? '').trim()) problems.push('obstructionEvidenceRequired');
+      }
       patch.push(...append(pointer('ntaCalculation', 'pvSystems'), block.pvSystems, withIds(template.systems.map(pvObstruction), measureId, 'pv')));
       break;
     }
@@ -381,13 +537,45 @@ export function buildTemplatePatch(project: IProject, template: MwaMeasureTempla
     case 'lighting': {
       const current = block?.lighting as Block[] | undefined;
       if (!current || current.length === 0) { problems.push('lightingRequired'); break; }
-      // Per lighting zone: the changed power, occupancy, daylight, … blocks.
-      patch.push(...diffOperations(pointer('ntaCalculation', 'lighting'), current, template.lighting, 4));
+      // Per lighting zone: the changed members on top of the current zone.
+      const matched = new Set<string>();
+      current.forEach((entry, entryIndex) => {
+        ((entry.lightingZones as Block[] | undefined) ?? []).forEach((zone, zoneIndex) => {
+          const key = lightingKey(entry, zone);
+          const change = template.zones[key];
+          if (!change) return;
+          matched.add(key);
+          for (const field of LIGHTING_MEASURE_FIELDS) {
+            if (change[field] === undefined || JSON.stringify(change[field]) === JSON.stringify(zone[field])) continue;
+            patch.push({ op: zone[field] === undefined ? 'add' : 'replace',
+              path: pointer('ntaCalculation', 'lighting', entryIndex, 'lightingZones', zoneIndex, field), value: change[field] });
+          }
+        });
+      });
+      if (Object.keys(template.zones).some((key) => !matched.has(key))) problems.push('selectionStale');
       if (patch.length === 0) problems.push('noChange');
       break;
     }
   }
-  return { patch, problems };
+  return { patch, problems: [...new Set(problems)] };
+}
+
+/**
+ * Every template measure with its patch rebuilt against the current project
+ * (array indices in the paths follow the project) and its open problems in
+ * `incomplete`; the kernel refuses a variant with an incomplete measure.
+ */
+export function regenerateTemplatePatches(project: IProject, definition: NtaMaatwerkadvies): NtaMaatwerkadvies {
+  return {
+    ...definition,
+    measures: definition.measures.map((measure): MwaMeasure => {
+      const { incomplete: _old, ...rest } = measure;
+      void _old;
+      if (!measure.template) return rest;
+      const { patch, problems } = buildTemplatePatch(project, measure.template, measure.id);
+      return problems.length > 0 ? { ...rest, patch, incomplete: problems } : { ...rest, patch };
+    }),
+  };
 }
 
 /** RFC 6902 subset as the kernel's `apply_patch` (maatwerkadvies.rs), for previews and tests. */

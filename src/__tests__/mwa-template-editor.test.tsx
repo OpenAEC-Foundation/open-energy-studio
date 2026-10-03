@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import type { IProject } from '../core/energy/types';
-import { MaatwerkadviesPanel, regenerateTemplatePatches } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { MaatwerkadviesPanel } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { regenerateTemplatePatches } from '../core/nta/MwaTemplates';
 import { renderWithProviders, userEvent } from './test-utils';
 
 const dwelling = JSON.parse(readFileSync(resolve(process.cwd(), 'training-data/nta8800-example-terraced-dwelling.json'), 'utf8')) as IProject;

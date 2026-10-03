@@ -2,11 +2,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { IProject } from '../core/energy/types';
-import type { MwaMeasure } from '../core/nta/KernelClient';
+import { buildMaatwerkadviesInput, type MwaMeasure, type NtaMaatwerkadvies } from '../core/nta/KernelClient';
 import {
-  applyPatchOperation, buildTemplatePatch, diffOperations, heatPumpGeneratorTemplate, initialTemplate, insulationOptions,
-  insulationValues, TEMPLATE_CATEGORY, TEMPLATE_LIFETIME, windowOptions, type MwaMeasureTemplate,
+  applyLightingChanges, applyPatchOperation, buildTemplatePatch, diffOperations, heatPumpGeneratorTemplate, initialTemplate, insulationOptions,
+  insulationValues, lightingChanges, pvSystemTemplate, regenerateTemplatePatches, TEMPLATE_CATEGORY, TEMPLATE_LIFETIME, windowOptions,
+  type LegacyTemplate, type MwaMeasureTemplate,
 } from '../core/nta/MwaTemplates';
+import { templateMeasure } from '../components/MaatwerkadviesPanel/MwaTemplateEditor';
 import { solarWaterHeaterTemplate } from '../core/nta/NtaSystemTemplates';
 
 // The measures below are generated from the templates against the two
@@ -33,7 +35,7 @@ function measure(project: IProject, id: string, name: string, template: MwaMeasu
 function dwellingMeasures(project: IProject): MwaMeasure[] {
   const keys = (part: 'roof' | 'facade' | 'floor') => insulationOptions(project, part).map((option) => option.key);
   const ventilation = initialTemplate('ventilation', project) as Extract<MwaMeasureTemplate, { kind: 'ventilation' }>;
-  const unit = (ventilation.ventilation.system as Block).unit as Block;
+  const unit = (ventilation.system as Block).unit as Block;
   unit.equipmentReference = 'test: WTW-unit productblad';
   unit.ducts = 'luka_a_b_c';
   unit.heatRecovery = { ...(unit.heatRecovery as Block),
@@ -59,7 +61,8 @@ function dwellingMeasures(project: IProject): MwaMeasure[] {
     measure(project, 'dhw', 'Tapwaterwarmtepomp', { kind: 'hot_water', generator: { kind: 'heat_pump', exhaustAirSource: false, measuredClass: 'class4' } }),
     measure(project, 'pv', 'PV 8 × 400 Wp', { kind: 'pv', systems: [{
       id: 'pv-1', peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 8 }, azimuthDeg: 180, tiltDeg: 35,
-      mounting: 'moderately_ventilated', obstruction: { method: 'minimal' }, sourceReference: 'test: offerte' }] }),
+      mounting: 'moderately_ventilated', obstruction: { method: 'minimal' }, sourceReference: 'test: offerte',
+      obstructionSourceReference: 'test: foto vrij dakvlak' }] }),
     measure(project, 'solar', 'Zonneboiler', { kind: 'solar_water_heater', systems: [solar] }),
     measure(project, 'shower', 'Douche-WTW', { kind: 'shower_heat_recovery', recovery: {
       showers: [{ unit: 'vertical' }], connection: 'mixer_and_heater', sourceReference: 'test: plattegrond' } }),
@@ -67,11 +70,13 @@ function dwellingMeasures(project: IProject): MwaMeasure[] {
 }
 
 function officeMeasures(project: IProject): MwaMeasure[] {
-  const lighting = initialTemplate('lighting', project) as Extract<MwaMeasureTemplate, { kind: 'lighting' }>;
-  const zone = ((lighting.lighting[0] as Block).lightingZones as Block[])[0];
+  const current = (project.ntaCalculation as unknown as { lighting: Block[] }).lighting;
+  const edited = structuredClone(current);
+  const zone = ((edited[0] as Block).lightingZones as Block[])[0];
   zone.occupancy = { ...(zone.occupancy as Block), control: 'auto_on_auto_off' };
   zone.daylight = { method: 'forfait', daylightControl: true };
   zone.power = { method: 'installed', sourceReference: 'test: lichtplan LED', luminaires: [{ count: 100, power: { method: 'system', powerW: 18 } }] };
+  const lighting: MwaMeasureTemplate = { kind: 'lighting', zones: lightingChanges(current, edited) };
   const generator = heatPumpGeneratorTemplate(project);
   generator.forfait = { ...(generator.forfait as Block), designSupplyTemperatureC: 45, classificationSourceReference: 'test: offerte',
     thermalCapacityKw: 40, capacitySourceReference: 'test: offerte' };
@@ -83,7 +88,8 @@ function officeMeasures(project: IProject): MwaMeasure[] {
       renewable: { sourceBelow20C: true, exhaustAirSource: false, sourceReference: 'test: buitenlucht' } }),
     measure(project, 'pv', 'PV 40 × 400 Wp', { kind: 'pv', systems: [{
       id: 'pv-1', peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 40 }, azimuthDeg: 180, tiltDeg: 15,
-      mounting: 'moderately_ventilated', obstruction: { method: 'minimal' }, sourceReference: 'test: offerte' }] }),
+      mounting: 'moderately_ventilated', obstruction: { method: 'minimal' }, sourceReference: 'test: offerte',
+      obstructionSourceReference: 'test: foto vrij dakvlak' }] }),
   ];
 }
 
@@ -137,6 +143,100 @@ describe('maatwerkadvies measure templates', () => {
     expect(buildTemplatePatch(dwelling, initialTemplate('lighting', dwelling), 'm1').problems).toEqual(['lightingRequired']);
     expect(buildTemplatePatch(dwelling, { kind: 'airtightness', qv10DmPerSM2: 0.3, sourceReference: '' }, 'm1').problems)
       .toEqual(['sourceRequired']);
+  });
+
+  it('marks chosen parts that no longer exist and roofs steeper than 60°', () => {
+    const template: MwaMeasureTemplate = { kind: 'insulation', part: 'facade', surfaces: ['z1/wall-N', 'z1/gone'], rcValue: 4, uValue: null };
+    expect(buildTemplatePatch(dwelling, template, 'm1').problems).toEqual(['selectionStale']);
+    expect(buildTemplatePatch(dwelling, { kind: 'glazing', windows: ['z1/x/y'], uValue: 1, gValue: null }, 'm1').problems)
+      .toEqual(['selectionStale', 'selectionRequired']);
+    // Table C.2 note 3: a roof steeper than 60° takes R_si 0,13.
+    const roof = insulationOptions(dwelling, 'roof')[0];
+    const surfaceId = roof.key.split('/')[1];
+    const steep = structuredClone(dwelling);
+    (steep.ntaCalculation as unknown as Block).surfaceTilts = [{ surfaceId, tiltDeg: 70, sourceReference: 'test' }];
+    const { patch } = buildTemplatePatch(steep, { kind: 'insulation', part: 'roof', surfaces: [roof.key], rcValue: 6, uValue: null }, 'm1');
+    expect(patch[0]).toMatchObject({ op: 'add', value: { uValue: Number((1 / (0.13 + 6 + 0.04)).toFixed(4)) } });
+    expect(String((patch[0] as { value: Block }).value.id)).toMatch(/-steep$/);
+    // A wall against the ground is not offered: its construction is not used (8.38).
+    const ground = structuredClone(dwelling);
+    ground.zones[0].surfaces[0].thermalBoundary = 'ground' as never;
+    expect(insulationOptions(ground, 'facade').map((option) => option.key)).not.toContain(`z1/${dwelling.zones[0].surfaces[0].id}`);
+  });
+
+  it('blocks incomplete heat pumps and PV and derives the source flags', () => {
+    const generator = heatPumpGeneratorTemplate(dwelling);
+    const problems = buildTemplatePatch(dwelling, { kind: 'heat_pump', generator, renewable: { sourceBelow20C: true, exhaustAirSource: false, sourceReference: 'x' } }, 'm1').problems;
+    expect(problems).toContain('supplyTemperatureRequired');
+    const warm = { ...generator, forfait: { ...(generator.forfait as Block), source: 'collective20_to40_c', designSupplyTemperatureC: 45 } };
+    const { patch } = buildTemplatePatch(dwelling, { kind: 'heat_pump', generator: warm,
+      renewable: { sourceBelow20C: true, exhaustAirSource: false, sourceReference: 'x' } }, 'm1');
+    expect(patch.find((operation) => operation.path === '/ntaCalculation/heatPumpRenewable'))
+      .toMatchObject({ value: { sourceBelow20C: false, exhaustAirSource: false } });
+    // PV starts on the conservative situation e); a blank peak power and situation a) without evidence block.
+    const pv = pvSystemTemplate(0);
+    expect(pv.obstruction).toEqual({ method: 'full' });
+    expect(buildTemplatePatch(dwelling, { kind: 'pv', systems: [pv] }, 'm1').problems).toEqual(['peakPowerRequired']);
+    const minimal = { ...pv, peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 4 }, obstruction: { method: 'minimal' } };
+    expect(buildTemplatePatch(dwelling, { kind: 'pv', systems: [minimal] }, 'm1').problems).toEqual(['obstructionEvidenceRequired']);
+    const evidenced = buildTemplatePatch(dwelling, { kind: 'pv', systems: [{ ...minimal, obstructionSourceReference: 'foto' }] }, 'm1');
+    expect(evidenced.problems).toEqual([]);
+    expect(JSON.stringify(evidenced.patch)).not.toContain('obstructionSourceReference');
+  });
+
+  it('applies ventilation and lighting changes on top of later project changes', () => {
+    const vent = generated.terracedDwelling.find((item) => item.id === 'vent')!;
+    const changed = structuredClone(dwelling);
+    const ventilation = (changed.ntaCalculation as unknown as { ventilation: Block }).ventilation;
+    ventilation.changedLater = true;
+    const { patch } = buildTemplatePatch(changed, vent.template!, 'vent');
+    expect(patch.map((operation) => operation.path)).toEqual(['/ntaCalculation/ventilation/system']);
+    // Lighting: a later area change of the base stays; only the measure members are patched.
+    const light = generated.office.find((item) => item.id === 'light')!;
+    const later = structuredClone(office);
+    const lightingZone = ((later.ntaCalculation as unknown as { lighting: Block[] }).lighting[0].lightingZones as Block[])[0];
+    lightingZone.areaM2 = 123;
+    const result = buildTemplatePatch(later, light.template!, 'light');
+    expect(result.problems).toEqual([]);
+    expect(result.patch.every((operation) => /\/(power|occupancy|daylight)$/.test(operation.path))).toBe(true);
+    const applied = applyLightingChanges((later.ntaCalculation as unknown as { lighting: Block[] }).lighting,
+      (light.template as Extract<MwaMeasureTemplate, { kind: 'lighting' }>).zones);
+    expect((applied[0].lightingZones as Block[])[0].areaM2).toBe(123);
+  });
+
+  it('migrates saved snapshot templates', () => {
+    const legacyVentilation = { kind: 'ventilation', ventilation: { system: { kind: 'single', unit: { variant: 'd2' } }, other: 1 } } as LegacyTemplate;
+    const vent = buildTemplatePatch(dwelling, legacyVentilation, 'm1');
+    expect(vent.problems).toEqual([]);
+    expect(vent.patch).toEqual([{ op: 'replace', path: '/ntaCalculation/ventilation/system', value: { kind: 'single', unit: { variant: 'd2' } } }]);
+    const current = (office.ntaCalculation as unknown as { lighting: Block[] }).lighting;
+    const snapshot = structuredClone(current);
+    ((snapshot[0].lightingZones as Block[])[0]).occupancy = { control: 'auto_on_auto_off', centralOnControl: false };
+    const light = buildTemplatePatch(office, { kind: 'lighting', lighting: snapshot } as LegacyTemplate, 'm1');
+    expect(light.problems).toEqual(['migrationReview']);
+    expect(light.patch.map((operation) => operation.path)).toEqual(['/ntaCalculation/lighting/0/lightingZones/0/occupancy']);
+  });
+
+  it('marks incomplete measures for the kernel and regenerates in the kernel input', () => {
+    const definition = {
+      measures: [{ id: 'm1', name: 'PV', category: 'pv', target: 'project', patch: [], investmentEur: 0, costSource: 'x',
+        lifetimeYears: 25, template: { kind: 'pv', systems: [pvSystemTemplate(0)] } }],
+      packages: [], tariffs: { gasEurPerM3: 1, electricityEurPerKwh: 0.3, sourceReference: 'x' },
+    } as unknown as NtaMaatwerkadvies;
+    expect(regenerateTemplatePatches(dwelling, definition).measures[0].incomplete).toEqual(['peakPowerRequired']);
+    const input = buildMaatwerkadviesInput(dwelling, definition) as { measures: MwaMeasure[] };
+    expect(input.measures[0].incomplete).toEqual(['peakPowerRequired']);
+    expect(input.measures[0].patch[0]).toMatchObject({ op: 'add', path: '/ntaCalculation/pvSystems/-' });
+  });
+
+  it('keeps a lifetime and category the adviser entered when the kind changes', () => {
+    const base: MwaMeasure = { id: 'm1', name: '', category: 'insulation', target: 'project', patch: [], investmentEur: 0, costSource: '', lifetimeYears: 30 };
+    const insulation = templateMeasure(dwelling, base, 'insulation');
+    expect(insulation.lifetimeYears).toBe(TEMPLATE_LIFETIME.insulation);
+    const glazing = templateMeasure(dwelling, insulation, 'glazing');
+    expect(glazing).toMatchObject({ category: 'glazing', lifetimeYears: TEMPLATE_LIFETIME.glazing });
+    const custom = templateMeasure(dwelling, { ...glazing, lifetimeYears: 27, category: 'other' }, 'pv');
+    expect(custom).toMatchObject({ category: 'other', lifetimeYears: 27 });
   });
 
   it('adds systems under the measure id and diffs only changed members', () => {
