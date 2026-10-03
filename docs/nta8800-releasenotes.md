@@ -38,7 +38,7 @@ Alleen de invoer verandert; opgeslagen projecten rekenen hetzelfde.
 - Een raam in bijlage AA mag met het projectraam-id worden opgegeven (`win-S`), naast de afgeleide naam `window:win-S`.
 - Nieuw uitvoerveld `weightedConductanceWPerK` per ventilatiemaand: H_ve volgens 7.19/7.20 met b_v. `conductanceWPerK` blijft ρ·c·Σq zonder b_v.
 
-## 5 oktober 2026 — R_se en R_si bij grenzen met een onverwarmde ruimte (8.4.2.1)
+## 3 oktober 2026 — R_se en R_si bij grenzen met een onverwarmde ruimte (8.4.2.1)
 
 Volgens 8.4.2.1 (p. 266) wordt bij een grens met een onverwarmde ruimte R_se vervangen door de R_si van tabel C.2 (p. 778). Een projectconstructie draagt R_se = 0,04 (C.10, p. 777). Deze release regelt de gevallen waarin dat niet zo is.
 
@@ -57,7 +57,7 @@ Volgens 8.4.2.1 (p. 266) wordt bij een grens met een onverwarmde ruimte R_se ver
 
 - **Het label van het vinkje is aangepast.** "Grenst aan buitenlucht" heet nu "Buitenvlak in contact met lucht". Het hoort ook aan te staan bij een grens met een onverwarmde ruimte.
 - **`towardsUnheatedSpace` in het forfaitaire envelopmodel geldt alleen voor de basisopname.** Een U-waarde uit die route hoort niet in een projectconstructie thuis.
-## 5 oktober 2026 — reviewcorrecties rekenzones in de utiliteitsopname
+## 3 oktober 2026 — reviewcorrecties rekenzones in de utiliteitsopname
 
 ### Opnames die nu `incomplete` worden
 
@@ -72,7 +72,7 @@ Volgens 8.4.2.1 (p. 266) wordt bij een grens met een onverwarmde ruimte R_se ver
 
 Opnames zonder `zones` geven dezelfde invoer als voorheen.
 
-## 5 oktober 2026 — hoofdstuk 8 na de herberekening
+## 3 oktober 2026 — hoofdstuk 8 na de herberekening
 
 ### Projecten die nu `incomplete` worden
 
@@ -92,7 +92,7 @@ Opnames zonder `zones` geven dezelfde invoer als voorheen.
 - `ground_floor_perimeter_implausible`: P groter dan 2·A/1 m + 2 m.
 - `detailed_thermal_bridges_none_entered`: gedetailleerde methode zonder ψ-waarden naar buitenlucht.
 - `sunroom_values_differ_from_unheated_space`: b_U of H_zi;ztu van een serre wijkt meer dan 10 % af van de onverwarmde ruimte met dezelfde id.
-## 5 oktober 2026 — meerdere rekenzones in de utiliteitsopname (ISSO 75.1 §6.5)
+## 3 oktober 2026 — meerdere rekenzones in de utiliteitsopname (ISSO 75.1 §6.5)
 
 ### Nieuwe invoer
 
@@ -111,7 +111,7 @@ Alleen opnames met `zones`:
 
 Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utiliteitsfixtures: invoer, standaardwaarden en uitkomst identiek).
 
-## 5 oktober 2026 — micro-WKK, PV en zonneboilers na de herberekening
+## 3 oktober 2026 — micro-WKK, PV en zonneboilers na de herberekening
 
 ### Projecten die nu `invalid` worden
 
@@ -128,7 +128,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 - `micro_chp_capacity_exceeded`: de micro-WKK levert in een maand meer warmte dan zijn vollastvermogen (verwarming of tapwater).
 - `solar_tested_backup_distribution_below_one`: geteste zonneboiler met geïntegreerde naverwarming en Σ f_dis < 1; 13.134 verhoogt dan de zonne-opbrengst.
 - `pvt_without_thermal_part`, `pvt_without_electric_part` en `pvt_cover_inconsistent`: het elektrische en het thermische deel van een PVT-systeem passen niet bij elkaar.
-## 5 oktober 2026 — reviewcorrecties utiliteitsopname (ISSO 75.1) en waterzijdig inregelen van koeling
+## 3 oktober 2026 — reviewcorrecties utiliteitsopname (ISSO 75.1) en waterzijdig inregelen van koeling
 
 ### Opnames met een andere uitkomst
 
@@ -159,7 +159,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 
 - `calculation_zone_split_required` toont in het paneel nu de vervolgstap. Het ontwerp voor meerdere rekenzones in de opname staat in `docs/nta8800-basisopname.md`.
 
-## 5 oktober 2026 — reviewcorrecties woningopname (ISSO 82.1)
+## 3 oktober 2026 — reviewcorrecties woningopname (ISSO 82.1)
 
 ### Opnames die nu `incomplete` worden
 
@@ -180,7 +180,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 ### Formulier
 
 - **Verborgen antwoorden worden gewist.** Kies je een andere bron of een ander toestel, dan wist het formulier de antwoorden die daarbij niet meer zichtbaar zijn: collectieve bron, grondwatersysteem, brontemperatuur, kwaliteitsverklaring en de brandstof van een stoomketel. Zo leveren ze geen `collective_source_water_based_only` of `local_heater_fuel_contradiction` meer op.
-## 5 oktober 2026 — basisopname utiliteitsgebouwen volgens ISSO 75.1 (7e druk)
+## 3 oktober 2026 — basisopname utiliteitsgebouwen volgens ISSO 75.1 (7e druk)
 
 ### Opnames die nu `incomplete` worden
 
@@ -203,7 +203,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 - Koeling: gasmotor-koelmachine, meer opwekkers met prioriteit, directe expansie in ruimte of LBK, koudemeters, appendages, leidinglengten.
 - Ventilatie: LUKA D en geen kanaal, "koude laden met LBK", decentrale WTW, isolatie en lengte van de buitenaansluiting, constant volumeregeling, gedeeltelijke bypass in procenten, geïnstalleerde capaciteit, systeem E en roosters met verwarmingslint.
 
-## 5 oktober 2026 — basisopname woningen volgens ISSO 82.1 (7e druk met erratum)
+## 3 oktober 2026 — basisopname woningen volgens ISSO 82.1 (7e druk met erratum)
 
 ### Opnames die nu `incomplete` worden
 
@@ -224,7 +224,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 - Woningpositie "dak + vloer".
 - Zonwerend glas of folie met een g-waarde uit het product.
 - Centrale of decentrale WTW.
-## 4 oktober 2026 — verwarmingsopties in de basisopname (ISSO 82.1 hoofdstuk 9)
+## 3 oktober 2026 — verwarmingsopties in de basisopname (ISSO 82.1 hoofdstuk 9)
 
 ### Nieuwe, aanvullende invoer
 
@@ -239,7 +239,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 - **Collectieve warmtepomp in de woningopname.** Deze rekent nu met tabel 9.29 en krijgt hulpenergie volgens 9.91. Eerder volgde `table_scope_capacity_mismatch` en ontbrak de hulpenergie.
 - **Warmtepomp boven 25 kW in de woningopname.** Deze rekent nu met tabel 9.29.
 
-## 4 oktober 2026 — koelmethode 1 en bijlage Q
+## 3 oktober 2026 — koelmethode 1 en bijlage Q
 
 ### Projecten die nu `invalid` worden
 
@@ -256,7 +256,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 
 - **Deellast boven 100 % (10.56/10.58).** Komt f_C;PL in een temperatuurklasse boven 100 %, dan extrapoleert de kubische functie van 10.63 buiten het meetbereik. De kern houdt de letterlijke uitkomst aan en meldt `cooling_part_load_above_full_load`. Een te klein toestel kan zo gunstiger uitkomen.
 
-## 4 oktober 2026 — dynamische ramen in de projectroute (bijlage A)
+## 3 oktober 2026 — dynamische ramen in de projectroute (bijlage A)
 
 - **Nieuw, aanvullend veld** `ntaCalculation.dynamicWindows`: bijlage A (p. 766–770) per buitenraam, methode A of B, met de correctiefactoren van stap 2. Opgeslagen projecten zonder dit veld houden dezelfde uitkomst.
 - In het NTA-formulier is dit invoerbaar onder "Dynamische ramen (bijlage A)". Eerder kon het alleen via de kerninvoer.
@@ -264,7 +264,7 @@ Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utili
 - **Lege waarden** in bijlage A (g, U, wegingen, correctiefactoren) geven `dynamic_value_missing` op hun eigen pad. Eerder blokkeerde één leeg veld het hele NTA-blok.
 - τ_vis en τ_sol staan niet meer in het formulier: hoofdstuk 14 gebruikt ze niet (14.38, 14.41). Opgeslagen waarden blijven bewaard.
 
-## 4 oktober 2026 — validatieregels en herberekeningsbevindingen
+## 3 oktober 2026 — validatieregels en herberekeningsbevindingen
 
 ### Projecten die nu `incomplete` worden
 

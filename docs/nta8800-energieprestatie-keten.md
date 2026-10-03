@@ -726,7 +726,7 @@ Tapwatergenerator `chp` gebruikt één van twee methoden.
 - In de verwarmde ruimte is het verlies bij een individuele installatie terugwinbaar (9.7).
 
 
-## Correcties na de review van WKK, ZEB en 9.7 (4 oktober 2026)
+## Correcties na de review van WKK, ZEB en 9.7 (3 oktober 2026)
 
 - **Combi-micro-WKK (§13.8.4.8, p. 650).** Bij een WKK die zowel verwarmt als tapwater maakt (`alsoSpaceHeating`), rekent de kern één 9.6.6.2-maand op Q_H + Q_W met t_H;op + t_W;op, begrensd op t_mi. E_in, de stroom en de hulpenergie worden daarna naar rato van de output verdeeld. Het tapwateraandeel gaat door 13.182, met afronding naar beneden op 0,025. Het verwarmingsaandeel (`combiChpHeating`) vervangt de eigen WKK-boeking van de keten. Daarmee tellen het standbyverlies en de standby-hulpenergie maar één keer.
   - Interpretatie: de warmtebehoefte en het terugwinbare verlies volgens 9.7 houden de waarden van de keten.
@@ -826,7 +826,7 @@ De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijv
 - In de projectroute moet het gebruik in het BACS-blok kloppen met de rekenscope (`bacs_building_use_mismatch`).
 - Interpretatie bij 5.19a: dw en dc worden niet nog eens als m³ aeq meegeteld. Letterlijk sluit 5.19a alleen el en dh uit, maar 5.18a telt dw en dc al.
 
-## Ketenpunten uit de dekkingsaudit (4 oktober 2026)
+## Ketenpunten uit de dekkingsaudit (3 oktober 2026)
 
 **f_prac bij externe levering (9.84, 13.152, 10.78).** Externe warmte, externe warmte voor tapwater en externe koude krijgen f_prac (koude: f_prpr) = 0,95 als de factor uit bijlage P op berekende waarden rust. De factor is 1,0 bij de forfaitaire factor en bij een bijlage P-route op uitsluitend gemeten waarden. Een kwaliteitsverklaring (`declared`) telt als berekend, tenzij `measuredOnly` is opgegeven. Het EMG-forfaitscenario van §5.3.1 houdt 1,0.
 
@@ -889,7 +889,7 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 
 **Correctie pompvermogen (9.49).** In de verwarmingsdistributie hoort 10⁻³ alleen bij de exponentiële term: P_ref = 1,7·P_hydr + 17·(1 − e^(−300·P_hydr))·10⁻³ (gerenderde p. 320). De code rekende eerst (1,7·P + 17·(…))·10⁻³. Daardoor viel de pompenergie zonder opgegeven elektrisch vermogen 2× tot 90× te laag uit (bij 0,01 kW respectievelijk 1 kW). De versies voor tapwater (13.41) en koeling waren al goed.
 
-## Kleinere punten uit de dekkingsaudit (5 oktober 2026)
+## Kleinere punten uit de dekkingsaudit (3 oktober 2026)
 
 **Meerdere opwekkers zonder vermogens (9.6.1 opmerking 1).** `estimatedBeta` geeft een geschatte cumulatieve β voor voorkeur 1 … n−1: oplopend en tussen 0 en 1. `nominalPowerKw` mag dan ontbreken. Opwekkers met dezelfde voorkeur delen gelijk. De invoer sluit `addedPreferredGenerator` uit.
 
@@ -918,7 +918,7 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 - onder 75°: een daklicht met h_p = h_w·cos γ en h_R,a = hoogte van het midden van het raam.
 - boven 105°: het raam telt niet mee voor daglicht.
 
-## Correcties na de review van ketenpunten en koeling (4 oktober 2026)
+## Correcties na de review van ketenpunten en koeling (3 oktober 2026)
 
 - **Identieke installaties en de pomp (§9.1).** Bij `identicalSystems` = n wordt de distributiepomp per fysiek systeem gedimensioneerd:
   - L_max (9.37) op A/n;

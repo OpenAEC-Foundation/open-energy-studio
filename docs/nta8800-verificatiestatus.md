@@ -1,6 +1,6 @@
 # NTA 8800 verificatiestatus — 2 oktober 2026
 
-## Samenvatting stand 4 oktober 2026 (avond)
+## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
 - EP_Tot, EP_ren en RER;
@@ -90,7 +90,7 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 
 Ze staan per module in `INTERPRETATIONS` en in de docs.
 
-**Onafhankelijke herberekeningen (4 oktober 2026).** Bij gebrek aan officiële referentiegevallen zijn beide voorbeeldprojecten opnieuw doorgerekend. De agent schreef daarvoor een eigen Python-implementatie, rechtstreeks vanuit de normtekst en de gerenderde pagina's, zonder de Rust-formules te lezen.
+**Onafhankelijke herberekeningen (3 oktober 2026).** Bij gebrek aan officiële referentiegevallen zijn beide voorbeeldprojecten opnieuw doorgerekend. De agent schreef daarvoor een eigen Python-implementatie, rechtstreeks vanuit de normtekst en de gerenderde pagina's, zonder de Rust-formules te lezen.
 
 | Voorbeeld | Vergeleken | Grootste verschil met de kern | BENG 2 | RER | Label |
 |---|---|---|---|---|---|
@@ -116,7 +116,7 @@ De herberekeningen brachten wel invoer- en validatiepunten aan het licht:
 
 Deze punten zijn afgewerkt in `3eec124`. De herberekende waarden in de tabel gelden voor de voorbeeldinvoer van vóór die correctie. De actuele uitkomsten staan in `docs/nta8800-voorbeeldproject-smoketest-2026-10-03.md`.
 
-**Herberekening van ventilatie (H11) en verlichting (H14), 4 oktober 2026.** Ook dit is gedaan met een eigen Python-implementatie vanuit de normpagina's. Getest zijn drie utiliteitsscenario's voor ventilatie (onder meer D5a met CO2-regeling, twee luchtstroomzones, een luchtbehandelingskast met verwarmer en koeler, en gedeclareerde en forfaitaire ventilatoren) en vier voor verlichting (installatie en forfait, daglichtsectoren met verticale ramen en daklichten, de forfaitaire daglichtmethode). Alle vergeleken maandtermen kwamen overeen tot op de rekenprecisie (≤ 1e-14). Wat er is vastgelegd of aangepast:
+**Herberekening van ventilatie (H11) en verlichting (H14), 3 oktober 2026.** Ook dit is gedaan met een eigen Python-implementatie vanuit de normpagina's. Getest zijn drie utiliteitsscenario's voor ventilatie (onder meer D5a met CO2-regeling, twee luchtstroomzones, een luchtbehandelingskast met verwarmer en koeler, en gedeclareerde en forfaitaire ventilatoren) en vier voor verlichting (installatie en forfait, daglichtsectoren met verticale ramen en daklichten, de forfaitaire daglichtmethode). Alle vergeleken maandtermen kwamen overeen tot op de rekenprecisie (≤ 1e-14). Wat er is vastgelegd of aangepast:
 - **11.100/11.101 bij een kast met verwarmer en koeler (interpretatie).**
   - De kern past tabel 11.15 alleen toe als de batterij die in die balans actief is nodig is. De koudebalans rekent zonder naverwarming (θ_rh = 0) en de warmtebalans zonder koeling (Q_C;ahu = 0), zoals de slotalinea op p. 494 zegt.
   - Een letterlijke lezing van p. 493 ("koeling en naverwarming → tabel 11.15") zou altijd de tabelwaarde geven. De energie van de batterijen verandert daardoor niet; de warmtestroom per setpoint wel.
@@ -131,13 +131,13 @@ Deze punten zijn afgewerkt in `3eec124`. De herberekende waarden in de tabel gel
   - `largeOfficeGroup` hoort alleen bij een zone met kantoorfunctie (§14.5.1, p. 664). Buiten een kantoorfunctie geeft het F_o;D = 1 (14.16), de minst gunstige waarde. Daarom is `lighting_large_office_group_without_office` een waarschuwing en blokkeert het de berekening niet.
   - `assess_zone_lighting` controleert de invoer zelf en weigert ongeldige invoer, zoals een gemengd forfait.
 
-**Review van bijlage A in de projectroute, 4 oktober 2026.**
+**Review van bijlage A in de projectroute, 3 oktober 2026.**
 - **Dynamisch raam en beweegbare zonwering (§A.2, p. 767; 7.42).** Bijlage A rekent een raam met beweegbare luiken of zonwering zelf tot de dynamische elementen (A.2, figuur A.1). Een dynamisch raam met daarnaast de projectbrede beweegbare zonwering van 7.42 zou de zonweringstand dus twee keer tellen. De norm schrijft niet voor welke van de twee voorrang heeft. Daarom geeft de combinatie een gap (`window_dynamic_and_shading_exclusive`), in de projectroute op `dynamicWindows[i]` en in de kern op `windows[i].movableShading`. De zonwering hoort dan in de toestanden van bijlage A.
 - **τ_vis en τ_sol van bijlage A (interpretatie).** Volgens p. 767 is τ_vis invoer voor hoofdstuk 14. Hoofdstuk 14 heeft daar echter geen ingang voor. 14.38 (verticale ramen) bevat geen doorlatingsfactor, en 14.41 zet τ_D65 vast op 0,6 voor daklichten (p. 673). De kern bewaart τ_vis en τ_sol daarom alleen als vastlegging. Het formulier vraagt ze niet meer, omdat ze de uitkomst niet veranderen.
 - **Half ingevulde invoer.** Een lege waarde in bijlage A (g, U, een weging of een correctiefactor) geeft `dynamic_value_missing` op het eigen pad. Eerder maakte één leeg veld het hele NTA-blok onleesbaar (`nta_calculation_block_invalid`).
 - **Ramen zonder grens.** Het formulier biedt alleen ramen aan in vlakken met een expliciete buitengrens. Een vlak zonder grens slaat de projectroute over (met een gap).
 
-**Herberekening van de berekende routes voor tapwater (H13) en koeling (H10, methode 2), 4 oktober 2026.** Ook deze controle is gedaan met een eigen Python-implementatie vanuit de normpagina's. Vergeleken scenario's:
+**Herberekening van de berekende routes voor tapwater (H13) en koeling (H10, methode 2), 3 oktober 2026.** Ook deze controle is gedaan met een eigen Python-implementatie vanuit de normpagina's. Vergeleken scenario's:
 - tapwater: vijf scenario's (circulatie, voorraadvaten, warmtepompen volgens 13.160b, alle standaardwaarden);
 - koeling: twee scenario's.
 
@@ -157,7 +157,7 @@ Hoofdstuk 13 kwam op elke maandterm overeen. In hoofdstuk 10 bleek één echte f
 - **Circulatie met standaardwaarden.** Ontbreekt de lengte (13.31) of de diameter/Ψ (13.29/tabel 13.4), en is het jaarlijkse η_W;dis lager dan 0,2? Dan meldt de kern de niet-blokkerende waarschuwing `hot_water_circulation_defaults_low_efficiency`. De berekening zelf blijft normconform.
 - Niet nagerekend: koelmethode 1 (NEN-EN 14825, 10.53–10.64); zie de volgende alinea.
 
-**Herberekening van bijlage Q (verwarming) en koelmethode 1 (H10), 4 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's (p. 340, 1028–1065 en 402–409). Getest zijn negen warmtepompscenario's: lucht/water modulerend en aan/uit, brine/water forfaitair en modulerend, lucht/lucht en bivalente gevallen. Voor koeling zijn een kamerairco zonder en een koelmachine met vijfde meetpunt getest. Alle bin- en maandtermen kwamen overeen (≈ 1e-12). Vastgelegd of aangepast:
+**Herberekening van bijlage Q (verwarming) en koelmethode 1 (H10), 3 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's (p. 340, 1028–1065 en 402–409). Getest zijn negen warmtepompscenario's: lucht/water modulerend en aan/uit, brine/water forfaitair en modulerend, lucht/lucht en bivalente gevallen. Voor koeling zijn een kamerairco zonder en een koelmachine met vijfde meetpunt getest. Alle bin- en maandtermen kwamen overeen (≈ 1e-12). Vastgelegd of aangepast:
 - **Bronpomp dubbel geteld (normpunt).** Q.4 (p. 1029) rekent W_H;aux;hp;an mee in η_H;gen;hp, en 9.6.3.2 (p. 340) boekt hem nogmaals als hulpenergie. De kern volgt beide letterlijk. Effect: ongeveer 5 % van het warmtepompverbruik bij brine/water aan/uit, 0,3 % bij een modulerende bronpomp.
 - **Q.4.4 (p. 1065).** Het forfaitaire bronpompvermogen van water/water rekent met het verdampervermogen bij conditie 1, P·(1 − 1/COP). De norm noemt de conditie niet.
 - **Q.1 bij volledige dekking.** Dekt de warmtepomp elke bin, dan geldt F_H;gen = 1, met of zonder bijverwarming. De afronding van tabel Q.6 zou anders een restaandeel van 0,007 % aan de bijverwarming geven.
@@ -169,7 +169,7 @@ Hoofdstuk 13 kwam op elke maandterm overeen. In hoofdstuk 10 bleek één echte f
 - tabel D.1 (p. 792): de grens R_n ≥ 2,0 alleen bij horizontale randisolatie;
 - C.12: R_cav;sv = 2·R_zv − R_nv; tabel C.4 omlaag zonder interpolatie (lagere rij).
 
-**Herberekening van PV (H16), zonneboilers en micro-WKK, 5 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's. De tabellen 17.2, 17.12 en 17.15 zijn zelf uit de pdf gelezen. Getest zijn:
+**Herberekening van PV (H16), zonneboilers en micro-WKK, 3 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's. De tabellen 17.2, 17.12 en 17.15 zijn zelf uit de pdf gelezen. Getest zijn:
 - PV: 16.2–16.4b, PVT (16.10) en de collectieve verdeling;
 - zonneboilers: de berekende route (13.72–13.127) en de geteste route (13.128–13.140), voor voorverwarmer en geïntegreerde naverwarming;
 - micro-WKK: 9.66–9.83 en 16.15.
@@ -189,7 +189,7 @@ Alle maandtermen kwamen overeen. Vastgelegd of aangepast:
   - P_el en η_el van één meetpunt moeten op 2 % na overeenkomen (`micro_chp_electric_values_inconsistent`);
   - een PVT-paneel en een PVT-zonneboiler moeten elkaar in het gebouw hebben, met een passende afdekking (`pvt_without_thermal_part`, `pvt_without_electric_part`, `pvt_cover_inconsistent`; niet-blokkerend, omdat de invoer geen koppeling heeft).
 
-**Herberekening van hoofdstuk 8 (transmissie, grond, onverwarmde ruimten), 5 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's, vergeleken via `assess_project_performance`. Getest zijn:
+**Herberekening van hoofdstuk 8 (transmissie, grond, onverwarmde ruimten), 3 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's, vergeleken via `assess_project_performance`. Getest zijn:
 - grond: vloer op staal, kruipruimte (geventileerd en niet), onverwarmde en verwarmde kelder, randisolatie verticaal en horizontaal, gedetailleerde ψ (8.30–8.49, D.1–D.16);
 - onverwarmde ruimten: b_U (8.53, 8.57–8.59), forfait H_ue (I.8), serre plus trappenhuis;
 - thermische bruggen en constructies: ΔU_for (8.3), spouwmuren (C.3, tabel C.3), zolder (C.5), geventileerd trappenhuis (C.15), afschotdaken (C.17–C.20), samengestelde bovengrens (C.5);
@@ -268,7 +268,7 @@ Vier leesreviews hebben de kern opnieuw tegen de normtekst gelegd, zonder de cod
 
   Daarnaast ontbreken nog boekregels, zoals leidingdoorvoeren H_p, leidingen in onverwarmde ruimten en het naïsolatiejaar.
 
-De vraag welke R_se onder een vloer boven een kruipruimte of kelder geldt, was beslist op 0,17 (R_si omlaag). Op 5 oktober 2026 is dat herzien naar de normtekst: 8.43 verwijst via 8.2.2.2.1 naar tabel C.2, en die geeft R_se = 0,04 zonder afwijking voor dit geval. Zie de herberekening van hoofdstuk 8 hierboven.
+De vraag welke R_se onder een vloer boven een kruipruimte of kelder geldt, was beslist op 0,17 (R_si omlaag). Op 3 oktober 2026 is dat herzien naar de normtekst: 8.43 verwijst via 8.2.2.2.1 naar tabel C.2, en die geeft R_se = 0,04 zonder afwijking voor dit geval. Zie de herberekening van hoofdstuk 8 hierboven.
 
 Het interpretatiedocument NTA 8800:2024/INT-V1:2024 is nagelopen. De correcties staan al in de doeleditie 2025+C1:2026:
 - buffervat zonder terugwinbare verliezen bij 9.5;

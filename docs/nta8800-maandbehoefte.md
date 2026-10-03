@@ -201,7 +201,7 @@ Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De ke
 
 BENG 1 (`needIndicatorKwhPerM2Year`, ook in `indicators`) staat alleen ingevuld als de behoefte uit de vaste C1-ventilatierun van §5.4 komt. E_H+C;nd met de opgegeven ventilatie staat in het hoofdstuk 5-blok (`chapter5.heatingAndCoolingNeedKwhPerM2`). `tojuliMeetsBblLimit` geldt alleen voor woonfuncties (Bbl art. 4.149b) en is bij utiliteit leeg.
 
-## Overgangsweerstand onder een vloer boven een kruipruimte of kelder (5 oktober 2026 herzien)
+## Overgangsweerstand onder een vloer boven een kruipruimte of kelder (3 oktober 2026 herzien)
 
 U_f in 8.43 (p. 258) verwijst via 8.2.2.2.1 en C.1.2 (8.6, p. 229) naar tabel C.2 (p. 778). Die geeft R_se = 0,04, "tenzij bij desbetreffende formules anders is aangegeven". Bij 8.43 staat geen afwijking. De vervanging van R_se door R_si in 8.4.2.1 geldt alleen voor H_D;zi,j;ztu naar een onverwarmde ruimte, en een kruipruimte valt onder §8.3. De kern rekende eerder met R_si 0,17 (naar analogie met 7.2 van NEN-EN-ISO 13370). Ze volgt nu de normtekst: U_f = 1/(R_si + R_c + 0,04).
 
