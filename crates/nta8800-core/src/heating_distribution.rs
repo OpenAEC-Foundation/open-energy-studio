@@ -444,8 +444,9 @@ pub fn pump_energy_factor(
         Some(power) => power / hydraulic_kw,
         // 9.48 with 9.49
         None if hydraulic_kw < 2.5 => {
+            // 10⁻³ applies to the exponential term only (rendered p. 320).
             let reference =
-                (1.7 * hydraulic_kw + 17.0 * (1.0 - (-0.3 * hydraulic_kw * 1000.0).exp())) * 1e-3;
+                1.7 * hydraulic_kw + 17.0 * (1.0 - (-0.3 * hydraulic_kw * 1000.0).exp()) * 1e-3;
             reference / hydraulic_kw
         }
         // 9.50 with b = 2
@@ -628,7 +629,9 @@ mod tests {
         assert!((flow - 20.0 / 84_000.0 * 3600.0).abs() < 1e-12);
         assert_eq!(hydraulic_power_kw(30.0, 0.5), 0.01);
         let power = 0.05;
-        let reference = (1.7 * power + 17.0 * (1.0 - (-15.0_f64).exp())) * 1e-3;
+        let reference = 1.7 * power + 17.0 * (1.0 - (-15.0_f64).exp()) * 1e-3;
+        // f_e = P_ref/P_hydr ≈ 2,04 at 0,05 kW.
+        assert!((reference / power - 2.04).abs() < 0.01);
         assert!((pump_energy_factor(power, None, None) - reference / power * 0.92).abs() < 1e-12);
         assert!(
             (pump_energy_factor(3.0, None, None) - (1.25 + (0.2_f64 / 3.0).sqrt()) * 2.0).abs()

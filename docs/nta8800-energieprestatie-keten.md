@@ -833,7 +833,9 @@ De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijv
 
 **Warmtepompen.**
 - Bijlage V koppelt c_source aan de forfaitaire COP (tabel 9.27 voetnoot a, via `regeneration`). V.1 rekent daarbij met de tabel-COP zonder c_source.
-- Boven 55 °C vraagt elke warmtepomp voor ruimteverwarming bijlage Q, ook zonder bijverwarming (§9.6.3, p. 331, interpretatie). "(hybride) systemen" lees ik letterlijk als alle systemen, hybride of niet. De kolommen tot 70 °C van tabel 9.27/9.29 horen volgens opmerking 7 bij tapwater via afleversets.
+- Een losse forfaitaire warmtepomp boven 55 °C gebruikt de conservatieve kolommen tot 70 °C van tabel 9.27/9.29 (opmerking 6). Een hybride of meervoudig systeem boven 55 °C vraagt bijlage Q (§9.6.3, p. 331).
+  - Interpretatie na de review: "(hybride) systemen" betreft systemen met een warmtepomp naast een andere opwekker.
+  - De strikte lezing ("elk systeem") zou een losse warmtepomp zonder meetgegevens volgens NEN-EN 14511/14825 zonder rekenroute laten, want methode 2 bestaat juist voor dat geval.
 - W_H;aux;hp;an wordt niet nog eens geboekt, omdat Q.4 het al in η_H;gen;hp opneemt. Deze keuze staat in `OMITTED_TERMS`.
 
 **Identieke installaties (§9.1).** Met `identicalSystems` = N rekent de opwekker per toestel op Q/N; ook de vraag voor bijlage Q en V wordt per toestel genomen. Dragers, hulpenergie (bijvoorbeeld de 9.85-constante) en verliezen worden met N vermenigvuldigd. Voor de 500 m²-grens van 9.2.5.1 telt het oppervlak per toestel. 6.6.5 (A_g per woning) wordt volgens de opmerking bij 6.6.5 in de berekening niet gebruikt.
@@ -877,3 +879,6 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 **Niet gekoppeld.** De koude-onttrekking van een boosterwarmtepomp (W.3) wordt niet automatisch als Q_C;HP (10.6) aan de koeling doorgegeven. Beide blijven invoer: `cooling.boosterHeatPumpExtractionKwh` en `coolingExtractionKwh` van bijlage W.
 
 **ϑ_ztu voor tapwater in de projectroute.** Heeft het project precies één onverwarmde ruimte, dan krijgen ook de tapwatersystemen die b_U mee (7.82, voor 13.26, 13.58 en 13.168). Dat gebeurt alleen als het systeem zelf geen b_U opgeeft, en gaat op dezelfde manier als bij het verwarmingsdistributiesysteem.
+
+
+**Correctie pompvermogen (9.49).** In de verwarmingsdistributie hoort 10⁻³ alleen bij de exponentiële term: P_ref = 1,7·P_hydr + 17·(1 − e^(−300·P_hydr))·10⁻³ (gerenderde p. 320). De code rekende eerst (1,7·P + 17·(…))·10⁻³. Daardoor viel de pompenergie zonder opgegeven elektrisch vermogen 2× tot 90× te laag uit (bij 0,01 kW respectievelijk 1 kW). De versies voor tapwater (13.41) en koeling waren al goed.

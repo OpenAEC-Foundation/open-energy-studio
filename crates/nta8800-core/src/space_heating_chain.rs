@@ -3410,21 +3410,12 @@ fn generate(
             }
         }
         Generator::HeatPumpForfait(generator) => {
-            // §9.6.3 (p. 331): "(hybride) systemen" above 55 °C need annex Q,
-            // read literally as every system, hybrid or not; the 60–70 °C
-            // columns of tables 9.27/9.29 serve hot water through delivery
-            // sets (note 7). The hybrid case is also checked in
+            // §9.6.3 (p. 331): "(hybride) systemen" above 55 °C need annex Q
+            // for the energy fraction. A heat pump on its own uses the
+            // conservative 55–70 °C columns of tables 9.27/9.29 (note 6):
+            // method 2 exists for heat pumps without the EN 14511/14825 data
+            // annex Q needs. The hybrid case is checked in
             // `generate_multiple`.
-            if generator
-                .forfait
-                .design_supply_temperature_c
-                .is_some_and(|temperature| temperature > 55.0)
-            {
-                issues.push(issue(
-                    "heat_pump_above55_requires_annex_q",
-                    "generator.forfait.designSupplyTemperatureC",
-                ));
-            }
             let mut forfait = generator.forfait.clone();
             if let Some(regeneration) = &generator.regeneration {
                 issues.extend(
@@ -5287,8 +5278,8 @@ mod tests {
             unreachable!()
         };
         generator.forfait.design_supply_temperature_c = Some(60.0);
-        // §9.6.3 read literally: every system above 55 °C needs annex Q.
-        assert!(codes(&input).contains(&"heat_pump_above55_requires_annex_q"));
+        // §9.6.3: a heat pump on its own uses the 60 °C column of table 9.27.
+        assert!(!codes(&input).contains(&"heat_pump_above55_requires_annex_q"));
         // In a (hybrid) system with another generator annex Q is required.
         let heat_pump = input.generator.clone();
         let boiler = boiler_chain().generator;
