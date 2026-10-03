@@ -18,6 +18,16 @@ function Harness() {
   </>;
 }
 
+function ProjectSwitchHarness() {
+  const { state, dispatch } = useEnergy();
+  return <><NtaPerformancePanel />
+    <button type="button" onClick={() => dispatch({ type: 'SET_PROJECT', payload: {
+      ...state.project, id: 'second-project', ntaCalculation: undefined,
+    } })}>Switch project</button>
+    <output data-testid="active-project">{state.project.id}</output>
+  </>;
+}
+
 const month = (value: number, index: number) => ({
   month: index + 1, heatingNeedKwh: value, emissionLossKwh: value * 0.15,
   emissionInputKwh: value * 1.15, distributionLossKwh: 0, generatorOutputKwh: value * 1.15,
@@ -26,6 +36,26 @@ const month = (value: number, index: number) => ({
 });
 
 describe('NTA performance panel', () => {
+  it('discards an open NTA editor when another project is loaded', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ status: 'incomplete', gaps: [], performance: null, derivedInput: null }),
+    }));
+    renderWithProviders(<ProjectSwitchHarness />);
+    const panel = within(await screen.findByRole('region', { name: 'NTA 8800 calculation (Rust kernel)' }));
+    await user.click(panel.getByRole('button', { name: 'Advanced (JSON)' }));
+    const editor = panel.getByLabelText('NTA input block (JSON)') as HTMLTextAreaElement;
+    await user.clear(editor);
+    await user.type(editor, 'stale draft');
+    await user.click(screen.getByRole('button', { name: 'Switch project' }));
+    expect(screen.getByTestId('active-project')).toHaveTextContent('second-project');
+    expect(panel.queryByLabelText('NTA input block (JSON)')).not.toBeInTheDocument();
+    await user.click(panel.getByRole('button', { name: 'Advanced (JSON)' }));
+    expect((panel.getByLabelText('NTA input block (JSON)') as HTMLTextAreaElement).value)
+      .not.toContain('stale draft');
+  });
+
   it('lists input gaps and stores an edited NTA block in the project', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({

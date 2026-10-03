@@ -700,6 +700,7 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 | Manifestvingerafdruk via gebouwde API/MCP | Gebouwde API houdt projecthash gelijk en wijzigt manifesthash bij gewijzigde verwachte waarde; MCP-handshake en `audit_reference_case` tonen `manifestFingerprint` en `referenceVerified=false` | Hash maakt een case herkenbaar, maar verifieert bron, rechten, normtoepassing of verwachte waarde niet |
 | Desktop-devbuild | Linux `.deb` gebouwd; pakketomschrijving benoemt de experimentele invoeraudit | Debugpakket; geen releasecertificaat |
 | Visuele UI-controle | Niet uitgevoerd | Browsertoegang tot `127.0.0.1:3006` door opgeslagen gebruikersinstelling geblokkeerd; deze blokkade is niet omzeild |
+| NTA-invoereditor bij projectwissel | Het prestatiepaneel sluit zowel het formulier als de JSON-editor bij een andere project-ID en wist de oude concepttekst. Gerichte componenttest: 7/7 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole; de Rust-kern valideert de opgeslagen invoer pas bij de volgende berekening. |
 
 ## Nog nodig voor inhoudelijke en externe verificatie
 

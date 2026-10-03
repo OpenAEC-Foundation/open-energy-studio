@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Calculator, CircleHelp } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
@@ -29,6 +29,17 @@ export function NtaPerformancePanel() {
   const [formOpen, setFormOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [parseError, setParseError] = useState(false);
+  const editorProjectId = useRef(project.id);
+
+  useEffect(() => {
+    if (editorProjectId.current !== project.id) {
+      editorProjectId.current = project.id;
+      setEditing(false);
+      setFormOpen(false);
+      setDraft('');
+      setParseError(false);
+    }
+  }, [project.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,14 +351,14 @@ export function NtaPerformancePanel() {
           <button type="button" className="btn" onClick={openEditor}>{t('nta.performance.advanced')}</button>
         </>}
       </div>
-      {formOpen && <NtaCalculationForm project={project}
+      {formOpen && editorProjectId.current === project.id && <NtaCalculationForm project={project}
         initial={(project.ntaCalculation as unknown as Record<string, unknown> | undefined) ?? buildNtaCalculationTemplate(project)}
         onCancel={() => setFormOpen(false)}
         onSave={(block) => {
           dispatch({ type: 'SET_NTA_CALCULATION', payload: block as unknown as NtaCalculationInput });
           setFormOpen(false);
         }} />}
-      {editing && <div className="nta-performance-editor">
+      {editing && editorProjectId.current === project.id && <div className="nta-performance-editor">
         <label>{t('nta.performance.blockLabel')}
           <textarea value={draft} spellCheck={false} rows={18} onChange={(event) => setDraft(event.target.value)} />
         </label>
