@@ -206,6 +206,11 @@ pub struct Measure {
     /// calculation only uses `patch`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub template: Option<Value>,
+    /// What keeps the editor's template from a complete patch (the editor's
+    /// problem keys). A measure with open problems is not calculated: every
+    /// variant that contains it reports `measure_template_incomplete`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub incomplete: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1232,6 +1237,20 @@ fn variant_input(
     measures: &[&Measure],
     issues: &mut Vec<MwaIssue>,
 ) -> Option<BuildingPerformanceInput> {
+    // A measure whose template is incomplete would be calculated with a
+    // partial patch; refuse the variant instead.
+    let mut incomplete = false;
+    for measure in measures.iter().filter(|m| !m.incomplete.is_empty()) {
+        incomplete = true;
+        issues.push(MwaIssue {
+            code: "measure_template_incomplete",
+            path: format!("measures[{}].template", measure.id),
+            detail: Some(measure.incomplete.join(", ")),
+        });
+    }
+    if incomplete {
+        return None;
+    }
     let mut building_value = match base {
         MwaBase::Project { project } => {
             let mut project = project.clone();
@@ -2450,6 +2469,7 @@ mod tests {
             phase_year: None,
             specialist_note: None,
             template: None,
+            incomplete: Vec::new(),
         };
         let economics = Economics {
             discount_rate: 0.0,
@@ -2549,6 +2569,7 @@ mod tests {
             phase_year: Some(2027),
             specialist_note: None,
             template: None,
+            incomplete: Vec::new(),
         }];
         input.packages = vec![Package {
             id: "p1".into(),
@@ -2576,6 +2597,48 @@ mod tests {
         assert!(advice.warnings.iter().any(|w| w.contains("minimaal twee")));
         assert!(advice.warnings.iter().any(|w| w.contains("let op")));
         assert_eq!(package.phasing[0].year, Some(2027));
+    }
+
+    #[test]
+    fn incomplete_template_measure_is_not_calculated() {
+        let mut input = mwa(building());
+        input.measures = vec![Measure {
+            id: "pv".into(),
+            name: "PV".into(),
+            category: MeasureCategory::Pv,
+            target: PatchTarget::Building,
+            patch: vec![PatchOperation::Replace {
+                path: "/areaSourceReference".into(),
+                value: json!("patched"),
+            }],
+            investment_eur: 1000.0,
+            cost_source: "offerte".into(),
+            lifetime_years: 20.0,
+            maintenance_eur_per_year: 0.0,
+            phase_year: None,
+            specialist_note: None,
+            template: Some(json!({"kind": "pv"})),
+            incomplete: vec!["peakPowerRequired".into()],
+        }];
+        input.packages = vec![Package {
+            id: "p1".into(),
+            name: "Pakket".into(),
+            measure_ids: vec!["pv".into()],
+            partial_execution_warning: None,
+        }];
+        let result = assess_maatwerkadvies(&input);
+        for variant in [&result.measures[0], &result.packages[0]] {
+            assert!(!variant.valid);
+            let issue = variant
+                .issues
+                .iter()
+                .find(|i| i.code == "measure_template_incomplete")
+                .expect("blocking issue");
+            assert_eq!(issue.path, "measures[pv].template");
+            assert_eq!(issue.detail.as_deref(), Some("peakPowerRequired"));
+        }
+        // The current situation is still calculated.
+        assert!(result.current.as_ref().unwrap().issues.is_empty());
     }
 
     #[test]
@@ -2850,6 +2913,7 @@ mod tests {
             phase_year: None,
             specialist_note: None,
             template: None,
+            incomplete: Vec::new(),
         };
         input.measures = vec![
             noop("isolatie", MeasureCategory::Insulation),
@@ -2915,6 +2979,7 @@ mod tests {
             phase_year: Some(2030),
             specialist_note: None,
             template: None,
+            incomplete: Vec::new(),
         };
         let economics = Economics {
             discount_rate: 0.05,
@@ -3040,6 +3105,7 @@ mod tests {
             phase_year: None,
             specialist_note: None,
             template: None,
+            incomplete: Vec::new(),
         };
         input.measures = vec![insulation("a", 0.15, 6.5), insulation("b", 0.12, 8.0)];
         input.packages = vec![
@@ -3187,6 +3253,7 @@ mod tests {
             phase_year: None,
             specialist_note: None,
             template: None,
+            incomplete: Vec::new(),
         }];
         input.packages = vec![Package {
             id: "p".into(),

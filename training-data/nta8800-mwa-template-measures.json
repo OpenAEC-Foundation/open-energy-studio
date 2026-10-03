@@ -237,65 +237,31 @@
       "lifetimeYears": 15,
       "template": {
         "kind": "ventilation",
-        "ventilation": {
-          "zoneId": "z1",
-          "usableFloorAreaM2": 100,
-          "category": "residential",
-          "functions": [
-            {
-              "function": "residential",
-              "areaM2": 100,
-              "swimmingPool": false
+        "system": {
+          "kind": "single",
+          "unit": {
+            "variant": "d2",
+            "ducts": "luka_a_b_c",
+            "equipmentReference": "test: WTW-unit productblad",
+            "heatRecovery": {
+              "efficiency": {
+                "method": "declared",
+                "value": 0.9,
+                "standard": "en13141_7",
+                "sourceReference": "test: productblad"
+              },
+              "bypass": {
+                "kind": "full"
+              },
+              "layout": "central",
+              "constantVolumeControl": false,
+              "supplyDuctInsulation": {
+                "kind": "insulated"
+              },
+              "equipmentReference": "test: WTW-unit",
+              "manufactureYear": 2026
             }
-          ],
-          "dwellingCount": 1,
-          "apartmentBuilding": false,
-          "buildingHeightM": 9,
-          "constructionYear": 2020,
-          "floorAboveCrawlspace": false,
-          "heatingSetpointC": 20,
-          "coolingSetpointC": 24,
-          "system": {
-            "kind": "single",
-            "unit": {
-              "variant": "d2",
-              "ducts": "luka_a_b_c",
-              "equipmentReference": "test: WTW-unit productblad",
-              "heatRecovery": {
-                "efficiency": {
-                  "method": "declared",
-                  "value": 0.9,
-                  "standard": "en13141_7",
-                  "sourceReference": "test: productblad"
-                },
-                "bypass": {
-                  "kind": "full"
-                },
-                "layout": "central",
-                "constantVolumeControl": false,
-                "supplyDuctInsulation": {
-                  "kind": "insulated"
-                },
-                "equipmentReference": "test: WTW-unit",
-                "manufactureYear": 2026
-              }
-            }
-          },
-          "flowReduction": {
-            "collective": false
-          },
-          "infiltration": {
-            "method": "measured",
-            "qv10DmPerSM2": 0.4,
-            "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
-          },
-          "combustionAppliances": [],
-          "fans": {
-            "method": "forfait",
-            "current": "dc",
-            "manufactureYear": 2020
-          },
-          "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+          }
         }
       }
     },
@@ -439,7 +405,8 @@
             "obstruction": {
               "method": "minimal"
             },
-            "sourceReference": "test: offerte"
+            "sourceReference": "test: offerte",
+            "obstructionSourceReference": "test: foto vrij dakvlak"
           }
         ]
       }
@@ -696,50 +663,32 @@
       "lifetimeYears": 15,
       "template": {
         "kind": "lighting",
-        "lighting": [
-          {
-            "zoneId": "z1",
-            "functions": [
-              {
-                "function": "office",
-                "areaM2": 400
-              }
-            ],
-            "lightingZones": [
-              {
-                "id": "kantoor",
-                "areaM2": 400,
-                "power": {
-                  "method": "installed",
-                  "sourceReference": "test: lichtplan LED",
-                  "luminaires": [
-                    {
-                      "count": 100,
-                      "power": {
-                        "method": "system",
-                        "powerW": 18
-                      }
-                    }
-                  ]
-                },
-                "parasitic": {
-                  "method": "forfait"
-                },
-                "occupancy": {
-                  "control": "auto_on_auto_off",
-                  "centralOnControl": true,
-                  "largeOfficeGroup": false
-                },
-                "daylight": {
-                  "method": "forfait",
-                  "daylightControl": true
-                },
-                "extractedLuminaires": false
-              }
-            ],
-            "sourceReference": "voorbeeld: LED-armaturen 2021"
+        "zones": {
+          "z1/kantoor": {
+            "power": {
+              "method": "installed",
+              "sourceReference": "test: lichtplan LED",
+              "luminaires": [
+                {
+                  "count": 100,
+                  "power": {
+                    "method": "system",
+                    "powerW": 18
+                  }
+                }
+              ]
+            },
+            "occupancy": {
+              "control": "auto_on_auto_off",
+              "centralOnControl": true,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "forfait",
+              "daylightControl": true
+            }
           }
-        ]
+        }
       }
     },
     {
@@ -854,7 +803,8 @@
             "obstruction": {
               "method": "minimal"
             },
-            "sourceReference": "test: offerte"
+            "sourceReference": "test: offerte",
+            "obstructionSourceReference": "test: foto vrij dakvlak"
           }
         ]
       }

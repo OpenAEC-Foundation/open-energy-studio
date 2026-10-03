@@ -86,7 +86,12 @@ export function NtaLightingSection({ draft, change, project }: SectionProps & { 
           ['auto_on_dimmed', t('nta.light.control.autoDimmed')], ['auto_on_auto_off', t('nta.light.control.autoOff')],
           ['manual_on_dimmed', t('nta.light.control.manualDimmed')], ['manual_on_auto_off', t('nta.light.control.manualAutoOff')]]} />
         <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'occupancy', 'centralOnControl']} label={t('nta.light.central')} />
+        {read(draft, ['lighting', 0, 'lightingZones', index, 'occupancy', 'centralOnControl']) === true &&
+          <p className="nta-form-note">{t('nta.light.centralNote')}</p>}
+        {read(draft, ['lighting', 0, 'lightingZones', index, 'power', 'method']) === 'forfait' &&
+          <p className="nta-form-note">{t('nta.light.forfaitDaylightNote')}</p>}
         <SelectField {...field} path={['lighting', 0, 'lightingZones', index, 'daylight', 'method']} label={t('nta.light.daylight')}
+          disabled={read(draft, ['lighting', 0, 'lightingZones', index, 'power', 'method']) === 'forfait'}
           options={[['none', t('nta.light.daylight.none')], ['forfait', t('nta.light.daylight.forfait')],
             ['sectors', t('nta.light.daylight.sectors')]]}
           onChange={(_, value) => change(['lighting', 0, 'lightingZones', index, 'daylight'], value === 'forfait'
@@ -94,7 +99,8 @@ export function NtaLightingSection({ draft, change, project }: SectionProps & { 
             : value === 'sectors' ? { method: 'sectors', sectors: [daylightSectorTemplate('vertical_windows')], sourceReference: '' }
               : { method: 'none' })} />
         {read(draft, ['lighting', 0, 'lightingZones', index, 'daylight', 'method']) === 'forfait' &&
-          <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'daylight', 'daylightControl']} label={t('nta.light.daylightControl')} />}
+          <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'daylight', 'daylightControl']} label={t('nta.light.daylightControl')}
+            disabled={read(draft, ['lighting', 0, 'lightingZones', index, 'power', 'method']) === 'forfait'} />}
         {read(draft, ['lighting', 0, 'lightingZones', index, 'daylight', 'method']) === 'sectors' &&
           <DaylightSectorsFields draft={draft} change={change} base={['lighting', 0, 'lightingZones', index, 'daylight']} />}
         <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'extractedLuminaires']} label={t('nta.light.extracted')} />

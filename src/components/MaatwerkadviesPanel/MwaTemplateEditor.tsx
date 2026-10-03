@@ -3,7 +3,8 @@ import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import type { MwaMeasure, MwaPatchOperation } from '../../core/nta/KernelClient';
 import {
-  buildTemplatePatch, forfaitHeatPumpTemplate, HEAT_PUMP_KINDS, heatPumpRenewableTemplate, initialTemplate, insulationOptions, insulationValues, pvSystemTemplate, TEMPLATE_CATEGORY,
+  applyLightingChanges, buildTemplatePatch, derivedRenewableFlags, forfaitHeatPumpTemplate, HEAT_PUMP_KINDS, heatPumpRenewableTemplate, initialTemplate,
+  insulationOptions, insulationValues, lightingChanges, normalizeTemplate, PV_OBSTRUCTION_SOURCE, pvSystemTemplate, TEMPLATE_CATEGORY,
   TEMPLATE_KINDS, TEMPLATE_LIFETIME, windowOptions,
   type InsulationPart, type MwaMeasureTemplate, type MwaTemplateKind,
 } from '../../core/nta/MwaTemplates';
@@ -18,17 +19,29 @@ type Block = Record<string, unknown>;
 
 /** The measure with `template` and the patch it generates against `project`. */
 export function applyTemplate(project: IProject, measure: MwaMeasure, template: MwaMeasureTemplate | null): MwaMeasure {
-  if (!template) return { ...measure, template: null };
-  return { ...measure, template, patch: buildTemplatePatch(project, template, measure.id).patch };
+  const { incomplete: _drop, ...rest } = measure;
+  void _drop;
+  if (!template) return { ...rest, template: null };
+  return { ...rest, template, patch: buildTemplatePatch(project, template, measure.id).patch };
 }
 
-/** A fresh measure of a template kind, with its category and a starting lifetime. */
+/** Starting lifetime of a new measure before any template (MaatwerkadviesPanel). */
+const NEW_MEASURE_LIFETIME = 30;
+
+/**
+ * A measure of a template kind. Category and lifetime follow the kind only
+ * while they still hold the previous kind's starting values; what the
+ * adviser entered is kept.
+ */
 export function templateMeasure(project: IProject, measure: MwaMeasure, kind: MwaTemplateKind): MwaMeasure {
+  const previous = measure.template?.kind;
+  const defaultLifetimes = new Set([NEW_MEASURE_LIFETIME, ...(previous ? [TEMPLATE_LIFETIME[previous]] : [])]);
+  const categoryIsDefault = !previous || measure.category === TEMPLATE_CATEGORY[previous];
   return applyTemplate(project, {
     ...measure,
-    category: TEMPLATE_CATEGORY[kind],
+    category: categoryIsDefault ? TEMPLATE_CATEGORY[kind] : measure.category,
     target: 'project',
-    lifetimeYears: TEMPLATE_LIFETIME[kind],
+    lifetimeYears: defaultLifetimes.has(measure.lifetimeYears) ? TEMPLATE_LIFETIME[kind] : measure.lifetimeYears,
   }, initialTemplate(kind, project));
 }
 
@@ -100,10 +113,11 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
   onChange: (measure: MwaMeasure) => void;
 }) {
   const { t } = useI18n();
-  const template = measure.template;
-  if (!template) return null;
+  if (!measure.template) return null;
+  // Saved snapshot forms (ventilation, lighting) open in their current form.
+  const { template, migrated } = normalizeTemplate(project, measure.template);
   const set = (next: MwaMeasureTemplate) => onChange(applyTemplate(project, measure, next));
-  const { patch, problems } = buildTemplatePatch(project, template, measure.id);
+  const { patch, problems } = buildTemplatePatch(project, measure.template, measure.id);
   const block = project.ntaCalculation as unknown as Block | undefined;
 
   let fields: ReactNode = null;
@@ -173,15 +187,19 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
         <p className="mwa-wide nta-form-note">{t('mwa.template.qv10Note')}</p>
       </>;
       break;
-    case 'ventilation':
-      fields = <DraftFields draft={{ ventilation: template.ventilation, calculationScope: block?.calculationScope }}
-        onDraft={(next) => set({ ...template, ventilation: next.ventilation as Block })}>
-        {(change) => <VentilationUnitFields draft={{ ventilation: template.ventilation }} change={change}
+    case 'ventilation': {
+      // The project's ventilation with the measure's system; only the system is stored.
+      const ventilation = { ...((block?.ventilation as Block | undefined) ?? {}), system: template.system };
+      fields = <DraftFields draft={{ ventilation, calculationScope: block?.calculationScope }}
+        onDraft={(next) => set({ ...template, system: (next.ventilation as Block).system as Block })}>
+        {(change) => <VentilationUnitFields draft={{ ventilation }} change={change}
           path={['ventilation', 'system', 'unit']} />}
       </DraftFields>;
       break;
+    }
     case 'heat_pump': {
-      const renewable = template.renewable ?? heatPumpRenewableTemplate();
+      const flags = derivedRenewableFlags(template.generator);
+      const renewable = { ...(template.renewable ?? heatPumpRenewableTemplate()), ...(flags ?? {}) };
       const draft = { generator: template.generator, renewable };
       const heatPump = HEAT_PUMP_KINDS.has(String(template.generator.kind));
       fields = <DraftFields draft={draft} onDraft={(next) => {
@@ -194,8 +212,11 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
           <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} heatPumpNote={false} />
           {template.generator.kind === 'heat_pump_forfait' && <ForfaitHeatPumpFields draft={draft} change={change} />}
           {heatPump && <>
-            <CheckField draft={draft} onChange={change} path={['renewable', 'sourceBelow20C']} label={t('mwa.template.hp.below20')} />
-            <CheckField draft={draft} onChange={change} path={['renewable', 'exhaustAirSource']} label={t('mwa.template.hp.exhaustAir')} />
+            <CheckField draft={draft} onChange={change} path={['renewable', 'sourceBelow20C']} label={t('mwa.template.hp.below20')}
+              disabled={flags?.sourceBelow20C !== undefined} />
+            <CheckField draft={draft} onChange={change} path={['renewable', 'exhaustAirSource']} label={t('mwa.template.hp.exhaustAir')}
+              disabled={flags != null} />
+            {flags && <p className="nta-form-note">{t('mwa.template.hp.flagsDerived')}</p>}
             <TextField draft={draft} onChange={change} path={['renewable', 'sourceReference']} label={t('mwa.template.hp.renewableSource')} />
           </>}
         </>}
@@ -215,6 +236,10 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
         {(change) => <>
           {template.systems.map((system, index) => <fieldset key={index} className="nta-form-row">
             <PvSystemFields draft={draft} change={change} base={['pvSystems', index]} label={String(system.id)} />
+            {(system.obstruction as Block | undefined)?.method === 'minimal' && <>
+              <TextField draft={draft} onChange={change} path={['pvSystems', index, PV_OBSTRUCTION_SOURCE]} label={t('mwa.template.pvObstructionSource')} />
+              <p className="nta-form-note">{t('mwa.template.pvObstructionNote')}</p>
+            </>}
             <button type="button" className="nta-form-remove"
               onClick={() => set({ ...template, systems: template.systems.filter((_, other) => other !== index) })}>{t('mwa.remove')}</button>
           </fieldset>)}
@@ -276,10 +301,18 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
       break;
     }
     case 'lighting': {
-      const draft = { lighting: template.lighting, labelFunction: block?.labelFunction, calculationScope: block?.calculationScope };
-      fields = <DraftFields draft={draft} onDraft={(next) => set({ ...template, lighting: (next.lighting as Block[]) ?? [] })}>
-        {(change) => <NtaLightingSection draft={draft} change={change} project={project} />}
-      </DraftFields>;
+      // The project's lighting with the measure's changes; only the changes are stored.
+      const current = (block?.lighting as Block[] | undefined) ?? [];
+      const draft = { lighting: applyLightingChanges(current, template.zones), labelFunction: block?.labelFunction, calculationScope: block?.calculationScope };
+      fields = <>
+        {migrated && <p className="mwa-wide nta-form-note" data-testid={`mwa-template-migrated-${measure.id}`}>
+          {t('mwa.template.migrated')}{' '}
+          <button type="button" className="btn" onClick={() => set(template)}>{t('mwa.template.migratedConfirm')}</button>
+        </p>}
+        <DraftFields draft={draft} onDraft={(next) => set({ ...template, zones: lightingChanges(current, (next.lighting as Block[]) ?? []) })}>
+          {(change) => <NtaLightingSection draft={draft} change={change} project={project} />}
+        </DraftFields>
+      </>;
       break;
     }
   }

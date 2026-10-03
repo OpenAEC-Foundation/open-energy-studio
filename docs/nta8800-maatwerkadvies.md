@@ -81,18 +81,27 @@ In het paneel kiest de adviseur een soort maatregel. Het sjabloon zet de keuzes 
 
 | Sjabloon | Invoer | Patch op het project |
 |---|---|---|
-| Isolatie dak, gevel of vloer | vlakken, nieuwe Rc of U | nieuwe constructie (`/constructions/-`) met U = 1/(R_si + Rc + R_se), R_si 0,10/0,13/0,17 en R_se 0,04 (tabel C.2); `constructionId` van de vlakken; bij een vloer met grondinvoer ook `constructionResistanceM2kPerW` = Rc + 0,17 |
+| Isolatie dak, gevel of vloer | vlakken, nieuwe Rc of U | nieuwe constructie (`/constructions/-`) met U = 1/(R_si + Rc + R_se), R_si 0,10/0,13/0,17 en R_se 0,04 (tabel C.2, p. 778); een dak steiler dan 60° krijgt R_si 0,13 (opmerking 3, helling uit `surfaceTilts`) en een eigen constructie; `constructionId` van de vlakken; bij een vloer met grondinvoer ook `constructionResistanceM2kPerW` = Rc + 0,17. Wanden tegen de grond worden niet aangeboden: de kern rekent een verwarmde kelder met `heatedBasement.wallResistanceM2kPerW` (8.38), niet met de constructie van de wand |
 | Beglazing | ramen, nieuwe U en eventueel g | `uValue`/`gValue` van de ramen |
 | Kierdichting | streefwaarde qv10 en bron | `infiltration` van de hoofdstuk 11-invoer (ook per zone) en `airTightness.qv10` |
-| Ventilatiesysteem | systeemunit (tabel 11.5) | de gewijzigde leden van `ntaCalculation.ventilation`, zonder `infiltration` |
-| Warmtepomp of andere opwekker | opwekker; bij een forfaitaire warmtepomp de tabelrij (9.27/9.29) | `ntaCalculation.generator` en `heatPumpRenewable` (5.31/5.32) |
+| Ventilatiesysteem | systeemunit (tabel 11.5) | alleen `ntaCalculation.ventilation.system` (en `zoneData[].ventilation.system`); debieten, regeling en infiltratie van het project blijven |
+| Warmtepomp of andere opwekker | opwekker; bij een forfaitaire warmtepomp de tabelrij (9.27/9.29) | `ntaCalculation.generator` en `heatPumpRenewable` (5.31/5.32); de vlaggen bron < 20 °C en ventilatieretourlucht volgen uit de gekozen bron. Bij afgifte via water is de ontwerpaanvoertemperatuur verplicht |
 | Tapwatertoestel | toestel (§13.8) | `ntaCalculation.hotWater.generator` |
-| PV | systemen (hoofdstuk 16) | toegevoegd aan `pvSystems`, id voorafgegaan door de maatregel-id; zonder opgegeven factoren beschaduwing volgens situatie a (minimaal, §17.3) |
+| PV | systemen (hoofdstuk 16) | toegevoegd aan `pvSystems`, id voorafgegaan door de maatregel-id; zonder opgegeven factoren start de belemmering op situatie e) (volledig), de conservatieve keuze voor PV (tabel 17.3 met opmerking 23, p. 706–707). Situatie a) (minimaal) vraagt een onderbouwing (`obstructionSourceReference`, alleen in het sjabloon). Een leeg piekvermogen blokkeert de maatregel |
 | Zonneboiler | systemen (§13.7) | toegevoegd aan `hotWater.solar` |
 | Douche-WTW | units per douche, aansluiting, bron (§13.6, bijlage U) | `hotWater.showerHeatRecovery` |
-| Verlichting (utiliteit) | verlichtingszones (hoofdstuk 14) | de gewijzigde blokken per verlichtingszone |
+| Verlichting (utiliteit) | verlichtingszones (hoofdstuk 14) | per verlichtingszone (`zoneId/id`) alleen de gewijzigde leden `power`, `parasitic`, `occupancy`, `daylight` en `extractedLuminaires`, toegepast op de actuele verlichting. Bij forfaitair vermogen is daglichtregeling uitgeschakeld (F_D = 1, 14.24, p. 667); bij centrale aan-schakeling meldt het formulier dat F_o;D = F_o;N = 1 (14.16/14.17, p. 664) |
 
-Het sjabloon wordt in de maatregel bewaard (`template`); de kern negeert het. Bij het doorrekenen genereert het paneel de patches opnieuw tegen het project zoals het dan is, zodat de array-indices in de paden kloppen. "Handmatig" laat het sjabloon los en houdt de patchregels bewerkbaar. De startwaarde voor de levensduur is een bewerkbare suggestie; ISSO 82.2/75.2 geven geen levensduurtabel (alleen ketels 15–20 jaar, 82.2 p. 90). De kerntest `template_measures_run_on_the_example_projects` rekent de sjablonen op beide voorbeeldprojecten door (`training-data/nta8800-mwa-template-measures.json`); elke maatregel verlaagt daar EP2.
+Het sjabloon wordt in de maatregel bewaard (`template`); de kern negeert het. `buildMaatwerkadviesInput` genereert de patches van alle sjabloonmaatregelen opnieuw tegen het project zoals het dan is, zodat de array-indices in de paden kloppen. Dat geldt voor het paneel, de rapportexport en het dossier.
+
+Een sjabloon met openstaande problemen (bijvoorbeeld gekozen vlakken die niet meer bestaan, `selectionStale`, of een ontbrekend piekvermogen) gaat met `incomplete` naar de kern. De kern rekent geen variant met zo'n maatregel en meldt `measure_template_incomplete` op de regel; er wordt dus nooit met een halve patch gerekend.
+
+**Migratie van oude sjablonen.** Ventilatie- en verlichtingssjablonen die vóór 3 oktober 2026 zijn bewaard, hielden een kopie van het hele blok; de patch zette daardoor latere projectwijzigingen terug. Bij het openen worden ze omgezet:
+
+- Ventilatie houdt alleen het systeem (`system`). De editor wijzigde alleen de unit, dus dit is verliesvrij.
+- Verlichting wordt omgezet naar de verschillen met het actuele project. Die kopie kan een maatregel niet onderscheiden van een latere projectwijziging, dus de maatregel blokkeert (`migrationReview`) tot de adviseur de wijzigingen bevestigt of bewerkt.
+
+Bij het wisselen van sjabloonsoort blijven een zelf ingevulde levensduur en categorie staan; alleen de startwaarden van de vorige soort worden vervangen. Een investering van 0 € geeft een waarschuwing (ISSO 82.2 p. 82, 75.2 p. 98). "Handmatig" laat het sjabloon los en houdt de patchregels bewerkbaar. De startwaarde voor de levensduur is een bewerkbare suggestie; ISSO 82.2/75.2 geven geen levensduurtabel (alleen ketels 15–20 jaar, 82.2 p. 90). De kerntest `template_measures_run_on_the_example_projects` rekent de sjablonen op beide voorbeeldprojecten door (`training-data/nta8800-mwa-template-measures.json`); elke maatregel verlaagt daar EP2.
 
 ## Energiekosten en economie
 
