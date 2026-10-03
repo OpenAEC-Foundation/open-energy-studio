@@ -5,6 +5,8 @@ import type {
 } from '../nta/KernelClient';
 import { evidenceArchiveName, loadEvidenceBytes, sha256Hex } from '../nta/Evidence';
 import { serializeProject, type KernelStamp } from '../io/ProjectSerializer';
+import { labelInputSha256, relabelDeadline } from '../nta/Registration';
+import { isProductionPath } from '../nta/RelabelText';
 
 /**
  * Project dossier of an EP adviser (BRL 9500-W Bijlage 3, p. 61–63;
@@ -28,7 +30,10 @@ export interface DossierContext {
   assessment?: ProjectPerformanceAssessment | null;
   /** Basic survey output, for the collapse reasons of applied defaults. */
   opname?: OpnameAssessment | null;
+  /** Relabel comparison; defaults to the one kept with the registration. */
   relabel?: RelabelAssessment | null;
+  /** SHA-256 of the project's label input, to see whether the kept comparison is out of date. */
+  labelInputSha256?: string | null;
 }
 
 function has(evidence: NtaEvidenceItem[], ...kinds: NtaEvidenceKind[]): boolean {
@@ -40,8 +45,9 @@ function filled(value: string | undefined): boolean {
 }
 
 /** Completeness of the project dossier per BRL 9500 Bijlage 3. */
-export function checkDossierCompleteness({ project, assessment, opname, relabel }: DossierContext): DossierItem[] {
+export function checkDossierCompleteness({ project, assessment, opname, relabel: given, labelInputSha256: currentSha }: DossierContext): DossierItem[] {
   const registration: NtaRegistration = project.registration ?? {};
+  const relabel = given ?? registration.relabelComparison?.assessment ?? null;
   const evidence = registration.evidence ?? [];
   const bbl = registration.purpose === 'bbl_check';
   const delivery = registration.purpose === 'delivery';
@@ -161,19 +167,45 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
     attention('forfait_justification', 'evidence', 'Onderbouwing van gebruikte forfaitaire waarden', 'alleen bij toets Bbl');
   }
 
-  // Herlabelen
+  // Herlabelen (BRL 9500-W §4.2.3 p. 23 en Bijlage 3 p. 63; 9500-U p. 18–19 en p. 54)
   if ((registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) === 'relabel') {
-    add('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
-      relabel ? relabel.allowed : false,
-      relabel == null ? 'geen herlabelvergelijking uitgevoerd' : relabel.allowed ? undefined : 'wijziging volgens Bijlage 6b');
+    const stored = registration.relabelComparison;
+    const outdated = Boolean(!given && stored?.currentSha256 && currentSha && stored.currentSha256 !== currentSha);
+    if (outdated) {
+      attention('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
+        'het project is na de herlabelvergelijking gewijzigd; vergelijk opnieuw');
+    } else {
+      add('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
+        relabel ? relabel.allowed : false,
+        relabel == null ? 'geen herlabelvergelijking uitgevoerd' : relabel.allowed ? undefined : 'wijziging volgens Bijlage 6b');
+    }
     if (relabel?.needsReview) {
       attention('relabel_review', 'relabel', 'Wijzigingen die beoordeling vragen', `${relabel.changes.filter((c) => c.verdict === 'review').length} wijziging(en)`);
     }
-    add('relabel_invoice', 'relabel', 'Offerte en opdracht of gespecificeerde factuur van de verbetering', has(evidence, 'invoice'));
-    add('relabel_improvement_date', 'relabel', 'Datum van de verbetering binnen 24 maanden na de opname', filled(registration.improvementDate));
-    const production = relabel?.changes.some((change) => /pv|solar|production/i.test(change.path)) ?? false;
+    add('relabel_original_label', 'relabel', 'Certificaathouder en EP-Online-nummer van het oorspronkelijke label',
+      filled(registration.originalCertificateNumber) && filled(registration.originalEpOnlineNumber)
+        && registration.originalCertificateNumber!.trim().toLowerCase() === (registration.certificateNumber ?? '').trim().toLowerCase(),
+      filled(registration.originalCertificateNumber) && registration.originalCertificateNumber!.trim().toLowerCase()
+        !== (registration.certificateNumber ?? '').trim().toLowerCase() ? 'alleen de certificaathouder van het oorspronkelijke label mag herlabelen' : undefined);
+    const proofs = evidence.filter((item) => item.relabelProof === 'quote_with_order' || item.relabelProof === 'specified_invoice');
+    add('relabel_invoice', 'relabel', 'Offerte met opdracht of gespecificeerde factuur van de verbetering op dit adres',
+      proofs.length > 0,
+      proofs.length ? undefined : 'markeer het bewijsstuk als offerte met opdracht of gespecificeerde factuur van de herlabeling');
+    const deadline = relabelDeadline(registration.surveyDate);
+    const improvement = registration.improvementDate ?? '';
+    const withinWindow = filled(improvement) && deadline != null
+      && improvement >= (registration.surveyDate ?? '') && improvement <= deadline;
+    add('relabel_improvement_date', 'relabel', 'Datum van de verbetering binnen 24 maanden na de opname', withinWindow,
+      !filled(improvement) ? undefined
+        : deadline == null ? 'opnamedatum ontbreekt'
+          : withinWindow ? undefined : `buiten de periode ${registration.surveyDate} t/m ${deadline}`);
+    const production = relabel?.changes.some((change) => isProductionPath(change.path)) ?? false;
     add('relabel_production_photos', 'relabel', 'Foto\'s van PV of zonthermie, met beschaduwing',
-      production ? has(evidence, 'photo_overview', 'photo_detail') : null);
+      production ? evidence.some((item) => item.relabelProof === 'production_photo') : null);
+    add('relabel_production_connection', 'relabel', 'PV of zonthermie exclusief en fysiek verbonden met de gebouwinstallatie',
+      production ? registration.productionPhysicallyConnected === true : null);
+    add('relabel_utility_confirmation', 'relabel', 'Vastgesteld dat er geen wijzigingen volgens Bijlage 6b zijn (utiliteit)',
+      relabel?.scheme === 'u' ? registration.noExcludedChangesConfirmed === true : null);
   }
   return items;
 }
@@ -204,6 +236,8 @@ export async function buildProjectDossier(
   context: DossierContext & { reportHtml?: string | null; generatedAt?: string },
 ): Promise<DossierBundle> {
   const { project, assessment } = context;
+  const relabel = context.relabel ?? project.registration?.relabelComparison?.assessment ?? null;
+  const labelSha = context.labelInputSha256 ?? await labelInputSha256(project).catch(() => null);
   const kernel: KernelStamp | null = assessment
     ? { kernelVersion: assessment.kernelVersion, targetNormVersion: assessment.targetNormVersion, inputFingerprint: assessment.inputFingerprint }
     : null;
@@ -213,14 +247,18 @@ export async function buildProjectDossier(
   if (assessment) files['kernel-output.json'] = strToU8(JSON.stringify(assessment, null, 2));
   if (context.reportHtml) files['rekenrapport.html'] = strToU8(context.reportHtml);
   if (context.opname) files['basisopname-output.json'] = strToU8(JSON.stringify(context.opname, null, 2));
-  if (context.relabel) files['herlabel-vergelijking.json'] = strToU8(JSON.stringify(context.relabel, null, 2));
+  if (relabel) {
+    const stored = project.registration?.relabelComparison;
+    const record = context.relabel ? { assessment: context.relabel } : stored;
+    files['herlabel-vergelijking.json'] = strToU8(JSON.stringify(record, null, 2));
+  }
   const missingEvidence: DossierManifest['missingEvidence'] = [];
   for (const item of project.registration?.evidence ?? []) {
     const bytes = await loadEvidenceBytes(item);
     if (bytes) files[evidenceArchiveName(item)] = bytes;
     else missingEvidence.push({ id: item.id, fileName: item.fileName, reason: 'bestand niet beschikbaar of hash wijkt af' });
   }
-  const checklist = checkDossierCompleteness(context);
+  const checklist = checkDossierCompleteness({ ...context, labelInputSha256: labelSha });
   files['dossier-checklist.json'] = strToU8(JSON.stringify(checklist, null, 2));
   const entries: DossierManifestEntry[] = [];
   for (const [path, bytes] of Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) {
