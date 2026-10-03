@@ -933,6 +933,11 @@ fn derive_input(
         {
             gaps.push(gap("dynamic_window_duplicate", format!("{path}.windowId")));
         }
+        // §A.2 (p. 767): movable shading of a dynamic window belongs in its
+        // states; the project-wide 7.42 shading would count it twice.
+        if nta.window_solar.movable_shading.is_some() {
+            gaps.push(gap("window_dynamic_and_shading_exclusive", path.clone()));
+        }
         for issue in item.dynamic.validate(&format!("{path}.dynamic")) {
             gaps.push(gap(issue.code, issue.path));
         }
@@ -1630,6 +1635,45 @@ mod tests {
             "dynamic_weights_invalid",
             "ntaCalculation.dynamicWindows[3].dynamic.solarWeights"
         )));
+        assert_eq!(result.status, "incomplete");
+    }
+
+    /// §A.2 (p. 767): a dynamic window with the project-wide movable shading
+    /// of 7.42 would count the shaded state twice; a blank form value is a
+    /// gap at its own path, not an unreadable block.
+    #[test]
+    fn dynamic_window_excludes_movable_shading_and_reports_blanks() {
+        let mut value = project();
+        value["ntaCalculation"]["windowSolar"]["movableShading"] = serde_json::json!({
+            "reductionFactor": 0.5,
+            "control": "automatic",
+            "sourceReference": "screen"
+        });
+        value["ntaCalculation"]["dynamicWindows"] = serde_json::json!([{
+            "windowId": "win-S",
+            "dynamic": {
+                "method": "single_state",
+                "state": {"id": "closed", "gPerpendicular": null, "uValueWPerM2k": 0.7},
+                "sourceReference": "product sheet"
+            }
+        }]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        assert!(codes.contains(&(
+            "window_dynamic_and_shading_exclusive",
+            "ntaCalculation.dynamicWindows[0]"
+        )));
+        assert!(codes.contains(&(
+            "dynamic_value_missing",
+            "ntaCalculation.dynamicWindows[0].dynamic.state.gPerpendicular"
+        )));
+        assert!(!codes
+            .iter()
+            .any(|(code, _)| *code == "nta_calculation_block_invalid"));
         assert_eq!(result.status, "incomplete");
     }
 

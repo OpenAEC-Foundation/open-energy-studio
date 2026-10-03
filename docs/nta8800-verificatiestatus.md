@@ -125,8 +125,14 @@ Deze punten zijn afgewerkt in `3eec124`. De herberekende waarden in de tabel gel
 - **Nieuwe validatie.**
   - Een gemeten q_v10 ≤ 0 wordt afgewezen (`infiltration_invalid`): zonder lekpad sluit de massabalans van 11.3 niet.
   - Een terugregel-x die gunstiger is dan de standaard (recirculatie > 20 %, debietregeling < 80 %) vraagt `flowReduction.evidenceReference` (opmerkingen 1 en 2 bij 11.60/11.61, p. 468), anders `flow_reduction_evidence_required`. De basisopname geeft de bron van de ventilatieopname mee bij een opgenomen percentage.
-  - `largeOfficeGroup` mag alleen in een zone met kantoorfunctie (§14.5.1, p. 664), anders `lighting_large_office_group_without_office`.
+  - `largeOfficeGroup` hoort alleen bij een zone met kantoorfunctie (§14.5.1, p. 664). Buiten een kantoorfunctie geeft het F_o;D = 1 (14.16), de minst gunstige waarde. Daarom is `lighting_large_office_group_without_office` een waarschuwing en blokkeert het de berekening niet.
   - `assess_zone_lighting` controleert de invoer zelf en weigert ongeldige invoer, zoals een gemengd forfait.
+
+**Review van bijlage A in de projectroute, 4 oktober 2026.**
+- **Dynamisch raam en beweegbare zonwering (§A.2, p. 767; 7.42).** Bijlage A rekent een raam met beweegbare luiken of zonwering zelf tot de dynamische elementen (A.2, figuur A.1). Een dynamisch raam met daarnaast de projectbrede beweegbare zonwering van 7.42 zou de zonweringstand dus twee keer tellen. De norm schrijft niet voor welke van de twee voorrang heeft. Daarom geeft de combinatie een gap (`window_dynamic_and_shading_exclusive`), in de projectroute op `dynamicWindows[i]` en in de kern op `windows[i].movableShading`. De zonwering hoort dan in de toestanden van bijlage A.
+- **τ_vis en τ_sol van bijlage A (interpretatie).** Volgens p. 767 is τ_vis invoer voor hoofdstuk 14. Hoofdstuk 14 heeft daar echter geen ingang voor. 14.38 (verticale ramen) bevat geen doorlatingsfactor, en 14.41 zet τ_D65 vast op 0,6 voor daklichten (p. 673). De kern bewaart τ_vis en τ_sol daarom alleen als vastlegging. Het formulier vraagt ze niet meer, omdat ze de uitkomst niet veranderen.
+- **Half ingevulde invoer.** Een lege waarde in bijlage A (g, U, een weging of een correctiefactor) geeft `dynamic_value_missing` op het eigen pad. Eerder maakte één leeg veld het hele NTA-blok onleesbaar (`nta_calculation_block_invalid`).
+- **Ramen zonder grens.** Het formulier biedt alleen ramen aan in vlakken met een expliciete buitengrens. Een vlak zonder grens slaat de projectroute over (met een gap).
 
 **Herberekening van de berekende routes voor tapwater (H13) en koeling (H10, methode 2), 4 oktober 2026.** Ook deze controle is gedaan met een eigen Python-implementatie vanuit de normpagina's. Vergeleken scenario's:
 - tapwater: vijf scenario's (circulatie, voorraadvaten, warmtepompen volgens 13.160b, alle standaardwaarden);

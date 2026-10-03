@@ -1660,6 +1660,15 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             ));
         }
         if let Some(dynamic) = &window.dynamic {
+            // §A.2 (p. 767) treats a window with movable shutters or shading
+            // as the dynamic element itself; 7.42 on top would count the
+            // shaded state twice.
+            if window.movable_shading.is_some() {
+                issues.push(issue(
+                    "window_dynamic_and_shading_exclusive",
+                    format!("{path}.movableShading"),
+                ));
+            }
             issues.extend(
                 dynamic
                     .validate(&format!("{path}.dynamic"))
@@ -2921,8 +2930,8 @@ mod tests {
         window.dynamic = Some(crate::annex_a::DynamicTransparent::SingleState {
             state: crate::annex_a::DynamicState {
                 id: "tinted".into(),
-                g_perpendicular: 0.3,
-                u_value_w_per_m2k: 1.7,
+                g_perpendicular: Some(0.3),
+                u_value_w_per_m2k: Some(1.7),
                 tau_solar: None,
                 tau_visual: None,
             },
