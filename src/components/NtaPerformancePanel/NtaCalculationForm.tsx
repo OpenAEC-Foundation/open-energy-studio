@@ -7,7 +7,7 @@ import {
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import {
-  AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields,
+  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields,
   SpaceGeneratorFields, WindowObstructionFields,
 } from './NtaSystemSections';
 import {
@@ -222,6 +222,9 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.generator')}>
       <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} allowMultiple />
     </Section>
+    {project.zones.length > 1 && <Section title={t('nta.form.heatingSystems.title')}>
+      <AdditionalHeatingSystemsFields draft={draft} change={change} project={project} />
+    </Section>}
     {read(draft, ['hotWater']) != null && <Section title={t('nta.form.hotWater')}>
       {residential
         ? <NumberField {...field} path={['hotWater', 'need', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />

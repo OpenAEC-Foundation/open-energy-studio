@@ -383,6 +383,41 @@ export function AdditionalHotWaterSystemsFields({ draft, change, residential }: 
   </div>;
 }
 
+/**
+ * §9.2: further heating systems, each with the calculation zones it serves
+ * and its own generator. The main system serves the remaining zones.
+ */
+export function AdditionalHeatingSystemsFields({ draft, change, project }: SectionProps & { project: IProject }) {
+  const { t } = useI18n();
+  const systems = list(draft, ['additionalHeatingSystems']);
+  const taken = (except: number) => new Set(systems.flatMap((system, index) =>
+    index === except ? [] : (Array.isArray(system.zoneIds) ? system.zoneIds as string[] : [])));
+  return <div className="nta-form-subsection">
+    {systems.map((system, index) => {
+      const base: Path = ['additionalHeatingSystems', index];
+      const zoneIds = Array.isArray(system.zoneIds) ? system.zoneIds as string[] : [];
+      const elsewhere = taken(index);
+      return <fieldset key={index} className="nta-form-row">
+        <legend>{t('nta.form.heatingSystems.system')} {index + 2}</legend>
+        {project.zones.map((zone) => <label key={zone.id} className="nta-form-check">
+          <input type="checkbox" checked={zoneIds.includes(zone.id)} disabled={elsewhere.has(zone.id)}
+            onChange={(event) => change([...base, 'zoneIds'], event.target.checked
+              ? [...zoneIds, zone.id]
+              : zoneIds.filter((id) => id !== zone.id))} />
+          {zone.name || zone.id}
+        </label>)}
+        <SpaceGeneratorFields draft={draft} change={change} base={[...base, 'generator']} project={project} allowMultiple />
+        <RemoveButton label={t('nta.form.remove')}
+          onClick={() => change(['additionalHeatingSystems'], systems.filter((__, other) => other !== index))} />
+      </fieldset>;
+    })}
+    <button type="button" className="btn" onClick={() => change(['additionalHeatingSystems'],
+      [...systems, { zoneIds: [], generator: spaceGeneratorTemplate('gas_boiler', project) }])}>
+      {t('nta.form.heatingSystems.add')}
+    </button>
+  </div>;
+}
+
 /** Twelve monthly numbers in one row. */
 function MonthlyValues({ draft, change, path, label }: SectionProps & { path: Path; label: string }) {
   const values = list(draft, path) as unknown as Array<number | null>;

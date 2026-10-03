@@ -1,13 +1,14 @@
-//! Monthly space-heating chain for one or more zones and one generator:
-//! need (chapter 7) → emission (9.3) → distribution (9.4) → node (9.2.3)
-//! → generator (9.6) → energy per carrier and auxiliary energy (9.6.8,
-//! 9.4.4).
+//! Monthly space-heating chain for one or more zones served by one heating
+//! system: need (chapter 7) → emission (9.3) → distribution (9.4) → node
+//! (9.2.3, including solar, booster and delivery-set node terms) →
+//! generator(s) (9.6, several by preference per 9.6.1) → energy per carrier
+//! and auxiliary energy (9.6.8, 9.4.4). Several heating systems in one
+//! building are separate chains combined by `building_performance`.
 //!
-//! With a single generator the table 9.1 dispatch gives `β = 1` and the
-//! generator covers the whole node input. The recoverable losses of 9.2.5
-//! are reported per zone (`zoneRecoverableLosses`) but are not fed back to
-//! the chapter 7 need here; that coupling belongs to the demand calculation.
-//! All results are unverified.
+//! The recoverable losses of 9.2.5 (distribution, storage, generator 9.7,
+//! humidifiers, solar) are fed back to the chapter 7 need through 7.3–7.8
+//! and reported per zone (`zoneRecoverableLosses`). All results are
+//! unverified.
 
 use crate::annex_m::{
     boiler_month, validate_product_boiler, BoilerFuel, BoilerMonth, BoilerPlacement, ProductBoiler,
@@ -66,11 +67,10 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
-    "9.2.3 node gains from solar thermal systems, booster heat pumps and delivery sets",
     "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
     "7.82: ϑ_ztu of the unheated space follows from distributionSystem.unheatedReductionFactor (b_U); without it and without entered values 13 °C is used",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
-    "annex Q: W_H;aux;hp;an is not booked again as 9.6.3.2 auxiliary energy, because Q.4 already includes it in η_H;gen;hp (COP of 9.63)",
+    "annex Q: W_H;gen;aux = W_H;aux;hp;an/(12·3,6) is booked literally per 9.6.3.2 (p. 340); Q.4 (p. 1029) already includes the source pump in η_H;gen;hp, so the norm counts it twice (norm issue, followed as written)",
     "annex Q: F_H;gen = 1 (Q.1) is taken as met when every bin of table Q.6 is fully covered; the rounded table hours sum to 277,757 instead of 277,778",
     "annex Q: V.1 hot-water term not needed, because c_source is not applied to method 1",
     "annex N: E_H;gen;in converted to the gross calorific value (N.3) with f_Hs/Hi of table M.3 (biomass as wood 1,08)",
@@ -786,7 +786,8 @@ impl Generator {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HybridGenerator {
-    /// Only the new-build installed-power route of the draft is supported.
+    /// `new_build` or `existing` (β by installed power, 9.56/9.57), or
+    /// `existing_added_preferred` (9.58/9.59 with f_gebouw;si;H).
     pub design_context: String,
     /// Heat pump and boiler with class, power and priority efficiency (table 9.1).
     pub generators: Vec<DispatchGenerator>,
@@ -892,10 +893,10 @@ pub struct ChainMonth {
     pub district_heat_kwh: f64,
     /// Solid biomass input, carrier `bm` (9.64).
     pub biomass_kwh: f64,
-    /// Biomass of appliances above 500 kW per installation (bmA, table 5.2:
-    /// f_P 0,0, f_Pren 1,0), kWh.
     /// 5.39f: heat delivered by biomass appliances, kWh.
     pub biomass_output_kwh: f64,
+    /// Biomass of appliances above 500 kW per installation (bmA, table 5.2:
+    /// f_P 0,0, f_Pren 1,0), kWh.
     pub biomass_class_a_kwh: f64,
     /// Other biomass (bmC, table 5.2: f_P 1,0, f_Pren 0), kWh.
     pub biomass_class_c_kwh: f64,
@@ -1090,6 +1091,130 @@ pub struct SpaceHeatingChainAssessment {
     pub demand: MonthlyDemandAssessment,
     pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
+}
+
+impl ChainMonth {
+    /// Adds the energy terms of another heating system's month (§9.2, 5.20).
+    /// The micro-CHP operating data stay those of this system (the combi
+    /// split of §13.8.4.8 belongs to the main system).
+    pub fn add_system(&mut self, other: &ChainMonth) {
+        self.heating_need_kwh += other.heating_need_kwh;
+        self.emission_loss_kwh += other.emission_loss_kwh;
+        self.emission_input_kwh += other.emission_input_kwh;
+        self.distribution_loss_kwh += other.distribution_loss_kwh;
+        self.distribution_auxiliary_to_medium_kwh += other.distribution_auxiliary_to_medium_kwh;
+        self.node_loss_kwh += other.node_loss_kwh;
+        self.solar_gain_kwh += other.solar_gain_kwh;
+        self.generator_output_kwh += other.generator_output_kwh;
+        self.heat_pump_output_kwh += other.heat_pump_output_kwh;
+        self.natural_gas_kwh += other.natural_gas_kwh;
+        self.district_heat_kwh += other.district_heat_kwh;
+        self.biomass_kwh += other.biomass_kwh;
+        self.biomass_output_kwh += other.biomass_output_kwh;
+        self.biomass_class_a_kwh += other.biomass_class_a_kwh;
+        self.biomass_class_c_kwh += other.biomass_class_c_kwh;
+        self.oil_kwh += other.oil_kwh;
+        self.generator_recoverable_loss_kwh += other.generator_recoverable_loss_kwh;
+        self.generator_electricity_kwh += other.generator_electricity_kwh;
+        self.auxiliary_electricity_kwh = match (
+            self.auxiliary_electricity_kwh,
+            other.auxiliary_electricity_kwh,
+        ) {
+            (Some(a), Some(b)) => Some(a + b),
+            _ => None,
+        };
+        self.distribution_auxiliary_electricity_kwh += other.distribution_auxiliary_electricity_kwh;
+        self.emission_fan_electricity_kwh += other.emission_fan_electricity_kwh;
+        self.recoverable_loss_kwh += other.recoverable_loss_kwh;
+        self.collective_source_heat_kwh += other.collective_source_heat_kwh;
+        self.humidification_load_kwh += other.humidification_load_kwh;
+        self.humidification_electricity_kwh += other.humidification_electricity_kwh;
+        self.humidification_fuel_kwh += other.humidification_fuel_kwh;
+        self.ahu_heating_load_kwh += other.ahu_heating_load_kwh;
+        self.chp_electricity_kwh += other.chp_electricity_kwh;
+        self.hot_water_load_kwh += other.hot_water_load_kwh;
+    }
+}
+
+/// §9.2/5.20: the results of several heating systems of one building as one
+/// result. Carriers, auxiliary energy, losses and zones are summed; the
+/// zones of the further systems follow `additional_zone_demands`. The
+/// generation efficiency becomes the heat-pump weighted COP
+/// Σ Q_hp / Σ (Q_hp / COP_si), so that 5.30/5.31 ambient heat equals the sum
+/// over the systems.
+pub fn combine_heating_systems(
+    mut main: SpaceHeatingChainAssessment,
+    others: Vec<SpaceHeatingChainAssessment>,
+) -> SpaceHeatingChainAssessment {
+    if others.is_empty() {
+        return main;
+    }
+    let heat_pump_output = |assessment: &SpaceHeatingChainAssessment| -> f64 {
+        assessment
+            .monthly
+            .iter()
+            .map(|row| row.heat_pump_output_kwh)
+            .sum()
+    };
+    let mut hp_out = 0.0;
+    let mut hp_in = 0.0;
+    for assessment in std::iter::once(&main).chain(&others) {
+        let out = heat_pump_output(assessment);
+        if let Some(cop) = assessment.generation_efficiency {
+            if out > 0.0 && cop > 0.0 {
+                hp_out += out;
+                hp_in += out / cop;
+            }
+        }
+    }
+    let sum = |a: Option<f64>, b: Option<f64>| match (a, b) {
+        (Some(a), Some(b)) => Some(a + b),
+        _ => None,
+    };
+    for other in others {
+        if other.status != "calculated_unverified" && main.status == "calculated_unverified" {
+            main.status = other.status;
+        }
+        if main.monthly.len() == 12 && other.monthly.len() == 12 {
+            for (row, add) in main.monthly.iter_mut().zip(&other.monthly) {
+                row.add_system(add);
+            }
+        } else {
+            main.monthly.clear();
+        }
+        main.annual_natural_gas_kwh =
+            sum(main.annual_natural_gas_kwh, other.annual_natural_gas_kwh);
+        main.annual_generator_electricity_kwh = sum(
+            main.annual_generator_electricity_kwh,
+            other.annual_generator_electricity_kwh,
+        );
+        main.annual_auxiliary_electricity_kwh = sum(
+            main.annual_auxiliary_electricity_kwh,
+            other.annual_auxiliary_electricity_kwh,
+        );
+        main.annual_collective_source_heat_kwh = sum(
+            main.annual_collective_source_heat_kwh,
+            other.annual_collective_source_heat_kwh,
+        );
+        main.annual_district_heat_kwh = sum(
+            main.annual_district_heat_kwh,
+            other.annual_district_heat_kwh,
+        );
+        main.annual_biomass_kwh = sum(main.annual_biomass_kwh, other.annual_biomass_kwh);
+        main.zone_recoverable_losses
+            .extend(other.zone_recoverable_losses);
+        main.additional_zone_demands.push(other.demand);
+        main.additional_zone_demands
+            .extend(other.additional_zone_demands);
+        if main.annex_q.is_none() {
+            main.annex_q = other.annex_q;
+        }
+        main.beng_calculation_available &= other.beng_calculation_available;
+    }
+    if hp_in > 0.0 {
+        main.generation_efficiency = Some(hp_out / hp_in);
+    }
+    main
 }
 
 fn issue(code: &'static str, path: impl Into<String>) -> ChainIssue {
@@ -2874,15 +2999,18 @@ fn generate_annex_q(
                 .collect(),
         );
     }
+    // W_H;aux;hp;an in MJ: /(12·3,6) per month, i.e. source_pump_kwh / 12.
+    let source_pump_monthly_kwh = result.source_pump_kwh / 12.0;
     for (index, row) in monthly.iter_mut().enumerate() {
         let output = outputs[index].energy_kwh;
         let pump = fraction * output;
         let backup = output - pump;
         row.heat_pump_output_kwh = pump;
         row.generator_electricity_kwh = pump / corrected;
-        // Q.4: the source pump is in η_H;gen;hp; 9.6.3.2 W_aux is not
-        // booked a second time (see OMITTED_TERMS).
-        let mut auxiliary = 0.0;
+        // 9.6.3.2 (p. 340): W_H;gen;aux;mi = W_H;aux;hp;an/(12·3,6), booked
+        // literally although Q.4 (p. 1029) already counts the source pump in
+        // η_H;gen;hp (see INTERPRETATIONS / OMITTED_TERMS).
+        let mut auxiliary = source_pump_monthly_kwh;
         match (&generator.backup, &backup_gas) {
             (Some(AnnexQBackup::ElectricResistance), _) => {
                 row.generator_electricity_kwh += backup;
@@ -3062,7 +3190,9 @@ fn generate_multiple(
             .annex_q()
             .is_some_and(|generator| generator.backup.is_some())
         {
-            // These already split the load themselves.
+            // 9.6.1 keeps one preference list per system: a hybrid or
+            // backup inside `multiple` would apply table 9.23 twice. Enter
+            // its heat pump and boiler as separate preferences instead.
             issues.push(issue(
                 "generator_nested_split_unsupported",
                 format!("generator.generators[{index}].generator"),
@@ -3751,6 +3881,7 @@ fn generate(
                     node_input_reference: "derived by space_heating_chain".into(),
                     design_context: generator.design_context.clone(),
                     generators: generator.generators.clone(),
+                    building_fraction: Some(building_fraction),
                 },
                 forfait: generator.forfait.clone(),
                 boiler: generator.boiler.clone(),
@@ -4836,7 +4967,10 @@ mod tests {
             // Electric backup covers 1 − F at COP 1.
             let expected = pump / efficiency + (row.generator_output_kwh - pump);
             assert!((row.generator_electricity_kwh - expected).abs() < 1e-9);
-            assert_eq!(row.auxiliary_electricity_kwh, Some(0.0));
+            // 9.6.3.2: W_H;aux;hp;an/(12·3,6) in every month.
+            let aux = details.annex_q.source_pump_kwh / 12.0;
+            assert!(aux > 0.0);
+            assert!((row.auxiliary_electricity_kwh.unwrap() - aux).abs() < 1e-9);
         }
         // The annual node input of Q.1 equals the chain output.
         let annual: f64 = result

@@ -1,5 +1,7 @@
-//! End-to-end unverified energy performance of a single-zone building:
-//! space-heating chain + declared other services → `E_EPus` per carrier
+//! End-to-end unverified energy performance of a building with one or more
+//! calculation zones and one or more heating, hot-water and cooling
+//! systems: space-heating chains + hot water (chapter 13) + cooling
+//! (chapter 10) + lighting (chapter 14) + declared other services → `E_EPus` per carrier
 //! (5.20/5.21) → on-site electricity self-use and export (5.22–5.26) →
 //! primary fossil energy `EPTot` (5.9–5.14, table 5.2) and renewable energy
 //! `EPrenTot` (5.29–5.31, 5.39, table 5.4) → indicators with the rounding of
@@ -47,7 +49,8 @@ use crate::space_cooling::{
     CoolingSystem, CoolingZoneNeed, FreeCoolingSource,
 };
 use crate::space_heating_chain::{
-    assess_space_heating_chain, Generator, SpaceHeatingChainAssessment, SpaceHeatingChainInput,
+    assess_space_heating_chain, combine_heating_systems, Generator, SpaceHeatingChainAssessment,
+    SpaceHeatingChainInput,
 };
 use crate::tojuli::{assess_tojuli, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -222,6 +225,11 @@ pub struct BuildingPerformanceInput {
     pub total_usable_floor_area_m2: f64,
     pub area_source_reference: String,
     pub space_heating: SpaceHeatingChainInput,
+    /// Further heating systems of the building (§9.2, 5.20), each a chain with
+    /// its own generator(s), emission, distribution and zones. A zone belongs
+    /// to exactly one heating system.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_heating_systems: Vec<SpaceHeatingChainInput>,
     /// Required when the generator is a heat pump.
     #[serde(default)]
     pub heat_pump_renewable: Option<HeatPumpRenewableEvidence>,
@@ -534,13 +542,7 @@ pub struct ChapterFiveIndicators {
 /// Σ N_woon over the zones, `None` without residential internal gains.
 fn dwelling_count(input: &BuildingPerformanceInput) -> Option<u32> {
     let mut total = None;
-    for zone in std::iter::once(&input.space_heating.demand).chain(
-        input
-            .space_heating
-            .additional_zones
-            .iter()
-            .map(|zone| &zone.demand),
-    ) {
+    for zone in input.zone_inputs().into_iter() {
         if let crate::monthly_demand::InternalGains::Residential { dwelling_count, .. } =
             &zone.internal_gains
         {
@@ -649,13 +651,7 @@ fn zeb_direct_use_fraction(input: &BuildingPerformanceInput) -> [f64; 12] {
     } else if matches!(input.calculation_scope, CalculationScope::Residential) {
         areas[0] = 1.0;
     } else {
-        for zone in std::iter::once(&input.space_heating.demand).chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        ) {
+        for zone in input.zone_inputs().into_iter() {
             let column = match zone.usage_function {
                 crate::monthly_demand::UsageFunction::Residential => 0,
                 crate::monthly_demand::UsageFunction::Education => 1,
@@ -890,14 +886,28 @@ impl BuildingPerformanceInput {
     }
 
     fn zone_ids(&self) -> Vec<&str> {
-        std::iter::once(&self.space_heating.demand)
-            .chain(
-                self.space_heating
-                    .additional_zones
-                    .iter()
-                    .map(|zone| &zone.demand),
-            )
+        self.zone_inputs()
+            .into_iter()
             .map(|demand| demand.zone_id.as_str())
+            .collect()
+    }
+
+    /// Every heating system: the main chain, then `additionalHeatingSystems`.
+    pub fn heating_systems(&self) -> Vec<&SpaceHeatingChainInput> {
+        std::iter::once(&self.space_heating)
+            .chain(&self.additional_heating_systems)
+            .collect()
+    }
+
+    /// Zone inputs of all heating systems, in the order of the combined
+    /// chain result (`demand`, then `additionalZoneDemands`).
+    pub fn zone_inputs(&self) -> Vec<&MonthlyDemandInput> {
+        self.heating_systems()
+            .into_iter()
+            .flat_map(|chain| {
+                std::iter::once(&chain.demand)
+                    .chain(chain.additional_zones.iter().map(|zone| &zone.demand))
+            })
             .collect()
     }
 }
@@ -1015,12 +1025,10 @@ pub fn fit_hot_water_need(result: &mut HotWaterAssessment, annual_need_kwh: f64)
 /// True when a zone carries a maatwerkadvies usage fit (ISSO 82.2/75.2).
 pub fn usage_fit_applied(input: &BuildingPerformanceInput) -> bool {
     input.hot_water_need_fit.is_some()
-        || input.space_heating.demand.usage_fit.is_some()
         || input
-            .space_heating
-            .additional_zones
-            .iter()
-            .any(|zone| zone.demand.usage_fit.is_some())
+            .zone_inputs()
+            .into_iter()
+            .any(|zone| zone.usage_fit.is_some())
 }
 
 /// The hot-water systems of the building with their input path.
@@ -1278,13 +1286,7 @@ pub fn hot_water_annual_need_kwh(input: &BuildingPerformanceInput) -> Option<f64
 }
 
 fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
-    let zones = std::iter::once(&input.space_heating.demand).chain(
-        input
-            .space_heating
-            .additional_zones
-            .iter()
-            .map(|zone| &zone.demand),
-    );
+    let zones = input.zone_inputs().into_iter();
     let (weighted, standard, area) =
         zones.fold((0.0, 0.0, 0.0), |(weighted, standard, area), zone| {
             (
@@ -1360,14 +1362,9 @@ fn cooling_assessment(
     if !input.has_cooling() {
         return None;
     }
-    let areas = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let areas = input
+        .zone_inputs()
+        .into_iter()
         .map(|zone| zone.usable_floor_area_m2);
     let zones: Vec<CoolingZoneNeed> = std::iter::once(&heating.demand)
         .chain(&heating.additional_zone_demands)
@@ -1402,8 +1399,8 @@ fn cooling_assessment(
         let row = &heating.monthly[index];
         (row.heat_pump_output_kwh - row.generator_electricity_kwh).max(0.0)
     });
-    let extraction = if input.space_heating.generator.heat_pump().is_some()
-        || input.space_heating.generator.annex_q().is_some()
+    let extraction = if heat_pump_generator(input).heat_pump().is_some()
+        || heat_pump_generator(input).annex_q().is_some()
     {
         extraction
     } else {
@@ -1475,6 +1472,35 @@ fn cooling_assessment(
     Some(crate::space_cooling::combine_cooling(parts, zones.len()))
 }
 
+/// The generator the `heatPumpRenewable` evidence belongs to: the first
+/// heating system (main first, §9.2) with an electric, annex Q or gas heat
+/// pump; the main generator otherwise.
+fn heat_pump_generator(input: &BuildingPerformanceInput) -> &Generator {
+    input
+        .heating_systems()
+        .into_iter()
+        .map(|system| &system.generator)
+        .find(|generator| {
+            generator.heat_pump().is_some()
+                || generator.annex_q().is_some()
+                || generator.has_gas_heat_pump()
+        })
+        .unwrap_or(&input.space_heating.generator)
+}
+
+/// §9.2: a zone belongs to exactly one heating system.
+fn validate_heating_systems(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
+    let mut seen = std::collections::HashSet::new();
+    for id in input.zone_ids() {
+        if !seen.insert(id) {
+            issues.push(issue(
+                "heating_system_zone_twice",
+                "additionalHeatingSystems",
+            ));
+        }
+    }
+}
+
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
     // 13.156a: E_W;gen;in;PFHRD needs the heating gas of the same combi.
     for (system, path) in hot_water_system_list(input) {
@@ -1525,14 +1551,9 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         // §5.5.8: the 1,05 correction applies to utility buildings only.
         issues.push(issue("bacs_factor_residential_invalid", "bacsFactor"));
     }
-    let zone_area: f64 = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let zone_area: f64 = input
+        .zone_inputs()
+        .into_iter()
         .map(|zone| zone.usable_floor_area_m2)
         .sum();
     if (zone_area - input.total_usable_floor_area_m2).abs()
@@ -1719,14 +1740,9 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             }
         }
     }
-    let chapter_11_zones = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let chapter_11_zones = input
+        .zone_inputs()
+        .into_iter()
         .any(|demand| demand.ventilation.is_some());
     if chapter_11_zones
         && input
@@ -1778,14 +1794,9 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         {
             issues.push(issue("lighting_double_count", "lighting"));
         }
-        let zones: Vec<(&str, f64)> = std::iter::once(&input.space_heating.demand)
-            .chain(
-                input
-                    .space_heating
-                    .additional_zones
-                    .iter()
-                    .map(|zone| &zone.demand),
-            )
+        let zones: Vec<(&str, f64)> = input
+            .zone_inputs()
+            .into_iter()
             .map(|zone| (zone.zone_id.as_str(), zone.usable_floor_area_m2))
             .collect();
         let mut seen = HashSet::new();
@@ -1882,7 +1893,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         }
     }
     match (
-        input.space_heating.generator.heat_pump(),
+        heat_pump_generator(input).heat_pump(),
         &input.heat_pump_renewable,
     ) {
         (Some((forfait, source_system)), evidence) => {
@@ -1956,7 +1967,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 }
             }
         }
-        (None, evidence) => match (input.space_heating.generator.annex_q(), evidence) {
+        (None, evidence) => match (heat_pump_generator(input).annex_q(), evidence) {
             (Some(generator), None) => {
                 let _ = generator;
                 issues.push(issue(
@@ -1998,7 +2009,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                 }
             }
             // Gas-driven heat pumps (tables 9.27/9.29) also need 5.31 evidence.
-            (None, Some(evidence)) if input.space_heating.generator.has_gas_heat_pump() => {
+            (None, Some(evidence)) if heat_pump_generator(input).has_gas_heat_pump() => {
                 if evidence.source_reference.trim().is_empty() {
                     issues.push(issue(
                         "source_reference_required",
@@ -2006,7 +2017,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                     ));
                 }
             }
-            (None, None) if input.space_heating.generator.has_gas_heat_pump() => {
+            (None, None) if heat_pump_generator(input).has_gas_heat_pump() => {
                 issues.push(issue(
                     "heat_pump_renewable_evidence_required",
                     "heatPumpRenewable",
@@ -2024,14 +2035,9 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
 }
 
 fn lighting_context(input: &BuildingPerformanceInput) -> LightingContext {
-    let window_area: f64 = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let window_area: f64 = input
+        .zone_inputs()
+        .into_iter()
         .flat_map(|zone| zone.windows.iter())
         .map(|window| window.area_m2)
         .sum();
@@ -2044,7 +2050,14 @@ fn lighting_context(input: &BuildingPerformanceInput) -> LightingContext {
 /// 7.28: replace `UtilityLighting::Chapter14` by the internal gain of the
 /// zone's chapter 14 lighting, when that lighting is valid.
 fn with_lighting_gains(input: &BuildingPerformanceInput) -> SpaceHeatingChainInput {
-    let mut chain = input.space_heating.clone();
+    lighting_gains_for(input, input.space_heating.clone())
+}
+
+/// 7.28: chapter 14 lighting gains for the zones of one heating chain.
+fn lighting_gains_for(
+    input: &BuildingPerformanceInput,
+    mut chain: SpaceHeatingChainInput,
+) -> SpaceHeatingChainInput {
     let context = lighting_context(input);
     let resolve = |demand: &mut MonthlyDemandInput| {
         if let InternalGains::Utility { lighting, .. } = &mut demand.internal_gains {
@@ -2250,14 +2263,9 @@ fn levelled_setpoint(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
 ) -> Option<[f64; 12]> {
-    let areas = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let areas = input
+        .zone_inputs()
+        .into_iter()
         .map(|zone| zone.usable_floor_area_m2);
     let zones: Vec<(&crate::monthly_demand::MonthlyDemandAssessment, f64)> =
         std::iter::once(&heating.demand)
@@ -2377,7 +2385,19 @@ fn apply_exhaust_air_hot_water(
 fn with_hot_water_gains(
     input: &BuildingPerformanceInput,
     context: HotWaterContext,
+    chain: SpaceHeatingChainInput,
+) -> SpaceHeatingChainInput {
+    hot_water_gains_for(input, context, chain, true)
+}
+
+/// The hot-water couplings of one heating chain. Only the main heating
+/// system takes the node terms (13.185, solar combi 9.2.3.4, exhaust air);
+/// every system takes its share of the 7.29 gains.
+fn hot_water_gains_for(
+    input: &BuildingPerformanceInput,
+    context: HotWaterContext,
     mut chain: SpaceHeatingChainInput,
+    main: bool,
 ) -> SpaceHeatingChainInput {
     let systems = hot_water_system_list(input);
     if systems.is_empty()
@@ -2394,11 +2414,18 @@ fn with_hot_water_gains(
     ) else {
         return chain;
     };
-    let total_area: f64 = std::iter::once(&chain.demand)
-        .chain(chain.additional_zones.iter().map(|zone| &zone.demand))
+    // 7.29: the recoverable hot-water losses are spread over the zones of
+    // all heating systems by usable area.
+    let total_area: f64 = input
+        .zone_inputs()
+        .into_iter()
         .map(|demand| demand.usable_floor_area_m2)
         .sum();
     if total_area <= 0.0 {
+        return chain;
+    }
+    if !main {
+        fill_hot_water_gains(&result, total_area, &mut chain);
         return chain;
     }
     // 13.185: hot water made with heat from the space-heating system.
@@ -2426,6 +2453,17 @@ fn with_hot_water_gains(
             .map(|month| month.solar_space_heating_kwh)
             .collect();
     }
+    fill_hot_water_gains(&result, total_area, &mut chain);
+    chain
+}
+
+/// 7.29 Φ_int;WA for utility zones: the recoverable hot-water losses by
+/// usable-area share of the building.
+fn fill_hot_water_gains(
+    result: &HotWaterAssessment,
+    total_area: f64,
+    chain: &mut SpaceHeatingChainInput,
+) {
     let fill = |demand: &mut MonthlyDemandInput| {
         let share = demand.usable_floor_area_m2 / total_area;
         if let InternalGains::Utility {
@@ -2446,7 +2484,6 @@ fn with_hot_water_gains(
     for zone in &mut chain.additional_zones {
         fill(&mut zone.demand);
     }
-    chain
 }
 
 pub fn assess_building_performance(
@@ -2531,7 +2568,30 @@ pub fn assess_building_performance(
         .iter()
         .map(|item| issue(item.code, format!("spaceHeating.{}", item.path)))
         .collect();
+    // §9.2/5.20: further heating systems run as their own chains and are
+    // combined; every later step sees the building total.
+    let mut others = Vec::with_capacity(input.additional_heating_systems.len());
+    let mut extra_chains = Vec::with_capacity(input.additional_heating_systems.len());
+    for (index, system) in input.additional_heating_systems.iter().enumerate() {
+        let chain = hot_water_gains_for(
+            input,
+            hot_water_context,
+            lighting_gains_for(input, system.clone()),
+            false,
+        );
+        let assessed = assess_space_heating_chain(&chain);
+        extra_chains.push(chain);
+        issues.extend(assessed.issues.iter().map(|item| {
+            issue(
+                item.code,
+                format!("additionalHeatingSystems[{index}].{}", item.path),
+            )
+        }));
+        others.push(assessed);
+    }
+    let mut heating = combine_heating_systems(heating, others);
     validate(input, &mut issues);
+    validate_heating_systems(input, &mut issues);
     if let Some(error) = standalone_solar_issue {
         issues.push(issue(error.code, error.path));
     }
@@ -2676,15 +2736,7 @@ pub fn assess_building_performance(
         .filter(|_| valid && (input.demand_uses_fixed_c1_ventilation || need_from_fixed_c1))
         .and_then(|result| result.need_indicator_kwh_per_m2_year);
     // Bbl 4.149 paragraph 4: capacity weighted by usable floor area.
-    let zone_demands = || {
-        std::iter::once(&input.space_heating.demand).chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
-    };
+    let zone_demands = || input.zone_inputs().into_iter();
     let heating_capacity = {
         let assessed = std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
         let mut weighted = 0.0;
@@ -2705,8 +2757,12 @@ pub fn assess_building_performance(
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
     // a_C;red follows the zone's usage function (monthly_demand, 7.74/7.75).
     let tojuli: Vec<TojuliAssessment> = if valid {
-        std::iter::once(&chain_input.demand)
-            .chain(chain_input.additional_zones.iter().map(|zone| &zone.demand))
+        std::iter::once(&chain_input)
+            .chain(&extra_chains)
+            .flat_map(|chain| {
+                std::iter::once(&chain.demand)
+                    .chain(chain.additional_zones.iter().map(|zone| &zone.demand))
+            })
             .enumerate()
             .map(|(zone_index, zone)| {
                 assess_tojuli(
@@ -3113,9 +3169,9 @@ fn compute(
             .is_some_and(|storage| storage.building_bound_electrical_kwh >= 5.0);
     let zeb_direct_use = zeb_direct_use_fraction(input);
     // 5.31 for electric and gas-driven heat pumps (COP ≥ 1, source < 20 °C).
-    let heat_pump_renewable = (input.space_heating.generator.heat_pump().is_some()
-        || input.space_heating.generator.annex_q().is_some()
-        || input.space_heating.generator.has_gas_heat_pump())
+    let heat_pump_renewable = (heat_pump_generator(input).heat_pump().is_some()
+        || heat_pump_generator(input).annex_q().is_some()
+        || heat_pump_generator(input).has_gas_heat_pump())
         && input
             .heat_pump_renewable
             .as_ref()
@@ -5510,6 +5566,67 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn several_heating_systems_add_up_without_double_counting() {
+        use crate::space_heating_chain::ChainZone;
+        let base = input();
+        let mut second = base.space_heating.demand.clone();
+        second.zone_id = "z2".into();
+        // Reference: one heating system serving both zones.
+        let mut one = base.clone();
+        one.space_heating.additional_zones.push(ChainZone {
+            demand: second.clone(),
+            emission: base.space_heating.emission.clone(),
+            distribution: base.space_heating.distribution.clone(),
+        });
+        one.total_usable_floor_area_m2 *= 2.0;
+        // §9.2: the second zone gets its own system with the same generator.
+        let mut two = base.clone();
+        let mut system = base.space_heating.clone();
+        system.demand = second;
+        system.additional_zones.clear();
+        two.additional_heating_systems.push(system);
+        two.total_usable_floor_area_m2 *= 2.0;
+        let single = assess_building_performance(&one);
+        let split = assess_building_performance(&two);
+        assert_eq!(
+            single.status, "calculated_unverified",
+            "{:?}",
+            single.issues
+        );
+        assert_eq!(split.status, "calculated_unverified", "{:?}", split.issues);
+        let annual = |result: &BuildingPerformanceAssessment,
+                      pick: fn(&crate::space_heating_chain::ChainMonth) -> f64|
+         -> f64 { result.space_heating.monthly.iter().map(pick).sum() };
+        let need = annual(&single, |row| row.heating_need_kwh);
+        assert!(need > 0.0);
+        // Each zone is counted once: the needs equal the one-system total
+        // and are twice the single zone's need.
+        assert!((annual(&split, |row| row.heating_need_kwh) - need).abs() < 1e-6 * need);
+        let alone = assess_building_performance(&base);
+        let zone_need: f64 = alone
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| row.heating_need_kwh)
+            .sum();
+        assert!((need - 2.0 * zone_need).abs() < 1e-6 * need);
+        // The carriers of both systems are summed.
+        let output = annual(&single, |row| row.generator_output_kwh);
+        assert!((annual(&split, |row| row.generator_output_kwh) - output).abs() < 1e-6 * output);
+        assert_eq!(split.space_heating.additional_zone_demands.len(), 1);
+        // A zone entered in two systems is refused.
+        let mut twice = two.clone();
+        twice.additional_heating_systems[0].demand.zone_id =
+            base.space_heating.demand.zone_id.clone();
+        let codes: Vec<&str> = assess_building_performance(&twice)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert!(codes.contains(&"heating_system_zone_twice"), "{codes:?}");
     }
 
     #[test]

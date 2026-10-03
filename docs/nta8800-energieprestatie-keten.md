@@ -1,9 +1,9 @@
 # NTA 8800 energieprestatieketen: van gebouw naar BENG 2/3
 
-De Rust-module `building_performance` sluit de rekenruggengraat af voor een gebouw met één rekenzone:
+De Rust-module `building_performance` sluit de rekenruggengraat af voor een gebouw met een of meer rekenzones en een of meer verwarmingssystemen:
 
 1. [maandelijkse warmte- en koudebehoefte](nta8800-maandbehoefte.md) (hoofdstuk 7, transmissie uit hoofdstuk 8);
-2. [keten ruimteverwarming](nta8800-verwarmingsketen.md) (afgifte, distributie, één opwekker);
+2. [keten ruimteverwarming](nta8800-verwarmingsketen.md) (afgifte, distributie en opwekking per verwarmingssysteem);
 3. berekende koeling (H10), tapwater (H13), verlichting bij utiliteit (H14) en PV (H16); ventilatoren (H11) en overige posten als gedeclareerde diensten;
 4. `E_EPus` per energiedrager (5.20/5.21, met `f_BACS` op verwarming, koeling en hun hulpenergie);
 5. eigen elektriciteitsproductie: eigengebruik en export (5.22–5.26, met `E_nEPus;el = 0` volgens 5.27);
@@ -289,7 +289,7 @@ Module `lighting` (p. 655–676):
   
   Bij forfaitair vermogen geldt `F_D = 1`.
 - **Maandverdeling:** `t_mi/t_an`, zoals in 7.28.
-- **Interne winst:** `f_L·W_t·1000/t_an` (7.28) staat per zone in de uitkomst. Neem die op in de opgegeven interne warmtelast van hoofdstuk 7; de koppeling gebeurt nog niet automatisch.
+- **Interne winst:** `f_L·W_t·1000/t_an` (7.28) staat per zone in de uitkomst en wordt automatisch opgeteld bij de interne warmtelast van hoofdstuk 7 van die zone (ook in TO-juli).
 
 ## Warmtepomp als hernieuwbare bron
 
@@ -380,7 +380,7 @@ Een `heat_pump_annex_q` telt voor 5.30/5.31 net als een forfaitaire warmtepomp: 
 
 - **f_prac (9.63, p. 340).** Het elektriciteitsgebruik is `Q_out / (COP · 0,95)`. `practiceFactor` staat in de uitvoer en `correctedEfficiency` is `COP · 0,95`.
 - **Geen c_source bij methode 1.** Formule 9.63 kent geen broncorrectie; c_source (bijlage V) staat alleen in de forfaitaire tabellen 9.27/9.29 en de tapwatertabel. Een opgegeven `regeneration` wordt nog gevalideerd en de regeneratiegraad wordt gerapporteerd, maar `sourceCorrection` is altijd 1. Daardoor is ook de tapwaterterm van V.1 niet nodig.
-- **Hulpenergie bronpomp (9.6.3.2).** Interpretatie: `W_H;aux;hp;an` zit volgens Q.4 al in de noemer van η_H;gen;hp (de COP van 9.63). Een tweede boeking van `W_aux/(12·3,6)` zou de bronpomp dubbel tellen; de kern boekt hem daarom niet opnieuw.
+- **Hulpenergie bronpomp (9.6.3.2).** Vervallen interpretatie: de kern boekte `W_H;aux;hp;an` niet, omdat Q.4 hem al in de COP telt. Sinds 3 oktober 2026 volgt de kern de tekst letterlijk; zie hieronder.
 - **F = 1 zonder bijverwarming (Q.1).** De afgeronde uren van tabel Q.6 sommeren tot 277,757 in plaats van 277,778. Daardoor blijft de letterlijke F net onder 1, ook als de warmtepomp elke bin dekt. Interpretatie: als elke bin volledig is gedekt, geldt F = 1 en is geen bijverwarming nodig. Met bijverwarming blijft de letterlijke F gelden.
 - **COP ≤ 0.** Een bin met geleverde warmte en een COP ≤ 0 (extrapolatie) wordt geweigerd met `annex_q_cop_not_positive`. Voorheen werd die bin stil overgeslagen.
 - **Bijlage N, bovenwaarde (N.3).** Bijlage N rekent op de onderwaarde; hoofdstuk 5 telt brandstof op de calorische bovenwaarde. De keten vermenigvuldigt `E_H;gen;in` met f_Hs/Hi uit tabel M.3: gas 1,11, olie 1,06, biomassa als hout 1,08. Bijlage N geeft zelf geen verhouding.
@@ -395,8 +395,7 @@ Een `heat_pump_annex_q` telt voor 5.30/5.31 net als een forfaitaire warmtepomp: 
   - anders tabel M.6.
 
 Nog open:
-- het terugwinbare verlies van de boosterwarmtepomp (13.164, hoofdstuk 13);
-- de koppeling van de afvoerluchtfuncties van Q.5 aan hoofdstuk 11 (overventilatie, Q.96/Q.97).
+- niets uit deze review. Het terugwinbare verlies van de boosterwarmtepomp (13.164) en de koppeling van Q.5.3 aan hoofdstuk 11 zijn inmiddels uitgewerkt (zie de betreffende secties). De hulpenergie van de bronpomp is herzien: zie "Bijlage Q: hulpenergie bronpomp letterlijk" hieronder.
 
 ## BENG 1
 
@@ -407,13 +406,12 @@ De ventilatoren (11.132), de vorstbeveiliging (11.105) en de voorverwarming in r
 ## Geweigerd of niet ondersteund
 
 - opslag zonder opgegeven capaciteit (`storage_capacity_required`);
-- collectieve warmtepompbron (vergt de `dh`-factorroute);
 - export van warmte en absorptiekoeling op WKK;
 - verlichting bij woningbouw (14.2.1: `W_L;spec = 0`);
 - ventilatoren, verlichting en hulpenergie op een andere drager dan elektriciteit;
 - onvolledige inventaris van diensten of productie.
 
-Een energielabel wordt niet bepaald; de labelgrenzen en de EP-Online-uitvoer zijn niet geïmplementeerd.
+Een officieel energielabel wordt niet bepaald (`labelAvailable = false`). De kern geeft wel de indicatieve labelklasse en de registratiegegevens van hoofdstuk 5; zie "Indicatieve labelklasse" en "Indicatoren van hoofdstuk 5". De collectieve warmtepompbron wordt ondersteund via de `dh`-route (zie "Collectieve warmtepompbron").
 
 ## Synthetisch voorbeeld
 
@@ -510,7 +508,7 @@ Generator `multiple` bevat twee of meer opwekkers, elk met een preferentie (1 = 
 - **Zelfde preferentie:** opwekkers met dezelfde preferentie verdelen hun aandeel naar nominaal vermogen. Dit is een interpretatie.
 - **Berekening per opwekker:** elke opwekker rekent zijn eigen route op F·Q_H;gen;out. Daarna worden de dragers en de hulpenergie opgeteld.
 - **Rendement:** het gerapporteerde opwekkingsrendement is dat van de warmtepomp. Daarmee volgt de omgevingswarmte (5.30/5.31) uit de warmtepompoutput. Zonder warmtepomp is het output/input.
-- **Niet toegestaan:** geneste splitsingen. Dat zijn `multiple` of `hybrid_heat_pump` als onderdeel, en een bijlage-Q-warmtepomp met eigen backup.
+- **Niet toegestaan:** geneste splitsingen. Dat zijn `multiple` of `hybrid_heat_pump` als onderdeel, en een bijlage-Q-warmtepomp met eigen backup. 9.6.1 kent per systeem één preferentielijst; een hybride binnen `multiple` zou tabel 9.23 twee keer toepassen. Voer de warmtepomp en de ketel van een hybride dan als afzonderlijke preferenties in.
 
 **Belemmering van zonnecollectoren.** Voor de collectoren gelden de collectortabellen van §17.3:
 - 17.6 bij minimale belemmering (1,00);
@@ -553,7 +551,7 @@ Opgegeven factoren gaan via `declared.factors` (twaalf maandwaarden). Een eerder
 - **Tappatronen en bereik:** de toegestane combinaties i1/i2 en de extrapolatiegrenzen volgen de randvoorwaardentabel van 13.8.4.2. Buiten die grenzen geeft de kern `hot_water_two_profile_out_of_range`.
 - **Hulpenergie (13.159/13.160):** alleen voor gastoestellen die geen combi zijn.
 - **Terugwinbaar verlies (13.160a):** voor afvoerluchtwarmtepompen en voor combi's met een geïntegreerd voorraadvat.
-- **Niet ondersteund:** PFHRD (13.156a/b, vraagt het verwarmingsgebruik van de combi), de mengluchtcorrectie (13.153d–i) en de wintermeetmethode (13.153). E_PFHRD = 0 en C_W;mixed air = 1.
+- **PFHRD, mengluchtcorrectie en wintermeting:** de bijdrage van PFHRD (13.156a/b, `pfhrd`), de mengluchtcorrectie (13.153b/d–i, `mixedAir`) en de wintermeetmethode (13.153, `winter_gas_consumption_kwh`) zijn uitgewerkt in `domestic_hot_water`. Zonder opgave geldt E_PFHRD = 0 en C_W;mixed air = 1.
 
 **Warm tapwater uit het verwarmingssysteem (13.8.4.9.3).** Generator `heating_system` geeft het tapwater geen eigen energiedrager, hulpenergie of terugwinbaar verlies. E_W;gen;in;conv;hj = Q_W;gen;gi;out (13.185) komt in de verwarmingsketen als extra belasting van het knooppunt (`hotWaterLoadKwh`), net als bevochtiging en LBK-naverwarming. De verdeling van 13.184, die laat zien welk deel van het opwekkergebruik naar tapwater gaat, wordt niet gerapporteerd.
 
@@ -947,3 +945,32 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
   - Een opgegeven `sourceCorrection` gaat voor.
   - c_source moet 1,00, 1,02 of 1,04 zijn (tabel V.1/V.3). Eerder werd alles boven 1,0 afgewezen.
 - **W.3.** Q_C;HP;si;mi van de koelketen (10.6/10.9) vult `coolingExtractionKwh` in van boosterwarmtepompen die zelf geen waarde opgeven. Bij meer boosters wordt het gelijk verdeeld (W.3, opmerking 3).
+
+## Meerdere verwarmingssystemen per gebouw (§9.2, 5.20)
+
+- **Invoer.** `BuildingPerformanceInput.additionalHeatingSystems` is een lijst van volledige ketens (`SpaceHeatingChainInput`), elk met eigen zones, afgifte, distributie en opwekker(s). `spaceHeating` blijft het hoofdsysteem; JSON zonder het nieuwe veld rekent als voorheen.
+- **Berekening.** Elke keten wordt apart berekend: eigen 9.7-terugkoppeling, eigen bijlage Q of 9.6.1-verdeling. Daarna telt `combine_heating_systems` per maand de dragers, de hulpenergie, de terugwinbare verliezen, de hernieuwbare termen en de WKK-elektriciteit op. De zones van de extra systemen staan in `additionalZoneDemands`.
+- **Interne winsten.** Verlichting (7.28) en terugwinbare tapwaterverliezen (7.29, naar oppervlakteaandeel van het hele gebouw) worden in alle systemen ingevuld. De tapwaterkoppeling van het hoofdsysteem (13.185, bijlage V) blijft bij het hoofdsysteem.
+- **Rendement.** Het gerapporteerde opwekkingsrendement is het naar warmtepompoutput gewogen COP, Σ Q_hp / Σ (Q_hp/COP). Daaruit volgt de omgevingswarmte van 5.30/5.31.
+- **Geen dubbeltelling.** Een zone mag maar in één systeem staan (`heating_system_zone_twice`). Hoofdstuk 5, TO-juli, koeling en het maatwerkadvies lopen over alle zones van alle systemen.
+- **Koeling en 10.84.** De bewijs- en extractiecontrole kijkt naar het eerste systeem met een warmtepomp. De onttrokken bronwarmte volgt uit de opgetelde rijen (Q_hp − E_el). Benadering: een extra systeem met elektrische weerstandsverwarming verlaagt die som.
+- **Projectroute.** `ntaCalculation.additionalHeatingSystems` geeft per systeem `zoneIds`, `generator` en optioneel `distributionSystem`, `collectiveConnection`, `identicalSystems` en `humidifiers`. Het hoofdsysteem bedient de overige zones. Afgifte en distributie volgen `zoneData` per zone. Gaten: `heating_system_zones_required`, `heating_system_zone_twice`, `heating_system_zone_unknown`, `main_heating_system_without_zones`.
+- **UI.** In het NTA-formulier staat bij meer dan één zone de sectie "Extra verwarmingssystemen (§9.2)". Daar kies je per systeem de zones en de opwekker.
+
+## Hybride warmtepomp en 9.6.1 bij bestaande bouw
+
+- `designContext` van `hybrid_heat_pump` (en van de dispatch) is `new_build` of `existing` (β volgens 9.56/9.57 met het opgestelde vermogen). `existing_added_preferred` geldt bij renovatie met een bijgeplaatste preferente opwekker: 9.58/9.59, Φ_H;tot = Σ Q_H;node;in / 1139, met f_gebouw;si;H (`buildingFraction`).
+- Andere waarden geven `design_context_unsupported`.
+- Een hybride binnen `multiple` blijft geweigerd (`generator_nested_split_unsupported`); zie "Meerdere opwekkers voor ruimteverwarming".
+
+## Bijlage Q: hulpenergie bronpomp letterlijk (9.6.3.2)
+
+- Onder 9.63 (p. 340) staat W_H;gen;aux;mi = W_H;aux;hp;an/(12·3,6). De kern boekt dat nu als hulpenergie in elke maand (`sourcePumpKwh / 12`), naast de hulpenergie van een eventuele gasketel als backup.
+- **Normprobleem.** Volgens Q.4 (p. 1029) bevat Q_H;hp;us;an;el al W_H;aux;hp;an, dus zit de bronpomp ook in η_H;gen;hp. De norm telt de bronpomp daarmee twee keer. De kern volgt de tekst zoals die er staat; dit staat in `OMITTED_TERMS` van `space_heating_chain`.
+
+## Berekende zonetemperatuur (7.9.6)
+
+- `operativeTemperatureC` staat in de verwarmings- en koelbalans van elke maand.
+- **Verwarming:** θ_int;op;H = θ_int;calc;H.
+- **Koeling, 7.80/7.81:** θ_int;op;C = θ_e;avg + (Q_C;nd + Q_C;gn)/(H_C;ht·0,001·t), met H_C;ht = Q_C;ht/((θ_int;set;C;stc − θ_e;avg)·0,001·t). De kern neemt het plusteken over zoals gedrukt (p. 221). Fysisch zou je eerder Q_C;gn − Q_C;nd verwachten; dit is een open normvraag.
+- Bij θ_int;set;C = θ_e;avg of Q_C;ht = 0 is H_C;ht niet gedefinieerd; de uitvoer is dan `null`.
