@@ -1,7 +1,10 @@
 //! Provisional indicator arithmetic from public consultation chapter 5, §5.3.1.
 //! Caller supplies independently derived annual totals and Ag;tot. No label is calculated.
 
-use crate::final_energy_draft::{as_f64, decimal, DRAFT_SOURCE};
+use crate::final_energy_draft::{as_f64, decimal};
+
+/// Final-edition citation of the §5.3.1 indicators.
+const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §5.3.1, formules 5.1–5.8 (p. 72–79)";
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use rust_decimal::{Decimal, RoundingStrategy};
 use serde::{Deserialize, Serialize};

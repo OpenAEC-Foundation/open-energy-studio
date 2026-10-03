@@ -1,11 +1,15 @@
-//! Lookup of electric heat-pump COP values in the public consultation draft,
-//! chapter 9 tables 9.27 and 9.29. This is not a generator-energy calculation.
+//! Lookup of electric heat-pump COP values in NTA 8800:2025+C1:2026 tables
+//! 9.27 (p. 333–334) and 9.29 (p. 337–338). The values were first taken from
+//! the public consultation draft and checked against the final edition. This
+//! is not a generator-energy calculation.
 
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-pub const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+/// Final-edition citation of the tables; the name is kept for the output field.
+pub const DRAFT_SOURCE: &str =
+    "NTA 8800:2025+C1:2026, tabellen 9.27 (p. 333–334) en 9.29 (p. 337–338)";
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

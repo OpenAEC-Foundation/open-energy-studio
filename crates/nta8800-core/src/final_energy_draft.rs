@@ -10,7 +10,8 @@ use serde_json::json;
 use std::collections::HashSet;
 use std::str::FromStr;
 
-pub const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14147";
+/// Final-edition citation of §5.9; the name is kept for the output field.
+pub const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §5.9, formules 5.57–5.60 (p. 133)";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

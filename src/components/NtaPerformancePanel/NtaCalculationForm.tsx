@@ -12,13 +12,16 @@ import { DynamicWindowsFields } from './NtaDynamicWindows';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import {
-  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
+  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
   SpaceGeneratorFields, WindowObstructionFields,
 } from './NtaSystemSections';
 import {
   buildVentilationDraft, removeVentilation, syncVentilation, utilityInternalGains,
 } from '../../core/nta/NtaFormModels';
 import { nullPaths } from '../../core/nta/KernelInput';
+import {
+  CollectiveAndRenewableFields, CoolingSystemsFields, DeclaredFlowsFields, HumidifiersFields, SpaceHeatingSolarFields, SunroomsFields,
+} from './NtaProjectExtras';
 
 // The block is edited as plain JSON data; the Rust kernel is the validator.
 
@@ -204,6 +207,9 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.dynamic.title')}>
       <DynamicWindowsFields draft={draft} change={change} project={project} />
     </Section>
+    <Section title={t('nta.form.sunroom.title')}>
+      <SunroomsFields draft={draft} change={change} />
+    </Section>
     {tilts.length > 0 && <Section title={t('nta.form.roofTilts')}>
       {tilts.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">
         <NumberField {...field} path={['surfaceTilts', index, 'tiltDeg']} label={`${surfaceName(item.surfaceId)} — ${t('nta.form.tilt')}`} />
@@ -298,6 +304,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.generator')}>
       <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} allowMultiple />
       <NumberField {...field} path={['identicalSystems']} label={t('nta.form.identicalSystems')} step="1" />
+      <CollectiveAndRenewableFields draft={draft} change={change} />
     </Section>
     <Section title={t('nta.form.bcrg.title')}>
       <DeclaredHeatingTableTool />
@@ -335,68 +342,14 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     {read(draft, ['hotWater']) != null && <Section title={t('nta.form.solar.title')}>
       <SolarWaterHeaterFields draft={draft} change={change} />
     </Section>}
+    <Section title={t('nta.form.spaceHeatingSolar.title')}>
+      <SpaceHeatingSolarFields draft={draft} change={change} />
+    </Section>
     <Section title={t('nta.form.cooling')}>
-      <label>{t('nta.form.coolingGenerator')}
-        <select value={String(read(draft, ['cooling', 'generators', 0, 'generator', 'kind']) ?? '')} onChange={(event) => {
-          const kind = event.target.value;
-          if (!kind) { change(['cooling'], null); return; }
-          const current = (read(draft, ['cooling']) as Draft | null) ?? {
-            emission: { emitter: null, balancing: null, control: null, fanCoilCount: 0, sourceReference: '' },
-            distribution: null, generators: [], boosterHeatPumpExtractionKwh: [] };
-          const generator = kind === 'free_cooling'
-            ? { kind, source: null, heatPumpSource: false, groundAboveZeroDemonstrated: false } : { kind };
-          change(['cooling'], { ...current, generators: [{ id: 'cold-1', generator, capacityKw: null, equipmentReference: '' }] });
-        }}>
-          <option value="">{t('nta.form.cooling.none')}</option>
-          <option value="compression">{t('nta.form.cooling.compression')}</option>
-          <option value="room_air_conditioner">{t('nta.form.cooling.rac')}</option>
-          <option value="gas_absorption">{t('nta.form.cooling.absorption')}</option>
-          <option value="absorption_external_heat">{t('nta.form.cooling.absorptionDh')}</option>
-          <option value="external_cold">{t('nta.form.cooling.external')}</option>
-          <option value="unknown_collective">{t('nta.form.cooling.unknownCollective')}</option>
-          <option value="free_cooling">{t('nta.form.cooling.free')}</option>
-        </select>
-      </label>
-      {read(draft, ['cooling']) != null && <>
-        <TextField {...field} path={['cooling', 'generators', 0, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
-        {['compression', 'room_air_conditioner'].includes(String(read(draft, ['cooling', 'generators', 0, 'generator', 'kind']))) &&
-          <CoolingPerformanceFields draft={draft} change={change} base={['cooling', 'generators', 0, 'generator']} />}
-        {read(draft, ['cooling', 'generators', 0, 'generator', 'kind']) === 'free_cooling' && <>
-          <SelectField {...field} path={['cooling', 'generators', 0, 'generator', 'source']} label={t('nta.form.freeCoolingSource')} options={[
-            ['aquifer_from2013', t('nta.form.free.aquiferNew')], ['aquifer_dwellings_before2013', t('nta.form.free.aquiferOld')],
-            ['aquifer_utility_before2013', t('nta.form.free.aquiferUtility')], ['surface_water', t('nta.form.free.surface')],
-            ['closed_ground_loop', t('nta.form.free.ground')], ['dew_point_cooling', t('nta.form.free.dewPoint')]]} />
-          <CheckField {...field} path={['cooling', 'generators', 0, 'generator', 'heatPumpSource']} label={t('nta.form.free.heatPumpSource')} />
-        </>}
-        <SelectField {...field} path={['cooling', 'emission', 'emitter']} label={t('nta.form.coolingEmitter')} options={[
-          ['floor_cooling', t('nta.form.coolEm.floor')], ['wall_cooling', t('nta.form.coolEm.wall')],
-          ['fan_coil_or_rac_on_outer_wall', t('nta.form.coolEm.fanWall')], ['ceiling_cooling', t('nta.form.coolEm.ceiling')],
-          ['fan_coil_or_rac_on_ceiling', t('nta.form.coolEm.fanCeiling')], ['other_or_unknown', t('nta.form.coolEm.other')]]} />
-        <SelectField {...field} path={['cooling', 'emission', 'balancing']} label={t('nta.form.balancing')} options={[
-          ['none_or_unknown', t('nta.form.coolBal.none')], ['static', t('nta.form.coolBal.static')],
-          ['dynamic', t('nta.form.coolBal.dynamic')], ['not_applicable', t('nta.form.coolBal.na')]]} />
-        <SelectField {...field} path={['cooling', 'emission', 'control']} label={t('nta.form.coolingControl')} options={[
-          ['unknown_or_other', t('nta.form.coolCtrl.unknown')], ['standalone_per_room', t('nta.form.coolCtrl.standalone')],
-          ['central_with_room_control', t('nta.form.coolCtrl.central')]]} />
-        <NumberField {...field} path={['cooling', 'emission', 'fanCoilCount']} label={t('nta.form.coolingFanCoils')} />
-        <TextField {...field} path={['cooling', 'emission', 'sourceReference']} label={t('nta.form.source')} />
-        <label className="nta-form-check">
-          <input type="checkbox" checked={read(draft, ['cooling', 'distribution']) != null}
-            onChange={(event) => change(['cooling', 'distribution'], event.target.checked
-              ? { designTemperature: 't6_to12_or_unknown', pipe: { kind: 'insulated_before1980_or_unknown_age' }, fittingsInsulated: false, sourceReference: '' }
-              : null)} />
-          {t('nta.form.coolingWaterBased')}
-        </label>
-        {read(draft, ['cooling', 'distribution']) != null && <>
-          <SelectField {...field} path={['cooling', 'distribution', 'designTemperature']} label={t('nta.form.coolingDesign')} options={[
-            ['t6_to12_or_unknown', '6/12'], ['t12_to16', '12/16'], ['t12_to18', '12/18'], ['t17_to21', '17/21']]} />
-          <SelectField {...field} path={['cooling', 'distribution', 'pipe', 'kind']} label={t('nta.form.coolingPipe')} options={[
-            ['insulated_from1995', t('nta.form.coolPipe.from1995')], ['insulated1980_to1995', t('nta.form.coolPipe.1980')],
-            ['insulated_before1980_or_unknown_age', t('nta.form.coolPipe.before1980')], ['uninsulated', t('nta.form.coolPipe.none')]]} />
-          <CheckField {...field} path={['cooling', 'distribution', 'fittingsInsulated']} label={t('nta.form.coolingFittings')} />
-          <TextField {...field} path={['cooling', 'distribution', 'sourceReference']} label={t('nta.form.source')} />
-        </>}
-      </>}
+      <CoolingSystemsFields draft={draft} change={change} project={project} />
+    </Section>
+    <Section title={t('nta.form.humidifiers.title')}>
+      <HumidifiersFields draft={draft} change={change} project={project} />
     </Section>
     {!residential && <NtaLightingSection draft={draft} change={change} project={project} />}
     {pv.length > 0 && <Section title={t('nta.form.pv')}>
@@ -432,6 +385,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <BacsAndSupplyFields draft={draft} change={change} residential={residential} />
       <CheckField {...field} path={['useInventoryComplete']} label={t('nta.form.useInventory')} />
       <CheckField {...field} path={['productionInventoryComplete']} label={t('nta.form.productionInventory')} />
+      <DeclaredFlowsFields draft={draft} change={change} />
       {chapter11
         ? <p className="nta-form-note">{t('nta.vent.c1Automatic')}</p>
         : <CheckField {...field} path={['demandUsesFixedC1Ventilation']} label={t('nta.form.c1')} />}

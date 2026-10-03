@@ -2,6 +2,24 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — formulieren voor externe levering, serres, bevochtiging, koelsystemen en opgegeven stromen
+
+Alleen de invoer verandert; opgeslagen projecten rekenen hetzelfde.
+
+- **Externe levering (§5.8, bijlage P):** het JSON-veld is vervangen door een formulier per drager (dh, dw, dc):
+  - forfaitair (geen route), kwaliteitsverklaring, gemeten stromen (P.6) of berekend systeem (P.7, P.9);
+  - bij het berekende systeem: levering of percelen (P.72–P.83), distributie (jaarstromen, tabel P.0 of klein koudesysteem), opwekkers met hun soort, vermogen, fractie en voorkeur, hulpenergie (P.56–P.70) en de tapwateropslag (P.34/P.35);
+  - collectieve warmtepompbron en elektriciteit in het gebied (P.7, P.71).
+
+  Leidingdelen, berekende opslag en de opwekkers collectieve zonnewarmte, elektrische flex en sorptiekoeling houden een JSON-veld binnen het formulier.
+- **Aangrenzende onverwarmde serres (7.30b)** met beglazing, b_U, H_zi;ztu en vlakken.
+- **Bevochtiging (hoofdstuk 12)** per rekenzone: verstuivend of stoom, met warmtewiel.
+- **Meerdere koelsystemen (§10.2):** een project met meer rekenzones kan per koelsysteem de bediende zones kiezen; dat sluit één koelsysteem voor het hele gebouw uit.
+- **Zonneverwarming zonder tapwatersysteem (§13.7).**
+- **Collectieve installatie (9.6.1)** en het bewijs voor het hernieuwbare aandeel van een warmtepomp (5.31/5.32).
+- **Opgegeven stromen per maand:** gebruik buiten de berekening (§5.5), hernieuwbare tapwaterwarmte (5.35/5.36) en opwekking op eigen perceel (hoofdstuk 16).
+- **Bronvermelding in de uitvoer:** de velden `draftSource` en `consultationSource` van de tabellen 9.25, 9.27 en 9.29, §5.3.1, §5.5.8, 5.20–5.21 en §5.9 noemen nu de paragraaf en pagina's van de eindtekst in plaats van de internetconsultatie.
+
 ## 3 oktober 2026 — invoerformulieren voor toestellen met productgegevens en de grondvloer
 
 Alleen de invoer verandert; opgeslagen projecten rekenen hetzelfde.

@@ -1,12 +1,13 @@
 import { useI18n } from '../../i18n/i18n';
 import { airHeatersTemplate, bacsTemplate } from '../../core/nta/NtaSystemTemplates';
 import {
-  CheckField, JsonField, NumberField, read, SelectField, TextField, TriStateField, type Draft, type Path,
+  CheckField, NumberField, read, SelectField, TextField, TriStateField, type Draft, type Path,
 } from './NtaFormFields';
+import { ExternalSupplyFields } from './NtaExternalSupply';
 
 // Less common NTA calculation inputs: area-weighted use functions (§5.3.1,
 // Bbl art. 4.149), air-heater fans (9.23), §5.5.8 BACS evidence and the
-// annex P external-supply routes (edited as JSON).
+// annex P external-supply routes (NtaExternalSupply).
 
 interface SectionProps {
   draft: Draft;
@@ -150,7 +151,6 @@ export function BacsFields({ draft, change }: SectionProps) {
 /** §5.5.8 BACS evidence (replaces bacsFactor) and annex P external supply. */
 export function BacsAndSupplyFields({ draft, change, residential }: SectionProps & { residential: boolean }) {
   const { t } = useI18n();
-  const field = { draft, onChange: change };
   const bacs = read(draft, ['bacs']) != null;
   return <>
     <label className="nta-form-check">
@@ -159,8 +159,6 @@ export function BacsAndSupplyFields({ draft, change, residential }: SectionProps
       {t('nta.form.bacsDraft')}
     </label>
     {bacs && <BacsFields draft={draft} change={change} />}
-    <JsonField key="externalSupply" {...field} path={['externalSupply']} label={t('nta.form.externalSupplyJson')}
-      invalid={t('nta.form.jsonInvalid')} />
-    <p className="nta-form-note">{t('nta.form.externalSupplyNote')}</p>
+    <ExternalSupplyFields draft={draft} change={change} />
   </>;
 }

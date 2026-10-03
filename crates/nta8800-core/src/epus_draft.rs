@@ -4,12 +4,15 @@
 use crate::bacs_draft::{assess_bacs_draft, BacsDraftInput};
 use crate::final_energy_draft::{
     as_f64, assess_final_energy_draft, decimal, CarrierUse, FinalEnergyDraftAssessment,
-    FinalEnergyDraftInput, MonthlyEnergy, SolarThermalUse, DRAFT_SOURCE,
+    FinalEnergyDraftInput, MonthlyEnergy, SolarThermalUse,
 };
 use crate::gas_collective_source_draft::{
     assess_gas_collective_source_draft, GasCollectiveSourceDraftInput,
 };
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+
+/// Final-edition citation of the E_EPus composition.
+const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, formules 5.20–5.21 (p. 89–91)";
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

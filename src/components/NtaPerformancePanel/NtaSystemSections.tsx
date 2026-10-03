@@ -618,7 +618,7 @@ export function AdditionalHeatingSystemsFields({ draft, change, project }: Secti
 }
 
 /** Twelve monthly numbers in one row. */
-function MonthlyValues({ draft, change, path, label }: SectionProps & { path: Path; label: string }) {
+export function MonthlyValues({ draft, change, path, label }: SectionProps & { path: Path; label: string }) {
   const values = list(draft, path) as unknown as Array<number | null>;
   return <fieldset className="nta-form-months"><legend>{label}</legend>
     {Array.from({ length: 12 }, (_, index) => <input key={index} type="number" step="any" aria-label={`${label} ${index + 1}`}
@@ -654,15 +654,20 @@ function CollectorObstructionFields({ draft, change, base }: SectionProps & { ba
   </>;
 }
 
-/** §13.7 solar water heaters and solar combi systems (`hotWater.solar`). */
-export function SolarWaterHeaterFields({ draft, change }: SectionProps) {
+/**
+ * §13.7 solar water heaters and solar combi systems (`hotWater.solar`), or
+ * solar space heating without a hot-water system (`spaceHeatingSolar`).
+ */
+export function SolarWaterHeaterFields({ draft, change, base = ['hotWater', 'solar'], solarUse = 'water_heating' }: SectionProps & {
+  base?: Path; solarUse?: string;
+}) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
-  const systems = list(draft, ['hotWater', 'solar']);
+  const systems = list(draft, base);
   const orientations: Array<[string, string]> = ORIENTATIONS.map((key) => [key, t(`nta.form.orientation.${key}`)]);
   return <div className="nta-form-subsection">
     {systems.map((_, index) => {
-      const at = (...rest: Path): Path => ['hotWater', 'solar', index, ...rest];
+      const at = (...rest: Path): Path => [...base, index, ...rest];
       const method = read(draft, at('method', 'method'));
       const points = list(draft, at('method', 'testPoints'));
       return <fieldset key={index} className="nta-form-row">
@@ -732,10 +737,10 @@ export function SolarWaterHeaterFields({ draft, change }: SectionProps) {
           ['unglazed', t('nta.form.solar.pvt.unglazed')], ['single_glazed', t('nta.form.solar.pvt.glazed')],
           ['tested_iso9806', t('nta.form.solar.pvt.tested')]]} />
         <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
-        <RemoveButton label={t('nta.form.remove')} onClick={() => change(['hotWater', 'solar'], systems.filter((__, other) => other !== index))} />
+        <RemoveButton label={t('nta.form.remove')} onClick={() => change(base, systems.filter((__, other) => other !== index))} />
       </fieldset>;
     })}
-    <button type="button" onClick={() => change(['hotWater', 'solar'], [...systems, solarWaterHeaterTemplate(systems.length)])}>
+    <button type="button" onClick={() => change(base, [...systems, solarWaterHeaterTemplate(systems.length, solarUse)])}>
       {t('nta.form.solar.add')}
     </button>
   </div>;

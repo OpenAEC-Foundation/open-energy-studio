@@ -6,7 +6,10 @@
 //! sets the factor for all heating and cooling. The module name keeps its
 //! history; the rules were checked against the target edition.
 
-use crate::final_energy_draft::{as_f64, decimal, DRAFT_SOURCE};
+use crate::final_energy_draft::{as_f64, decimal};
+
+/// Final-edition citation of §5.5.8.
+const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §5.5.8 (p. 99–101)";
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
