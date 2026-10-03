@@ -58,6 +58,23 @@ Per balans: setpoint na nivellering, reductiefactor (`a_H;red` of `a_C;red`), re
 
 `transmission.verticalPipes` (route `components`) geeft per leiding het aantal bouwlagen van de zone, geïsoleerd of niet en het aantal zones waarlangs de leiding loopt. `H_p = Σ N_bouwlaag;j · H_p;spec;j / n_zones` met tabel 7.1 (1,8 W/K ongeïsoleerd, 0,5 W/K geïsoleerd). `H_p` telt mee in `H_tr` (7.16) en staat apart in de transmissiesamenvatting (`verticalPipeConductanceWPerK`).
 
+Bij een fictieve leiding per toiletgroep in de utiliteitsbouw (7.17a) mag in plaats van `storeys` ook `buildingHeightM` (H van 11.2.1.2) worden opgegeven. Dan geldt N_bouwlaag = ⌊H/3⌋, met een minimum van 1. `areaShare` verdeelt H_p naar rato van de gebruiksoppervlakte over de zones van het gebouw.
+
+## Zontoetreding: tabelwaarden (7.41, tabel 7.4–7.6, 7.4a/b)
+
+Invoer voor de zontoetreding per raam:
+- `glazing.glazingType` geeft g_gl;n uit tabel 7.4 in plaats van `gPerpendicular`. Opgeven van allebei is een fout.
+- `movableShading.device` geeft F_c uit tabel 7.5/7.6. Voor zonneschermen hangt die af van de oriëntatie. Een expliciete `reductionFactor` blijft mogelijk; die wordt naar boven afgerond op 0,01.
+- `glazing.fixedLouvres` vermenigvuldigt g met F_c;lam: 0,27 bij 90°, 0,15 schuin, 0,27/0,06 draaibaar open/dicht. Bij draaibare lamellen weegt `f_sh;with` uit de regeling.
+- `glazing.diffusing` rekent met g = 0,75·g_alt + 0,25·g_dif (7.41).
+- Zonwerend glas staat in tabel 7.4 alleen voor de utiliteitsbouw.
+
+## Kelderdiepte per wanddeel (8.42/D.12) en vochtfactor (E.8/E.9)
+
+- `heatedBasement.wallDepths` geeft z_j per wanddeel. Dan is z = Σℓ_j·z_j/Σℓ_j, en Σℓ_j moet gelijk zijn aan de omtrek P. `depthM` mag dan niet ook worden opgegeven.
+- Voor kruipruimten en onverwarmde kelders zijn z_j een klasse (0 of 0,5 m) en h_j vast 0,125 m (8.47). D.17 en D.18 vallen daar samen met de enkele waarde.
+- `moistureConversion` bij een opgegeven isolatie-λ_D rekent F_M = e^{f·(x₂ − 0)}: E.8 voor Ψ, E.9 voor u. De coëfficiënt komt uit tabel 4 van NEN-EN-ISO 10456. Deze F_M vervangt tabel E.2.
+
 ## Niet toegepast (altijd meegeleverd als `omittedCorrections`)
 
 - terugwinbare systeemverliezen `Q_H;ls;rbl`/`Q_C;ls;rbl` en de Δη-termen van 7.3–7.5 en 7.7–7.9 (komen uit hoofdstuk 9 en 10);

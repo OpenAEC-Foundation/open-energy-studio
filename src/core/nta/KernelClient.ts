@@ -419,10 +419,27 @@ export type NtaShadingControl =
   | 'automatic'
   | 'manual_utility_with_glare_protection'
   | 'manual_utility_without_glare_protection';
+export type NtaShadeColour = 'dark' | 'other' | 'white' | 'unknown';
+/** Table 7.5/7.6 devices; F_c follows from the table instead of `reductionFactor`. */
+export type NtaShadingDevice =
+  | { kind: 'external_screen'; colour: NtaShadeColour }
+  | { kind: 'external_venetian_blind'; colour: NtaShadeColour }
+  | { kind: 'external_roller_shutter'; colour: NtaShadeColour }
+  | { kind: 'internal_metallised_fabric' }
+  | { kind: 'drop_arm_awning' }
+  | { kind: 'folding_arm_awning' };
 export interface NtaMovableShading {
-  reductionFactor: number;
+  /** Explicit F_c; omit when `device` gives the table value. */
+  reductionFactor?: number;
+  device?: NtaShadingDevice | null;
   control: NtaShadingControl;
   sourceReference: string;
+}
+/** 7.41/7.41a/7.41b: table 7.4 glazing, fixed louvres (7.4a) or diffusing glazing (7.4b). */
+export interface NtaGlazingSolar {
+  glazingType?: 'single' | 'double' | 'single_with_secondary_pane' | 'double_low_e' | 'triple_one_coating' | 'triple_two_coatings' | 'solar_control' | null;
+  fixedLouvres?: { kind: 'horizontal90' } | { kind: 'horizontal_angled' } | { kind: 'rotatable'; control: NtaShadingControl } | null;
+  diffusing?: { gAltitude45: number; gDiffuse: number; sourceReference: string } | null;
 }
 
 /** Usage functions of NTA 8800 tables 7.13–7.15. */
@@ -495,7 +512,7 @@ export type MonthlyDemandTransmission =
       }>;
       groundInventoryConfirmed: boolean;
       /** 7.3.3 vertical pipes through the envelope (H_p, table 7.1). */
-      verticalPipes?: Array<{ id: string; storeys: number; insulated: boolean; sharedZones?: number; sourceReference: string }>;
+      verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }>;
     };
 
 /** 8.3.4.2: crawlspace or unheated basement below a ground floor. */
@@ -520,7 +537,9 @@ export type NtaFloorBelow =
 
 /** 8.3.3.2: heated room with its floor below ground level. */
 export interface NtaHeatedBasement {
-  depthM: number;
+  /** Omit when `wallDepths` gives z_j per wall part (8.42/D.12). */
+  depthM?: number;
+  wallDepths?: Array<{ lengthM: number; depthM: number }>;
   wallResistanceM2kPerW: number;
   forfaitDeltaUWPerM2k?: number | null;
 }
@@ -600,7 +619,9 @@ export interface MonthlyDemandInput {
     areaM2: number;
     orientation: NtaOrientation;
     tiltDeg: number;
-    gPerpendicular: number;
+    /** Omit when `glazing.glazingType` gives the table 7.4 value. */
+    gPerpendicular?: number;
+    glazing?: NtaGlazingSolar | null;
     frameFraction: number;
     uValueWPerM2k: number;
     obstruction: NtaObstruction;
@@ -1348,8 +1369,10 @@ export interface BoilerForfaitDraftInput {
   generatorId: string;
   role: 'individual_main' | 'individual_supplementary' | 'collective';
   location: 'inside_thermal_boundary' | 'outside_thermal_boundary';
-  kind: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107';
-  fuel: 'natural_gas';
+  /** `unknown`: collective only (table 9.25 a), W_aux = 0 per 9.6.8.2.2). */
+  kind: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'unknown';
+  /** Oil boilers are `conventional`. */
+  fuel: 'natural_gas' | 'oil';
   averageDesignEmissionTemperatureC: number;
   emissionCircuit: 'direct' | 'mixing_with_return_limit' | 'mixing_without_return_limit';
   equipmentReference: string;
@@ -1618,6 +1641,8 @@ export interface SpaceHeatingChainInput {
         designTemperatureClass?: NtaDesignTemperatureClass | null;
         annexRCompliantAtMost500Kw?: boolean | null;
         annexRReference?: string | null;
+        /** Biomass above 500 kW per installation: bmA (table 5.2). */
+        biomassAbove500Kw?: boolean;
       }
     | {
         /** Annex N: local, air or radiant heater or stove. */
@@ -1626,6 +1651,7 @@ export interface SpaceHeatingChainInput {
         fuel: 'natural_gas' | 'oil' | 'biomass';
         annexRCompliantAtMost500Kw?: boolean | null;
         annexRReference?: string | null;
+        biomassAbove500Kw?: boolean;
         soleHeatingInServedRooms?: boolean | null;
       }
     | {
@@ -1655,12 +1681,15 @@ export interface SpaceHeatingChainInput {
         kind: 'multiple';
         generators: Array<{
           preference: number;
-          nominalPowerKw: number;
+          /** May be omitted with `estimatedBeta`. */
+          nominalPowerKw?: number;
           /** Any single generator of this union except `multiple` and `hybrid_heat_pump`. */
           generator: { kind: string } & Record<string, unknown>;
         }>;
         /** 9.58/9.59: renovation with an added preferred generator. */
         addedPreferredGenerator?: boolean;
+        /** 9.6.1 note 1: estimated cumulative β for preferences 1 … n−1 when powers are unknown. */
+        estimatedBeta?: number[];
         sourceReference: string;
       };
 }
@@ -2036,6 +2065,8 @@ export type MaterialConductivity =
       moisture: string;
       ageing: { kind: 'factory_made' } | { kind: 'in_situ'; product: string; situation: 'a' | 'b'; practiceTested?: boolean };
       temperature?: { meanTemperatureC: number; conversionCoefficient: number; sourceReference: string };
+      /** E.8/E.9 F_M from the moisture content; replaces table E.2. */
+      moistureConversion?: { basis: 'volume' | 'mass'; conversionCoefficient: number; moistureContent: number; sourceReference: string } | null;
       convectionFactor?: number;
       sourceReference: string;
     }
@@ -2973,6 +3004,8 @@ export interface BuildingPerformanceInput {
     /** §17.3 collector situation (tables 17.6/17.12/17.15). */
     obstruction?: NtaCollectorObstruction;
     collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
+    /** 16.10, table 16.4: f_PVT;PV of a PVT panel. */
+    pvt?: { kind: 'unglazed' } | { kind: 'glazed'; collectorAreaM2: number; storageVolumeL: number } | null;
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
@@ -3379,7 +3412,13 @@ export type NtaHotWaterGenerator =
     | { kind: 'gas_storage_heater'; volumeL: number; measuredStandbyKwhPerDay?: number | null; before1985: boolean; inHeatedZone: boolean }
     | { kind: 'large_direct_storage'; gasFired: boolean }
     | { kind: 'indirect_boiler'; boiler: 'conventional_or_unknown' | 'vr' | 'hr100_or104' | 'hr107'; oil: boolean;
-        insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null }
+        insideBoundary: boolean; alsoSpaceHeating: boolean; declared?: NtaDhwDeclared | null;
+        /** §13.8.4.7.4 gas pilot flame, counted when the boiler does not also heat the building. */
+        pilotFlame?: boolean }
+    /** §13.8.4.6 table 13.22 solid-biomass combi appliance with an annex R vessel. */
+    | { kind: 'biomass_combi'; insulation: 'at_least20_mm' | 'at_least10_mm' | 'none'; insideBoundary: boolean }
+    /** §13.8.4.10 electric heat pumps in series as one notional device (table 9.29, 65–70 °C). */
+    | { kind: 'heat_pump_series'; lastSource: ForfaitHeatPumpDraftInput['source'] }
     | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
     | { kind: 'external_heat' }
     | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump)
@@ -3577,10 +3616,10 @@ export interface NtaCalculationInput {
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
   ventilation?: VentilationInput | null;
   /** 7.3.3 vertical pipes (single-zone projects; per zone in `zoneData`). */
-  verticalPipes?: Array<{ id: string; storeys: number; insulated: boolean; sharedZones?: number; sourceReference: string }>;
+  verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }>;
   zoneData?: Array<{
     zoneId: string;
-    verticalPipes?: Array<{ id: string; storeys: number; insulated: boolean; sharedZones?: number; sourceReference: string }>;
+    verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }>;
     functionAreas?: Array<{ function: NtaUsageFunction; areaM2: number }>;
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
     ventilation?: VentilationInput | null;

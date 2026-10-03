@@ -3471,12 +3471,8 @@ mod tests {
             .iter()
             .map(|issue| issue.code)
             .collect();
-        assert!(codes
-            .iter()
-            .any(|code| *code == "vertical_pipe_building_height_invalid"));
-        assert!(codes
-            .iter()
-            .any(|code| *code == "vertical_pipe_area_share_requires_building_height"));
+        assert!(codes.contains(&"vertical_pipe_building_height_invalid"));
+        assert!(codes.contains(&"vertical_pipe_area_share_requires_building_height"));
     }
 
     #[test]

@@ -854,3 +854,32 @@ De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijv
 **ϑ_ztu voor tapwaterleidingen en -vaten (7.82).** Met `unheatedReductionFactor` (b_U) op het tapwatersysteem rekenen circulatieleidingen (13.26) en voorraadvaten (13.58) in een onverwarmde ruimte met ϑ_ztu = ϑ_int;set;H − b_U·(ϑ_int;set;H − ϑ_e;avg). Dat geldt ook voor de gasboiler buiten de verwarmde zone (13.168). Een opgegeven `unheatedAmbientC` gaat voor; zonder beide geldt 13 °C.
 
 **Douche-WTW met meerdere douches (13.53–13.57, p. 563–564).** Het rendement is het gemiddelde over alle douches van het systeem, met 0 voor een douche zonder unit. In de utiliteitsbouw kan bekend zijn dat meer dan 80 % van de douches op een unit is aangesloten, terwijl niet bekend is welke douche op welke unit zit (`assignmentUnknown`). Dan geldt het laagste rendement van de aangesloten units.
+
+## Kleinere punten uit de dekkingsaudit (5 oktober 2026)
+
+**Meerdere opwekkers zonder vermogens (9.6.1 opmerking 1).** `estimatedBeta` geeft een geschatte cumulatieve β voor voorkeur 1 … n−1: oplopend en tussen 0 en 1. `nominalPowerKw` mag dan ontbreken. Opwekkers met dezelfde voorkeur delen gelijk. De invoer sluit `addedPreferredGenerator` uit.
+
+**Ketel-forfait (tabel 9.25).**
+- Olieketels rekenen als `conventional`; een waakvlam is alleen voor gas toegestaan.
+- Een onbekende opwekker van een collectieve installatie (`kind: unknown`) krijgt 0,70 en W_H;aux;gen = 0 (9.6.8.2.2). De 9.91-hulpenergie-invoer is dan niet nodig.
+
+**Biomassaklassen (tabel 5.2–5.4).**
+- bmA: een installatie boven 500 kW (`biomassAbove500Kw`), met f_P 0 en volledig hernieuwbaar.
+- bmB: bijlage R aangetoond, met f_P 0,5.
+- bmC: overige gevallen, met f_P 1,0 en CO2 0,104.
+- De klassen gelden voor `product_boiler` en `local_heater`. De forfaitaire biomassa-opwekker blijft alleen voor bijlage R-toestellen, omdat tabel 9.30 alleen die dekt.
+- Tapwaterbiomassa telt als bmB.
+
+**Tapwater.**
+- Biomassa-combitoestel volgens tabel 13.22 (`biomass_combi`).
+- Waakvlam van een indirect gestookte ketel (§13.8.4.7.4, `pilotFlame`): 695 kWh/jaar gas, alleen als de ketel niet ook verwarmt.
+- Elektrische warmtepompen in serie als één fictief toestel (§13.8.4.10, `heat_pump_series`): COP uit tabel 9.29, kolom 65–70 °C, voor de bron van de laatste warmtepomp.
+
+**PVT (16.10, tabel 16.4).** `pvt` op een PV-systeem vermenigvuldigt de opbrengst met f_PVT;PV:
+- onafgedekt: 1,00;
+- afgedekt: 0,88, 0,84 of 0,80, afhankelijk van de verhouding collectoroppervlak/voorraadvat (< 0,015, ≤ 0,03, daarboven).
+
+**Hellende ramen voor daglicht (bijlage Y bij 14.6).** `DaylightSector::TiltedWindow` wordt op basis van de hoek γ omgezet:
+- 75–105°: een verticaal raam. A1 houdt c_w aan; A2 verlaagt het raam tot onder het plafond, maar niet onder het begin van de helling.
+- onder 75°: een daklicht met h_p = h_w·cos γ en h_R,a = hoogte van het midden van het raam.
+- boven 105°: het raam telt niet mee voor daglicht.
