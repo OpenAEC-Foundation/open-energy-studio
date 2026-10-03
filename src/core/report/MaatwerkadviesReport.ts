@@ -1,14 +1,33 @@
 import type { IProject } from '../energy/types';
 import type { MaatwerkadviesAssessment, MwaVariantResult, NtaMaatwerkadvies } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
-import { dutchCodeCell, dutchNumber, dutchTimeHtml } from './DutchReportText';
+import { dutchCodeCell, dutchCodeHtml, dutchNumber, dutchTimeHtml } from './DutchReportText';
 import { measureEvidenceNotes } from '../nta/MwaTemplates';
+import { nl } from '../../i18n/nl';
 
 function cell(value: unknown): string { return `<td>${escapeHtml(value)}</td>`; }
+/** Amounts (€, m³, kWh, kg) in Dutch with thousands grouping: 5.000, −1.282. */
 function num(value: number | null | undefined, digits = 0): string {
-  return dutchNumber(value, digits);
+  if (value == null || !Number.isFinite(value)) return dutchNumber(value, digits);
+  return value.toLocaleString('nl-NL', { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: true });
 }
 function n(value: number | null | undefined, digits = 0): string { return `<td class="n">${num(value, digits)}</td>`; }
+
+/** Dutch text of the assessment and attest status. */
+const STATUS: Record<string, string> = {
+  calculated_unverified: 'berekend, niet geverifieerd',
+  partially_calculated: 'gedeeltelijk berekend (niet alle varianten)',
+  invalid: 'ongeldig',
+  unattested: 'niet geattesteerd',
+};
+function status(value: string | null | undefined): string {
+  return value == null ? '—' : STATUS[value] ?? value;
+}
+
+/** The measure category in Dutch, with the code when there is no label. */
+function category(value: string): string {
+  return nl[`mwa.category.${value}`] ?? value;
+}
 
 const SYSTEM: Record<string, string> = {
   space_heating: 'Ruimteverwarming',
@@ -43,6 +62,11 @@ const PROFILE: Record<string, string> = {
 function variantRow(result: MwaVariantResult): string {
   const use = result.actualUse;
   const savings = result.savings;
+  if (!result.valid) {
+    // A variant that could not be calculated: its reasons instead of dashes.
+    const reasons = result.issues.map((item) => `${dutchCodeHtml(item.code)}${item.detail ? ` — ${escapeHtml(item.detail)}` : ''}`).join('<br>');
+    return `<tr>${cell(result.name)}<td colspan="12">Niet berekend: ${reasons || 'onbekende reden'}</td></tr>`;
+  }
   return `<tr>${cell(result.name)}${cell(result.label.labelClass ?? '—')}${n(result.label.primaryFossilIndicatorKwhPerM2, 1)}${n(result.label.tojuliMaxK, 2)}
     ${n(use?.gasM3)}${n(use ? use.electricityImportKwh - use.electricityExportKwh : null)}${n(use?.districtHeatKwh)}${n(use?.co2Kg)}${n(use?.energyCostEur)}
     ${n(savings?.energyCostEur)}${n(result.investmentEur)}${n(result.simplePaybackYears, 1)}${n(result.netPresentValueEur)}</tr>`;
@@ -66,7 +90,7 @@ export function generateMaatwerkadviesReportHTML(
     <div class="notice"><strong>Onverifieerde berekening, niet geattesteerd.</strong> De energieberekening komt uit de Rust-rekenkern van Open Energy Studio (NTA 8800:2025+C1:2026). Werkelijke besparingen hangen af van gebruik, uitvoering en energieprijzen. TO<sub>juli</sub> is slechts een indicatie en is voor bestaande bouw niet gevalideerd (ISSO 82.2 §4.2.3).</div>
     <h2>Herleidbaarheid</h2><table><tbody>
       <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Kernelversie</th>${cell(assessment.kernelVersion)}</tr>
-      <tr><th>Status</th>${cell(assessment.status)}<th>Atteststatus</th>${cell(assessment.attestStatus)}</tr>
+      <tr><th>Status</th>${cell(status(assessment.status))}<th>Atteststatus</th>${cell(status(assessment.attestStatus))}</tr>
       <tr><th>Invoervingerafdruk</th><td colspan="3"><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>
     </tbody></table>`;
   if (assessment.status === 'invalid' || !assessment.current) {
@@ -81,7 +105,7 @@ export function generateMaatwerkadviesReportHTML(
   const advice = assessment.advice;
   const evidenceNote = (measure: (typeof definition.measures)[number]) => measureEvidenceNotes(measure)
     .map((note) => `<br><small>PV ${escapeHtml(note.id)}: belemmeringssituatie a) (minimaal, NTA 8800 tabel 17.3) — onderbouwing: ${escapeHtml(note.source)}</small>`).join('');
-  const measureRows = definition.measures.map((measure) => `<tr><td>${escapeHtml(measure.name)}${evidenceNote(measure)}</td>${cell(measure.category)}${n(measure.investmentEur)}${cell(measure.costSource)}
+  const measureRows = definition.measures.map((measure) => `<tr><td>${escapeHtml(measure.name)}${evidenceNote(measure)}</td>${cell(category(measure.category))}${n(measure.investmentEur)}${cell(measure.costSource)}
     ${n(measure.lifetimeYears)}${n(measure.maintenanceEurPerYear ?? 0)}${cell(measure.phaseYear ?? '—')}</tr>`).join('');
   const packageRows = definition.packages.map((item) => {
     const names = item.measureIds.map((id) => definition.measures.find((m) => m.id === id)?.name ?? id).join(', ');
@@ -158,6 +182,8 @@ export function generateMaatwerkadviesReportHTML(
       <tr><th>Warmte</th><td>€ ${num(tariffs.districtHeatEurPerKwh ?? 0, 3)}/kWh</td><th>Bron tarieven</th>${cell(tariffs.sourceReference)}</tr>
       <tr><th>Discontovoet / prijsstijging</th><td>${num((definition.economics?.discountRate ?? 0.03) * 100, 1)} % / ${num((definition.economics?.energyPriceChange ?? 0) * 100, 1)} %</td><th>Bron</th>${cell(definition.economics?.sourceReference ?? '—')}</tr>
     </tbody></table>
-    <h3>Interpretaties</h3>${list(assessment.interpretations)}
+    <h3>Interpretaties van de rekenkern</h3>
+    <p>De rekenkern legt zijn interpretaties vast in het Engels, zoals ze in de broncode staan; ze zijn hier ongewijzigd opgenomen.</p>
+    ${list(assessment.interpretations)}
     </body></html>`;
 }

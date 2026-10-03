@@ -39,7 +39,7 @@ describe('maatwerkadvies measure templates in the panel', () => {
     expect(measure.category).toBe('insulation');
     expect(measure.template).toMatchObject({ kind: 'insulation', part: 'facade', rcValue: 6, surfaces: ['z1/wall-N', 'z1/wall-S'] });
     expect(measure.patch).toEqual([
-      { op: 'add', path: '/constructions/-', value: { id: 'm1-c-wall', name: 'Gevel Rc 4,7 (m1)', layers: [], rcValue: 6, uValue: 0.1621 } },
+      { op: 'add', path: '/constructions/-', value: { id: 'm1-c-wall', name: 'Gevel Rc 4,7 → Rc 6 (m1)', layers: [], rcValue: 6, uValue: 0.1621 } },
       { op: 'replace', path: '/zones/0/surfaces/0/constructionId', value: 'm1-c-wall' },
       { op: 'replace', path: '/zones/0/surfaces/1/constructionId', value: 'm1-c-wall' },
     ]);

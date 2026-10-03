@@ -285,7 +285,14 @@ export function renameZone(draft: Draft, index: number, id: string): Draft {
  */
 export function defaultValueLabel(t: T, value: string, locale = 'en') {
   if (value === 'true' || value === 'false') return t(value === 'true' ? 'common.yes' : 'common.no');
-  if (/^-?\d+(\.\d+)?$/.test(value)) return formatNumber(Number(value), locale, value.split('.')[1]?.length ?? 0);
+  // Recorded numbers (years, counts, areas) without thousands grouping: "1985", not "1.985".
+  if (/^-?\d+(\.\d+)?$/.test(value)) {
+    return Number(value).toLocaleString(locale, {
+      useGrouping: false,
+      minimumFractionDigits: value.split('.')[1]?.length ?? 0,
+      maximumFractionDigits: value.split('.')[1]?.length ?? 0,
+    });
+  }
   const pascal = /^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$/.test(value);
   if (pascal || /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(value)) {
     const id = pascal ? snakeCase(value) : value;
@@ -305,6 +312,28 @@ export function removeZone(draft: Draft, index: number): Draft {
   const others = zones.filter((_, item) => item !== index).map((zone) => String(zone.id ?? ''));
   const cleared = old !== '' && !others.includes(old) ? moveZoneReferences(draft, old, null) : draft;
   return write(cleared, ['zones'], zones.filter((_, item) => item !== index));
+}
+
+/** ISSO 75.1 §7.2.1 (p. 63–64) and p. 39–40: the building's EP-liable use functions with A_g (NEN 2580). */
+export function BuildingFunctionFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const { locale } = useI18n();
+  const field = { draft, onChange: change };
+  const functions = list(draft, ['functions']);
+  const total = functions.reduce((sum, item) => sum + (Number(item.areaM2) || 0), 0);
+  return <div className="nta-form-subsection" role="group" aria-label={t('opname.functions')}>
+    <strong>{t('opname.functions')}</strong>
+    <p className="nta-form-note">{t('opname.functions.note')}</p>
+    {functions.map((_, index) => <div key={index} className="opname-served">
+      <SelectField {...field} path={['functions', index, 'function']} label={t('opname.zones.function')}
+        options={opts(t, 'opname.functionKind', UTILITY_FUNCTIONS)} />
+      <NumberField {...field} path={['functions', index, 'areaM2']} label={t('opname.functions.area')} />
+      <RemoveButton label={t('opname.remove')}
+        onRemove={() => change(['functions'], functions.filter((_, item) => item !== index))} />
+    </div>)}
+    <ListControls label={t('opname.zones.addFunction')}
+      onAdd={() => change(['functions'], [...functions, { function: 'office', areaM2: 0 }])} />
+    <p className="nta-form-note">{t('opname.functions.total', { area: formatNumber(total, locale, 1) })}</p>
+  </div>;
 }
 
 /** ISSO 75.1 §6.5 (afb. 6.6, p. 52–54): calculation zones with their use functions, and the zone per lighting zone. */
@@ -355,10 +384,14 @@ export function CalculationZoneFields({ draft, change, replace, t }: {
     })}
     <ListControls label={t('opname.zones.add')}
       onAdd={() => change(['zones'], [...zones, calculationZoneTemplate(zones.length)])} />
-    {ids.length > 1 && lighting.map((item, index) =>
-      <ZoneSelect key={`l${index}`} draft={draft} change={change} path={['lighting', index, 'zoneId']}
+    {ids.length > 1 && lighting.map((item, index) => <div key={`l${index}`} className="opname-served">
+      <ZoneSelect draft={draft} change={change} path={['lighting', index, 'zoneId']}
         label={`${t('opname.zones.lightingZone')} ${String(item.id ?? index)}`} ids={ids} empty={t('opname.zones.notSet')}
-        unknown={t('opname.zones.unknownZone')} />)}
+        unknown={t('opname.zones.unknownZone')} />
+      {/* The lighting zones of a calculation zone cover its A_g (14.3.4). */}
+      <NumberField draft={draft} onChange={change} path={['lighting', index, 'areaM2']}
+        label={t('opname.zones.lightingArea', { id: String(item.id ?? index) })} />
+    </div>)}
   </>;
 }
 
@@ -639,6 +672,7 @@ export function BasisopnamePanel() {
       {kind === 'residential' && read(draft, ['dwelling', 'kind']) === 'apartment' &&
         <SelectField {...field} path={['dwelling', 'floor']} label={t('opname.dwelling.floor')}
           options={opts(t, 'opname.dwelling.floorKind', ['ground_or_intermediate', 'top', 'roof_and_floor'])} />}
+      {kind === 'utility' && <BuildingFunctionFields draft={draft} change={change} t={t} />}
       {kind === 'utility' && <>
         <NumberField {...field} path={['toiletStacks']} label={t('opname.toiletStacks')} step="1" />
         <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['fossilFuelOnPlot']} label={t('opname.fossilFuelOnPlot')} />

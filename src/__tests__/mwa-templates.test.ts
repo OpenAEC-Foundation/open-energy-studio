@@ -33,8 +33,8 @@ function measure(project: IProject, id: string, name: string, template: MwaMeasu
   };
 }
 
-function dwellingMeasures(project: IProject): MwaMeasure[] {
-  const keys = (part: 'roof' | 'facade' | 'floor') => insulationOptions(project, part).map((option) => option.key);
+/** Balanced ventilation with heat recovery η 0,9 (declared), as a ventilation template. */
+function heatRecoveryVentilation(project: IProject): Extract<MwaMeasureTemplate, { kind: 'ventilation' }> {
   const ventilation = initialTemplate('ventilation', project) as Extract<MwaMeasureTemplate, { kind: 'ventilation' }>;
   const unit = (ventilation.system as Block).unit as Block;
   unit.equipmentReference = 'test: WTW-unit productblad';
@@ -42,6 +42,12 @@ function dwellingMeasures(project: IProject): MwaMeasure[] {
   unit.heatRecovery = { ...(unit.heatRecovery as Block),
     efficiency: { method: 'declared', value: 0.9, standard: 'en13141_7', sourceReference: 'test: productblad' },
     supplyDuctInsulation: { kind: 'insulated' }, manufactureYear: 2026, equipmentReference: 'test: WTW-unit' };
+  return ventilation;
+}
+
+function dwellingMeasures(project: IProject): MwaMeasure[] {
+  const keys = (part: 'roof' | 'facade' | 'floor') => insulationOptions(project, part).map((option) => option.key);
+  const ventilation = heatRecoveryVentilation(project);
   const generator = heatPumpGeneratorTemplate(project);
   generator.forfait = { ...(generator.forfait as Block), designSupplyTemperatureC: 45, classificationSourceReference: 'test: offerte',
     thermalCapacityKw: 6, capacitySourceReference: 'test: offerte' };
@@ -91,6 +97,11 @@ function officeMeasures(project: IProject): MwaMeasure[] {
       id: 'pv-1', peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 40 }, azimuthDeg: 180, tiltDeg: 15,
       mounting: 'moderately_ventilated', obstruction: { method: 'minimal' }, sourceReference: 'test: offerte',
       obstructionSourceReference: 'test: foto vrij dakvlak' }] }),
+    measure(project, 'air', 'Kierdichting', { kind: 'airtightness', qv10DmPerSM2: 0.2, sourceReference: 'test: streefwaarde' }),
+    measure(project, 'vent', 'Balansventilatie met WTW', heatRecoveryVentilation(project)),
+    // The forfait tap-water heat pump carries its storage in the table
+    // efficiency, so the template removes the office's electric-boiler vessel.
+    measure(project, 'dhw', 'Tapwaterwarmtepomp', { kind: 'hot_water', generator: { kind: 'heat_pump', exhaustAirSource: false, measuredClass: 'class4' } }),
   ];
 }
 
@@ -136,6 +147,21 @@ describe('maatwerkadvies measure templates', () => {
     for (const operation of [...air.patch, ...vent.patch]) expect(applyPatchOperation(project, operation)).toBeNull();
     expect(project.ntaCalculation.ventilation.infiltration).toMatchObject({ qv10DmPerSM2: 0.25 });
     expect((project.ntaCalculation.ventilation.system as Block).unit).toMatchObject({ variant: 'd2' });
+  });
+
+  it('flags blanks the kernel would refuse and handles the storage vessel', () => {
+    const ventilation = heatRecoveryVentilation(office);
+    const unit = (ventilation.system as Block).unit as Block;
+    (unit.heatRecovery as Block).efficiency = { method: 'declared', value: null, standard: 'en13141_7', sourceReference: 'x' };
+    expect(buildTemplatePatch(office, ventilation, 'm1').problems).toContain('valueRequired');
+    const forfait = buildTemplatePatch(office, { kind: 'hot_water', generator: { kind: 'heat_pump', exhaustAirSource: false, measuredClass: 'class4' } }, 'm1');
+    expect(forfait.problems).toEqual([]);
+    expect(forfait.patch).toContainEqual({ op: 'replace', path: '/ntaCalculation/hotWater/storage', value: [] });
+    const boiler = buildTemplatePatch(office, { kind: 'hot_water', generator: { kind: 'electric_boiler' } }, 'm1');
+    expect(boiler.patch.some((operation) => operation.path.endsWith('/storage'))).toBe(false);
+    const tested = buildTemplatePatch(office, { kind: 'hot_water', generator: { kind: 'heat_pump_en16147', profile: 'l',
+      deliveredKwhPerDay: 11.655, inputKwhPerDay: null, exhaustAirSource: false, sourceReference: 'x' } }, 'm1');
+    expect(tested.problems).toContain('valueRequired');
   });
 
   it('reports what keeps a template from a patch', () => {

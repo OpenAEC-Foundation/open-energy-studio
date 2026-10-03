@@ -60,7 +60,8 @@ pub struct FunctionArea {
 /// A calculation zone of the survey (§6.5, afb. 6.6 with table 6.4,
 /// p. 52–54). The zones split the building's use functions; a function
 /// merged into the main function (p. 39–40) counts as the main function in
-/// its zone (§6.6, p. 54).
+/// its zone (§6.6, p. 54). A function placed in a zone without the main
+/// function is not merged: the merge is optional ("toegestaan").
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SurveyCalculationZone {
@@ -962,6 +963,18 @@ pub fn function_groups(
     functions: &[FunctionArea],
     recorder: &mut Recorder,
 ) -> Option<FunctionGroups> {
+    function_groups_keeping(functions, &[], recorder)
+}
+
+/// As [`function_groups`], but the functions in `keep` are never merged.
+/// The merge of p. 39–40 is a permitted simplification ("toegestaan"); a
+/// function the adviser placed in a calculation zone without the main
+/// function keeps its own use function in that zone (§6.6, p. 54).
+pub fn function_groups_keeping(
+    functions: &[FunctionArea],
+    keep: &[LabelFunction],
+    recorder: &mut Recorder,
+) -> Option<FunctionGroups> {
     let total: f64 = functions.iter().map(|item| item.area_m2).sum();
     let mut groups: Vec<(LabelFunction, f64)> = Vec::new();
     for item in functions {
@@ -983,7 +996,7 @@ pub fn function_groups(
     let mut merged = 0.0;
     let mut separate = Vec::new();
     for (function, area) in others {
-        if merged + area <= MERGE_LIMIT * total + 1e-9 {
+        if !keep.contains(&function) && merged + area <= MERGE_LIMIT * total + 1e-9 {
             merged += area;
         } else {
             separate.push((function, area));
@@ -3470,6 +3483,41 @@ struct ZoneParts {
     function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
 }
 
+/// Functions that appear in a calculation zone without the building's main
+/// (largest) function. With two or more zones they are not merged into the
+/// main function (p. 39–40 is optional; §6.6, p. 54 takes the functions per
+/// zone). Without zones the list is empty.
+fn zoned_apart(survey: &UtilitySurvey) -> Vec<LabelFunction> {
+    if survey.zones.len() < 2 {
+        return Vec::new();
+    }
+    let mut totals: Vec<(LabelFunction, f64)> = Vec::new();
+    for item in &survey.functions {
+        match totals
+            .iter_mut()
+            .find(|(function, _)| *function == item.function)
+        {
+            Some(entry) => entry.1 += item.area_m2,
+            None => totals.push((item.function, item.area_m2)),
+        }
+    }
+    let Some((main, _)) = totals.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1)) else {
+        return Vec::new();
+    };
+    let mut apart = Vec::new();
+    for zone in &survey.zones {
+        if zone.functions.iter().any(|item| item.function == main) {
+            continue;
+        }
+        for item in &zone.functions {
+            if item.function != main && !apart.contains(&item.function) {
+                apart.push(item.function);
+            }
+        }
+    }
+    apart
+}
+
 /// §6.5 with afb. 6.6 and table 6.4 (p. 52–54): the calculation zones.
 /// Without `zones` (or with one) the building is one zone and afb. 6.6
 /// decides whether that is allowed; with `zones` every zone must itself
@@ -4046,7 +4094,7 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
     // BACS, A_g) comes from the zone sums, so the kernel sees one source.
     let governed = zone_function_totals(survey, recorder);
     let survey = governed.as_ref().unwrap_or(survey);
-    let groups = function_groups(&survey.functions, recorder)?;
+    let groups = function_groups_keeping(&survey.functions, &zoned_apart(survey), recorder)?;
     let plans = zone_plans(survey, &groups, recorder);
     if !recorder.issues.is_empty() {
         return None;
@@ -5872,6 +5920,35 @@ mod tests {
             .is_empty());
         let performance = result.performance.unwrap();
         assert!(performance.status == "calculated_unverified");
+    }
+
+    #[test]
+    fn small_function_in_its_own_zone_is_not_merged() {
+        // Sport is only 200 of 1 600 m² (12,5 %): without zones p. 39–40
+        // may merge it into education, but in its own zone it keeps its
+        // own use function (§6.6, p. 54).
+        let mut survey = school_with_sports_hall();
+        survey.functions[1].area_m2 = 200.0;
+        survey.zones[1].functions[0].area_m2 = 200.0;
+        survey.lighting[2].area_m2 = 200.0;
+        let mut recorder = Recorder::default();
+        let input = derive_utility_input(&survey, &mut recorder).unwrap();
+        assert!(!applied(&recorder, "small_functions_merged_into_main"));
+        let hall = &input["spaceHeating"]["additionalZones"][0]["demand"];
+        assert_eq!(hall["usageFunction"], "sport");
+        assert_eq!(hall["ventilation"]["functions"][0]["function"], "sport");
+        // Without zones the same building merges sport into education.
+        let mut single = survey.clone();
+        single.zones.clear();
+        for item in single.lighting.iter_mut() {
+            item.zone_id = None;
+        }
+        for surface in single.envelope.surfaces.iter_mut() {
+            surface.zone_id = None;
+        }
+        let mut recorder = Recorder::default();
+        derive_utility_input(&single, &mut recorder);
+        assert!(applied(&recorder, "small_functions_merged_into_main"));
     }
 
     #[test]

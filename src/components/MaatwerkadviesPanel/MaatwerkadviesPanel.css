@@ -25,3 +25,8 @@
 .mwa-template-problems { margin: 0; }
 .mwa-template-preview ol { margin: 4px 0 0; padding-left: 20px; font-size: 12px; overflow-wrap: anywhere; }
 .mwa-template-preview code { font-size: 11px; }
+/* The measure type names are long ("Warmtepomp (of andere opwekker) voor ruimteverwarming"). */
+.mwa-measure-kind { grid-column: span 2; }
+.mwa-measure-kind select { width: 100%; text-overflow: ellipsis; }
+@media (max-width: 720px) { .mwa-measure-kind { grid-column: 1 / -1; } }
+.mwa-template-warnings { margin: 0; padding: 6px 10px 6px 26px; border-left: 3px solid var(--energy-orange, #f59e0b); background: rgba(245, 158, 11, 0.08); }

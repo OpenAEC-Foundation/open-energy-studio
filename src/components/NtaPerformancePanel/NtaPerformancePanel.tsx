@@ -11,6 +11,7 @@ import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTempla
 import { NtaCalculationForm } from './NtaCalculationForm';
 import { summarizeExtras } from '../../core/nta/NtaResultSummary';
 import { summarizeServiceEnergy } from '../../core/nta/ServiceEnergy';
+import { kernelNote } from '../../core/nta/KernelNoteText';
 import './NtaPerformancePanel.css';
 
 /** Short month name in the UI language. */
@@ -336,7 +337,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
         <details className="nta-performance-limits">
           <summary>{t('nta.performance.limits')}</summary>
           <ul>
-            {[...heating.demand.omittedCorrections, ...heating.omittedTerms].map((item) => <li key={item}>{item}</li>)}
+            {[...heating.demand.omittedCorrections, ...heating.omittedTerms].map((item) => <li key={item}>{kernelNote(item, locale)}</li>)}
           </ul>
         </details>
       </>}

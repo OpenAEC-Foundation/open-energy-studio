@@ -93,6 +93,22 @@ export function relabelValue(t: Translate, locale: string, value: unknown): stri
   if (typeof value === 'number') return value.toLocaleString(locale, { maximumFractionDigits: 4 });
   if (typeof value === 'boolean') return t(value ? 'common.yes' : 'common.no');
   if (typeof value === 'string') return value.length > 80 ? `${value.slice(0, 77)}…` : value;
-  const text = JSON.stringify(value);
+  if (Array.isArray(value)) return t('relabel.value.items', { count: value.length });
+  // An added or removed element: its name and main properties, not raw JSON.
+  const record = value as Record<string, unknown>;
+  const parts: string[] = [];
+  const name = record.name ?? record.id;
+  if (typeof name === 'string' && name !== '') parts.push(name);
+  for (const [key, unit] of SUMMARY_FIELDS) {
+    const item = record[key];
+    if (typeof item === 'number') parts.push(`${t(`relabel.value.${key}`)} ${item.toLocaleString(locale, { maximumFractionDigits: 3 })}${unit}`);
+  }
+  const text = parts.length > 0 ? parts.join(', ') : t('relabel.value.element');
   return text.length > 80 ? `${text.slice(0, 77)}…` : text;
 }
+
+/** Properties shown for an added or removed element, with their unit. */
+const SUMMARY_FIELDS: Array<[string, string]> = [
+  ['area', ' m²'], ['areaM2', ' m²'], ['uValue', ' W/(m²·K)'], ['gValue', ''], ['rcValue', ' m²·K/W'],
+  ['floorArea', ' m²'], ['tiltDeg', '°'], ['azimuthDeg', '°'],
+];

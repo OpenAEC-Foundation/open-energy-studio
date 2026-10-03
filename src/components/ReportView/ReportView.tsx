@@ -1,7 +1,8 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { IBENGResultMonthly } from '../../core/energy/types';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { labelInputSha256 } from '../../core/nta/Registration';
 import {
   downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML, downloadProjectDossier,
 } from '../../core/report/ReportGenerator';
@@ -49,7 +50,7 @@ export function ReportView() {
   const meetsText = (meets: boolean | null) =>
     t(meets == null ? 'report.notTestable' : meets ? 'report.meetsUnverified' : 'report.fails');
   const [calculationError, setCalculationError] = useState<string | null>(null);
-  const [exported, setExported] = useState<{ checklist: DossierItem[]; missingEvidence: number } | null>(null);
+  const [exported, setExported] = useState<{ project: typeof project; checklist: DossierItem[]; missingEvidence: number } | null>(null);
   const [dossierBusy, setDossierBusy] = useState(false);
   const exportCalculation = () => {
     setCalculationError(null);
@@ -60,12 +61,25 @@ export function ReportView() {
     setCalculationError(null);
     setDossierBusy(true);
     downloadProjectDossier(project)
-      .then((manifest) => setExported({ checklist: manifest.checklist, missingEvidence: manifest.missingEvidence.length }))
+      .then((manifest) => setExported({ project, checklist: manifest.checklist, missingEvidence: manifest.missingEvidence.length }))
       .catch((reason: unknown) => setCalculationError(reason instanceof Error ? reason.message : String(reason)))
       .finally(() => setDossierBusy(false));
   };
-  // Live check without kernel output; the export repeats it with the output.
-  const checklist = useMemo(() => exported?.checklist ?? checkDossierCompleteness({ project }), [exported, project]);
+  // The live check uses the same inputs as the dossier export: the kernel
+  // assessment (with its relabel re-run) and the canonical label-input hash.
+  const assessment = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
+  const [labelSha, setLabelSha] = useState<{ project: typeof project; sha: string | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    labelInputSha256(project).then((sha) => { if (!cancelled) setLabelSha({ project, sha }); })
+      .catch(() => { if (!cancelled) setLabelSha({ project, sha: null }); });
+    return () => { cancelled = true; };
+  }, [project]);
+  const currentSha = labelSha?.project === project ? labelSha.sha : null;
+  const checklist = useMemo(() => {
+    if (exported && exported.project === project) return exported.checklist;
+    return checkDossierCompleteness({ project, assessment, labelInputSha256: currentSha });
+  }, [exported, project, assessment, currentSha]);
   const open = checklist.filter((item) => item.status === 'missing' || item.status === 'check');
 
   return (
