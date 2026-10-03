@@ -69,6 +69,13 @@ function SetNtaBlock() {
   );
 }
 
+function SwitchProject() {
+  const { state, dispatch } = useEnergy();
+  return <button onClick={() => dispatch({ type: 'SET_PROJECT', payload: {
+    ...state.project, id: 'next-preview-project',
+  } })}>Switch project</button>;
+}
+
 describe('preview panel', () => {
   it('shows no legacy BENG figures without an NTA block', () => {
     renderWithProviders(<PreviewPanel />);
@@ -89,5 +96,18 @@ describe('preview panel', () => {
     expect(screen.getByText(/48\.37 kWh\/m²/)).toBeInTheDocument();
     expect(screen.getByText(/0\.84 K/)).toBeInTheDocument();
     expect(screen.getAllByText('Unverified').length).toBeGreaterThan(0);
+  });
+
+  it('hides the old indicative label while a new project is loading', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => assessment() })
+      .mockImplementation(() => new Promise(() => {}));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProviders(<><SetNtaBlock /><SwitchProject /><PreviewPanel /></>);
+    await user.click(screen.getByRole('button', { name: 'Set NTA block' }));
+    await waitFor(() => expect(screen.getByText('A++')).toBeInTheDocument(), { timeout: 5000 });
+    await user.click(screen.getByRole('button', { name: 'Switch project' }));
+    expect(screen.queryByText('A++')).not.toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import { hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, legacyHeatPumpInputIssue, validProjectFloorArea } from '../../core/energy/ProjectArea';
 import { calculateProjectPerformanceWithRust } from '../../core/nta/KernelClient';
 import { summarizeForPreview, type PreviewSummary } from '../../core/nta/PreviewSummary';
+import type { IProject } from '../../core/energy/types';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
 import { MonthlyBarChart } from './MonthlyBarChart';
 import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
@@ -15,9 +16,9 @@ const KERNEL_DEBOUNCE_MS = 400;
 
 type KernelState =
   | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'error'; message: string }
-  | { kind: 'done'; summary: PreviewSummary };
+  | { kind: 'loading'; project: IProject }
+  | { kind: 'error'; project: IProject; message: string }
+  | { kind: 'done'; project: IProject; summary: PreviewSummary };
 
 function kwh(value: number | null): string {
   return value == null ? '–' : `${Math.round(value).toLocaleString('nl-NL')} kWh`;
@@ -49,12 +50,12 @@ export function PreviewPanel() {
       return;
     }
     let cancelled = false;
-    setKernel({ kind: 'loading' });
+    setKernel({ kind: 'loading', project });
     const timer = setTimeout(() => {
       calculateProjectPerformanceWithRust(project).then(
-        (assessment) => { if (!cancelled) setKernel({ kind: 'done', summary: summarizeForPreview(assessment) }); },
+        (assessment) => { if (!cancelled) setKernel({ kind: 'done', project, summary: summarizeForPreview(assessment) }); },
         (reason: unknown) => {
-          if (!cancelled) setKernel({ kind: 'error', message: reason instanceof Error ? reason.message : String(reason) });
+          if (!cancelled) setKernel({ kind: 'error', project, message: reason instanceof Error ? reason.message : String(reason) });
         },
       );
     }, KERNEL_DEBOUNCE_MS);
@@ -99,7 +100,11 @@ export function PreviewPanel() {
     );
   }
 
-  const summary = kernel.kind === 'done' ? kernel.summary : null;
+  // An earlier project's result must never render during the first frame of a switch.
+  const visibleKernel: KernelState = kernel.kind !== 'idle' && kernel.project !== project
+    ? hasNtaBlock ? { kind: 'loading', project } : { kind: 'idle' }
+    : kernel;
+  const summary = visibleKernel.kind === 'done' ? visibleKernel.summary : null;
   const calculated = summary?.status === 'calculated_unverified';
 
   return (
@@ -122,9 +127,9 @@ export function PreviewPanel() {
             {!hasNtaBlock && (
               <div className="preview-empty preview-kernel-empty">{t('preview.kernelEmpty')}</div>
             )}
-            {hasNtaBlock && kernel.kind === 'loading' && <p role="status" className="preview-kernel-status">{t('preview.kernelLoading')}</p>}
-            {hasNtaBlock && kernel.kind === 'error' && (
-              <div className="preview-empty" role="alert">{t('kernel.unavailable')} <small>{kernel.message}</small></div>
+            {hasNtaBlock && visibleKernel.kind === 'loading' && <p role="status" className="preview-kernel-status">{t('preview.kernelLoading')}</p>}
+            {hasNtaBlock && visibleKernel.kind === 'error' && (
+              <div className="preview-empty" role="alert">{t('kernel.unavailable')} <small>{visibleKernel.message}</small></div>
             )}
             {summary && !calculated && (
               <div className="preview-empty preview-kernel-empty" role="status">

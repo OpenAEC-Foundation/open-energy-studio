@@ -745,6 +745,7 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 | Vernieuwde desktop-devbuild `fc5a8a5` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-03-fc5a8a5.md): schone tweede bouw, 703 kerntests, 53 servicetests en 10 gerichte frontendtests groen; SHA-256 en pakketmetadata vastgelegd | Debugpakket; geen visuele acceptatie, onafhankelijke actuele EDR-toets of attest |
 | Visuele UI-controle | Niet uitgevoerd | Browsertoegang tot `127.0.0.1:3006` door opgeslagen gebruikersinstelling geblokkeerd; deze blokkade is niet omzeild |
 | NTA-invoereditor bij projectwissel | Het prestatiepaneel sluit zowel het formulier als de JSON-editor bij een andere project-ID en wist de oude concepttekst. Gerichte componenttest: 7/7 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole; de Rust-kern valideert de opgeslagen invoer pas bij de volgende berekening. |
+| Zijbalk met indicatief label bij projectwissel | De respons draagt de projectreferentie van de aanvraag; een oudere BENG-/labeluitkomst wordt bij een gewijzigde projectreferentie direct verborgen. Gerichte previewtests: 5/5 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of onafhankelijke toets van de energie-uitkomst. |
 
 ## Nog nodig voor inhoudelijke en externe verificatie
 
