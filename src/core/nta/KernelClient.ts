@@ -3472,19 +3472,23 @@ export interface OpnamePassiveCooling {
   installedCapacityDm3PerS?: number | null;
 }
 
-/** Annex A state; τ values (A.3/A.4) are optional. */
+/**
+ * Annex A state. A blank form value is `null`: the kernel reports it as
+ * `dynamic_value_missing` at its own path. τ_sol/τ_vis (A.3/A.4) are kept
+ * for the record only; chapter 14 has no input for them (14.38, 14.41).
+ */
 export interface NtaDynamicState {
   id: string;
-  gPerpendicular: number;
-  uValueWPerM2k: number;
-  tauSolar?: number;
-  tauVisual?: number;
+  gPerpendicular: number | null;
+  uValueWPerM2k: number | null;
+  tauSolar?: number | null;
+  tauVisual?: number | null;
 }
 
 /** Annex A step 2: twelve declared factors per property (p. 770). */
 export interface NtaDynamicCorrection {
-  uFactors: number[];
-  gFactors: number[];
+  uFactors: Array<number | null>;
+  gFactors: Array<number | null>;
   sourceReference: string;
 }
 
@@ -3494,16 +3498,16 @@ export type NtaDynamicTransparent =
       method: 'weighted_states';
       states: NtaDynamicState[];
       /** 12 rows, one weight per state, each row summing to 1. */
-      solarWeights: number[][];
-      temperatureWeights: number[][];
+      solarWeights: Array<Array<number | null>>;
+      temperatureWeights: Array<Array<number | null>>;
       sourceReference: string;
-      correction?: NtaDynamicCorrection;
+      correction?: NtaDynamicCorrection | null;
     }
   | {
       method: 'single_state';
       state: NtaDynamicState;
       sourceReference: string;
-      correction?: NtaDynamicCorrection;
+      correction?: NtaDynamicCorrection | null;
     };
 
 /** Annex B construction element; layers from the zone side outwards. */

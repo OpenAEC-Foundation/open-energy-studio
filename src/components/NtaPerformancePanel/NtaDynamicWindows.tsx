@@ -25,7 +25,11 @@ export function dynamicWindowTemplate(windowId: string): Draft {
   return { windowId, dynamic: { method: 'single_state', state: newState(0), sourceReference: '' } };
 }
 
-/** One `U_dyn;i`/`g_dyn;i` state with optional τ_sol and τ_vis. */
+/**
+ * One `U_dyn;i`/`g_dyn;i` state. τ_sol/τ_vis (A.3/A.4) are not asked:
+ * chapter 14 has no input for them (14.38 has no transmittance term, 14.41
+ * fixes τ_D65 = 0,6), so they would not change the result.
+ */
 function StateFields({ draft, change, base }: SectionProps & { base: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
@@ -33,8 +37,6 @@ function StateFields({ draft, change, base }: SectionProps & { base: Path }) {
     <TextField {...field} path={[...base, 'id']} label={t('nta.form.dynamic.stateId')} />
     <NumberField {...field} path={[...base, 'gPerpendicular']} label={t('nta.form.dynamic.g')} />
     <NumberField {...field} path={[...base, 'uValueWPerM2k']} label={t('nta.form.dynamic.u')} />
-    <NumberField {...field} path={[...base, 'tauSolar']} label={t('nta.form.dynamic.tauSolar')} />
-    <NumberField {...field} path={[...base, 'tauVisual']} label={t('nta.form.dynamic.tauVisual')} />
   </div>;
 }
 
@@ -115,11 +117,15 @@ function DynamicWindowFields({ draft, change, base, windowName }: SectionProps &
   </fieldset>;
 }
 
-/** Annex A per project window; windows not listed keep their fixed U and g. */
+/**
+ * Annex A per project window; windows not listed keep their fixed U and g.
+ * Only surfaces with an explicit outdoor boundary: a surface without one is
+ * skipped by the project route (gap), so its windows cannot be dynamic.
+ */
 export function DynamicWindowsFields({ draft, change, project }: SectionProps & { project: IProject }) {
   const { t } = useI18n();
   const windows = project.zones.flatMap((zone) => zone.surfaces)
-    .filter((surface) => (surface.thermalBoundary ?? 'outdoor') === 'outdoor')
+    .filter((surface) => surface.thermalBoundary === 'outdoor')
     .flatMap((surface) => surface.windows);
   const entries = (read(draft, ['dynamicWindows']) as Draft[] | undefined) ?? [];
   const name = (id: unknown) => windows.find((window) => window.id === id)?.name || String(id);

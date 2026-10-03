@@ -907,6 +907,13 @@ fn result_warnings(
             ));
         }
     }
+    for (index, zone) in input.lighting.iter().enumerate() {
+        warnings.extend(
+            crate::lighting::lighting_warnings(zone, &format!("lighting[{index}]"))
+                .into_iter()
+                .map(|item| issue(item.code, item.path)),
+        );
+    }
     warnings
 }
 

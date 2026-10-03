@@ -6,6 +6,9 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
 
 - **Nieuw, aanvullend veld** `ntaCalculation.dynamicWindows`: bijlage A (p. 766–770) per buitenraam, methode A of B, met de correctiefactoren van stap 2. Opgeslagen projecten zonder dit veld houden dezelfde uitkomst.
 - In het NTA-formulier is dit invoerbaar onder "Dynamische ramen (bijlage A)". Eerder kon het alleen via de kerninvoer.
+- **Nieuwe gap** `window_dynamic_and_shading_exclusive`: een dynamisch raam samen met beweegbare zonwering (7.42) telt de zonwering dubbel (§A.2, p. 767). Neem de zonwering op in de toestanden.
+- **Lege waarden** in bijlage A (g, U, wegingen, correctiefactoren) geven `dynamic_value_missing` op hun eigen pad. Eerder blokkeerde één leeg veld het hele NTA-blok.
+- τ_vis en τ_sol staan niet meer in het formulier: hoofdstuk 14 gebruikt ze niet (14.38, 14.41). Opgeslagen waarden blijven bewaard.
 
 ## 4 oktober 2026 — validatieregels en herberekeningsbevindingen
 
@@ -24,7 +27,6 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
 
 - **Ventilatie (11.60/11.61, p. 468).** Een terugregel-x gunstiger dan de standaard (recirculatie boven 20 %, debietregeling onder 80 %) zonder `flowReduction.evidenceReference` geeft `flow_reduction_evidence_required`.
 - **Gemeten luchtdoorlatendheid.** Een q_v10 van 0 of lager geeft `infiltration_invalid`.
-- **Verlichting (§14.5.1, p. 664).** `largeOfficeGroup` in een zone zonder kantoorfunctie geeft `lighting_large_office_group_without_office`.
 
 ### Projecten met een andere uitkomst
 
@@ -52,5 +54,6 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
 - `utility_open_ceiling_requires_evidence`
 - `cooling_emission_loss_singular`
 - `hot_water_circulation_defaults_low_efficiency`
+- `lighting_large_office_group_without_office`: `largeOfficeGroup` in een zone zonder kantoorfunctie (§14.5.1, p. 664). Dit geeft F_o;D = 1, de minst gunstige waarde, en blokkeert dus niet.
 
 Het rekenrapport toont zowel de projectmeldingen als de meldingen van de kern.

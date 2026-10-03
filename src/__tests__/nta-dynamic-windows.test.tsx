@@ -13,6 +13,9 @@ const project = {
       windows: [{ id: 'win-S', name: 'Raam Z', area: 8, uValue: 1.1, gValue: 0.6, orientation: 'S', surfaceId: 's' }] },
     { id: 'u', name: 'Wand berging', type: 'wall', thermalBoundary: 'unheated', area: 10, orientation: 'N', constructionId: 'c', zoneId: 'z1',
       windows: [{ id: 'win-U', name: 'Raam berging', area: 1, uValue: 1.1, gValue: 0.6, orientation: 'N', surfaceId: 'u' }] },
+    // No boundary: the project route skips the surface (gap), so its window is not offered.
+    { id: 'x', name: 'Gevel zonder grens', type: 'wall', area: 10, orientation: 'O', constructionId: 'c', zoneId: 'z1',
+      windows: [{ id: 'win-X', name: 'Raam zonder grens', area: 1, uValue: 1.1, gValue: 0.6, orientation: 'O', surfaceId: 'x' }] },
   ] }],
   heatingSystems: [], ventilationSystems: [], coolingSystems: [], hotWaterSystems: [], solarPV: [], solarThermal: [], constructions: [],
 } as unknown as IProject;

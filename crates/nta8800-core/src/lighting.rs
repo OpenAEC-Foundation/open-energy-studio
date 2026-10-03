@@ -22,7 +22,8 @@ pub const INTERPRETATIONS: &[&str] = &[
     "chapter 14 is annual only; months follow t_mi/t_an as in 7.28",
     "table 14.7 below D = 0,13 % keeps the first value 0,12 (the norm gives no extrapolation); above 18 % the last value 0,91",
     "the 7.28 internal gain uses W_t = W_L + W_P (see docs/nta8800-maandbehoefte.md)",
-    "§14.5.1 (p. 664): the office group rule (F_o;D = 1 above 30 m²) is only accepted in a zone with an office function",
+    "§14.5.1 (p. 664): the office group rule (F_o;D = 1 above 30 m²) belongs to an office function; elsewhere it only gives the least favourable F_o;D, so it is a warning (lighting_large_office_group_without_office)",
+    "annex A τ_vis (p. 767) has no input in chapter 14: 14.38 has no transmittance term and 14.41 fixes τ_D65 = 0,6, so a dynamic window's τ_vis does not change the daylight factor",
 ];
 
 /// 14.10: hours per year.
@@ -544,6 +545,26 @@ fn positive(value: f64) -> bool {
     value.is_finite() && value > 0.0
 }
 
+/// Non-blocking findings on a lighting input. §14.5.1 (p. 664) applies the
+/// large-group rule only to areas within an office function; outside one it
+/// sets F_o;D = 1 (14.16), the least favourable value, so the result stays
+/// valid and the input is only flagged.
+pub fn lighting_warnings(zone: &ZoneLighting, path: &str) -> Vec<LightingIssue> {
+    let has_office = zone
+        .functions
+        .iter()
+        .any(|use_area| use_area.function == LabelFunction::Office);
+    zone.lighting_zones
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| item.occupancy.large_office_group && !has_office)
+        .map(|(index, _)| LightingIssue {
+            code: "lighting_large_office_group_without_office",
+            path: format!("{path}.lightingZones[{index}].occupancy.largeOfficeGroup"),
+        })
+        .collect()
+}
+
 pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> Vec<LightingIssue> {
     let mut issues = Vec::new();
     let mut push = |code, field: String| {
@@ -602,18 +623,6 @@ pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> 
         }
         if !positive(item.area_m2) {
             push("lighting_zone_area_invalid", format!("{base}.areaM2"));
-        }
-        // §14.5.1 (p. 664): the group rule only covers areas in an office function.
-        if item.occupancy.large_office_group
-            && !zone
-                .functions
-                .iter()
-                .any(|use_area| use_area.function == LabelFunction::Office)
-        {
-            push(
-                "lighting_large_office_group_without_office",
-                format!("{base}.occupancy.largeOfficeGroup"),
-            );
         }
         if let InstalledPower::Installed {
             luminaires,
@@ -1052,6 +1061,29 @@ mod tests {
             },
             extracted_luminaires: false,
         }
+    }
+
+    /// §14.5.1 (p. 664): the large-group rule outside an office function
+    /// only gives F_o;D = 1 (14.16), the least favourable value, so it is
+    /// a warning and the zone still calculates.
+    #[test]
+    fn large_office_group_outside_an_office_is_only_a_warning() {
+        let mut zone = office(vec![forfait_zone(200.0)]);
+        zone.lighting_zones[0].occupancy.large_office_group = true;
+        assert!(lighting_warnings(&zone, "lighting[0]").is_empty());
+        zone.functions[0].function = LabelFunction::Retail;
+        assert!(validate_lighting(&zone, 200.0, "lighting[0]").is_empty());
+        let warnings = lighting_warnings(&zone, "lighting[0]");
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            "lighting_large_office_group_without_office"
+        );
+        assert_eq!(
+            warnings[0].path,
+            "lighting[0].lightingZones[0].occupancy.largeOfficeGroup"
+        );
+        assert!(assess_zone_lighting(&zone, 200.0, context()).is_ok());
     }
 
     #[test]

@@ -12,8 +12,14 @@
 //! no way to derive the state shares from monthly data. Declared factors
 //! per month (with their source) may be supplied in `correction`; without
 //! them the factors are 1. τ_sol and τ_vis (A.3/A.4) are weighted like g
-//! with the solar weights when the states give them (τ_vis feeds chapter
-//! 14 as the caller's daylight input).
+//! with the solar weights when the states give them. Chapter 14 has no
+//! input for them: 14.38 (vertical windows) has no transmittance term and
+//! 14.41 fixes τ_D65 = 0,6 for rooflights (p. 673), so τ_vis is kept for
+//! the record only (see the interpretation list).
+//!
+//! The numeric inputs are optional in the serde shape so that a half-filled
+//! form entry gives one issue at its own path (`dynamic_value_missing`)
+//! instead of making the whole project block unreadable.
 
 use serde::{Deserialize, Serialize};
 
@@ -22,9 +28,11 @@ use serde::{Deserialize, Serialize};
 pub struct DynamicState {
     pub id: String,
     /// `g_dyn;i` at normal incidence (as `gPerpendicular`).
-    pub g_perpendicular: f64,
+    #[serde(default)]
+    pub g_perpendicular: Option<f64>,
     /// `U_dyn;i`, W/(m²·K).
-    pub u_value_w_per_m2k: f64,
+    #[serde(default)]
+    pub u_value_w_per_m2k: Option<f64>,
     /// `τ_sol;dyn;i` (A.3), optional.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tau_solar: Option<f64>,
@@ -38,8 +46,11 @@ pub struct DynamicState {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StepTwoCorrection {
-    pub u_factors: Vec<f64>,
-    pub g_factors: Vec<f64>,
+    #[serde(default)]
+    pub u_factors: Vec<Option<f64>>,
+    #[serde(default)]
+    pub g_factors: Vec<Option<f64>>,
+    #[serde(default)]
     pub source_reference: String,
 }
 
@@ -50,12 +61,12 @@ pub enum DynamicTransparent {
     WeightedStates {
         states: Vec<DynamicState>,
         /// Share of `Σ I_sol·Δt` per state and month (A.2).
-        #[serde(rename = "solarWeights")]
-        solar_weights: Vec<Vec<f64>>,
+        #[serde(rename = "solarWeights", default)]
+        solar_weights: Vec<Vec<Option<f64>>>,
         /// Share of `Σ Δθ_int-e·Δt` per state and month (A.1).
-        #[serde(rename = "temperatureWeights")]
-        temperature_weights: Vec<Vec<f64>>,
-        #[serde(rename = "sourceReference")]
+        #[serde(rename = "temperatureWeights", default)]
+        temperature_weights: Vec<Vec<Option<f64>>>,
+        #[serde(rename = "sourceReference", default)]
         source_reference: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         correction: Option<StepTwoCorrection>,
@@ -63,7 +74,7 @@ pub enum DynamicTransparent {
     /// Method B: one state for every month.
     SingleState {
         state: DynamicState,
-        #[serde(rename = "sourceReference")]
+        #[serde(rename = "sourceReference", default)]
         source_reference: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         correction: Option<StepTwoCorrection>,
@@ -76,12 +87,26 @@ pub struct DynamicIssue {
     pub path: String,
 }
 
-fn weighted(states: &[DynamicState], weights: &[f64], value: fn(&DynamicState) -> f64) -> f64 {
+/// Weighted mean over the states. Only called on validated input, where
+/// every value is present; a missing one counts as 0.
+fn weighted(
+    states: &[DynamicState],
+    weights: &[Option<f64>],
+    value: fn(&DynamicState) -> Option<f64>,
+) -> f64 {
     states
         .iter()
         .zip(weights)
-        .map(|(state, weight)| value(state) * weight)
+        .map(|(state, weight)| value(state).unwrap_or(0.0) * weight.unwrap_or(0.0))
         .sum()
+}
+
+fn factor(values: &[Option<f64>], month_index: usize) -> f64 {
+    values.get(month_index).copied().flatten().unwrap_or(1.0)
+}
+
+fn weight_rows(rows: &[Vec<Option<f64>>], month_index: usize) -> &[Option<f64>] {
+    rows.get(month_index).map_or(&[], Vec::as_slice)
 }
 
 impl DynamicTransparent {
@@ -100,13 +125,14 @@ impl DynamicTransparent {
                 states,
                 solar_weights,
                 ..
-            } => weighted(states, &solar_weights[month_index], |s| s.g_perpendicular),
-            Self::SingleState { state, .. } => state.g_perpendicular,
+            } => weighted(states, weight_rows(solar_weights, month_index), |s| {
+                s.g_perpendicular
+            }),
+            Self::SingleState { state, .. } => state.g_perpendicular.unwrap_or(0.0),
         };
         base * self
             .correction()
-            .and_then(|item| item.g_factors.get(month_index).copied())
-            .unwrap_or(1.0)
+            .map_or(1.0, |item| factor(&item.g_factors, month_index))
     }
 
     /// `U_mi;mn` for month index 0–11 (A.1), times the step-2 factor.
@@ -116,15 +142,14 @@ impl DynamicTransparent {
                 states,
                 temperature_weights,
                 ..
-            } => weighted(states, &temperature_weights[month_index], |s| {
+            } => weighted(states, weight_rows(temperature_weights, month_index), |s| {
                 s.u_value_w_per_m2k
             }),
-            Self::SingleState { state, .. } => state.u_value_w_per_m2k,
+            Self::SingleState { state, .. } => state.u_value_w_per_m2k.unwrap_or(0.0),
         };
         base * self
             .correction()
-            .and_then(|item| item.u_factors.get(month_index).copied())
-            .unwrap_or(1.0)
+            .map_or(1.0, |item| factor(&item.u_factors, month_index))
     }
 
     /// τ_sol;mi;mn (A.3) or τ_vis;mi;mn (A.4) with the solar weights; `None`
@@ -141,8 +166,8 @@ impl DynamicTransparent {
                 ..
             } => states
                 .iter()
-                .zip(&solar_weights[month_index])
-                .map(|(state, weight)| value(state).map(|tau| tau * weight))
+                .zip(weight_rows(solar_weights, month_index))
+                .map(|(state, weight)| value(state).map(|tau| tau * weight.unwrap_or(0.0)))
                 .sum(),
             Self::SingleState { state, .. } => value(state),
         }
@@ -158,50 +183,85 @@ impl DynamicTransparent {
 
     pub fn validate(&self, path: &str) -> Vec<DynamicIssue> {
         let mut issues = Vec::new();
-        let mut push = |code, field: &str| {
+        let mut push = |code, field: String| {
             issues.push(DynamicIssue {
                 code,
                 path: format!("{path}.{field}"),
             })
         };
-        let (states, source) = match self {
+        let (states, prefix, source) = match self {
             Self::WeightedStates {
                 states,
                 source_reference,
                 ..
-            } => (states.as_slice(), source_reference),
+            } => (states.as_slice(), "states", source_reference),
             Self::SingleState {
                 state,
                 source_reference,
                 ..
-            } => (std::slice::from_ref(state), source_reference),
+            } => (std::slice::from_ref(state), "state", source_reference),
         };
         if let Some(correction) = self.correction() {
-            let valid = |values: &[f64]| {
-                values.len() == 12 && values.iter().all(|v| v.is_finite() && *v > 0.0)
-            };
-            if !valid(&correction.u_factors) || !valid(&correction.g_factors) {
-                push("dynamic_correction_invalid", "correction");
+            for (field, values) in [
+                ("uFactors", &correction.u_factors),
+                ("gFactors", &correction.g_factors),
+            ] {
+                if values.len() != 12 {
+                    push("dynamic_correction_invalid", "correction".into());
+                } else if let Some(index) = values.iter().position(Option::is_none) {
+                    push(
+                        "dynamic_value_missing",
+                        format!("correction.{field}[{index}]"),
+                    );
+                } else if values
+                    .iter()
+                    .flatten()
+                    .any(|v| !(v.is_finite() && *v > 0.0))
+                {
+                    push("dynamic_correction_invalid", "correction".into());
+                }
             }
             if correction.source_reference.trim().is_empty() {
-                push("source_reference_required", "correction.sourceReference");
+                push(
+                    "source_reference_required",
+                    "correction.sourceReference".into(),
+                );
             }
         }
         if source.trim().is_empty() {
-            push("source_reference_required", "sourceReference");
+            push("source_reference_required", "sourceReference".into());
         }
         if states.is_empty() {
-            push("dynamic_state_required", "states");
+            push("dynamic_state_required", "states".into());
         }
-        for state in states {
-            if !(0.0..=1.0).contains(&state.g_perpendicular)
-                || !(state.u_value_w_per_m2k.is_finite() && state.u_value_w_per_m2k > 0.0)
+        for (index, state) in states.iter().enumerate() {
+            let state_path = match self {
+                Self::WeightedStates { .. } => format!("{prefix}[{index}]"),
+                Self::SingleState { .. } => prefix.to_owned(),
+            };
+            let (Some(g), Some(u)) = (state.g_perpendicular, state.u_value_w_per_m2k) else {
+                if state.g_perpendicular.is_none() {
+                    push(
+                        "dynamic_value_missing",
+                        format!("{state_path}.gPerpendicular"),
+                    );
+                }
+                if state.u_value_w_per_m2k.is_none() {
+                    push(
+                        "dynamic_value_missing",
+                        format!("{state_path}.uValueWPerM2k"),
+                    );
+                }
+                continue;
+            };
+            if !(0.0..=1.0).contains(&g)
+                || !(u.is_finite() && u > 0.0)
                 || [state.tau_solar, state.tau_visual]
                     .iter()
                     .flatten()
                     .any(|tau| !(0.0..=1.0).contains(tau))
             {
-                push("dynamic_state_invalid", "states");
+                push("dynamic_state_invalid", state_path);
             }
         }
         if let Self::WeightedStates {
@@ -215,14 +275,26 @@ impl DynamicTransparent {
                 ("solarWeights", solar_weights),
                 ("temperatureWeights", temperature_weights),
             ] {
+                let missing = rows.iter().enumerate().find_map(|(month, row)| {
+                    row.iter()
+                        .position(Option::is_none)
+                        .map(|column| (month, column))
+                });
+                if let Some((month, column)) = missing {
+                    push(
+                        "dynamic_value_missing",
+                        format!("{field}[{month}][{column}]"),
+                    );
+                    continue;
+                }
                 let valid = rows.len() == 12
                     && rows.iter().all(|row| {
                         row.len() == states.len()
-                            && row.iter().all(|w| (0.0..=1.0).contains(w))
-                            && (row.iter().sum::<f64>() - 1.0).abs() < 1e-6
+                            && row.iter().flatten().all(|w| (0.0..=1.0).contains(w))
+                            && (row.iter().flatten().sum::<f64>() - 1.0).abs() < 1e-6
                     });
                 if !valid {
-                    push("dynamic_weights_invalid", field);
+                    push("dynamic_weights_invalid", field.into());
                 }
             }
         }
@@ -239,23 +311,23 @@ mod tests {
         let states = vec![
             DynamicState {
                 id: "clear".into(),
-                g_perpendicular: 0.6,
-                u_value_w_per_m2k: 1.0,
+                g_perpendicular: Some(0.6),
+                u_value_w_per_m2k: Some(1.0),
                 tau_solar: Some(0.5),
                 tau_visual: Some(0.7),
             },
             DynamicState {
                 id: "tinted".into(),
-                g_perpendicular: 0.2,
-                u_value_w_per_m2k: 1.4,
+                g_perpendicular: Some(0.2),
+                u_value_w_per_m2k: Some(1.4),
                 tau_solar: Some(0.1),
                 tau_visual: Some(0.2),
             },
         ];
         let element = DynamicTransparent::WeightedStates {
             states,
-            solar_weights: vec![vec![0.75, 0.25]; 12],
-            temperature_weights: vec![vec![0.5, 0.5]; 12],
+            solar_weights: vec![vec![Some(0.75), Some(0.25)]; 12],
+            temperature_weights: vec![vec![Some(0.5), Some(0.5)]; 12],
             source_reference: "control strategy".into(),
             correction: None,
         };
@@ -269,8 +341,8 @@ mod tests {
         let mut corrected = element.clone();
         if let DynamicTransparent::WeightedStates { correction, .. } = &mut corrected {
             *correction = Some(StepTwoCorrection {
-                u_factors: vec![1.1; 12],
-                g_factors: vec![0.9; 12],
+                u_factors: vec![Some(1.1); 12],
+                g_factors: vec![Some(0.9); 12],
                 source_reference: "hourly comparison".into(),
             });
         }
@@ -282,11 +354,64 @@ mod tests {
         };
         let broken = DynamicTransparent::WeightedStates {
             states,
-            solar_weights: vec![vec![0.5, 0.4]; 12],
-            temperature_weights: vec![vec![0.5, 0.5]; 11],
+            solar_weights: vec![vec![Some(0.5), Some(0.4)]; 12],
+            temperature_weights: vec![vec![Some(0.5), Some(0.5)]; 11],
             source_reference: "x".into(),
             correction: None,
         };
         assert_eq!(broken.validate("w").len(), 2);
+    }
+
+    /// A half-filled form entry: each blank value is one issue at its own
+    /// path, and the entry still deserializes.
+    #[test]
+    fn blank_values_are_reported_at_their_path() {
+        let element: DynamicTransparent = serde_json::from_value(serde_json::json!({
+            "method": "weighted_states",
+            "states": [
+                {"id": "open", "gPerpendicular": null, "uValueWPerM2k": 1.1},
+                {"id": "closed", "gPerpendicular": 0.1, "uValueWPerM2k": null}
+            ],
+            "solarWeights": vec![vec![serde_json::json!(0.5), serde_json::Value::Null]; 12],
+            "temperatureWeights": vec![vec![0.5, 0.5]; 12],
+            "sourceReference": "simulation",
+            "correction": {
+                "uFactors": vec![serde_json::Value::Null; 12],
+                "gFactors": vec![1.0; 12],
+                "sourceReference": "comparison"
+            }
+        }))
+        .unwrap();
+        let paths: Vec<(&str, String)> = element
+            .validate("w")
+            .into_iter()
+            .map(|issue| (issue.code, issue.path))
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                (
+                    "dynamic_value_missing",
+                    "w.correction.uFactors[0]".to_owned()
+                ),
+                (
+                    "dynamic_value_missing",
+                    "w.states[0].gPerpendicular".to_owned()
+                ),
+                (
+                    "dynamic_value_missing",
+                    "w.states[1].uValueWPerM2k".to_owned()
+                ),
+                ("dynamic_value_missing", "w.solarWeights[0][1]".to_owned()),
+            ]
+        );
+        let single: DynamicTransparent = serde_json::from_value(serde_json::json!({
+            "method": "single_state",
+            "state": {"id": "closed"},
+            "sourceReference": "sheet"
+        }))
+        .unwrap();
+        assert_eq!(single.validate("w").len(), 2);
+        assert_eq!(single.validate("w")[0].path, "w.state.gPerpendicular");
     }
 }

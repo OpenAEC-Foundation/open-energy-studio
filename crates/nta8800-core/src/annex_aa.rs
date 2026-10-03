@@ -585,8 +585,8 @@ mod tests {
         input.windows[0].dynamic = Some(crate::annex_a::DynamicTransparent::SingleState {
             state: crate::annex_a::DynamicState {
                 id: "tinted".into(),
-                g_perpendicular: 0.3,
-                u_value_w_per_m2k: 1.0,
+                g_perpendicular: Some(0.3),
+                u_value_w_per_m2k: Some(1.0),
                 tau_solar: None,
                 tau_visual: None,
             },
