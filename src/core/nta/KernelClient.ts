@@ -4390,6 +4390,18 @@ export interface NtaRegistration {
   /** Relabel: date of the improvement (quote with order or invoice), YYYY-MM-DD; within 24 months of the survey (BRL 9500 §4.2.3). */
   improvementDate?: string;
   originalKernelVersion?: string;
+  /** Relabel: certificate number of the holder of the original label; only that holder may relabel (BRL 9500-W §4.2.3, p. 23). */
+  originalCertificateNumber?: string;
+  /** Relabel: EP-Online number of the original label; the relabel is an addendum to its dossier (W p. 26, U p. 21). */
+  originalEpOnlineNumber?: string;
+  /** Relabel: reference to the original project dossier. */
+  originalDossierReference?: string;
+  /** Relabel: Bijlage 6a/6b comparison with the original project, kept for the dossier (Bijlage 3). */
+  relabelComparison?: NtaRelabelComparison;
+  /** Relabel with PV or solar thermal: the panels are exclusively and physically connected to this building (W p. 23, U p. 19). */
+  productionPhysicallyConnected?: boolean;
+  /** Utility relabel: the adviser established there are no excluded (6b) changes (BRL 9500-U §4.2.3, p. 19). */
+  noExcludedChangesConfirmed?: boolean;
   epOnlineNumber?: string;
   /** Opleverdatum, YYYY-MM-DD (§3.1: completed after 1-1-2021 needs a detailed survey). */
   completionDate?: string;
@@ -4400,6 +4412,21 @@ export interface NtaRegistration {
 }
 
 export type NtaMessageType = 'regular' | 'relabel' | 'replacement';
+
+/** The relabel comparison as kept with the registration. */
+export interface NtaRelabelComparison {
+  originalFileName: string;
+  /** SHA-256 of the original project file. */
+  originalSha256?: string;
+  /** SHA-256 of the compared project's label input; a later edit makes the comparison out of date. */
+  currentSha256?: string;
+  /** ISO 8601. */
+  comparedAt?: string;
+  assessment: RelabelAssessment;
+}
+
+/** Role of an evidence file in a relabel (BRL 9500-W §4.2.3, p. 23). */
+export type NtaRelabelProof = 'quote_with_order' | 'specified_invoice' | 'production_photo';
 
 export interface NtaSoftwareIdentity {
   name: string;
@@ -4440,6 +4467,8 @@ export interface NtaEvidenceItem {
   linkedPaths?: string[];
   /** Local copy in the desktop app's data folder. */
   storedPath?: string;
+  /** Relabel: proof of the improvement at this address, or a PV/solar photo with shading. */
+  relabelProof?: NtaRelabelProof;
 }
 
 export interface RelabelChange {

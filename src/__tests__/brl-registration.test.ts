@@ -6,6 +6,7 @@ import {
   bagConflicts, cleanRegistration, readBagLedger, recordBagRegistration, SOFTWARE_NAME, softwareIdentity,
 } from '../core/nta/Registration';
 import type { BagLedgerEntry } from '../core/nta/Registration';
+import { relabelDeadline } from '../core/nta/Registration';
 import { version } from '../../package.json';
 import type { ProjectPerformanceAssessment } from '../core/nta/KernelClient';
 
@@ -163,5 +164,15 @@ describe('registration block', () => {
       attestStatus: 'unattested', gaps: [], geometry: null, derivedInput: null, performance: null,
     } as unknown as ProjectPerformanceAssessment;
     expect(generateNtaCalculationReportHTML(createDefaultProject(), assessment)).toContain('Geen registratiegegevens ingevuld');
+  });
+});
+
+describe('relabel window', () => {
+  it('ends 24 months after the survey, clamped to the month end (BRL 9500-W §4.2.3)', () => {
+    expect(relabelDeadline('2026-01-31')).toBe('2028-01-31');
+    expect(relabelDeadline('2026-02-28')).toBe('2028-02-28');
+    expect(relabelDeadline('2027-02-28')).toBe('2029-02-28');
+    expect(relabelDeadline(undefined)).toBeUndefined();
+    expect(relabelDeadline('31-01-2026')).toBeUndefined();
   });
 });

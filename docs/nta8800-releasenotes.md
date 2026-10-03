@@ -2,6 +2,25 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — herlabelen volgens BRL 9500 §4.2.3 en bijlage 6a/6b
+
+### Registraties die nu een ontbrekend gegeven melden
+
+- **Herlabelen (berichttype `relabel`).** De kern vraagt nu het certificaatnummer en het EP-Online-nummer van het oorspronkelijke label (`original_certificate_number_required`, `original_ep_online_number_required`), de bewaarde herlabelvergelijking (`relabel_comparison_required`) en een bewijsstuk met de rol offerte met opdracht of gespecificeerde factuur (`relabel_proof_required`; W §4.2.3 p. 23, U p. 19). Een ander certificaatnummer dan dat van het oorspronkelijke label geeft `relabel_certificate_holder_differs`; een vergelijking met een 6b-wijziging geeft `relabel_changes_not_allowed`. Bij een wijziging aan PV of zonthermie zijn een foto met beschaduwing en de bevestiging van de fysieke aansluiting nodig; bij utiliteit bevestigt de adviseur dat er geen 6b-wijzigingen zijn (U p. 19). Bestaande herlabelprojecten zijn dus niet meer gereed voor registratie tot deze gegevens zijn ingevuld.
+
+### Indeling van wijzigingen die verandert
+
+- Alleen een gewijzigde gebruiksoppervlakte (`floorArea`) is nu 6b in plaats van beoordeling.
+- Grootte, helling en oriëntatie van PV of zonthermie vragen beoordeling in plaats van 6b.
+- De g-waarde van beglazing is 6a in plaats van beoordeling.
+- Bij woningen volgen distributie, afgifte en regeling bijlage 6a per functie (p. 67): bij ventilatie en tapwater geldt alleen het afgiftesysteem als 6a, de rest vraagt beoordeling.
+- Het aandeel van een opwekker naast een toegevoegde opwekker vraagt beoordeling.
+- Wijzigingen in `maatwerkadvies` en `basisopname` worden niet meer als wijziging getoond.
+
+### Dossier
+
+- De herlabelvergelijking wordt bij de registratie bewaard en komt als `herlabel-vergelijking.json` in het projectdossier. De checklist toetst nu de verbeterdatum aan de 24 maanden, vraagt een bewijsstuk met de herlabelrol en markeert een vergelijking als verouderd als het project daarna is gewijzigd.
+
 ## 3 oktober 2026 — reviewcorrecties rapportafronding, restset, bouwjaar en setpoints
 
 ### Projecten die nu `incomplete` worden

@@ -113,7 +113,7 @@ describe('project dossier', () => {
     expect(reference(true)).toBe('ok');
 
     const relabel = checkDossierCompleteness({
-      project: project({ relabel: true, evidence: [evidence('ev-1', 'invoice', 'A')] }),
+      project: project({ relabel: true, evidence: [{ ...evidence('ev-1', 'invoice', 'A'), relabelProof: 'specified_invoice' }] }),
       relabel: {
         source: 'x', scheme: 'w', allowed: false, needsReview: true,
         changes: [{ path: '/pvSystems/0', before: null, after: {}, verdict: 'review', cluster: 'x' }],
@@ -132,6 +132,73 @@ describe('project dossier', () => {
     expect(typed.some((item) => item.id === 'relabel_invoice')).toBe(true);
     const replacement = checkDossierCompleteness({ project: project({ messageType: 'replacement' }) });
     expect(replacement.some((item) => item.group === 'relabel')).toBe(false);
+  });
+
+  it('takes the relabel comparison kept with the registration and checks the relabel proof (BRL 9500-W §4.2.3)', async () => {
+    const assessmentW = {
+      source: 'x', scheme: 'w' as const, allowed: true, needsReview: false,
+      changes: [{ path: '/solarPV/0/area', before: 10, after: 14, verdict: 'review' as const, cluster: 'x' }],
+    };
+    const base = project({
+      messageType: 'relabel', certificateNumber: 'K1', originalCertificateNumber: 'k1', originalEpOnlineNumber: 'EP-1',
+      surveyDate: '2026-01-31', improvementDate: '2028-02-01',
+      evidence: [evidence('ev-1', 'invoice', 'A')],
+    });
+    const { labelInputSha256 } = await import('../core/nta/Registration');
+    base.registration!.relabelComparison = {
+      originalFileName: 'origineel.oes.json', currentSha256: await labelInputSha256(base), assessment: assessmentW,
+    };
+    const status = (items: ReturnType<typeof checkDossierCompleteness>, id: string) =>
+      items.find((item) => item.id === id);
+    let items = checkDossierCompleteness({ project: base, labelInputSha256: await labelInputSha256(base) });
+    expect(status(items, 'relabel_changes')?.status).toBe('ok');
+    expect(status(items, 'relabel_original_label')?.status).toBe('ok');
+    // An invoice without the relabel role does not prove the improvement.
+    expect(status(items, 'relabel_invoice')?.status).toBe('missing');
+    // 2028-02-01 lies after 31-01-2028, the end of the 24 months.
+    expect(status(items, 'relabel_improvement_date')?.status).toBe('missing');
+    expect(status(items, 'relabel_improvement_date')?.detail).toContain('2028-01-31');
+    expect(status(items, 'relabel_production_photos')?.status).toBe('missing');
+    expect(status(items, 'relabel_production_connection')?.status).toBe('missing');
+    expect(status(items, 'relabel_utility_confirmation')?.status).toBe('not_applicable');
+
+    base.registration!.improvementDate = '2028-01-31';
+    base.registration!.productionPhysicallyConnected = true;
+    base.registration!.evidence = [
+      { ...evidence('ev-1', 'invoice', 'A'), relabelProof: 'specified_invoice' },
+      { ...evidence('ev-2', 'photo_overview', 'A'), relabelProof: 'production_photo' },
+    ];
+    items = checkDossierCompleteness({ project: base, labelInputSha256: await labelInputSha256(base) });
+    for (const id of ['relabel_invoice', 'relabel_improvement_date', 'relabel_production_photos', 'relabel_production_connection']) {
+      expect(status(items, id)?.status, id).toBe('ok');
+    }
+    // Another certificate holder may not relabel.
+    base.registration!.originalCertificateNumber = 'K2';
+    items = checkDossierCompleteness({ project: base });
+    expect(status(items, 'relabel_original_label')?.status).toBe('missing');
+
+    // An edit after the comparison makes it out of date.
+    const edited = { ...base, name: 'Woning na verbouwing', zones: [{ id: 'z1' }] } as unknown as IProject;
+    items = checkDossierCompleteness({ project: edited, labelInputSha256: await labelInputSha256(edited) });
+    expect(status(items, 'relabel_changes')?.status).toBe('check');
+
+    // The dossier export writes the kept comparison.
+    const bundle = await buildProjectDossier({ project: base });
+    const record = JSON.parse(strFromU8(bundle.files['herlabel-vergelijking.json']));
+    expect(record.originalFileName).toBe('origineel.oes.json');
+    expect(record.assessment.changes).toHaveLength(1);
+  });
+
+  it('keeps the relabel comparison and stated answers when cleaning the registration', () => {
+    const comparison = {
+      originalFileName: 'o.oes.json', assessment: { source: 'x', scheme: 'u' as const, allowed: true, needsReview: false, changes: [] },
+    };
+    const cleaned = cleanRegistration({
+      messageType: 'relabel', relabelComparison: comparison, productionPhysicallyConnected: false, noExcludedChangesConfirmed: true,
+    });
+    expect(cleaned?.relabelComparison).toEqual(comparison);
+    expect(cleaned?.productionPhysicallyConnected).toBe(false);
+    expect(cleaned?.noExcludedChangesConfirmed).toBe(true);
   });
 
   it('requires a collapse reason for every applied default of a basic survey', () => {

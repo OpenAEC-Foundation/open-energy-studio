@@ -5,9 +5,14 @@
 //! §4.2.3/4.2.4 (p. 23–24, original survey date and software version),
 //! Bijlage 6a (allowed measures, p. 67) and Bijlage 6b (measures that may
 //! not be counted, p. 68); BRL 9500-U draft 14-10-2025 §4.2.3 (p. 18–19)
-//! and Bijlagen 6a/6b (p. 58–60). For utility buildings 6a covers only
+//! with §4.2.4 (p. 19–20) and Bijlagen 6a/6b (p. 58–60). For utility
+//! buildings 6a covers only
 //! one-to-one replacements: geometric changes of insulation or
 //! installation and changes in distribution, emission or control are 6b.
+//! For dwellings 6a lists the subsystem changes per service (p. 67):
+//! ventilation and hot water only the emission system; heating and
+//! cooling distribution, emission and control. Other subsystem changes need
+//! review.
 //! Lighting is in neither appendix and always needs review. ISSO 82.1 and
 //! 75.1 explain the clusters. The scheme follows the project's
 //! `buildingFunction` (residential → W, otherwise U).
@@ -28,7 +33,7 @@ use serde_json::Value;
 pub const RELABEL_SOURCE_W: &str =
     "BRL 9500-W (14-10-2025) §4.2.3–4.2.4 (p. 23–24), Bijlage 6a (p. 67) and 6b (p. 68)";
 pub const RELABEL_SOURCE_U: &str =
-    "BRL 9500-U (14-10-2025) §4.2.3–4.2.4 (p. 18–19), Bijlage 6a (p. 58) and 6b (p. 59–60)";
+    "BRL 9500-U (14-10-2025) §4.2.3 (p. 18–19), §4.2.4 (p. 19–20), Bijlage 6a (p. 58) and 6b (p. 59–60)";
 
 /// BRL 9500 part that governs the relabel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -94,6 +99,8 @@ const GEOMETRY_KEYS: &[&str] = &[
     "grossAreaM2",
     "netArea",
     "usableFloorArea",
+    "floorArea",
+    "floorAreaM2",
     "usableFloorAreaM2",
     "totalUsableFloorAreaM2",
     "lossAreaM2",
@@ -178,7 +185,63 @@ const INSULATION_MARKERS: &[&str] = &[
 
 const SHADING_MARKERS: &[&str] = &["shading", "overhang", "obstruction", "sunshade"];
 
-const PRODUCTION_ARRAYS: &[&str] = &["pvSystems", "onSiteProduction", "pv", "solarThermal"];
+const PRODUCTION_ARRAYS: &[&str] = &[
+    "solarPV",
+    "pvSystems",
+    "onSiteProduction",
+    "pv",
+    "solarThermal",
+    "solarWaterHeaters",
+];
+
+/// Project blocks that are not label input: the maatwerkadvies and the
+/// basic survey kept with the project, and the registration (compared only
+/// for the survey date).
+const NON_LABEL_BLOCKS: &[&str] = &["registration", "maatwerkadvies", "basisopname"];
+
+/// Window and glazing properties: one-to-one replacement of glazing (6a,
+/// W p. 67, U p. 58).
+const GLAZING_KEYS: &[&str] = &["gValue", "gGl", "gglN", "gPerpendicular", "frameFraction"];
+
+/// Keys of the share a generator covers; with an added generator they
+/// follow the system change and need review.
+const SHARE_MARKERS: &[&str] = &["fraction", "coverage", "share"];
+
+/// Whether a change path belongs to building-bound production (PV or
+/// solar thermal); such relabels need photos with shading and proof that
+/// the panels serve this building (BRL 9500-W p. 23, U p. 19).
+pub fn is_production_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.contains("solar")
+        || segments(path).iter().any(|segment| {
+            let segment = segment.to_ascii_lowercase();
+            segment == "pv" || segment.starts_with("pvsystem") || segment == "onsiteproduction"
+        })
+}
+
+/// Service of a subsystem change, from the path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Service {
+    Ventilation,
+    HotWater,
+    Heating,
+    Cooling,
+}
+
+fn service_of(path: &str) -> Option<Service> {
+    let lower = path.to_ascii_lowercase();
+    if lower.contains("ventilation") {
+        Some(Service::Ventilation)
+    } else if lower.contains("hotwater") || lower.contains("tapwater") || lower.contains("dhw") {
+        Some(Service::HotWater)
+    } else if lower.contains("cooling") {
+        Some(Service::Cooling)
+    } else if lower.contains("heating") {
+        Some(Service::Heating)
+    } else {
+        None
+    }
+}
 
 fn segments(path: &str) -> Vec<String> {
     path.split('/')
@@ -254,6 +317,16 @@ fn classify(
             Some("a one-to-one replacement is allowed (6a), a system change is not (6b)"),
         );
     }
+    // PV or solar thermal resized, tilted or turned: building-bound
+    // production, 6a for a one-to-one replacement and 6b for a system
+    // change (W p. 67–68, U p. 58–59); not an area of the building.
+    if is_production_path(path) && GEOMETRY_KEYS.contains(&key.as_str()) {
+        return change(
+            RelabelVerdict::Review,
+            "building-bound production: size, tilt or orientation changed",
+            Some("a one-to-one replacement is allowed (6a), a system change is not (6b)"),
+        );
+    }
     if GEOMETRY_KEYS.contains(&key.as_str()) {
         return change(
             RelabelVerdict::NotAllowed,
@@ -291,11 +364,31 @@ fn classify(
     }
     if contains_any(path, SUBSYSTEM_MARKERS) {
         return match scheme {
-            RelabelScheme::W => change(
-                RelabelVerdict::Allowed,
-                "change in distribution, emission or control",
-                None,
-            ),
+            RelabelScheme::W => {
+                // Bijlage 6a (p. 67) per service: ventilation and hot water
+                // only the emission system; heating and cooling also
+                // distribution and control.
+                let lower = path.to_ascii_lowercase();
+                let emission = lower.contains("emission");
+                let listed = match service_of(path) {
+                    Some(Service::Ventilation | Service::HotWater) => emission,
+                    Some(Service::Heating | Service::Cooling) => true,
+                    None => false,
+                };
+                if listed {
+                    change(
+                        RelabelVerdict::Allowed,
+                        "change in distribution, emission or control",
+                        None,
+                    )
+                } else {
+                    change(
+                        RelabelVerdict::Review,
+                        "change in distribution, emission or control not listed for this service",
+                        Some("Bijlage 6a lists only the emission system for ventilation and hot water; the adviser decides"),
+                    )
+                }
+            }
             RelabelScheme::U => change(
                 RelabelVerdict::NotAllowed,
                 "change in distribution, emission or control",
@@ -323,6 +416,13 @@ fn classify(
         return change(
             RelabelVerdict::Allowed,
             "one-to-one replacement or change: installation properties",
+            None,
+        );
+    }
+    if in_opening && GLAZING_KEYS.contains(&key.as_str()) {
+        return change(
+            RelabelVerdict::Allowed,
+            "one-to-one replacement or change: glazing properties",
             None,
         );
     }
@@ -355,7 +455,7 @@ fn diff(
             for key in keys {
                 if IGNORED_KEYS.contains(&key.as_str())
                     || key.ends_with("Reference")
-                    || (path.is_empty() && key == "registration")
+                    || (path.is_empty() && NON_LABEL_BLOCKS.contains(&key.as_str()))
                 {
                     continue;
                 }
@@ -380,6 +480,41 @@ fn diff(
     }
 }
 
+/// A generator added next to an existing one (a hybrid heat pump beside the
+/// boiler) is a system change (6b) or at least needs review; the shares the
+/// generators cover then follow that change and cannot be counted as a
+/// one-to-one change on their own (W p. 67–68).
+fn review_shares_next_to_added_generators(changes: &mut [RelabelChange]) {
+    let top = |path: &str| segments(path).into_iter().next().unwrap_or_default();
+    let added: Vec<String> = changes
+        .iter()
+        .filter(|change| {
+            (change.before.is_none() || change.after.is_none())
+                && contains_any(&change.path, INSTALLATION_MARKERS)
+        })
+        .map(|change| top(&change.path))
+        .collect();
+    if added.is_empty() {
+        return;
+    }
+    for change in changes.iter_mut() {
+        let key = segments(&change.path)
+            .into_iter()
+            .rev()
+            .find(|segment| segment.parse::<usize>().is_err())
+            .unwrap_or_default();
+        if change.verdict == RelabelVerdict::Allowed
+            && contains_any(&key, SHARE_MARKERS)
+            && added.contains(&top(&change.path))
+        {
+            change.verdict = RelabelVerdict::Review;
+            change.cluster = "installation: share of a generator next to an added generator";
+            change.note =
+                Some("follows the added generator, a system change (6b); the adviser decides");
+        }
+    }
+}
+
 /// Classifies every difference between the original and the current
 /// project per Bijlage 6a/6b. The registration block is compared only for
 /// the survey date, which must stay the original one (§4.2.4).
@@ -394,6 +529,7 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
     };
     let mut changes = Vec::new();
     diff(scheme, "", Some(original), Some(current), &mut changes);
+    review_shares_next_to_added_generators(&mut changes);
     let survey_date = |project: &Value| project.pointer("/registration/surveyDate").cloned();
     let (before, after) = (survey_date(original), survey_date(current));
     if before.is_some() && before != after {
@@ -568,5 +704,131 @@ mod tests {
         assert!(result.allowed);
         assert!(result.needs_review);
         assert_eq!(verdict(&result, "/pvSystems/0"), RelabelVerdict::Review);
+    }
+
+    #[test]
+    fn floor_area_alone_is_a_geometric_change() {
+        // W 6b p. 68, U 6b p. 59: a changed usable floor area.
+        let mut original = project();
+        original["zones"][0]["floorArea"] = json!(100.0);
+        let mut current = original.clone();
+        current["zones"][0]["floorArea"] = json!(104.0);
+        let result = assess_relabel(&original, &current);
+        assert!(!result.allowed);
+        assert_eq!(
+            verdict(&result, "/zones/0/floorArea"),
+            RelabelVerdict::NotAllowed
+        );
+    }
+
+    #[test]
+    fn pv_size_and_position_need_review_and_glazing_g_is_allowed() {
+        let mut original = project();
+        original["solarPV"] =
+            json!([{"id": "pv1", "area": 10.0, "tilt": 30.0, "orientation": "S"}]);
+        let mut current = original.clone();
+        current["solarPV"][0]["area"] = json!(14.0);
+        current["solarPV"][0]["tilt"] = json!(35.0);
+        current["solarPV"][0]["orientation"] = json!("SW");
+        current["zones"][0]["surfaces"][0]["windows"][0]["gValue"] = json!(0.4);
+        let result = assess_relabel(&original, &current);
+        assert!(result.allowed, "{:?}", result.changes);
+        for path in [
+            "/solarPV/0/area",
+            "/solarPV/0/tilt",
+            "/solarPV/0/orientation",
+        ] {
+            assert_eq!(verdict(&result, path), RelabelVerdict::Review, "{path}");
+        }
+        assert_eq!(
+            verdict(&result, "/zones/0/surfaces/0/windows/0/gValue"),
+            RelabelVerdict::Allowed
+        );
+        assert!(is_production_path("/solarPV/0/area"));
+        assert!(!is_production_path("/zones/0/surfaces/0/windows/0/gValue"));
+    }
+
+    #[test]
+    fn dwelling_subsystem_changes_follow_the_service() {
+        // W 6a p. 67: ventilation and hot water only the emission system.
+        let mut original = project();
+        original["ventilationSystems"] =
+            json!([{"distribution": {"ducts": "a"}, "emission": {"grilles": "a"}}]);
+        original["hotWaterSystems"] =
+            json!([{"distribution": {"loop": false}, "emission": {"taps": 1}}]);
+        original["coolingSystems"] = json!([{"control": {"kind": "a"}}]);
+        let mut current = original.clone();
+        current["ventilationSystems"][0]["distribution"]["ducts"] = json!("b");
+        current["ventilationSystems"][0]["emission"]["grilles"] = json!("b");
+        current["hotWaterSystems"][0]["distribution"]["loop"] = json!(true);
+        current["hotWaterSystems"][0]["emission"]["taps"] = json!(2);
+        current["coolingSystems"][0]["control"]["kind"] = json!("b");
+        let result = assess_relabel(&original, &current);
+        assert_eq!(
+            verdict(&result, "/ventilationSystems/0/distribution/ducts"),
+            RelabelVerdict::Review
+        );
+        assert_eq!(
+            verdict(&result, "/ventilationSystems/0/emission/grilles"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            verdict(&result, "/hotWaterSystems/0/distribution/loop"),
+            RelabelVerdict::Review
+        );
+        assert_eq!(
+            verdict(&result, "/hotWaterSystems/0/emission/taps"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            verdict(&result, "/coolingSystems/0/control/kind"),
+            RelabelVerdict::Allowed
+        );
+    }
+
+    #[test]
+    fn advice_and_survey_blocks_are_not_compared() {
+        let mut original = project();
+        original["maatwerkadvies"] = json!({"measures": []});
+        original["basisopname"] = json!({"kind": "residential", "survey": {"a": 1}});
+        let mut current = original.clone();
+        current["maatwerkadvies"]["measures"] = json!([{"id": "m1"}]);
+        current["basisopname"]["survey"]["a"] = json!(2);
+        let result = assess_relabel(&original, &current);
+        assert!(result.changes.is_empty(), "{:?}", result.changes);
+    }
+
+    #[test]
+    fn share_next_to_an_added_generator_needs_review() {
+        let mut original = project();
+        original["heatingSystems"][0]["coverageFraction"] = json!(1.0);
+        let mut current = original.clone();
+        current["heatingSystems"][0]["coverageFraction"] = json!(0.4);
+        current["heatingSystems"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"generator": {"type": "heat_pump_hybrid"}, "coverageFraction": 0.6}));
+        let result = assess_relabel(&original, &current);
+        assert_eq!(
+            verdict(&result, "/heatingSystems/1"),
+            RelabelVerdict::Review
+        );
+        assert_eq!(
+            verdict(&result, "/heatingSystems/0/coverageFraction"),
+            RelabelVerdict::Review
+        );
+        // Without an added generator a share change stays one-to-one.
+        let mut alone = original.clone();
+        alone["heatingSystems"][0]["coverageFraction"] = json!(0.9);
+        let result = assess_relabel(&original, &alone);
+        assert_eq!(
+            verdict(&result, "/heatingSystems/0/coverageFraction"),
+            RelabelVerdict::Allowed
+        );
+    }
+
+    #[test]
+    fn utility_source_cites_the_relabel_paragraph() {
+        assert!(RELABEL_SOURCE_U.contains("§4.2.4 (p. 19–20)"));
     }
 }

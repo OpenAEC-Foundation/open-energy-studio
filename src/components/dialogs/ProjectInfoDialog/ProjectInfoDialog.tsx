@@ -22,7 +22,8 @@ const buildingFunctions: BuildingFunction[] = [
 type TextKey = 'referenceObjectId' | 'bagObjectId' | 'postcode' | 'houseNumber' | 'houseNumberAddition'
   | 'buildingType' | 'client' | 'certificateNumber' | 'surveyDate' | 'registrationDate'
   | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate' | 'improvementDate'
-  | 'replacedEpOnlineNumber' | 'previousLabelClass';
+  | 'replacedEpOnlineNumber' | 'previousLabelClass'
+  | 'originalCertificateNumber' | 'originalEpOnlineNumber' | 'originalDossierReference';
 
 type TextField = { key: TextKey; type?: 'date' };
 
@@ -37,8 +38,14 @@ const surveyFields: TextField[] = [
   { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' }, { key: 'completionDate', type: 'date' },
   { key: 'epOnlineNumber' }, { key: 'previousLabelClass' },
 ];
-/** Relabel only (BRL 9500-W §4.2.4, Bijlage 6a/6b). */
-const relabelFields: TextField[] = [{ key: 'originalKernelVersion' }, { key: 'improvementDate', type: 'date' }];
+/** Relabel only (BRL 9500-W §4.2.3/4.2.4 p. 23–24, Bijlage 6a/6b; the relabel is an addendum to the original dossier). */
+const relabelFields: TextField[] = [
+  { key: 'originalKernelVersion' }, { key: 'improvementDate', type: 'date' },
+  { key: 'originalCertificateNumber' }, { key: 'originalEpOnlineNumber' }, { key: 'originalDossierReference' },
+];
+/** Relabel answers the kernel checks; empty means not yet established. */
+type RelabelAnswer = 'productionPhysicallyConnected' | 'noExcludedChangesConfirmed';
+const relabelAnswers: RelabelAnswer[] = ['productionPhysicallyConnected', 'noExcludedChangesConfirmed'];
 /** Replacement of an incorrect label only. */
 const replacementFields: TextField[] = [{ key: 'replacedEpOnlineNumber' }];
 
@@ -222,6 +229,17 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
           </select>
         </div>
         {messageType === 'relabel' && relabelFields.map(textInput)}
+        {messageType === 'relabel' && relabelAnswers.map((key) => (
+          <div className="dialog-field" key={key}>
+            <label htmlFor={`reg-${key}`}>{t(`reg.${key}`)}</label>
+            <select id={`reg-${key}`} value={registration[key] == null ? '' : String(registration[key])}
+              onChange={(e) => update({ [key]: e.target.value === '' ? undefined : e.target.value === 'true' })}>
+              <option value="">—</option>
+              <option value="true">{t('common.yes')}</option>
+              <option value="false">{t('common.no')}</option>
+            </select>
+          </div>
+        ))}
         {messageType === 'replacement' && replacementFields.map(textInput)}
         </div>
       </section>

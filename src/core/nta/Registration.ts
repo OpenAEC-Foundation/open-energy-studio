@@ -1,5 +1,6 @@
 import { version } from '../../../package.json';
 import type { NtaRegistration, NtaSoftwareIdentity } from './KernelClient';
+import { sha256Hex } from './Evidence';
 
 /** Name of this program in the registration (Regeling art. 5 lid 1 onder b, p. 6). */
 export const SOFTWARE_NAME = 'Open Energy Studio';
@@ -57,6 +58,15 @@ export function cleanRegistration(registration: NtaRegistration, kernelVersion?:
   for (const [key, raw] of Object.entries(registration)) {
     let value: unknown = typeof raw === 'string' ? raw.trim() : raw;
     if (key === 'software') continue;
+    if (key === 'relabelComparison') {
+      if (value && typeof value === 'object') result[key] = value;
+      continue;
+    }
+    // A stated "no" is an answer the kernel checks (BRL 9500 §4.2.3).
+    if ((key === 'productionPhysicallyConnected' || key === 'noExcludedChangesConfirmed') && typeof value === 'boolean') {
+      result[key] = value;
+      continue;
+    }
     if (Array.isArray(value)) {
       if (value.length === 0) continue;
     } else if (key === 'detailSurveyTriggers' && typeof value === 'object' && value !== null) {
@@ -156,4 +166,28 @@ export function bagConflicts(entry: BagLedgerEntry, ledger: BagLedgerEntry[]): B
   return ledger.filter((item) => item.projectId !== entry.projectId
     && item.residential && registered(item) && item.bagObjectId.trim() === id
     && !expired(item, reference));
+}
+
+/**
+ * SHA-256 of the project's label input: everything except the registration,
+ * the maatwerkadvies and the basic survey, which the relabel comparison skips.
+ * A stored comparison whose hash differs is out of date.
+ */
+export async function labelInputSha256(project: object): Promise<string> {
+  const rest: Record<string, unknown> = { ...(project as Record<string, unknown>) };
+  delete rest.registration;
+  delete rest.maatwerkadvies;
+  delete rest.basisopname;
+  return sha256Hex(new TextEncoder().encode(JSON.stringify(rest)));
+}
+
+/** Last day an improvement may be counted: 24 months after the survey (BRL 9500-W §4.2.3, p. 23). */
+export function relabelDeadline(surveyDate: string | undefined): string | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(surveyDate ?? '');
+  if (!match) return undefined;
+  const year = Number(match[1]) + 2;
+  const month = Number(match[2]);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const day = Math.min(Number(match[3]), lastDay);
+  return `${year}-${match[2]}-${String(day).padStart(2, '0')}`;
 }

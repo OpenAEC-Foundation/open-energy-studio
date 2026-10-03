@@ -180,6 +180,71 @@ pub struct GpsPosition {
     pub longitude: f64,
 }
 
+/// Role of an evidence file in a relabel (BRL 9500-W §4.2.3 p. 23, U p. 19):
+/// the proof that the improvement was made at this address, and for PV or
+/// solar thermal the photos that show the panels and their shading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RelabelProof {
+    /// Quote with the order (offerte met opdrachtverstrekking).
+    QuoteWithOrder,
+    /// Specified invoice showing the improvement at this address.
+    SpecifiedInvoice,
+    /// Photo of PV or solar thermal panels traceable to this building,
+    /// showing whether there is shading.
+    ProductionPhoto,
+}
+
+/// The relabel comparison (Bijlage 6a/6b) kept with the registration, so the
+/// project dossier holds the overview of later changes (Bijlage 3, W p. 63,
+/// U p. 54).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RelabelComparisonRecord {
+    /// File name of the original project.
+    pub original_file_name: String,
+    /// SHA-256 of the original project file, lowercase hex.
+    #[serde(default)]
+    pub original_sha256: Option<String>,
+    /// SHA-256 of the compared project (label input only); a later edit
+    /// makes the comparison out of date.
+    #[serde(default)]
+    pub current_sha256: Option<String>,
+    /// Moment of the comparison, ISO 8601.
+    #[serde(default)]
+    pub compared_at: Option<String>,
+    /// The kernel's relabel assessment as returned by `assess_relabel`.
+    pub assessment: Value,
+}
+
+impl RelabelComparisonRecord {
+    fn allowed(&self) -> bool {
+        self.assessment
+            .get("allowed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+
+    fn utility(&self) -> bool {
+        self.assessment.get("scheme").and_then(Value::as_str) == Some("u")
+    }
+
+    /// A change to PV or solar thermal is part of the comparison.
+    fn changes_production(&self) -> bool {
+        self.assessment
+            .get("changes")
+            .and_then(Value::as_array)
+            .is_some_and(|changes| {
+                changes.iter().any(|change| {
+                    change
+                        .get("path")
+                        .and_then(Value::as_str)
+                        .is_some_and(crate::relabel::is_production_path)
+                })
+            })
+    }
+}
+
 /// One evidence file. The kernel keeps its identity (hash) and metadata;
 /// the file itself goes into the dossier export.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -209,6 +274,10 @@ pub struct EvidenceItem {
     /// Local copy of the file in the desktop app.
     #[serde(default)]
     pub stored_path: Option<String>,
+    /// Role in a relabel: proof of the improvement at this address, or a
+    /// photo of PV or solar thermal with its shading.
+    #[serde(default)]
+    pub relabel_proof: Option<RelabelProof>,
 }
 
 /// All fields are optional so projects without registration data stay
@@ -294,6 +363,32 @@ pub struct Registration {
     /// Kernel version of the original calculation, for a relabel.
     #[serde(default)]
     pub original_kernel_version: Option<String>,
+    /// Relabel: certificate number of the holder that registered the
+    /// original label; only that holder may relabel (W §4.2.3 p. 23, U
+    /// p. 18).
+    #[serde(default)]
+    pub original_certificate_number: Option<String>,
+    /// Relabel: EP-Online number of the original label; the relabel is an
+    /// addendum to its project dossier (W p. 26, U p. 21).
+    #[serde(default)]
+    pub original_ep_online_number: Option<String>,
+    /// Relabel: reference to the original project dossier.
+    #[serde(default)]
+    pub original_dossier_reference: Option<String>,
+    /// Relabel: Bijlage 6a/6b comparison with the original project.
+    #[serde(default)]
+    pub relabel_comparison: Option<RelabelComparisonRecord>,
+    /// Relabel with PV or solar thermal: the adviser has shown that the
+    /// panels are exclusively and physically connected to this building's
+    /// installation and that the yield benefits its use (W p. 23, U p. 19).
+    #[serde(default)]
+    pub production_physically_connected: Option<bool>,
+    /// Utility relabel: the adviser established, by asking the client and
+    /// from the documents, that there are no changes to the thermal zone or
+    /// shell, no system changes, no geometric changes of the installation
+    /// and no distribution or emission changes (U §4.2.3 p. 19).
+    #[serde(default)]
+    pub no_excluded_changes_confirmed: Option<bool>,
     /// EP-Online number, entered after registration.
     #[serde(default)]
     pub ep_online_number: Option<String>,
@@ -986,6 +1081,9 @@ pub fn assess_registration_with(
             }
         }
     }
+    if message_type == MessageType::Relabel {
+        check_relabel_dossier(registration, &mut issues);
+    }
     // §4.2.3 (W p. 23, U p. 18): relabelling only for existing buildings.
     if message_type == MessageType::Relabel
         && registration
@@ -1035,6 +1133,104 @@ pub fn assess_registration_with(
         software,
         issues,
         plausibility,
+    }
+}
+
+/// Relabel requirements of BRL 9500-W §4.2.3 (p. 23), §4.2.5 and Bijlage 3
+/// (p. 63), and BRL 9500-U §4.2.3 (p. 18–19) and Bijlage 3 (p. 54): the
+/// holder of the original label, the link to the original dossier, the
+/// Bijlage 6a overview, the proof of the improvement and, for PV or solar
+/// thermal, photos with shading and the physical connection.
+fn check_relabel_dossier(registration: &Registration, issues: &mut Vec<RegistrationIssue>) {
+    match (
+        registration
+            .original_certificate_number
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty()),
+        registration
+            .certificate_number
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty()),
+    ) {
+        (None, _) => issues.push(issue(
+            "original_certificate_number_required",
+            "originalCertificateNumber",
+            "missing",
+        )),
+        (Some(original), Some(current)) if !original.eq_ignore_ascii_case(current) => {
+            issues.push(issue(
+                "relabel_certificate_holder_differs",
+                "certificateNumber",
+                "error",
+            ))
+        }
+        _ => {}
+    }
+    if blank(&registration.original_ep_online_number) {
+        issues.push(issue(
+            "original_ep_online_number_required",
+            "originalEpOnlineNumber",
+            "missing",
+        ));
+    }
+    match &registration.relabel_comparison {
+        None => issues.push(issue(
+            "relabel_comparison_required",
+            "relabelComparison",
+            "missing",
+        )),
+        Some(comparison) => {
+            if !comparison.allowed() {
+                issues.push(issue(
+                    "relabel_changes_not_allowed",
+                    "relabelComparison",
+                    "error",
+                ));
+            }
+            if comparison.utility() && registration.no_excluded_changes_confirmed != Some(true) {
+                issues.push(issue(
+                    "relabel_utility_confirmation_required",
+                    "noExcludedChangesConfirmed",
+                    "missing",
+                ));
+            }
+            if comparison.changes_production() {
+                if !registration
+                    .evidence
+                    .iter()
+                    .any(|item| item.relabel_proof == Some(RelabelProof::ProductionPhoto))
+                {
+                    issues.push(issue(
+                        "relabel_production_photo_required",
+                        "evidence",
+                        "missing",
+                    ));
+                }
+                match registration.production_physically_connected {
+                    None => issues.push(issue(
+                        "relabel_production_connection_required",
+                        "productionPhysicallyConnected",
+                        "missing",
+                    )),
+                    Some(false) => issues.push(issue(
+                        "relabel_production_not_connected",
+                        "productionPhysicallyConnected",
+                        "error",
+                    )),
+                    Some(true) => {}
+                }
+            }
+        }
+    }
+    if !registration.evidence.iter().any(|item| {
+        matches!(
+            item.relabel_proof,
+            Some(RelabelProof::QuoteWithOrder | RelabelProof::SpecifiedInvoice)
+        )
+    }) {
+        issues.push(issue("relabel_proof_required", "evidence", "missing"));
     }
 }
 
@@ -1273,6 +1469,35 @@ mod tests {
         }
     }
 
+    /// The relabel dossier items of §4.2.3: original holder and label, the
+    /// comparison and the proof of the improvement.
+    fn relabel_dossier(registration: &mut Registration) {
+        registration.original_certificate_number = registration.certificate_number.clone();
+        registration.original_ep_online_number = Some("EP-123".into());
+        registration.relabel_comparison = Some(RelabelComparisonRecord {
+            original_file_name: "origineel.oes.json".into(),
+            original_sha256: None,
+            current_sha256: None,
+            compared_at: None,
+            assessment: serde_json::json!({"scheme": "w", "allowed": true, "needsReview": false,
+                "changes": [{"path": "/constructions/0/rcValue", "verdict": "allowed"}]}),
+        });
+        registration.evidence.push(EvidenceItem {
+            id: "ev-invoice".into(),
+            kind: EvidenceKind::Invoice,
+            file_name: "factuur.pdf".into(),
+            sha256: "a".repeat(64),
+            date: None,
+            gps: None,
+            source_party: None,
+            checked_by: Some("A".into()),
+            description: None,
+            linked_paths: Vec::new(),
+            stored_path: None,
+            relabel_proof: Some(RelabelProof::SpecifiedInvoice),
+        });
+    }
+
     fn codes(registration: &Registration) -> Vec<&'static str> {
         assess_registration(registration)
             .issues
@@ -1323,6 +1548,7 @@ mod tests {
 
         let mut relabel = complete();
         relabel.relabel = true;
+        relabel_dossier(&mut relabel);
         // The registration date may lie after the 24 months; the
         // improvement date decides (§4.2.3).
         relabel.registration_date = Some("2028-03-01".into());
@@ -1671,7 +1897,78 @@ mod tests {
             description: None,
             linked_paths: vec!["/zones/0".into()],
             stored_path: None,
+            relabel_proof: None,
         }
+    }
+
+    #[test]
+    fn relabel_dossier_requirements() {
+        // BRL 9500-W §4.2.3 (p. 23), Bijlage 3 (p. 63); 9500-U p. 18–19.
+        let mut relabel = complete();
+        relabel.message_type = Some(MessageType::Relabel);
+        relabel.original_kernel_version = Some(KERNEL_VERSION.into());
+        relabel.improvement_date = Some("2027-01-31".into());
+        let found = codes(&relabel);
+        for code in [
+            "original_certificate_number_required",
+            "original_ep_online_number_required",
+            "relabel_comparison_required",
+            "relabel_proof_required",
+        ] {
+            assert!(found.contains(&code), "{code}: {found:?}");
+        }
+        relabel_dossier(&mut relabel);
+        assert!(codes(&relabel).is_empty(), "{:?}", codes(&relabel));
+
+        // Another certificate holder may not relabel.
+        relabel.original_certificate_number = Some("K99999".into());
+        assert_eq!(codes(&relabel), vec!["relabel_certificate_holder_differs"]);
+        relabel.original_certificate_number = Some("k12345".into());
+        assert!(codes(&relabel).is_empty());
+
+        // An invoice without the relabel role does not prove the improvement.
+        relabel.evidence[0].relabel_proof = None;
+        assert_eq!(codes(&relabel), vec!["relabel_proof_required"]);
+        relabel.evidence[0].relabel_proof = Some(RelabelProof::QuoteWithOrder);
+
+        // A Bijlage 6b change blocks the relabel.
+        let comparison = relabel.relabel_comparison.as_mut().unwrap();
+        comparison.assessment["allowed"] = serde_json::json!(false);
+        assert_eq!(codes(&relabel), vec!["relabel_changes_not_allowed"]);
+        let comparison = relabel.relabel_comparison.as_mut().unwrap();
+        comparison.assessment["allowed"] = serde_json::json!(true);
+
+        // PV changed: photos with shading and the physical connection.
+        let comparison = relabel.relabel_comparison.as_mut().unwrap();
+        comparison.assessment["changes"] =
+            serde_json::json!([{"path": "/solarPV/0", "verdict": "review"}]);
+        let found = codes(&relabel);
+        assert!(
+            found.contains(&"relabel_production_photo_required"),
+            "{found:?}"
+        );
+        assert!(found.contains(&"relabel_production_connection_required"));
+        relabel.production_physically_connected = Some(false);
+        assert!(codes(&relabel).contains(&"relabel_production_not_connected"));
+        relabel.production_physically_connected = Some(true);
+        let mut photo = evidence("ev-photo");
+        photo.kind = EvidenceKind::PhotoOverview;
+        photo.relabel_proof = Some(RelabelProof::ProductionPhoto);
+        relabel.evidence.push(photo);
+        assert!(codes(&relabel).is_empty(), "{:?}", codes(&relabel));
+
+        // Utility: the adviser confirms no 6b changes (U p. 19).
+        let comparison = relabel.relabel_comparison.as_mut().unwrap();
+        comparison.assessment["scheme"] = serde_json::json!("u");
+        assert_eq!(
+            codes(&relabel),
+            vec!["relabel_utility_confirmation_required"]
+        );
+        relabel.no_excluded_changes_confirmed = Some(true);
+        assert!(codes(&relabel).is_empty());
+
+        // A regular registration does not ask for any of this.
+        assert!(codes(&complete()).is_empty());
     }
 
     #[test]

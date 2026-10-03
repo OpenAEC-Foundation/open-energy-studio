@@ -20,6 +20,10 @@ const CLUSTER_KEYS: Record<string, string> = {
   'one-to-one replacement or change: insulation properties': 'insulationProperties',
   'not classified': 'notClassified',
   'relabel keeps the original survey date': 'surveyDate',
+  'building-bound production: size, tilt or orientation changed': 'productionGeometry',
+  'change in distribution, emission or control not listed for this service': 'distributionNotListed',
+  'one-to-one replacement or change: glazing properties': 'glazingProperties',
+  'installation: share of a generator next to an added generator': 'generatorShare',
 };
 
 const NOTE_KEYS: Record<string, string> = {
@@ -29,9 +33,23 @@ const NOTE_KEYS: Record<string, string> = {
   'lighting is not listed in Bijlage 6a or 6b; the adviser decides': 'lightingNotListed',
   'confirm: not insulation on the inside and not of elements outside the thermal zone (6b)': 'insulationConfirm',
   'decide with Bijlage 6a/6b and ISSO 82.1': 'decide',
+  'Bijlage 6a lists only the emission system for ventilation and hot water; the adviser decides': 'emissionOnly',
+  'follows the added generator, a system change (6b); the adviser decides': 'addedGenerator',
 };
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/**
+ * Whether a change path belongs to PV or solar thermal, as in the kernel's
+ * `is_production_path`; such a relabel needs photos with shading (BRL 9500-W p. 23).
+ */
+export function isProductionPath(path: string): boolean {
+  if (/solar/i.test(path)) return true;
+  return path.split('/').some((segment) => {
+    const lower = segment.toLowerCase();
+    return lower === 'pv' || lower.startsWith('pvsystem') || lower === 'onsiteproduction';
+  });
+}
 
 /** The cluster in the UI language; an unknown kernel text is shown as written. */
 export function relabelCluster(t: Translate, cluster: string): string {
