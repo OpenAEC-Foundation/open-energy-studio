@@ -787,6 +787,8 @@ De voor het formele dossier benodigde tests, versiegegevens, registratie en kwal
 
 ## Lokaal reproduceren
 
+Op 3 oktober is de integratiecontrole gestart op `02fafc5`: 735 kerntests, 53 servicetests, beide Rust-formatcontroles en de frontend-build slaagden. Tijdens de volledige frontendtestrun werd de relabel-wijziging `b7c08b7` in dezelfde werkboom gemerged. Die run eindigde met 367/369 geslaagde tests; de twee relabel-fouten betroffen een tussentoestand van de bestanden tijdens de run. De twee betrokken testbestanden zijn daarna op `b7c08b7` opnieuw uitgevoerd en slaagden met 10/10 tests. Een volledige frontendtestrun op een stilstaande versie blijft nodig voor een nieuwe volledige integratievrijgave.
+
 ```bash
 cargo test --manifest-path crates/nta8800-core/Cargo.toml
 cargo test --manifest-path crates/nta8800-service/Cargo.toml
