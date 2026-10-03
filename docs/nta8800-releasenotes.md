@@ -2,6 +2,23 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — reviewcorrecties energie per energiefunctie en invoerformulieren
+
+### Uitkomsten die veranderen
+
+- **Tapwater uit een combitoestel of afleverset op het verwarmingstoestel (13.184/13.185, p. 653; 5.20a, p. 89).** Het tapwateraandeel van het toestel is E_W en telt nu onder warm tapwater, zonder f_BACS. Alleen E_H krijgt f_BACS. Bij een utiliteitsgebouw met f_BACS = 1,05 en zo'n toestel dalen het gebruik, EPtot en BENG 2 met 0,05 × het tapwateraandeel. Woningen (f_BACS = 1) houden dezelfde totalen; in de verdeling per energiefunctie verschuift het aandeel van verwarming naar warm tapwater. Het hulpenergiegebruik van het toestel blijft bij verwarming (p. 653).
+
+### Opgeslagen projecten
+
+- **Leeg getal in een lijst.** Een lege maandwaarde of een leeg pompvermogen gaf `nta_calculation_block_invalid` voor het hele NTA-blok. Nu is dat het gat `nta_value_missing` op het pad van die waarde, bijvoorbeeld `ntaCalculation.declaredUses[0].monthlyKwh[3]`.
+- **Gecombineerde buitenlucht en afvoerlucht uitgevinkt.** Het formulier wist nu de verborgen `outdoorAirHeatFraction` en `outdoorAirFractionReference`. Die gaven anders het blokkerende `outdoor_air_fraction_without_combined_source`. Een opgeslagen project met zulke restwaarden houdt dat gat tot het vakje opnieuw wordt aan- en uitgevinkt.
+
+### Formulieren en uitvoer
+
+- Een ander koudeopwekkertype vervangt alleen de eerste opwekker; verdere opwekkers blijven staan. De keuzelijst kent nu ook de compressiekoelmachine met gasmotor (tabel 10.29) en de absorptiekoelmachine op een WKK (tabel 10.30).
+- Waarschuwingen over opgegeven interne warmte wijzen nu naar de zone, bijvoorbeeld `spaceHeating.demand.internalGains.heatFluxWPerM2`. Een zone waarvan alle gebruiksfuncties woonfuncties zijn, krijgt `internal_gains_declared_residential`.
+- De bijlage met interpretaties bevat nu ook hoofdstuk 5 (`building_performance::INTERPRETATIONS`).
+
 ## 3 oktober 2026 — energie per energiefunctie, rapportaanvullingen en opgegeven interne warmte
 
 Uitkomsten veranderen niet; er komen uitvoervelden en waarschuwingen bij.

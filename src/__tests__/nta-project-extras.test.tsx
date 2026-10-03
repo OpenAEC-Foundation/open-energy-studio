@@ -148,6 +148,40 @@ describe('NTA project input forms', () => {
     expect(current().cooling.generators[0].generator.kind).toBe('compression');
   }, 60000);
 
+  it('keeps further cooling generators and clears hidden outdoor-air values', async () => {
+    const user = userEvent.setup();
+    const cooling = coolingSystemTemplate('compression') as Draft;
+    const generators = cooling.generators as Draft[];
+    const initial = {
+      cooling: { ...cooling, generators: [...generators, { id: 'cold-2', generator: { kind: 'external_cold' }, capacityKw: 40, equipmentReference: '' }] },
+      heatPumpRenewable: {
+        sourceBelow20C: false, exhaustAirSource: false, combinedOutdoorAndExhaustAir: true,
+        outdoorAirHeatFraction: 0.6, outdoorAirFractionReference: 'kwaliteitsverklaring', sourceReference: '',
+      },
+    };
+    renderWithProviders(<Harness initial={initial} body={(draft, change) => <>
+      <CoolingSystemsFields draft={draft} change={change} project={project} />
+      <CollectiveAndRenewableFields draft={draft} change={change} />
+    </>} />);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Cold generator' }), 'absorption_chp');
+    let draft = current();
+    expect(draft.cooling.generators).toHaveLength(2);
+    expect(draft.cooling.generators[0].generator).toEqual({
+      kind: 'absorption_chp', chp: { powerKw: null, builtAfter2006: true, hreDeclared: false, lowTemperature: false },
+    });
+    expect(draft.cooling.generators[1].id).toBe('cold-2');
+    await user.type(screen.getByRole('spinbutton', { name: 'Electric power P_el, kW' }), '50');
+    expect(current().cooling.generators[0].generator.chp.powerKw).toBe(50);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Cold generator' }), 'gas_engine_compression');
+    expect(current().cooling.generators[0].generator).toMatchObject({ kind: 'gas_engine_compression', gasEngine: { powerKw: null } });
+    await user.click(screen.getByRole('checkbox', { name: 'Outdoor air and exhaust air combined' }));
+    draft = current();
+    expect(draft.heatPumpRenewable.combinedOutdoorAndExhaustAir).toBe(false);
+    expect(withoutNulls(draft.heatPumpRenewable)).toEqual({
+      sourceBelow20C: false, exhaustAirSource: false, combinedOutdoorAndExhaustAir: false, sourceReference: '',
+    });
+  }, 60000);
+
   it('edits solar space heating, the collective installation and declared flows', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{ declaredUses: [] }} body={(draft, change) => <>

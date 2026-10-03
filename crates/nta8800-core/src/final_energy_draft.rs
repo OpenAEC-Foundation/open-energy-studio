@@ -1,7 +1,8 @@
-//! Provisional final-energy arithmetic from the public 2026 chapter-5 consultation draft.
-//! Inputs must already be monthly E_EPus values from an independently established
-//! upstream route. This module neither derives those values nor proves the draft
-//! survived unchanged in NTA 8800:2025+C1:2026.
+//! Final-energy arithmetic of NTA 8800:2025+C1:2026 §5.9, formulas 5.57–5.60
+//! (p. 133). The module began from the 2026 consultation draft and was checked
+//! against the final edition; the `_draft` name is kept for the API. Inputs must
+//! already be monthly E_EPus values from an independently established upstream
+//! route; this module does not derive them.
 
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use rust_decimal::{Decimal, RoundingStrategy};

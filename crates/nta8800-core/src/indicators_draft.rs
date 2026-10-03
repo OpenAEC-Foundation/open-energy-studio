@@ -1,5 +1,7 @@
-//! Provisional indicator arithmetic from public consultation chapter 5, §5.3.1.
-//! Caller supplies independently derived annual totals and Ag;tot. No label is calculated.
+//! Indicator arithmetic of NTA 8800:2025+C1:2026 §5.3.1, formulas 5.1–5.8
+//! (p. 72–79), checked against the final edition; the `_draft` name is kept for
+//! the API. The caller supplies independently derived annual totals and Ag;tot.
+//! No label is calculated.
 
 use crate::final_energy_draft::{as_f64, decimal};
 

@@ -25,6 +25,11 @@ pub fn kernel_interpretations() -> Vec<InterpretationGroup> {
     };
     vec![
         group(
+            "hoofdstuk 5",
+            "building_performance",
+            crate::building_performance::INTERPRETATIONS,
+        ),
+        group(
             "hoofdstuk 7",
             "monthly_demand",
             crate::monthly_demand::OMITTED_CORRECTIONS,
@@ -83,7 +88,8 @@ mod tests {
     #[test]
     fn every_group_has_items() {
         let groups = kernel_interpretations();
-        assert!(groups.len() >= 13);
+        assert!(groups.len() >= 14);
+        assert_eq!(groups[0].module, "building_performance");
         for group in &groups {
             assert!(!group.items.is_empty(), "{}", group.module);
         }

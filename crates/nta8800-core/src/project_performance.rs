@@ -1025,9 +1025,21 @@ fn derive_input(
             match serde_path_to_error::deserialize::<_, NtaCalculationInput>(value.clone()) {
                 Ok(block) => Some(block),
                 Err(error) => {
+                    // A blank value (null) where the kernel needs a number,
+                    // e.g. one month of a 12-month row or one pump power, is
+                    // a missing input at its own path, not a malformed block.
+                    let blank = error.inner().to_string().starts_with("invalid type: null");
+                    let found = if blank {
+                        gap(
+                            "nta_value_missing",
+                            format!("ntaCalculation.{}", error.path()),
+                        )
+                    } else {
+                        gap("nta_calculation_block_invalid", "ntaCalculation")
+                    };
                     gaps.push(InputGap {
                         detail: Some(error.to_string()),
-                        ..gap("nta_calculation_block_invalid", "ntaCalculation")
+                        ..found
                     });
                     None
                 }
@@ -2116,6 +2128,12 @@ mod tests {
         assert!(
             detail.contains("ventilationFlows[0].months[3].conductanceWPerK"),
             "{detail}"
+        );
+        // A blank number is a missing input at its own path.
+        assert_eq!(result.gaps[0].code, "nta_value_missing");
+        assert_eq!(
+            result.gaps[0].path,
+            "ntaCalculation.ventilationFlows[0].months[3].conductanceWPerK"
         );
     }
 
