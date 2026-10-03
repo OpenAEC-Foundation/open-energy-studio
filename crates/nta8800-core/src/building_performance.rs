@@ -58,6 +58,15 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// Chapter 5 choices the norm text leaves open, collected for the report
+/// appendix (`interpretations::kernel_interpretations`).
+pub const INTERPRETATIONS: &[&str] = &[
+    "§5.5.3/5.20 energy per energy function: self-used on-site production (5.22) is shared over the functions in proportion to their electricity use; the norm fixes E_pr;EPus;el per carrier only. Export (5.10/5.13), the storage correction (5.14a) and renewable electricity (5.39a) stay building terms",
+    "13.184/13.185 with 5.20a (p. 653, p. 89): the hot-water share of a combi or delivery set on the heating generator is E_W and carries no f_BACS; the generator's auxiliary energy stays with space heating",
+    "declared internal gains (§7.5.3.1/7.5.3.2, p. 179–180; 7.21, p. 177): a flux within 0,01 W/m² of the table value, or of the table value plus the §5.4.2 q_L, gives no warning; any other value a non-blocking warning",
+    "16.11–16.13: only CHP electricity of heating and hot-water systems counts as on-site production (without f_BACS); the electricity of a CHP driving absorption cooling (ε_chp;el) is reported only",
+];
+
 /// Table 5.2 `f_P;del` / `f_P;pr;us` / `f_P;exp` for electricity.
 pub const F_P_ELECTRICITY: f64 = 1.45;
 /// Table 5.2 `f_P;del` for natural gas and fuel oil.
@@ -1131,7 +1140,30 @@ const DECLARED_GAIN_TOLERANCE_W_PER_M2: f64 = 0.01;
 fn declared_gain_warnings(input: &BuildingPerformanceInput) -> Vec<PerformanceIssue> {
     use crate::monthly_demand::{function_profile, InternalGains, UsageFunction};
     let mut warnings = Vec::new();
-    for zone in input.zone_inputs() {
+    let zones = input
+        .heating_systems()
+        .into_iter()
+        .enumerate()
+        .flat_map(|(system, chain)| {
+            let base = if system == 0 {
+                "spaceHeating".to_string()
+            } else {
+                format!("additionalHeatingSystems[{}]", system - 1)
+            };
+            std::iter::once((format!("{base}.demand"), &chain.demand)).chain(
+                chain
+                    .additional_zones
+                    .iter()
+                    .enumerate()
+                    .map(move |(index, zone)| {
+                        (
+                            format!("{base}.additionalZones[{index}].demand"),
+                            &zone.demand,
+                        )
+                    }),
+            )
+        });
+    for (zone_path, zone) in zones {
         let InternalGains::Declared {
             heat_flux_w_per_m2, ..
         } = &zone.internal_gains
@@ -1141,9 +1173,16 @@ fn declared_gain_warnings(input: &BuildingPerformanceInput) -> Vec<PerformanceIs
         if zone.usage_fit.is_some() {
             continue;
         }
-        let path = format!("zones[{}].internalGains.heatFluxWPerM2", zone.zone_id);
-        let residential =
-            zone.function_areas.is_empty() && zone.usage_function == UsageFunction::Residential;
+        let path = format!("{zone_path}.internalGains.heatFluxWPerM2");
+        // 7.21 (p. 177) applies to residential functions, also when the
+        // zone lists them as function areas.
+        let residential = if zone.function_areas.is_empty() {
+            zone.usage_function == UsageFunction::Residential
+        } else {
+            zone.function_areas
+                .iter()
+                .all(|item| item.function == UsageFunction::Residential)
+        };
         if residential {
             warnings.push(issue("internal_gains_declared_residential", path));
             continue;
@@ -2503,6 +2542,16 @@ pub struct HotWaterFromHeatingMonth {
     pub electricity_kwh: f64,
 }
 
+/// The 13.184 share `E_W;gen;in;conv;hj / (E_W;gen;in;conv;hj + Q_H;nod;in)`
+/// of one chain month; 0 without a hot-water load on the heating system.
+fn combi_hot_water_share(row: &crate::space_heating_chain::ChainMonth) -> f64 {
+    if row.hot_water_load_kwh > 0.0 && row.generator_output_kwh > 0.0 {
+        (row.hot_water_load_kwh / row.generator_output_kwh).min(1.0)
+    } else {
+        0.0
+    }
+}
+
 /// 13.184 for each month with a hot-water load on the heating system.
 fn hot_water_from_heating(heating: &SpaceHeatingChainAssessment) -> Vec<HotWaterFromHeatingMonth> {
     if heating
@@ -2516,11 +2565,7 @@ fn hot_water_from_heating(heating: &SpaceHeatingChainAssessment) -> Vec<HotWater
         .monthly
         .iter()
         .map(|row| {
-            let share = if row.generator_output_kwh > 0.0 {
-                (row.hot_water_load_kwh / row.generator_output_kwh).min(1.0)
-            } else {
-                0.0
-            };
+            let share = combi_hot_water_share(row);
             HotWaterFromHeatingMonth {
                 month: row.month,
                 share,
@@ -3690,28 +3735,64 @@ fn compute(
         let month = (index + 1) as u8;
         let row = &heating.monthly[index];
         let mut by = ServiceMonth::default();
-        // 5.20/5.21: space heating and its auxiliary energy weighted by f_BACS.
-        let mut used_el =
-            bacs * (row.generator_electricity_kwh + row.auxiliary_electricity_kwh.unwrap_or(0.0));
-        let mut used_gas = bacs * row.natural_gas_kwh;
-        let mut used_oil = bacs * row.oil_kwh;
-        by.add(F_HEATING, C_EL, bacs * row.generator_electricity_kwh, 0.0);
+        // 13.184/13.185 (p. 653): the hot-water share of a combi or
+        // delivery-set generator is E_W, not E_H. 5.20a (p. 89) weights only
+        // E_H by f_BACS, so that share is booked under hot water without it.
+        // The generator's auxiliary energy stays with heating (p. 653).
+        let combi_share = combi_hot_water_share(row);
+        let heating_weight = bacs * (1.0 - combi_share);
+        let carrier_weight = heating_weight + combi_share;
+        let mut used_el = carrier_weight * row.generator_electricity_kwh
+            + bacs * row.auxiliary_electricity_kwh.unwrap_or(0.0);
+        let mut used_gas = carrier_weight * row.natural_gas_kwh;
+        let mut used_oil = carrier_weight * row.oil_kwh;
+        by.add(
+            F_HEATING,
+            C_EL,
+            heating_weight * row.generator_electricity_kwh,
+            0.0,
+        );
+        by.add(
+            F_HOT_WATER,
+            C_EL,
+            combi_share * row.generator_electricity_kwh,
+            0.0,
+        );
         by.add(
             F_AUXILIARY,
             C_EL,
             bacs * row.auxiliary_electricity_kwh.unwrap_or(0.0),
             0.0,
         );
-        by.add(F_HEATING, C_GAS, used_gas, F_P_GAS);
-        by.add(F_HEATING, C_OIL, used_oil, F_P_OIL);
+        by.add(
+            F_HEATING,
+            C_GAS,
+            heating_weight * row.natural_gas_kwh,
+            F_P_GAS,
+        );
+        by.add(
+            F_HOT_WATER,
+            C_GAS,
+            combi_share * row.natural_gas_kwh,
+            F_P_GAS,
+        );
+        by.add(F_HEATING, C_OIL, heating_weight * row.oil_kwh, F_P_OIL);
+        by.add(F_HOT_WATER, C_OIL, combi_share * row.oil_kwh, F_P_OIL);
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
         // 9.84: E = Q/(η·f_prac) with η_H;gen;equiv;dh = 1.
-        let mut used_dh = bacs * row.district_heat_kwh / factors.practice_heat;
+        let dh_input = row.district_heat_kwh / factors.practice_heat;
+        let mut used_dh = carrier_weight * dh_input;
         by.add(
             F_HEATING,
             C_DH,
-            used_dh,
+            heating_weight * dh_input,
+            factors.district_heat.primary_factor,
+        );
+        by.add(
+            F_HOT_WATER,
+            C_DH,
+            combi_share * dh_input,
             factors.district_heat.primary_factor,
         );
         // 5.39g: the renewable share counts Q_H;gen;out of external heat and
@@ -3924,13 +4005,18 @@ fn compute(
         // 5.20 books Q_HD;hp;in;bron as carrier dh (its own factors above).
         let reported_dh = used_dh + if source.is_some() { source_heat } else { 0.0 };
         // Tables 5.2/5.3: bmA f_P 0,0, bmB 0,5, bmC 1,0 (× 0,104 for CO2).
-        let used_bm_b = bacs * row.biomass_kwh + hot_water_biomass;
-        let used_bm_a = bacs * row.biomass_class_a_kwh;
-        let used_bm_c = bacs * row.biomass_class_c_kwh;
+        let used_bm_b = carrier_weight * row.biomass_kwh + hot_water_biomass;
+        let used_bm_a = carrier_weight * row.biomass_class_a_kwh;
+        let used_bm_c = carrier_weight * row.biomass_class_c_kwh;
         let used_bm = used_bm_a + used_bm_b + used_bm_c;
-        by.add(F_HEATING, C_BM, bacs * row.biomass_kwh, F_P_BIOMASS_B);
-        by.add(F_HEATING, C_BM, used_bm_a, 0.0);
-        by.add(F_HEATING, C_BM, used_bm_c, 1.0);
+        for (kwh, primary) in [
+            (row.biomass_kwh, F_P_BIOMASS_B),
+            (row.biomass_class_a_kwh, 0.0),
+            (row.biomass_class_c_kwh, 1.0),
+        ] {
+            by.add(F_HEATING, C_BM, heating_weight * kwh, primary);
+            by.add(F_HOT_WATER, C_BM, combi_share * kwh, primary);
+        }
         by.add(F_HOT_WATER, C_BM, hot_water_biomass, F_P_BIOMASS_B);
         fossil += used_bm_b * F_P_BIOMASS_B + used_bm_c;
         co2 += used_bm_b * K_CO2_BIOMASS_B + used_bm_c * 0.104;
@@ -4231,6 +4317,30 @@ mod tests {
         );
         // The residential 7.21 gain is not a declared flux.
         assert!(declared_gain_warnings(&input()).is_empty());
+        // A zone whose function areas are all residential, with an index path.
+        let mut sample = input();
+        sample.space_heating.demand.usage_fit = None;
+        sample.space_heating.demand.function_areas = vec![
+            crate::monthly_demand::UsageFunctionArea {
+                function: UsageFunction::Residential,
+                area_m2: 60.0,
+            },
+            crate::monthly_demand::UsageFunctionArea {
+                function: UsageFunction::Residential,
+                area_m2: 40.0,
+            },
+        ];
+        sample.space_heating.demand.internal_gains = InternalGains::Declared {
+            heat_flux_w_per_m2: 5.0,
+            source_reference: "test".into(),
+        };
+        let warnings = declared_gain_warnings(&sample);
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].code, "internal_gains_declared_residential");
+        assert_eq!(
+            warnings[0].path,
+            "spaceHeating.demand.internalGains.heatFluxWPerM2"
+        );
     }
 
     fn chain() -> SpaceHeatingChainInput {
@@ -5875,6 +5985,92 @@ mod tests {
         assert!(assess_building_performance(&sample)
             .hot_water_from_heating
             .is_empty());
+    }
+
+    #[test]
+    fn combi_hot_water_is_e_w_without_bacs_in_a_utility_building() {
+        use crate::domestic_hot_water::{
+            HotWaterEmission, HotWaterGenerator, HotWaterNeed, UtilityArea,
+        };
+        use crate::monthly_demand::{LightingRecovery, UsageFunction};
+        let mut sample = input();
+        sample.calculation_scope = CalculationScope::Utility;
+        sample.label_function = Some(LabelFunction::Office);
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let demand = &mut sample.space_heating.demand;
+        demand.usage_function = UsageFunction::Office;
+        demand.dwelling_type = None;
+        demand.setpoints.heating_c = 21.0;
+        demand.internal_gains = InternalGains::Utility {
+            lighting: UtilityLighting::Declared {
+                annual_kwh: 0.0,
+                recovery: LightingRecovery::Other,
+            },
+            hot_water_recoverable_kwh: Vec::new(),
+            source_reference: "tables 7.2/7.3".into(),
+        };
+        let area = demand.usable_floor_area_m2;
+        let mut system = hot_water_system(HotWaterGenerator::HeatingSystem);
+        system.need = HotWaterNeed::Utility {
+            areas: vec![UtilityArea {
+                function: LabelFunction::Office,
+                area_m2: area,
+            }],
+            source_reference: "plan".into(),
+        };
+        system.emission = HotWaterEmission::Utility {
+            mean_length_m: 2.0,
+            source_reference: "plan".into(),
+        };
+        sample.hot_water = Some(system);
+        sample.bacs_factor = 1.0;
+        let plain = assess_building_performance(&sample);
+        assert_eq!(plain.status, "calculated_unverified", "{:?}", plain.issues);
+        sample.bacs_factor = 1.05;
+        let weighted = assess_building_performance(&sample);
+        assert_eq!(
+            weighted.status, "calculated_unverified",
+            "{:?}",
+            weighted.issues
+        );
+        assert_services_reconcile(&weighted);
+        // 13.184/13.185 (p. 653) with 5.20a (p. 89): only the space-heating
+        // part of the generator gas carries f_BACS; the combi share is E_W.
+        let mut space_gas = 0.0;
+        let mut combi_gas = 0.0;
+        for (row, split) in weighted
+            .space_heating
+            .monthly
+            .iter()
+            .zip(&weighted.hot_water_from_heating)
+        {
+            combi_gas += split.natural_gas_kwh;
+            space_gas += row.natural_gas_kwh - split.natural_gas_kwh;
+        }
+        assert!(combi_gas > 0.0);
+        let gas = |result: &BuildingPerformanceAssessment| -> f64 {
+            result
+                .carriers
+                .iter()
+                .filter(|row| row.carrier == "gas")
+                .map(|row| row.used_kwh)
+                .sum()
+        };
+        let delta = gas(&weighted) - gas(&plain);
+        assert!((delta - 0.05 * space_gas).abs() < 1e-6, "{delta}");
+        let service_gas = |service: &str| -> f64 {
+            weighted
+                .energy_by_service
+                .annual
+                .iter()
+                .filter(|row| row.service == service && row.carrier == "gas")
+                .map(|row| row.used_kwh)
+                .sum()
+        };
+        assert!((service_gas("hotWater") - combi_gas).abs() < 1e-6);
+        assert!((service_gas("heating") - 1.05 * space_gas).abs() < 1e-6);
     }
 
     #[test]

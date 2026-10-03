@@ -1,7 +1,7 @@
 import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import {
-  collectiveConnectionTemplate, coolingSystemTemplate, declaredRenewableHeatTemplate, declaredUseTemplate,
+  chpClassTemplate, collectiveConnectionTemplate, coolingSystemTemplate, declaredRenewableHeatTemplate, declaredUseTemplate,
   heatPumpRenewableTemplate, humidifierTemplate, onSiteProductionTemplate, sunroomSurfaceTemplate, sunroomTemplate,
 } from '../../core/nta/NtaSystemTemplates';
 import {
@@ -99,14 +99,30 @@ export function HumidifiersFields({ draft, change, project }: SectionProps & { p
   </div>;
 }
 
-const COOLING_KINDS = ['compression', 'room_air_conditioner', 'gas_absorption', 'absorption_external_heat', 'external_cold',
-  'unknown_collective', 'free_cooling'] as const;
+const COOLING_KINDS = ['compression', 'room_air_conditioner', 'gas_engine_compression', 'gas_absorption',
+  'absorption_external_heat', 'absorption_chp', 'external_cold', 'unknown_collective', 'free_cooling'] as const;
 const COOLING_KIND_LABELS: Record<string, string> = {
   compression: 'nta.form.cooling.compression', room_air_conditioner: 'nta.form.cooling.rac',
+  gas_engine_compression: 'nta.form.cooling.gasEngine',
   gas_absorption: 'nta.form.cooling.absorption', absorption_external_heat: 'nta.form.cooling.absorptionDh',
+  absorption_chp: 'nta.form.cooling.absorptionChp',
   external_cold: 'nta.form.cooling.external', unknown_collective: 'nta.form.cooling.unknownCollective',
   free_cooling: 'nta.form.cooling.free',
 };
+
+/** The kernel's `CoolingGeneratorKind` of `kind` with its required members. */
+function coolingGeneratorTemplate(kind: string): Draft {
+  switch (kind) {
+    case 'free_cooling':
+      return { kind, source: null, heatPumpSource: false, groundAboveZeroDemonstrated: false };
+    case 'gas_engine_compression':
+      return { kind, gasEngine: chpClassTemplate() };
+    case 'absorption_chp':
+      return { kind, chp: chpClassTemplate() };
+    default:
+      return { kind };
+  }
+}
 
 /** Chapter 10: one cooling system at `base` (`cooling` or `coolingSystems[i].system`). */
 export function CoolingSystemFields({ draft, change, base, allowNone }: SectionProps & { base: Path; allowNone: boolean }) {
@@ -121,9 +137,11 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
         const next = event.target.value;
         if (!next) { change(base, null); return; }
         const current = (read(draft, base) as Draft | null) ?? coolingSystemTemplate();
-        const generator = next === 'free_cooling'
-          ? { kind: next, source: null, heatPumpSource: false, groundAboveZeroDemonstrated: false } : { kind: next };
-        change(base, { ...current, generators: [{ id: 'cold-1', generator, capacityKw: null, equipmentReference: '' }] });
+        const generator = coolingGeneratorTemplate(next);
+        // Only the first generator changes kind; further generators stay.
+        const generators = list(current, ['generators']);
+        const first = generators[0] ?? { id: 'cold-1', capacityKw: null, equipmentReference: '' };
+        change(base, { ...current, generators: [{ ...first, generator }, ...generators.slice(1)] });
       }}>
         {(allowNone || kind == null) && <option value="">{t('nta.form.cooling.none')}</option>}
         {COOLING_KINDS.map((key) => <option key={key} value={key}>{t(COOLING_KIND_LABELS[key])}</option>)}
@@ -133,6 +151,14 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
       <TextField {...field} path={at('generators', 0, 'equipmentReference')} label={t('nta.form.boilerEquipmentSource')} />
       {(kind === 'compression' || kind === 'room_air_conditioner') &&
         <CoolingPerformanceFields draft={draft} change={change} base={at('generators', 0, 'generator')} />}
+      {(kind === 'gas_engine_compression' || kind === 'absorption_chp') && (() => {
+        const chp = at('generators', 0, 'generator', kind === 'absorption_chp' ? 'chp' : 'gasEngine');
+        return <>
+          <NumberField {...field} path={[...chp, 'powerKw']} label={t('nta.form.chp.power')} />
+          <CheckField {...field} path={[...chp, 'builtAfter2006']} label={t('nta.form.chp.after2006')} />
+          <CheckField {...field} path={[...chp, 'hreDeclared']} label={t('nta.form.chp.hre')} />
+        </>;
+      })()}
       {kind === 'free_cooling' && <>
         <SelectField {...field} path={at('generators', 0, 'generator', 'source')} label={t('nta.form.freeCoolingSource')} options={[
           ['aquifer_from2013', t('nta.form.free.aquiferNew')], ['aquifer_dwellings_before2013', t('nta.form.free.aquiferOld')],
@@ -255,7 +281,15 @@ export function CollectiveAndRenewableFields({ draft, change }: SectionProps) {
     {renewable && <>
       <CheckField {...field} path={['heatPumpRenewable', 'sourceBelow20C']} label={t('nta.form.heatPumpRenewable.below20')} />
       <CheckField {...field} path={['heatPumpRenewable', 'exhaustAirSource']} label={t('nta.form.heatPumpRenewable.exhaust')} />
-      <CheckField {...field} path={['heatPumpRenewable', 'combinedOutdoorAndExhaustAir']} label={t('nta.form.heatPumpRenewable.combined')} />
+      <label className="nta-form-check">
+        <input type="checkbox" checked={combined} onChange={(event) => change(['heatPumpRenewable'], {
+          ...(read(draft, ['heatPumpRenewable']) as Draft),
+          combinedOutdoorAndExhaustAir: event.target.checked,
+          // The kernel rejects a fraction without the combined source; hidden values are cleared.
+          ...(event.target.checked ? {} : { outdoorAirHeatFraction: null, outdoorAirFractionReference: null }),
+        })} />
+        {t('nta.form.heatPumpRenewable.combined')}
+      </label>
       {combined && <>
         <NumberField {...field} path={['heatPumpRenewable', 'outdoorAirHeatFraction']} label={t('nta.form.heatPumpRenewable.fraction')} />
         <TextField {...field} path={['heatPumpRenewable', 'outdoorAirFractionReference']} label={t('nta.form.heatPumpRenewable.fractionSource')} />

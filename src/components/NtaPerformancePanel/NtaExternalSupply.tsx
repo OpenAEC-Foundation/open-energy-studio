@@ -307,7 +307,7 @@ function AuxiliaryFields({ draft, change, base }: SectionProps & { base: Path })
       <SelectField {...field} path={[...base, 'auxiliary', 'distribution', 'method']} label={t('nta.annexP.auxiliaryMethod')}
         options={options(t, 'nta.annexP.aux', ['forfait', 'pumps', 'pumps_monthly'])}
         onChange={(_, value) => change([...base, 'auxiliary', 'distribution'], value === 'pumps' || value === 'pumps_monthly'
-          ? { method: value, pumpPowersW: [null], sourceReference: '' } : { method: 'forfait' })} />
+          ? { method: value, pumpPowersW: [], sourceReference: '' } : { method: 'forfait' })} />
       {method === 'forfait' && <>
         <SelectField {...field} path={[...base, 'auxiliary', 'distribution', 'network']} label={t('nta.annexP.network')}
           options={options(t, 'nta.annexP.network', ['primary_and_secondary', 'primary', 'secondary', 'small_system'])} />
