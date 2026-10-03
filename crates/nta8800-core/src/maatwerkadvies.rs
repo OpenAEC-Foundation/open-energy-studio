@@ -665,6 +665,16 @@ fn split_pointer(path: &str) -> Option<(String, String)> {
 
 /// Applies one RFC 6902 operation (replace, add, remove).
 pub fn apply_patch(target: &mut Value, operation: &PatchOperation) -> Result<(), String> {
+    // A measure changes a part of the input, never the whole document: an
+    // empty pointer would replace the project itself (RFC 6901 root).
+    let path = match operation {
+        PatchOperation::Replace { path, .. }
+        | PatchOperation::Add { path, .. }
+        | PatchOperation::Remove { path } => path,
+    };
+    if !path.starts_with('/') {
+        return Err(format!("path must start with '/': {path:?}"));
+    }
     match operation {
         PatchOperation::Replace { path, value } => {
             let slot = target
@@ -674,10 +684,6 @@ pub fn apply_patch(target: &mut Value, operation: &PatchOperation) -> Result<(),
             Ok(())
         }
         PatchOperation::Add { path, value } => {
-            if path.is_empty() {
-                *target = value.clone();
-                return Ok(());
-            }
             let (parent, last) = split_pointer(path).ok_or_else(|| format!("bad path: {path}"))?;
             let container = target
                 .pointer_mut(&parent)
@@ -2394,6 +2400,26 @@ mod tests {
             }
         )
         .is_err());
+        // An empty or relative path would replace the whole document.
+        for path in ["", "c", "a/b"] {
+            assert!(apply_patch(
+                &mut value,
+                &PatchOperation::Replace {
+                    path: path.into(),
+                    value: Value::Null
+                }
+            )
+            .is_err());
+            assert!(apply_patch(
+                &mut value,
+                &PatchOperation::Add {
+                    path: path.into(),
+                    value: Value::Null
+                }
+            )
+            .is_err());
+        }
+        assert_eq!(value, json!({"a": {"b": [2, 3], "d": "x"}, "c": 5}));
     }
 
     #[test]

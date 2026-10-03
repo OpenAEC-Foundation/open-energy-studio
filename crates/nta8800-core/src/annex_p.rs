@@ -2928,6 +2928,18 @@ fn pipe_losses(
             ));
             ok = false;
         }
+        // P.14: null marks a month out of operation; a network that is
+        // never in operation has no loss, so an all-null row is an
+        // unfilled input rather than a network out of operation.
+        NetworkWaterTemperature::Monthly { temperatures_c }
+            if temperatures_c.iter().all(Option::is_none) =>
+        {
+            issues.push(issue(
+                "network_temperature_required",
+                format!("{path}.waterTemperature.temperaturesC"),
+            ));
+            ok = false;
+        }
         NetworkWaterTemperature::OutdoorBins { curve, .. } if curve.is_empty() => {
             issues.push(issue(
                 "heating_curve_required",
@@ -3283,6 +3295,13 @@ fn storage_efficiency(
             _,
         ) => {
             reference(source_reference, format!("{spath}.sourceReference"), issues);
+            // P.35: the calculated route sums the losses of the components
+            // present; without any it would give η = 1, better than the
+            // forfait of P.6.6.4.3, so at least one is required.
+            if vessels.is_empty() && pipes.is_empty() && exchanger.is_none() {
+                issues.push(issue("storage_components_required", spath.clone()));
+                return None;
+            }
             let mut storage = Some(0.0);
             for (index, vessel) in vessels.iter().enumerate() {
                 let loss = vessel_loss_kwh(vessel, &format!("{spath}.vessels[{index}]"), issues);
@@ -6064,6 +6083,22 @@ mod tests {
             result.calculation.unwrap().distribution_loss_kwh,
             loss - summer,
         );
+        // A row without any month in operation is an unfilled input.
+        if let SystemDistribution::Pipes {
+            water_temperature, ..
+        } = &mut input.distribution
+        {
+            *water_temperature = Some(NetworkWaterTemperature::Monthly {
+                temperatures_c: vec![None; 12],
+            });
+        }
+        let issues = calculated(&input, "s").unwrap_err();
+        assert!(
+            issues
+                .iter()
+                .any(|item| item.code == "network_temperature_required"),
+            "{issues:?}"
+        );
     }
 
     #[test]
@@ -6111,6 +6146,23 @@ mod tests {
             source_reference: "design".into(),
         });
         let result = calculated(&wd, "w").unwrap();
+        // Without any component the calculated route would give η = 1.
+        let mut empty = wd.clone();
+        empty.hot_water_storage = Some(WdStorage::Calculated {
+            vessels: Vec::new(),
+            pipes: Vec::new(),
+            exchanger: None,
+            circulation_temperature_c: None,
+            correction_factor: None,
+            source_reference: "design".into(),
+        });
+        let issues = calculated(&empty, "w").unwrap_err();
+        assert!(
+            issues
+                .iter()
+                .any(|item| item.code == "storage_components_required"),
+            "{issues:?}"
+        );
         // P.45/P.46: (20·0,271·60·1,20 + 0,2·100)·8,76.
         let pipes = (20.0 * 0.271 * 60.0 * 1.2 + 20.0) * 8.76;
         close(

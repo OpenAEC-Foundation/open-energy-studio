@@ -2,6 +2,26 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — review van de registratie, lege waarden en bijlage P-formulieren
+
+### Status van opgeslagen projecten
+
+- **Gereed voor registratie.** `readyForRegistration` is nu waar als het dossier compleet is én het rekenprogramma een BRL 9501-attest heeft (Regeling art. 2 en 3, p. 4–5). Zolang `SOFTWARE_ATTEST_NUMBER` leeg is, is het dus overal onwaar. Het nieuwe veld `dossierComplete` beoordeelt alleen het dossier; het rapport toont beide.
+- **Herlabelen.** Alleen een herlabeling houdt het opgeslagen rekenprogramma (BRL 9500-W §4.2.4, p. 24). Het programma legt nu ook de kernversie vast (`software.kernelVersion`). Wijkt die af van de rekenkern die nu rekent, dan meldt de registratie `relabel_software_kernel_differs`. Een vervanging is een nieuwe berekening en krijgt het huidige programma (p. 23).
+- **WLC-GWP.** Een oplevering vóór 2028 zonder datum van de toets Bbl geeft weer "niet vereist" in plaats van "onbekend". Een vrijstaande woning met één woning in de berekening is het hele gebouw: haar eigen A_g beslist, zonder waarschuwing.
+- **Bijlage P.** Een maandreeks van de netwatertemperatuur zonder enige maand in bedrijf geeft `network_temperature_required` (P.14). Een berekende opslag (P.35) zonder vat, laadleiding of warmtewisselaar geeft `storage_components_required`; zonder onderdelen kwam η op 1, gunstiger dan het forfait. Het formulier begint de berekende opslag nu met één vat.
+- **Maatwerkadvies.** Een wijziging met een leeg pad of een pad zonder `/` wordt geweigerd met `measure_patch_failed` op die regel. Voorheen verving een leeg pad het hele project.
+
+### Lege waarden
+
+`nta_value_missing` vindt nu ook twee of meer lege verplichte velden in één type (bijvoorbeeld lengte en gronddekking van één leidingsegment). Toegestane lege maanden in reeksen als `temperaturesC` worden niet meer gemeld.
+
+### Formulieren
+
+- Elke wijziging in een maatregel heeft nu een soort waarde (getal, tekst, ja/nee, leeg of JSON), zodat tekst "2" tekst blijft.
+- Het wissen van "overig verlies" verwijdert het veld (de kern neemt dan 0). Een gebieds-PV-systeem begint zonder belemmeringsfactor.
+- De dode JSON-controle bij het opslaan van het NTA-formulier is verwijderd.
+
 ## 3 oktober 2026 — formulieren zonder JSON-editors (bijlage P, hoofdstuk 14, randdelen, maatwerkadvies)
 
 Rekenuitkomsten en opgeslagen projecten veranderen niet; dezelfde invoer is nu met gewone velden te maken:

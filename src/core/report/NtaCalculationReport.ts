@@ -168,7 +168,8 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     <tr><th>Opnemend adviseur</th>${cell(advisor(registration.surveyingAdvisor))}<th>Registrerend adviseur</th>${cell(advisor(registration.registeringAdvisor))}</tr>
     <tr><th>Opnamedatum</th>${cell(registration.surveyDate ?? '—')}<th>Registratiedatum</th>${cell(registration.registrationDate ?? '—')}</tr>
     <tr><th>Uiterste registratiedatum</th>${cell(assessment?.registrationDeadline ?? assessment?.relabelDeadline ?? '—')}<th>Geldig tot (opnamedatum + 10 jaar)</th>${cell(assessment?.validUntil ?? '—')}</tr>
-    <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Gereed voor registratie</th>${cell(assessment?.readyForRegistration ? (assessment.softwareAttested === false ? 'ja, dossier compleet; rekenprogramma nog niet geattesteerd' : 'ja') : 'nee')}</tr>
+    <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Dossier compleet</th>${cell(assessment ? ((assessment.dossierComplete ?? assessment.issues.length === 0) ? 'ja' : 'nee') : '—')}</tr>
+    <tr><th>Gereed voor registratie</th>${cell(assessment?.readyForRegistration ? 'ja' : (assessment && assessment.softwareAttested === false ? 'nee, rekenprogramma nog niet geattesteerd (BRL 9501)' : 'nee'))}<th>Rekenprogramma geattesteerd</th>${cell(assessment?.softwareAttested ? 'ja' : 'nee')}</tr>
     <tr><th>Rekenprogramma (Regeling art. 5)</th>${cell(softwareText)}<th>WLC-GWP</th>${cell(wlcText)}</tr>
     ${messageType === 'replacement' ? `<tr><th>Vervangt label</th>${cell(registration.replacedEpOnlineNumber ?? '—')}<th>Uiterste vervangdatum</th>${cell(assessment?.replacementDeadline ?? '—')}</tr>` : ''}
   </tbody></table>

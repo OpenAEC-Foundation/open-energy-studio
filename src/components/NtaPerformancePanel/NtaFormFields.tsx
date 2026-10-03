@@ -31,11 +31,16 @@ export interface FieldProps {
   onChange: (path: Path, value: unknown) => void;
 }
 
-export function NumberField({ draft, path, label, onChange, step = 'any' }: FieldProps & { step?: string }) {
+/**
+ * A number input. Clearing writes `null` (a blank the kernel reports at its
+ * path), or with `optional` drops the member so the kernel default applies.
+ */
+export function NumberField({ draft, path, label, onChange, step = 'any', optional = false }:
+  FieldProps & { step?: string; optional?: boolean }) {
   const value = read(draft, path);
   return <label>{label}
     <input type="number" step={step} value={typeof value === 'number' ? value : ''}
-      onChange={(event) => onChange(path, event.target.value === '' ? null : Number(event.target.value))} />
+      onChange={(event) => onChange(path, event.target.value === '' ? (optional ? undefined : null) : Number(event.target.value))} />
   </label>;
 }
 

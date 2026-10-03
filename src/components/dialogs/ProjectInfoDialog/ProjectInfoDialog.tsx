@@ -4,7 +4,7 @@ import { useEnergy } from '../../../context/EnergyContext';
 import { BuildingFunction } from '../../../core/energy/types';
 import type { NtaDetailSurveyTriggers, NtaRegistration } from '../../../core/nta/KernelClient';
 import {
-  bagConflicts, cleanRegistration, readBagLedger, recordBagRegistration, softwareIdentity,
+  bagConflicts, cleanRegistration, keepsSoftwareIdentity, readBagLedger, recordBagRegistration, softwareIdentity,
 } from '../../../core/nta/Registration';
 import { DialogShell } from '../DialogShell';
 import { EvidenceRegister } from './EvidenceRegister';
@@ -64,7 +64,7 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
     surveyDate: registration.surveyDate,
   };
   const conflicts = bagConflicts(ledgerEntry, readBagLedger());
-  const software = messageType !== 'regular' && registration.software ? registration.software : softwareIdentity();
+  const software = keepsSoftwareIdentity(registration) && registration.software ? registration.software : softwareIdentity();
 
   const handleSave = () => {
     // Keeps registered labels only and drops this project's entry when the

@@ -81,6 +81,8 @@ describe('registration block', () => {
     expect(cleanRegistration({ relabel: true, client: 'X', software: original })?.software).toEqual(original);
     expect(cleanRegistration({ messageType: 'regular', client: 'X', software: original })?.software).toEqual(softwareIdentity());
     expect(cleanRegistration({ messageType: 'relabel', client: 'X' })?.software).toEqual(softwareIdentity());
+    // A replacement is a new calculation with the current version (p. 23).
+    expect(cleanRegistration({ messageType: 'replacement', client: 'X', software: original })?.software).toEqual(softwareIdentity());
   });
 
   it('prints advisers, dates, validity and label data in the report', () => {
@@ -119,6 +121,15 @@ describe('registration block', () => {
     expect(html).toContain('7.50 kg CO₂-eq/m²·jr (wlc.pdf)');
     expect(html).toContain('plausibility_borderline_label');
     expect(html).toContain('registratie');
+    // Dossier state and readiness are shown apart (Regeling art. 2/3).
+    expect(html).toContain('<th>Dossier compleet</th><td>nee</td>');
+    const attestMissing = {
+      ...assessment,
+      registration: { ...assessment.registration!, issues: [], dossierComplete: true, softwareAttested: false, readyForRegistration: false },
+    } as ProjectPerformanceAssessment;
+    const ready = generateNtaCalculationReportHTML(project, attestMissing);
+    expect(ready).toContain('<th>Dossier compleet</th><td>ja</td>');
+    expect(ready).toContain('nee, rekenprogramma nog niet geattesteerd (BRL 9501)');
   });
 
   it('notes missing registration data', () => {

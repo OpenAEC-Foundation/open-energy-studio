@@ -4395,6 +4395,8 @@ export interface NtaSoftwareIdentity {
   version: string;
   /** BRL 9501 attest number; empty until the program is attested. */
   attestNumber?: string;
+  /** Calculation core of the calculation; a relabel must keep it (BRL 9500-W §4.2.4). */
+  kernelVersion?: string;
 }
 
 export interface NtaDetailSurveyTriggers {
@@ -4767,8 +4769,11 @@ export interface RegistrationAssessment {
   wlcGwpRequired?: boolean | null;
   /** Program of the registration; this program for projects saved without one. */
   software?: NtaSoftwareIdentity;
-  /** Whether that program has a BRL 9501 attest number; does not block readiness. */
+  /** Whether that program has a BRL 9501 attest number. */
   softwareAttested?: boolean;
+  /** The dossier holds everything the registration needs (no `issues`). */
+  dossierComplete?: boolean;
+  /** Dossier complete and program attested (Regeling art. 2/3, p. 4–5). */
   readyForRegistration: boolean;
   issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
   /** BRL 9500 §7.2.2-style plausibility warnings; never block registration. */

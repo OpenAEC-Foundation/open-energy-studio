@@ -71,8 +71,78 @@ export function parsePatchValue(text: string): unknown {
   }
 }
 
-function patchValueText(value: unknown): string {
-  return typeof value === 'string' ? value : JSON.stringify(value ?? null);
+/** JSON type of a patch value; the row keeps it, so "2" stays text and 2 a number. */
+export type PatchValueKind = 'number' | 'text' | 'boolean' | 'null' | 'json';
+
+export function patchValueKind(value: unknown): PatchValueKind {
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'string') return 'text';
+  if (typeof value === 'boolean') return 'boolean';
+  if (value === null || value === undefined) return 'null';
+  return 'json';
+}
+
+/** The value converted to another type, as far as it carries over. */
+export function convertPatchValue(value: unknown, kind: PatchValueKind): unknown {
+  switch (kind) {
+    case 'number': {
+      const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.replace(',', '.')) : NaN;
+      return Number.isFinite(number) && !(typeof value === 'string' && value.trim() === '') ? number : null;
+    }
+    case 'text':
+      if (typeof value === 'string') return value;
+      if (value === null || value === undefined) return '';
+      return typeof value === 'object' ? JSON.stringify(value) : String(value);
+    case 'boolean': return value === true || value === 'true';
+    case 'null': return null;
+    case 'json': return typeof value === 'object' && value !== null ? value : {};
+  }
+}
+
+const VALUE_KINDS: PatchValueKind[] = ['number', 'text', 'boolean', 'null', 'json'];
+
+/** The value of one patch row with its JSON type chosen explicitly. */
+function PatchValueField({ value, onChange }: { value: unknown; onChange: (value: unknown) => void }) {
+  const { t } = useI18n();
+  // A fresh row (null) starts as a number, the usual change.
+  const [kind, setKind] = useState<PatchValueKind>(() => (value === null ? 'number' : patchValueKind(value)));
+  const [text, setText] = useState(() => (kind === 'json' ? JSON.stringify(value)
+    : typeof value === 'number' ? String(value) : ''));
+  return <>
+    <label>{t('mwa.patch.valueType')}
+      <select value={kind} onChange={(e) => {
+        const next = e.target.value as PatchValueKind;
+        const converted = convertPatchValue(value, next);
+        setKind(next);
+        setText(next === 'json' ? JSON.stringify(converted) : typeof converted === 'number' ? String(converted) : '');
+        onChange(converted);
+      }}>
+        {VALUE_KINDS.map((item) => <option key={item} value={item}>{t(`mwa.patch.type.${item}`)}</option>)}
+      </select>
+    </label>
+    {kind === 'number' && <label>{t('mwa.patch.value')}
+      <input inputMode="decimal" value={text} onChange={(e) => {
+        setText(e.target.value);
+        onChange(convertPatchValue(e.target.value, 'number'));
+      }} />
+    </label>}
+    {kind === 'text' && <label>{t('mwa.patch.value')}
+      <input value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />
+    </label>}
+    {kind === 'boolean' && <label>{t('mwa.patch.value')}
+      <select value={value === true ? 'true' : 'false'} onChange={(e) => onChange(e.target.value === 'true')}>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    </label>}
+    {kind === 'json' && <label>{t('mwa.patch.value')}
+      <textarea rows={3} value={text} aria-invalid={patchValueKind(parsePatchValue(text)) !== 'json'} onChange={(e) => {
+        setText(e.target.value);
+        const parsed = parsePatchValue(e.target.value);
+        if (patchValueKind(parsed) === 'json') onChange(parsed);
+      }} />
+    </label>}
+  </>;
 }
 
 /** The RFC 6902 operations of a measure, one row per operation: op, path and value. */
@@ -103,10 +173,8 @@ export function MeasurePatchFields({ patch, onChange }: {
             <input value={operation.path} placeholder="/ntaCalculation/…"
               onChange={(e) => update(index, { ...operation, path: e.target.value })} />
           </label>
-          {operation.op !== 'remove' && <label>{t('mwa.patch.value')}
-            <input value={patchValueText(operation.value)}
-              onChange={(e) => update(index, { ...operation, value: parsePatchValue(e.target.value) })} />
-          </label>}
+          {operation.op !== 'remove' && <PatchValueField value={operation.value}
+            onChange={(value) => update(index, { ...operation, value })} />}
           <button type="button" onClick={() => onChange(patch.filter((_, other) => other !== index))}>{t('mwa.remove')}</button>
         </div>
       ))}
