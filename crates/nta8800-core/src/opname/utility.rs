@@ -1947,6 +1947,7 @@ fn ventilation_value(
         &mut input,
         vent.passive_cooling.as_ref(),
         vent.principle,
+        false,
         vent.bypass_present,
         recorder,
     );

@@ -1469,6 +1469,15 @@ fn convert_heat_pump(
     let collective_source = collective_source_reference
         .as_deref()
         .filter(|value| !value.trim().is_empty());
+    // p. 111: a collective source is established from invoices or design
+    // data. A ticked but blank reference must not silently fall back to an
+    // individual source (no table V.3 doublet, no 9.62 correction).
+    if collective_source_reference.is_some() && collective_source.is_none() {
+        recorder.issue(
+            "collective_source_reference_required",
+            "heating.generator.collectiveSourceReference",
+        );
+    }
     let water_based = matches!(
         source,
         HeatPumpSource::Ground
@@ -1537,7 +1546,9 @@ fn convert_heat_pump(
         // The gas rows have no temperature condition for groundwater.
         HeatPumpSource::Groundwater if gas => "groundwater_below15_c",
         HeatPumpSource::Groundwater => groundwater_row(recorder),
-        HeatPumpSource::SurfaceWater if collective_source.is_none() => {
+        // p. 111: surface water is a choice for a collective installation
+        // (or a collective source); an individual installation takes ground.
+        HeatPumpSource::SurfaceWater if !collective && collective_source.is_none() => {
             recorder.record(
                 "individual_surface_water_as_ground",
                 path,
@@ -1546,8 +1557,9 @@ fn convert_heat_pump(
             );
             "ground"
         }
+        // The table 9.27 GWP rows have no surface-water row.
+        HeatPumpSource::SurfaceWater if gas && !large => "groundwater_below15_c",
         HeatPumpSource::SurfaceWater if collective || large => "surface_water",
-        HeatPumpSource::SurfaceWater if gas => "groundwater_below15_c",
         // Table 9.27 has no surface-water row.
         HeatPumpSource::SurfaceWater => groundwater_row(recorder),
         HeatPumpSource::WaterBasedUnknown => {
@@ -1628,8 +1640,16 @@ fn convert_heat_pump(
                 "heating.generator.capacityKw",
             );
         }
-        // Table 9.27 "GWP" rows: dwellings up to 25 kW (collective
-        // installations included); table 9.29 above 25 kW.
+        // Table 9.27 "GWP" rows (NTA p. 334) cover only a gas heat pump in a
+        // collective building installation; table 9.29 covers collective
+        // installations and units above 25 kW. An individual dwelling unit up
+        // to 25 kW has no forfait row.
+        if !collective && !large && capacity.is_some() {
+            recorder.issue(
+                "gas_heat_pump_individual_no_forfait_row",
+                "heating.generator.drive",
+            );
+        }
         let table = if large {
             "utility_collective_or_above25_kw"
         } else {

@@ -195,7 +195,9 @@ pub struct SurveyWindow {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SolarControlG {
-    pub g_value: f64,
+    /// `None` while the field is blank: reported as `solar_control_g_invalid`.
+    #[serde(default)]
+    pub g_value: Option<f64>,
     pub source_reference: String,
 }
 
@@ -700,10 +702,10 @@ pub fn derive_envelope_with_cooling(
             );
             let g = match &window.solar_control {
                 Some(product) => {
-                    if !(product.g_value.is_finite()
-                        && product.g_value > 0.0
-                        && product.g_value <= 1.0)
-                    {
+                    let value = product
+                        .g_value
+                        .filter(|value| value.is_finite() && *value > 0.0 && *value <= 1.0);
+                    if value.is_none() {
                         recorder.issue(
                             "solar_control_g_invalid",
                             format!("{w_path}.solarControl.gValue"),
@@ -715,7 +717,9 @@ pub fn derive_envelope_with_cooling(
                             format!("{w_path}.solarControl.sourceReference"),
                         );
                     }
-                    product.g_value
+                    // The table g stands in so the remaining derivation runs;
+                    // the issue keeps the survey from calculating.
+                    value.unwrap_or_else(|| glass_g(row))
                 }
                 None => glass_g(row),
             };
@@ -1726,16 +1730,24 @@ mod tests {
         };
         assert_eq!(run(None).0, json!(0.6));
         let (g, codes) = run(Some(SolarControlG {
-            g_value: 0.28,
+            g_value: Some(0.28),
             source_reference: "BCRG kwaliteitsverklaring".into(),
         }));
         assert_eq!(g, json!(0.28));
         assert!(codes.is_empty());
         let (_, codes) = run(Some(SolarControlG {
-            g_value: 0.28,
+            g_value: Some(0.28),
             source_reference: String::new(),
         }));
         assert_eq!(codes, vec!["solar_control_evidence_required"]);
+        // A blank g (the form template sends null) is a field issue, not a
+        // deserialisation failure of the whole survey.
+        let blank: SolarControlG =
+            serde_json::from_value(json!({"gValue": null, "sourceReference": "datasheet"}))
+                .expect("blank g deserialises");
+        let (g, codes) = run(Some(blank));
+        assert_eq!(g, json!(0.6));
+        assert_eq!(codes, vec!["solar_control_g_invalid"]);
     }
 
     #[test]
