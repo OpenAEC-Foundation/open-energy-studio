@@ -189,6 +189,44 @@ describe('NTA performance panel', () => {
     expect(block.thermalMass.sourceReference).toBe('');
   });
 
+  it('states the vertical pipes and lists plausibility warnings', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ status: 'incomplete', inputFingerprint: 'sha256:x', attestStatus: 'unattested',
+        geometry: null, gaps: [{ code: 'vertical_pipes_unknown', path: 'ntaCalculation.verticalPipes' }],
+        warnings: [{ code: 'declared_hot_water_efficiency_above_one', path: 'ntaCalculation.declaredUses[0].monthlyKwh',
+          detail: 'η_W ≈ 1.08 > 1' }],
+        derivedInput: null, performance: null }),
+    }));
+    renderWithProviders(<Harness />);
+    const panel = within(await screen.findByRole('region', { name: 'NTA 8800 calculation (Rust kernel)' }));
+    expect(await panel.findByText('Vertical pipes unknown: list them, or none (7.3.3)')).toBeInTheDocument();
+    const warnings = within(panel.getByTestId('nta-plausibility-warnings'));
+    expect(warnings.getByText('Declared hot-water use implies an efficiency above 1')).toBeInTheDocument();
+    expect(warnings.getByText('η_W ≈ 1.08 > 1')).toBeInTheDocument();
+
+    await user.click(panel.getByRole('button', { name: 'Start NTA input' }));
+    const form = within(panel.getByRole('form', { name: 'NTA input' }));
+    // The template leaves the pipes unknown (a kernel gap until stated).
+    expect(form.getByLabelText('Pipes through the envelope')).toHaveValue('unknown');
+    await user.selectOptions(form.getByLabelText('Pipes through the envelope'), 'listed');
+    fireEvent.change(form.getByLabelText('Storeys of the zone'), { target: { value: '2' } });
+    await user.click(form.getByRole('button', { name: 'Add pipe' }));
+    expect(form.getAllByLabelText('Storeys of the zone')).toHaveLength(2);
+    await user.click(form.getAllByRole('button', { name: 'Remove' })[1]);
+    await user.click(form.getByRole('button', { name: 'Save' }));
+    let block = JSON.parse(screen.getByTestId('block').textContent ?? 'null');
+    expect(block.verticalPipes).toEqual([{ id: 'leiding-1', storeys: 2, insulated: false, sourceReference: '' }]);
+
+    await user.click(panel.getByRole('button', { name: 'Edit NTA input' }));
+    const edit = within(panel.getByRole('form', { name: 'NTA input' }));
+    await user.selectOptions(edit.getByLabelText('Pipes through the envelope'), 'none');
+    await user.click(edit.getByRole('button', { name: 'Save' }));
+    block = JSON.parse(screen.getByTestId('block').textContent ?? 'null');
+    expect(block.verticalPipes).toEqual([]);
+  });
+
   it('switches the form to chapter 11 ventilation and saves a mirrored block', async () => {
     const user = userEvent.setup();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

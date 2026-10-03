@@ -61,6 +61,12 @@ Per balans: setpoint na nivellering, reductiefactor (`a_H;red` of `a_C;red`), re
 
 Bij een fictieve leiding per toiletgroep in de utiliteitsbouw (7.17a) mag in plaats van `storeys` ook `buildingHeightM` (H van 11.2.1.2) worden opgegeven. Dan geldt N_bouwlaag = ⌊H/3⌋, met een minimum van 1. `areaShare` verdeelt H_p naar rato van de gebruiksoppervlakte over de zones van het gebouw.
 
+`verticalPipes: []` betekent dat er aantoonbaar geen doorvoeren zijn (tabel 7.1, 0 W/K). Ontbreekt de lijst, dan is de aanwezigheid onbekend en geeft de kern `vertical_pipes_unknown`. 7.3.3 schrijft dan fictieve ongeïsoleerde leidingen voor: per bouwlaag van de rekenzone (woning buiten een woongebouw), één per woonfunctie (woongebouw) of één per toiletgroep met N = ⌊H/3⌋, verdeeld naar gebruiksoppervlakte (utiliteit). De kern leidt die niet zelf af, omdat het aantal bouwlagen, woningen of toiletgroepen niet in de invoer staat; de adviseur voert ze in. De basisopname past de standaardwaarde wel zelf toe (`vertical_pipes_unknown_one_per_storey`, `vertical_pipes_unknown_one_per_toilet_group`).
+
+## Lineaire thermische bruggen: één methode (8.2.1, 8.3.3.1)
+
+De forfaitaire verrekening (ΔU_for in 8.2, 0,5·P in 8.37/8.38) mag alleen voor het hele gebouw; vermenging met ψ-waarden is niet toegestaan. De kern geeft `thermal_bridge_methods_mixed` als een vloerrand forfaitair is (`edgeThermalBridges.method = forfait`) terwijl er elders ψ-waarden staan: lineaire bruggen in H_D, in de begrenzing met een onverwarmde ruimte of in een gedetailleerde vloerrand met ψ_gr. Een aansluiting vloer–gevel van een vloer op grond hoort volgens opmerking 10 van 8.2.1 niet in H_D maar in de vloerrand (8.36, ψ_gr).
+
 ## Zontoetreding: tabelwaarden (7.41, tabel 7.4–7.6, 7.4a/b)
 
 Invoer voor de zontoetreding per raam:
@@ -90,12 +96,13 @@ Invoer voor de zontoetreding per raam:
 1. `θ_e;avg;an` in 7.14/7.15 en D.1–D.3 is het ongewogen gemiddelde van tabel 17.1 (10,6725 °C); D.4 gebruikt de vaste 10,67 °C.
 2. D.7/D.8 staan in de NTA met exponenten in `d_f;equi/δ`; NEN-EN-ISO 13370 gebruikt daar de breedte of diepte van de randisolatie. De module volgt de NTA zoals gedrukt.
 3. Tabel D.1: verticale randisolatie geeft altijd β = 2; horizontale randisolatie alleen vanaf R_c ≥ 2,0 m²K/W.
-4. 7.66–7.68: als `dθ_set − dθ_float ≤ 0` geldt `f_low = 1` vóór de regel `dθ_float = 1 → f_low = 0`.
+4. 7.66–7.68: als `dθ_set − dθ_float ≤ 0` geldt `f_low = 1` vóór de regel `dθ_float = 1 → f_low = 0`. De norm noemt beide voorwaarden zonder rangorde, en bij `dθ_float = 1` gelden ze allebei (dubbelzinnig). De kern kiest `f_H;red;low = 1`. Dat is de enige fysische lezing: bij `dθ_float = 1` dekken de winsten het hele verlies, de temperatuur zakt in de verlaagde periode niet onder het verlaagde setpoint, en 7.64 geeft dan `a_H;red = 1` (geen verlaging). Met `f = 0` zou 7.65 een verlaging opleveren voor een periode waarin de zone niet afkoelt. Omdat `dθ_set` volgens 7.70–7.72 hooguit 1 is, valt elk geval met `dθ_float = 1` onder de eerste voorwaarde; de regel van 7.68 heeft in de kern dus geen eigen effect.
 5. `b_v` (7.20) is ongedefinieerd als `θ_set;stc = θ_e`; de module neemt dan 1. Met tabel 17.1 en tabel 7.13 komt dat niet voor.
 6. Een maand met `H_tr + H_g;adj + H_ve ≤ 0` (bijvoorbeeld door warme toevoerlucht met negatieve `b_v`) wordt geweigerd; de tijdconstante is dan niet gedefinieerd.
 7. TOjuli (§5.7) gebruikt in de balans en in 5.40 de juliwaarde `H_gr;an`, en in de tijdconstante `H_C;g;adj`.
 8. Bijlage B: een vrijhangend plafond met ten minste 15 % open oppervlak telt niet mee voor de weerstand vanaf het binnenoppervlak. Omdat het geen bouwconstructie is, telt de module ook de massa ervan niet mee.
 9. Bijlage A: de correctiefactoren van stap 2 hebben geen forfaitaire waarde. Zonder opgegeven `correction` zijn ze 1. De kern heeft geen uurklimaat, dus de gewichten van stap 1 worden opgegeven. De nominale U van het raam moet in de transmissie-invoer staan, omdat de module per maand alleen het verschil corrigeert. TOjuli gebruikt per oriëntatie nog de nominale U.
+10. 7.28: De legenda beschrijft `W_t` als het verlichtingsgebruik voor de vereiste lichtniveaus, wat op `W_L` (14.7) lijkt, maar het symbool en de verwijzing naar 14.2.2 wijzen naar het totaal `W_t = W_L + W_P` (14.6). De kern volgt het symbool en de verwijzing: de interne warmtelast van verlichting is `f_L·(W_L + W_P)·1000/t_an`, dus inclusief parasitaire energie (`internal_gain_w` in `lighting.rs`).
 
 ## Toetsing
 
@@ -164,7 +171,22 @@ Beide velden tegelijk geeft `unheated_factor_declared_and_derived`. Geen van bei
 
 ## Leidingdoorvoeren in de projectroute
 
-`ntaCalculation.verticalPipes` geeft de verticale leidingen van 7.3.3 (H_p, 7.17) voor een project met één rekenzone. Bij meer zones staan ze per zone in `zoneData[].verticalPipes`; een projectlijst geeft dan `vertical_pipes_per_zone_required`, zodat dezelfde leiding niet in elke zone wordt meegeteld.
+`ntaCalculation.verticalPipes` geeft de verticale leidingen van 7.3.3 (H_p, 7.17) voor een project met één rekenzone. Bij meer zones staan ze per zone in `zoneData[].verticalPipes`; een projectlijst geeft dan `vertical_pipes_per_zone_required`, zodat dezelfde leiding niet in elke zone wordt meegeteld. Een ontbrekende lijst (geen projectlijst bij één zone, geen zonelijst bij meer zones) geeft de lacune `vertical_pipes_unknown` met de standaardregel van 7.3.3 in `detail`; `[]` betekent geen doorvoeren.
+
+## Forfaitaire thermische bruggen in de projectroute
+
+Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De kern berekent dan ΔU_for volgens 8.3 uit de ondoorschijnende vlakken naar buitenlucht (oppervlak min ramen, U van de constructie) en telt die op bij elke U in H_D, ramen inbegrepen (opmerking 7 bij 8.3). Ook de zoninstraling op ondoorschijnende delen en de ramen gebruiken die U. Staan er dan nog ψ-waarden in `zones[].thermalBridges` of een gedetailleerde vloerrand met ψ_gr, dan geeft de kern `thermal_bridge_methods_mixed`. In de forfaitaire route is H_U;for = 0 en hoort de scheiding met een onverwarmde ruimte in H_D;for met U_iu;equi (C.1.3). Dat leidt de projectroute niet af; een grensvlak met een onverwarmde ruimte geeft dan `forfait_thermal_bridges_unheated_space_unsupported`.
+
+## Plausibiliteitswaarschuwingen in de projectroute
+
+`warnings` in de projectbeoordeling houdt de berekening niet tegen, maar meldt opgegeven waarden die met de norm of andere invoer botsen:
+
+- `declared_hot_water_efficiency_above_one`: een opgegeven brandstofgebruik voor warm tapwater is lager dan Q_W;nd (13.15 voor woningen, tabel 13.1 voor utiliteit). Dat impliceert een opwekkingsrendement boven 1 op bovenwaarde.
+- `declared_ventilation_below_required_flow`: bij een mechanisch systeem zonder warmteterugwinning ligt de opgegeven H_ve onder ρc·q_V;ODA;req (11.22 met f_ctrl = 1, zonder ondergrens 11.63). Dat is een indicatieve ondergrens; infiltratie komt er nog bij.
+- `bacs_factor_without_capacity_evidence`: een utiliteitsgebouw met f_BACS < 1,05 zonder `bacs`-blok. Volgens §5.5.8 is f_BACS 1,05 tenzij alle verwarmings- en koelsystemen aantoonbaar ten hoogste 290 kW zijn, of de gebouwautomatisering voldoet.
+- `utility_open_ceiling_requires_evidence`: tabel 7.10 voetnoot a. Utiliteitsbouw rekent met de kolom "gesloten of verlaagd plafond", tenzij een vrijhangend plafond ten minste 15 % open is.
+
+BENG 1 (`needIndicatorKwhPerM2Year`, ook in `indicators`) staat alleen ingevuld als de behoefte uit de vaste C1-ventilatierun van §5.4 komt. E_H+C;nd met de opgegeven ventilatie staat in het hoofdstuk 5-blok (`chapter5.heatingAndCoolingNeedKwhPerM2`). `tojuliMeetsBblLimit` geldt alleen voor woonfuncties (Bbl art. 4.149b) en is bij utiliteit leeg.
 
 ## Interpretatie: R_si onder een vloer boven een kruipruimte of kelder
 

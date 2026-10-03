@@ -563,6 +563,21 @@ pub fn specific_capacity(function: VentilationFunction) -> f64 {
     function.specific_capacity()
 }
 
+/// Indicative q_V;ODA;req of 11.22 with f_ctrl = 1 and without the lower
+/// bound of 11.63, m³/h: f_τ·q_usi;spec·A_g·3,6/f_prac;req. Used only as a
+/// plausibility floor for declared ventilation conductances.
+pub fn indicative_required_flow_m3_per_h(
+    function: VentilationFunction,
+    usable_floor_area_m2: f64,
+    dwelling_area_m2: f64,
+) -> f64 {
+    function.occupancy_factor(dwelling_area_m2)
+        * function.specific_capacity()
+        * usable_floor_area_m2
+        * 3.6
+        / PRACTICE_FACTOR_REQUIRED
+}
+
 /// Table 11.13 f_y.
 pub fn year_factor(year: i32) -> f64 {
     match year {

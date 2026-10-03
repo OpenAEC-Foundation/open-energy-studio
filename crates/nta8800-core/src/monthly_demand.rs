@@ -240,9 +240,11 @@ pub struct ComponentTransmission {
     pub ground_floors: Vec<SlabOnGround>,
     pub ground_inventory_confirmed: bool,
     /// 7.3.3 vertical pipes through the thermal envelope open to outdoor
-    /// air (rainwater, sewer and vent stacks), `H_p` of 7.17.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub vertical_pipes: Vec<VerticalPipe>,
+    /// air (rainwater, sewer and vent stacks), `H_p` of 7.17. `[]` states
+    /// that there are none; absent (unknown) is an issue, since 7.3.3 then
+    /// prescribes fictitious uninsulated pipes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertical_pipes: Option<Vec<VerticalPipe>>,
 }
 
 /// One vertical pipe of 7.3.3.
@@ -288,6 +290,28 @@ impl VerticalPipe {
             None => self.storeys,
         }
     }
+}
+
+/// 8.2.1 and 8.3.3.1: the forfait treatment of linear thermal bridges
+/// (ΔU_for in 8.2, 0,5·P in 8.37/8.38) applies to the whole building or not
+/// at all. A forfait floor edge next to explicit ψ-values (H_D, H_U or a
+/// detailed floor edge) mixes the two methods.
+pub fn thermal_bridge_methods_mixed(components: &ComponentTransmission) -> bool {
+    let forfait = components
+        .ground_floors
+        .iter()
+        .any(|slab| matches!(slab.edge_thermal_bridges, EdgeThermalBridges::Forfait));
+    let detailed_edges = components.ground_floors.iter().any(|slab| {
+        matches!(&slab.edge_thermal_bridges, EdgeThermalBridges::Detailed { bridges } if !bridges.is_empty())
+    });
+    let psi = !components.direct.linear_bridges.is_empty()
+        || components.unheated.as_ref().is_some_and(|unheated| {
+            unheated
+                .spaces
+                .iter()
+                .any(|space| !space.boundary.linear_bridges.is_empty())
+        });
+    forfait && (detailed_edges || psi)
 }
 
 /// 7.17 with the split over the bordering zones.
@@ -1831,8 +1855,14 @@ fn resolve_transmission(
                     "transmission.groundInventoryConfirmed",
                 ));
             }
+            if components.vertical_pipes.is_none() {
+                issues.push(issue(
+                    "vertical_pipes_unknown",
+                    "transmission.verticalPipes",
+                ));
+            }
             let mut pipe_ids = HashSet::new();
-            for (index, pipe) in components.vertical_pipes.iter().enumerate() {
+            for (index, pipe) in components.vertical_pipes.iter().flatten().enumerate() {
                 let path = format!("transmission.verticalPipes[{index}]");
                 if pipe.id.trim().is_empty() || !pipe_ids.insert(pipe.id.as_str()) {
                     issues.push(issue("vertical_pipe_id_invalid", format!("{path}.id")));
@@ -1912,6 +1942,9 @@ fn resolve_transmission(
                     None => issues.push(issue("ground_floor_invalid", path)),
                 }
             }
+            if thermal_bridge_methods_mixed(components) {
+                issues.push(issue("thermal_bridge_methods_mixed", "transmission"));
+            }
             if issues.len() != prior {
                 return None;
             }
@@ -1927,7 +1960,9 @@ fn resolve_transmission(
                 annual_mean,
             );
             // 7.16: H_p adds to the transfer to outdoor air.
-            let pipes = vertical_pipe_conductance_w_per_k(&components.vertical_pipes);
+            let pipes = vertical_pipe_conductance_w_per_k(
+                components.vertical_pipes.as_deref().unwrap_or_default(),
+            );
             Some(TransmissionSummary {
                 method: "components",
                 conductance_w_per_k: direct_conductance
@@ -3462,7 +3497,8 @@ mod tests {
                 "edgeThermalBridges": {"method": "detailed", "bridges": []},
                 "sourceReference": "C1 example"
             }],
-            "groundInventoryConfirmed": true
+            "groundInventoryConfirmed": true,
+            "verticalPipes": []
         });
         let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
         let result = valid(&input);
@@ -3483,6 +3519,57 @@ mod tests {
         let jan = &result.monthly[0];
         let tau = 180.0 * 1000.0 * 100.0 / 3600.0 / (26.0 + ground.heating_adjusted_w_per_k + 40.0);
         assert!((jan.heating.time_constant_h - tau).abs() < 1e-9);
+    }
+
+    #[test]
+    fn unknown_pipes_and_mixed_bridge_methods_are_issues() {
+        let mut value = serde_json::to_value(sample()).unwrap();
+        value["transmission"] = json!({
+            "method": "components",
+            "direct": {
+                "elements": [{"id": "wall", "areaM2": 100.0, "uValueWPerM2k": 0.2, "sourceReference": "Rc 4.7"}],
+                "linearBridges": [{"id": "lb", "lengthM": 20.0, "psiWPerMk": 0.05, "sourceReference": "detail"}]
+            },
+            "groundFloors": [{
+                "id": "slab", "areaM2": 67.0, "exposedPerimeterM": 32.92,
+                "constructionResistanceM2kPerW": 3.87,
+                "edgeThermalBridges": {"method": "forfait"},
+                "sourceReference": "slab"
+            }],
+            "groundInventoryConfirmed": true
+        });
+        let input: MonthlyDemandInput = serde_json::from_value(value.clone()).unwrap();
+        let codes: Vec<_> = assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        // 7.3.3: unknown is not "none"; 8.2.1/8.3.3.1: forfait 0,5·P next
+        // to an explicit ψ mixes the methods.
+        assert!(codes.contains(&"vertical_pipes_unknown"), "{codes:?}");
+        assert!(codes.contains(&"thermal_bridge_methods_mixed"), "{codes:?}");
+        // [] states no pipes; without ψ-values the forfait route is whole.
+        value["transmission"]["verticalPipes"] = json!([]);
+        value["transmission"]["direct"]["linearBridges"] = json!([]);
+        let input: MonthlyDemandInput = serde_json::from_value(value.clone()).unwrap();
+        valid(&input);
+        // A detailed floor edge with ψ_gr next to a forfait edge also mixes.
+        value["transmission"]["groundFloors"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+                "id": "slab-2", "areaM2": 20.0, "exposedPerimeterM": 10.0,
+                "constructionResistanceM2kPerW": 3.87,
+                "edgeThermalBridges": {"method": "detailed", "bridges": [
+                    {"lengthM": 10.0, "psiWPerMk": 0.1, "sourceReference": "detail"}
+                ]},
+                "sourceReference": "slab"
+            }));
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        assert!(assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .any(|item| item.code == "thermal_bridge_methods_mixed"));
     }
 
     #[test]

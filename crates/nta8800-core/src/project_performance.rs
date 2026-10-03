@@ -58,9 +58,11 @@ pub struct NtaCalculationInput {
     #[serde(default)]
     pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
     /// Vertical pipes through the envelope (7.3.3, H_p of 7.17); per zone in
-    /// `zoneData`.
+    /// `zoneData`. `[]` states that there are none; absent means unknown,
+    /// for which 7.3.3 prescribes fictitious uninsulated pipes that have to
+    /// be entered (gap `vertical_pipes_unknown`).
     #[serde(default)]
-    pub vertical_pipes: Vec<crate::monthly_demand::VerticalPipe>,
+    pub vertical_pipes: Option<Vec<crate::monthly_demand::VerticalPipe>>,
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
     #[serde(default)]
@@ -164,10 +166,10 @@ pub struct ZoneNtaData {
     pub function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
     #[serde(default)]
     pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
-    /// 7.3.3 vertical pipes of this zone; empty falls back to the project
-    /// list.
+    /// 7.3.3 vertical pipes of this zone; `[]` states none, absent falls
+    /// back to the project list (single-zone projects only).
     #[serde(default)]
-    pub vertical_pipes: Vec<crate::monthly_demand::VerticalPipe>,
+    pub vertical_pipes: Option<Vec<crate::monthly_demand::VerticalPipe>>,
     #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
     #[serde(default)]
@@ -241,6 +243,9 @@ pub struct ProjectPerformanceAssessment {
     pub input_fingerprint: String,
     pub attest_status: &'static str,
     pub gaps: Vec<InputGap>,
+    /// Plausibility findings that do not block the calculation: input the
+    /// norm allows but that contradicts other input or a norm default.
+    pub warnings: Vec<InputGap>,
     /// Envelope geometry derived from the project alone, available even when
     /// the NTA block is incomplete.
     pub geometry: Option<GeometrySummary>,
@@ -411,6 +416,264 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
     })
 }
 
+/// 8.2.1 and 8.3.3.1: a forfait floor edge (0,5·P of 8.37/8.38) selects
+/// the forfait treatment of linear thermal bridges for the whole building,
+/// so H_D takes ΔU_for of 8.3 and no ψ-values may be entered; mixing the
+/// two methods is not allowed. Returns ΔU_for for the forfait route.
+fn forfait_bridge_route(
+    project: &ProjectInput,
+    nta: &NtaCalculationInput,
+    constructions: &HashMap<&str, &Value>,
+    gaps: &mut Vec<InputGap>,
+) -> Option<f64> {
+    let forfait = nta
+        .ground_floors
+        .iter()
+        .any(|floor| matches!(floor.edge_thermal_bridges, EdgeThermalBridges::Forfait));
+    if !forfait {
+        return None;
+    }
+    let detailed_edges = nta.ground_floors.iter().any(|floor| {
+        matches!(&floor.edge_thermal_bridges, EdgeThermalBridges::Detailed { bridges } if !bridges.is_empty())
+    });
+    let psi = project.zones.iter().any(|zone| {
+        zone.thermal_bridges
+            .as_deref()
+            .is_some_and(|items| !items.is_empty())
+    });
+    if detailed_edges || psi {
+        gaps.push(gap(
+            "thermal_bridge_methods_mixed",
+            "ntaCalculation.groundFloors",
+        ));
+    }
+    let boundary = |surface: &Value| {
+        surface
+            .get("thermalBoundary")
+            .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
+    };
+    let surfaces = || project.zones.iter().flat_map(|zone| &zone.surfaces);
+    // 8.4: in the forfait route H_U;for = 0 and the partition joins H_D;for
+    // with U_iu;equi of C.1.3, which this route does not derive.
+    if surfaces().any(|surface| boundary(surface) == Some(ThermalBoundary::UnheatedSpace)) {
+        gaps.push(gap(
+            "forfait_thermal_bridges_unheated_space_unsupported",
+            "ntaCalculation.groundFloors",
+        ));
+    }
+    // 8.3: area-weighted U of the opaque parts bordering outdoor air.
+    let (mut sum_au, mut sum_a) = (0.0, 0.0);
+    for surface in surfaces().filter(|surface| boundary(surface) == Some(ThermalBoundary::Outdoor))
+    {
+        let windows: f64 = surface
+            .get("windows")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|window| window.get("area").and_then(Value::as_f64))
+                    .sum()
+            })
+            .unwrap_or(0.0);
+        let area = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0) - windows;
+        let u_value = surface
+            .get("constructionId")
+            .and_then(Value::as_str)
+            .and_then(|id| constructions.get(id))
+            .and_then(|item| item.get("uValue"))
+            .and_then(Value::as_f64);
+        if let (true, Some(u_value)) = (area > 1e-9, u_value) {
+            sum_au += area * u_value;
+            sum_a += area;
+        }
+    }
+    Some(if sum_a > 0.0 {
+        crate::constructions::forfait_bridge_supplement(&[(sum_a, sum_au / sum_a)])
+    } else {
+        0.0
+    })
+}
+
+/// Plausibility checks that leave the calculation running: declared values
+/// the norm accepts but that contradict a norm default or other input.
+fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
+    use crate::building_performance::{Carrier, Service};
+    use crate::monthly_demand::CeilingColumn;
+    let mut warnings = Vec::new();
+    let Some(nta) = project_value
+        .get("ntaCalculation")
+        .filter(|value| !value.is_null())
+        .and_then(|value| serde_json::from_value::<NtaCalculationInput>(value.clone()).ok())
+    else {
+        return warnings;
+    };
+    let Ok(project) = serde_json::from_value::<ProjectInput>(project_value.clone()) else {
+        return warnings;
+    };
+    let residential = matches!(nta.calculation_scope, CalculationScope::Residential);
+    let area: f64 = project.zones.iter().map(|zone| zone.floor_area).sum();
+    let dwellings = match &nta.internal_gains {
+        InternalGains::Residential { dwelling_count, .. } if *dwelling_count > 0 => {
+            f64::from(*dwelling_count)
+        }
+        _ => 1.0,
+    };
+
+    // Chapter 13: a declared fuel use for hot water below the net need
+    // Q_W;nd (13.15 or table 13.1) implies η_W above 1 on gross value.
+    let need = if residential {
+        Some(
+            crate::domestic_hot_water::RESIDENTIAL_NEED_PER_OCCUPANT_KWH
+                * dwellings
+                * crate::monthly_demand::occupants_per_dwelling(area / dwellings),
+        )
+    } else if !nta.label_functions.is_empty() {
+        Some(
+            nta.label_functions
+                .iter()
+                .map(|part| {
+                    crate::domestic_hot_water::utility_specific_need(part.function).unwrap_or(0.0)
+                        * part.area_m2
+                })
+                .sum(),
+        )
+    } else {
+        nta.label_function
+            .and_then(crate::domestic_hot_water::utility_specific_need)
+            .map(|specific| specific * area)
+    };
+    if let Some(need) = need.filter(|need| *need > 0.0) {
+        for (index, item) in nta.declared_uses.iter().enumerate() {
+            let declared: f64 = item.monthly_kwh.iter().sum();
+            if item.service == Service::DomesticHotWater
+                && item.carrier != Carrier::El
+                && declared > 0.0
+                && need > declared
+            {
+                warnings.push(InputGap {
+                    detail: Some(format!(
+                        "Q_W;nd ≈ {need:.0} kWh/yr against {declared:.0} kWh/yr declared fuel: η_W ≈ {:.2} > 1",
+                        need / declared
+                    )),
+                    ..gap(
+                        "declared_hot_water_efficiency_above_one",
+                        format!("ntaCalculation.declaredUses[{index}].monthlyKwh"),
+                    )
+                });
+            }
+        }
+    }
+
+    // Chapter 11: a mechanical system without heat recovery moves at least
+    // q_V;ODA;req; a declared conductance below that flow is implausible.
+    let recovery_free_mechanical = project.ventilation_systems.iter().any(|system| {
+        matches!(
+            system.get("type").and_then(Value::as_str),
+            Some("type_b" | "type_c" | "type_d")
+        ) && system
+            .get("heatRecoveryEfficiency")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            <= 0.0
+    });
+    if recovery_free_mechanical {
+        for zone in &project.zones {
+            let data = nta.zone_data.iter().find(|item| item.zone_id == zone.id);
+            let (flows, chapter11, path) = match data {
+                Some(item) => (
+                    &item.ventilation_flows,
+                    item.ventilation.is_some(),
+                    format!(
+                        "ntaCalculation.zoneData[{}].ventilationFlows",
+                        nta.zone_data
+                            .iter()
+                            .position(|other| other.zone_id == zone.id)
+                            .unwrap_or(0)
+                    ),
+                ),
+                None => (
+                    &nta.ventilation_flows,
+                    nta.ventilation.is_some(),
+                    "ntaCalculation.ventilationFlows".to_owned(),
+                ),
+            };
+            if chapter11 || flows.is_empty() {
+                continue;
+            }
+            let function = data
+                .and_then(|item| item.usage_function)
+                .unwrap_or(nta.usage_function);
+            let required = crate::ventilation::indicative_required_flow_m3_per_h(
+                crate::zoning::ventilation_function(function),
+                zone.floor_area,
+                zone.floor_area / dwellings,
+            );
+            let floor = crate::ventilation::VOLUMETRIC_HEAT_CAPACITY / 3600.0 * required;
+            let lowest = (1..=12u8)
+                .map(|month| {
+                    flows
+                        .iter()
+                        .flat_map(|flow| &flow.months)
+                        .filter(|item| item.month == month)
+                        .map(|item| item.conductance_w_per_k)
+                        .sum::<f64>()
+                })
+                .fold(f64::INFINITY, f64::min);
+            if lowest < floor {
+                warnings.push(InputGap {
+                    detail: Some(format!(
+                        "H_ve {lowest:.1} W/K is below ρc·q_V;ODA;req ≈ {floor:.1} W/K ({required:.1} m³/h, 11.22) of the mechanical system without heat recovery"
+                    )),
+                    ..gap("declared_ventilation_below_required_flow", path)
+                });
+            }
+        }
+    }
+
+    // §5.5.8: f_BACS = 1,0 in a utility building needs every heating and
+    // cooling system shown at most 290 kW (or class A/B automation).
+    if !residential && nta.bacs.is_none() && nta.bacs_factor < 1.05 {
+        warnings.push(InputGap {
+            detail: Some(
+                "§5.5.8: without the bacs block (system powers ≤ 290 kW or BACS evidence) f_BACS is 1,05".into(),
+            ),
+            ..gap("bacs_factor_without_capacity_evidence", "ntaCalculation.bacsFactor")
+        });
+    }
+
+    // Table 7.10 footnote a: utility buildings use the closed-ceiling
+    // column unless an open suspended ceiling (≥ 15 % open) is shown.
+    if !residential {
+        let masses = std::iter::once(("ntaCalculation.thermalMass".to_owned(), &nta.thermal_mass))
+            .chain(
+                nta.zone_data
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, item)| {
+                        item.thermal_mass.as_ref().map(|mass| {
+                            (
+                                format!("ntaCalculation.zoneData[{index}].thermalMass"),
+                                mass,
+                            )
+                        })
+                    }),
+            );
+        for (path, mass) in masses {
+            if mass.ceiling == CeilingColumn::OpenOrNone && mass.annex_b_elements.is_empty() {
+                warnings.push(InputGap {
+                    detail: Some(
+                        "Table 7.10 a: utility buildings take the closed or suspended ceiling column unless at least 15 % of a free-hanging ceiling is open".into(),
+                    ),
+                    ..gap("utility_open_ceiling_requires_evidence", format!("{path}.ceiling"))
+                });
+            }
+        }
+    }
+    warnings
+}
+
+const VERTICAL_PIPES_UNKNOWN_DETAIL: &str = "7.3.3: state the pipes, [] for none; when unknown enter one fictitious uninsulated pipe per storey of the zone (dwelling outside a residential building), one per dwelling (residential building) or one per toilet group with N = H/3 shared by usable area over the zones (utility building)";
+
 fn gap(code: &'static str, path: impl Into<String>) -> InputGap {
     InputGap {
         code,
@@ -541,6 +804,7 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         bacs,
         label_data,
         gaps,
+        warnings: plausibility_warnings(project_value),
         geometry: project_geometry(project_value),
         schematisation: derived
             .as_ref()
@@ -585,7 +849,12 @@ fn derive_input(
     }
     let nta = nta?;
     let multi_zone = project.zones.len() > 1;
-    if multi_zone && !nta.vertical_pipes.is_empty() {
+    if multi_zone
+        && nta
+            .vertical_pipes
+            .as_ref()
+            .is_some_and(|pipes| !pipes.is_empty())
+    {
         gaps.push(gap(
             "vertical_pipes_per_zone_required",
             "ntaCalculation.verticalPipes",
@@ -619,6 +888,7 @@ fn derive_input(
         .iter()
         .map(|item| (item.surface_id.as_str(), item))
         .collect();
+    let delta_u_forfait = forfait_bridge_route(&project, &nta, &constructions, gaps);
     let mut used_ground = HashSet::new();
     let mut loss_area = 0.0;
     let mut total_area = 0.0;
@@ -727,7 +997,7 @@ fn derive_input(
                     tilt_deg: tilt,
                     g_perpendicular: g_value,
                     frame_fraction: nta.window_solar.frame_fraction,
-                    u_value_w_per_m2k: u_value,
+                    u_value_w_per_m2k: u_value + delta_u_forfait.unwrap_or(0.0),
                     obstruction: nta.window_solar.obstruction.clone(),
                     movable_shading: nta.window_solar.movable_shading.clone(),
                     dynamic: None,
@@ -755,7 +1025,7 @@ fn derive_input(
                         area_m2: opaque_area,
                         orientation: azimuth_orientation,
                         tilt_deg: tilt,
-                        u_value_w_per_m2k: u_value,
+                        u_value_w_per_m2k: u_value + delta_u_forfait.unwrap_or(0.0),
                         source_reference: format!("project:construction:{construction_id}.uValue"),
                     }),
                     None => gaps.push(gap(
@@ -765,8 +1035,18 @@ fn derive_input(
                 }
             }
         }
-        let direct =
+        let mut direct =
             direct_boundary_input_zone(&project, ThermalBoundary::Outdoor, None, Some(&zone.id));
+        if let (Some(direct), Some(delta)) = (direct.as_mut(), delta_u_forfait) {
+            // 8.2 and note 7 of 8.3: ΔU_for on every element of H_D.
+            for element in &mut direct.elements {
+                element.u_value_w_per_m2k += delta;
+                element.source_reference = format!(
+                    "{} + ΔU_for {delta:.3} (NTA 8800 8.2/8.3)",
+                    element.source_reference
+                );
+            }
+        }
         if direct.is_none() {
             gaps.push(gap("direct_transmission_unresolved", zone_path.clone()));
         }
@@ -811,11 +1091,31 @@ fn derive_input(
                 ground_inventory_confirmed: true,
                 // The project list serves a single zone only; a multi-zone
                 // project gives the pipes per zone (no double counting).
-                vertical_pipes: match data {
-                    Some(item) if !item.vertical_pipes.is_empty() => item.vertical_pipes.clone(),
-                    _ if !multi_zone => nta.vertical_pipes.clone(),
-                    _ => Vec::new(),
-                },
+                vertical_pipes: Some(match data.and_then(|item| item.vertical_pipes.as_ref()) {
+                    Some(pipes) => pipes.clone(),
+                    None if !multi_zone && nta.vertical_pipes.is_some() => {
+                        nta.vertical_pipes.clone().unwrap_or_default()
+                    }
+                    None => {
+                        // 7.3.3: unknown pipes are not "none"; the fictitious
+                        // pipes of the norm have to be entered.
+                        let path = match nta
+                            .zone_data
+                            .iter()
+                            .position(|item| item.zone_id == zone.id)
+                        {
+                            Some(index) if multi_zone => {
+                                format!("ntaCalculation.zoneData[{index}].verticalPipes")
+                            }
+                            _ => "ntaCalculation.verticalPipes".into(),
+                        };
+                        gaps.push(InputGap {
+                            detail: Some(VERTICAL_PIPES_UNKNOWN_DETAIL.into()),
+                            ..gap("vertical_pipes_unknown", path)
+                        });
+                        Vec::new()
+                    }
+                }),
             }),
             ventilation_flows: data
                 .map(|item| item.ventilation_flows.clone())
@@ -1113,7 +1413,9 @@ mod tests {
             (
                 include_str!("../../../training-data/nta8800-example-terraced-dwelling.json"),
                 "residential",
-                5.0..60.0,
+                // Gas boiler and gas combi for hot water: BENG 2 of an
+                // all-gas dwelling with a small PV system.
+                50.0..100.0,
             ),
             (
                 include_str!("../../../training-data/nta8800-example-office.json"),
@@ -1129,7 +1431,45 @@ mod tests {
                 "{function}: {:?}",
                 result.gaps
             );
+            // Norm-consistent input: no plausibility findings, one bridge
+            // method (forfait: no ψ-values, ΔU_for in H_D), stated pipes,
+            // chapter 11 ventilation (BENG 1 from the C1 run) and a
+            // calculated hot-water system.
+            assert!(
+                result.warnings.is_empty(),
+                "{function}: {:?}",
+                result.warnings
+            );
+            let derived = result.derived_input.as_ref().unwrap();
+            let demand = &derived.space_heating.demand;
+            let Transmission::Components(components) = &demand.transmission else {
+                panic!("{function}: component transmission expected");
+            };
+            assert!(components.direct.linear_bridges.is_empty(), "{function}");
+            assert!(components.direct.elements[0]
+                .source_reference
+                .contains("ΔU_for"));
+            assert!(!components.vertical_pipes.as_ref().unwrap().is_empty());
+            assert!(demand.ventilation.is_some() && demand.ventilation_flows.is_empty());
+            assert!(derived.hot_water.is_some());
+            assert!(
+                !derived
+                    .declared_uses
+                    .iter()
+                    .any(|item| item.service
+                        == crate::building_performance::Service::DomesticHotWater)
+            );
             let performance = result.performance.as_ref().unwrap();
+            assert!(
+                performance.need_indicator_kwh_per_m2_year.is_some(),
+                "{function}"
+            );
+            // Bbl art. 4.149b: the TOjuli limit is for woonfuncties only.
+            assert!(performance.tojuli_max_k.is_some());
+            assert_eq!(
+                performance.tojuli_meets_bbl_limit.is_some(),
+                function == "residential"
+            );
             let ep2 = performance
                 .primary_fossil_indicator_kwh_per_m2_year
                 .unwrap();
@@ -1252,6 +1592,120 @@ mod tests {
         }]);
         // Table 7.1: 1,8 W/K per storey (7.17).
         assert!((conductance(&value) - base - 3.6).abs() < 1e-9);
+        // 7.3.3: an absent list is "unknown", not "none".
+        value["ntaCalculation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("verticalPipes");
+        let unknown = assess_project_performance(&value);
+        assert_eq!(unknown.status, "incomplete");
+        assert!(unknown
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "vertical_pipes_unknown"
+                && gap.path == "ntaCalculation.verticalPipes"
+                && gap.detail.is_some()));
+    }
+
+    /// 8.2.1/8.3.3.1: the forfait floor edge selects ΔU_for for the whole
+    /// building; ψ-values next to it mix the methods.
+    #[test]
+    fn forfait_bridges_apply_to_the_whole_building() {
+        let mut value = project();
+        value["ntaCalculation"]["groundFloors"][0]["edgeThermalBridges"] =
+            serde_json::json!({"method": "forfait"});
+        let mixed = assess_project_performance(&value);
+        assert_eq!(mixed.status, "incomplete");
+        assert!(mixed
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "thermal_bridge_methods_mixed"));
+
+        value["zones"][0]["thermalBridges"] = serde_json::json!([]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        // 8.3: opaque walls 98 m² at 0,21 and roof 52 m² at 0,16.
+        let mean = (98.0 * 0.21 + 52.0 * 0.16) / 150.0;
+        let delta = 0.1 - 0.25 * (mean - 0.4);
+        // 8.2: ΔU_for on all 162 m² of H_D, glass included (note 7).
+        let expected = 98.0 * 0.21 + 52.0 * 0.16 + 12.0 * 1.1 + 162.0 * delta;
+        let summary = result
+            .performance
+            .as_ref()
+            .unwrap()
+            .space_heating
+            .demand
+            .transmission
+            .clone()
+            .unwrap();
+        assert!((summary.direct_conductance_w_per_k.unwrap() - expected).abs() < 1e-9);
+
+        // H_U;for = 0 with U_iu;equi (C.1.3) is not derived here.
+        value["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "garage-wall", "name": "Wand garage", "type": "wall",
+                "thermalBoundary": "unheated_space", "unheatedSpaceId": "garage",
+                "area": 10.0, "orientation": "E", "constructionId": "c-wall",
+                "zoneId": "z1", "windows": []
+            }));
+        assert!(assess_project_performance(&value)
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "forfait_thermal_bridges_unheated_space_unsupported"));
+    }
+
+    #[test]
+    fn plausibility_warnings_leave_the_calculation_running() {
+        // The synthetic dwelling declares 1 800 kWh gas for 1 952 kWh need
+        // and 35 W/K for a C system that moves about 152 m³/h.
+        let result = assess_project_performance(&project());
+        assert_eq!(result.status, "calculated_unverified");
+        let codes: Vec<_> = result.warnings.iter().map(|item| item.code).collect();
+        assert_eq!(
+            codes,
+            [
+                "declared_hot_water_efficiency_above_one",
+                "declared_ventilation_below_required_flow"
+            ]
+        );
+        assert!(result.warnings[1]
+            .detail
+            .as_ref()
+            .unwrap()
+            .contains("51.0 W/K"));
+
+        // Utility: f_BACS 1,0 without the bacs block and an open ceiling.
+        let mut office: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap();
+        office["ntaCalculation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("bacs");
+        office["ntaCalculation"]["thermalMass"]["ceiling"] = Value::from("open_or_none");
+        let codes: Vec<_> = plausibility_warnings(&office)
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                "bacs_factor_without_capacity_evidence",
+                "utility_open_ceiling_requires_evidence"
+            ]
+        );
+        // The same declarations in a dwelling are the norm defaults.
+        let mut dwelling = project();
+        dwelling["ntaCalculation"]["declaredUses"] = serde_json::json!([]);
+        dwelling["ntaCalculation"]["ventilationFlows"][0]["months"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|month| month["conductanceWPerK"] = Value::from(55.0));
+        assert!(plausibility_warnings(&dwelling).is_empty());
     }
 
     #[test]
@@ -1282,6 +1736,7 @@ mod tests {
         let zone_entry = |id: &str| {
             serde_json::json!({
                 "zoneId": id,
+                "verticalPipes": [],
                 "ventilationFlows": block["ventilationFlows"].clone(),
                 "internalGains": block["internalGains"].clone()
             })
@@ -1291,14 +1746,9 @@ mod tests {
         block["surfaceTilts"].as_array_mut().unwrap().push(
             serde_json::json!({"surfaceId": "roof-2", "tiltDeg": 45.0, "sourceReference": "copy"}),
         );
-        block["groundFloors"]
-            .as_array_mut()
-            .unwrap()
-            .push(serde_json::json!({
-                "surfaceId": "floor-2", "exposedPerimeterM": 20.0,
-                "constructionResistanceM2kPerW": 3.87,
-                "edgeThermalBridges": {"method": "forfait"}, "sourceReference": "copy"
-            }));
+        let mut floor = block["groundFloors"][0].clone();
+        floor["surfaceId"] = Value::from("floor-2");
+        block["groundFloors"].as_array_mut().unwrap().push(floor);
         let result = assess_project_performance(&value);
         assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
         let derived = result.derived_input.as_ref().unwrap();
