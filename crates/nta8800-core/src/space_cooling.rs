@@ -63,6 +63,10 @@ pub const ZETA_GAS_ABSORPTION: f64 = 0.8;
 pub const ZETA_EXTERNAL_HEAT_FACTOR: f64 = 0.7;
 /// 5.34: minimum EER for ambient cold to count as renewable.
 pub const RENCOLD_MIN_EER: f64 = 8.0;
+/// 10.15: an emission loss above this multiple of the zone need is flagged
+/// as `cooling_emission_loss_singular` (ϑ_C;int;inc − ϑ_e;comb near zero).
+pub const EMISSION_LOSS_WARNING_RATIO: f64 = 3.0;
+
 /// 10.10: initial internal temperature for cooling, °C.
 pub const COOLING_INITIAL_TEMPERATURE_C: f64 = 24.0;
 /// Table 10.7: electric power per fan coil, W.
@@ -846,6 +850,10 @@ pub struct CoolingAssessment {
     /// zones it serves; empty for one system serving every zone.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub systems: Vec<ServedCoolingResult>,
+    /// Non-blocking findings on the literal norm result (e.g.
+    /// `cooling_emission_loss_singular`); the calculation is unchanged.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<CoolingIssue>,
 }
 
 /// One cooling system of a building with several (§10.2).
@@ -871,8 +879,13 @@ pub fn combine_cooling(parts: Vec<ServedCoolingResult>, zone_count: usize) -> Co
     let mut zone_booster = vec![[0.0; 12]; zone_count];
     let mut shares = Vec::new();
     let mut interpretations: Vec<&'static str> = Vec::new();
+    let mut warnings = Vec::new();
     for (system_index, part) in parts.iter().enumerate() {
         let result = &part.assessment;
+        warnings.extend(result.warnings.iter().map(|item| CoolingIssue {
+            code: item.code,
+            path: format!("systems[{system_index}].{}", item.path),
+        }));
         for (total, month) in months.iter_mut().zip(&result.months) {
             if system_index == 0 {
                 total.operating_hours = month.operating_hours;
@@ -931,6 +944,7 @@ pub fn combine_cooling(parts: Vec<ServedCoolingResult>, zone_count: usize) -> Co
         zone_booster_extraction_kwh: zone_booster,
         interpretations,
         systems: parts,
+        warnings,
     }
 }
 
@@ -1398,7 +1412,9 @@ const PRACTICE_FACTOR_OTHER: f64 = 0.9;
 pub const COOLING_INTERPRETATIONS: &[&str] = &[
     "10.66 with an absorption chiller on building CHP: the table 10.30 factor 1,00 is replaced by PLV·ζ_n·f_prpr, so the CHP fuel is Q_C/(PLV·ζ_n·f_prpr·ε_chp;th)",
     "absorption method 2: f_prpr 0,60 only for an air-cooled absorber (direct condensation, principle 2), 0,9 otherwise or when the heat rejection is not given",
-    "10.61/10.73: ϑ_C;gen;req;out is the distribution supply temperature of table 10.8 (6 °C without distribution) for chillers and 24 °C (10.10) for evaporation in the room, unless declared",
+    "10.61/10.73: ϑ_C;gen;req;out is ϑ_C;dis;flw;set of table 10.8 (design supply − Δϑ_int;inc, the 6/12 column without distribution) for chillers and ϑ_C;int;inc of 10.10 for evaporation in the room (§10.3.4), unless declared",
+    "10.23c: ϑ_C;mean is the mean of ϑ_in and ϑ_out of table 10.8 (both minus Δϑ_int;inc); the printed second line (ϑ_C,out = ϑ_C;dis;in;flw;req) is read as a misprint",
+    "10.15: the literal result is kept near ϑ_C;int;inc = ϑ_e;comb; a loss above 3× the need is reported as cooling_emission_loss_singular",
     "10.55: months without bins in table 10.18 (January, December) use the 14 °C bin",
     "10.56/10.57: a bin with a non-positive temperature lift uses f_EER;gi;bn = 1",
     "10.68: Q_C;gen;in;req;si;mi of a generator is its share of the generator cold (10.52); method 2 counts all of it in 10.65, 10.70–10.72 only report the coverage",
@@ -1826,12 +1842,15 @@ fn rated_months(
     cooling_limit_c: f64,
     building_fraction: f64,
     supply_c: f64,
+    internal_c: f64,
 ) -> RatedMonths {
     let air_cooled = rated.room_unit || rated.rejection == HeatRejection::AirCooled;
     // Table 10.22.
     let delta_evaporator = if rated.room_unit { 20.0 } else { 6.0 };
+    // §10.3.4: ϑ_C;int;inc (10.10) for evaporation in the room, otherwise
+    // ϑ_C;gen;out;set = ϑ_C;dis;flw;set of table 10.8.
     let default_outlet = if rated.room_unit {
-        COOLING_INITIAL_TEMPERATURE_C
+        internal_c
     } else {
         supply_c
     };
@@ -1989,6 +2008,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
     let mut pump_energy = [0.0; 12];
     if let Some(distribution) = &system.distribution {
         let (supply, ret) = distribution.design_temperature.supply_return_c();
+        // 10.23c with ϑ_in/ϑ_out of table 10.8 (see COOLING_INTERPRETATIONS).
         let mean = (supply + ret) / 2.0 - delta;
         let psi = distribution.pipe.psi(building_area);
         let length = distribution
@@ -2156,6 +2176,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
     });
     let mut months = Vec::with_capacity(12);
     let mut base_auxiliary = [0.0; 12];
+    let mut warnings: Vec<CoolingIssue> = Vec::new();
     for index in 0..12 {
         let outdoor = OUTDOOR_TEMPERATURE_C[index];
         let combined = outdoor + solar_correction;
@@ -2167,7 +2188,18 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             need += zone_need;
             // 10.15/10.16
             if internal - combined < 0.0 && zone_need > 0.0 {
-                emission += zone_need * (delta / (internal - combined)).max(0.15);
+                let ratio = (delta / (internal - combined)).max(0.15);
+                emission += zone_need * ratio;
+                // Literal 10.15 kept; a near-zero denominator is reported.
+                let path = format!("months[{index}]");
+                if ratio > EMISSION_LOSS_WARNING_RATIO
+                    && !warnings.iter().any(|item| item.path == path)
+                {
+                    warnings.push(CoolingIssue {
+                        code: "cooling_emission_loss_singular",
+                        path,
+                    });
+                }
             }
             // 10.21 only for zones with a cooling need.
             if zone_need > 0.0 && zone_area > 0.0 {
@@ -2242,17 +2274,21 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         })
         .collect();
     // Methods 1 and 2 (§10.5.4/10.5.5).
+    // Table 10.8: ϑ_C;dis;flw;set = design supply − Δϑ_int;inc (6/12 when
+    // the design is unknown).
     let supply_c = system
         .distribution
         .as_ref()
-        .map_or(6.0, |item| item.design_temperature.supply_return_c().0);
+        .map_or(6.0, |item| item.design_temperature.supply_return_c().0)
+        - delta;
     let rated_months: Vec<Option<RatedMonths>> = system
         .generators
         .iter()
         .zip(&generator_cold)
         .map(|(generator, cold)| {
-            rated(&generator.generator)
-                .map(|rated| rated_months(&rated, cold, &hours, limit, f_building, supply_c))
+            rated(&generator.generator).map(|rated| {
+                rated_months(&rated, cold, &hours, limit, f_building, supply_c, internal)
+            })
         })
         .collect();
     for (share, rated) in shares.iter_mut().zip(&rated_months) {
@@ -2411,6 +2447,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         zone_booster_extraction_kwh: zone_booster,
         systems: Vec::new(),
         regeneration_return_kwh: (!qualifying.is_empty()).then_some(returned),
+        warnings,
     }
 }
 
@@ -2494,6 +2531,36 @@ mod tests {
         assert_eq!(operating_hours(15.0, 6), 603.0);
         assert_eq!(operating_hours(10.0, 4), 367.0);
         assert_eq!(operating_hours(30.0, 7), 74.0);
+    }
+
+    #[test]
+    fn emission_loss_near_the_10_15_singularity_is_flagged() {
+        // Wall cooling, dynamic balancing, central control with room
+        // control: Δϑ_int;inc = −1,4 + 0 − 0,75 = −2,15, ϑ_C;int;inc 21,85.
+        // Utility October: ϑ_e;comb = 10,40 + 12 = 22,40, so 10.15 gives
+        // 2,15/0,55 ≈ 3,9 × the need (literal result kept).
+        let mut input = system(vec![generator(compression(), None)]);
+        input.emission.emitter = CoolingEmitter::WallCooling;
+        input.emission.balancing = CoolingBalancing::Dynamic;
+        input.emission.control = CoolingControl::CentralWithRoomControl;
+        let zones = [CoolingZoneNeed {
+            usable_floor_area_m2: 100.0,
+            need_kwh: summer_need(),
+            ahu_load_kwh: [0.0; 12],
+            limit_need_kwh: None,
+        }];
+        let mut context = context(&zones);
+        context.residential = false;
+        let result = assess_cooling(&input, context);
+        let october = &result.months[9];
+        let ratio = 2.15 / (22.40 - 21.85);
+        assert!((october.emission_loss_kwh - 10.0 * ratio).abs() < 1e-9);
+        assert_eq!(result.warnings.len(), 1);
+        assert_eq!(result.warnings[0].code, "cooling_emission_loss_singular");
+        assert_eq!(result.warnings[0].path, "months[9]");
+        // Residential (+8 K) stays far from the singularity.
+        context.residential = true;
+        assert!(assess_cooling(&input, context).warnings.is_empty());
     }
 
     #[test]
@@ -2954,11 +3021,14 @@ mod tests {
         assert_eq!(result.generator_shares[0].method, 1);
         let coefficients = en14825_coefficients(&performance).unwrap();
         let annual: f64 = result.months.iter().map(|row| row.generator_cold_kwh).sum();
-        // 10.61: 24 °C in the room minus Δϑ_evap 20 K.
+        // 10.61: ϑ_C;int;inc = 24 + Δϑ_int;inc (10.10, §10.3.4) in the
+        // room minus Δϑ_evap 20 K.
+        let delta = result.internal_temperature_shift_k;
+        assert!((delta + 1.75).abs() < 1e-12);
         let factors = en14825_monthly_factor(
             &performance,
             &coefficients,
-            4.0,
+            4.0 + delta,
             result.cooling_limit_c,
             annual,
             1.0,
@@ -2993,9 +3063,12 @@ mod tests {
         let july = &result.months[6];
         let column = limit_column_from_15(result.cooling_limit_c);
         let reference = THETA_E_KG[6][column];
-        // 10.73 with ϑ_req;out = 24 °C, Δϑ_evap 20 K, Δϑ_cond 10 K:
-        // both cold sides are 277,16 K, so f = (35 + 6)/(ϑ_e;kg + 6).
-        let correction = 41.0 / (reference + 6.0);
+        // 10.73 with ϑ_req;out = ϑ_C;int;inc = 24 + Δϑ_int;inc (§10.3.4),
+        // Δϑ_evap 20 K, Δϑ_cond 10 K against the 24/35 rating.
+        let outlet = 24.0 + result.internal_temperature_shift_k;
+        let carnot =
+            |outlet: f64, inlet: f64| (T0_ABS + outlet - 20.0) / (inlet + 10.0 - (outlet - 20.0));
+        let correction = carnot(outlet, reference) / carnot(24.0, 35.0);
         // 10.68/10.69 with table 10.19 row C.
         let part_load = july.generator_cold_kwh / (july.operating_hours * 2.0);
         let row = [1.52, 1.54, 1.57, 1.69, 1.45, 1.31, 1.21, 1.09, 1.03, 0.95];
@@ -3037,11 +3110,14 @@ mod tests {
         let result = assess_cooling(&input, context(&zones));
         let july = &result.months[6];
         let column = limit_column_from_15(result.cooling_limit_c);
-        // Table 10.26: wet cooling tower ϑ_wb + 6; ϑ_req;out 6 °C without
-        // distribution; Δϑ_evap 6 K, Δϑ_cond 4 K.
+        // Table 10.26: wet cooling tower ϑ_wb + 6; ϑ_req;out is
+        // ϑ_C;dis;flw;set of table 10.8, 6 − Δϑ_int;inc without distribution
+        // (6/12 column); Δϑ_evap 6 K, Δϑ_cond 4 K.
         let reference = THETA_WET_BULB[6][column] + 6.0;
+        let outlet = 6.0 - result.internal_temperature_shift_k;
+        assert!((outlet - 7.75).abs() < 1e-12);
         let carnot = |outlet: f64, inlet: f64| (T0_ABS + outlet - 6.0) / (inlet + 10.0 - outlet);
-        let correction = carnot(6.0, reference) / carnot(7.0, 30.0);
+        let correction = carnot(outlet, reference) / carnot(7.0, 30.0);
         let part_load = july.generator_cold_kwh / (july.operating_hours * 50.0);
         let row = [0.96, 0.94, 0.92, 0.90, 0.90, 0.90, 0.92, 0.94, 0.96, 1.00];
         let plv = if part_load < 0.05 {

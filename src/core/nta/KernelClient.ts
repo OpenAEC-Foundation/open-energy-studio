@@ -3711,7 +3711,8 @@ export interface NtaSolarWaterHeater {
           loss:
             | { method: 'label'; label: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' }
             | { method: 'unknown_label'; producedFrom2018: boolean }
-            | { method: 'measured'; transmissionWPerK: number };
+            | { method: 'measured'; transmissionWPerK: number }
+            | { method: 'measured_standby'; standbyKwhPerDay: number; referenceStorageC: number; referenceAmbientC: number };
           backupLossInGeneratorEfficiency?: boolean;
         };
       }
@@ -3741,7 +3742,10 @@ export type NtaHotWaterGenerator =
         /** Annex V: on the same regenerated ground source as the space-heating heat pump (V.1, table V.1). */
         sameGroundSource?: boolean }
     | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
-        exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null; sourceReference: string }
+        exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null;
+        /** 13.153b SCF (smart = 1 from 0,07) and 13.153c temperatures; omitted means no correction. */
+        smartControlFactor?: number | null; maxTestTemperatureC?: number | null; designSetTemperatureC?: number | null;
+        sourceReference: string }
     | { kind: 'electric_instantaneous' }
     | { kind: 'electric_boiler' }
     | { kind: 'gas_storage_heater'; volumeL: number; measuredStandbyKwhPerDay?: number | null; before1985: boolean; inHeatedZone: boolean }
@@ -3808,10 +3812,14 @@ export interface NtaHotWaterSystem {
     loss:
       | { method: 'label'; label: 'a_plus' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' }
       | { method: 'unknown_label'; producedFrom2018: boolean }
-      | { method: 'measured'; transmissionWPerK: number };
+      | { method: 'measured'; transmissionWPerK: number }
+      /** 13.60 from the standby test; H_sto;ls rounded up per annex X. */
+      | { method: 'measured_standby'; standbyKwhPerDay: number; referenceStorageC: number; referenceAmbientC: number };
     connectionFactor: 1 | 2 | 3 | 4 | 5;
     inHeatedZone: boolean;
     unheatedAmbientC?: number | null;
+    /** Note 1 of §13.6.2: the 13.8.4.2/13.8.4.3 appliance was tested without this vessel. */
+    notInApplianceTest?: boolean;
     sourceReference: string;
   }>;
   deliverySets?: { count: number; sourceReference: string } | null;
@@ -3906,6 +3914,8 @@ export interface BuildingPerformanceAssessment {
   /** Factors of the external supply and the EMGforf totals (§5.8). */
   externalSupply?: NtaExternalSupplyResult | null;
   issues: Array<{ code: string; path: string }>;
+  /** Non-blocking findings (e.g. cooling_emission_loss_singular, hot_water_circulation_defaults_low_efficiency). */
+  warnings?: Array<{ code: string; path: string }>;
 }
 
 export async function calculateBuildingPerformanceWithRust(input: BuildingPerformanceInput): Promise<BuildingPerformanceAssessment> {
