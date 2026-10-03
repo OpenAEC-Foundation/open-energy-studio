@@ -46,5 +46,6 @@ describe('WelcomeScreen', () => {
     await user.click(screen.getByText(/Example: terraced dwelling/i));
     await user.click(screen.getByText(/Example: small office/i));
     expect(onExample.mock.calls).toEqual([['terraced_dwelling'], ['small_office']]);
+    expect(screen.getByText(/Fictional practice projects/)).toHaveTextContent('no registered energy label');
   });
 });

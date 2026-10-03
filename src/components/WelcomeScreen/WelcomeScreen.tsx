@@ -9,7 +9,7 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onNewProject, onOpenProject, onOpenExample }: WelcomeScreenProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <div className="welcome-screen">
@@ -41,6 +41,9 @@ export function WelcomeScreen({ onNewProject, onOpenProject, onOpenExample }: We
               {t(`welcome.example.${kind}`)}
             </button>
           ))}
+          <p className="welcome-examples-note">{locale === 'nl'
+            ? 'Fictieve oefenprojecten. BENG en labelklasse zijn indicatief; geen geregistreerd energielabel.'
+            : 'Fictional practice projects. BENG and label class are indicative; no registered energy label.'}</p>
         </div>
       </div>
     </div>

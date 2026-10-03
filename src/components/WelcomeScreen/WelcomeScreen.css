@@ -66,3 +66,13 @@
   color: var(--text-secondary);
   margin: 0;
 }
+
+.welcome-examples-note {
+  flex-basis: 100%;
+  max-width: 34rem;
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
