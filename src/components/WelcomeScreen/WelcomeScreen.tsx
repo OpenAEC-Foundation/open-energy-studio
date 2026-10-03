@@ -1,12 +1,14 @@
 import { useI18n } from '../../i18n/i18n';
+import { EXAMPLE_KINDS, type ExampleKind } from '../../core/nta/ExampleProjects';
 import './WelcomeScreen.css';
 
 interface WelcomeScreenProps {
   onNewProject: () => void;
   onOpenProject: () => void;
+  onOpenExample: (kind: ExampleKind) => void;
 }
 
-export function WelcomeScreen({ onNewProject, onOpenProject }: WelcomeScreenProps) {
+export function WelcomeScreen({ onNewProject, onOpenProject, onOpenExample }: WelcomeScreenProps) {
   const { t } = useI18n();
 
   return (
@@ -31,6 +33,14 @@ export function WelcomeScreen({ onNewProject, onOpenProject }: WelcomeScreenProp
             </svg>
             {t('ribbon.open')}
           </button>
+        </div>
+        <div className="welcome-examples">
+          <p className="welcome-examples-title">{t('welcome.examples')}</p>
+          {EXAMPLE_KINDS.map((kind) => (
+            <button key={kind} className="btn welcome-btn" onClick={() => onOpenExample(kind)}>
+              {t(`welcome.example.${kind}`)}
+            </button>
+          ))}
         </div>
       </div>
     </div>

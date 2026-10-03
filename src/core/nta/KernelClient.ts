@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { IProject, INtaHeatPumpInput } from '../energy/types';
+import { kernelProject } from './KernelInput';
 
 /** Annex T Gaskeur test report (gas water heaters and combi appliances). */
 export type NtaAnnexTTest =
@@ -1495,7 +1496,8 @@ export async function diagnoseHeatingAuxMeasuredDraftWithRust(input: HeatingAuxM
   throw new Error('Rust draft heat-pump measurement diagnostics are available in the desktop app and local development server.');
 }
 
-export async function assessProjectWithRust(project: IProject): Promise<KernelAssessment> {
+export async function assessProjectWithRust(input: IProject): Promise<KernelAssessment> {
+  const project = kernelProject(input);
   if (isTauri()) {
     return invoke<KernelAssessment>('validate_nta_project', { project });
   }
@@ -4559,7 +4561,8 @@ export interface LabelData {
   } | null;
 }
 
-export async function calculateProjectPerformanceWithRust(project: IProject): Promise<ProjectPerformanceAssessment> {
+export async function calculateProjectPerformanceWithRust(input: IProject): Promise<ProjectPerformanceAssessment> {
+  const project = kernelProject(input);
   if (isTauri()) {
     return invoke<ProjectPerformanceAssessment>('calculate_project_performance', { project });
   }

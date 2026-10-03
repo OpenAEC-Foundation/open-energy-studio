@@ -6,6 +6,9 @@ export const en: Record<string, string> = {
 
   // Welcome
   'welcome.subtitle': 'Create or open a project to get started',
+  'welcome.examples': 'Or start from a complete example',
+  'welcome.example.terraced_dwelling': 'Example: terraced dwelling',
+  'welcome.example.small_office': 'Example: small office',
 
   // Ribbon tabs
   'ribbon.start': 'Home',
@@ -1188,6 +1191,7 @@ export const en: Record<string, string> = {
   'nta.performance.advanced': 'Advanced (JSON)',
   'nta.form.title': 'NTA input',
   'nta.form.help': 'Enter each value with its source. Empty fields remain input gaps; the Rust kernel checks everything on the next run.',
+  'nta.form.openFields': 'Still empty ({{n}}): {{paths}}. Empty fields are left out of the kernel input; a required one appears as an input gap after calculating.',
   'nta.form.general': 'General',
   'nta.form.scope': 'Calculation scope',
   'nta.form.scope.residential': 'Residential',
