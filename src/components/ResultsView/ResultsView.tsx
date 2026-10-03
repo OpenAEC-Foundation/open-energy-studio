@@ -38,7 +38,15 @@ export function ResultsView() {
   const surfaceCount = project.zones.reduce((count, zone) => count + zone.surfaces.length, 0);
   const systemCount = project.heatingSystems.length + project.ventilationSystems.length
     + project.coolingSystems.length + project.hotWaterSystems.length;
-  const floorArea = kernel?.geometry?.usableFloorAreaM2 ?? shown?.totalFloorArea ?? null;
+  const kernelFloorArea = kernel?.geometry?.usableFloorAreaM2 ?? null;
+  const floorArea = kernelFloorArea ?? shown?.totalFloorArea ?? null;
+  // Whether the last settled kernel run of this project had a result: while the next (debounced)
+  // run is pending, the simplified output stays only if the kernel had none before.
+  const settled = useRef<{ projectId: string; calculated: boolean } | null>(null);
+  if (kernelQuery && kernelQuery.kind !== 'loading') settled.current = { projectId: project.id, calculated: kernel != null };
+  const kernelHadNoResult = settled.current?.projectId === project.id && !settled.current.calculated;
+  // Output of the simplified engine: only without a kernel result, and marked stale after an edit.
+  const indicative = !performance && shown != null && (!kernelPending || kernelHadNoResult);
   const bbl = performance?.bblCheck ?? null;
   const utility = kernel?.derivedInput?.calculationScope === 'utility';
 
@@ -66,10 +74,11 @@ export function ResultsView() {
         <div><strong>{project.zones.length}</strong><span>{t('results.zones')}</span></div>
         <div><strong>{surfaceCount}</strong><span>{t('results.surfaces')}</span></div>
         <div><strong>{systemCount}</strong><span>{t('results.systems')}</span></div>
-        <div><strong>{formatNumber(floorArea, locale, 1)}</strong><span>m² {t('results.floorArea')}</span></div>
+        <div className={kernelFloorArea == null && stale ? 'results-stale-value' : undefined}
+          title={kernelFloorArea == null && stale ? t('results.staleShort') : undefined}>
+          <strong>{formatNumber(floorArea, locale, 1)}</strong><span>m² {t('results.floorArea')}</span></div>
       </div>
 
-      {stale && !performance && !kernelPending && <p className="results-stale" role="status" data-testid="results-stale">{t('results.stale')}</p>}
       {!shown && !performance && <div className="results-empty">
         <p>{t('results.noResults')}</p>
       </div>}
@@ -110,8 +119,27 @@ export function ResultsView() {
         />}
       </div>}
 
+      {/* TO-juli: the kernel value (dwellings only), otherwise the indicative GTO. */}
+      {performance && !utility && performance.tojuliMaxK != null && (
+        <div className="to-juli-card" data-testid="to-juli-kernel">
+          <div className="to-juli-header">
+            <h3>{t('results.toJuli')}</h3>
+            <span className="to-juli-badge">{t('results.kernelBadge')}</span>
+          </div>
+          <div className="to-juli-value">
+            TO<sub>juli</sub>: {formatNumber(performance.tojuliMaxK, locale, 2)} K
+            <span className="to-juli-limit">
+              {' '}/ {t('results.limit')}: {'≤'} {formatNumber(1.2, locale, 2)} K
+            </span>
+          </div>
+        </div>
+      )}
+      {performance && <EnergyBreakdownChart breakdown={kernelEnergyBreakdown(performance)} source="kernel" />}
+
       {/* The simplified engine only when the kernel has no result; never next to kernel values. */}
-      {!performance && !kernelPending && shown && <div className={stale ? 'results-indicative results-stale-block' : 'results-indicative'}>
+      {indicative && shown && <div className={stale ? 'results-indicative results-stale-block' : 'results-indicative'}
+        data-testid="results-indicative">
+        {stale && <p className="results-stale" role="status" data-testid="results-stale">{t('results.stale')}</p>}
         <p className="results-indicative-note">{t('results.indicativeNote')}</p>
         <div className="beng-cards" data-testid="beng-cards-indicative">
           <BENGIndicator
@@ -137,45 +165,23 @@ export function ResultsView() {
             higherIsBetter
           />
         </div>
+        {monthlyResult && (
+          <div className="to-juli-card to-juli-indicative">
+            <div className="to-juli-header">
+              <h3>{t('results.toJuli')}</h3>
+              <span className="to-juli-badge indicative">{t('results.indicativeBadge')}</span>
+            </div>
+            <div className="to-juli-value">
+              GTO: {formatNumber(monthlyResult.toJuli.gto, locale, 2)}
+              <span className="to-juli-limit">
+                {' '}/ {t('results.limit')}: {'≤'} {monthlyResult.toJuli.limit}
+              </span>
+            </div>
+          </div>
+        )}
+        <EnergyBreakdownChart breakdown={shown.breakdown} />
+        {monthlyResult && <MonthlyBreakdownChart monthly={monthlyResult.monthly} />}
       </div>}
-
-      {/* TO-juli: the kernel value (dwellings only), otherwise the indicative GTO. */}
-      {performance && !utility && performance.tojuliMaxK != null && (
-        <div className="to-juli-card" data-testid="to-juli-kernel">
-          <div className="to-juli-header">
-            <h3>{t('results.toJuli')}</h3>
-            <span className="to-juli-badge">{t('results.kernelBadge')}</span>
-          </div>
-          <div className="to-juli-value">
-            TO<sub>juli</sub>: {formatNumber(performance.tojuliMaxK, locale, 2)} K
-            <span className="to-juli-limit">
-              {' '}/ {t('results.limit')}: {'≤'} {formatNumber(1.2, locale, 2)} K
-            </span>
-          </div>
-        </div>
-      )}
-      {!performance && !kernelPending && monthlyResult && (
-        <div className="to-juli-card to-juli-indicative">
-          <div className="to-juli-header">
-            <h3>{t('results.toJuli')}</h3>
-            <span className="to-juli-badge indicative">{t('results.indicativeBadge')}</span>
-          </div>
-          <div className="to-juli-value">
-            GTO: {formatNumber(monthlyResult.toJuli.gto, locale, 2)}
-            <span className="to-juli-limit">
-              {' '}/ {t('results.limit')}: {'≤'} {monthlyResult.toJuli.limit}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {performance && <EnergyBreakdownChart breakdown={kernelEnergyBreakdown(performance)} source="kernel" />}
-      {!performance && !kernelPending && shown && <EnergyBreakdownChart breakdown={shown.breakdown} />}
-
-      {/* Monthly breakdown chart of the simplified engine */}
-      {!performance && !kernelPending && monthlyResult && (
-        <MonthlyBreakdownChart monthly={monthlyResult.monthly} />
-      )}
     </div>
   );
 }

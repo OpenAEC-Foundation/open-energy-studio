@@ -4,7 +4,7 @@ export function formatNumber(value: number | null | undefined, locale: string, d
   return value.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-const KERNEL_CODE_PREFIXES = ['nta.gap.', 'nta.warning.', 'kernel.issue.', 'opname.issue.', 'mwa.issue.'];
+const KERNEL_CODE_PREFIXES = ['nta.gap.', 'nta.warning.', 'kernel.issue.', 'opname.issue.', 'mwa.issue.', 'registration.issue.'];
 
 /**
  * Translated label of a kernel code (gap, warning, issue). `known` is false when no

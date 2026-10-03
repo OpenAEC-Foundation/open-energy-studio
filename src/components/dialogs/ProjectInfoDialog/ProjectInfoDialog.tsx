@@ -24,13 +24,23 @@ type TextKey = 'referenceObjectId' | 'bagObjectId' | 'postcode' | 'houseNumber' 
   | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate' | 'improvementDate'
   | 'replacedEpOnlineNumber' | 'previousLabelClass';
 
-const textFields: Array<{ key: TextKey; type?: 'date' }> = [
+type TextField = { key: TextKey; type?: 'date' };
+
+/** Address and object (Regeling art. 5 lid 1 onder a). */
+const objectFields: TextField[] = [
   { key: 'bagObjectId' }, { key: 'postcode' }, { key: 'houseNumber' }, { key: 'houseNumberAddition' },
-  { key: 'buildingType' }, { key: 'client' }, { key: 'certificateNumber' },
-  { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' }, { key: 'completionDate', type: 'date' },
-  { key: 'referenceObjectId' }, { key: 'originalKernelVersion' }, { key: 'improvementDate', type: 'date' },
-  { key: 'epOnlineNumber' }, { key: 'replacedEpOnlineNumber' }, { key: 'previousLabelClass' },
+  { key: 'buildingType' }, { key: 'referenceObjectId' },
 ];
+/** Survey and registration (BRL 9500 §4.2.5/§4.2.6). */
+const surveyFields: TextField[] = [
+  { key: 'client' }, { key: 'certificateNumber' },
+  { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' }, { key: 'completionDate', type: 'date' },
+  { key: 'epOnlineNumber' }, { key: 'previousLabelClass' },
+];
+/** Relabel only (BRL 9500-W §4.2.4, Bijlage 6a/6b). */
+const relabelFields: TextField[] = [{ key: 'originalKernelVersion' }, { key: 'improvementDate', type: 'date' }];
+/** Replacement of an incorrect label only. */
+const replacementFields: TextField[] = [{ key: 'replacedEpOnlineNumber' }];
 
 /** BRL 9500 §3.1 situations that require a detailed survey. */
 const detailTriggers: Array<keyof NtaDetailSurveyTriggers> = [
@@ -75,6 +85,14 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
   const conflicts = bagConflicts(ledgerEntry, readBagLedger());
   const software = registrationSoftware(registration, kernelVersion);
 
+  const textInput = ({ key, type }: TextField) => (
+    <div className="dialog-field" key={key}>
+      <label htmlFor={`reg-${key}`}>{t(`reg.${key}`)}</label>
+      <input id={`reg-${key}`} type={type ?? 'text'} value={registration[key] ?? ''}
+        onChange={(e) => update({ [key]: e.target.value || undefined })} />
+    </div>
+  );
+
   const handleSave = () => {
     // Keeps registered labels only and drops this project's entry when the
     // BAG id or the EP-Online number was cleared.
@@ -93,10 +111,15 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
       onSubmit={handleSave}
       submitLabel={t('dialog.save')}
       cancelLabel={t('dialog.cancel')}
+      className="project-info-dialog"
     >
+      <section className="dialog-section" aria-labelledby="project-info-general">
+        <h3 className="dialog-section-title" id="project-info-general">{t('dialog.projectInfo.general')}</h3>
+        <div className="dialog-grid">
         <div className="dialog-field">
-          <label>{t('dialog.projectInfo.name')}</label>
+          <label htmlFor="project-name">{t('dialog.projectInfo.name')}</label>
           <input
+            id="project-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -104,8 +127,9 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.projectInfo.description')}</label>
+          <label htmlFor="project-description">{t('dialog.projectInfo.description')}</label>
           <textarea
+            id="project-description"
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -113,8 +137,9 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.projectInfo.function')}</label>
+          <label htmlFor="project-function">{t('dialog.projectInfo.function')}</label>
           <select
+            id="project-function"
             value={buildingFunction}
             onChange={(e) => setBuildingFunction(e.target.value as BuildingFunction)}
           >
@@ -127,8 +152,9 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.projectInfo.address')}</label>
+          <label htmlFor="project-address">{t('dialog.projectInfo.address')}</label>
           <input
+            id="project-address"
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -136,16 +162,22 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.projectInfo.city')}</label>
+          <label htmlFor="project-city">{t('dialog.projectInfo.city')}</label>
           <input
+            id="project-city"
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
           />
         </div>
 
-        <h3 className="dialog-section-title">{t('dialog.projectInfo.registration')}</h3>
+        </div>
+      </section>
+
+      <section className="dialog-section" aria-labelledby="project-info-registration">
+        <h3 className="dialog-section-title" id="project-info-registration">{t('dialog.projectInfo.registration')}</h3>
         <p className="dialog-hint">{t('dialog.projectInfo.registrationHint')}</p>
+        <div className="dialog-grid">
         <div className="dialog-field">
           <label htmlFor="reg-purpose">{t('reg.purpose')}</label>
           <select id="reg-purpose" value={registration.purpose ?? ''}
@@ -180,13 +212,34 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
           <input id="reg-construction-year" type="number" value={registration.constructionYear ?? ''}
             onChange={(e) => update({ constructionYear: e.target.value ? Number(e.target.value) : undefined })} />
         </div>
-        {textFields.map(({ key, type }) => (
-          <div className="dialog-field" key={key}>
-            <label htmlFor={`reg-${key}`}>{t(`reg.${key}`)}</label>
-            <input id={`reg-${key}`} type={type ?? 'text'} value={registration[key] ?? ''}
-              onChange={(e) => update({ [key]: e.target.value || undefined })} />
-          </div>
-        ))}
+        <div className="dialog-field">
+          <label htmlFor="reg-message-type">{t('reg.messageType')}</label>
+          <select id="reg-message-type" value={messageType}
+            onChange={(e) => update({ messageType: e.target.value as NonNullable<NtaRegistration['messageType']>, relabel: undefined })}>
+            <option value="regular">{t('reg.messageType.regular')}</option>
+            <option value="relabel">{t('reg.messageType.relabel')}</option>
+            <option value="replacement">{t('reg.messageType.replacement')}</option>
+          </select>
+        </div>
+        {messageType === 'relabel' && relabelFields.map(textInput)}
+        {messageType === 'replacement' && replacementFields.map(textInput)}
+        </div>
+      </section>
+
+      <section className="dialog-section" aria-labelledby="project-info-object">
+        <h3 className="dialog-section-title" id="project-info-object">{t('dialog.projectInfo.object')}</h3>
+        <div className="dialog-grid">{objectFields.map(textInput)}</div>
+        {conflicts.length > 0 && (
+          <p className="dialog-hint" role="alert">
+            {t('reg.bagConflict')} {conflicts.map((item) => item.projectName || item.projectId).join(', ')}
+          </p>
+        )}
+      </section>
+
+      <section className="dialog-section" aria-labelledby="project-info-survey">
+        <h3 className="dialog-section-title" id="project-info-survey">{t('dialog.projectInfo.survey')}</h3>
+        <div className="dialog-grid">
+        {surveyFields.map(textInput)}
         {(['surveyingAdvisor', 'registeringAdvisor'] as const).map((key) => (
           <div className="dialog-field" key={key}>
             <label htmlFor={`reg-${key}-name`}>{t(`reg.${key}`)}</label>
@@ -202,23 +255,13 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
             onChange={(e) => update({ serialProject: e.target.checked })} />
           {t('reg.serialProject')}
         </label>
-        <div className="dialog-field">
-          <label htmlFor="reg-message-type">{t('reg.messageType')}</label>
-          <select id="reg-message-type" value={messageType}
-            onChange={(e) => update({ messageType: e.target.value as NonNullable<NtaRegistration['messageType']>, relabel: undefined })}>
-            <option value="regular">{t('reg.messageType.regular')}</option>
-            <option value="relabel">{t('reg.messageType.relabel')}</option>
-            <option value="replacement">{t('reg.messageType.replacement')}</option>
-          </select>
         </div>
-        {conflicts.length > 0 && (
-          <p className="dialog-hint" role="alert">
-            {t('reg.bagConflict')} {conflicts.map((item) => item.projectName || item.projectId).join(', ')}
-          </p>
-        )}
+      </section>
 
-        <h3 className="dialog-section-title">{t('reg.wlcGwp')}</h3>
+      <section className="dialog-section" aria-labelledby="project-info-wlc">
+        <h3 className="dialog-section-title" id="project-info-wlc">{t('reg.wlcGwp')}</h3>
         <p className="dialog-hint">{t('reg.wlcGwpHint')}</p>
+        <div className="dialog-grid">
         <div className="dialog-field">
           <label htmlFor="reg-wlc-value">{t('reg.wlcGwp.value')}</label>
           <input id="reg-wlc-value" type="number" step="any" value={registration.wlcGwp?.valueKgCo2EqPerM2Year ?? ''}
@@ -239,12 +282,16 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
           <input id="reg-building-area" type="number" step="any" value={registration.buildingUsableFloorAreaM2 ?? ''}
             onChange={(e) => update({ buildingUsableFloorAreaM2: e.target.value ? Number(e.target.value) : undefined })} />
         </div>
+        </div>
         <p className="dialog-hint" data-testid="reg-software">
           {t('reg.software')}: {software.name} {software.version} — {software.attestNumber
             ? `${t('reg.software.attest')} ${software.attestNumber}` : t('reg.software.unattested')}
         </p>
 
-        <h3 className="dialog-section-title">{t('reg.detailSurveyTriggers')}</h3>
+      </section>
+
+      <section className="dialog-section" aria-labelledby="project-info-triggers">
+        <h3 className="dialog-section-title" id="project-info-triggers">{t('reg.detailSurveyTriggers')}</h3>
         <p className="dialog-hint">{t('reg.detailSurveyTriggersHint')}</p>
         {detailTriggers.map((key) => (
           <label className="dialog-check" key={key}>
@@ -254,9 +301,13 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
           </label>
         ))}
 
-        <h3 className="dialog-section-title">{t('evidence.title')}</h3>
+      </section>
+
+      <section className="dialog-section" aria-labelledby="project-info-evidence">
+        <h3 className="dialog-section-title" id="project-info-evidence">{t('evidence.title')}</h3>
         <EvidenceRegister evidence={registration.evidence ?? []}
           onChange={(evidence) => update({ evidence })} />
+      </section>
     </DialogShell>
   );
 }

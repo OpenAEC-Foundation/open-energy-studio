@@ -547,3 +547,14 @@ code, pre, .monospace,
 input[type="number"] {
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* Native scrollbars and form controls follow the theme. */
+:root, [data-theme="dark"], [data-theme="highContrast"] { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+/* Grouped dialogs (project information): sections with a two-column field grid. */
+.dialog-section { margin: 0 0 14px; padding: 0 0 6px; border-bottom: 1px solid var(--border-light); }
+.dialog-section:last-child { border-bottom: none; }
+.dialog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 14px; align-items: start; }
+.dialog-grid > .dialog-check { align-self: center; }
+.project-info-dialog { width: min(760px, 94vw); }

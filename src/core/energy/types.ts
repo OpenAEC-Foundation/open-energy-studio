@@ -366,6 +366,10 @@ export interface IEnergyBreakdown {
   renewableEnergy: number;        // kWh/year
   pvProduction: number;           // kWh/year
   solarThermalProduction: number; // kWh/year
+  /** Kernel only: heating gains not in solar/internal (sunroom gains 7.37 and other terms). */
+  otherGain?: number;               // kWh/year
+  /** Kernel only: the per-service delivered energy is unavailable, so the delivered bars are not zero but unknown. */
+  deliveredUnavailable?: boolean;
 }
 
 export interface IBENGResult {

@@ -6,12 +6,13 @@ import type {
 import { escapeHtml } from './HtmlEscaping';
 import { summarizeExtras } from '../nta/NtaResultSummary';
 import { summarizeServiceEnergy } from '../nta/ServiceEnergy';
+import { dutchCodeCell, dutchNumber, dutchTimestamp } from './DutchReportText';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
 function cell(value: unknown): string { return `<td>${escapeHtml(value)}</td>`; }
 function num(value: number | null | undefined, digits = 0): string {
-  return value == null || !Number.isFinite(value) ? '—' : value.toFixed(digits);
+  return dutchNumber(value, digits);
 }
 function meets(value: boolean | null | undefined): string {
   return value == null ? 'niet te toetsen' : value ? 'voldoet (onverifieerd)' : 'voldoet niet';
@@ -158,7 +159,7 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie).</p>';
   }
   const issues = [...(assessment?.issues ?? []), ...(assessment?.plausibility ?? [])].map((item) =>
-    `<tr>${cell(item.severity === 'error' ? 'fout' : item.severity === 'warning' ? 'plausibiliteit' : 'ontbreekt')}${cell(item.code)}${cell(item.path)}</tr>`).join('');
+    `<tr>${cell(item.severity === 'error' ? 'fout' : item.severity === 'warning' ? 'plausibiliteit' : 'ontbreekt')}${dutchCodeCell(item.code)}${cell(item.path)}</tr>`).join('');
   const messageType = assessment?.messageType ?? registration.messageType ?? (registration.relabel ? 'relabel' : 'regular');
   const software = assessment?.software ?? registration.software;
   const softwareText = software
@@ -220,7 +221,7 @@ export function generateNtaCalculationReportHTML(
     ...(assessment.warnings ?? []),
     ...(performance?.warnings ?? []),
   ];
-  const generatedAt = new Date().toISOString();
+  const generatedAt = dutchTimestamp();
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>NTA 8800-rekenrapport — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -242,10 +243,10 @@ export function generateNtaCalculationReportHTML(
     ${registrationSection(project.registration, assessment.registration)}
     ${warnings.length > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen. De invoer of de uitkomst botst met de norm of met andere invoer, of is extreem volgens de letter van de norm.</p>
       <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${warnings
-        .map((warning) => `<tr>${cell(warning.code)}${cell(warning.path)}${cell(warning.detail ?? '')}</tr>`).join('')}</tbody></table>` : ''}`;
+        .map((warning) => `<tr>${dutchCodeCell(warning.code)}${cell(warning.path)}${cell(warning.detail ?? '')}</tr>`).join('')}</tbody></table>` : ''}`;
   if (!performance || assessment.status !== 'calculated_unverified') {
-    const gaps = assessment.gaps.map((gap) => `<tr>${cell(gap.code)}${cell(gap.path)}${cell(gap.detail ?? '')}</tr>`).join('');
-    const issues = (performance?.issues ?? []).map((item) => `<tr>${cell(item.code)}${cell(item.path)}<td></td></tr>`).join('');
+    const gaps = assessment.gaps.map((gap) => `<tr>${dutchCodeCell(gap.code)}${cell(gap.path)}${cell(gap.detail ?? '')}</tr>`).join('');
+    const issues = (performance?.issues ?? []).map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}<td></td></tr>`).join('');
     return `${head}<h2>Geen uitkomst</h2><p>De rekenkern geeft geen uitkomst. Onderstaande invoergaten of afwijzingen moeten eerst worden opgelost.</p>
       <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${gaps}${issues}</tbody></table></body></html>`;
   }
@@ -265,7 +266,7 @@ export function generateNtaCalculationReportHTML(
     <td class="n">${num(zone.transmission?.conductanceWPerK, 2)}</td><td class="n">${num(zone.transmission?.groundHeatingAdjustedWPerK, 2)}</td>
     <td class="n">${num(zone.specificHeatCapacityKjPerM2k)}</td><td class="n">${num(zone.annualHeatingNeedKwh)}</td><td class="n">${num(zone.annualCoolingNeedKwh)}</td></tr>`).join('');
   const tojuliRows = performance.tojuli.flatMap((zone) => zone.activeCooling
-    ? [`<tr>${cell(zone.zoneId)}${cell('actieve koeling (§5.7.1)')}<td class="n">0,00</td></tr>`]
+    ? [`<tr>${cell(zone.zoneId)}${cell('actieve koeling (§5.7.1)')}<td class="n">${num(0, 2)}</td></tr>`]
     : zone.orientations.filter((item) => item.assessed).map((item) =>
       `<tr>${cell(zone.zoneId)}${cell(item.orientation)}<td class="n">${num(item.tojuliK, 2)}</td></tr>`)).join('');
   const bbl = performance.bblCheck;

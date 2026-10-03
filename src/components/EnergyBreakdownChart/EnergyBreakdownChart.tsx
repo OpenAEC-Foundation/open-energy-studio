@@ -24,6 +24,9 @@ export function EnergyBreakdownChart({ breakdown, source = 'indicative' }: Energ
   const gains = [
     { key: 'solarGain', label: t('results.solarGain'), value: breakdown.solarGain, color: '#eab308' },
     { key: 'internalGain', label: t('results.internalGain'), value: breakdown.internalGain, color: '#84cc16' },
+    ...(breakdown.otherGain ? [
+      { key: 'otherGain', label: t('results.otherGain'), value: breakdown.otherGain, color: '#a3a3a3' },
+    ] : []),
   ];
 
   const delivered = [
@@ -78,7 +81,9 @@ export function EnergyBreakdownChart({ breakdown, source = 'indicative' }: Energ
 
       <div className="breakdown-section">
         <h4>{t('results.breakdownDelivered')}</h4>
-        {delivered.map(renderBar)}
+        {breakdown.deliveredUnavailable
+          ? <p className="breakdown-source" role="status" data-testid="breakdown-delivered-unavailable">{t('results.breakdownDeliveredUnavailable')}</p>
+          : delivered.map(renderBar)}
       </div>
 
       <div className="breakdown-section">

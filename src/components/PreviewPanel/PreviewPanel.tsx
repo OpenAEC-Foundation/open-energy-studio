@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, legacyHeatPumpInputIssue, validProjectFloorArea } from '../../core/energy/ProjectArea';
-import { calculateProjectPerformanceWithRust } from '../../core/nta/KernelClient';
+import { calculateProjectPerformanceShared } from '../../core/nta/useProjectPerformance';
 import { summarizeForPreview, type PreviewSummary } from '../../core/nta/PreviewSummary';
 import type { IProject } from '../../core/energy/types';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
@@ -51,7 +51,7 @@ export function PreviewPanel() {
     let cancelled = false;
     setKernel({ kind: 'loading', project });
     const timer = setTimeout(() => {
-      calculateProjectPerformanceWithRust(project).then(
+      calculateProjectPerformanceShared(project).then(
         (assessment) => { if (!cancelled) setKernel({ kind: 'done', project, summary: summarizeForPreview(assessment) }); },
         (reason: unknown) => {
           if (!cancelled) setKernel({ kind: 'error', project, message: reason instanceof Error ? reason.message : String(reason) });

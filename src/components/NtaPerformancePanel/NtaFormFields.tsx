@@ -53,8 +53,12 @@ export function TextField({ draft, path, label, onChange }: FieldProps) {
 
 export function SelectField({ draft, path, label, onChange, options }: FieldProps & { options: Array<[string, string]> }) {
   const value = read(draft, path);
-  return <label>{label}
-    <select value={value == null ? '' : String(value)} onChange={(event) => onChange(path, event.target.value || null)}>
+  const selected = options.find(([key]) => key === String(value))?.[1];
+  // Long option texts get two grid columns, and the full text as tooltip, so they are not cut off.
+  const wide = options.some(([, text]) => text.length > 34);
+  return <label className={wide ? 'nta-form-wide' : undefined}>{label}
+    <select value={value == null ? '' : String(value)} title={selected}
+      onChange={(event) => onChange(path, event.target.value || null)}>
       <option value="">—</option>
       {options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}
     </select>

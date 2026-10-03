@@ -1,4 +1,5 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useId, useState } from 'react';
+import i18next from 'i18next';
 
 interface DialogShellProps {
   title: string;
@@ -25,6 +26,7 @@ export function DialogShell({
   style,
   footer,
 }: DialogShellProps) {
+  const titleId = useId();
   // ── Drag support ──
   const dialogRef = useRef<HTMLDivElement>(null);
   const dragState = useRef({ isDragging: false, offsetX: 0, offsetY: 0 });
@@ -116,10 +118,13 @@ export function DialogShell({
         ref={dialogRef}
         className={`${className ? `dialog ${className}` : 'dialog'}${shake ? ' dialog-shake' : ''}`}
         style={{ ...style, ...positionStyle }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
       >
         <div className="dialog-header" onMouseDown={handleHeaderMouseDown}>
-          <span className="dialog-header-title">{title}</span>
-          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+          <span className="dialog-header-title" id={titleId}>{title}</span>
+          <button type="button" className="dialog-close-btn" onClick={onClose} aria-label={i18next.t('dialog.close')}>&times;</button>
         </div>
         <div className={bodyClassName ?? 'dialog-body'}>
           {children}

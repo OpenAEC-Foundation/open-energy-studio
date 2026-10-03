@@ -55,7 +55,7 @@ function ActiveDocumentContent({
   onCloseTab: (id: string) => void;
 }) {
   const { state, dispatch } = useEnergy();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { dialog, project, result } = state;
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
@@ -111,8 +111,9 @@ function ActiveDocumentContent({
   }, [dispatch]);
 
   const handleExportReport = useCallback(() => {
-    if (result) downloadReportHTML(project, result);
-  }, [project, result]);
+    downloadReportHTML(project, result, locale).catch((error: unknown) =>
+      setCalculationError(error instanceof Error ? error.message : String(error)));
+  }, [project, result, locale]);
 
   const handlePrintReport = useCallback(() => {
     setPrintPreviewOpen(true);
