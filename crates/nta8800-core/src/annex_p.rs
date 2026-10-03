@@ -98,6 +98,10 @@ pub enum AnnexPRoute {
         co2_kg_per_kwh: f64,
         #[serde(rename = "declarationReference")]
         declaration_reference: String,
+        /// The declaration rests on measured values only (f_prac 1 in 9.84,
+        /// 13.152, 10.78); otherwise 0,95.
+        #[serde(default, rename = "measuredOnly")]
+        measured_only: bool,
     },
     /// Annex P with calculated (and possibly measured) flows (P.7, P.9).
     Calculated(Box<CalculatedSystem>),
@@ -1164,6 +1168,7 @@ pub fn assess_route(
             renewable_factor,
             co2_kg_per_kwh,
             declaration_reference,
+            ..
         } => {
             let mut issues = Vec::new();
             reference(
@@ -1511,6 +1516,7 @@ mod tests {
                 renewable_factor: 0.5,
                 co2_kg_per_kwh: 0.05,
                 declaration_reference: "EMG".into(),
+                measured_only: false,
             }),
         };
         let (factors, _) = source_factors(&warm, "s").unwrap();

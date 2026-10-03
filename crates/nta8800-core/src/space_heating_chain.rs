@@ -726,6 +726,11 @@ pub struct HeatPumpGenerator {
     pub forfait: ForfaitHeatPumpDraftInput,
     pub source_system: SourceSystem,
     pub source_system_reference: String,
+    /// Annex V regeneration of an individual ground source: `c_source` of
+    /// table 9.27 footnote a follows from table V.1 instead of
+    /// `forfait.sourceCorrectionFactor`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regeneration: Option<RegenerationInput>,
     /// Measured auxiliary powers of an individual heat pump (9.85–9.88);
     /// absent means the 9.85 forfait constants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2736,6 +2741,24 @@ fn generate_multiple(
             ));
         }
     }
+    // §9.6.3 (p. 331): a heat pump in a (hybrid) system above 55 °C
+    // needs annex Q.
+    for (index, part) in set.generators.iter().enumerate() {
+        if let Generator::HeatPumpForfait(generator) = &part.generator {
+            if generator
+                .forfait
+                .design_supply_temperature_c
+                .is_some_and(|temperature| temperature > 55.0)
+            {
+                issues.push(issue(
+                    "heat_pump_above55_requires_annex_q",
+                    format!(
+                        "generator.generators[{index}].generator.forfait.designSupplyTemperatureC"
+                    ),
+                ));
+            }
+        }
+    }
     if issues.len() > prior {
         return None;
     }
@@ -3089,16 +3112,47 @@ fn generate(
             }
         }
         Generator::HeatPumpForfait(generator) => {
-            if generator
-                .forfait
-                .design_supply_temperature_c
-                .is_some_and(|temperature| temperature > 55.0)
-            {
-                // §9.6.3: systems above 55 °C need annex Q, also without a boiler.
-                issues.push(issue(
-                    "heat_pump_above55_requires_annex_q",
-                    "generator.forfait.designSupplyTemperatureC",
-                ));
+            // §9.6.3 (p. 331): (hybrid) systems above 55 °C need annex Q;
+            // a heat pump on its own uses the 60–70 °C columns of tables
+            // 9.27/9.29 (note 7). The hybrid case is checked in
+            // `generate_multiple`.
+            let mut forfait = generator.forfait.clone();
+            if let Some(regeneration) = &generator.regeneration {
+                issues.extend(
+                    validate_regeneration(regeneration, "generator.regeneration")
+                        .into_iter()
+                        .map(|item| issue(item.code, item.path)),
+                );
+                if forfait.source_correction_factor.is_some() {
+                    issues.push(issue(
+                        "regeneration_and_declared_source_correction",
+                        "generator.regeneration",
+                    ));
+                }
+                // V.1 needs η_H;gen with c_source = 1: the table COP.
+                let mut probe = forfait.clone();
+                probe.source_correction_factor = Some(1.0);
+                probe.source_correction_reference = Some("annex V".into());
+                let table_cop =
+                    crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(&probe)
+                        .table_cop;
+                if let Some(cop) = table_cop {
+                    let annual: f64 = outputs.iter().map(|item| item.energy_kwh).sum();
+                    let result = calculate_regeneration(
+                        regeneration,
+                        RegenerationContext {
+                            heating_kwh: annual,
+                            heating_efficiency: cop,
+                            hot_water_kwh: 0.0,
+                            hot_water_efficiency: 0.0,
+                            annual_cooling_need_kwh: building.cooling_need_kwh,
+                            electricity_efficiency: ELECTRICITY_EFFICIENCY,
+                        },
+                    );
+                    forfait.source_correction_factor = Some(result.correction);
+                    forfait.source_correction_reference =
+                        Some(format!("annex V: R = {:.3}", result.degree));
+                }
             }
             let collective = generator.forfait.collective_building_installation == Some(true);
             if collective {
@@ -3117,7 +3171,7 @@ fn generate(
             }
             let result =
                 assess_forfait_heat_pump_monthly_draft(&ForfaitHeatPumpMonthlyDraftInput {
-                    forfait: generator.forfait.clone(),
+                    forfait,
                     generator_output_kwh: outputs.to_vec(),
                     generator_output_reference: "derived by space_heating_chain".into(),
                     source_system: generator.source_system,
@@ -3679,6 +3733,51 @@ mod tests {
     }
 
     #[test]
+    fn forfait_ground_heat_pump_takes_c_source_from_annex_v() {
+        let mut forfait = heat_pump();
+        forfait.source = TableSource::Ground;
+        let mut input = boiler_chain();
+        input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            forfait: forfait.clone(),
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own borehole".into(),
+            regeneration: Some(RegenerationInput {
+                free_cooling_from_source: true,
+                solar: Vec::new(),
+                source_reference: "design".into(),
+            }),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let mut probe = forfait.clone();
+        probe.source_correction_factor = Some(1.0);
+        probe.source_correction_reference = Some("probe".into());
+        let table = crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(&probe)
+            .table_cop
+            .unwrap();
+        // c_source of table V.1: 1,00 / 1,02 / 1,04.
+        let ratio = result.generation_efficiency.unwrap() / table;
+        assert!(
+            [1.0, 1.02, 1.04]
+                .iter()
+                .any(|value| (ratio - value).abs() < 1e-9),
+            "{ratio}"
+        );
+        // A declared c_source together with annex V is rejected.
+        if let Generator::HeatPumpForfait(generator) = &mut input.generator {
+            generator.forfait.source_correction_factor = Some(1.0);
+            generator.forfait.source_correction_reference = Some("declared".into());
+        }
+        assert!(codes(&input).contains(&"regeneration_and_declared_source_correction"));
+    }
+
+    #[test]
     fn boiler_chain_carries_need_through_emission_to_gas() {
         let result = assess_space_heating_chain(&boiler_chain());
         assert_eq!(
@@ -3896,6 +3995,7 @@ mod tests {
         let mut input = boiler_chain();
         let boiler = input.generator.clone();
         let heat_pump_generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
             forfait: heat_pump(),
             source_system: SourceSystem::Individual,
             source_system_reference: "own outdoor unit".into(),
@@ -3954,6 +4054,7 @@ mod tests {
     fn heat_pump_chain_uses_forfait_cop() {
         let mut input = boiler_chain();
         input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
             forfait: heat_pump(),
             source_system: SourceSystem::Individual,
             source_system_reference: "own outdoor unit".into(),
@@ -4324,6 +4425,7 @@ mod tests {
         use crate::heating_aux_draft::ElectricHeatPumpAuxMeasurements;
         let mut input = boiler_chain();
         input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
             forfait: heat_pump(),
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
@@ -4801,6 +4903,7 @@ mod tests {
     fn heat_pump_forfait_auxiliary_follows_9_85() {
         let mut input = boiler_chain();
         input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
             forfait: heat_pump(),
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
@@ -4822,6 +4925,27 @@ mod tests {
             unreachable!()
         };
         generator.forfait.design_supply_temperature_c = Some(60.0);
+        // §9.6.3: a heat pump on its own uses the 60 °C column of table 9.27.
+        assert!(!codes(&input).contains(&"heat_pump_above55_requires_annex_q"));
+        // In a (hybrid) system with another generator annex Q is required.
+        let heat_pump = input.generator.clone();
+        let boiler = boiler_chain().generator;
+        input.generator = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 4.0,
+                    generator: heat_pump,
+                },
+                PreferredGenerator {
+                    preference: 2,
+                    nominal_power_kw: 20.0,
+                    generator: boiler,
+                },
+            ],
+            added_preferred_generator: false,
+            source_reference: "survey".into(),
+        }));
         assert!(codes(&input).contains(&"heat_pump_above55_requires_annex_q"));
     }
 

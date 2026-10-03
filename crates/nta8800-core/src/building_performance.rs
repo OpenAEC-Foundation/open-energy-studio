@@ -321,6 +321,12 @@ pub struct CarrierFactors {
     pub district_hot_water: SupplyFactors,
     pub district_cold: SupplyFactors,
     pub heat_pump_source: Option<SupplyFactors>,
+    /// f_prac of 9.84 (dh), 13.152 (dw) and f_prpr of 10.78 (dc): 1 for
+    /// the forfait factor or measured-only annex P values, 0,95 for
+    /// calculated annex P values.
+    pub practice_heat: f64,
+    pub practice_hot_water: f64,
+    pub practice_cold: f64,
 }
 
 const FORFAIT_FACTORS: CarrierFactors = CarrierFactors {
@@ -328,7 +334,21 @@ const FORFAIT_FACTORS: CarrierFactors = CarrierFactors {
     district_hot_water: HEAT_FORFAIT,
     district_cold: COLD_FORFAIT,
     heat_pump_source: None,
+    practice_heat: 1.0,
+    practice_hot_water: 1.0,
+    practice_cold: 1.0,
 };
+
+/// 9.84 / 13.152 / 10.78: 1,0 for the forfait factor (no route) or an annex
+/// P route on measured values only, 0,95 for calculated values. A quality
+/// declaration counts as calculated unless it states measured values only.
+fn external_practice_factor(route: Option<&AnnexPRoute>) -> f64 {
+    match route {
+        None | Some(AnnexPRoute::Measured(_)) => 1.0,
+        Some(AnnexPRoute::Declared { measured_only, .. }) if *measured_only => 1.0,
+        Some(_) => 0.95,
+    }
+}
 
 /// Resolved annex P values and the EMGforf scenario.
 #[derive(Debug, Clone, Serialize)]
@@ -402,6 +422,11 @@ fn resolve_external(
         district_hot_water: hot_water.as_ref().map_or(HEAT_FORFAIT, |item| item.factors),
         district_cold: cooling.as_ref().map_or(COLD_FORFAIT, |item| item.factors),
         heat_pump_source: source.map(|item| item.declared),
+        practice_heat: external_practice_factor(heating.as_ref().and(supply.heating.as_ref())),
+        practice_hot_water: external_practice_factor(
+            hot_water.as_ref().and(supply.hot_water.as_ref()),
+        ),
+        practice_cold: external_practice_factor(cooling.as_ref().and(supply.cooling.as_ref())),
     };
     let forfait = CarrierFactors {
         heat_pump_source: source.map(|item| item.forfait),
@@ -2381,7 +2406,8 @@ fn compute(
         let mut used_oil = bacs * row.oil_kwh;
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
-        let mut used_dh = bacs * row.district_heat_kwh;
+        // 9.84: E = Q/(η·f_prac) with η_H;gen;equiv;dh = 1.
+        let mut used_dh = bacs * row.district_heat_kwh / factors.practice_heat;
         // 5.39g: the renewable share counts Q_H;gen;out of external heat and
         // Q_C;gen;out of absorption chillers on it, without f_BACS.
         let mut renewable_dh_basis = row.district_heat_kwh;
@@ -2424,7 +2450,8 @@ fn compute(
             used_gas += bacs * (month_row.natural_gas_kwh + month_row.chp_heat_kwh);
             used_dh += bacs * month_row.district_heat_kwh;
             renewable_dh_basis += month_row.district_heat_cold_kwh;
-            used_dc += bacs * month_row.district_cold_kwh;
+            // 10.78: f_prpr of external cold.
+            used_dc += bacs * month_row.district_cold_kwh / factors.practice_cold;
             ambient_cold = month_row.ambient_cold_kwh;
         }
         // Chapter 14 lighting (electricity, months by t_mi/t_an).
@@ -2447,7 +2474,8 @@ fn compute(
             used_el += row.electricity_kwh;
             used_gas += row.natural_gas_kwh;
             used_oil += row.oil_kwh;
-            used_dw += row.district_heat_kwh;
+            // 13.152: f_prac;gi of external heat for hot water.
+            used_dw += row.district_heat_kwh / factors.practice_hot_water;
             used_el += row.auxiliary_electricity_kwh;
             hot_water_ambient = row.ambient_heat_kwh;
             hot_water_chp = row.chp_electricity_kwh;
@@ -2875,6 +2903,7 @@ mod tests {
             renewable_factor: 0.35,
             co2_kg_per_kwh: 0.05,
             declaration_reference: "BCRG EMG-verklaring".into(),
+            measured_only: true,
         });
         let result = assess_building_performance(&sample);
         assert_eq!(
@@ -2907,6 +2936,32 @@ mod tests {
             [ScenarioKind::EmgDeclaration, ScenarioKind::EmgForfait]
         );
         assert!(!forfait.external_supply.unwrap().quality_declaration_used);
+        // 9.84: a declaration on calculated values has f_prac = 0,95.
+        if let Some(AnnexPRoute::Declared { measured_only, .. }) =
+            sample.external_supply.heating.as_mut()
+        {
+            *measured_only = false;
+        }
+        let calculated = assess_building_performance(&sample);
+        let ep_calculated = calculated.annual_primary_fossil_kwh.unwrap();
+        assert!((ep_calculated - (ep + heat * 0.42 * (1.0 / 0.95 - 1.0))).abs() < 1e-6);
+        // The EMG forfait scenario keeps f_prac = 1 (fixed factor 0,9).
+        assert!(
+            (calculated
+                .external_supply
+                .as_ref()
+                .unwrap()
+                .forfait_primary_fossil_kwh
+                .unwrap()
+                - ep_forfait)
+                .abs()
+                < 1e-6
+        );
+        if let Some(AnnexPRoute::Declared { measured_only, .. }) =
+            sample.external_supply.heating.as_mut()
+        {
+            *measured_only = true;
+        }
         // 5.39g: the renewable share counts Q_H;gen;out, not weighted by f_BACS.
         sample.calculation_scope = CalculationScope::Utility;
         let plain = assess_building_performance(&sample);
@@ -2947,6 +3002,7 @@ mod tests {
             source_quality_declaration_reference: None,
         };
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
             forfait,
             source_system: SourceSystem::CollectiveGround,
             source_system_reference: "district ground loop".into(),
@@ -3021,6 +3077,7 @@ mod tests {
             source_quality_declaration_reference: None,
         };
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
             forfait,
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
