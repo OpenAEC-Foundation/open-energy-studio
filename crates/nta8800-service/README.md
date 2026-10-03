@@ -4,7 +4,7 @@
 
 `POST /v1/nta8800/heat-pumps/gas-collective-source-draft/diagnose` and MCP tool `diagnose_gas_collective_source_draft` accept `{ "input": { "chain": { ... }, "sourceTemperatureClass": "below20_c", "sourceTemperatureReference": "...", "noQualityDeclarationConfirmed": true, "noQualityDeclarationReference": "..." } }`. The validated twelve-month linked gas chain is reused. Results keep collective source heat on the separate `dh` carrier and expose only draft fossil/renewable primary contributions from public consultation chapters 5 and 9. Invalid evidence returns HTTP 422 or an MCP tool error without partial numbers. Gas input, source pump/fan, final-edition verification, BENG and label are unavailable. See `docs/nta8800-gaswarmtepomp-collectieve-bron-concept.md`.
 
-This service exposes the same `nta8800-core` crate used by the desktop app. It currently assesses legacy `.oes` project structure. The BENG calculation route and tool explicitly report that calculation is unavailable; no result from this service is certified or suitable for an energy label.
+This service exposes the same `nta8800-core` crate used by the desktop app. A project with a complete `ntaCalculation` block can return BENG indicators and an indicative label class through the project-performance route; incomplete input returns explicit gaps. Results are unverified and unattested. The service does not register or issue an energy label.
 
 ## Run locally
 

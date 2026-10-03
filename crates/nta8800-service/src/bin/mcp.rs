@@ -689,7 +689,7 @@ impl EnergyMcp {
     }
 
     #[tool(
-        description = "Calculate unverified single-zone primary fossil and renewable energy and the BENG 2/3 indicators (BENG 1 only with confirmed C1 ventilation); no label, no attest"
+        description = "Calculate unverified building energy indicators, BENG and an indicative label class when the supplied input is complete; no registered label or attest"
     )]
     fn calculate_building_performance(
         &self,
@@ -716,7 +716,7 @@ impl EnergyMcp {
     }
 
     #[tool(
-        description = "Derive the unverified single-zone energy performance of a saved .oes project with its ntaCalculation block; returns input gaps when data is missing; no label, no attest"
+        description = "Derive unverified BENG and an indicative label class from a saved .oes project with its ntaCalculation block; returns input gaps when data is missing; no registered label or attest"
     )]
     fn calculate_project_performance(
         &self,
