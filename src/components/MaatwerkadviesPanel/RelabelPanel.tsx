@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n/i18n';
 import { assessRelabelWithRust, type NtaRelabelComparison } from '../../core/nta/KernelClient';
 import { deserializeProject } from '../../core/io/ProjectSerializer';
 import { sha256Hex } from '../../core/nta/Evidence';
-import { labelInputSha256 } from '../../core/nta/Registration';
+import { labelInputSha256, originalProjectTextForStorage } from '../../core/nta/Registration';
 import { relabelCluster, relabelElementName, relabelNote, relabelValue } from '../../core/nta/RelabelText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './MaatwerkadviesPanel.css';
@@ -48,11 +48,14 @@ export function RelabelPanel() {
     setError(null);
     setBusy(true);
     try {
-      const text = await file.text();
+      // A relabel comparison inside the original (with its own original
+      // file) is left out, so originals do not nest.
+      const text = originalProjectTextForStorage(await file.text());
       const original = deserializeProject(text);
       const assessment = await assessRelabelWithRust(original, state.project);
       const [originalSha256, currentSha256] = await Promise.all([
-        sha256Hex(new TextEncoder().encode(text)), labelInputSha256(state.project),
+        sha256Hex(new TextEncoder().encode(text)),
+        assessment.currentLabelInputHash ?? labelInputSha256(state.project),
       ]);
       if (requestId.current === current) {
         store({ originalFileName: file.name, originalSha256, currentSha256, comparedAt: new Date().toISOString(),

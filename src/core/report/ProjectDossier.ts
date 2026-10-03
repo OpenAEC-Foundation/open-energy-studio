@@ -45,10 +45,25 @@ function filled(value: string | undefined): boolean {
   return value != null && value.trim() !== '';
 }
 
+/** The relabel comparison the kernel ran again at registration, if any. */
+function kernelRelabel(assessment: ProjectPerformanceAssessment | null | undefined): RelabelAssessment | null {
+  return assessment?.registration?.relabelAssessment ?? null;
+}
+
+/** The project as written into the dossier: the stored original project lives in its own file. */
+function withoutStoredOriginal(project: IProject): IProject {
+  const comparison = project.registration?.relabelComparison;
+  if (!comparison?.originalProjectText) return project;
+  const { originalProjectText: _omitted, ...rest } = comparison;
+  return { ...project, registration: { ...project.registration, relabelComparison: rest } };
+}
+
 /** Completeness of the project dossier per BRL 9500 Bijlage 3. */
 export function checkDossierCompleteness({ project, assessment, opname, relabel: given, labelInputSha256: currentSha }: DossierContext): DossierItem[] {
   const registration: NtaRegistration = project.registration ?? {};
-  const relabel = given ?? registration.relabelComparison?.assessment ?? null;
+  // The verdict comes from the kernel's fresh comparison at registration,
+  // never from the stored one (BRL 9500-W Bijlage 3, p. 63).
+  const relabel = given ?? kernelRelabel(assessment);
   const evidence = registration.evidence ?? [];
   const bbl = registration.purpose === 'bbl_check';
   const delivery = registration.purpose === 'delivery';
@@ -178,13 +193,19 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel:
   // Herlabelen (BRL 9500-W §4.2.3 p. 23 en Bijlage 3 p. 63; 9500-U p. 18–19 en p. 54)
   if ((registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) === 'relabel') {
     const stored = registration.relabelComparison;
-    const outdated = Boolean(!given && stored?.currentSha256 && currentSha && stored.currentSha256 !== currentSha);
+    const kernelOutdated = (assessment?.registration?.issues ?? [])
+      .some((item) => item.code === 'relabel_comparison_outdated');
+    const outdated = !given && (kernelOutdated
+      || Boolean(stored?.currentSha256 && currentSha && stored.currentSha256 !== currentSha));
     if (!given && stored && !stored.originalProjectText) {
       attention('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
         'de vergelijking bevat het oorspronkelijke projectbestand niet; vergelijk opnieuw zodat de registratiecontrole het kan nagaan');
     } else if (outdated) {
       attention('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
         'het project is na de herlabelvergelijking gewijzigd; vergelijk opnieuw');
+    } else if (relabel == null && stored) {
+      attention('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
+        'de rekenkern heeft de bewaarde vergelijking niet opnieuw kunnen uitvoeren; controleer de vergelijking');
     } else {
       add('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
         relabel ? relabel.allowed : false,
@@ -210,13 +231,16 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel:
       !filled(improvement) ? undefined
         : deadline == null ? 'opnamedatum ontbreekt'
           : withinWindow ? undefined : `buiten de periode ${registration.surveyDate} t/m ${deadline}`);
-    const production = relabel?.changes.some((change) => isProductionPath(change.path)) ?? false;
+    // Which evidence is required follows the fresh comparison, else the
+    // stored one: a requirement is never dropped for lack of a re-run.
+    const scope = relabel ?? stored?.assessment ?? null;
+    const production = scope?.changes.some((change) => isProductionPath(change.path)) ?? false;
     add('relabel_production_photos', 'relabel', 'Foto\'s van PV of zonthermie, met beschaduwing',
       production ? evidence.some((item) => item.relabelProof === 'production_photo') : null);
     add('relabel_production_connection', 'relabel', 'PV of zonthermie exclusief en fysiek verbonden met de gebouwinstallatie',
       production ? registration.productionPhysicallyConnected === true : null);
     add('relabel_utility_confirmation', 'relabel', 'Vastgesteld dat er geen wijzigingen volgens Bijlage 6b zijn (utiliteit)',
-      relabel?.scheme === 'u' ? registration.noExcludedChangesConfirmed === true : null);
+      scope?.scheme === 'u' ? registration.noExcludedChangesConfirmed === true : null);
   }
   return items;
 }
@@ -247,25 +271,32 @@ export async function buildProjectDossier(
   context: DossierContext & { reportHtml?: string | null; generatedAt?: string },
 ): Promise<DossierBundle> {
   const { project, assessment } = context;
-  const relabel = context.relabel ?? project.registration?.relabelComparison?.assessment ?? null;
+  const stored = project.registration?.relabelComparison;
+  const rerun = kernelRelabel(assessment);
   const labelSha = context.labelInputSha256 ?? await labelInputSha256(project).catch(() => null);
   const kernel: KernelStamp | null = assessment
     ? { kernelVersion: assessment.kernelVersion, targetNormVersion: assessment.targetNormVersion, inputFingerprint: assessment.inputFingerprint }
     : null;
   const files: Record<string, Uint8Array> = {
-    'project.oes.json': strToU8(serializeProject(project, kernel)),
+    // The original project of a relabel comparison goes in once, as its
+    // own file, not again inside the project file.
+    'project.oes.json': strToU8(serializeProject(withoutStoredOriginal(project), kernel)),
   };
   if (assessment) files['kernel-output.json'] = strToU8(JSON.stringify(assessment, null, 2));
   if (context.reportHtml) files['rekenrapport.html'] = strToU8(context.reportHtml);
   if (context.opname) files['basisopname-output.json'] = strToU8(JSON.stringify(context.opname, null, 2));
-  if (relabel) {
-    const stored = project.registration?.relabelComparison;
+  if (context.relabel) {
+    files['herlabel-vergelijking.json'] = strToU8(JSON.stringify({ assessment: context.relabel }, null, 2));
+  } else if (stored) {
     // The original project goes in as its own file, so the manifest's
-    // SHA-256 of it equals the comparison's `originalSha256`.
-    const { originalProjectText, ...rest } = stored ?? { originalProjectText: undefined };
-    const record = context.relabel ? { assessment: context.relabel } : stored ? rest : undefined;
+    // SHA-256 of it equals the comparison's `originalSha256`. The verdict
+    // is the kernel's fresh comparison; without one the file says so.
+    const { originalProjectText, assessment: _storedVerdict, ...rest } = stored;
+    const record = rerun
+      ? { ...rest, assessment: rerun, kernelRecheck: true }
+      : { ...rest, kernelRecheck: false };
     files['herlabel-vergelijking.json'] = strToU8(JSON.stringify(record, null, 2));
-    if (!context.relabel && originalProjectText) files['herlabel-origineel.oes.json'] = strToU8(originalProjectText);
+    if (originalProjectText) files['herlabel-origineel.oes.json'] = strToU8(originalProjectText);
   }
   const missingEvidence: DossierManifest['missingEvidence'] = [];
   for (const item of project.registration?.evidence ?? []) {

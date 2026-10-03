@@ -10,9 +10,9 @@
 //! one-to-one replacements: geometric changes of insulation or
 //! installation and changes in distribution, emission or control are 6b.
 //! For dwellings 6a lists the subsystem changes per service (p. 67):
-//! ventilation and hot water only the emission system; heating and
-//! cooling distribution, emission and control. Other subsystem changes need
-//! review.
+//! ventilation the emission system and distribution; hot water only the
+//! emission system; heating and cooling distribution, emission and
+//! control. Other subsystem changes need review.
 //! Lighting is in neither appendix and always needs review. ISSO 82.1 and
 //! 75.1 explain the clusters. The scheme follows the project's
 //! `buildingFunction` (residential → W, otherwise U).
@@ -402,13 +402,15 @@ fn classify(
     if contains_any(path, SUBSYSTEM_MARKERS) {
         return match scheme {
             RelabelScheme::W => {
-                // Bijlage 6a (p. 67) per service: ventilation and hot water
-                // only the emission system; heating and cooling also
-                // distribution and control.
+                // Bijlage 6a (p. 67) per service: ventilation the emission
+                // system and distribution, hot water only the emission
+                // system, heating and cooling also distribution and control.
                 let lower = path.to_ascii_lowercase();
                 let emission = lower.contains("emission");
+                let distribution = lower.contains("distribution");
                 let listed = match service_of(path) {
-                    Some(Service::Ventilation | Service::HotWater) => emission,
+                    Some(Service::Ventilation) => emission || distribution,
+                    Some(Service::HotWater) => emission,
                     Some(Service::Heating | Service::Cooling) => true,
                     None => false,
                 };
@@ -422,7 +424,7 @@ fn classify(
                     change(
                         RelabelVerdict::Review,
                         "change in distribution, emission or control not listed for this service",
-                        Some("Bijlage 6a lists only the emission system for ventilation and hot water; the adviser decides"),
+                        Some("Bijlage 6a lists emission and distribution for ventilation and only the emission system for hot water; the adviser decides"),
                     )
                 }
             }
@@ -602,7 +604,10 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
 }
 
 /// Copy of `value` without null object members, at any depth; null array
-/// elements stay, as in the app's `withoutNulls`.
+/// elements stay, as in the app's `withoutNulls`. Numbers are normalised
+/// the way JavaScript reads them: a float with an integral value becomes an
+/// integer (`100.0` is `100`) and `-0` becomes `0`, so a file written by
+/// other tooling compares and hashes like the same file read by the app.
 fn without_null_members(value: &Value) -> Value {
     match value {
         Value::Object(map) => Value::Object(
@@ -612,7 +617,20 @@ fn without_null_members(value: &Value) -> Value {
                 .collect::<Map<String, Value>>(),
         ),
         Value::Array(items) => Value::Array(items.iter().map(without_null_members).collect()),
+        Value::Number(number) => Value::Number(normalised_number(number)),
         other => other.clone(),
+    }
+}
+
+/// Integral floats within the exactly representable range become integers;
+/// `-0` becomes `0`.
+fn normalised_number(number: &serde_json::Number) -> serde_json::Number {
+    const EXACT: f64 = 9_007_199_254_740_992.0; // 2^53
+    match number.as_f64() {
+        Some(value) if number.is_f64() && value.fract() == 0.0 && value.abs() <= EXACT => {
+            serde_json::Number::from(value as i64)
+        }
+        _ => number.clone(),
     }
 }
 
@@ -644,13 +662,45 @@ fn write_canonical(value: &Value, out: &mut String) {
             }
             out.push(']');
         }
+        Value::Number(number) => out.push_str(&canonical_number(&number.to_string())),
         other => out.push_str(&other.to_string()),
     }
 }
 
+/// A number as `<digits>e<exponent>` with integer digits and no leading or
+/// trailing zeros (`0` for zero), so Rust's and JavaScript's shortest
+/// round-trip forms (`1e-7`, `0.0000001`, `1e21`, `1000000000000000000000`)
+/// give the same text. The app's `labelInputSha256` writes the same form.
+fn canonical_number(text: &str) -> String {
+    let (negative, unsigned) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text),
+    };
+    let (mantissa, exponent) = match unsigned.find(['e', 'E']) {
+        Some(at) => (
+            &unsigned[..at],
+            unsigned[at + 1..].parse::<i64>().unwrap_or(0),
+        ),
+        None => (unsigned, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let mut exponent = exponent - fraction.len() as i64;
+    let digits = format!("{whole}{fraction}");
+    let digits = digits.trim_start_matches('0');
+    if digits.is_empty() {
+        return "0".into();
+    }
+    let trimmed = digits.trim_end_matches('0');
+    exponent += (digits.len() - trimmed.len()) as i64;
+    format!("{}{trimmed}e{exponent}", if negative { "-" } else { "" })
+}
+
 /// SHA-256 (lowercase hex) of a project's label input: the project without
 /// the registration, maatwerkadvies and basic survey, null members left
-/// out and object keys sorted, so key order and nulls do not change it.
+/// out, object keys sorted by their UTF-8 bytes and numbers in
+/// [`canonical_number`] form, so key order, nulls and number notation do
+/// not change it. The app's `labelInputSha256` computes the same hash;
+/// `training-data/nta8800-label-hash-cases.json` holds shared cases.
 pub fn label_input_hash(project: &Value) -> String {
     let mut input = without_null_members(project);
     if let Value::Object(map) = &mut input {
@@ -755,6 +805,67 @@ mod tests {
         assert_eq!(label_input_hash(&a), label_input_hash(&b));
         let c = json!({"a": {"x": [1, 2]}, "b": 1.5});
         assert_ne!(label_input_hash(&a), label_input_hash(&c));
+    }
+
+    #[test]
+    fn label_input_hash_matches_the_shared_cases() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../training-data/nta8800-label-hash-cases.json"
+        );
+        let mut fixture: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let write = std::env::var_os("LABEL_HASH_WRITE_FIXTURE").is_some();
+        for case in fixture["cases"].as_array_mut().unwrap() {
+            let hash = label_input_hash(&case["project"]);
+            if write {
+                case["sha256"] = json!(hash);
+            } else {
+                assert_eq!(case["sha256"], json!(hash), "{}", case["name"]);
+            }
+        }
+        if write {
+            std::fs::write(path, serde_json::to_string_pretty(&fixture).unwrap() + "\n").unwrap();
+        }
+    }
+
+    #[test]
+    fn canonical_numbers_ignore_notation() {
+        for (text, expected) in [
+            ("0", "0"),
+            ("-0.0", "0"),
+            ("100", "1e2"),
+            ("100.0", "1e2"),
+            ("1e-7", "1e-7"),
+            ("0.0000001", "1e-7"),
+            ("1e21", "1e21"),
+            ("1e+21", "1e21"),
+            ("1000000000000000000000", "1e21"),
+            ("-12.50", "-125e-1"),
+        ] {
+            assert_eq!(canonical_number(text), expected, "{text}");
+        }
+    }
+
+    #[test]
+    fn integral_floats_and_negative_zero_are_not_changes() {
+        // Files written by other tooling keep `100.0` and `-0.0`; the app
+        // reads them as 100 and 0.
+        let original: Value =
+            serde_json::from_str(r#"{"zones":[{"floorArea":100.0,"offset":-0.0,"u":0.25}]}"#)
+                .unwrap();
+        let current: Value =
+            serde_json::from_str(r#"{"zones":[{"floorArea":100,"offset":0,"u":0.25}]}"#).unwrap();
+        let result = assess_relabel(&original, &current);
+        assert!(result.changes.is_empty(), "{:?}", result.changes);
+        assert_eq!(label_input_hash(&original), label_input_hash(&current));
+        assert_eq!(
+            result.original_label_input_hash,
+            result.current_label_input_hash
+        );
+        let changed: Value =
+            serde_json::from_str(r#"{"zones":[{"floorArea":100.5,"offset":0,"u":0.25}]}"#).unwrap();
+        assert_ne!(label_input_hash(&original), label_input_hash(&changed));
     }
 
     fn project() -> Value {
@@ -944,7 +1055,8 @@ mod tests {
 
     #[test]
     fn dwelling_subsystem_changes_follow_the_service() {
-        // W 6a p. 67: ventilation and hot water only the emission system.
+        // W 6a p. 67: ventilation emission and distribution, hot water
+        // only the emission system.
         let mut original = project();
         original["ventilationSystems"] =
             json!([{"distribution": {"ducts": "a"}, "emission": {"grilles": "a"}}]);
@@ -960,7 +1072,7 @@ mod tests {
         let result = assess_relabel(&original, &current);
         assert_eq!(
             verdict(&result, "/ventilationSystems/0/distribution/ducts"),
-            RelabelVerdict::Review
+            RelabelVerdict::Allowed
         );
         assert_eq!(
             verdict(&result, "/ventilationSystems/0/emission/grilles"),

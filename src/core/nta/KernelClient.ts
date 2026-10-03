@@ -4431,8 +4431,12 @@ export interface NtaRelabelComparison {
   assessment: RelabelAssessment;
 }
 
-/** Role of an evidence file in a relabel (BRL 9500-W §4.2.3, p. 23). */
-export type NtaRelabelProof = 'quote_with_order' | 'specified_invoice' | 'production_photo';
+/**
+ * Role of an evidence file in a relabel (BRL 9500-W §4.2.3, p. 23); `review`
+ * marks an invoice of a relabel saved before the roles existed, which does
+ * not count as proof until the adviser picks its role.
+ */
+export type NtaRelabelProof = 'quote_with_order' | 'specified_invoice' | 'production_photo' | 'review';
 
 export interface NtaSoftwareIdentity {
   name: string;
@@ -4840,6 +4844,12 @@ export interface RegistrationAssessment {
   issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
   /** BRL 9500 §7.2.2-style plausibility warnings; never block registration. */
   plausibility?: Array<{ code: string; path: string; severity: 'warning' }>;
+  /**
+   * The relabel comparison as the kernel ran it again against the stored
+   * original and the current project; the dossier uses this, never the
+   * stored verdict. Null without a relabel or a readable original.
+   */
+  relabelAssessment?: RelabelAssessment | null;
 }
 
 export interface NtaBacsEvidence {

@@ -3,7 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import type { NtaEvidenceItem, NtaEvidenceKind, NtaRelabelProof } from '../../../core/nta/KernelClient';
 
 /** Roles of a file in a relabel (BRL 9500-W §4.2.3, p. 23). */
-const RELABEL_PROOFS: NtaRelabelProof[] = ['quote_with_order', 'specified_invoice', 'production_photo'];
+const RELABEL_PROOFS: NtaRelabelProof[] = ['quote_with_order', 'specified_invoice', 'production_photo', 'review'];
 import { createEvidenceItem, EVIDENCE_KINDS, EVIDENCE_REFERENCE_PREFIX } from '../../../core/nta/Evidence';
 
 interface EvidenceRegisterProps {

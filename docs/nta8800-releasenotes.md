@@ -2,6 +2,23 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — herlabelvergelijking: getallen, anker van het origineel en dossieroordeel
+
+### Registraties die nu een fout of ontbrekend gegeven melden
+
+- **Oorspronkelijk project gekoppeld aan het oorspronkelijke label (BRL 9500-W §4.2.3–4.2.4, p. 23–24; U p. 18–20).** De SHA-256 van het bewaarde origineel is nu verplicht (`relabel_original_project_hash_required`). Het registratieblok in het origineel moet het opgegeven EP-Online-nummer, de certificaathouder en de opnamedatum bevatten; anders volgt `relabel_original_project_anchor_missing` of `relabel_original_project_anchor_mismatch`. Bewaar het oorspronkelijke project dus na registratie, met het EP-Online-nummer.
+- **Kernelhash van de labelinvoer.** Getallen tellen nu in één notatie (`100.0` = `100`, `-0` = `0`, `1e-7` = `0.0000001`), zowel in de vergelijking als in de hash. Een vergelijking die vóór deze wijziging is bewaard, meldt daardoor `relabel_comparison_outdated`: vergelijk opnieuw. De app gebruikt nu dezelfde hash als de kern.
+- **Oudere herlabelprojecten.** Alleen bestanden zonder een van de nieuwe herlabelvelden worden bij openen bijgewerkt. Een factuur zonder rol krijgt nu de rol ‘te beoordelen’ (`review`), die niet als bewijs telt; de melding verschijnt altijd als er facturen zijn gemarkeerd. Eerder bijgewerkte bestanden met de rol gespecificeerde factuur blijven ongewijzigd.
+
+### Indeling van wijzigingen die verandert
+
+- **Ventilatie bij woningen (W bijlage 6a, p. 67).** Een wijziging in de distributie van ventilatie is nu toegestaan (6a), naast het afgiftesysteem. Bij utiliteit blijft dit 6b (U p. 60).
+
+### Dossier
+
+- Het herlabeloordeel in de checklist en in `herlabel-vergelijking.json` komt uit de nieuwe kernvergelijking bij registratie (`relabelAssessment` in de registratiebeoordeling), niet uit het bewaarde oordeel. Zonder kernuitvoer toont de checklist ‘controleren’.
+- `project.oes.json` in het dossier bevat het bewaarde origineel niet meer; dat staat alleen in `herlabel-origineel.oes.json`.
+
 ## 3 oktober 2026 — herlabelvergelijking opnieuw gecontroleerd bij registratie
 
 ### Registraties die nu een fout of ontbrekend gegeven melden
