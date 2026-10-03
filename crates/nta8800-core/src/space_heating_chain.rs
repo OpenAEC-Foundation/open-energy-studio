@@ -1115,6 +1115,10 @@ pub struct SpaceHeatingChainAssessment {
     pub demand: MonthlyDemandAssessment,
     pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
+    /// Points the calculation accepted but the input should know about,
+    /// e.g. an annex R declaration on a biomass installation above 500 kW.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<ChainIssue>,
 }
 
 impl ChainMonth {
@@ -1311,6 +1315,7 @@ pub fn combine_heating_systems(
         if main.annex_q.is_none() {
             main.annex_q = other.annex_q;
         }
+        main.warnings.extend(other.warnings);
         main.beng_calculation_available &= other.beng_calculation_available;
     }
     if hp_in > 0.0 {
@@ -2666,6 +2671,7 @@ fn assess_chain_pass(
         demand,
         additional_zone_demands,
         issues,
+        warnings: biomass_class_warnings(input),
     }
 }
 
@@ -2907,7 +2913,9 @@ enum BiomassClass {
 /// Biomass class of annex M boilers and annex N stoves (method 1, so all
 /// three classes of table 5.2 occur); the annex R evidence is needed for
 /// bmB.
-/// Tables 5.2/5.4: the bmB row covers appliances of at most 500 kW.
+/// Tables 5.2/5.4 (p. 94–95): bmA is biomass above 500 kW thermal power per
+/// installation, so the powers of all solid-biomass generators of one
+/// heating system (a multiple set, identical appliances) are added.
 const BIOMASS_CLASS_LIMIT_KW: f64 = 500.0;
 
 fn validate_biomass_evidence(
@@ -2917,13 +2925,9 @@ fn validate_biomass_evidence(
     issues: &mut Vec<ChainIssue>,
 ) -> BiomassClass {
     if above_500_kw {
-        if compliant == Some(true) {
-            // Annex R covers appliances of at most 500 kW.
-            issues.push(issue(
-                "biomass_class_conflict",
-                "generator.annexRCompliantAtMost500Kw",
-            ));
-        }
+        // Above 500 kW the installation is bmA whatever the annex R
+        // declaration says; a ticked declaration is only a warning
+        // (`biomass_class_conflict`, see `biomass_class_warnings`).
         return BiomassClass::A;
     }
     if compliant != Some(true) {
@@ -2936,6 +2940,109 @@ fn validate_biomass_evidence(
         ));
     }
     BiomassClass::B
+}
+
+/// Thermal power of a solid-biomass generator, kW (0 for other generators):
+/// the annex M type plate, the annex N full-load output, else the power
+/// declared for it in a multiple set.
+fn biomass_power_kw(generator: &Generator, declared_kw: f64) -> f64 {
+    match generator {
+        Generator::ProductBoiler(generator) if generator.boiler.fuel == BoilerFuel::Wood => {
+            generator.boiler.product.nominal_power_kw
+        }
+        Generator::LocalHeater(generator) if generator.fuel == LocalHeaterFuel::Biomass => {
+            generator
+                .heater
+                .product
+                .output_full_kw
+                .filter(|power| power.is_finite() && *power > 0.0)
+                .unwrap_or(declared_kw)
+        }
+        _ => 0.0,
+    }
+}
+
+/// Whether a generator burns solid biomass.
+fn is_biomass(generator: &Generator) -> bool {
+    matches!(generator, Generator::ProductBoiler(generator) if generator.boiler.fuel == BoilerFuel::Wood)
+        || matches!(generator, Generator::LocalHeater(generator) if generator.fuel == LocalHeaterFuel::Biomass)
+}
+
+/// Thermal biomass power of the installation the input describes (tables
+/// 5.2/5.4: "per installatie"), kW.
+fn biomass_installation_kw(input: &SpaceHeatingChainInput) -> f64 {
+    let single = match &input.generator {
+        Generator::Multiple(set) => set
+            .generators
+            .iter()
+            .map(|part| biomass_power_kw(&part.generator, part.nominal_power_kw))
+            .sum(),
+        generator => biomass_power_kw(generator, 0.0),
+    };
+    single * f64::from(input.identical_systems.unwrap_or(1).max(1))
+}
+
+/// Marks a biomass generator as part of an installation above 500 kW.
+fn mark_biomass_installation(generator: &mut Generator) {
+    match generator {
+        Generator::ProductBoiler(generator) if generator.boiler.fuel == BoilerFuel::Wood => {
+            generator.biomass_above_500_kw = true;
+        }
+        Generator::LocalHeater(generator) if generator.fuel == LocalHeaterFuel::Biomass => {
+            generator.biomass_above_500_kw = true;
+        }
+        _ => {}
+    }
+}
+
+/// An annex R declaration (bmB) on a biomass generator whose installation is
+/// above 500 kW: the generator is calculated as bmA (tables 5.2/5.4) and the
+/// declaration is reported, not refused.
+fn biomass_class_warnings(input: &SpaceHeatingChainInput) -> Vec<ChainIssue> {
+    let installation_kw = biomass_installation_kw(input);
+    let above = |flagged: bool| flagged || installation_kw > BIOMASS_CLASS_LIMIT_KW;
+    let declared = |generator: &Generator| -> Option<(bool, bool)> {
+        match generator {
+            Generator::ProductBoiler(item) if item.boiler.fuel == BoilerFuel::Wood => Some((
+                item.annex_r_compliant_at_most_500_kw == Some(true),
+                item.biomass_above_500_kw
+                    || item.boiler.product.nominal_power_kw > BIOMASS_CLASS_LIMIT_KW,
+            )),
+            Generator::LocalHeater(item) if item.fuel == LocalHeaterFuel::Biomass => Some((
+                item.annex_r_compliant_at_most_500_kw == Some(true),
+                item.biomass_above_500_kw,
+            )),
+            _ => None,
+        }
+    };
+    let mut warnings = Vec::new();
+    match &input.generator {
+        Generator::Multiple(set) => {
+            for (index, part) in set.generators.iter().enumerate() {
+                if let Some((ticked, flagged)) = declared(&part.generator) {
+                    if ticked && above(flagged) {
+                        warnings.push(issue(
+                            "biomass_class_conflict",
+                            format!(
+                                "generator.generators[{index}].generator.annexRCompliantAtMost500Kw"
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+        generator => {
+            if let Some((ticked, flagged)) = declared(generator) {
+                if ticked && above(flagged) {
+                    warnings.push(issue(
+                        "biomass_class_conflict",
+                        "generator.annexRCompliantAtMost500Kw",
+                    ));
+                }
+            }
+        }
+    }
+    warnings
 }
 
 /// Moves the biomass of a generator to its table 5.2 class.
@@ -3437,9 +3544,13 @@ fn generate_multiple_with_annex_q(
     let mut rest_rows = rows_for(&rest_outputs);
     let mut rest_issues = Vec::new();
     let mut annex_q_unused = None;
+    let installation_above_500 = biomass_installation_kw(input) > BIOMASS_CLASS_LIMIT_KW;
     if let [only] = rest_indices.as_slice() {
         let mut sub_input = input.clone();
         sub_input.generator = set.generators[*only].generator.clone();
+        if installation_above_500 {
+            mark_biomass_installation(&mut sub_input.generator);
+        }
         generate(
             &sub_input,
             &rest_outputs,
@@ -3457,7 +3568,12 @@ fn generate_multiple_with_annex_q(
     } else {
         // β of the remaining preferences: estimated values rebased on the
         // share left by preference 1 (interpretation), else nominal powers.
+        // When preference 1 was estimated to cover everything (β ≥ 1) there
+        // is nothing to rebase on: every remaining generator then counts with
+        // the same power (an equal share by 9.56–9.60), so the nominal powers
+        // the estimate stood in for are not demanded after all.
         let first = set.estimated_beta.first().copied().unwrap_or(0.0);
+        let equal_shares = !set.estimated_beta.is_empty() && first >= 1.0;
         let estimated_beta = if set.estimated_beta.len() > 1 && first < 1.0 {
             set.estimated_beta[1..]
                 .iter()
@@ -3472,6 +3588,12 @@ fn generate_multiple_with_annex_q(
                 .map(|other| {
                     let mut item = set.generators[*other].clone();
                     item.preference -= 1;
+                    if equal_shares {
+                        item.nominal_power_kw = 1.0;
+                    }
+                    if installation_above_500 {
+                        mark_biomass_installation(&mut item.generator);
+                    }
                     item
                 })
                 .collect(),
@@ -3707,6 +3829,8 @@ fn generate_multiple(
     let mut hp_efficiency = None;
     let mut total_input = 0.0;
     let mut auxiliary_known = true;
+    // Tables 5.2/5.4: the biomass class follows the whole installation.
+    let installation_above_500 = biomass_installation_kw(input) > BIOMASS_CLASS_LIMIT_KW;
     for row in monthly.iter_mut() {
         row.auxiliary_electricity_kwh = Some(0.0);
     }
@@ -3746,6 +3870,9 @@ fn generate_multiple(
             .collect();
         let mut sub_input = input.clone();
         sub_input.generator = part.generator.clone();
+        if installation_above_500 {
+            mark_biomass_installation(&mut sub_input.generator);
+        }
         let mut sub_issues = Vec::new();
         let efficiency = generate(
             &sub_input,
@@ -3819,6 +3946,18 @@ fn generate_identical(
         );
     }
     let n = f64::from(count);
+    // §9.1 identical appliances form one installation (tables 5.2/5.4).
+    let marked;
+    let input = if is_biomass(&input.generator)
+        && biomass_installation_kw(input) > BIOMASS_CLASS_LIMIT_KW
+    {
+        let mut copy = input.clone();
+        mark_biomass_installation(&mut copy.generator);
+        marked = copy;
+        &marked
+    } else {
+        input
+    };
     let per_outputs: Vec<MonthlyEnergy> = outputs
         .iter()
         .map(|item| MonthlyEnergy {
@@ -5172,10 +5311,13 @@ mod tests {
             BiomassClass::A
         );
         assert!(issues.is_empty());
-        validate_biomass_evidence(Some(true), true, None, &mut issues);
-        assert!(issues
-            .iter()
-            .any(|item| item.code == "biomass_class_conflict"));
+        // Above 500 kW an annex R declaration does not block: the class is
+        // bmA and the declaration is reported as a warning of the chain.
+        assert_eq!(
+            validate_biomass_evidence(Some(true), true, None, &mut issues),
+            BiomassClass::A
+        );
+        assert!(issues.is_empty());
         let mut rows = vec![ChainMonth {
             biomass_kwh: 100.0,
             ..ChainMonth::default()
@@ -5628,6 +5770,30 @@ mod tests {
                 assert!(row.natural_gas_kwh > 0.0);
             }
         }
+
+        // Preference 1 estimated to cover everything (β = 1) with two more
+        // preferences of unknown power: the rest shares equally instead of
+        // demanding nominal powers.
+        let mut estimated = partial.clone();
+        if let Generator::Multiple(set) = &mut estimated.generator {
+            let boiler = set.generators[1].generator.clone();
+            set.generators.push(PreferredGenerator {
+                preference: 3,
+                nominal_power_kw: 0.0,
+                generator: boiler,
+            });
+            for part in &mut set.generators {
+                part.nominal_power_kw = 0.0;
+            }
+            set.estimated_beta = vec![1.0, 1.0];
+        }
+        let result = assess_space_heating_chain(&estimated);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(!codes(&estimated).contains(&"generator_nominal_power_invalid"));
     }
 
     #[test]
@@ -6059,7 +6225,104 @@ mod tests {
             generator.annex_r_compliant_at_most_500_kw = Some(true);
             generator.annex_r_reference = Some("annex R test".into());
         }
-        assert!(codes(&wood).contains(&"biomass_class_conflict"));
+        let result = assess_space_heating_chain(&wood);
+        assert!(!result
+            .issues
+            .iter()
+            .any(|item| item.code == "biomass_class_conflict"));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|item| item.code == "biomass_class_conflict"));
+        if result.status == "calculated_unverified" {
+            assert!(result.monthly.iter().all(|row| row.biomass_kwh == 0.0));
+            assert!(result
+                .monthly
+                .iter()
+                .any(|row| row.biomass_class_a_kwh > 0.0));
+        }
+    }
+
+    #[test]
+    fn biomass_class_follows_the_whole_installation() {
+        // Tables 5.2/5.4 (p. 94–95): "meer dan 500 kW per installatie". Two
+        // 300 kW wood boilers in one set form a 600 kW installation: bmA,
+        // even with each appliance declared under annex R.
+        let wood = |power: f64| {
+            let mut generator = product_boiler();
+            generator.boiler.fuel = BoilerFuel::Wood;
+            generator.boiler.technology = crate::annex_m::BoilerTechnology::SolidFuelStandard;
+            generator.boiler.product.full_load = crate::annex_m::FullLoadEfficiency::Single {
+                efficiency: 0.85,
+                test_temperature_c: None,
+                additional_test: None,
+            };
+            generator.boiler.product.part_load_efficiency = 0.85;
+            generator.boiler.product.nominal_power_kw = power;
+            generator.annex_r_compliant_at_most_500_kw = Some(true);
+            generator.annex_r_reference = Some("annex R test".into());
+            Generator::ProductBoiler(Box::new(generator))
+        };
+        let cascade = |power: f64| {
+            let mut input = boiler_chain();
+            let mut distribution = system(calculated_pump());
+            distribution.installation = Installation::Individual;
+            distribution.design_temperature_class = Some(DesignTemperatureClass::C45);
+            input.distribution_system = Some(distribution);
+            input.generator = Generator::Multiple(Box::new(MultipleGenerators {
+                generators: vec![
+                    PreferredGenerator {
+                        preference: 1,
+                        nominal_power_kw: power,
+                        generator: wood(power),
+                    },
+                    PreferredGenerator {
+                        preference: 2,
+                        nominal_power_kw: power,
+                        generator: wood(power),
+                    },
+                ],
+                added_preferred_generator: false,
+                estimated_beta: Vec::new(),
+                source_reference: "design".into(),
+            }));
+            input
+        };
+        assert_eq!(biomass_installation_kw(&cascade(300.0)), 600.0);
+        let large = assess_space_heating_chain(&cascade(300.0));
+        assert_eq!(large.status, "calculated_unverified", "{:?}", large.issues);
+        assert!(large.monthly.iter().all(|row| row.biomass_kwh == 0.0));
+        assert!(large
+            .monthly
+            .iter()
+            .any(|row| row.biomass_class_a_kwh > 0.0));
+        assert_eq!(large.warnings.len(), 2, "{:?}", large.warnings);
+        // 2 × 200 kW stays within 500 kW: bmB with the annex R evidence.
+        let small = assess_space_heating_chain(&cascade(200.0));
+        assert_eq!(small.status, "calculated_unverified", "{:?}", small.issues);
+        assert!(small.monthly.iter().any(|row| row.biomass_kwh > 0.0));
+        assert!(small
+            .monthly
+            .iter()
+            .all(|row| row.biomass_class_a_kwh == 0.0));
+        assert!(small.warnings.is_empty());
+        // Identical appliances (§9.1) are one installation too.
+        let mut identical = boiler_chain();
+        identical.distribution_system = cascade(200.0).distribution_system;
+        identical.generator = wood(300.0);
+        identical.identical_systems = Some(2);
+        assert_eq!(biomass_installation_kw(&identical), 600.0);
+        let result = assess_space_heating_chain(&identical);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(result.monthly.iter().all(|row| row.biomass_kwh == 0.0));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|item| item.code == "biomass_class_conflict"));
     }
 
     #[test]

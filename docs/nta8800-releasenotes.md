@@ -26,6 +26,17 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
 ### Overig
 
 - Het maatwerkadviespaneel sorteert maatregelen en pakketten desgewenst op terugverdientijd of netto contante waarde; ISSO 82.2 §6.2.4 schrijft geen rangorde voor.
+## 3 oktober 2026 — lege velden getoetst met willekeurige proeven, biomassa per installatie
+
+### Status die verandert
+
+- **Lege velden.** De zoektocht naar lege waarden werkt nu in twee stappen. Eerst wordt een kopie gerepareerd tot die inleest: elke fout krijgt op zijn plek een waarde die de kern accepteert, bij een keuzeveld de variant die alle naastgelegen velden van de invoer kent. Daarna wordt elke lege waarde afzonderlijk teruggezet. Een veld dat leeg mag zijn (ook een `null` dat via `deserialize_with` "onbepaald" betekent, zoals `nominalThermalCapacityKw` in het BACS-blok) wordt niet meer als ontbrekend gemeld. Een leeg keuzeveld (`method`, `kind`) verbergt de lege velden daarachter niet meer en geeft geen extra `nta_calculation_block_invalid`. Een vaste test zet in beide voorbeeldprojecten 300 keer 1 of 2 willekeurige waarden leeg en daarna alle waarden tegelijk: geen onterechte en geen gemiste meldingen.
+- **Biomassa boven 500 kW met bijlage R-vinkje.** Dat blokkeert niet meer. De installatie rekent als bmA (tabel 5.2, p. 94; p. 95) en `biomass_class_conflict` is nu een waarschuwing.
+
+### Uitkomsten die veranderen
+
+- **Biomassaklasse per installatie** (tabel 5.2 en 5.4, "per installatie", p. 94–95). Het vermogen van alle vaste-biomassatoestellen in één verwarmingssysteem wordt opgeteld: de toestellen van een meervoudige opwekking, en N gelijke toestellen (§9.1) als N × het vermogen. Twee houtketels van 300 kW zijn samen bmA, ook als elke ketel onder bijlage R valt.
+- **Geschatte β bij een warmtepomp met bijlage Q.** Als voorkeur 1 met β = 1 geschat is, krijgen de overige toestellen elk een gelijk aandeel. Eerder vroeg de kern dan alsnog om nominale vermogens (`generator_nominal_power_invalid`).
 
 ## 3 oktober 2026 — reviewcorrecties lege velden, herlabeling en WLC-GWP
 

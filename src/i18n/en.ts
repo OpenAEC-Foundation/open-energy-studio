@@ -1210,6 +1210,7 @@ export const en: Record<string, string> = {
   'nta.gap.cold_network_gain_outside_cooling_months': "Cold network pipes gain heat in months without cold delivery (P.13–P.18); leave those months without a water temperature",
   'nta.gap.humidifier_zone_duplicate': "Second humidifier on the same calculation zone; §12.1 assumes one system per zone",
   'nta.gap.micro_chp_capacity_exceeded': 'Micro-CHP heat above P_th;chp_100+sup_100 (9.66): the excess earns no electricity and is booked as supplementary heat',
+  'nta.gap.biomass_class_conflict': 'Annex R declared for a biomass installation above 500 kW: calculated as bmA (tables 5.2/5.4, per installation)',
   'nta.gap.micro_chp_total_efficiency_invalid': 'Micro-CHP total efficiency η_th + η_el above 1.2 (table 9.33)',
   'nta.gap.micro_chp_electric_values_inconsistent': 'Micro-CHP electric power and electric efficiency of a test point do not agree (P_el ≠ P_th·η_el/η_th)',
   'nta.gap.solar_tested_backup_distribution_below_one': 'Tested solar water heater with integrated backup and Σ f_dis below 1: 13.134 then raises the solar yield (norm defect)',

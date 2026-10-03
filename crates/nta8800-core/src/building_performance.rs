@@ -1054,6 +1054,14 @@ fn result_warnings(
                 .collect()
         })
         .unwrap_or_default();
+    // Chain warnings, e.g. an annex R declaration on a biomass installation
+    // above 500 kW (tables 5.2/5.4: calculated as bmA).
+    warnings.extend(
+        heating
+            .warnings
+            .iter()
+            .map(|item| issue(item.code, format!("spaceHeating.{}", item.path))),
+    );
     // 9.66: micro-CHP heat above P_th;chp_100+sup_100·t earns no electricity
     // (16.15) and is booked as supplementary heat (interpretation).
     if heating
