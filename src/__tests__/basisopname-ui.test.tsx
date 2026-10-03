@@ -162,6 +162,50 @@ describe('basisopname panel', () => {
     expect(survey.ventilation.ahu.heatingConnected).toBe(true);
   });
 
+  it('edits the ISSO 75.1 general, ventilation and cooling answers of a utility survey', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
+
+    // §7.1.7, p. 65 and afb. 6.6.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Fossil-fuel installations on the plot (§7.1.7)' }), 'true');
+    await user.type(screen.getByRole('spinbutton', { name: 'Sport and swimming halls, A_g m² (p. 65)' }), '450');
+    await user.click(screen.getByRole('checkbox', { name: 'Residence areas openly connected (afb. 6.6)' }));
+    // Tables 11.9–11.13 and §11.4.1.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat recovery (table 11.9)' }), 'cold_storage_with_ahu');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Duct airtightness (table 11.13; unknown: 1,1)' }), 'luka_d');
+    await user.type(screen.getByRole('spinbutton', { name: 'Installed ventilation capacity, dm³/s (§11.4.1; unknown: regulatory)' }), '1500');
+    await user.selectOptions(screen.getByRole('combobox', {
+      name: 'Outside connection of the heat recovery (table 11.10; unknown: not insulated)',
+    }), 'specified');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Constant-volume control at all flows (table 11.11)' }), 'false');
+    await user.type(screen.getByRole('spinbutton', { name: "Partial bypass, % (table 11.12; unknown: 'unknown')" }), '40');
+    let survey = stored()!.survey;
+    expect(survey.fossilFuelOnPlot).toBe(true);
+    expect(survey.sportHallAreaM2).toBe(450);
+    expect(survey.openlyConnectedResidenceAreas).toBe(true);
+    expect(survey.ventilation).toMatchObject({
+      heatRecovery: 'cold_storage_with_ahu', ductAirtightness: 'luka_d', installedCapacityDm3PerS: 1500,
+      supplyDuctInsulation: { kind: 'specified', thicknessM: 0.02, conductivityWPerMK: 0.04 },
+      constantVolumeControl: false, bypassPercent: 40,
+    });
+    expect(survey.ventilation.controls).toBeUndefined();
+
+    // Table 10.2, §10.4.1 and §10.3.2.
+    await user.click(screen.getByRole('checkbox', { name: 'Building-bound cooling system present' }));
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Cooling generator' })[0], 'gas_engine_compression');
+    await user.type(screen.getByRole('spinbutton', { name: 'Electric power of the gas engine, kW' }), '50');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Direct expansion (§10.4.1)' }), 'air_handling_unit');
+    const addButtons = screen.getAllByRole('button', { name: 'Add generator' });
+    await user.click(addButtons[addButtons.length - 1]);
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Cooling generator' })[1], 'aquifer_from2013');
+    survey = stored()!.survey;
+    expect(survey.cooling).toMatchObject({
+      generator: 'gas_engine_compression', gasEngine: { electricPowerKw: 50 }, directExpansion: 'air_handling_unit',
+      additionalGenerators: [{ generator: 'aquifer_from2013', capacityKw: null }],
+    });
+  }, 60000);
+
   it('adds a dwelling cooling system in the ISSO 82.1 chapter 10 shape', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);

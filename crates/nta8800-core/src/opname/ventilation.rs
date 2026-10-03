@@ -63,6 +63,9 @@ pub enum ExchangerAnswer {
     Enthalpy,
     HeatPipe,
     TwoElement,
+    /// Cold loading with an air handling unit (ISSO 75.1 table 11.9; NTA
+    /// table 11.18, η 0,40).
+    ColdStorageWithAhu,
     /// Type not determinable: no heat recovery (table 11.9).
     Unknown,
 }
@@ -287,6 +290,7 @@ fn exchanger_kind(
         Some(ExchangerAnswer::Enthalpy) => Some("enthalpy"),
         Some(ExchangerAnswer::HeatPipe) => Some("heat_pipe"),
         Some(ExchangerAnswer::TwoElement) => Some("two_element"),
+        Some(ExchangerAnswer::ColdStorageWithAhu) => Some("run_around_coil_ahu"),
     }
 }
 
