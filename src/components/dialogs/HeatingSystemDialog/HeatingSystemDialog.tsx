@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IHeatingSystem, HeatingSystemType } from '../../../core/energy/types';
@@ -36,6 +36,7 @@ const defaultCop: Record<HeatingSystemType, number> = {
 const isHeatPumpType = (value: HeatingSystemType) => value === 'heat_pump_air' || value === 'heat_pump_ground';
 
 export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -118,8 +119,8 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.heating.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.heating.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -127,8 +128,8 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.heating.type')}</label>
-          <select value={type} onChange={(e) => handleTypeChange(e.target.value as HeatingSystemType)}>
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.heating.type')}</label>
+          <select id={`${fieldId}-2`} value={type} onChange={(e) => handleTypeChange(e.target.value as HeatingSystemType)}>
             {heatingTypes.map((ht) => (
               <option key={ht} value={ht}>
                 {t(heatingTypeLabels[ht])}
@@ -138,8 +139,8 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.heating.cop')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.heating.cop')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             step={0.01}
@@ -149,8 +150,8 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.heating.coverage')}</label>
-          <input
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.heating.coverage')}</label>
+          <input id={`${fieldId}-4`}
             type="number"
             min={0}
             max={100}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ICoolingSystem, CoolingSystemType } from '../../../core/energy/types';
@@ -19,6 +19,7 @@ const coolingTypeLabels: Record<CoolingSystemType, string> = {
 };
 
 export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -58,8 +59,8 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.cooling.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.cooling.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -67,8 +68,8 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.cooling.type')}</label>
-          <select value={type} onChange={(e) => setType(e.target.value as CoolingSystemType)}>
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.cooling.type')}</label>
+          <select id={`${fieldId}-2`} value={type} onChange={(e) => setType(e.target.value as CoolingSystemType)}>
             {coolingTypes.map((ct) => (
               <option key={ct} value={ct}>
                 {t(coolingTypeLabels[ct])}
@@ -78,8 +79,8 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.cooling.eer')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.cooling.eer')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             step={0.1}

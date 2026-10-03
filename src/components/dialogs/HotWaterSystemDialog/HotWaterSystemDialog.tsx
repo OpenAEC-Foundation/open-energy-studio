@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IHotWaterSystem, HotWaterSystemType } from '../../../core/energy/types';
@@ -23,6 +23,7 @@ const hotWaterTypeLabels: Record<HotWaterSystemType, string> = {
 };
 
 export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -109,8 +110,8 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.hotWater.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.hotWater.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -118,8 +119,8 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.hotWater.type')}</label>
-          <select value={type} onChange={(e) => setType(e.target.value as HotWaterSystemType)}>
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.hotWater.type')}</label>
+          <select id={`${fieldId}-2`} value={type} onChange={(e) => setType(e.target.value as HotWaterSystemType)}>
             {hotWaterTypes.map((ht) => (
               <option key={ht} value={ht}>
                 {t(hotWaterTypeLabels[ht])}
@@ -129,8 +130,8 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.hotWater.efficiency')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.hotWater.efficiency')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             max={5}
@@ -154,8 +155,8 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
 
         {hasSolarBoiler && (
           <div className="dialog-field">
-            <label>{t('dialog.hotWater.solarFraction')}</label>
-            <input
+            <label htmlFor={`${fieldId}-4`}>{t('dialog.hotWater.solarFraction')}</label>
+            <input id={`${fieldId}-4`}
               type="number"
               min={0}
               max={100}

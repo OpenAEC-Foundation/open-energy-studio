@@ -7,6 +7,7 @@ import {
   Wind, Snowflake, Droplets, Zap, SunMedium,
   Building2, Grid3X3, PanelLeftClose,
 } from 'lucide-react';
+import { editAction } from '../../core/energy/projectItems';
 import './ProjectBrowser.css';
 
 interface TreeNodeProps {
@@ -15,10 +16,11 @@ interface TreeNodeProps {
   children?: React.ReactNode;
   selected?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   defaultOpen?: boolean;
 }
 
-function TreeNode({ label, icon, children, selected, onClick, defaultOpen = false }: TreeNodeProps) {
+function TreeNode({ label, icon, children, selected, onClick, onDoubleClick, defaultOpen = false }: TreeNodeProps) {
   const [open, setOpen] = useState(defaultOpen);
   const hasChildren = !!children;
 
@@ -30,6 +32,7 @@ function TreeNode({ label, icon, children, selected, onClick, defaultOpen = fals
           if (hasChildren) setOpen(!open);
           onClick?.();
         }}
+        onDoubleClick={onDoubleClick ? (event) => { event.stopPropagation(); onDoubleClick(); } : undefined}
       >
         {hasChildren ? (
           open ? <ChevronDown size={14} /> : <ChevronRight size={14} />
@@ -81,6 +84,11 @@ export function ProjectBrowser() {
   const select = (id: string, type: string) => {
     dispatch({ type: 'SELECT_ITEM', payload: { id, itemType: type } });
   };
+  // Double-click opens the item's editor; the dialog updates it in place, so ids stay stable.
+  const edit = (id: string, type: string) => () => {
+    const action = editAction(type, id);
+    if (action) dispatch(action);
+  };
 
   if (collapsed) {
     return (
@@ -114,6 +122,7 @@ export function ProjectBrowser() {
               icon={<Layers size={14} />}
               selected={selectedItemId === zone.id}
               onClick={() => select(zone.id, 'zone')}
+                    onDoubleClick={edit(zone.id, 'zone')}
               defaultOpen={true}
             >
               {/* Surfaces */}
@@ -125,6 +134,7 @@ export function ProjectBrowser() {
                     icon={<Square size={14} />}
                     selected={selectedItemId === surface.id}
                     onClick={() => select(surface.id, 'surface')}
+                    onDoubleClick={edit(surface.id, 'surface')}
                   >
                     {surface.windows.map(win => (
                       <TreeNode
@@ -133,6 +143,7 @@ export function ProjectBrowser() {
                         icon={<PanelTop size={14} />}
                         selected={selectedItemId === win.id}
                         onClick={() => select(win.id, 'window')}
+                    onDoubleClick={edit(win.id, 'window')}
                       />
                     ))}
                   </TreeNode>
@@ -147,6 +158,7 @@ export function ProjectBrowser() {
                     icon={<Thermometer size={14} />}
                     selected={selectedItemId === tb.id}
                     onClick={() => select(tb.id, 'thermalBridge')}
+                    onDoubleClick={edit(tb.id, 'thermalBridge')}
                   />
                 ))}
               </TreeNode>
@@ -154,7 +166,8 @@ export function ProjectBrowser() {
                 {(zone.pointThermalBridges ?? []).map((bridge) => <TreeNode
                   key={bridge.id} label={bridge.name} icon={<Thermometer size={14} />}
                   selected={selectedItemId === bridge.id}
-                  onClick={() => select(bridge.id, 'pointBridge')} />)}
+                  onClick={() => select(bridge.id, 'pointBridge')}
+                    onDoubleClick={edit(bridge.id, 'pointBridge')} />)}
               </TreeNode>
             </TreeNode>
           ))}
@@ -172,6 +185,7 @@ export function ProjectBrowser() {
               icon={<Grid3X3 size={14} />}
               selected={selectedItemId === c.id}
               onClick={() => select(c.id, 'construction')}
+                    onDoubleClick={edit(c.id, 'construction')}
             />
           ))}
         </TreeNode>
@@ -189,6 +203,7 @@ export function ProjectBrowser() {
                 label={h.name}
                 selected={selectedItemId === h.id}
                 onClick={() => select(h.id, 'heatingSystem')}
+                    onDoubleClick={edit(h.id, 'heatingSystem')}
               />
             ))}
           </TreeNode>
@@ -199,6 +214,7 @@ export function ProjectBrowser() {
                 label={v.name}
                 selected={selectedItemId === v.id}
                 onClick={() => select(v.id, 'ventilationSystem')}
+                    onDoubleClick={edit(v.id, 'ventilationSystem')}
               />
             ))}
           </TreeNode>
@@ -209,6 +225,7 @@ export function ProjectBrowser() {
                 label={c.name}
                 selected={selectedItemId === c.id}
                 onClick={() => select(c.id, 'coolingSystem')}
+                    onDoubleClick={edit(c.id, 'coolingSystem')}
               />
             ))}
           </TreeNode>
@@ -219,6 +236,7 @@ export function ProjectBrowser() {
                 label={hw.name}
                 selected={selectedItemId === hw.id}
                 onClick={() => select(hw.id, 'hotWaterSystem')}
+                    onDoubleClick={edit(hw.id, 'hotWaterSystem')}
               />
             ))}
           </TreeNode>
@@ -236,6 +254,7 @@ export function ProjectBrowser() {
                 label={pv.name}
                 selected={selectedItemId === pv.id}
                 onClick={() => select(pv.id, 'solarPV')}
+                    onDoubleClick={edit(pv.id, 'solarPV')}
               />
             ))}
           </TreeNode>
@@ -246,6 +265,7 @@ export function ProjectBrowser() {
                 label={st.name}
                 selected={selectedItemId === st.id}
                 onClick={() => select(st.id, 'solarThermal')}
+                    onDoubleClick={edit(st.id, 'solarThermal')}
               />
             ))}
           </TreeNode>

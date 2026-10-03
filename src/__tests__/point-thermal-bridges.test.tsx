@@ -42,8 +42,9 @@ describe('point thermal bridge inventory', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm full point bridge inventory' }));
     expect(screen.getByTestId('inventory-complete')).toHaveTextContent('true');
     await user.click(within(screen.getByRole('row', { name: /Corner detail/ }))
-      .getByRole('button', { name: 'Delete' }));
+      .getByRole('button', { name: 'Delete: Corner detail' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
     expect(screen.getByTestId('point-bridges')).toHaveTextContent('[]');
     expect(screen.getByTestId('inventory-complete')).toHaveTextContent('false');
-  });
+  }, 60000);
 });

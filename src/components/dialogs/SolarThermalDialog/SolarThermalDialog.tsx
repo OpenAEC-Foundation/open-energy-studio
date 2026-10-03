@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISolarThermal, SolarThermalType, Orientation } from '../../../core/energy/types';
@@ -19,6 +19,7 @@ const collectorTypeLabels: Record<SolarThermalType, string> = {
 const orientations: Orientation[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'horizontal'];
 
 export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -63,8 +64,8 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
     >
 
         <div className="dialog-field">
-          <label>{t('dialog.solarThermal.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.solarThermal.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -72,8 +73,8 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarThermal.collectorArea')}</label>
-          <input
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.solarThermal.collectorArea')}</label>
+          <input id={`${fieldId}-2`}
             type="number"
             min={0}
             step={0.1}
@@ -83,8 +84,8 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarThermal.type')}</label>
-          <select value={type} onChange={(e) => setType(e.target.value as SolarThermalType)}>
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.solarThermal.type')}</label>
+          <select id={`${fieldId}-3`} value={type} onChange={(e) => setType(e.target.value as SolarThermalType)}>
             {collectorTypes.map((ct) => (
               <option key={ct} value={ct}>
                 {t(collectorTypeLabels[ct])}
@@ -94,8 +95,8 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarThermal.orientation')}</label>
-          <select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.solarThermal.orientation')}</label>
+          <select id={`${fieldId}-4`} value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
             {orientations.map((o) => (
               <option key={o} value={o}>
                 {t(`orientation.${o}`)}
@@ -105,8 +106,8 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarThermal.tilt')}</label>
-          <input
+          <label htmlFor={`${fieldId}-5`}>{t('dialog.solarThermal.tilt')}</label>
+          <input id={`${fieldId}-5`}
             type="number"
             min={0}
             max={90}

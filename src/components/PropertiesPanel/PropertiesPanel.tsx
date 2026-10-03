@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { PanelRightClose } from 'lucide-react';
 import type { IZone, ISurface, IWindow, IThermalBridge, IPointThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
+import { ItemActions } from '../ItemActions/ItemActions';
 import './PropertiesPanel.css';
 
 function findItem(state: ReturnType<typeof useEnergy>['state']): { item: unknown; type: string | null } {
@@ -113,6 +114,13 @@ export function PropertiesPanel() {
       <div className="properties-panel-content">
         {!item && (
           <div className="properties-empty">{t('properties.noSelection')}</div>
+        )}
+
+        {Boolean(item) && type && state.selectedItemId && (
+          <div className="properties-actions">
+            <ItemActions itemType={type} id={state.selectedItemId}
+              name={(item as { name?: string }).name ?? state.selectedItemId} />
+          </div>
         )}
 
         {type === 'zone' && (() => {

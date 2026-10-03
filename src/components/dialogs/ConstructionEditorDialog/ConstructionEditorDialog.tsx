@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IConstruction, IConstructionLayer } from '../../../core/energy/types';
@@ -11,6 +11,7 @@ interface ConstructionEditorDialogProps {
 }
 
 export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditorDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -95,8 +96,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
     >
 
         <div className="dialog-field">
-          <label>{t('dialog.construction.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.construction.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -104,8 +105,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.construction.layers')}</label>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}>
+          <span className="dialog-field-label" id={`${fieldId}-layers`}>{t('dialog.construction.layers')}</span>
+          <table aria-labelledby={`${fieldId}-layers`} style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: 'left', fontSize: 12, color: 'var(--text-secondary)', padding: '4px 8px' }}>
@@ -126,6 +127,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                   <td style={{ padding: '2px 4px' }}>
                     <input
                       type="text"
+                      aria-label={`${t('dialog.construction.material')} ${i + 1}`}
                       value={layer.material}
                       onChange={(e) => handleLayerChange(i, 'material', e.target.value)}
                       style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13 }}
@@ -136,6 +138,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                       type="number"
                       min={0}
                       step={0.001}
+                      aria-label={`${t('dialog.construction.thickness')} ${i + 1}`}
                       value={layer.thickness}
                       onChange={(e) => handleLayerChange(i, 'thickness', parseFloat(e.target.value) || 0)}
                       style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
@@ -146,6 +149,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                       type="number"
                       min={0.001}
                       step={0.001}
+                      aria-label={`${t('dialog.construction.lambda')} ${i + 1}`}
                       value={layer.lambda}
                       onChange={(e) => handleLayerChange(i, 'lambda', parseFloat(e.target.value) || 0)}
                       style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
@@ -155,6 +159,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                     {layers.length > 1 && (
                       <button
                         className="btn btn-sm"
+                        type="button"
+                        aria-label={`${t('dialog.delete')} ${i + 1}`}
                         onClick={() => removeLayer(i)}
                         style={{ padding: '2px 6px', color: 'var(--danger)' }}
                       >
@@ -173,12 +179,12 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
 
         <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
           <div className="dialog-field" style={{ flex: 1 }}>
-            <label>{t('dialog.construction.rcValue')}</label>
-            <input type="text" readOnly value={rcValue.toFixed(2)} />
+            <label htmlFor={`${fieldId}-2`}>{t('dialog.construction.rcValue')}</label>
+            <input id={`${fieldId}-2`} type="text" readOnly value={rcValue.toFixed(2)} />
           </div>
           <div className="dialog-field" style={{ flex: 1 }}>
-            <label>{t('dialog.construction.uValue')}</label>
-            <input type="text" readOnly value={uValue.toFixed(3)} />
+            <label htmlFor={`${fieldId}-3`}>{t('dialog.construction.uValue')}</label>
+            <input id={`${fieldId}-3`} type="text" readOnly value={uValue.toFixed(3)} />
           </div>
         </div>
         {ntaResult && <p role="status" style={{ fontSize: 12 }}>

@@ -96,25 +96,25 @@ export function NtaConstructionSection({ layers, onApply }: {
         </tr></thead>
         <tbody>{draft.layers.map((layer, index) => <tr key={index}>
           <td style={cell}>
-            <select aria-label={t('nta.construction.layerKind')} value={layer.kind} onChange={(event) => updateLayer(index, event.target.value === 'air_cavity'
+            <select aria-label={`${t('nta.construction.layerKind')} ${index + 1}`} value={layer.kind} onChange={(event) => updateLayer(index, event.target.value === 'air_cavity'
               ? { kind: 'air_cavity', name: layer.name, thicknessMm: 40, ventilation: 'unventilated' }
               : { kind: 'material', name: layer.name, thicknessM: 0.1, lambda: 0.04, sourceReference: '' })}>
               <option value="material">{t('nta.construction.kind.material')}</option>
               <option value="air_cavity">{t('nta.construction.kind.cavity')}</option>
             </select>
           </td>
-          <td style={cell}><input value={layer.name} onChange={(event) => updateLayer(index, { ...layer, name: event.target.value })} /></td>
+          <td style={cell}><input aria-label={`${t('dialog.construction.material')} ${index + 1}`} value={layer.name} onChange={(event) => updateLayer(index, { ...layer, name: event.target.value })} /></td>
           {layer.kind === 'material' ? <>
             <td style={cell}><input type="number" step="0.001" aria-label={`${t('nta.construction.thickness')} ${index + 1}`} value={layer.thicknessM}
               onChange={(event) => updateLayer(index, { ...layer, thicknessM: Number(event.target.value) })} /></td>
             <td style={cell}><input type="number" step="0.001" aria-label={`λ ${index + 1}`} value={layer.lambda}
               onChange={(event) => updateLayer(index, { ...layer, lambda: Number(event.target.value) })} /></td>
-            <td style={cell}><input value={layer.sourceReference}
+            <td style={cell}><input aria-label={`${t('nta.form.source')} ${index + 1}`} value={layer.sourceReference}
               onChange={(event) => updateLayer(index, { ...layer, sourceReference: event.target.value })} /></td>
           </> : <>
             <td style={cell}><input type="number" step="1" aria-label={`mm ${index + 1}`} value={layer.thicknessMm}
               onChange={(event) => updateLayer(index, { ...layer, thicknessMm: Number(event.target.value) })} /> mm</td>
-            <td style={cell}><select value={layer.ventilation}
+            <td style={cell}><select aria-label={`${t('nta.construction.lambdaOrVentilation')} ${index + 1}`} value={layer.ventilation}
               onChange={(event) => updateLayer(index, { ...layer, ventilation: event.target.value as 'unventilated' | 'weakly' | 'strongly' })}>
               <option value="unventilated">{t('nta.construction.cavity.unventilated')}</option>
               <option value="weakly">{t('nta.construction.cavity.weakly')}</option>
