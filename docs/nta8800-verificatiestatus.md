@@ -31,26 +31,45 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
 | Bijlage AB ZEB-indicator (informatief) met operationele CO2 | geïmplementeerd |
 | WKK voor tapwater (13.8.4.8), basisopname voor collectieve, meervoudige en hybride installaties, WKK en zonneboilers, opname-UI | geïmplementeerd |
 
-**Dekkingsaudit 4 oktober 2026.** Een systematische audit heeft hoofdstuk 5 t/m 17 en alle bijlagen naast de code gelegd. De formules zijn grotendeels gedekt.
+**Dekkingsaudits.** Er zijn twee volledige audits gedaan van hoofdstuk 5 t/m 17 en alle bijlagen.
+- Audit 1 vond tien open punten. Die zijn alle afgewerkt:
+  - de indicatoren van hoofdstuk 5;
+  - meerdere tapwater- en koelsystemen;
+  - identieke installaties;
+  - f_prac bij externe levering;
+  - θ_ztu;
+  - bijlage V;
+  - gaswarmtepompen;
+  - renovatiestandaard;
+  - f_BACS.
+- Audit 2 (alle 1 284 genummerde formules gecontroleerd) beoordeelt per hoofdstuk:
 
-Open punten, in volgorde van belang voor de attestering:
-1. Uitvoerindicatoren van hoofdstuk 5:
-   - E_H;nd en E_C;nd;
-   - EH;Standaard;
-   - EwePrenTot;
-   - gebruik en hernieuwbaar per energiedrager (5.17–5.19, 5.39a–h);
-   - lokaal CO2-vrij (5.5.7).
-2. Meerdere tapwatersystemen per gebouw (13.19a–13.20a).
-3. Identieke individuele installaties in woongebouwen (§9.1).
-4. f_prac 0,95 bij externe warmte en koude (9.84, 10.78).
-5. Renovatiestandaard utiliteit (tabel 5.7).
-6. Koppeling van f_BACS (5.5.8).
-7. θ_ztu (7.82) en θ_int;op (7.9.6).
-8. Kleinere punten bij warmtepompen.
-9. Meerdere koelsystemen.
-10. Gaswarmtepompen.
+  | Beoordeling | Hoofdstukken en bijlagen |
+  |---|---|
+  | Compleet | Hoofdstuk 5, 7 en 10–16; bijlagen B–I, L–O, Q, R, T–V, X, Y, AA, AB |
+  | Bijna compleet | Hoofdstuk 6, 8 en 17; bijlagen A en W |
+  | Echte gaten | Hoofdstuk 9: één verwarmingssysteem per gebouw, hybride alleen nieuwbouw. Bijlage P: berekende route. |
 
-Deze punten worden in rondes afgewerkt.
+Wordt nu afgewerkt:
+- meerdere verwarmingssystemen;
+- hybride in bestaande bouw;
+- de letterlijke boeking van W_H;aux;hp;an bij bijlage Q;
+- θ_int;op;C;
+- de opname voor utiliteit: meerdere zones, meerdere tapwatersystemen, LBK-koeling en bevochtiging;
+- de opname voor woningen: aangrenzende onverwarmde serre (AOS), daklichten, woonboot en caravan.
+
+Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
+- bijlage Q: F_H;gen = 1 bij volledige dekking; Q.48 bij L/W;
+- de teken-keuze van Δθ_fan in 9.29 tegenover 10.20;
+- 10.15 en tabel 10.16;
+- bijlage N: N.69, N.52 en N.61;
+- micro-WKK: P_th;sb;
+- TOjuli: AOR/AVR;
+- θ_ztu = 13 °C zonder b_U;
+- C.12;
+- de afronding in 13.77 en 13.130.
+
+Ze staan per module in `INTERPRETATIONS` en in de docs.
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
