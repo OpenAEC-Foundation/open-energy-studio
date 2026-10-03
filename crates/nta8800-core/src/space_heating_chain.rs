@@ -419,6 +419,11 @@ pub struct MultipleGenerators {
     /// f_gebouw;si;H to Φ_H;tot = Σ Q_H;node;in / 1139.
     #[serde(default)]
     pub added_preferred_generator: bool,
+    /// 9.6.1 note 1: β_H;gen;i;pref estimated for preferences 1 … n−1 when
+    /// the nominal powers are unknown (cumulative, non-decreasing, 0–1).
+    /// Generators with the same preference then share equally.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub estimated_beta: Vec<f64>,
     pub source_reference: String,
 }
 
@@ -428,7 +433,9 @@ pub struct PreferredGenerator {
     /// 1 is the highest priority (9.2.2.1.3, table 9.1).
     pub preference: u32,
     /// Φ_H;gen;i nominal heating power, kW (type plate, NEN-EN 14511-2 for
-    /// heat pumps, at most 40 % of a combi boiler's maximum).
+    /// heat pumps, at most 40 % of a combi boiler's maximum); may be
+    /// omitted with `estimatedBeta`.
+    #[serde(default)]
     pub nominal_power_kw: f64,
     pub generator: Generator,
 }
@@ -2884,8 +2891,28 @@ fn generate_multiple(
             "generator.generators",
         ));
     }
+    let estimated = !set.estimated_beta.is_empty();
+    if estimated {
+        let n = preferences.len();
+        let values = &set.estimated_beta;
+        if values.len() + 1 != n
+            || values.iter().any(|value| !(0.0..=1.0).contains(value))
+            || values.windows(2).any(|pair| pair[1] < pair[0])
+        {
+            issues.push(issue(
+                "generator_estimated_beta_invalid",
+                "generator.estimatedBeta",
+            ));
+        }
+        if set.added_preferred_generator {
+            issues.push(issue(
+                "generator_estimated_beta_and_added_preferred",
+                "generator.estimatedBeta",
+            ));
+        }
+    }
     for (index, part) in set.generators.iter().enumerate() {
-        if !part.nominal_power_kw.is_finite() || part.nominal_power_kw <= 0.0 {
+        if !estimated && (!part.nominal_power_kw.is_finite() || part.nominal_power_kw <= 0.0) {
             issues.push(issue(
                 "generator_nominal_power_invalid",
                 format!("generator.generators[{index}].nominalPowerKw"),
@@ -2952,7 +2979,14 @@ fn generate_multiple(
         1.0
     };
     let beta = |preference: u32| -> f64 {
-        if preference == 0 || reference <= 0.0 {
+        if preference == 0 {
+            0.0
+        } else if estimated {
+            set.estimated_beta
+                .get(preference as usize - 1)
+                .copied()
+                .unwrap_or(1.0)
+        } else if reference <= 0.0 {
             0.0
         } else {
             power_up_to(preference) * scale / reference
@@ -2981,7 +3015,16 @@ fn generate_multiple(
             .filter(|other| other.preference == part.preference)
             .map(|other| other.nominal_power_kw)
             .sum();
-        let share = part.nominal_power_kw / same;
+        let count = set
+            .generators
+            .iter()
+            .filter(|other| other.preference == part.preference)
+            .count() as f64;
+        let share = if estimated || same <= 0.0 {
+            1.0 / count
+        } else {
+            part.nominal_power_kw / same
+        };
         let sub_outputs: Vec<MonthlyEnergy> = outputs
             .iter()
             .enumerate()
@@ -4237,6 +4280,7 @@ mod tests {
                 },
             ],
             added_preferred_generator: false,
+            estimated_beta: Vec::new(),
             source_reference: "survey".into(),
         }));
         // Two generators at preference 1 only are also a valid split.
@@ -4296,6 +4340,50 @@ mod tests {
     }
 
     #[test]
+    fn estimated_beta_replaces_unknown_powers() {
+        // 9.6.1 note 1: β estimated when nominal powers are unknown.
+        let mut input = boiler_chain();
+        let boiler = input.generator.clone();
+        let heat_pump_generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
+            forfait: heat_pump(),
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own outdoor unit".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        input.generator = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 0.0,
+                    generator: heat_pump_generator,
+                },
+                PreferredGenerator {
+                    preference: 2,
+                    nominal_power_kw: 0.0,
+                    generator: boiler,
+                },
+            ],
+            added_preferred_generator: false,
+            estimated_beta: vec![0.3],
+            source_reference: "adviser estimate".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.issues);
+        // January, β 0,3: f = 0,59 (table 9.23).
+        let jan = &result.monthly[0];
+        assert!((jan.heat_pump_output_kwh - 0.59 * jan.generator_output_kwh).abs() < 1e-6);
+        if let Generator::Multiple(set) = &mut input.generator {
+            set.estimated_beta = vec![1.2];
+        }
+        assert!(assess_space_heating_chain(&input)
+            .issues
+            .iter()
+            .any(|item| item.code == "generator_estimated_beta_invalid"));
+    }
+
+    #[test]
     fn multiple_generators_split_by_table_9_23() {
         // β per 9.56: heat pump 4 kW of 24 kW → β 1/6; winter
         // 0,20 + (1/6 − 0,1)·10·0,20 = 1/3; July 0,87 + 0,5·0,08 = 0,91.
@@ -4326,6 +4414,7 @@ mod tests {
                 },
             ],
             added_preferred_generator: false,
+            estimated_beta: Vec::new(),
             source_reference: "installation survey".into(),
         }));
         let result = assess_space_heating_chain(&input);
@@ -5306,6 +5395,7 @@ mod tests {
                 },
             ],
             added_preferred_generator: false,
+            estimated_beta: Vec::new(),
             source_reference: "survey".into(),
         }));
         assert!(codes(&input).contains(&"heat_pump_above55_requires_annex_q"));
