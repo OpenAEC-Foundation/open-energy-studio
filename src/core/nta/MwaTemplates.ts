@@ -574,23 +574,28 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       if (!hotWater) { problems.push('hotWaterRequired'); break; }
       if (hasRequiredBlank(template.generator, HOT_WATER_REQUIRED)) problems.push('valueRequired');
       patch.push({ op: 'replace', path: pointer('ntaCalculation', 'hotWater', 'generator'), value: template.generator });
-      // §13.6.2 with the kernel's storage rule: a separate vessel goes with
-      // an electric/indirect boiler or an indirect heat pump; other
-      // generators carry their storage in the generator efficiency, so the
-      // old vessel is removed (a tested appliance keeps vessels marked as
-      // outside its test).
-      const kind = String(template.generator.kind);
+      // §13.6.2 with the kernel's storage rule (domestic_hot_water.rs),
+      // decided over the main and the additional generators: a separate
+      // vessel goes with an electric/indirect boiler, an indirect heat pump
+      // or external heat; other generators carry their storage in the
+      // generator efficiency, so the old vessel is removed.
       const storage = (hotWater.storage as Block[] | undefined) ?? [];
-      const others = ((hotWater.additionalGenerators as Block[] | undefined) ?? [])
-        .map((item) => String((item.generator as Block | undefined)?.kind ?? ''));
-      const needsStorage = (value: string) => STORAGE_GENERATORS.has(value);
-      const tested = kind === 'measured_two_profiles' || kind === 'heat_pump_en16147'
-        || (kind === 'gas_appliance' && template.generator.annexT != null);
-      if (needsStorage(kind) && storage.length === 0) problems.push('storageRequired');
-      const keep = needsStorage(kind) || kind === 'external_heat' || others.some(needsStorage)
-        || (tested && storage.every((vessel) => vessel.notInApplianceTest === true));
-      if (!keep && storage.length > 0) {
-        patch.push({ op: 'replace', path: pointer('ntaCalculation', 'hotWater', 'storage'), value: [] });
+      const generators: Block[] = [template.generator as Block, ...((hotWater.additionalGenerators as Block[] | undefined) ?? [])
+        .map((item) => (item.generator as Block | undefined) ?? {})];
+      const kindOf = (generator: Block) => String(generator.kind ?? '');
+      const needsStorage = generators.some((generator) => STORAGE_GENERATORS.has(kindOf(generator)));
+      const external = generators.some((generator) => kindOf(generator) === 'external_heat');
+      const tested = generators.some((generator) => kindOf(generator) === 'measured_two_profiles'
+        || kindOf(generator) === 'heat_pump_en16147'
+        || (kindOf(generator) === 'gas_appliance' && generator.annexT != null));
+      if (needsStorage && storage.length === 0) problems.push('storageRequired');
+      if (!needsStorage && !external && storage.length > 0) {
+        // Note 1 of §13.6.2 (p. 566): with a tested appliance, vessels outside
+        // its test stay and are calculated; the rest is in the efficiency.
+        const kept = tested ? storage.filter((vessel) => vessel.notInApplianceTest === true) : [];
+        if (kept.length !== storage.length) {
+          patch.push({ op: 'replace', path: pointer('ntaCalculation', 'hotWater', 'storage'), value: kept });
+        }
       }
       break;
     }

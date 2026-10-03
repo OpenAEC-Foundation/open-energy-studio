@@ -16,7 +16,8 @@ import { measureEvidenceNotes } from '../nta/MwaTemplates';
  * numbers of the BRL are cited; the checklist wording is our own.
  */
 
-export type DossierStatus = 'ok' | 'missing' | 'check' | 'not_applicable';
+/** `pending`: the kernel run (or survey assessment) this item depends on is still running. */
+export type DossierStatus = 'ok' | 'missing' | 'check' | 'not_applicable' | 'pending';
 
 export interface DossierItem {
   id: string;
@@ -35,7 +36,15 @@ export interface DossierContext {
   relabel?: RelabelAssessment | null;
   /** SHA-256 of the project's label input, to see whether the kept comparison is out of date. */
   labelInputSha256?: string | null;
+  /** The kernel assessment or the survey assessment is still running (live check only). */
+  pending?: boolean;
 }
+
+/** Items whose status follows from the kernel run or the survey assessment. */
+const KERNEL_DEPENDENT = new Set([
+  'delivered_report', 'output_file', 'electronic_files', 'collapse_reasons', 'thermal_properties',
+  'relabel_changes', 'relabel_review',
+]);
 
 function has(evidence: NtaEvidenceItem[], ...kinds: NtaEvidenceKind[]): boolean {
   return evidence.some((item) => kinds.includes(item.kind));
@@ -59,7 +68,15 @@ function withoutStoredOriginal(project: IProject): IProject {
 }
 
 /** Completeness of the project dossier per BRL 9500 Bijlage 3. */
-export function checkDossierCompleteness({ project, assessment, opname, relabel: given, labelInputSha256: currentSha }: DossierContext): DossierItem[] {
+export function checkDossierCompleteness(context: DossierContext): DossierItem[] {
+  const items = dossierItems(context);
+  if (!context.pending) return items;
+  return items.map((item) => KERNEL_DEPENDENT.has(item.id) && (item.status === 'missing' || item.status === 'check')
+    ? { id: item.id, group: item.group, label: item.label, status: 'pending' as const }
+    : item);
+}
+
+function dossierItems({ project, assessment, opname, relabel: given, labelInputSha256: currentSha }: DossierContext): DossierItem[] {
   const registration: NtaRegistration = project.registration ?? {};
   // The verdict comes from the kernel's fresh comparison at registration,
   // never from the stored one (BRL 9500-W Bijlage 3, p. 63).

@@ -1,5 +1,9 @@
 import type { DialogType, IProject } from './types';
 import type { EnergyAction } from '../../context/EnergyContext';
+import {
+  type CascadeEntry, type DeleteResult, deleteSurfaceFromProject, deleteWindowFromProject, deleteZoneFromProject,
+  manualMeasuresShiftedBy,
+} from './projectDelete';
 
 /**
  * Edit and delete targets for project items shown in the browser tree,
@@ -44,25 +48,39 @@ export function constructionUsage(project: IProject, constructionId: string): st
 }
 
 export type DeleteTarget =
-  | { kind: 'action'; action: EnergyAction }
-  | { kind: 'blocked'; reason: 'constructionInUse'; usedBy: string[] }
+  /** `cascade`: NTA input entries that the delete removes with it. */
+  | { kind: 'action'; action: EnergyAction; cascade: CascadeEntry[] }
+  | { kind: 'blocked'; reason: 'constructionInUse' | 'manualMeasures'; usedBy: string[] }
   | { kind: 'none' };
 
+/** Geometry deletes cascade into the NTA block and are refused when they renumber a manual measure's path. */
+function geometryDelete(project: IProject, action: EnergyAction, result: DeleteResult): DeleteTarget {
+  const shifted = manualMeasuresShiftedBy(project, result.project, project.maatwerkadvies?.measures);
+  return shifted.length > 0
+    ? { kind: 'blocked', reason: 'manualMeasures', usedBy: shifted }
+    : { kind: 'action', action, cascade: result.cascade };
+}
+
 export function deleteTarget(project: IProject, itemType: string, id: string): DeleteTarget {
-  const action = (a: EnergyAction): DeleteTarget => ({ kind: 'action', action: a });
+  const action = (a: EnergyAction): DeleteTarget => ({ kind: 'action', action: a, cascade: [] });
   switch (itemType as ProjectItemType) {
     case 'zone':
-      return project.zones.some((z) => z.id === id) ? action({ type: 'DELETE_ZONE', payload: id }) : { kind: 'none' };
+      return project.zones.some((z) => z.id === id)
+        ? geometryDelete(project, { type: 'DELETE_ZONE', payload: id }, deleteZoneFromProject(project, id))
+        : { kind: 'none' };
     case 'surface':
       for (const zone of project.zones)
         if (zone.surfaces.some((s) => s.id === id))
-          return action({ type: 'DELETE_SURFACE', payload: { zoneId: zone.id, surfaceId: id } });
+          return geometryDelete(project, { type: 'DELETE_SURFACE', payload: { zoneId: zone.id, surfaceId: id } },
+            deleteSurfaceFromProject(project, zone.id, id));
       return { kind: 'none' };
     case 'window':
       for (const zone of project.zones)
         for (const surface of zone.surfaces)
           if (surface.windows.some((w) => w.id === id))
-            return action({ type: 'DELETE_WINDOW', payload: { zoneId: zone.id, surfaceId: surface.id, windowId: id } });
+            return geometryDelete(project,
+              { type: 'DELETE_WINDOW', payload: { zoneId: zone.id, surfaceId: surface.id, windowId: id } },
+              deleteWindowFromProject(project, zone.id, surface.id, id));
       return { kind: 'none' };
     case 'thermalBridge':
       for (const zone of project.zones)

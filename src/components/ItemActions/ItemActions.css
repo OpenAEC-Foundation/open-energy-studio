@@ -5,6 +5,13 @@
   gap: 4px;
 }
 
+.item-actions-cascade {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  max-height: 8em;
+  overflow-y: auto;
+}
+
 .item-actions-confirm,
 .item-actions-blocked {
   font-size: 12px;

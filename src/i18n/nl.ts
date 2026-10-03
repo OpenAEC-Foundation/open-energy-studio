@@ -111,7 +111,9 @@ export const nl: Record<string, string> = {
   // Dialogs
   'dialog.save': 'Opslaan',
   'dialog.cancel': 'Annuleren',
-  'item.deleteConfirm': "\"{{name}}\" verwijderen? Verwijzingen in NTA-invoer, herlabelvergelijking of maatwerkadvies naar dit onderdeel worden ongeldig.",
+  'item.deleteConfirm': "\"{{name}}\" verwijderen? Een herlabelvergelijking van vóór deze wijziging raakt verouderd.",
+  'item.deleteCascade': "De NTA-invoer verliest {{count}} verwijzing(en) naar dit onderdeel:",
+  'item.manualMeasuresShift': "Verwijderen kan niet: de handmatige maatwerkadviesmaatregel(en) {{list}} wijzen het project aan op positie, en na deze verwijdering zouden ze een ander onderdeel wijzigen. Pas die maatregelen eerst aan of verwijder ze.",
   'item.deleteYes': "Ja, verwijderen",
   'item.constructionInUse': "Deze constructie is in gebruik bij {{count}} vlak(ken): {{list}}. Koppel die vlakken eerst aan een andere constructie.",
   'envelope.actions': "Acties",
@@ -228,6 +230,7 @@ export const nl: Record<string, string> = {
   'report.dossierStatus.missing': "ontbreekt",
   'report.dossierStatus.check': "controleren",
   'report.dossierStatus.not_applicable': "n.v.t.",
+  'report.dossierStatus.pending': "bezig",
   'project.kernelChanged': "Dit project is opgeslagen met een andere rekenkern of normversie ({{saved}}) dan de huidige ({{current}}). Reken opnieuw en controleer de verschillen voordat u registreert.",
   'project.inputChanged': "De invoer van dit project is na het opslaan buiten de applicatie gewijzigd (de vingerafdruk verschilt).",
   'preview.labelFromKernel': "De labelklasse komt alleen uit de NTA 8800-rekenkern; zie het NTA-paneel.",

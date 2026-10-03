@@ -1,6 +1,7 @@
 import residentialExample from '../../../training-data/nta8800-opname-1930-terraced.json';
 import utilityExample from '../../../training-data/nta8800-opname-utility-1985-office.json';
-import type { ResidentialSurvey, UtilitySurvey } from './KernelClient';
+import type { OpnameAssessment, ResidentialSurvey, UtilitySurvey } from './KernelClient';
+import { assessResidentialSurveyWithRust, assessUtilitySurveyWithRust } from './KernelClient';
 
 // Starting points of the ISSO 82.1 / 75.1 basisopname editor: the synthetic
 // survey fixtures of the kernel tests, edited by the adviser.
@@ -71,4 +72,20 @@ export function asResidential(stored: StoredSurvey): ResidentialSurvey {
 
 export function asUtility(stored: StoredSurvey): UtilitySurvey {
   return stored.survey as unknown as UtilitySurvey;
+}
+
+/**
+ * Kernel assessment of the survey kept with the project, for the collapse
+ * reasons in the dossier checklist (BRL 9500 Bijlage 3). `null` without a
+ * survey or when the kernel cannot assess it.
+ */
+export async function assessStoredSurvey(stored: StoredSurvey | undefined | null): Promise<OpnameAssessment | null> {
+  if (!stored) return null;
+  try {
+    return stored.kind === 'residential'
+      ? await assessResidentialSurveyWithRust(asResidential(stored))
+      : await assessUtilitySurveyWithRust(asUtility(stored));
+  } catch {
+    return null;
+  }
 }

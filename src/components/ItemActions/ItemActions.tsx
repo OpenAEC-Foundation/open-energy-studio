@@ -9,14 +9,16 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
   const [confirming, setConfirming] = useState(false);
-  const [blocked, setBlocked] = useState<string[] | null>(null);
+  const [blocked, setBlocked] = useState<{ reason: 'constructionInUse' | 'manualMeasures'; usedBy: string[] } | null>(null);
+  const [cascade, setCascade] = useState<string[]>([]);
   const edit = editAction(itemType, id);
 
   const requestDelete = () => {
     const target = deleteTarget(state.project, itemType, id);
-    if (target.kind === 'blocked') { setBlocked(target.usedBy); return; }
+    if (target.kind === 'blocked') { setBlocked({ reason: target.reason, usedBy: target.usedBy }); return; }
     if (target.kind === 'none') return;
     setBlocked(null);
+    setCascade(target.cascade.map((entry) => entry.path));
     setConfirming(true);
   };
   const confirmDelete = () => {
@@ -35,12 +37,20 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
     {!confirming && <button type="button" className="btn btn-sm btn-danger" aria-label={`${t('dialog.delete')}: ${name}`}
       onClick={requestDelete}>{t('dialog.delete')}</button>}
     {confirming && <>
-      <span className="item-actions-confirm" role="alert">{t('item.deleteConfirm', { name })}</span>
+      <span className="item-actions-confirm" role="alert">
+        {t('item.deleteConfirm', { name })}
+        {cascade.length > 0 && <>
+          {' '}{t('item.deleteCascade', { count: cascade.length })}
+          <ul className="item-actions-cascade">{cascade.map((path) => <li key={path}><code>{path}</code></li>)}</ul>
+        </>}
+      </span>
       <button type="button" className="btn btn-sm btn-danger" onClick={confirmDelete}>{t('item.deleteYes')}</button>
       <button type="button" className="btn btn-sm" onClick={() => setConfirming(false)}>{t('dialog.cancel')}</button>
     </>}
     {blocked && <span className="item-actions-blocked" role="alert">
-      {t('item.constructionInUse', { count: blocked.length, list: blocked.join(', ') })}
+      {blocked.reason === 'constructionInUse'
+        ? t('item.constructionInUse', { count: blocked.usedBy.length, list: blocked.usedBy.join(', ') })
+        : t('item.manualMeasuresShift', { count: blocked.usedBy.length, list: blocked.usedBy.join(', ') })}
     </span>}
   </span>;
 }

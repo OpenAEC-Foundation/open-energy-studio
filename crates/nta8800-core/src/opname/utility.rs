@@ -5952,6 +5952,53 @@ mod tests {
     }
 
     #[test]
+    fn function_split_over_own_and_main_zone_is_kept_apart_in_both() {
+        // A function with its own zone is kept apart everywhere (p. 39–40
+        // merging is optional; §6.6, p. 54 takes the zone functions), also
+        // in the zone that holds the main function. That zone then passes
+        // afb. 6.6 (p. 53–54) with the function: 50 m² sport next to
+        // 1 400 m² education is below 10 % and passes.
+        let split = |in_school: f64, in_hall: f64| {
+            let mut survey = school_with_sports_hall();
+            survey.functions[1].area_m2 = in_school + in_hall;
+            survey.zones[0].functions.push(FunctionArea {
+                function: LabelFunction::Sport,
+                area_m2: in_school,
+            });
+            survey.zones[1].functions[0].area_m2 = in_hall;
+            survey.lighting[1].area_m2 = 350.0 + in_school;
+            survey.lighting[2].area_m2 = in_hall;
+            let mut recorder = Recorder::default();
+            let input = derive_utility_input(&survey, &mut recorder);
+            (input, recorder)
+        };
+        let (input, recorder) = split(50.0, 150.0);
+        assert!(!applied(&recorder, "small_functions_merged_into_main"));
+        let codes: Vec<_> = recorder.issues.iter().map(|item| item.code).collect();
+        assert!(
+            !codes.contains(&"calculation_zone_criteria_not_met"),
+            "{codes:?}"
+        );
+        let school = &input.unwrap()["spaceHeating"]["demand"];
+        let functions: Vec<_> = school["ventilation"]["functions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["function"].as_str().unwrap().to_string())
+            .collect();
+        assert!(functions.contains(&"sport".to_string()), "{functions:?}");
+        // The side effect: 250 m² sport next to 1 400 m² education (15 %)
+        // would be merged without zones (400 of 1 800 m² is 22 %), but kept
+        // apart here it makes the school zone fail afb. 6.6.
+        let (_, recorder) = split(250.0, 150.0);
+        let codes: Vec<_> = recorder.issues.iter().map(|item| item.code).collect();
+        assert!(
+            codes.contains(&"calculation_zone_criteria_not_met"),
+            "{codes:?}"
+        );
+    }
+
+    #[test]
     fn calculation_zones_are_validated() {
         let issues = |survey: &UtilitySurvey| {
             let mut recorder = Recorder::default();
