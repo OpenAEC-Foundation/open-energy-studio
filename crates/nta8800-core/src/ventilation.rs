@@ -1048,8 +1048,12 @@ pub struct BalanceFlows {
     pub mechanical_supply_temperature_c: f64,
     /// Temperature of ventilative cooling air (table 11.4), °C.
     pub ventilative_cooling_temperature_c: f64,
-    /// H_ve (7.19) with b_v folded into the supply temperatures, W/K.
+    /// ρ_a·c_a·Σq of all flows in W/K, without b_v: the supply temperatures
+    /// carry b_v (see `heat_flow_per_setpoint_w`). Not the H_ve of 7.19.
     pub conductance_w_per_k: f64,
+    /// H_ve of 7.19 with b_v (7.20): the heat flow per setpoint divided by
+    /// θ_set − θ_e, W/K; `None` when θ_set equals θ_e.
+    pub weighted_conductance_w_per_k: Option<f64>,
     /// H_ve·(θ_set − θ_sup) summed over flows, W.
     pub heat_flow_per_setpoint_w: f64,
 }
@@ -2915,6 +2919,8 @@ fn balance_month(
             },
             ventilative_cooling_temperature_c: argii_temperature,
             conductance_w_per_k: conductance,
+            weighted_conductance_w_per_k: ((indoor - outdoor).abs() > 1e-9)
+                .then(|| heat_flow / (indoor - outdoor)),
             heat_flow_per_setpoint_w: heat_flow,
         },
         pressures,
@@ -3661,6 +3667,23 @@ mod tests {
             c1_base.months[0].heating.conductance_w_per_k,
             1e-9,
         );
+    }
+
+    #[test]
+    fn weighted_conductance_carries_b_v_of_7_20() {
+        // C1: every incoming flow is at θ_e, so b_v = 1 and both agree.
+        let extract = calculate_ventilation(&dwelling(SystemVariant::C1)).unwrap();
+        let january = &extract.months[0].heating;
+        close(
+            january.weighted_conductance_w_per_k.unwrap(),
+            january.conductance_w_per_k,
+            1e-9,
+        );
+        // D with heat recovery: b_v < 1 on the preheated supply (7.20).
+        let recovery = calculate_ventilation(&dwelling(SystemVariant::D5a)).unwrap();
+        let january = &recovery.months[0].heating;
+        let weighted = january.weighted_conductance_w_per_k.unwrap();
+        assert!(weighted > 0.0 && weighted < january.conductance_w_per_k);
     }
 
     #[test]

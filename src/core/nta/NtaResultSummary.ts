@@ -35,7 +35,8 @@ export function summarizeExtras(performance: BuildingPerformanceAssessment): Nta
       zoneId: result.zoneId,
       requiredJanuaryM3PerH: january?.heating.requiredOutdoorAirM3PerH ?? 0,
       infiltrationJanuaryM3PerH: january?.heating.infiltrationM3PerH ?? 0,
-      conductanceJanuaryWPerK: january?.heating.conductanceWPerK ?? 0,
+      // 7.19 with b_v; older payloads only carry ρ·c·Σq.
+      conductanceJanuaryWPerK: january?.heating.weightedConductanceWPerK ?? january?.heating.conductanceWPerK ?? 0,
       fanKwh: result.annualFanElectricityKwh,
       frostProtectionKwh: result.annualFrostProtectionElectricityKwh,
       grillePreheatingKwh: result.annualGrillePreheatingElectricityKwh,

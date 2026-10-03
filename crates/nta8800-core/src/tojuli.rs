@@ -28,8 +28,8 @@ use crate::climate::{Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::{assess_direct_transmission, EnvelopeSide};
 use crate::monthly_demand::{
     assess_monthly_demand, cooling_utilization, internal_gains_kwh, opaque_solar_kwh,
-    ventilation_conductance, window_solar_kwh, with_resolved_ventilation, MonthlyDemandInput,
-    Transmission, A_0, TAU_0_H,
+    ventilation_conductance, window_g_gl, window_obstruction, window_solar_kwh,
+    with_resolved_ventilation, MonthlyDemandInput, Transmission, A_0, TAU_0_H,
 };
 use crate::solar_shading::Balance;
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,14 @@ pub const MIN_ORIENTATION_AREA_M2: f64 = 3.0;
 pub const HORIZONTAL_TILT_MAX_DEG: f64 = 5.0;
 /// §5.7.1 method 3: window area below this share of `A_g;tot`.
 pub const SMALL_WINDOW_AREA_RATIO: f64 = 0.2;
+/// §5.7.1 method 3, second situation (p. 114–115): more than 95 % of the
+/// assessed glazing area must limit solar gain.
+pub const SHADED_GLAZING_AREA_SHARE: f64 = 0.95;
+/// `g_gl` (7.40/7.41/7.41a/7.41b, July, cooling) at or below which a
+/// transparent opening limits solar gain.
+pub const SHADED_GLAZING_G_MAX: f64 = 0.4;
+/// `F_sh;obst;juli` below which a transparent opening limits solar gain.
+pub const SHADED_GLAZING_OBSTRUCTION_MAX: f64 = 0.67;
 
 const ORIENTATIONS: [Orientation; 8] = [
     Orientation::North,
@@ -81,7 +89,8 @@ pub enum SolarLimitationCriterion {
     /// `A_w < 0,2 · A_g;tot`; checked against the window inventory.
     SmallWindowArea,
     /// More than 95 % of the glazing (45°–315° and horizontal) has table 7.4a/b
-    /// shading, `g_gl ≤ 0,4`, or `F_sh;obst;juli < 0,67` (declared).
+    /// louvres, `g_gl ≤ 0,4`, or `F_sh;obst;juli < 0,67`; checked against the
+    /// window data ([`shaded_glazing_share`]).
     ShadedGlazing,
 }
 
@@ -179,6 +188,10 @@ pub struct TojuliAssessment {
     /// Annex AA capacity check when that is the active-cooling evidence.
     pub annex_aa: Option<AnnexAaResult>,
     pub issues: Vec<TojuliIssue>,
+    /// Findings that leave the result valid, e.g. an active cooling system
+    /// whose annex AA capacity is insufficient (TOjuli is then calculated).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<TojuliIssue>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -208,6 +221,7 @@ fn invalid(zone_id: &str, active_cooling: bool, issues: Vec<TojuliIssue>) -> Toj
         meets_bbl_limit: None,
         annex_aa: None,
         issues,
+        warnings: Vec::new(),
     }
 }
 
@@ -218,6 +232,39 @@ pub fn use_function_required(zone_id: &str) -> TojuliAssessment {
         false,
         vec![issue("tojuli_use_function_required", "labelFunction")],
     )
+}
+
+/// §5.7.1 method 3, second situation (p. 114–115): the share of the
+/// assessed glazing area (orientation 45°–315° or horizontal) that has fixed
+/// louvres of table 7.4a/7.4b, `g_gl ≤ 0,4` (July, cooling) or
+/// `F_sh;obst;juli < 0,67`. Without assessed glazing the share is 1.
+pub fn shaded_glazing_share(input: &MonthlyDemandInput) -> f64 {
+    let mut total = 0.0;
+    let mut limited = 0.0;
+    for window in &input.windows {
+        // Note 1: north-facing openings (between NW and NE) are not assessed.
+        if window.tilt_deg > HORIZONTAL_TILT_MAX_DEG && window.orientation == Orientation::North {
+            continue;
+        }
+        total += window.area_m2;
+        let louvres = window
+            .glazing
+            .as_ref()
+            .is_some_and(|glazing| glazing.fixed_louvres.is_some());
+        let g = window_g_gl(window, JULY, Balance::Cooling);
+        let obstruction = window_obstruction(window, JULY, Balance::Cooling).unwrap_or(1.0);
+        if louvres
+            || g <= SHADED_GLAZING_G_MAX + 1e-9
+            || obstruction < SHADED_GLAZING_OBSTRUCTION_MAX
+        {
+            limited += window.area_m2;
+        }
+    }
+    if total > 0.0 {
+        limited / total
+    } else {
+        1.0
+    }
 }
 
 /// Checks the §5.7.1 evidence against the zone; empty means accepted.
@@ -263,6 +310,20 @@ pub fn validate_active_cooling(
             }
             let window_area: f64 = input.windows.iter().map(|window| window.area_m2).sum();
             if window_area >= SMALL_WINDOW_AREA_RATIO * input.usable_floor_area_m2 {
+                issues.push(issue(
+                    "solar_limitation_not_met",
+                    &format!("{path}.capacity.criterion"),
+                ));
+            }
+        }
+        if *criterion == SolarLimitationCriterion::ShadedGlazing {
+            if !input.window_inventory_complete {
+                issues.push(issue(
+                    "window_inventory_incomplete",
+                    &format!("{path}.capacity.criterion"),
+                ));
+            }
+            if shaded_glazing_share(input) <= SHADED_GLAZING_AREA_SHARE {
                 issues.push(issue(
                     "solar_limitation_not_met",
                     &format!("{path}.capacity.criterion"),
@@ -326,6 +387,9 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
     }
     let resolved = with_resolved_ventilation(input, &demand);
     let input = &resolved;
+    // §5.7.1 (p. 114–115): a system without sufficient capacity falls under
+    // "alle andere systemen en situaties", so TOjuli is calculated (5.40).
+    let mut insufficient_annex_aa = None;
     if let Some(evidence) = options.active_cooling {
         let mut issues =
             validate_active_cooling(evidence, input, options.residential, "activeCooling");
@@ -344,14 +408,12 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
                             path: item.path,
                         })),
                         Ok(result) => {
-                            if !result.sufficient {
+                            if result.sufficient {
+                                annex_aa = Some(result);
+                            } else {
                                 // AA.10/AA.12 not met: the capacity is insufficient.
-                                issues.push(issue(
-                                    "annex_aa_capacity_insufficient",
-                                    "activeCooling.capacity.calculation",
-                                ));
+                                insufficient_annex_aa = Some(result);
                             }
-                            annex_aa = Some(result);
                         }
                     }
                 }
@@ -359,20 +421,23 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
         }
         if !issues.is_empty() {
             let mut result = invalid(&input.zone_id, has_active, issues);
-            result.annex_aa = annex_aa;
+            result.annex_aa = annex_aa.or(insufficient_annex_aa);
             return result;
         }
-        // §5.7.2: an active cooling system allows TOjuli = 0 for all orientations.
-        return TojuliAssessment {
-            zone_id: input.zone_id.clone(),
-            status: "calculated_unverified",
-            active_cooling: true,
-            orientations: Vec::new(),
-            max_tojuli_k: Some(0.0),
-            meets_bbl_limit: Some(true),
-            annex_aa,
-            issues: Vec::new(),
-        };
+        if insufficient_annex_aa.is_none() {
+            // §5.7.2: an active cooling system allows TOjuli = 0 for all orientations.
+            return TojuliAssessment {
+                zone_id: input.zone_id.clone(),
+                status: "calculated_unverified",
+                active_cooling: true,
+                orientations: Vec::new(),
+                max_tojuli_k: Some(0.0),
+                meets_bbl_limit: Some(true),
+                annex_aa,
+                issues: Vec::new(),
+                warnings: Vec::new(),
+            };
+        }
     }
     let Transmission::Components(components) = &input.transmission else {
         return invalid(
@@ -568,7 +633,17 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
         orientations: results,
         max_tojuli_k: max,
         meets_bbl_limit: max.map(|value| value <= TOJULI_LIMIT_K),
-        annex_aa: None,
+        warnings: insufficient_annex_aa
+            .is_some()
+            .then(|| {
+                issue(
+                    "annex_aa_capacity_insufficient",
+                    "activeCooling.capacity.calculation",
+                )
+            })
+            .into_iter()
+            .collect(),
+        annex_aa: insufficient_annex_aa,
         issues: Vec::new(),
     }
 }
@@ -731,7 +806,7 @@ mod tests {
             .iter()
             .map(|item| item.code)
             .collect();
-        assert_eq!(codes, ["dew_point_cooling_requires_capacity_calculation"]);
+        assert!(codes.contains(&"dew_point_cooling_requires_capacity_calculation"));
 
         let mut other = dynamic.clone();
         other.system = ActiveCoolingSystem::OtherUtility;
@@ -797,18 +872,87 @@ mod tests {
             passed.issues
         );
         assert_eq!(passed.max_tojuli_k, Some(0.0));
-        let required = passed.annex_aa.as_ref().unwrap().required_kw;
+        // A small room behind the same window needs capacity (AA.9/AA.13);
+        // none is installed.
+        let mut small = calculation(0.0);
+        small.rooms[0].area_m2 = 2.0;
         aa.capacity = CoolingCapacityEvidence::AnnexAa {
-            calculation: Some(calculation(0.0)),
+            calculation: Some(small),
             source_reference: "annex AA".into(),
         };
+        // §5.7.1 (p. 115): insufficient capacity is one of "alle andere
+        // situaties", so TOjuli follows 5.40 as without active cooling.
         let failed = options(&aa);
-        if required > 0.0 {
-            assert!(failed
-                .issues
+        let without = assess_tojuli(&input, TojuliOptions::default());
+        assert_eq!(
+            failed.status, "calculated_unverified",
+            "{:?}",
+            failed.issues
+        );
+        assert!(!failed.active_cooling);
+        assert_eq!(failed.max_tojuli_k, without.max_tojuli_k);
+        assert_eq!(failed.meets_bbl_limit, without.meets_bbl_limit);
+        assert!(failed.max_tojuli_k.is_some_and(|value| value > 0.0));
+        assert!(failed.annex_aa.as_ref().is_some_and(|aa| !aa.sufficient));
+        assert_eq!(failed.warnings.len(), 1);
+        assert_eq!(failed.warnings[0].code, "annex_aa_capacity_insufficient");
+
+        // The derived zone names project windows `window:<id>`; the project
+        // id resolves as well.
+        let mut derived = input.clone();
+        derived.windows[0].id = format!("window:{window}");
+        aa.capacity = CoolingCapacityEvidence::AnnexAa {
+            calculation: Some(calculation(100.0)),
+            source_reference: "annex AA".into(),
+        };
+        let resolved = assess_tojuli(
+            &derived,
+            TojuliOptions {
+                active_cooling: Some(&aa),
+                ..TojuliOptions::default()
+            },
+        );
+        assert_eq!(resolved.max_tojuli_k, Some(0.0), "{:?}", resolved.issues);
+    }
+
+    #[test]
+    fn shaded_glazing_is_checked_against_the_window_data() {
+        let mut input = demand();
+        let shaded = evidence(CoolingCapacityEvidence::SolarLimitation {
+            criterion: SolarLimitationCriterion::ShadedGlazing,
+            source_reference: "shading inventory".into(),
+        });
+        let codes = |input: &MonthlyDemandInput| -> Vec<&'static str> {
+            validate_active_cooling(&shaded, input, true, "a")
                 .iter()
-                .any(|item| item.code == "annex_aa_capacity_insufficient"));
+                .map(|item| item.code)
+                .collect()
+        };
+        input.window_inventory_complete = true;
+        // Clear glazing without obstruction: the declaration is contradicted.
+        assert!(shaded_glazing_share(&input) < SHADED_GLAZING_AREA_SHARE);
+        assert!(codes(&input).contains(&"solar_limitation_not_met"));
+        // g_gl;n 0,40 → g_gl = F_W·0,40 ≤ 0,4 on every opening (7.40).
+        for window in &mut input.windows {
+            window.g_perpendicular = 0.40;
+            window.glazing = None;
+            window.dynamic = None;
         }
+        assert!((shaded_glazing_share(&input) - 1.0).abs() < 1e-12);
+        assert!(codes(&input).is_empty(), "{:?}", codes(&input));
+        // Only north-facing (vertical) openings are excluded (p. 115, note 1).
+        let south = input
+            .windows
+            .iter()
+            .position(|window| window.orientation == Orientation::South)
+            .expect("south window");
+        input.windows[south].g_perpendicular = 0.70;
+        assert!(codes(&input).contains(&"solar_limitation_not_met"));
+        input.windows[south].orientation = Orientation::North;
+        assert!(codes(&input).is_empty());
+        // An incomplete inventory cannot carry the declaration.
+        input.window_inventory_complete = false;
+        assert!(codes(&input).contains(&"window_inventory_incomplete"));
     }
 
     #[test]

@@ -2421,7 +2421,10 @@ export interface VentilationBalanceFlows {
   naturalSupplyTemperatureC: number;
   mechanicalSupplyTemperatureC: number;
   ventilativeCoolingTemperatureC: number;
+  /** ρ·c·Σq without b_v (the supply temperatures carry b_v); not H_ve of 7.19. */
   conductanceWPerK: number;
+  /** H_ve of 7.19 with b_v: heat flow per setpoint / (θ_set − θ_e). Absent in older payloads. */
+  weightedConductanceWPerK?: number | null;
   heatFlowPerSetpointW: number;
 }
 
@@ -3556,6 +3559,8 @@ export interface NtaTojuliAssessment {
   meetsBblLimit: boolean | null;
   annexAa: NtaAnnexAaResult | null;
   issues: Array<{ code: string; path: string }>;
+  /** Non-blocking findings, e.g. insufficient annex AA capacity (TOjuli then calculated). */
+  warnings?: Array<{ code: string; path: string }>;
 }
 
 /** Annex AA input per calculation zone (dwellings). */

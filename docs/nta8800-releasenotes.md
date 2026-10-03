@@ -21,6 +21,22 @@ Alleen de invoer verandert; opgeslagen projecten rekenen hetzelfde.
   - verwarmde ruimte onder maaiveld (8.3.3.2);
   - randisolatie (tabel D.1).
 - **BCRG-verklaringstabel:** invoer met de BCRG-code. De kern interpoleert η, F en W_aux binnen de tabel. De uitkomst is informatief en wordt niet in het project opgeslagen.
+## 3 oktober 2026 — TOjuli, bijlage AA en de jaargemiddelde buitentemperatuur
+
+### Uitkomsten die veranderen
+
+- **TOjuli bij onvoldoende koelcapaciteit (bijlage AA).** Was: geen TOjuli en geen Bbl-toets. Nu: TOjuli volgens 5.40, zoals zonder actieve koeling (§5.7.1, p. 114–115), met de waarschuwing `annex_aa_capacity_insufficient`.
+- **`θ_e;avg;an`.** Overal 10,67 °C (D.4, p. 791) in plaats van het ongewogen gemiddelde 10,6717 °C in 7.14/7.15/7.73. Verschillen in de orde van 0,01 kWh/m².
+
+### Projecten die nu een gat krijgen
+
+- **Zonwering als bewijs voor actieve koeling** (`criterion: shaded_glazing`). De raamgegevens moeten de verklaring dragen: meer dan 95 % van het beoordeelde glas met lamellen van tabel 7.4a/7.4b, `g_gl ≤ 0,4` of `F_sh;obst;juli < 0,67`. Anders `solar_limitation_not_met`; bij een onvolledige raaminventaris `window_inventory_incomplete`.
+- **Afgewezen bewijs voor actieve koeling** staat nu ook als gat in `gaps` (pad `ntaCalculation.activeCooling…`). Eerder viel TOjuli stil weg.
+
+### Overig
+
+- Een raam in bijlage AA mag met het projectraam-id worden opgegeven (`win-S`), naast de afgeleide naam `window:win-S`.
+- Nieuw uitvoerveld `weightedConductanceWPerK` per ventilatiemaand: H_ve volgens 7.19/7.20 met b_v. `conductanceWPerK` blijft ρ·c·Σq zonder b_v.
 
 ## 5 oktober 2026 — R_se en R_si bij grenzen met een onverwarmde ruimte (8.4.2.1)
 
