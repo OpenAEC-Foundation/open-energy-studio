@@ -2,6 +2,12 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — maatregelsjablonen in het maatwerkadvies
+
+- **Maatregelen via sjablonen (ISSO 82.2/75.2 §4.3).** Een nieuwe maatregel start als sjabloon: isolatie van dak, gevel of vloer, beglazing, kierdichting, ventilatiesysteem, warmtepomp (forfaitair of bijlage Q), tapwatertoestel, PV, zonneboiler, douche-WTW en verlichting. Het sjabloon genereert de JSON-patch en toont die als voorbeeld; de patchregels blijven beschikbaar onder "Handmatig".
+- **Opgeslagen maatregelen.** Een maatregel krijgt het optionele veld `template`; de kern negeert het. Bestaande maatregelen zonder sjabloon openen als "Handmatig" en rekenen ongewijzigd.
+- **Patches opnieuw opgebouwd.** Bij het doorrekenen worden de patches van sjabloonmaatregelen opnieuw gegenereerd tegen het huidige project, zodat een gewijzigde volgorde van vlakken of ramen de paden niet laat verouderen.
+
 ## 3 oktober 2026 — vakantiewoning in ZEB, reservevermogens, één bouwjaar en lege enum-tag
 
 - **ZEB-indicator (bijlage AB).** Een vakantiewoning (‘andere logiesfunctie’) telt in tabel AB.1 nu in de kolom woningbouw (f_du januari 0,75 in plaats van 0,55), zoals tabel 6.1 (p. 136) haar als woonfunctie behandelt. ZEB-uitkomsten van projecten met deze functie veranderen.

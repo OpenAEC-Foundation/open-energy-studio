@@ -18,3 +18,10 @@
 .mwa-patch-row label { display: flex; flex-direction: column; flex: 1 1 140px; }
 .mwa-variant-issues td { background: rgba(197, 140, 43, 0.12); font-size: 12px; }
 .mwa-variant-issues ul { margin: 0; padding-left: 18px; }
+.mwa-template { display: grid; gap: 8px; }
+.mwa-measure-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
+.mwa-measure-fields > label { display: grid; gap: 4px; font-weight: 600; }
+.mwa-template-draft { grid-column: 1 / -1; }
+.mwa-template-problems { margin: 0; }
+.mwa-template-preview ol { margin: 4px 0 0; padding-left: 20px; font-size: 12px; overflow-wrap: anywhere; }
+.mwa-template-preview code { font-size: 11px; }

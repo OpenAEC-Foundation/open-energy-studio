@@ -1,3 +1,4 @@
+import type { MwaMeasureTemplate } from './MwaTemplates';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { IProject, INtaHeatPumpInput } from '../energy/types';
 import { kernelProject } from './KernelInput';
@@ -4533,6 +4534,8 @@ export interface MwaMeasure {
   maintenanceEurPerYear?: number;
   phaseYear?: number;
   specialistNote?: string;
+  /** Measure template that generated `patch` (editor only; the kernel uses `patch`). */
+  template?: MwaMeasureTemplate | null;
 }
 
 export interface MwaPackage {

@@ -19,6 +19,9 @@ import {
   type NtaMaatwerkadvies,
 } from '../../core/nta/KernelClient';
 import { downloadMaatwerkadviesReportHTML } from '../../core/report/ReportGenerator';
+import type { IProject } from '../../core/energy/types';
+import { buildTemplatePatch, type MwaTemplateKind } from '../../core/nta/MwaTemplates';
+import { applyTemplate, MwaTemplateEditor, TEMPLATE_KINDS, templateMeasure } from './MwaTemplateEditor';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './MaatwerkadviesPanel.css';
 
@@ -202,16 +205,36 @@ export function MeasurePatchFields({ patch, onChange }: {
   );
 }
 
-function MeasureEditor({ measure, onChange, onRemove }: {
+/** Measures with a template get their patch regenerated against the current project. */
+export function regenerateTemplatePatches(project: IProject, definition: NtaMaatwerkadvies): NtaMaatwerkadvies {
+  return {
+    ...definition,
+    measures: definition.measures.map((measure) => (measure.template
+      ? { ...measure, patch: buildTemplatePatch(project, measure.template, measure.id).patch } : measure)),
+  };
+}
+
+function MeasureEditor({ project, measure, onChange, onRemove }: {
+  project: IProject;
   measure: MwaMeasure;
   onChange: (measure: MwaMeasure) => void;
   onRemove: () => void;
 }) {
   const { t } = useI18n();
   const num = (value: string) => (value.trim() === '' ? undefined : Number(value));
+  const kind = measure.template?.kind ?? 'manual';
   return (
     <fieldset className="mwa-measure">
       <legend>{measure.name || measure.id}</legend>
+      <label>{t('mwa.template.kind')}
+        <select value={kind} onChange={(e) => {
+          const next = e.target.value;
+          onChange(next === 'manual' ? applyTemplate(project, measure, null) : templateMeasure(project, measure, next as MwaTemplateKind));
+        }}>
+          {TEMPLATE_KINDS.map((item) => <option key={item} value={item}>{t(`mwa.template.kind.${item}`)}</option>)}
+          <option value="manual">{t('mwa.template.kind.manual')}</option>
+        </select>
+      </label>
       <label>{t('mwa.measure.name')}
         <input value={measure.name} onChange={(e) => onChange({ ...measure, name: e.target.value })} />
       </label>
@@ -244,7 +267,9 @@ function MeasureEditor({ measure, onChange, onRemove }: {
       <label className="mwa-wide">{t('mwa.measure.specialist')}
         <input value={measure.specialistNote ?? ''} onChange={(e) => onChange({ ...measure, specialistNote: e.target.value || undefined })} />
       </label>
-      <MeasurePatchFields patch={measure.patch} onChange={(patch) => onChange({ ...measure, patch })} />
+      {measure.template
+        ? <MwaTemplateEditor project={project} measure={measure} onChange={onChange} />
+        : <MeasurePatchFields patch={measure.patch} onChange={(patch) => onChange({ ...measure, patch })} />}
       <button type="button" className="btn" onClick={onRemove}>{t('mwa.remove')}</button>
     </fieldset>
   );
@@ -344,13 +369,15 @@ export function MaatwerkadviesPanel() {
       packages: definition.packages.map((item) => ({ ...item, measureIds: item.measureIds.filter((m) => m !== id) })),
     });
   };
+  // A new measure starts from the insulation template; "manual" keeps the
+  // expert patch rows.
   const addMeasure = () => update({
     ...definition,
-    measures: [...definition.measures, {
+    measures: [...definition.measures, templateMeasure(project, {
       id: nextId('m', definition.measures.map((item) => item.id)),
       name: '', category: 'insulation', target: 'project', patch: [],
       investmentEur: 0, costSource: '', lifetimeYears: 30,
-    }],
+    }, 'insulation')],
   });
   const setPackage = (index: number, value: MwaPackage) =>
     update({ ...definition, packages: definition.packages.map((item, i) => (i === index ? value : item)) });
@@ -363,7 +390,11 @@ export function MaatwerkadviesPanel() {
     setBusy(true);
     setError(null);
     try {
-      setAssessment(await assessMaatwerkadviesWithRust(project, definition));
+      // Template patches use array indices; regenerate them against the
+      // project as it is now.
+      const current = regenerateTemplatePatches(project, definition);
+      if (JSON.stringify(current) !== JSON.stringify(definition)) dispatch({ type: 'SET_MAATWERKADVIES', payload: current });
+      setAssessment(await assessMaatwerkadviesWithRust(project, current));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -482,7 +513,7 @@ export function MaatwerkadviesPanel() {
         <summary>{t('mwa.measures')} ({definition.measures.length})</summary>
         <p>{t('mwa.patchHelp')}</p>
         {definition.measures.map((measure, index) => (
-          <MeasureEditor key={measure.id} measure={measure}
+          <MeasureEditor key={measure.id} project={project} measure={measure}
             onChange={(value) => setMeasure(index, value)} onRemove={() => removeMeasure(index)} />
         ))}
         <button type="button" className="btn" onClick={addMeasure}>{t('mwa.addMeasure')}</button>
