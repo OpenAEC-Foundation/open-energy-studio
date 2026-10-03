@@ -134,6 +134,15 @@ describe('NTA performance panel', () => {
           annualZebCo2Kg: 1234.25,
           annualFinalEnergyKwh: 6080.25, annualFinalEnergyEedKwh: 6330.25,
           finalEnergyByCarrier: [{ carrier: 'gas', annualKwh: 5900 }, { carrier: 'el', annualKwh: 180.25 }],
+          energyByService: {
+            months: [{ service: 'heating', carrier: 'gas', month: 1, usedKwh: 5900, deliveredKwh: 5900, primaryFossilKwh: 5900 }],
+            renewable: [{ service: 'hotWater', month: 1, renewablePrimaryKwh: 250 }],
+            adjustments: [{ month: 1, exportedElectricityCreditKwh: 0, storageCorrectionKwh: 0, renewableElectricityKwh: 1171 }],
+            annual: [
+              { service: 'heating', carrier: 'gas', usedKwh: 5900, deliveredKwh: 5900, primaryFossilKwh: 5900 },
+              { service: 'auxiliary', carrier: 'el', usedKwh: 180.25, deliveredKwh: 180.25, primaryFossilKwh: 261.36 },
+            ],
+          },
           spaceHeating: {
             omittedTerms: ['9.2.3 node losses and node gains (including solar thermal)'],
             monthly: need.map(month),
@@ -165,6 +174,12 @@ describe('NTA performance panel', () => {
     expect(finalEnergy.getByText('6330.25 kWh/yr')).toBeInTheDocument();
     expect(finalEnergy.getByRole('row', { name: 'gas 5900.00' })).toBeInTheDocument();
     expect(finalEnergy.getByRole('row', { name: 'el 180.25' })).toBeInTheDocument();
+    await user.click(screen.getByText('Energy per energy function (§5.5.3)'));
+    const services = within(screen.getByTestId('nta-energy-by-service'));
+    expect(services.getByRole('row', { name: 'Space heating 0 5.900 5.900 0' })).toBeInTheDocument();
+    expect(services.getByRole('row', { name: 'Auxiliary energy 180 0 261 0' })).toBeInTheDocument();
+    expect(services.getByRole('row', { name: 'Domestic hot water 0 0 0 250' })).toBeInTheDocument();
+    expect(services.getByRole('row', { name: 'Total (EPtot / EPrenTot) 6.161 1.421' })).toBeInTheDocument();
     expect(screen.getByText('7.9.2 intermittent heating reduction a_H;red')).toBeInTheDocument();
     expect(screen.getByText('sha256:abc')).toBeInTheDocument();
     const bbl = within(screen.getByRole('group', { name: 'Bbl article 4.149 check (table 4.148A)' }));
@@ -176,7 +191,7 @@ describe('NTA performance panel', () => {
     expect(tojuli.getByText('1.34 K')).toBeInTheDocument();
     expect(tojuli.queryByText('North-east')).not.toBeInTheDocument();
     expect(tojuli.getByText('does not meet')).toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(16);
+    expect(screen.getAllByRole('row')).toHaveLength(22);
   });
   it('edits the NTA block through the structured form', async () => {
     const user = userEvent.setup();

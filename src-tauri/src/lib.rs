@@ -178,6 +178,11 @@ fn calculate_building_performance(
 }
 
 #[tauri::command]
+fn kernel_interpretations() -> Vec<nta8800_core::interpretations::InterpretationGroup> {
+    nta8800_core::interpretations::kernel_interpretations()
+}
+
+#[tauri::command]
 fn calculate_project_performance(
     project: serde_json::Value,
 ) -> nta8800_core::project_performance::ProjectPerformanceAssessment {
@@ -537,6 +542,7 @@ pub fn run() {
             calculate_constructions,
             calculate_building_performance,
             calculate_project_performance,
+            kernel_interpretations,
             diagnose_bacs_draft,
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,

@@ -1,7 +1,11 @@
 import type { IProject } from '../energy/types';
-import type { LabelData, NtaChapterFiveIndicators, NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment } from '../nta/KernelClient';
+import type {
+  BuildingPerformanceAssessment, LabelData, NtaChapterFiveIndicators, NtaCoolingResult, NtaInterpretationGroup,
+  NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment,
+} from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
 import { summarizeExtras } from '../nta/NtaResultSummary';
+import { summarizeServiceEnergy } from '../nta/ServiceEnergy';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
@@ -34,6 +38,99 @@ function chapterFiveSection(indicators: NtaChapterFiveIndicators | null | undefi
       <tr><th>Overige dragers (5.19)</th><td class="n">${num(indicators.deliveredOtherM3Aeq)} m³ aeq · ${num(indicators.deliveredOtherM3AeqPerM2, 2)} m³ aeq/m²</td><th>Lokaal koolstofemissievrij (§5.5.7)</th>${cell(carbonFree)}</tr>
       <tr><th>Hernieuwbaar per drager (5.39a–h) [kWh]</th><td colspan="3">elektriciteit ${num(r.electricity)} · warmtepomp ${num(r.heatPumpHeat)} · zon thermisch ${num(r.solarHeat)} · koude ${num(r.cold)} · biomassa ${num(r.biomass)} · externe warmte ${num(r.externalHeat)} · externe koude ${num(r.externalCold)}</td></tr>
     </tbody></table>`;
+}
+
+const SERVICE: Record<string, string> = {
+  heating: 'Verwarming (E<sub>H;corr</sub>)', hotWater: 'Warm tapwater (E<sub>W</sub>)', cooling: 'Koeling (E<sub>C;corr</sub>)',
+  humidification: 'Bevochtiging (E<sub>hum</sub>)', ventilation: 'Ventilatie (E<sub>V</sub>)', lighting: 'Verlichting (E<sub>L</sub>)',
+  auxiliary: 'Hulpenergie (W<sub>aux;tot</sub>, 5.21)', heatPumpSource: 'Collectieve warmtepompbron (Q<sub>HD;hp;in;bron</sub>)',
+};
+const CARRIER: Record<string, string> = { el: 'el', gas: 'gas', oil: 'olie', bm: 'biomassa', dh: 'warmte (dh)', dw: 'tapwater (dw)', dc: 'koude (dc)' };
+
+/** §5.5.3/5.20: energy per energy function and carrier. */
+function serviceEnergySection(performance: BuildingPerformanceAssessment): string {
+  const summary = summarizeServiceEnergy(performance.energyByService);
+  if (!summary) return '';
+  const head = summary.carriers.map((carrier) => `<th>${escapeHtml(CARRIER[carrier] ?? carrier)}</th>`).join('');
+  const rows = summary.rows.map((row) => `<tr><th>${SERVICE[row.service] ?? escapeHtml(row.service)}</th>${summary.carriers
+    .map((carrier) => `<td class="n">${num(row.usedKwh[carrier] ?? 0)}</td>`).join('')}
+    <td class="n">${num(row.deliveredKwh)}</td><td class="n">${num(row.primaryFossilKwh)}</td><td class="n">${num(row.renewablePrimaryKwh)}</td></tr>`).join('');
+  const span = summary.carriers.length + 1;
+  return `<h2>Energie per energiefunctie (§5.5.3, 5.20)</h2>
+    <table><thead><tr><th>Energiefunctie</th>${head}<th>Afgenomen [kWh]</th><th>Primair fossiel [kWh]</th><th>Hernieuwbaar [kWh]</th></tr></thead><tbody>${rows}
+      <tr><th>Export elektriciteit (5.10/5.13)</th><td colspan="${span}"></td><td class="n">−${num(summary.exportedElectricityCreditKwh)}</td><td></td></tr>
+      <tr><th>Opslagcorrectie (5.14a)</th><td colspan="${span}"></td><td class="n">−${num(summary.storageCorrectionKwh)}</td><td></td></tr>
+      <tr><th>Hernieuwbare elektriciteit (5.39a)</th><td colspan="${span}"></td><td></td><td class="n">${num(summary.renewableElectricityKwh)}</td></tr>
+      <tr><th>Totaal (EPtot / EPrenTot)</th><td colspan="${span}"></td><td class="n">${num(summary.primaryFossilTotalKwh)}</td><td class="n">${num(summary.renewableTotalKwh)}</td></tr>
+    </tbody></table>
+    <p>Gebruik per drager in kWh (E<sub>EPus;ci</sub>). De eigen benutte opwekking (5.22) is naar rato van het elektriciteitsgebruik over de energiefuncties verdeeld; de norm bepaalt die alleen per drager.</p>`;
+}
+
+/** Chapter 13: need, losses and generator. */
+function hotWaterSection(performance: BuildingPerformanceAssessment): string {
+  const hot = performance.hotWater;
+  if (!hot) return '';
+  const total = (field: keyof (typeof hot.months)[number]) =>
+    hot.months.reduce((sum, month) => sum + (Number(month[field]) || 0), 0);
+  const carrier = total('carrierInputKwh');
+  return `<h2>Warm tapwater (hoofdstuk 13)</h2><table><tbody>
+    <tr><th>Netto behoefte Q<sub>W;nd</sub></th><td class="n">${num(hot.annualNetNeedKwh)} kWh</td><th>Afgifterendement η<sub>W;em</sub></th><td class="n">${num(hot.emissionEfficiency, 3)}</td></tr>
+    <tr><th>Afgifte-invoer Q<sub>W;em;in</sub> (13.17)</th><td class="n">${num(total('emissionInputKwh'))} kWh</td><th>Circulatieverlies (13.26)</th><td class="n">${num(total('circulationLossKwh'))} kWh</td></tr>
+    <tr><th>Opslagverlies (13.58)</th><td class="n">${num(total('storageLossKwh'))} kWh</td><th>Terugwinbaar verlies (13.1.2)</th><td class="n">${num(total('recoverableLossKwh'))} kWh</td></tr>
+    <tr><th>Opwekkeroutput Q<sub>W;gen;out</sub></th><td class="n">${num(hot.annualGeneratorOutputKwh)} kWh</td><th>Opwekkerinvoer (drager)</th><td class="n">${num(carrier)} kWh</td></tr>
+    <tr><th>Opwekkingsrendement (jaar)</th><td class="n">${carrier > 0 ? num(hot.annualGeneratorOutputKwh / carrier, 3) : '—'}</td><th>Hulpenergie W<sub>W;aux</sub></th><td class="n">${num(total('auxiliaryElectricityKwh'))} kWh</td></tr>
+    <tr><th>Zonne-energie (hernieuwbaar)</th><td class="n">${num(hot.annualSolarRenewableKwh)} kWh</td><th>Omgevingswarmte warmtepomp</th><td class="n">${num(total('ambientHeatKwh'))} kWh</td></tr>
+    <tr><th>Opwekkers</th><td colspan="3">${hot.generators.map((item) => `#${item.index + 1}: ${num(item.monthlyOutputKwh.reduce((a, b) => a + b, 0))} kWh`).join(' · ') || '—'}</td></tr>
+  </tbody></table>`;
+}
+
+function coolingRows(result: NtaCoolingResult, label: string): string {
+  const total = (field: 'needKwh' | 'emissionLossKwh' | 'distributionLossKwh' | 'generatorColdKwh' | 'electricityKwh' | 'auxiliaryElectricityKwh') =>
+    result.months.reduce((sum, month) => sum + (month[field] ?? 0), 0);
+  const generators = result.generatorShares.map((item) => {
+    const eer = item.monthlyEer.filter((value) => value > 0);
+    const mean = eer.length ? eer.reduce((a, b) => a + b, 0) / eer.length : null;
+    return `${escapeHtml(item.id)} (methode ${item.method}, aandeel jul–sep ${num(item.shareJulyToSeptember * 100)} %, gem. EER ${num(mean, 2)})`;
+  }).join('; ');
+  return `<tr>${cell(label)}<td class="n">${num(total('needKwh'))}</td><td class="n">${num(total('emissionLossKwh'))}</td><td class="n">${num(total('distributionLossKwh'))}</td>
+    <td class="n">${num(total('generatorColdKwh'))}</td><td class="n">${num(total('electricityKwh'))}</td><td class="n">${num(total('auxiliaryElectricityKwh'))}</td><td>${generators || '—'}</td></tr>`;
+}
+
+/** Chapter 10 per cooling system (§10.2). */
+function coolingSection(performance: BuildingPerformanceAssessment): string {
+  const cooling = performance.cooling;
+  if (!cooling) return '';
+  const systems = cooling.systems?.length
+    ? cooling.systems.map((item, index) => coolingRows(item.assessment, `koelsysteem ${index + 1} (zones ${item.zoneIndexes.map((zone) => zone + 1).join(', ')})`))
+    : [coolingRows(cooling, 'koelsysteem')];
+  return `<h2>Koeling (hoofdstuk 10)</h2><table><thead><tr><th>Systeem</th><th>Q<sub>C;nd</sub> [kWh]</th><th>Afgifteverlies [kWh]</th><th>Distributieverlies [kWh]</th>
+    <th>Opgewekte koude [kWh]</th><th>Elektriciteit [kWh]</th><th>Hulpenergie [kWh]</th><th>Opwekkers</th></tr></thead><tbody>${systems.join('')}</tbody></table>
+    <p>Koelgrens ${num(cooling.coolingLimitC, 1)} °C · Δϑ<sub>int;inc</sub> ${num(cooling.internalTemperatureShiftK, 1)} K.</p>`;
+}
+
+/** Chapter 16 per PV system. */
+function pvSection(performance: BuildingPerformanceAssessment): string {
+  const systems = performance.pvSystems ?? [];
+  if (systems.length === 0) return '';
+  const rows = systems.map((item) => `<tr>${cell(item.id)}<td class="n">${num(item.annualKwh)}</td>${item.monthlyKwh.map((value) => `<td class="n">${num(value)}</td>`).join('')}</tr>`).join('');
+  return `<h2>Zonnestroom (hoofdstuk 16)</h2><table><thead><tr><th>Systeem</th><th>E<sub>pr;el</sub> [kWh/jr]</th>${MONTHS.map((month) => `<th>${month}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/** Annex AB (informative) ZEB indicator. */
+function zebSection(performance: BuildingPerformanceAssessment): string {
+  if (performance.zebPrimaryTotalIndicatorKwhPerM2 == null && performance.annualZebPrimaryTotalKwh == null) return '';
+  return `<h2>ZEB-indicator (bijlage AB, informatief)</h2><table><tbody>
+    <tr><th>EweP,ZEB;Tot (AB.1)</th><td class="n">${num(performance.zebPrimaryTotalIndicatorKwhPerM2, 2)} kWh/m²·jr</td><th>E<sub>P,ZEB;Tot;an</sub></th><td class="n">${num(performance.annualZebPrimaryTotalKwh)} kWh</td></tr>
+    <tr><th>m<sub>CO2;ZEB</sub> (AB.3)</th><td class="n">${num(performance.annualZebCo2Kg)} kg/jr</td><th>Status</th>${cell('informatief, telt niet mee voor label of Bbl')}</tr>
+  </tbody></table>`;
+}
+
+/** Appendix: the kernel's interpretation choices. */
+function interpretationsSection(groups: NtaInterpretationGroup[] | undefined): string {
+  if (!groups || groups.length === 0) return '';
+  return `<h2>Bijlage: interpretaties van de rekenkern</h2>
+    <p>Waar de normtekst meerdere lezingen toelaat of een formule als gedrukt een implausibele uitkomst geeft, legt de kern de gekozen lezing vast. Paginaverwijzingen gaan naar NTA 8800:2025+C1:2026.</p>
+    ${groups.map((group) => `<h3>${escapeHtml(group.part)} <small>(${escapeHtml(group.module)})</small></h3><ul>${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`).join('')}`;
 }
 
 function advisor(value: NtaRegistration['surveyingAdvisor']): string {
@@ -89,6 +186,7 @@ function labelDataSection(labelData: LabelData | null | undefined): string {
 export function generateNtaCalculationReportHTML(
   project: IProject,
   assessment: ProjectPerformanceAssessment,
+  interpretations?: NtaInterpretationGroup[],
 ): string {
   const performance = assessment.performance;
   // Project plausibility and the kernel's own warnings (e.g. 10.15, 13.25).
@@ -174,6 +272,8 @@ export function generateNtaCalculationReportHTML(
       <tr><th>Labelgegevens (Reg. art. 4)</th><td colspan="3">EP2 ${num(performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr · hernieuwbaar ${num(performance.renewableSharePercent, 1)} % · TO<sub>juli</sub> ${num(performance.tojuliMaxK, 2)} K · ${project.buildingFunction === 'residential' ? 'warmtebehoefte (BENG 1)' : 'energiebehoefte (BENG 1)'} ${num(performance.needIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td></tr>
     </tbody></table>
     ${chapterFiveSection(performance.chapter5)}
+    ${serviceEnergySection(performance)}
+    ${zebSection(performance)}
     ${labelDataSection(assessment.labelData)}
     ${ventilationRows ? `<h2>Ventilatie (hoofdstuk 11)</h2><table><thead><tr><th>Zone</th><th>q<sub>V;ODA;req</sub> jan [m³/h]</th><th>Infiltratie jan [m³/h]</th>
       <th>H<sub>ve</sub> jan [W/K]</th><th>Ventilatoren [kWh/jr]</th><th>Vorstbeveiliging [kWh/jr]</th><th>Voorverwarming roosters [kWh/jr]</th></tr></thead>
@@ -189,6 +289,9 @@ export function generateNtaCalculationReportHTML(
       <tr><th>BENG 1 / BENG 3 (tabel 4.148A)</th>${cell(`${meets(performance.a0Check.energyNeedMeets)} / ${meets(performance.a0Check.renewableShareMeets)}`)}<th>A0 mogelijk</th>${cell(performance.a0Check.eligible == null ? 'niet te toetsen' : performance.a0Check.eligible ? 'ja (onverifieerd)' : 'nee')}</tr>
       <tr><th>Bron</th><td colspan="3">${escapeHtml(performance.a0Check.source)}</td></tr>
     </tbody></table>` : ''}
+    ${hotWaterSection(performance)}
+    ${coolingSection(performance)}
+    ${pvSection(performance)}
     <h2>TO<sub>juli</sub> (§5.7)</h2>
     ${tojuliRows ? `<table><thead><tr><th>Zone</th><th>Oriëntatie</th><th>TO<sub>juli</sub> [K]</th></tr></thead><tbody>${tojuliRows}</tbody></table>
       <p>Hoogste waarde: ${num(performance.tojuliMaxK, 2)} K — Bbl 4.149b (≤ 1,20): ${project.ntaCalculation?.calculationScope === 'utility' ? 'niet van toepassing (alleen woonfunctie)' : meets(performance.tojuliMeetsBblLimit)}.</p>` : '<p>Niet bepaald.</p>'}
@@ -202,5 +305,6 @@ export function generateNtaCalculationReportHTML(
       <li>Hoofdstuk 9 (afgifte, opwekking): ${escapeHtml(heating.chapter9Source)}</li>
       <li>Hoofdstuk 5 (primaire energie, indicatoren): ${escapeHtml(performance.chapter5Source)}</li>
       <li>Hoofdstukken 7–17: getranscribeerd uit NTA 8800:2025+C1:2026 (paginaverwijzingen in de kern); verificatie met referentiegevallen nog nodig.</li>
-    </ul></body></html>`;
+    </ul>
+    ${interpretationsSection(interpretations)}</body></html>`;
 }

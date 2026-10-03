@@ -768,6 +768,153 @@ pub struct ElectricityBalanceMonth {
     pub exported_kwh: f64,
 }
 
+/// Chapter 16 yield of one PV system.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PvSystemYield {
+    pub id: String,
+    pub monthly_kwh: [f64; 12],
+    pub annual_kwh: f64,
+}
+
+/// Energy functions of 5.20 for the per-service breakdown (§5.5.3, p. 89):
+/// E_H;corr, E_hum, E_V, E_L, E_C;corr, E_W, W_aux;tot (5.21) and
+/// Q_HD;hp;in;bron. E_dhum is part of cooling (its value is 0).
+pub const ENERGY_FUNCTIONS: [&str; 8] = [
+    "heating",
+    "humidification",
+    "ventilation",
+    "lighting",
+    "cooling",
+    "hotWater",
+    "auxiliary",
+    "heatPumpSource",
+];
+
+/// Carriers of 5.20 in the order of the breakdown.
+pub const BREAKDOWN_CARRIERS: [&str; 7] = ["el", "gas", "oil", "bm", "dh", "dw", "dc"];
+
+const F_HEATING: usize = 0;
+const F_HUMIDIFICATION: usize = 1;
+const F_VENTILATION: usize = 2;
+const F_LIGHTING: usize = 3;
+const F_COOLING: usize = 4;
+const F_HOT_WATER: usize = 5;
+const F_AUXILIARY: usize = 6;
+const F_SOURCE: usize = 7;
+const C_EL: usize = 0;
+const C_GAS: usize = 1;
+const C_OIL: usize = 2;
+const C_BM: usize = 3;
+const C_DH: usize = 4;
+const C_DW: usize = 5;
+const C_DC: usize = 6;
+
+/// One energy function and carrier in one month.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceEnergyMonth {
+    pub service: &'static str,
+    pub carrier: &'static str,
+    pub month: u8,
+    /// Part of E_EPus;ci (5.20) for this function, kWh.
+    pub used_kwh: f64,
+    /// Part of E_EPdel;ci (5.15/5.16). For electricity the self-used own
+    /// production (5.22) is shared over the functions in proportion to
+    /// their use (interpretation: the norm sets it per carrier only).
+    pub delivered_kwh: f64,
+    /// Delivered energy times f_P;del;ci (tables 5.2/5.3 or annex P), kWh.
+    pub primary_fossil_kwh: f64,
+}
+
+/// Renewable primary energy of one function in one month (5.29/5.39).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceRenewableMonth {
+    pub service: &'static str,
+    pub month: u8,
+    pub renewable_primary_kwh: f64,
+}
+
+/// Building-level terms of chapter 5 that belong to no energy function.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildingEnergyAdjustmentMonth {
+    pub month: u8,
+    /// 5.10/5.13: E_exp;el × f_P;exp;el, subtracted from EPTot, kWh.
+    pub exported_electricity_credit_kwh: f64,
+    /// 5.14a: E_P;BAT,out, subtracted from EPTot, kWh.
+    pub storage_correction_kwh: f64,
+    /// 5.39a: renewable electricity produced on the plot × f_Pren, kWh.
+    pub renewable_electricity_kwh: f64,
+}
+
+/// Annual totals of one energy function and carrier.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceEnergyAnnual {
+    pub service: &'static str,
+    pub carrier: &'static str,
+    pub used_kwh: f64,
+    pub delivered_kwh: f64,
+    pub primary_fossil_kwh: f64,
+}
+
+/// §5.5.3 energy per energy function and carrier. Σ months per carrier
+/// equals `carriers`; Σ primary fossil minus the adjustments equals the
+/// annual EPTot; Σ renewable plus the renewable electricity equals EPrenTot.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceEnergyBreakdown {
+    pub months: Vec<ServiceEnergyMonth>,
+    pub renewable: Vec<ServiceRenewableMonth>,
+    pub adjustments: Vec<BuildingEnergyAdjustmentMonth>,
+    pub annual: Vec<ServiceEnergyAnnual>,
+}
+
+impl ServiceEnergyBreakdown {
+    fn finish_annual(&mut self) {
+        let mut annual: Vec<ServiceEnergyAnnual> = Vec::new();
+        for row in &self.months {
+            match annual
+                .iter_mut()
+                .find(|item| item.service == row.service && item.carrier == row.carrier)
+            {
+                Some(item) => {
+                    item.used_kwh += row.used_kwh;
+                    item.delivered_kwh += row.delivered_kwh;
+                    item.primary_fossil_kwh += row.primary_fossil_kwh;
+                }
+                None => annual.push(ServiceEnergyAnnual {
+                    service: row.service,
+                    carrier: row.carrier,
+                    used_kwh: row.used_kwh,
+                    delivered_kwh: row.delivered_kwh,
+                    primary_fossil_kwh: row.primary_fossil_kwh,
+                }),
+            }
+        }
+        self.annual = annual;
+    }
+}
+
+/// Per-month accumulator of the breakdown.
+#[derive(Default)]
+struct ServiceMonth {
+    used: [[f64; 7]; 8],
+    /// Primary fossil of the non-electric carriers (their factors differ
+    /// per class and supply); electricity follows from the delivered share.
+    fossil: [[f64; 7]; 8],
+    renewable: [f64; 8],
+}
+
+impl ServiceMonth {
+    fn add(&mut self, function: usize, carrier: usize, used: f64, primary_factor: f64) {
+        self.used[function][carrier] += used;
+        self.fossil[function][carrier] += used * primary_factor;
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PerformanceIssue {
@@ -789,6 +936,8 @@ pub struct BuildingPerformanceAssessment {
     pub attest_status: &'static str,
     pub label_available: bool,
     pub carriers: Vec<CarrierMonth>,
+    /// §5.5.3/5.20: the carriers split per energy function.
+    pub energy_by_service: ServiceEnergyBreakdown,
     pub electricity_balance: Vec<ElectricityBalanceMonth>,
     pub annual_primary_fossil_kwh: Option<f64>,
     pub annual_renewable_primary_kwh: Option<f64>,
@@ -848,6 +997,13 @@ pub struct BuildingPerformanceAssessment {
     pub standalone_solar: Option<crate::domestic_hot_water::StandaloneSolarHeating>,
     /// Chapter 14 per zone, with the 7.28 internal gain for chapter 7.
     pub lighting: Vec<ZoneLightingResult>,
+    /// Chapter 10, when the building is cooled (`systems` per cooling
+    /// system with several).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cooling: Option<CoolingAssessment>,
+    /// Chapter 16 E_pr;el per PV system (16.2–16.4), kWh.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub pv_systems: Vec<PvSystemYield>,
     pub indicators: Option<IndicatorsDraftAssessment>,
     /// Factors of the external supply and the EMGforf totals (§5.8).
     pub external_supply: Option<ExternalSupplyResult>,
@@ -951,12 +1107,58 @@ fn result_warnings(
             ));
         }
     }
+    warnings.extend(declared_gain_warnings(input));
     for (index, zone) in input.lighting.iter().enumerate() {
         warnings.extend(
             crate::lighting::lighting_warnings(zone, &format!("lighting[{index}]"))
                 .into_iter()
                 .map(|item| issue(item.code, item.path)),
         );
+    }
+    warnings
+}
+
+/// Tolerance on a declared internal heat flux, W/m².
+const DECLARED_GAIN_TOLERANCE_W_PER_M2: f64 = 0.01;
+
+/// §7.5.3.1/7.5.3.2 (p. 179–180): q_Oc·f_τ and q_A are rekenwaarden of
+/// tables 7.2/7.3 without an alternative, and 7.21 (p. 177) fixes the
+/// residential gain. A declared flux is accepted (it may also carry the
+/// 7.28 lighting and 7.29 hot-water terms), but one that matches neither
+/// the table value nor the table value with the §5.4.2 q_L is reported.
+/// The maatwerkadvies usage fit (annex Z) replaces the tables and is
+/// not checked.
+fn declared_gain_warnings(input: &BuildingPerformanceInput) -> Vec<PerformanceIssue> {
+    use crate::monthly_demand::{function_profile, InternalGains, UsageFunction};
+    let mut warnings = Vec::new();
+    for zone in input.zone_inputs() {
+        let InternalGains::Declared {
+            heat_flux_w_per_m2, ..
+        } = &zone.internal_gains
+        else {
+            continue;
+        };
+        if zone.usage_fit.is_some() {
+            continue;
+        }
+        let path = format!("zones[{}].internalGains.heatFluxWPerM2", zone.zone_id);
+        let residential =
+            zone.function_areas.is_empty() && zone.usage_function == UsageFunction::Residential;
+        if residential {
+            warnings.push(issue("internal_gains_declared_residential", path));
+            continue;
+        }
+        let profile = function_profile(zone);
+        let table = profile.occupancy_appliance_w_per_m2;
+        let with_lighting = table + profile.fixed_lighting_w_per_m2;
+        let flux = *heat_flux_w_per_m2;
+        if flux + DECLARED_GAIN_TOLERANCE_W_PER_M2 < table {
+            warnings.push(issue("internal_gains_declared_below_table", path));
+        } else if (flux - table).abs() > DECLARED_GAIN_TOLERANCE_W_PER_M2
+            && (flux - with_lighting).abs() > DECLARED_GAIN_TOLERANCE_W_PER_M2
+        {
+            warnings.push(issue("internal_gains_declared_differs_from_table", path));
+        }
     }
     warnings
 }
@@ -2810,6 +3012,7 @@ pub fn assess_building_performance(
 
     let mut carriers = Vec::new();
     let mut balance = Vec::new();
+    let mut services = ServiceEnergyBreakdown::default();
     let mut totals = None;
     let cooling = if issues.is_empty() {
         cooling_assessment(input, &heating)
@@ -2881,6 +3084,7 @@ pub fn assess_building_performance(
             external.declared,
             &mut carriers,
             &mut balance,
+            &mut services,
         ));
         if external.quality_declaration_used {
             // §5.3.1: EwePTot;EMGforf and RERPrenTot;EMGforf.
@@ -2894,6 +3098,7 @@ pub fn assess_building_performance(
                 external.forfait,
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &mut ServiceEnergyBreakdown::default(),
             ));
         }
     }
@@ -2952,6 +3157,7 @@ pub fn assess_building_performance(
     if !valid {
         carriers.clear();
         balance.clear();
+        services = ServiceEnergyBreakdown::default();
     }
     let scenario = indicators
         .as_ref()
@@ -3238,6 +3444,7 @@ pub fn assess_building_performance(
         annual_final_energy_kwh: final_energy,
         annual_final_energy_eed_kwh: final_energy.map(|value| value + solar_yield),
         carriers,
+        energy_by_service: services,
         electricity_balance: balance,
         annual_primary_fossil_kwh: totals.map(|item| item.fossil),
         annual_renewable_primary_kwh: totals.map(|item| item.renewable),
@@ -3289,6 +3496,23 @@ pub fn assess_building_performance(
         hot_water_from_heating,
         standalone_solar,
         lighting: if valid { lighting } else { Vec::new() },
+        cooling: cooling.filter(|_| valid),
+        pv_systems: if valid {
+            input
+                .pv_systems
+                .iter()
+                .map(|system| {
+                    let monthly_kwh = monthly_yield_kwh(system, input.total_usable_floor_area_m2);
+                    PvSystemYield {
+                        id: system.id.clone(),
+                        annual_kwh: monthly_kwh.iter().sum(),
+                        monthly_kwh,
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        },
         indicators: indicators.filter(|_| valid),
         external_supply: valid.then_some(external),
         issues,
@@ -3387,6 +3611,7 @@ fn compute(
     factors: CarrierFactors,
     carriers: &mut Vec<CarrierMonth>,
     balance: &mut Vec<ElectricityBalanceMonth>,
+    services: &mut ServiceEnergyBreakdown,
 ) -> Totals {
     let bacs = input.bacs_factor;
     let storage_factor = storage_correction_factor(input);
@@ -3464,15 +3689,31 @@ fn compute(
     for index in 0..12 {
         let month = (index + 1) as u8;
         let row = &heating.monthly[index];
+        let mut by = ServiceMonth::default();
         // 5.20/5.21: space heating and its auxiliary energy weighted by f_BACS.
         let mut used_el =
             bacs * (row.generator_electricity_kwh + row.auxiliary_electricity_kwh.unwrap_or(0.0));
         let mut used_gas = bacs * row.natural_gas_kwh;
         let mut used_oil = bacs * row.oil_kwh;
+        by.add(F_HEATING, C_EL, bacs * row.generator_electricity_kwh, 0.0);
+        by.add(
+            F_AUXILIARY,
+            C_EL,
+            bacs * row.auxiliary_electricity_kwh.unwrap_or(0.0),
+            0.0,
+        );
+        by.add(F_HEATING, C_GAS, used_gas, F_P_GAS);
+        by.add(F_HEATING, C_OIL, used_oil, F_P_OIL);
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
         // 9.84: E = Q/(η·f_prac) with η_H;gen;equiv;dh = 1.
         let mut used_dh = bacs * row.district_heat_kwh / factors.practice_heat;
+        by.add(
+            F_HEATING,
+            C_DH,
+            used_dh,
+            factors.district_heat.primary_factor,
+        );
         // 5.39g: the renewable share counts Q_H;gen;out of external heat and
         // Q_C;gen;out of absorption chillers on it, without f_BACS.
         let mut renewable_dh_basis = row.district_heat_kwh;
@@ -3492,18 +3733,48 @@ fn compute(
                 Carrier::Gas => used_gas += value,
                 Carrier::Oil => used_oil += value,
             }
+            let function = match item.service {
+                Service::DomesticHotWater => F_HOT_WATER,
+                Service::VentilationFans => F_VENTILATION,
+                Service::SpaceCooling => F_COOLING,
+                Service::Lighting => F_LIGHTING,
+                Service::Humidification => F_HUMIDIFICATION,
+                Service::DomesticHotWaterAuxiliary
+                | Service::SpaceCoolingAuxiliary
+                | Service::PvAuxiliary => F_AUXILIARY,
+            };
+            let carrier = match item.carrier {
+                Carrier::El => C_EL,
+                Carrier::Gas => C_GAS,
+                Carrier::Oil => C_OIL,
+            };
+            by.add(function, carrier, value, item.carrier.primary_factor());
         }
         // Chapter 12: steam humidifiers (12.3), carrier electricity or gas.
         used_el += heating.monthly[index].humidification_electricity_kwh;
         used_gas += heating.monthly[index].humidification_fuel_kwh;
+        by.add(
+            F_HUMIDIFICATION,
+            C_EL,
+            heating.monthly[index].humidification_electricity_kwh,
+            0.0,
+        );
+        by.add(
+            F_HUMIDIFICATION,
+            C_GAS,
+            heating.monthly[index].humidification_fuel_kwh,
+            F_P_GAS,
+        );
         // Chapter 11: fans (11.132), frost protection (11.105) and grille
         // preheating (11.125); not weighted by f_BACS.
         for demand in std::iter::once(&heating.demand).chain(&heating.additional_zone_demands) {
             if let Some(ventilation) = &demand.ventilation {
                 let row = &ventilation.months[index];
-                used_el += row.fan_electricity_kwh
+                let fans = row.fan_electricity_kwh
                     + row.frost_protection_electricity_kwh
                     + row.grille_preheating_electricity_kwh;
+                used_el += fans;
+                by.add(F_VENTILATION, C_EL, fans, 0.0);
             }
         }
         // Chapter 10 cooling and its auxiliaries, weighted by f_BACS (5.20/5.21).
@@ -3513,27 +3784,61 @@ fn compute(
         if let Some(assessment) = cooling {
             let month_row = &assessment.months[index];
             used_el += bacs * (month_row.electricity_kwh + month_row.auxiliary_electricity_kwh);
+            by.add(F_COOLING, C_EL, bacs * month_row.electricity_kwh, 0.0);
+            by.add(
+                F_AUXILIARY,
+                C_EL,
+                bacs * month_row.auxiliary_electricity_kwh,
+                0.0,
+            );
             // Table 10.30 with 9.65: CHP fuel (natural gas, gross value).
             used_gas += bacs * (month_row.natural_gas_kwh + month_row.chp_heat_kwh);
+            by.add(
+                F_COOLING,
+                C_GAS,
+                bacs * (month_row.natural_gas_kwh + month_row.chp_heat_kwh),
+                F_P_GAS,
+            );
             used_dh += bacs * month_row.district_heat_kwh;
+            by.add(
+                F_COOLING,
+                C_DH,
+                bacs * month_row.district_heat_kwh,
+                factors.district_heat.primary_factor,
+            );
             renewable_dh_basis += month_row.district_heat_cold_kwh;
+            by.renewable[F_COOLING] +=
+                month_row.district_heat_cold_kwh * factors.district_heat.renewable_factor;
             // 10.78: f_prpr of external cold.
             used_dc += bacs * month_row.district_cold_kwh / factors.practice_cold;
+            by.add(
+                F_COOLING,
+                C_DC,
+                bacs * month_row.district_cold_kwh / factors.practice_cold,
+                factors.district_cold.primary_factor,
+            );
+            by.renewable[F_COOLING] += month_row.district_cold_kwh
+                * factors.district_cold.renewable_factor
+                + month_row.ambient_cold_kwh * F_PREN_RENCOLD;
             renewable_dc_basis += month_row.district_cold_kwh;
             ambient_cold = month_row.ambient_cold_kwh;
         }
         // Chapter 14 lighting (electricity, months by t_mi/t_an).
-        used_el += lighting
+        let lighting_el = lighting
             .iter()
             .map(|zone| zone.monthly_kwh[index])
             .sum::<f64>();
+        used_el += lighting_el;
+        by.add(F_LIGHTING, C_EL, lighting_el, 0.0);
         let mut hot_water_ambient = 0.0;
         let mut hot_water_chp = 0.0;
         // 5.39d: solar heat for hot water and the space-heating node.
         let mut solar_heat = row.solar_gain_kwh;
         // 13.67: pump energy of standalone space-heating solar systems.
         if let Some(solar) = standalone_solar {
-            used_el += solar.auxiliary_kwh.get(index).copied().unwrap_or(0.0);
+            let pumps = solar.auxiliary_kwh.get(index).copied().unwrap_or(0.0);
+            used_el += pumps;
+            by.add(F_AUXILIARY, C_EL, pumps, 0.0);
         }
         // §13.8.4.6: table 13.22 biomass appliances (bmB).
         let mut hot_water_biomass = 0.0;
@@ -3545,9 +3850,19 @@ fn compute(
             used_el += row.electricity_kwh;
             used_gas += row.natural_gas_kwh;
             used_oil += row.oil_kwh;
+            by.add(F_HOT_WATER, C_EL, row.electricity_kwh, 0.0);
+            by.add(F_HOT_WATER, C_GAS, row.natural_gas_kwh, F_P_GAS);
+            by.add(F_HOT_WATER, C_OIL, row.oil_kwh, F_P_OIL);
             // 13.152: f_prac;gi of external heat for hot water.
             used_dw += row.district_heat_kwh / factors.practice_hot_water;
+            by.add(
+                F_HOT_WATER,
+                C_DW,
+                row.district_heat_kwh / factors.practice_hot_water,
+                factors.district_hot_water.primary_factor,
+            );
             used_el += row.auxiliary_electricity_kwh;
+            by.add(F_AUXILIARY, C_EL, row.auxiliary_electricity_kwh, 0.0);
             hot_water_ambient = row.ambient_heat_kwh;
             hot_water_chp = row.chp_electricity_kwh;
             solar_heat += row.solar_renewable_kwh;
@@ -3602,6 +3917,10 @@ fn compute(
             fossil += source_heat * source.primary_factor;
             co2 += source_heat * source.co2_kg_per_kwh;
         }
+        if let Some(source) = source {
+            by.add(F_SOURCE, C_DH, source_heat, source.primary_factor);
+            by.renewable[F_SOURCE] += source_heat * source.renewable_factor;
+        }
         // 5.20 books Q_HD;hp;in;bron as carrier dh (its own factors above).
         let reported_dh = used_dh + if source.is_some() { source_heat } else { 0.0 };
         // Tables 5.2/5.3: bmA f_P 0,0, bmB 0,5, bmC 1,0 (× 0,104 for CO2).
@@ -3609,6 +3928,10 @@ fn compute(
         let used_bm_a = bacs * row.biomass_class_a_kwh;
         let used_bm_c = bacs * row.biomass_class_c_kwh;
         let used_bm = used_bm_a + used_bm_b + used_bm_c;
+        by.add(F_HEATING, C_BM, bacs * row.biomass_kwh, F_P_BIOMASS_B);
+        by.add(F_HEATING, C_BM, used_bm_a, 0.0);
+        by.add(F_HEATING, C_BM, used_bm_c, 1.0);
+        by.add(F_HOT_WATER, C_BM, hot_water_biomass, F_P_BIOMASS_B);
         fossil += used_bm_b * F_P_BIOMASS_B + used_bm_c;
         co2 += used_bm_b * K_CO2_BIOMASS_B + used_bm_c * 0.104;
         if used_bm > 0.0 {
@@ -3700,14 +4023,25 @@ fn compute(
         // 5.39f with table 5.4: f_Pren bmA 1,0, bmB 0,5, bmC 0 on the
         // delivered heat, split by fuel when classes are mixed.
         let biomass_fuel = row.biomass_kwh + row.biomass_class_a_kwh + row.biomass_class_c_kwh;
-        let biomass_heat = if biomass_fuel > 0.0 {
+        let heating_biomass_heat = if biomass_fuel > 0.0 {
             // Only the heat of the biomass appliances (a `multiple` set
             // also holds other generators).
             row.biomass_output_kwh * (row.biomass_class_a_kwh / F_PREN_BIOMASS_B + row.biomass_kwh)
                 / biomass_fuel
         } else {
             0.0
-        } + hot_water_biomass_heat;
+        };
+        let biomass_heat = heating_biomass_heat + hot_water_biomass_heat;
+        // 5.39 per energy function; renewable electricity stays a
+        // building-level term.
+        by.renewable[F_HEATING] += ambient * F_PREN_RENHEAT
+            + row.solar_gain_kwh * F_PREN_RENHEAT
+            + heating_biomass_heat * F_PREN_BIOMASS_B
+            + row.district_heat_kwh * dh.renewable_factor;
+        by.renewable[F_HOT_WATER] += (declared_heat + hot_water_ambient) * F_PREN_RENHEAT
+            + (solar_heat - row.solar_gain_kwh) * F_PREN_RENHEAT
+            + hot_water_biomass_heat * F_PREN_BIOMASS_B
+            + used_dw * dw.renewable_factor;
         // 5.39: external supply at f_Pren;dX and the collective source.
         // 5.39a–h per carrier ri; their sum is EPrenTot (5.28).
         let month_renewable = RenewableByCarrier {
@@ -3723,7 +4057,49 @@ fn compute(
         };
         renewable += month_renewable.total();
         renewable_by.add(&month_renewable);
+        // §5.5.3 breakdown: self-used production shared by electricity use.
+        let delivered_share = if used_el > 0.0 {
+            delivered_el / used_el
+        } else {
+            1.0
+        };
+        for (function, service) in ENERGY_FUNCTIONS.iter().enumerate() {
+            for (carrier, code) in BREAKDOWN_CARRIERS.iter().enumerate() {
+                let used = by.used[function][carrier];
+                if used.abs() <= 0.0 {
+                    continue;
+                }
+                let (delivered, primary) = if carrier == C_EL {
+                    let delivered = used * delivered_share;
+                    (delivered, delivered * F_P_ELECTRICITY)
+                } else {
+                    (used, by.fossil[function][carrier])
+                };
+                services.months.push(ServiceEnergyMonth {
+                    service,
+                    carrier: code,
+                    month,
+                    used_kwh: used,
+                    delivered_kwh: delivered,
+                    primary_fossil_kwh: primary,
+                });
+            }
+            if by.renewable[function] != 0.0 {
+                services.renewable.push(ServiceRenewableMonth {
+                    service,
+                    month,
+                    renewable_primary_kwh: by.renewable[function],
+                });
+            }
+        }
+        services.adjustments.push(BuildingEnergyAdjustmentMonth {
+            month,
+            exported_electricity_credit_kwh: exported * F_P_ELECTRICITY,
+            storage_correction_kwh: correction,
+            renewable_electricity_kwh: month_renewable.electricity,
+        });
     }
+    services.finish_annual();
     let zone_demands = || std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
     // §5.4.2: the fixed C1 run, when chapter 11 supplied it for every zone.
     let fixed_c1_need: Option<f64> = zone_demands()
@@ -3771,6 +4147,91 @@ mod tests {
     use crate::annex_p::{AnnexPRoute, CollectiveHeatPumpSource};
     use crate::space_heating_chain::HeatPumpGenerator;
     use serde_json::json;
+
+    /// §5.5.3: the per-function rows add up to the carriers, EPTot and
+    /// EPrenTot.
+    fn assert_services_reconcile(result: &BuildingPerformanceAssessment) {
+        let services = &result.energy_by_service;
+        for row in &result.carriers {
+            let (used, delivered) = services
+                .months
+                .iter()
+                .filter(|item| item.carrier == row.carrier && item.month == row.month)
+                .fold((0.0, 0.0), |(u, d), item| {
+                    (u + item.used_kwh, d + item.delivered_kwh)
+                });
+            assert!((used - row.used_kwh).abs() < 1e-6, "{}", row.carrier);
+            assert!(
+                (delivered - row.delivered_kwh).abs() < 1e-6,
+                "{}",
+                row.carrier
+            );
+        }
+        let fossil: f64 = services
+            .months
+            .iter()
+            .map(|item| item.primary_fossil_kwh)
+            .sum::<f64>()
+            - services
+                .adjustments
+                .iter()
+                .map(|item| item.exported_electricity_credit_kwh + item.storage_correction_kwh)
+                .sum::<f64>();
+        let expected = result.annual_primary_fossil_kwh.unwrap();
+        assert!((fossil - expected).abs() < 1e-6, "{fossil} vs {expected}");
+        let renewable: f64 = services
+            .renewable
+            .iter()
+            .map(|item| item.renewable_primary_kwh)
+            .sum::<f64>()
+            + services
+                .adjustments
+                .iter()
+                .map(|item| item.renewable_electricity_kwh)
+                .sum::<f64>();
+        let expected = result.annual_renewable_primary_kwh.unwrap();
+        assert!(
+            (renewable - expected).abs() < 1e-6,
+            "{renewable} vs {expected}"
+        );
+    }
+
+    /// §7.5.3.1/7.5.3.2: a declared flux is checked against tables 7.2/7.3
+    /// (office 5·0,30 + 4 = 5,5 W/m², with q_L 1,25 W/m² 6,75 W/m²).
+    #[test]
+    fn declared_internal_gains_are_checked_against_tables_7_2_and_7_3() {
+        use crate::monthly_demand::{InternalGains, UsageFunction};
+        let codes = |flux: f64, function: UsageFunction| {
+            let mut sample = input();
+            sample.space_heating.demand.usage_function = function;
+            sample.space_heating.demand.function_areas.clear();
+            sample.space_heating.demand.usage_fit = None;
+            sample.space_heating.demand.internal_gains = InternalGains::Declared {
+                heat_flux_w_per_m2: flux,
+                source_reference: "test".into(),
+            };
+            declared_gain_warnings(&sample)
+                .into_iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        assert!(codes(5.5, UsageFunction::Office).is_empty());
+        assert!(codes(6.75, UsageFunction::Office).is_empty());
+        assert_eq!(
+            codes(3.0, UsageFunction::Office),
+            ["internal_gains_declared_below_table"]
+        );
+        assert_eq!(
+            codes(9.0, UsageFunction::Office),
+            ["internal_gains_declared_differs_from_table"]
+        );
+        assert_eq!(
+            codes(5.0, UsageFunction::Residential),
+            ["internal_gains_declared_residential"]
+        );
+        // The residential 7.21 gain is not a declared flux.
+        assert!(declared_gain_warnings(&input()).is_empty());
+    }
 
     fn chain() -> SpaceHeatingChainInput {
         serde_json::from_str(include_str!(
@@ -5787,6 +6248,7 @@ mod tests {
             + aux * 1.45;
         assert!((result.annual_primary_fossil_kwh.unwrap() - expected).abs() < 1e-6);
         assert!(result.carriers.iter().any(|item| item.carrier == "dh"));
+        assert_services_reconcile(&result);
         assert_eq!(
             result.annual_renewable_primary_kwh,
             base.annual_renewable_primary_kwh
@@ -5845,6 +6307,7 @@ mod tests {
             - base.annual_renewable_primary_kwh.unwrap();
         assert!((renewable_delta - heat * 0.5).abs() < 1e-6);
         assert!(result.carriers.iter().any(|item| item.carrier == "bm"));
+        assert_services_reconcile(&result);
     }
 
     fn cooling_system(kind: crate::space_cooling::CoolingGeneratorKind) -> CoolingSystem {
@@ -6241,6 +6704,12 @@ mod tests {
             .map(|item| item.used_kwh)
             .sum();
         assert!(cold > 0.0);
+        assert_services_reconcile(&result);
+        assert!(result
+            .energy_by_service
+            .annual
+            .iter()
+            .any(|item| item.service == "cooling" && item.carrier == "dc"));
         let delta =
             result.annual_primary_fossil_kwh.unwrap() - base.annual_primary_fossil_kwh.unwrap();
         assert!((delta - cold * 1.45 / 3.0).abs() < 1e-6);

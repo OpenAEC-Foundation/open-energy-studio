@@ -10,6 +10,7 @@ import {
 import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTemplate';
 import { NtaCalculationForm } from './NtaCalculationForm';
 import { summarizeExtras } from '../../core/nta/NtaResultSummary';
+import { summarizeServiceEnergy } from '../../core/nta/ServiceEnergy';
 import './NtaPerformancePanel.css';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -99,6 +100,7 @@ export function NtaPerformancePanel() {
   const heating = performance?.spaceHeating;
   const issues = performance?.issues ?? [];
   const extras = calculated && performance ? summarizeExtras(performance) : null;
+  const services = calculated && performance ? summarizeServiceEnergy(performance.energyByService) : null;
 
   return (
     <section className="nta-performance" aria-label={t('nta.performance.title')}>
@@ -228,6 +230,30 @@ export function NtaPerformancePanel() {
               </tr>)}</tbody>
             </table></div>}
           </details>}
+        {services && <details className="nta-performance-monthly" data-testid="nta-energy-by-service">
+          <summary>{t('nta.performance.byService')}</summary>
+          <div className="nta-performance-table"><table>
+            <thead><tr><th scope="col">{t('nta.performance.byService.function')}</th>
+              {services.carriers.map((carrier) => <th scope="col" key={carrier}>{carrier}</th>)}
+              <th scope="col">{t('nta.performance.byService.primaryFossil')}</th>
+              <th scope="col">{t('nta.performance.byService.renewable')}</th></tr></thead>
+            <tbody>
+              {services.rows.map((row) => <tr key={row.service}>
+                <th scope="row">{t(`nta.performance.service.${row.service}`)}</th>
+                {services.carriers.map((carrier) => <td key={carrier}>{kwh(row.usedKwh[carrier] ?? 0)}</td>)}
+                <td>{kwh(row.primaryFossilKwh)}</td><td>{kwh(row.renewablePrimaryKwh)}</td>
+              </tr>)}
+              <tr><th scope="row">{t('nta.performance.byService.export')}</th>
+                {services.carriers.map((carrier) => <td key={carrier} />)}
+                <td>−{kwh(services.exportedElectricityCreditKwh + services.storageCorrectionKwh)}</td>
+                <td>{kwh(services.renewableElectricityKwh)}</td></tr>
+              <tr><th scope="row">{t('nta.performance.byService.total')}</th>
+                {services.carriers.map((carrier) => <td key={carrier} />)}
+                <td>{kwh(services.primaryFossilTotalKwh)}</td><td>{kwh(services.renewableTotalKwh)}</td></tr>
+            </tbody>
+          </table></div>
+          <p>{t('nta.performance.byService.note')}</p>
+        </details>}
         {performance.tojuli.length > 0 && <div className="nta-performance-bbl" role="group" aria-label="TOjuli">
           <strong>TO<sub>juli</sub> (§5.7)</strong>
           <small>{t('nta.performance.tojuliScope')}</small>

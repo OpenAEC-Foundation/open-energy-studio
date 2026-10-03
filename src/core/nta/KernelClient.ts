@@ -4002,6 +4002,58 @@ export interface NtaHotWaterSystem {
   equipmentReference: string;
 }
 
+/** Chapter 10 result; see crates/nta8800-core/src/space_cooling.rs. */
+export interface NtaCoolingResult {
+  coolingLimitC: number;
+  internalTemperatureShiftK: number;
+  generatorShares: Array<{ id: string; priority: number; beta: number; shareJulyToSeptember: number;
+    shareOtherMonths: number; method: number; monthlyEer: number[] }>;
+  months: Array<{ month: number; needKwh: number; emissionLossKwh: number; distributionLossKwh: number;
+    generatorColdKwh: number; electricityKwh: number; naturalGasKwh: number; districtHeatKwh: number;
+    districtColdKwh: number; auxiliaryElectricityKwh: number; ambientColdKwh: number }>;
+  interpretations: string[];
+  systems?: Array<{ zoneIndexes: number[]; assessment: NtaCoolingResult }>;
+  warnings?: Array<{ code: string; path: string }>;
+}
+
+/** Energy functions of 5.20 (E_dhum is part of cooling). */
+export type NtaEnergyFunction = 'heating' | 'humidification' | 'ventilation' | 'lighting' | 'cooling'
+  | 'hotWater' | 'auxiliary' | 'heatPumpSource';
+
+/**
+ * §5.5.3 energy per energy function and carrier; see building_performance.rs.
+ * Σ months per carrier equals `carriers`; Σ primaryFossilKwh minus the
+ * adjustments equals EPTot; Σ renewable plus renewableElectricityKwh equals EPrenTot.
+ */
+export interface NtaServiceEnergyBreakdown {
+  months: Array<{ service: NtaEnergyFunction; carrier: string; month: number; usedKwh: number;
+    deliveredKwh: number; primaryFossilKwh: number }>;
+  renewable: Array<{ service: NtaEnergyFunction; month: number; renewablePrimaryKwh: number }>;
+  adjustments: Array<{ month: number; exportedElectricityCreditKwh: number; storageCorrectionKwh: number;
+    renewableElectricityKwh: number }>;
+  annual: Array<{ service: NtaEnergyFunction; carrier: string; usedKwh: number; deliveredKwh: number;
+    primaryFossilKwh: number }>;
+}
+
+/** One norm part with the kernel's interpretation choices. */
+export interface NtaInterpretationGroup {
+  part: string;
+  module: string;
+  items: string[];
+}
+
+/** The kernel's interpretation lists (crates/nta8800-core/src/interpretations.rs). */
+export async function fetchKernelInterpretations(): Promise<NtaInterpretationGroup[]> {
+  if (isTauri()) {
+    return invoke<NtaInterpretationGroup[]>('kernel_interpretations');
+  }
+  if (import.meta.env.DEV) {
+    const response = await fetch('/api/v1/nta8800/interpretations');
+    return response.json() as Promise<NtaInterpretationGroup[]>;
+  }
+  return [];
+}
+
 export interface BuildingPerformanceAssessment {
   status: 'calculated_unverified' | 'invalid';
   scope: string;
@@ -4017,6 +4069,8 @@ export interface BuildingPerformanceAssessment {
     usedKwh: number;
     deliveredKwh: number;
   }>;
+  /** §5.5.3/5.20: the carriers split per energy function. */
+  energyByService?: NtaServiceEnergyBreakdown;
   electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; selfUsedKwh: number; exportedKwh: number }>;
   annualPrimaryFossilKwh: number | null;
   annualRenewablePrimaryKwh: number | null;
@@ -4066,6 +4120,10 @@ export interface BuildingPerformanceAssessment {
   /** Standalone space-heating solar systems. */
   standaloneSolar?: { spaceHeatingKwh: number[]; auxiliaryKwh: number[]; recoverableKwh: number[] };
   lighting?: Array<{ zoneId: string; annualKwh: number; monthlyKwh: number[]; internalGainW: number }>;
+  /** Chapter 10 when cooled; `systems` per cooling system with several (§10.2). */
+  cooling?: NtaCoolingResult;
+  /** Chapter 16 E_pr;el per PV system, kWh. */
+  pvSystems?: Array<{ id: string; monthlyKwh: number[]; annualKwh: number }>;
   /** Factors of the external supply and the EMGforf totals (§5.8). */
   externalSupply?: NtaExternalSupplyResult | null;
   issues: Array<{ code: string; path: string }>;
@@ -4756,6 +4814,12 @@ export interface NtaHotWaterAssessment {
   months: Array<{
     month: number;
     netNeedKwh: number;
+    /** 13.17 emission input Q_W;em;in, kWh. */
+    emissionInputKwh?: number;
+    /** 13.26 circulation loss, kWh. */
+    circulationLossKwh?: number;
+    /** 13.58 storage loss, kWh. */
+    storageLossKwh?: number;
     generatorOutputKwh: number;
     generationEfficiency: number;
     carrierInputKwh: number;
