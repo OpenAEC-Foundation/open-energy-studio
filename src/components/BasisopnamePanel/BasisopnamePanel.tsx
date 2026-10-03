@@ -21,7 +21,11 @@ import './BasisopnamePanel.css';
 type Change = (path: Path, value: unknown) => void;
 type T = (key: string) => string;
 
-const HEATING_KINDS = ['boiler', 'heat_pump', 'district_heat', 'electric', 'biomass', 'chp', 'none_present'];
+const HEATING_KINDS = ['boiler', 'heat_pump', 'local_fired', 'gas_air_heater', 'district_heat', 'electric', 'biomass',
+  'chp', 'none_present'];
+const HEAT_PUMP_SOURCES = ['outdoor_air', 'exhaust_air', 'outdoor_and_exhaust_air', 'heat_pump_panel', 'ground',
+  'groundwater', 'surface_water', 'high_temperature', 'water_based_unknown'];
+const WATER_SOURCES = ['ground', 'groundwater', 'surface_water', 'high_temperature', 'water_based_unknown'];
 const HOT_WATER_KINDS: Record<SurveyKind, string[]> = {
   residential: ['gas_appliance', 'electric_boiler', 'electric_instantaneous', 'heat_pump', 'district_heat',
     'collective_unknown', 'delivery_set_from_heating', 'none'],
@@ -89,6 +93,30 @@ export function EmitterFields({ draft, change, t }: { draft: Draft; change: Chan
   </>;
 }
 
+/** ISSO §9.4.2 and table 9.12: one- or two-pipe system and the pipe insulation (unknown: not insulated). */
+export function DistributionFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
+  const type = read(draft, ['heating', 'distributionType', 'kind']);
+  const insulation = read(draft, ['heating', 'pipeInsulation']);
+  const insulated = read(draft, ['heating', 'pipeInsulation', 'insulated']) === true;
+  return <>
+    <SelectField {...field} path={['heating', 'distributionType', 'kind']} label={t('opname.heating.distributionType')}
+      options={opts(t, 'opname.heating.distributionTypeKind', ['two_pipe', 'one_pipe', 'renovated_one_pipe'])}
+      onChange={(_, value) => change(['heating', 'distributionType'], value == null ? null
+        : value === 'one_pipe' ? { kind: value, emitterCount: 1 } : { kind: value })} />
+    {type === 'one_pipe' && <NumberField {...field} path={['heating', 'distributionType', 'emitterCount']}
+      label={t('opname.heating.emitterCount')} step="1" />}
+    <TriStateField {...field} {...yesNo} path={['heating', 'pipeInsulation', 'insulated']} label={t('opname.heating.pipesInsulated')}
+      onChange={(_, value) => change(['heating', 'pipeInsulation'], value == null ? null
+        : { ...(insulation as Draft | null ?? {}), insulated: value })} />
+    {insulated && <NumberField {...field} path={['heating', 'pipeInsulation', 'insulationYear']}
+      label={t('opname.heating.insulationYear')} step="1" />}
+    {insulation != null && <TriStateField {...field} {...yesNo} path={['heating', 'pipeInsulation', 'fittingsInsulated']}
+      label={t('opname.heating.fittingsInsulated')} />}
+  </>;
+}
+
 /** ISSO §11.4.1/§11.5.6: passive cooling proven by a supplier project document. */
 export function PassiveCoolingFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
   const field = { draft, onChange: change };
@@ -109,22 +137,59 @@ export function PassiveCoolingFields({ draft, change, t }: { draft: Draft; chang
 
 function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path: Path; change: Change; t: T }) {
   const field = { draft, onChange: change };
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
   const kind = read(draft, [...path, 'kind']);
+  const source = read(draft, [...path, 'source']);
+  const collectiveSource = read(draft, [...path, 'collectiveSourceReference']) != null;
   return <>
     <KindSelect draft={draft} path={path} label={t('opname.heating.generator')} kinds={HEATING_KINDS}
       prefix="opname.heating.kind" template={heatingGeneratorTemplate} change={change} t={t} />
     {kind === 'boiler' && <>
       <SelectField {...field} path={[...path, 'boilerType']} label={t('opname.heating.boilerType')}
-        options={opts(t, 'opname.heating.boiler', ['conventional', 'vr', 'hr100', 'hr104', 'hr107', 'hydrogen'])} />
+        options={opts(t, 'opname.heating.boiler', ['conventional', 'vr', 'hr100', 'hr104', 'hr107', 'hydrogen', 'oil'])} />
       <CheckField {...field} path={[...path, 'insideThermalBoundary']} label={t('opname.insideThermalBoundary')} />
       <NumberField {...field} path={[...path, 'manufactureYear']} label={t('opname.manufactureYear')} step="1" />
     </>}
     {kind === 'heat_pump' && <>
+      <SelectField {...field} path={[...path, 'drive']} label={t('opname.heating.drive')}
+        options={opts(t, 'opname.heating.driveKind', ['electric', 'gas_engine', 'gas_absorption'])} />
       <SelectField {...field} path={[...path, 'source']} label={t('opname.heating.source')}
-        options={opts(t, 'opname.heating.hpSource', ['outdoor_air', 'exhaust_air', 'outdoor_and_exhaust_air', 'ground',
-          'groundwater', 'surface_water', 'water_based_unknown'])} />
+        options={opts(t, 'opname.heating.hpSource', HEAT_PUMP_SOURCES)} />
       <NumberField {...field} path={[...path, 'capacityKw']} label={t('opname.capacityKw')} />
       <CheckField {...field} path={[...path, 'highTemperature']} label={t('opname.heating.highTemperature')} />
+      {typeof source === 'string' && WATER_SOURCES.includes(source) && <>
+        <label className="nta-form-check">
+          <input type="checkbox" checked={collectiveSource}
+            onChange={(event) => change([...path, 'collectiveSourceReference'], event.target.checked ? '' : null)} />
+          {t('opname.heating.collectiveSource')}
+        </label>
+        {collectiveSource && <TextField {...field} path={[...path, 'collectiveSourceReference']}
+          label={t('opname.heating.collectiveSourceReference')} />}
+      </>}
+      {source === 'groundwater' && <SelectField {...field} path={[...path, 'groundwaterSystem']}
+        label={t('opname.heating.groundwaterSystem')}
+        options={opts(t, 'opname.heating.groundwaterSystemKind', ['doublet', 'recirculation'])} />}
+      {(source === 'groundwater' || source === 'high_temperature' || (source === 'surface_water' && collectiveSource)) && <>
+        <NumberField {...field} path={[...path, 'sourceTemperatureC']} label={t('opname.heating.sourceTemperature')} />
+        <TextField {...field} path={[...path, 'sourceTemperatureReference']} label={t('opname.heating.sourceTemperatureReference')} />
+      </>}
+      {source === 'high_temperature' && <TextField {...field} path={[...path, 'sourceQualityDeclarationReference']}
+        label={t('opname.heating.sourceQualityDeclaration')} />}
+      <p className="nta-form-note">{t('opname.heating.heatPumpNote')}</p>
+    </>}
+    {kind === 'local_fired' && <>
+      <SelectField {...field} path={[...path, 'appliance']} label={t('opname.heating.appliance')}
+        options={opts(t, 'opname.heating.localFired', ['gas_heater', 'oil_heater', 'steam_boiler'])} />
+      {read(draft, [...path, 'appliance']) === 'steam_boiler' && <SelectField {...field} path={[...path, 'fuel']}
+        label={t('opname.heating.fuel')} options={opts(t, 'opname.heating.fuelKind', ['natural_gas', 'oil'])} />}
+      <CheckField {...field} path={[...path, 'flueGasExhaust']} label={t('opname.heating.flueGasExhaust')} />
+      <TriStateField {...field} {...yesNo} path={[...path, 'electricityConnected']} label={t('opname.heating.electricityConnected')} />
+    </>}
+    {kind === 'gas_air_heater' && <>
+      <SelectField {...field} path={[...path, 'heaterType']} label={t('opname.heating.airHeaterType')}
+        options={opts(t, 'opname.heating.boiler', ['conventional', 'vr', 'hr100', 'hr104', 'hr107'])} />
+      <TriStateField {...field} {...yesNo} path={[...path, 'pilotFlame']} label={t('opname.heating.pilotFlame')} />
+      <NumberField {...field} path={[...path, 'count']} label={t('opname.airHeating.count')} step="1" />
     </>}
     {kind === 'electric' && <NumberField {...field} path={[...path, 'connectedDevices']} label={t('opname.heating.connectedDevices')} step="1" />}
     {kind === 'biomass' && <>
@@ -382,6 +447,7 @@ export function BasisopnamePanel() {
       <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} />
       <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
       <EmitterFields draft={draft} change={change} t={t} />
+      <DistributionFields draft={draft} change={change} t={t} />
       <CheckField {...field} path={['heating', 'addedPreferredGenerator']} label={t('opname.heating.addedPreferred')} />
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, ['heating', 'collective']) != null}

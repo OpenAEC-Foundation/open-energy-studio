@@ -371,8 +371,33 @@ export type NtaObstruction =
 /** Collectors and PV (x = P): tables 17.6, 17.12 and 17.15. */
 /** ISSO 82.1/75.1 survey heating generator (opname/heating.rs). */
 export type OpnameHeatingGenerator =
-  | { kind: 'boiler'; boilerType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'hydrogen'; pilotFlame?: boolean | null; insideThermalBoundary: boolean; manufactureYear?: number; installationYear?: number }
-  | { kind: 'heat_pump'; source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water' | 'water_based_unknown'; airSink?: boolean; highTemperature?: boolean; capacityKw?: number; sourceRegenerationFactor?: number | null; highEfficiencyEvidence?: unknown }
+  /** `oil`: oil-fired central boiler, conventional per NTA table 9.25 (no pilot flame). */
+  | { kind: 'boiler'; boilerType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107' | 'hydrogen' | 'oil'; pilotFlame?: boolean | null; insideThermalBoundary: boolean; manufactureYear?: number; installationYear?: number }
+  /**
+   * Table 9.6: `heat_pump_panel` takes the outdoor-air row (NTA p. 336); groundwater or a collective
+   * source without `sourceTemperatureC` takes the ground row (NTA p. 335); `high_temperature` is a
+   * collective source only. Gas-driven heat pumps use the GWP rows of tables 9.27/9.29.
+   */
+  | {
+    kind: 'heat_pump';
+    source: 'outdoor_air' | 'exhaust_air' | 'outdoor_and_exhaust_air' | 'ground' | 'groundwater' | 'surface_water'
+      | 'water_based_unknown' | 'heat_pump_panel' | 'high_temperature';
+    airSink?: boolean; highTemperature?: boolean; capacityKw?: number | null; sourceRegenerationFactor?: number | null;
+    highEfficiencyEvidence?: unknown;
+    drive?: 'electric' | 'gas_engine' | 'gas_absorption';
+    /** Table 9.6; unknown → recirculation (doublet: c_source 1,04 for a collective source, table V.3). */
+    groundwaterSystem?: 'doublet' | 'recirculation' | null;
+    /** Invoices or design data of a collective water-based source; absent: individual source. */
+    collectiveSourceReference?: string | null;
+    sourceTemperatureC?: number | null;
+    sourceTemperatureReference?: string | null;
+    /** Quality declaration of a source of 20 °C or more (otherwise the groundwater row). */
+    sourceQualityDeclarationReference?: string | null;
+  }
+  /** Table 9.3 / NTA table 9.25: local gas heating incl. pilot, oil heating or a steam boiler (0,65 with flue, 0,10 without). */
+  | { kind: 'local_fired'; appliance: 'gas_heater' | 'oil_heater' | 'steam_boiler'; fuel?: 'natural_gas' | 'oil' | null; flueGasExhaust: boolean; electricityConnected?: boolean | null }
+  /** Table 9.3: direct-fired gas air heaters; pilot flame unknown → present; count unknown → the table 9.16 count, else 1. */
+  | { kind: 'gas_air_heater'; heaterType: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107'; pilotFlame?: boolean | null; count?: number | null }
   | { kind: 'district_heat' }
   | { kind: 'electric'; connectedDevices: number }
   | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean; annexRCompliant?: boolean | null }
@@ -1679,6 +1704,7 @@ export interface SpaceHeatingChainInput {
         equipmentReference: string;
         /** Pilot flames of gas air heaters (695 kWh/year each, §9.6.2.1). */
         pilotFlames?: number;
+        /** 9.91; without `nominalPowerKw` 9.92 runs the burner the whole month (upper bound). */
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
       }
     | {
@@ -1962,6 +1988,8 @@ export interface NtaDistributionSystem {
         designFlowM3PerH?: number | null;
         energyEfficiencyIndex?: number | null;
         electricPowerKw?: number | null;
+        /** One-pipe loop: emitters in series, each adding its table 9.21 resistance (p. 317). */
+        onePipeEmitterCount?: number | null;
         sourceReference: string;
       };
   sourceReference: string;
@@ -2601,6 +2629,10 @@ export interface ResidentialSurvey {
     } | null;
     /** ISSO table 9.16 with emitters `air_heating`; absent: type unknown (no fans). */
     airHeating?: OpnameAirHeating | null;
+    /** §9.4.2; absent: two-pipe. A one-pipe loop sums its emitter resistances (NTA table 9.21). */
+    distributionType?: { kind: 'two_pipe' | 'renovated_one_pipe' } | { kind: 'one_pipe'; emitterCount: number } | null;
+    /** Table 9.12; absent: not insulated. Year unknown → construction year; fittings unknown → not insulated. */
+    pipeInsulation?: { insulated: boolean; insulationYear?: number | null; fittingsInsulated?: boolean | null } | null;
     sourceReference: string;
   };
   hotWater: {

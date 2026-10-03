@@ -566,6 +566,9 @@ pub fn derive_residential_input(
     if let Some(renewable) = heating.heat_pump_renewable {
         input["heatPumpRenewable"] = renewable;
     }
+    if let Some(source) = heating.collective_heat_pump_source {
+        input["externalSupply"] = json!({"collectiveHeatPumpSource": source});
+    }
     // ISSO 82.1 chapter 10: the main cooling system of the zone.
     if let Some(cooling) = &survey.cooling {
         let mut value = utility::cooling_value(
@@ -889,6 +892,12 @@ mod tests {
             capacity_kw: Some(5.0),
             source_regeneration_factor: None,
             high_efficiency_evidence: None,
+            drive: Default::default(),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
         }
     }
 
@@ -1195,5 +1204,363 @@ mod tests {
             })
             .sum();
         assert!((loss_area(&survey.envelope) - expected).abs() < 1e-9);
+    }
+
+    fn calculated(survey: &ResidentialSurvey) -> (OpnameAssessment, Value) {
+        let result = assess_residential_survey(survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        (result, input)
+    }
+
+    fn rules(result: &OpnameAssessment) -> Vec<&'static str> {
+        result
+            .applied_defaults
+            .iter()
+            .map(|item| item.rule)
+            .collect()
+    }
+
+    fn efficiency(result: &OpnameAssessment) -> f64 {
+        result
+            .performance
+            .as_ref()
+            .unwrap()
+            .space_heating
+            .generation_efficiency
+            .unwrap()
+    }
+
+    #[test]
+    fn oil_boiler_is_a_conventional_boiler_on_oil() {
+        let mut survey = fixture("1930");
+        survey.heating.generator = heating::HeatingGenerator::Boiler {
+            boiler_type: heating::BoilerType::Oil,
+            pilot_flame: None,
+            inside_thermal_boundary: true,
+            manufacture_year: Some(1990),
+            installation_year: None,
+        };
+        let (result, input) = calculated(&survey);
+        let boiler = &input["spaceHeating"]["generator"]["boiler"];
+        assert_eq!(boiler["kind"], "conventional");
+        assert_eq!(boiler["fuel"], "oil");
+        assert_eq!(boiler["pilotFlamePresent"], false);
+        // Table 9.25: conventional, inside the boundary, 0,75.
+        assert!((efficiency(&result) - 0.75).abs() < 1e-12);
+        assert!(!rules(&result).contains(&"pilot_flame_unknown_present"));
+    }
+
+    #[test]
+    fn local_and_air_heaters_follow_table_9_25_other_systems() {
+        let mut survey = fixture("1930");
+        survey.heating.emitters = heating::Emitters::LocalHeaters;
+        survey.heating.generator = heating::HeatingGenerator::LocalFired {
+            appliance: heating::LocalFiredAppliance::GasHeater,
+            fuel: None,
+            flue_gas_exhaust: true,
+            electricity_connected: None,
+        };
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["kind"], "forfait_heater");
+        assert_eq!(generator["heaterKind"], "local_with_flue");
+        assert_eq!(generator["fuel"], "natural_gas");
+        assert!((efficiency(&result) - 0.65).abs() < 1e-12);
+        assert!(rules(&result).contains(&"fired_heater_electricity_unknown_connected"));
+
+        // Without a flue: 0,10.
+        survey.heating.generator = heating::HeatingGenerator::LocalFired {
+            appliance: heating::LocalFiredAppliance::OilHeater,
+            fuel: None,
+            flue_gas_exhaust: false,
+            electricity_connected: Some(false),
+        };
+        let (result, input) = calculated(&survey);
+        assert_eq!(input["spaceHeating"]["generator"]["fuel"], "oil");
+        assert!((efficiency(&result) - 0.10).abs() < 1e-12);
+
+        // A steam boiler needs its fuel.
+        survey.heating.generator = heating::HeatingGenerator::LocalFired {
+            appliance: heating::LocalFiredAppliance::SteamBoiler,
+            fuel: None,
+            flue_gas_exhaust: true,
+            electricity_connected: Some(true),
+        };
+        let missing = assess_residential_survey(&survey);
+        assert!(missing
+            .issues
+            .iter()
+            .any(|item| item.code == "steam_boiler_fuel_required"));
+
+        // Three HR-107 air heaters with unknown pilot flames (table 9.3) and
+        // their count from table 9.16.
+        survey.heating.emitters = heating::Emitters::AirHeating;
+        survey.heating.air_heating = Some(heating::AirHeatingAnswer::Direct {
+            radial_fan: Some(false),
+            count: Some(3),
+        });
+        survey.heating.generator = heating::HeatingGenerator::GasAirHeater {
+            heater_type: heating::AirHeaterType::Hr107,
+            pilot_flame: None,
+            count: None,
+        };
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["heaterKind"], "air_heater_hr107");
+        assert_eq!(generator["pilotFlames"], 3);
+        assert_eq!(generator["auxiliary"]["electricallyConnectedDevices"], 3);
+        assert!((efficiency(&result) - 0.95).abs() < 1e-12);
+        assert!(rules(&result).contains(&"pilot_flame_unknown_present"));
+    }
+
+    #[test]
+    fn heat_pump_sources_follow_table_9_6() {
+        let mut survey = fixture("2015");
+        // Heat-pump panel: the outdoor-air row (NTA p. 336 note 3).
+        survey.heating.generator = heat_pump(heating::HeatPumpSource::HeatPumpPanel);
+        let (result, input) = calculated(&survey);
+        assert_eq!(
+            input["spaceHeating"]["generator"]["forfait"]["source"],
+            "outdoor_air"
+        );
+        assert!(rules(&result).contains(&"heat_pump_panel_outdoor_air_row"));
+
+        // Groundwater without a known temperature: the ground row (p. 335);
+        // with 11 °C from design data: the groundwater row.
+        survey.heating.generator = heat_pump(heating::HeatPumpSource::Groundwater);
+        let (result, input) = calculated(&survey);
+        assert_eq!(
+            input["spaceHeating"]["generator"]["forfait"]["source"],
+            "ground"
+        );
+        assert!(rules(&result).contains(&"source_temperature_unknown_ground"));
+        if let heating::HeatingGenerator::HeatPump {
+            source_temperature_c,
+            ..
+        } = &mut survey.heating.generator
+        {
+            *source_temperature_c = Some(11.0);
+        }
+        let (_, input) = calculated(&survey);
+        let forfait = &input["spaceHeating"]["generator"]["forfait"];
+        assert_eq!(forfait["source"], "groundwater_below15_c");
+        assert_eq!(forfait["sourceTemperatureC"], 11.0);
+        // Individual source: no doublet correction.
+        assert_eq!(forfait["sourceCorrectionFactor"], 1.0);
+    }
+
+    #[test]
+    fn collective_groundwater_doublet_and_high_temperature_sources() {
+        let mut survey = fixture("2015");
+        let collective = |source, temperature, system| heating::HeatingGenerator::HeatPump {
+            source,
+            air_sink: false,
+            high_temperature: false,
+            capacity_kw: Some(6.0),
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
+            drive: Some(heating::HeatPumpDrive::Electric),
+            groundwater_system: system,
+            collective_source_reference: Some("invoice heat-pump source".into()),
+            source_temperature_c: temperature,
+            source_temperature_reference: Some("design data".into()),
+            source_quality_declaration_reference: Some("declaration".into()),
+        };
+        survey.heating.generator = collective(
+            heating::HeatPumpSource::Groundwater,
+            Some(12.0),
+            Some(heating::GroundwaterSystem::Doublet),
+        );
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        // Table V.3: doublet 1,04; 9.62 with f_cor.bron.col 0,022.
+        assert_eq!(generator["forfait"]["sourceCorrectionFactor"], 1.04);
+        assert_eq!(
+            generator["sourceSystem"],
+            "collective_groundwater_surface_or_at_least15_c"
+        );
+        assert_eq!(
+            input["externalSupply"]["collectiveHeatPumpSource"]["temperatureClass"],
+            "below20_c"
+        );
+        // Table 9.27 groundwater row × 1,04 (45 °C: 4,1; 55 °C: 3,7).
+        let supply = generator["forfait"]["designSupplyTemperatureC"]
+            .as_f64()
+            .unwrap();
+        let row = if supply > 45.0 { 3.7 } else { 4.1 };
+        assert!(
+            (efficiency(&result) - row * 1.04).abs() < 1e-9,
+            "{supply} {}",
+            efficiency(&result)
+        );
+
+        // A source of 25 °C with a quality declaration: the 20–40 °C row.
+        survey.heating.generator =
+            collective(heating::HeatPumpSource::HighTemperature, Some(25.0), None);
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["forfait"]["source"], "collective20_to40_c");
+        assert_eq!(input["heatPumpRenewable"]["sourceBelow20C"], false);
+        assert_eq!(
+            input["externalSupply"]["collectiveHeatPumpSource"]["temperatureClass"],
+            "at_least20_c_or_surface_water_or_unknown"
+        );
+        let supply = generator["forfait"]["designSupplyTemperatureC"]
+            .as_f64()
+            .unwrap();
+        let row = if supply > 45.0 { 4.0 } else { 4.5 };
+        assert!((efficiency(&result) - row).abs() < 1e-9, "{supply}");
+
+        // An individual high-temperature source does not exist (p. 111).
+        if let heating::HeatingGenerator::HeatPump {
+            collective_source_reference,
+            ..
+        } = &mut survey.heating.generator
+        {
+            *collective_source_reference = None;
+        }
+        let invalid = assess_residential_survey(&survey);
+        assert!(invalid
+            .issues
+            .iter()
+            .any(|item| item.code == "high_temperature_source_collective_only"));
+    }
+
+    #[test]
+    fn large_or_collective_heat_pumps_use_table_9_29() {
+        let mut survey = fixture("1975");
+        survey.heating.generator = heat_pump(heating::HeatPumpSource::OutdoorAir);
+        survey.heating.nominal_power_kw = Some(120.0);
+        survey.heating.collective = Some(heating::CollectiveHeating {
+            connected_usable_area_m2: None,
+            connected_dwellings: Some(40),
+            connected_storeys: Some(4),
+            heat_meters_present: Some(true),
+        });
+        if let heating::HeatingGenerator::HeatPump { capacity_kw, .. } =
+            &mut survey.heating.generator
+        {
+            *capacity_kw = Some(120.0);
+        }
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(
+            generator["forfait"]["scope"],
+            "utility_collective_or_over25_kw"
+        );
+        assert_eq!(generator["auxiliary"]["nominalPowerKw"], 120.0);
+        assert!(rules(&result).contains(&"heat_pump_table_9_29"));
+        // Table 9.29 outdoor air at 55 °C: 2,80.
+        assert!((efficiency(&result) - 2.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn gas_heat_pumps_use_the_gwp_rows() {
+        let mut survey = fixture("2015");
+        survey.heating.generator = heating::HeatingGenerator::HeatPump {
+            source: heating::HeatPumpSource::Ground,
+            air_sink: false,
+            high_temperature: false,
+            capacity_kw: Some(20.0),
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
+            drive: Some(heating::HeatPumpDrive::GasAbsorption),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
+        };
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["kind"], "gas_heat_pump");
+        assert_eq!(generator["table"], "residential_at_most25_kw");
+        let class = input["spaceHeating"]["generator"]["designSupplyTemperatureC"]
+            .as_f64()
+            .unwrap();
+        // Table 9.27 GWP ground row: 1,1 at 55 °C, 1,2 at 45 °C.
+        let expected = if class > 45.0 { 1.1 } else { 1.2 };
+        assert!((efficiency(&result) - expected).abs() < 1e-9);
+
+        // Table 9.6 footnotes 4–6: no exhaust air for gas heat pumps.
+        if let heating::HeatingGenerator::HeatPump { source, .. } = &mut survey.heating.generator {
+            *source = heating::HeatPumpSource::ExhaustAir;
+        }
+        let invalid = assess_residential_survey(&survey);
+        assert!(invalid
+            .issues
+            .iter()
+            .any(|item| item.code == "gas_heat_pump_source_not_allowed"));
+    }
+
+    #[test]
+    fn pipe_insulation_and_one_pipe_loop_reach_the_distribution() {
+        let mut survey = fixture("1975");
+        survey.heating.generator = boiler();
+        survey.heating.nominal_power_kw = Some(300.0);
+        survey.heating.collective = Some(heating::CollectiveHeating {
+            connected_usable_area_m2: None,
+            connected_dwellings: Some(40),
+            connected_storeys: Some(4),
+            heat_meters_present: Some(true),
+        });
+        let (plain, _) = calculated(&survey);
+        survey.heating.pipe_insulation = Some(heating::PipeInsulationAnswer {
+            insulated: true,
+            insulation_year: Some(1990),
+            fittings_insulated: Some(true),
+        });
+        survey.heating.distribution_type =
+            Some(heating::DistributionTypeAnswer::OnePipe { emitter_count: 8 });
+        let (result, input) = calculated(&survey);
+        let system = &input["spaceHeating"]["distributionSystem"];
+        assert_eq!(
+            system["pipeTransmittance"]["insulation"]["period"],
+            "from1980_to1995"
+        );
+        assert_eq!(system["valvesInsulated"], true);
+        assert_eq!(system["pump"]["onePipeEmitterCount"], 8);
+        assert!(!rules(&result).contains(&"pipe_insulation_unknown_uninsulated"));
+        // Insulated pipes lose less; the one-pipe loop needs more pump energy.
+        let chain = |item: &OpnameAssessment| {
+            let months = &item.performance.as_ref().unwrap().space_heating.monthly;
+            let loss: f64 = months.iter().map(|month| month.distribution_loss_kwh).sum();
+            let pump: f64 = months
+                .iter()
+                .map(|month| month.distribution_auxiliary_electricity_kwh)
+                .sum();
+            (loss, pump)
+        };
+        let (plain_loss, plain_pump) = chain(&plain);
+        let (loss, pump) = chain(&result);
+        assert!(loss < plain_loss, "{loss} vs {plain_loss}");
+        assert!(pump > plain_pump, "{pump} vs {plain_pump}");
+
+        // Insulation year unknown: the construction year (1975 → before 1980).
+        survey.heating.pipe_insulation = Some(heating::PipeInsulationAnswer {
+            insulated: true,
+            insulation_year: None,
+            fittings_insulated: None,
+        });
+        survey.heating.distribution_type = Some(heating::DistributionTypeAnswer::RenovatedOnePipe);
+        let (result, input) = calculated(&survey);
+        let system = &input["spaceHeating"]["distributionSystem"];
+        assert_eq!(
+            system["pipeTransmittance"]["insulation"]["period"],
+            "before1980_or_unknown"
+        );
+        assert_eq!(system["valvesInsulated"], false);
+        assert!(system["pump"]["onePipeEmitterCount"].is_null());
+        let applied = rules(&result);
+        assert!(applied.contains(&"pipe_insulation_year_unknown_construction_year"));
+        assert!(applied.contains(&"pipe_fittings_unknown_uninsulated"));
+        assert!(applied.contains(&"renovated_one_pipe_as_two_pipe"));
     }
 }

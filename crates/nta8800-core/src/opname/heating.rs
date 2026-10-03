@@ -29,6 +29,13 @@
 //!   unknown → dwellings × the dwelling's area (p. 121); heat meters
 //!   unknown → present (table 9.16, p. 122); pipes forfait (table 9.14).
 //! - Biomass annex R compliance unknown: not compliant (p. 111–112, 28).
+//! - Oil boilers, local gas/oil heating, steam boilers and gas air heaters
+//!   (table 9.3, p. 108) follow NTA table 9.25; pilot flame unknown →
+//!   present; electricity connection unknown → present.
+//! - Heat-pump sources (table 9.6, p. 110–111): see `convert_heat_pump`.
+//! - Pipe insulation (table 9.12, p. 118): year unknown → construction
+//!   year, fittings unknown → not insulated; one-pipe loops (p. 115) add
+//!   the table 9.21 resistance per emitter.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -45,6 +52,81 @@ pub enum BoilerType {
     Hr107,
     /// Boiler on hydrogen: HR-107 on natural gas (p. 108).
     Hydrogen,
+    /// Oil-fired central boiler (table 9.3, p. 108): conventional, the NTA
+    /// table 9.25 definition of an oil boiler.
+    Oil,
+}
+
+/// Table 9.3 (p. 108): local gas heating incl. pilot flame, oil heating
+/// or a steam boiler; NTA table 9.25 "overige systemen".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalFiredAppliance {
+    GasHeater,
+    OilHeater,
+    SteamBoiler,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FiredFuel {
+    NaturalGas,
+    Oil,
+}
+
+/// Table 9.3 type of a direct-fired gas air heater (NTA table 9.25).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AirHeaterType {
+    Conventional,
+    Vr,
+    Hr100,
+    Hr104,
+    Hr107,
+}
+
+/// §9.3.1.3 (p. 109): how the heat pump is driven.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeatPumpDrive {
+    #[default]
+    Electric,
+    GasEngine,
+    GasAbsorption,
+}
+
+/// Table 9.6 (p. 110): groundwater source system; unknown → recirculation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroundwaterSystem {
+    Doublet,
+    Recirculation,
+}
+
+/// §9.4.2 (p. 115, WD 2025 p. 50): water-based distribution system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DistributionTypeAnswer {
+    /// Including a Tichelmann system (p. 116).
+    TwoPipe,
+    OnePipe {
+        #[serde(rename = "emitterCount")]
+        emitter_count: u32,
+    },
+    RenovatedOnePipe,
+}
+
+/// Table 9.12 (p. 118): insulation of the distribution pipes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PipeInsulationAnswer {
+    pub insulated: bool,
+    /// Year of insulation; unknown → the construction year.
+    #[serde(default)]
+    pub insulation_year: Option<i32>,
+    /// Valves and brackets; unknown → not insulated.
+    #[serde(default)]
+    pub fittings_insulated: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -59,6 +141,11 @@ pub enum HeatPumpSource {
     SurfaceWater,
     /// Water-based source of unknown kind: ground (table 9.6).
     WaterBasedUnknown,
+    /// Heat-pump panel (table 9.6): the outdoor-air row (NTA p. 336,
+    /// note 3 below table 9.28).
+    HeatPumpPanel,
+    /// Collective high-temperature source (table 9.6, p. 110–111).
+    HighTemperature,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -105,6 +192,26 @@ pub enum HeatingGenerator {
         /// `highEfficiencyEvidence`.
         #[serde(default, rename = "highEfficiencyEvidence")]
         high_efficiency_evidence: Option<Value>,
+        /// Electric (`None`) or gas driven (p. 109).
+        #[serde(default)]
+        drive: Option<HeatPumpDrive>,
+        /// Table 9.6: doublet or recirculation; `None` unknown →
+        /// recirculation.
+        #[serde(default, rename = "groundwaterSystem")]
+        groundwater_system: Option<GroundwaterSystem>,
+        /// Invoices or design data showing a collective water-based source
+        /// (p. 111); `None`: an individual source.
+        #[serde(default, rename = "collectiveSourceReference")]
+        collective_source_reference: Option<String>,
+        /// Source temperature from design data or winter measurements
+        /// (p. 111), °C; classifies groundwater and high-temperature rows.
+        #[serde(default, rename = "sourceTemperatureC")]
+        source_temperature_c: Option<f64>,
+        #[serde(default, rename = "sourceTemperatureReference")]
+        source_temperature_reference: Option<String>,
+        /// Quality declaration of a source of 20 °C or more (WD 2025 p. 45).
+        #[serde(default, rename = "sourceQualityDeclarationReference")]
+        source_quality_declaration_reference: Option<String>,
     },
     DistrictHeat,
     Electric {
@@ -143,6 +250,30 @@ pub enum HeatingGenerator {
         /// LT operation demonstrated with design data (table 9.31 note a).
         #[serde(default, rename = "lowTemperature")]
         low_temperature: bool,
+    },
+    /// Table 9.3: local gas heating incl. pilot flame, oil heating or a
+    /// steam boiler, with or without a flue.
+    LocalFired {
+        appliance: LocalFiredAppliance,
+        /// Steam boilers: gas or oil (p. 107); the heaters follow their
+        /// appliance.
+        #[serde(default)]
+        fuel: Option<FiredFuel>,
+        #[serde(rename = "flueGasExhaust")]
+        flue_gas_exhaust: bool,
+        /// Electricity connection (NTA 9.6.8.2.3); `None` → connected.
+        #[serde(default, rename = "electricityConnected")]
+        electricity_connected: Option<bool>,
+    },
+    /// Table 9.3: direct-fired gas air heater(s).
+    GasAirHeater {
+        #[serde(rename = "heaterType")]
+        heater_type: AirHeaterType,
+        #[serde(default, rename = "pilotFlame")]
+        pilot_flame: Option<bool>,
+        /// Number of air heaters; `None`: the table 9.16 count, else 1.
+        #[serde(default)]
+        count: Option<u32>,
     },
     /// No generator present (renovation), previous one unknown.
     NonePresent,
@@ -273,6 +404,12 @@ pub struct SurveyHeating {
     /// `air_heating`.
     #[serde(default)]
     pub air_heating: Option<AirHeatingAnswer>,
+    /// §9.4.2: one- or two-pipe system; `None` → two-pipe.
+    #[serde(default)]
+    pub distribution_type: Option<DistributionTypeAnswer>,
+    /// Table 9.12; `None` unknown → not insulated.
+    #[serde(default)]
+    pub pipe_insulation: Option<PipeInsulationAnswer>,
     pub source_reference: String,
 }
 
@@ -373,10 +510,13 @@ pub struct DerivedHeating {
     pub generator: Value,
     pub distribution_system: Option<Value>,
     pub heat_pump_renewable: Option<Value>,
+    /// `externalSupply.collectiveHeatPumpSource` (NTA 9.6.8.1.1.2.3).
+    pub collective_heat_pump_source: Option<Value>,
     /// Water-based emission (a distribution system exists).
     pub hydronic: bool,
     /// NTA table 9.14 class of the distribution.
     pub design_class: &'static str,
+    pub construction_year: i32,
 }
 
 /// Pipes in unheated spaces (afb. 9.1, p. 120).
@@ -566,6 +706,7 @@ pub fn derive_heating(
         hydronic,
         collective,
         heating.nominal_power_kw,
+        heating.air_heating,
         "opwekker-1",
         reference,
         construction_year,
@@ -573,6 +714,7 @@ pub fn derive_heating(
     );
     let mut needs_pump = main.needs_pump;
     let mut heat_pump_renewable = main.heat_pump_renewable;
+    let mut collective_heat_pump_source = main.collective_source;
     let generator_value = if heating.additional_generators.is_empty() {
         if is_exhaust_air(&generator) {
             // WD 2025 p. 43: an exhaust-air heat pump needs a second
@@ -603,6 +745,7 @@ pub fn derive_heating(
                 hydronic,
                 collective,
                 extra.nominal_power_kw,
+                heating.air_heating,
                 &format!("opwekker-{}", index + 2),
                 reference,
                 construction_year,
@@ -610,6 +753,8 @@ pub fn derive_heating(
             );
             needs_pump |= converted.needs_pump;
             heat_pump_renewable = heat_pump_renewable.or(converted.heat_pump_renewable);
+            collective_heat_pump_source =
+                collective_heat_pump_source.or(converted.collective_source);
             parts.push((generator, extra.nominal_power_kw, converted.value));
         }
         multiple_generators(
@@ -620,12 +765,8 @@ pub fn derive_heating(
         )
     };
     let distribution_system = needs_pump.then(|| {
-        recorder.record(
-            "pipe_insulation_unknown_uninsulated",
-            "heating.distribution",
-            "uninsulated".into(),
-            "ISSO 82.1 p. 118 (table 9.12)",
-        );
+        let (transmittance, valves) = pipe_insulation(heating, construction_year, recorder);
+        let one_pipe = one_pipe_emitters(heating, recorder);
         recorder.record(
             "pump_unknown_forfait",
             "heating.distribution.pump",
@@ -649,9 +790,9 @@ pub fn derive_heating(
                     "installation": "collective",
                     "usageFunction": "residential",
                     "connectedStoreys": collective.connected_storeys.unwrap_or(heating.storeys).max(1),
-                    "pipeTransmittance": {"method": "forfait", "insulation": {"state": "uninsulated"}},
-                    "valvesInsulated": false,
-                    "pump": {"method": "calculated", "heatMeterPresent": meters, "sourceReference": "basisopname forfait; collective installation"},
+                    "pipeTransmittance": transmittance,
+                    "valvesInsulated": valves,
+                    "pump": {"method": "calculated", "heatMeterPresent": meters, "onePipeEmitterCount": one_pipe, "sourceReference": "basisopname forfait; collective installation"},
                     "sourceReference": format!("{reference}; basisopname"),
                 })
             }
@@ -660,11 +801,11 @@ pub fn derive_heating(
                 "installation": "individual",
                 "usageFunction": "residential",
                 "connectedStoreys": heating.storeys.max(1),
-                "pipeTransmittance": {"method": "forfait", "insulation": {"state": "uninsulated"}},
-                "valvesInsulated": false,
+                "pipeTransmittance": transmittance,
+                "valvesInsulated": valves,
                 // Table 9.16a (heat meter unknown: present) covers
                 // collective installations only.
-                "pump": {"method": "calculated", "heatMeterPresent": false, "sourceReference": "basisopname forfait; individual installation without heat meter"},
+                "pump": {"method": "calculated", "heatMeterPresent": false, "onePipeEmitterCount": one_pipe, "sourceReference": "basisopname forfait; individual installation without heat meter"},
                 "sourceReference": format!("{reference}; basisopname"),
             }),
         }
@@ -674,8 +815,94 @@ pub fn derive_heating(
         generator: generator_value,
         distribution_system,
         heat_pump_renewable,
+        collective_heat_pump_source,
         hydronic,
         design_class: design.kernel(),
+        construction_year,
+    }
+}
+
+/// Table 9.12 (p. 118) as NTA table 9.16 forfait Ψ and the 9.27a/9.27b
+/// valves: not insulated when unknown, the year of insulation unknown →
+/// the construction year, fittings unknown → not insulated.
+fn pipe_insulation(
+    heating: &SurveyHeating,
+    construction_year: i32,
+    recorder: &mut Recorder,
+) -> (Value, bool) {
+    let Some(answer) = heating.pipe_insulation else {
+        recorder.record(
+            "pipe_insulation_unknown_uninsulated",
+            "heating.distribution",
+            "uninsulated".into(),
+            "ISSO 82.1 p. 118 (table 9.12)",
+        );
+        return (
+            json!({"method": "forfait", "insulation": {"state": "uninsulated"}}),
+            false,
+        );
+    };
+    let fittings = answer.fittings_insulated.unwrap_or_else(|| {
+        recorder.record(
+            "pipe_fittings_unknown_uninsulated",
+            "heating.pipeInsulation.fittingsInsulated",
+            "false".into(),
+            "ISSO 82.1 p. 118 (table 9.12)",
+        );
+        false
+    });
+    if !answer.insulated {
+        return (
+            json!({"method": "forfait", "insulation": {"state": "uninsulated"}}),
+            fittings,
+        );
+    }
+    let year = answer.insulation_year.unwrap_or_else(|| {
+        recorder.record(
+            "pipe_insulation_year_unknown_construction_year",
+            "heating.pipeInsulation.insulationYear",
+            construction_year.to_string(),
+            "ISSO 82.1 p. 118 (table 9.12)",
+        );
+        construction_year
+    });
+    let period = if year >= 1995 {
+        "from1995"
+    } else if year >= 1980 {
+        "from1980_to1995"
+    } else {
+        "before1980_or_unknown"
+    };
+    (
+        json!({"method": "forfait", "insulation": {"state": "insulated", "period": period}}),
+        fittings,
+    )
+}
+
+/// §9.4.2 (p. 115): the emitters of a one-pipe loop for table 9.21; a
+/// renovated one-pipe system (WD 2025 p. 50) has no NTA rule of its own
+/// and counts as two-pipe.
+fn one_pipe_emitters(heating: &SurveyHeating, recorder: &mut Recorder) -> Option<u32> {
+    match heating.distribution_type {
+        Some(DistributionTypeAnswer::OnePipe { emitter_count }) => {
+            if emitter_count == 0 {
+                recorder.issue(
+                    "one_pipe_emitter_count_invalid",
+                    "heating.distributionType.emitterCount",
+                );
+            }
+            Some(emitter_count)
+        }
+        Some(DistributionTypeAnswer::RenovatedOnePipe) => {
+            recorder.record(
+                "renovated_one_pipe_as_two_pipe",
+                "heating.distributionType",
+                "two_pipe".into(),
+                "ISSO 82.1 WD 2025 p. 50; NTA 8800 p. 317 (one-pipe rule only)",
+            );
+            None
+        }
+        Some(DistributionTypeAnswer::TwoPipe) | None => None,
     }
 }
 
@@ -749,20 +976,16 @@ pub fn apply_unheated_pipes(
         }
     };
     let reference = heating.source_reference.as_str();
+    let year = derived.construction_year;
     let mut system = derived.distribution_system.take().unwrap_or_else(|| {
-        recorder.record(
-            "pipe_insulation_unknown_uninsulated",
-            "heating.distribution",
-            "uninsulated".into(),
-            "ISSO 82.1 p. 118 (table 9.12)",
-        );
+        let (transmittance, valves) = pipe_insulation(heating, year, recorder);
         json!({
             "designTemperatureClass": derived.design_class,
             "installation": "individual",
             "usageFunction": "residential",
             "connectedStoreys": heating.storeys.max(1),
-            "pipeTransmittance": {"method": "forfait", "insulation": {"state": "uninsulated"}},
-            "valvesInsulated": false,
+            "pipeTransmittance": transmittance,
+            "valvesInsulated": valves,
             "pump": {"method": "included_in_generator_auxiliary"},
             "sourceReference": format!("{reference}; basisopname"),
         })
@@ -836,7 +1059,10 @@ fn priority_class(generator: &HeatingGenerator) -> u32 {
         HeatingGenerator::Biomass { .. } => 4,
         HeatingGenerator::DistrictHeat => 5,
         HeatingGenerator::Electric { .. } => 6,
-        HeatingGenerator::Boiler { .. } | HeatingGenerator::NonePresent => 7,
+        HeatingGenerator::Boiler { .. }
+        | HeatingGenerator::LocalFired { .. }
+        | HeatingGenerator::GasAirHeater { .. }
+        | HeatingGenerator::NonePresent => 7,
     }
 }
 
@@ -925,6 +1151,7 @@ struct Converted {
     /// The generator's auxiliary energy excludes the distribution pump.
     needs_pump: bool,
     heat_pump_renewable: Option<Value>,
+    collective_source: Option<Value>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -934,12 +1161,14 @@ fn convert_generator(
     hydronic: bool,
     collective: bool,
     nominal_power_kw: Option<f64>,
+    air_heating: Option<AirHeatingAnswer>,
     id: &str,
     reference: &str,
     construction_year: i32,
     recorder: &mut Recorder,
 ) -> Converted {
     let mut heat_pump_renewable = None;
+    let mut collective_source = None;
     let mut needs_pump = false;
     let value = match generator {
         HeatingGenerator::Boiler {
@@ -949,8 +1178,9 @@ fn convert_generator(
             manufacture_year,
             installation_year,
         } => {
+            let oil = *boiler_type == BoilerType::Oil;
             let kind = match boiler_type {
-                BoilerType::Conventional => "conventional",
+                BoilerType::Conventional | BoilerType::Oil => "conventional",
                 BoilerType::Vr => "vr",
                 BoilerType::Hr100 => "hr100",
                 BoilerType::Hr104 => "hr104",
@@ -965,15 +1195,23 @@ fn convert_generator(
                     "hr107"
                 }
             };
-            let pilot = pilot_flame.unwrap_or_else(|| {
-                recorder.record(
-                    "pilot_flame_unknown_present",
-                    "heating.generator.pilotFlame",
-                    "true".into(),
-                    "ISSO 82.1 p. 108 (table 9.3)",
-                );
-                true
-            });
+            let pilot = if oil {
+                // Table 9.25: the pilot flame is a gas-boiler item.
+                if *pilot_flame == Some(true) {
+                    recorder.issue("pilot_flame_gas_only", "heating.generator.pilotFlame");
+                }
+                false
+            } else {
+                pilot_flame.unwrap_or_else(|| {
+                    recorder.record(
+                        "pilot_flame_unknown_present",
+                        "heating.generator.pilotFlame",
+                        "true".into(),
+                        "ISSO 82.1 p. 108 (table 9.3)",
+                    );
+                    true
+                })
+            };
             let year = super::general::device_year(
                 *manufacture_year,
                 *installation_year,
@@ -988,7 +1226,7 @@ fn convert_generator(
                     "role": if collective { "collective" } else { "individual_main" },
                     "location": if *inside_thermal_boundary { "inside_thermal_boundary" } else { "outside_thermal_boundary" },
                     "kind": kind,
-                    "fuel": "natural_gas",
+                    "fuel": if oil { "oil" } else { "natural_gas" },
                     "averageDesignEmissionTemperatureC": design.mean_c(),
                     "emissionCircuit": "direct",
                     "equipmentReference": reference,
@@ -1000,105 +1238,21 @@ fn convert_generator(
                 }
             })
         }
-        HeatingGenerator::HeatPump {
-            source,
-            air_sink,
-            capacity_kw,
-            source_regeneration_factor,
-            high_efficiency_evidence,
-            ..
-        } => {
-            let table_source = match source {
-                HeatPumpSource::OutdoorAir => "outdoor_air",
-                HeatPumpSource::ExhaustAir => "exhaust_air",
-                HeatPumpSource::OutdoorAndExhaustAir => {
-                    recorder.record(
-                        "combined_air_source_outdoor_row",
-                        "heating.generator.source",
-                        "outdoor_air".into(),
-                        "NTA table 9.27 footnote c; ISSO 82.1 WD p. 43–45",
-                    );
-                    "outdoor_air"
-                }
-                HeatPumpSource::Ground => "ground",
-                HeatPumpSource::Groundwater => "groundwater_below15_c",
-                HeatPumpSource::SurfaceWater => {
-                    recorder.record(
-                        "individual_surface_water_as_ground",
-                        "heating.generator.source",
-                        "ground".into(),
-                        "ISSO 82.1 p. 111",
-                    );
-                    "ground"
-                }
-                HeatPumpSource::WaterBasedUnknown => {
-                    recorder.record(
-                        "heat_pump_water_source_unknown_ground",
-                        "heating.generator.source",
-                        "ground".into(),
-                        "ISSO 82.1 p. 110 (table 9.6)",
-                    );
-                    "ground"
-                }
-            };
-            let ground_row = matches!(table_source, "ground" | "groundwater_below15_c");
-            let (correction, correction_reference) = if ground_row && !*air_sink {
-                match source_regeneration_factor {
-                    Some(factor) => (json!(factor), json!(format!("{reference}; annex V"))),
-                    None => {
-                        recorder.record(
-                            "source_regeneration_none_c_source_1",
-                            "heating.generator.sourceRegenerationFactor",
-                            "1.0".into(),
-                            "ISSO 82.1 p. 110; NTA table 9.27 footnote a",
-                        );
-                        (
-                            json!(1.0),
-                            json!("NTA 8800 table 9.27 footnote a: no regeneration"),
-                        )
-                    }
-                }
-            } else {
-                if source_regeneration_factor.is_some() {
-                    recorder.issue(
-                        "source_regeneration_not_applicable",
-                        "heating.generator.sourceRegenerationFactor",
-                    );
-                }
-                (Value::Null, Value::Null)
-            };
-            let exhaust = matches!(source, HeatPumpSource::ExhaustAir);
-            heat_pump_renewable = Some(json!({
-                "sourceBelow20C": true,
-                "exhaustAirSource": exhaust,
-                "combinedOutdoorAndExhaustAir": matches!(source, HeatPumpSource::OutdoorAndExhaustAir),
-                "sourceReference": reference,
-            }));
-            let mut forfait = json!({
-                "generatorId": id,
-                "classificationSourceReference": reference,
-                "scope": "residential_at_most25_kw",
-                "source": table_source,
-                "sink": if *air_sink { "indoor_air" } else { "hydronic" },
-                "designSupplyTemperatureC": design.supply_c(),
-                "sourceCorrectionFactor": correction,
-                "sourceCorrectionReference": correction_reference,
-                "collectiveBuildingInstallation": collective,
-            });
-            if let Some(capacity) = capacity_kw {
-                forfait["thermalCapacityKw"] = json!(capacity);
-                forfait["capacitySourceReference"] = json!(reference);
-            }
-            if let Some(evidence) = high_efficiency_evidence {
-                forfait["rowVariant"] = json!("table_9_28_high_efficiency");
-                forfait["highEfficiencyEvidence"] = evidence.clone();
-            }
-            json!({
-                "kind": "heat_pump_forfait",
-                "forfait": forfait,
-                "sourceSystem": "individual",
-                "sourceSystemReference": reference,
-            })
+        HeatingGenerator::HeatPump { .. } => {
+            let converted = convert_heat_pump(
+                generator,
+                design,
+                collective,
+                nominal_power_kw,
+                id,
+                reference,
+                recorder,
+            );
+            heat_pump_renewable = converted.heat_pump_renewable;
+            collective_source = converted.collective_source;
+            // A gas-driven heat pump is outside 9.85: the pump is separate.
+            needs_pump = hydronic && converted.value["kind"] == "gas_heat_pump";
+            converted.value
         }
         HeatingGenerator::DistrictHeat => {
             needs_pump = hydronic;
@@ -1182,6 +1336,16 @@ fn convert_generator(
                 "equipmentReference": reference,
             })
         }
+        HeatingGenerator::LocalFired { .. } | HeatingGenerator::GasAirHeater { .. } => {
+            needs_pump = hydronic;
+            convert_fired_heater(
+                generator,
+                air_heating,
+                nominal_power_kw,
+                reference,
+                recorder,
+            )
+        }
         HeatingGenerator::NonePresent => unreachable!("replaced by the caller"),
     };
     let mut value = value;
@@ -1204,7 +1368,7 @@ fn convert_generator(
                 });
                 needs_pump = hydronic;
             }
-            Some("heat_pump_forfait") => needs_pump = hydronic,
+            Some("heat_pump_forfait" | "gas_heat_pump") => needs_pump = hydronic,
             _ => {}
         }
     }
@@ -1212,6 +1376,494 @@ fn convert_generator(
         value,
         needs_pump,
         heat_pump_renewable,
+        collective_source,
+    }
+}
+
+/// A survey heat pump as a kernel generator.
+struct ConvertedHeatPump {
+    value: Value,
+    heat_pump_renewable: Option<Value>,
+    collective_source: Option<Value>,
+}
+
+/// Table 9.6 (p. 110–111, WD 2025 p. 43–45) → NTA tables 9.27/9.29 (p.
+/// 333–338) and 9.6.8.1.1.2.3 (p. 362).
+///
+/// - Table 9.29 applies to collective building installations and heat
+///   pumps above 25 kW (its title), table 9.27 otherwise.
+/// - Heat-pump panel: the outdoor-air row (p. 336, note 3).
+/// - Groundwater or a collective source without a known temperature: the
+///   ground row (p. 335).
+/// - A collective groundwater source of the doublet type: c_source 1,04
+///   (table V.3, p. 1117); recirculation or unknown: 1,00.
+/// - Gas-driven heat pumps (p. 109): the "GWP" rows of tables 9.27/9.29;
+///   exhaust air, combined air and high-temperature sources are no option
+///   (table 9.6 footnotes 4–6).
+fn convert_heat_pump(
+    generator: &HeatingGenerator,
+    design: DesignClass,
+    collective: bool,
+    nominal_power_kw: Option<f64>,
+    id: &str,
+    reference: &str,
+    recorder: &mut Recorder,
+) -> ConvertedHeatPump {
+    let HeatingGenerator::HeatPump {
+        source,
+        air_sink,
+        capacity_kw,
+        source_regeneration_factor,
+        high_efficiency_evidence,
+        drive,
+        groundwater_system,
+        collective_source_reference,
+        source_temperature_c,
+        source_temperature_reference,
+        source_quality_declaration_reference,
+        ..
+    } = generator
+    else {
+        unreachable!("called for heat pumps only");
+    };
+    let capacity = capacity_kw.or(nominal_power_kw);
+    let large = capacity.is_some_and(|value| value > 25.0);
+    let collective_source = collective_source_reference
+        .as_deref()
+        .filter(|value| !value.trim().is_empty());
+    let water_based = matches!(
+        source,
+        HeatPumpSource::Ground
+            | HeatPumpSource::Groundwater
+            | HeatPumpSource::SurfaceWater
+            | HeatPumpSource::WaterBasedUnknown
+            | HeatPumpSource::HighTemperature
+    );
+    if collective_source.is_some() && !water_based {
+        recorder.issue(
+            "collective_source_water_based_only",
+            "heating.generator.collectiveSourceReference",
+        );
+    }
+    if matches!(source, HeatPumpSource::HighTemperature) && collective_source.is_none() {
+        // p. 111: a high-temperature source is a collective source.
+        recorder.issue(
+            "high_temperature_source_collective_only",
+            "heating.generator.collectiveSourceReference",
+        );
+    }
+    let temperature = source_temperature_c.filter(|value| value.is_finite());
+    let temperature_reference = source_temperature_reference
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| reference.to_string());
+    let path = "heating.generator.source";
+    let drive = drive.unwrap_or_default();
+    let gas = drive != HeatPumpDrive::Electric;
+    // Collective sources below 15 °C enter as groundwater (WD 2025 p. 45);
+    // an unknown temperature takes the ground row (NTA p. 335).
+    let groundwater_row = |recorder: &mut Recorder| match temperature {
+        Some(value) if value < 15.0 => "groundwater_below15_c",
+        _ => {
+            recorder.record(
+                "source_temperature_unknown_ground",
+                path,
+                "ground".into(),
+                "NTA 8800 p. 335 (below table 9.27)",
+            );
+            "ground"
+        }
+    };
+    let table_source: &str = match source {
+        HeatPumpSource::OutdoorAir => "outdoor_air",
+        HeatPumpSource::ExhaustAir => "exhaust_air",
+        HeatPumpSource::OutdoorAndExhaustAir => {
+            recorder.record(
+                "combined_air_source_outdoor_row",
+                path,
+                "outdoor_air".into(),
+                "NTA table 9.27 footnote c; ISSO 82.1 WD p. 43–45",
+            );
+            "outdoor_air"
+        }
+        HeatPumpSource::HeatPumpPanel => {
+            recorder.record(
+                "heat_pump_panel_outdoor_air_row",
+                path,
+                "outdoor_air".into(),
+                "NTA 8800 p. 336 (note 3 below table 9.28)",
+            );
+            "outdoor_air"
+        }
+        HeatPumpSource::Ground => "ground",
+        // The gas rows have no temperature condition for groundwater.
+        HeatPumpSource::Groundwater if gas => "groundwater_below15_c",
+        HeatPumpSource::Groundwater => groundwater_row(recorder),
+        HeatPumpSource::SurfaceWater if collective_source.is_none() => {
+            recorder.record(
+                "individual_surface_water_as_ground",
+                path,
+                "ground".into(),
+                "ISSO 82.1 p. 111",
+            );
+            "ground"
+        }
+        HeatPumpSource::SurfaceWater if collective || large => "surface_water",
+        HeatPumpSource::SurfaceWater if gas => "groundwater_below15_c",
+        // Table 9.27 has no surface-water row.
+        HeatPumpSource::SurfaceWater => groundwater_row(recorder),
+        HeatPumpSource::WaterBasedUnknown => {
+            recorder.record(
+                "heat_pump_water_source_unknown_ground",
+                path,
+                "ground".into(),
+                "ISSO 82.1 p. 110 (table 9.6)",
+            );
+            "ground"
+        }
+        HeatPumpSource::HighTemperature => match temperature {
+            Some(value) if value >= 40.0 => "collective_at_least40_c",
+            Some(value) if value >= 20.0 => "collective20_to40_c",
+            Some(value) if value >= 15.0 => "collective15_to20_c",
+            _ => groundwater_row(recorder),
+        },
+    };
+    let ground_row = matches!(table_source, "ground" | "groundwater_below15_c");
+    // Table V.3 (p. 1117): collective groundwater source, doublet 1,04.
+    let doublet = |recorder: &mut Recorder| -> f64 {
+        if collective_source.is_none() || table_source != "groundwater_below15_c" {
+            return 1.0;
+        }
+        match groundwater_system {
+            Some(GroundwaterSystem::Doublet) => 1.04,
+            Some(GroundwaterSystem::Recirculation) => 1.0,
+            None => {
+                recorder.record(
+                    "groundwater_system_unknown_recirculation",
+                    "heating.generator.groundwaterSystem",
+                    "recirculation (c_source 1,00)".into(),
+                    "ISSO 82.1 p. 110 (table 9.6); NTA table V.3",
+                );
+                1.0
+            }
+        }
+    };
+    let renewable = json!({
+        "sourceBelow20C": !matches!(table_source, "collective20_to40_c" | "collective_at_least40_c"),
+        "exhaustAirSource": matches!(source, HeatPumpSource::ExhaustAir),
+        "combinedOutdoorAndExhaustAir": matches!(source, HeatPumpSource::OutdoorAndExhaustAir),
+        "sourceReference": reference,
+    });
+
+    if gas {
+        if matches!(
+            source,
+            HeatPumpSource::ExhaustAir
+                | HeatPumpSource::OutdoorAndExhaustAir
+                | HeatPumpSource::HighTemperature
+        ) {
+            recorder.issue("gas_heat_pump_source_not_allowed", path);
+        }
+        if *air_sink {
+            recorder.issue(
+                "gas_heat_pump_air_sink_unsupported",
+                "heating.generator.airSink",
+            );
+        }
+        if collective_source.is_some() {
+            // 9.62 f_cor.bron.col is modelled for electric heat pumps only.
+            recorder.issue(
+                "gas_heat_pump_collective_source_unsupported",
+                "heating.generator.collectiveSourceReference",
+            );
+        }
+        if high_efficiency_evidence.is_some() {
+            recorder.issue(
+                "high_efficiency_evidence_electric_only",
+                "heating.generator.highEfficiencyEvidence",
+            );
+        }
+        if capacity.is_none() {
+            // NTA §9.6.3 (p. 331) and 9.91/9.92 need P_H;gen.
+            recorder.issue(
+                "gas_heat_pump_capacity_required",
+                "heating.generator.capacityKw",
+            );
+        }
+        // Table 9.27 "GWP" rows: dwellings up to 25 kW (collective
+        // installations included); table 9.29 above 25 kW.
+        let table = if large {
+            "utility_collective_or_above25_kw"
+        } else {
+            "residential_at_most25_kw"
+        };
+        let gas_source = match table_source {
+            "groundwater_below15_c" => "groundwater",
+            "outdoor_air" => "outdoor_air",
+            "surface_water" => "surface_water",
+            _ => "ground",
+        };
+        let correction_allowed = !large && matches!(gas_source, "ground" | "groundwater");
+        if source_regeneration_factor.is_some() && !correction_allowed {
+            recorder.issue(
+                "source_regeneration_not_applicable",
+                "heating.generator.sourceRegenerationFactor",
+            );
+        }
+        let correction = correction_allowed
+            .then(|| source_regeneration_factor.unwrap_or_else(|| doublet(recorder)));
+        let drive_label = match drive {
+            HeatPumpDrive::GasEngine => "gas engine",
+            _ => "gas absorption",
+        };
+        return ConvertedHeatPump {
+            value: json!({
+                "kind": "gas_heat_pump",
+                "table": table,
+                "source": gas_source,
+                "designSupplyTemperatureC": design.supply_c(),
+                "sourceCorrectionFactor": correction,
+                "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": capacity, "sourceReference": reference},
+                "equipmentReference": format!("{reference}; ISSO 82.1 p. 109 ({drive_label})"),
+            }),
+            heat_pump_renewable: Some(renewable),
+            collective_source: None,
+        };
+    }
+
+    let utility_table = collective || large;
+    if utility_table {
+        recorder.record(
+            "heat_pump_table_9_29",
+            "heating.generator",
+            if collective {
+                "collective building installation".into()
+            } else {
+                format!("{} kW > 25 kW", capacity.unwrap_or_default())
+            },
+            "NTA 8800 p. 337 (title of table 9.29)",
+        );
+    }
+    // Table 9.27 footnote a: c_source for the ground and groundwater rows.
+    let (correction, correction_reference) = if ground_row && !*air_sink && !utility_table {
+        match source_regeneration_factor {
+            Some(factor) => (json!(factor), json!(format!("{reference}; annex V"))),
+            None => {
+                let factor = doublet(recorder);
+                if factor == 1.0 {
+                    recorder.record(
+                        "source_regeneration_none_c_source_1",
+                        "heating.generator.sourceRegenerationFactor",
+                        "1.0".into(),
+                        "ISSO 82.1 p. 110; NTA table 9.27 footnote a",
+                    );
+                    (
+                        json!(1.0),
+                        json!("NTA 8800 table 9.27 footnote a: no regeneration"),
+                    )
+                } else {
+                    (
+                        json!(factor),
+                        json!(format!("{reference}; NTA table V.3 doublet")),
+                    )
+                }
+            }
+        }
+    } else {
+        if source_regeneration_factor.is_some() {
+            recorder.issue(
+                "source_regeneration_not_applicable",
+                "heating.generator.sourceRegenerationFactor",
+            );
+        }
+        (Value::Null, Value::Null)
+    };
+    let mut forfait = json!({
+        "generatorId": id,
+        "classificationSourceReference": reference,
+        "scope": if utility_table { "utility_collective_or_over25_kw" } else { "residential_at_most25_kw" },
+        "source": table_source,
+        "sink": if *air_sink { "indoor_air" } else { "hydronic" },
+        "designSupplyTemperatureC": if *air_sink { Value::Null } else { json!(design.supply_c()) },
+        "sourceCorrectionFactor": correction,
+        "sourceCorrectionReference": correction_reference,
+        "collectiveBuildingInstallation": collective,
+    });
+    if let Some(capacity) = capacity {
+        forfait["thermalCapacityKw"] = json!(capacity);
+        forfait["capacitySourceReference"] = json!(reference);
+    }
+    if let Some(evidence) = high_efficiency_evidence {
+        forfait["rowVariant"] = json!("table_9_28_high_efficiency");
+        forfait["highEfficiencyEvidence"] = evidence.clone();
+    }
+    if matches!(
+        table_source,
+        "groundwater_below15_c"
+            | "collective15_to20_c"
+            | "collective20_to40_c"
+            | "collective_at_least40_c"
+    ) {
+        forfait["sourceTemperatureC"] = json!(temperature);
+        forfait["sourceTemperatureEvidenceReference"] = json!(temperature_reference);
+    }
+    if let Some(declaration) = source_quality_declaration_reference
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        forfait["sourceQualityDeclarationReference"] = json!(declaration);
+    }
+    let (source_system, collective_value) = match collective_source {
+        None => ("individual", None),
+        Some(supplier) => {
+            // 9.6.8.1.1.2.3 note 2 (p. 362): only ground or groundwater
+            // sources are below 20 °C; surface water, warm or unknown
+            // sources take tables 5.2–5.4.
+            let below_20 = matches!(
+                table_source,
+                "ground" | "groundwater_below15_c" | "collective15_to20_c"
+            ) && !matches!(source, HeatPumpSource::SurfaceWater)
+                && !(matches!(source, HeatPumpSource::HighTemperature) && temperature.is_none());
+            (
+                if table_source == "ground" {
+                    "collective_ground"
+                } else {
+                    "collective_groundwater_surface_or_at_least15_c"
+                },
+                Some(json!({
+                    "temperatureClass": if below_20 { "below20_c" } else { "at_least20_c_or_surface_water_or_unknown" },
+                    "supplierReference": supplier,
+                })),
+            )
+        }
+    };
+    let mut value = json!({
+        "kind": "heat_pump_forfait",
+        "forfait": forfait,
+        "sourceSystem": source_system,
+        "sourceSystemReference": collective_source.unwrap_or(reference),
+    });
+    if collective {
+        // 9.91 for a collective heat pump (9.85 covers individual ones).
+        value["auxiliary"] = json!({
+            "electricallyConnectedDevices": 1,
+            "nominalPowerKw": capacity,
+            "sourceReference": reference,
+        });
+    }
+    ConvertedHeatPump {
+        value,
+        heat_pump_renewable: Some(renewable),
+        collective_source: collective_value,
+    }
+}
+
+/// Table 9.3 (p. 108) local or air heater as NTA table 9.25 "overige
+/// systemen" (`forfait_heater`).
+fn convert_fired_heater(
+    generator: &HeatingGenerator,
+    air_heating: Option<AirHeatingAnswer>,
+    nominal_power_kw: Option<f64>,
+    reference: &str,
+    recorder: &mut Recorder,
+) -> Value {
+    match generator {
+        HeatingGenerator::LocalFired {
+            appliance,
+            fuel,
+            flue_gas_exhaust,
+            electricity_connected,
+        } => {
+            let fuel = match (appliance, fuel) {
+                (LocalFiredAppliance::GasHeater, None | Some(FiredFuel::NaturalGas)) => {
+                    "natural_gas"
+                }
+                (LocalFiredAppliance::OilHeater, None | Some(FiredFuel::Oil)) => "oil",
+                (LocalFiredAppliance::SteamBoiler, Some(FiredFuel::NaturalGas)) => "natural_gas",
+                (LocalFiredAppliance::SteamBoiler, Some(FiredFuel::Oil)) => "oil",
+                (LocalFiredAppliance::SteamBoiler, None) => {
+                    recorder.issue("steam_boiler_fuel_required", "heating.generator.fuel");
+                    "natural_gas"
+                }
+                _ => {
+                    recorder.issue("local_heater_fuel_contradiction", "heating.generator.fuel");
+                    "natural_gas"
+                }
+            };
+            let connected = electricity_connected.unwrap_or_else(|| {
+                recorder.record(
+                    "fired_heater_electricity_unknown_connected",
+                    "heating.generator.electricityConnected",
+                    "true (10 W stand-by)".into(),
+                    "NTA 8800 p. 365 (9.6.8.2.3)",
+                );
+                true
+            });
+            json!({
+                "kind": "forfait_heater",
+                "heaterKind": if *flue_gas_exhaust { "local_with_flue" } else { "local_without_flue" },
+                "fuel": fuel,
+                "equipmentReference": format!("{reference}; ISSO 82.1 table 9.3"),
+                "auxiliary": {
+                    "electricallyConnectedDevices": u32::from(connected),
+                    "nominalPowerKw": nominal_power_kw,
+                    "sourceReference": reference,
+                },
+            })
+        }
+        HeatingGenerator::GasAirHeater {
+            heater_type,
+            pilot_flame,
+            count,
+        } => {
+            let count = count
+                .or(match air_heating {
+                    Some(AirHeatingAnswer::Direct { count, .. })
+                    | Some(AirHeatingAnswer::Indirect { count, .. }) => count,
+                    _ => None,
+                })
+                .unwrap_or_else(|| {
+                    recorder.record(
+                        "air_heater_count_unknown_one",
+                        "heating.generator.count",
+                        "1".into(),
+                        "ISSO 82.1 p. 108 (table 9.3)",
+                    );
+                    1
+                });
+            if count == 0 {
+                recorder.issue("air_heater_count_invalid", "heating.generator.count");
+            }
+            let pilot = pilot_flame.unwrap_or_else(|| {
+                recorder.record(
+                    "pilot_flame_unknown_present",
+                    "heating.generator.pilotFlame",
+                    "true".into(),
+                    "ISSO 82.1 p. 108 (table 9.3)",
+                );
+                true
+            });
+            let kind = match heater_type {
+                AirHeaterType::Conventional => "air_heater_conventional",
+                AirHeaterType::Vr => "air_heater_vr",
+                AirHeaterType::Hr100 => "air_heater_hr100",
+                AirHeaterType::Hr104 => "air_heater_hr104",
+                AirHeaterType::Hr107 => "air_heater_hr107",
+            };
+            json!({
+                "kind": "forfait_heater",
+                "heaterKind": kind,
+                "fuel": "natural_gas",
+                "equipmentReference": format!("{reference}; ISSO 82.1 table 9.3"),
+                "pilotFlames": if pilot { count } else { 0 },
+                "auxiliary": {
+                    "electricallyConnectedDevices": count,
+                    "nominalPowerKw": nominal_power_kw,
+                    "sourceReference": reference,
+                },
+            })
+        }
+        _ => unreachable!("called for fired heaters only"),
     }
 }
 
@@ -1233,6 +1885,8 @@ mod tests {
             added_preferred_generator: false,
             collective: None,
             air_heating: None,
+            distribution_type: None,
+            pipe_insulation: None,
             source_reference: "survey".into(),
         }
     }
@@ -1322,6 +1976,12 @@ mod tests {
             capacity_kw: Some(6.0),
             source_regeneration_factor: None,
             high_efficiency_evidence: None,
+            drive: Default::default(),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
         };
         assert_eq!(
             design_class(Emitters::FloorHeating, &hp, &mut recorder),
@@ -1352,6 +2012,12 @@ mod tests {
             capacity_kw: None,
             source_regeneration_factor: None,
             high_efficiency_evidence: None,
+            drive: Default::default(),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
         };
         let derived = derive_heating(&heating(hp, Emitters::Radiators), 2015, &mut recorder);
         assert_eq!(

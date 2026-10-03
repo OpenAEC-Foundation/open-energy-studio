@@ -54,6 +54,51 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.verticalPipes).toEqual([]);
   }, 60000);
 
+  it('edits table 9.3/9.6 generators and the table 9.12 distribution', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    const generator = () => screen.getAllByRole('combobox', { name: 'Generator' })[0];
+
+    // Collective groundwater doublet with a gas-absorption heat pump.
+    await user.selectOptions(generator(), 'heat_pump');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Drive' }), 'gas_absorption');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'groundwater');
+    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
+    await user.type(screen.getByRole('textbox', { name: 'Evidence of the collective source' }), 'invoice');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Groundwater source system (unknown: recirculation)' }), 'doublet');
+    await user.type(screen.getByRole('spinbutton', { name: 'Source temperature, °C (unknown: ground)' }), '11');
+    expect(stored()!.survey.heating.generator).toMatchObject({
+      kind: 'heat_pump', drive: 'gas_absorption', source: 'groundwater', collectiveSourceReference: 'invoice',
+      groundwaterSystem: 'doublet', sourceTemperatureC: 11,
+    });
+
+    // Local gas heating without a flue, and gas air heaters.
+    await user.selectOptions(generator(), 'local_fired');
+    await user.click(screen.getByRole('checkbox', { name: 'With flue-gas exhaust' }));
+    expect(stored()!.survey.heating.generator).toEqual({
+      kind: 'local_fired', appliance: 'gas_heater', flueGasExhaust: false, electricityConnected: null,
+    });
+    await user.selectOptions(generator(), 'gas_air_heater');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Air heater type' }), 'hr107');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Pilot flame (unknown: yes)' }), 'false');
+    expect(stored()!.survey.heating.generator).toEqual({
+      kind: 'gas_air_heater', heaterType: 'hr107', pilotFlame: false, count: null,
+    });
+
+    // One-pipe loop with insulated pipes from 1990.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Distribution system (unknown: two-pipe)' }), 'one_pipe');
+    const count = screen.getByRole('spinbutton', { name: 'Emitters on the one-pipe loop' });
+    await user.clear(count);
+    await user.type(count, '8');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Pipes insulated (unknown: no)' }), 'true');
+    await user.type(screen.getByRole('spinbutton', { name: 'Year of insulation (unknown: construction year)' }), '1990');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Valves and brackets insulated (unknown: no)' }), 'true');
+    const heating = stored()!.survey.heating;
+    expect(heating.distributionType).toEqual({ kind: 'one_pipe', emitterCount: 8 });
+    expect(heating.pipeInsulation).toEqual({ insulated: true, insulationYear: 1990, fittingsInsulated: true });
+  }, 60000);
+
   it('edits houseboats, sunrooms and rooflights in the dwelling survey', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
