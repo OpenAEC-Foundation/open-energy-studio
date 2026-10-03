@@ -33,6 +33,8 @@
 
 **Interne controle op `aace329` (4 oktober).** De volledige Rust-kern (751 tests), HTTP/MCP-service (53 tests), frontend (385 tests in 61 bestanden) en TypeScript-/Vite-build zijn geslaagd. Daarna is een extra regressietest toegevoegd voor de onderwijsgrens van Bbl-tabel 4.148A; deze gerichte test en `cargo fmt --check` slaagden. Deze controles leveren geen externe normtoets of attest op.
 
+**Nieuwe desktopcontrole op `c62794c` (4 oktober).** Na de invoer- en UI-wijzigingen slaagden 753 Rust-kerntests, 53 servicetests, 399 frontendtests en de TypeScript-/Vite-build. De Linux-debugbuild is opnieuw gemaakt en als afzonderlijk pakket met SHA-256 bewaard. Zie het [bouwdossier](nta8800-build-verificatie-2026-10-04-c62794c.md). Een visuele UI-acceptatie en onafhankelijke actuele normtoets volgen hier niet uit.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
@@ -801,6 +803,7 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 | Desktop-devbuild | Linux `.deb` gebouwd; pakketomschrijving benoemt de experimentele invoeraudit | Debugpakket; geen releasecertificaat |
 | Vernieuwde desktop-devbuild `fc5a8a5` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-03-fc5a8a5.md): schone tweede bouw, 703 kerntests, 53 servicetests en 10 gerichte frontendtests groen; SHA-256 en pakketmetadata vastgelegd | Debugpakket; geen visuele acceptatie, onafhankelijke actuele EDR-toets of attest |
 | Vernieuwde desktop-devbuild `e811eb3` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-03-e811eb3.md): 747 kerntests, 53 servicetests en 380 frontendtests groen; TypeScript, Vite en Linux `.deb` gebouwd; pakketmetadata en SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
+| Vernieuwde desktop-devbuild `c62794c` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-04-c62794c.md): 753 kerntests, 53 servicetests en 399 frontendtests groen; TypeScript, Vite en Linux `.deb` gebouwd; pakketmetadata en SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
 | Visuele UI-controle | Niet uitgevoerd | Browsertoegang tot `127.0.0.1:3006` door opgeslagen gebruikersinstelling geblokkeerd; deze blokkade is niet omzeild |
 | NTA-invoereditor bij projectwissel | Het prestatiepaneel sluit zowel het formulier als de JSON-editor bij een andere project-ID en wist de oude concepttekst. Gerichte componenttest: 7/7 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole; de Rust-kern valideert de opgeslagen invoer pas bij de volgende berekening. |
 | Zijbalk met indicatief label bij projectwissel | De respons draagt de projectreferentie van de aanvraag; een oudere BENG-/labeluitkomst wordt bij een gewijzigde projectreferentie direct verborgen. Gerichte previewtests: 5/5 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of onafhankelijke toets van de energie-uitkomst. |

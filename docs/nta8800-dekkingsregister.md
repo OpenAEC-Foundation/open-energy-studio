@@ -20,6 +20,8 @@ De nieuwere [debug-desktopbuild van commit `e811eb3`](nta8800-build-verificatie-
 
 Op `aace329` slaagden later de volledige interne suites opnieuw (751 Rust-kerntests, 53 service- en 385 frontendtests) en de TypeScript-/Vite-build. De daarna toegevoegde onderwijsgrens-regressietest slaagde afzonderlijk. Dit is een nieuwere bronstand dan de verpakte debugbuild van `e811eb3`.
 
+De [Linux-debugbuild van `c62794c`](nta8800-build-verificatie-2026-10-04-c62794c.md) bevat de latere invoer- en UI-wijzigingen. Op die commit slaagden 753 Rust-kerntests, 53 servicetests, 399 frontendtests en de TypeScript-/Vite-build. Het pakket is met SHA-256 vastgelegd; de referentie- en atteststatus hieronder verandert daardoor niet.
+
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
 
 Een latere controle vanaf `02fafc5` gaf 735 groene kerntests, 53 groene servicetests, geslaagde Rust-formatcontroles en een geslaagde frontend-build. De volledige frontendrun overlapte een relabel-merge en is daarom geen vrijgave voor de nieuwe stand; de twee betrokken testbestanden zijn na de merge opnieuw uitgevoerd (10/10 groen). De precieze testgrens staat in de [verificatiestatus](nta8800-verificatiestatus.md).
