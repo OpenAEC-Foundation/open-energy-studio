@@ -304,9 +304,8 @@ pub fn general_data(
             .and_then(|input| input.label_function)
             .and_then(|function| tag(&function))
             .or_else(|| tag(&project.building_function)),
-        // The same resolved year as §5.3.2 (NTA block, registration, then
-        // the chapter 11 bouwjaar); the registration alone without a kernel
-        // input.
+        // The same resolved year as §5.3.2: the registration, else the NTA
+        // block (Regeling art. 4 a, p. 5).
         construction_year: derived
             .and_then(|input| input.construction_year)
             .or_else(|| {

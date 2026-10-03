@@ -1,6 +1,6 @@
 import type { INtaHeatPumpInput, IProject } from '../energy/types';
 import { escapeHtml } from './HtmlEscaping';
-import { dutchTimestamp } from './DutchReportText';
+import { dutchTimeHtml } from './DutchReportText';
 
 type PumpEntry = { context: string; pump: INtaHeatPumpInput };
 
@@ -153,9 +153,9 @@ function ntaSourceRows(value: unknown, path = 'ntaCalculation'): SourceRow[] {
 }
 
 /** Standalone input/provenance dossier; deliberately has no energy result. */
-export function generateNtaInputDossierHTML(project: IProject): string {
+export function generateNtaInputDossierHTML(project: IProject, generatedAt: Date = new Date()): string {
   const pumps = allHeatPumps(project);
-  const generatedAt = dutchTimestamp();
+  const generatedTime = dutchTimeHtml(generatedAt);
   return `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>NTA 8800 invoer- en bewijsoverzicht — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -163,7 +163,7 @@ export function generateNtaInputDossierHTML(project: IProject): string {
     th{background:#edf3f8}.notice{border-left:5px solid #b45309;background:#fff8e7;padding:12px 16px}.pump{break-inside:avoid;margin:28px 0}
     @media print{body{margin:12mm;padding:0;font-size:11px}table{break-inside:avoid}}</style></head><body>
     <h1>NTA 8800 invoer- en bewijsoverzicht</h1>
-    <p>Project: ${escapeHtml(project.name)} · Project-ID: ${escapeHtml(project.id)} · Gegenereerd: ${escapeHtml(generatedAt)}</p>
+    <p>Project: ${escapeHtml(project.name)} · Project-ID: ${escapeHtml(project.id)} · Gegenereerd: ${generatedTime}</p>
     <div class="notice"><strong>Invoer alleen — niet geattesteerd.</strong> Dit document bevat geen geverifieerde NTA 8800-berekening, BENG-uitkomst of officieel energielabel. Registervelden en bronverwijzingen zijn door de gebruiker ingevoerd en niet extern gecontroleerd.</div>
     <h2>Project en doeluitgave</h2><table><tbody>
       <tr><th>Doeluitgave</th>${cell('NTA 8800:2025+C1:2026')}<th>Gebouwfunctie</th>${cell(project.buildingFunction)}</tr>

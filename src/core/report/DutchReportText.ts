@@ -20,6 +20,14 @@ export function dutchTimestamp(date: Date = new Date()): string {
   return date.toLocaleString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * The generation time as `<time datetime="ISO">Dutch text</time>`: readable, and machine-exact so it
+ * matches the ISO `generatedAt` of the dossier manifest.
+ */
+export function dutchTimeHtml(date: Date = new Date()): string {
+  return `<time datetime="${date.toISOString()}">${escapeHtml(dutchTimestamp(date))}</time>`;
+}
+
 const PREFIXES = ['nta.gap.', 'nta.warning.', 'kernel.issue.', 'opname.issue.', 'mwa.issue.', 'registration.issue.'];
 
 /** Escaped HTML of a code: the Dutch label with the code as a small reference, or the bare code. */

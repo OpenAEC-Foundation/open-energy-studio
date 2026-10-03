@@ -1326,6 +1326,42 @@ pub fn combine_heating_systems(
     main
 }
 
+/// Paths (relative to the generator, e.g. `generators[2].nominalPowerKw`) of
+/// the missing nominal powers in a set whose annex Q heat pump was estimated
+/// to cover everything (β ≥ 1) while only some remaining powers are entered.
+/// Remark 1 (NTA 8800 p. 323) asks for the powers or an estimated β; with
+/// β ≥ 1 the estimate says nothing about the rest, so the rest set needs
+/// either all its powers (weighted per 9.56) or none (equal shares). Empty
+/// when the set is complete, fully unknown, or not such a set.
+pub(crate) fn rest_set_partial_power_paths(set: &MultipleGenerators) -> Vec<String> {
+    let Some(index) = set
+        .generators
+        .iter()
+        .position(|item| matches!(item.generator, Generator::HeatPumpAnnexQ(_)))
+    else {
+        return Vec::new();
+    };
+    let first = set.estimated_beta.first().copied().unwrap_or(0.0);
+    if set.estimated_beta.is_empty() || first < 1.0 {
+        return Vec::new();
+    }
+    let missing: Vec<usize> = (0..set.generators.len())
+        .filter(|other| *other != index)
+        .filter(|other| {
+            let power = set.generators[*other].nominal_power_kw;
+            !(power.is_finite() && power > 0.0)
+        })
+        .collect();
+    let rest = set.generators.len() - 1;
+    if missing.is_empty() || missing.len() == rest {
+        return Vec::new();
+    }
+    missing
+        .into_iter()
+        .map(|other| format!("generators[{other}].nominalPowerKw"))
+        .collect()
+}
+
 fn issue(code: &'static str, path: impl Into<String>) -> ChainIssue {
     ChainIssue {
         code,
@@ -3589,6 +3625,13 @@ fn generate_multiple_with_annex_q(
         // (interpretation). A partly known set is not mixed with equal
         // shares: remark 1 (p. 323) asks for the powers or an estimated β,
         // so the missing powers are reported by the rest set below.
+        let partial = rest_set_partial_power_paths(set);
+        if !partial.is_empty() {
+            for path in partial {
+                issues.push(issue("rest_set_power_partial", format!("generator.{path}")));
+            }
+            return None;
+        }
         let first = set.estimated_beta.first().copied().unwrap_or(0.0);
         let rest_powers_missing = rest_indices.iter().all(|other| {
             let power = set.generators[*other].nominal_power_kw;
@@ -5868,13 +5911,17 @@ mod tests {
                 }),
             });
             set.estimated_beta = vec![1.0, 1.0];
+            assert_eq!(
+                rest_set_partial_power_paths(set),
+                vec!["generators[2].nominalPowerKw".to_string()]
+            );
         }
         let result = assess_space_heating_chain(&mixed);
         assert_eq!(result.status, "invalid");
         assert!(result
             .issues
             .iter()
-            .any(|item| item.code == "generator_nominal_power_invalid"
+            .any(|item| item.code == "rest_set_power_partial"
                 && item.path == "generator.generators[2].nominalPowerKw"));
         assert!(!result
             .issues

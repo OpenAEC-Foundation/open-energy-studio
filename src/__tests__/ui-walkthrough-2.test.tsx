@@ -12,7 +12,7 @@ import { relabelCluster, relabelElementName, relabelNote, relabelValue } from '.
 import { calculateProjectPerformanceShared } from '../core/nta/useProjectPerformance';
 import { ResultRow } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { defaultValueLabel } from '../components/BasisopnamePanel/BasisopnamePanel';
-import { setpointChecks } from '../components/NtaPerformancePanel/NtaCalculationForm';
+import { setpointChecks, setpointWriteBack, TABLE_713_SOURCE } from '../components/NtaPerformancePanel/NtaCalculationForm';
 import { ProjectInfoDialog } from '../components/dialogs/ProjectInfoDialog/ProjectInfoDialog';
 import { ReportView } from '../components/ReportView/ReportView';
 import type { BuildingPerformanceAssessment, MwaVariantResult, ProjectPerformanceAssessment } from '../core/nta/KernelClient';
@@ -101,7 +101,7 @@ describe('BENG report from the NTA kernel', () => {
     renderWithProviders(<ReportView />);
     const section = within(await screen.findByTestId('report-beng-kernel', {}, { timeout: 3000 }));
     expect(section.getByText(/48\.33/)).toBeInTheDocument();
-    expect(section.getByText('≤ 50.0')).toBeInTheDocument();
+    expect(section.getByText('≤ 50.00')).toBeInTheDocument();
     expect(screen.queryByTestId('report-beng-indicative')).not.toBeInTheDocument();
   });
 });
@@ -199,18 +199,35 @@ describe('project information dialog', () => {
 });
 
 describe('table 7.13 setpoint check', () => {
-  it('mirrors the kernel: area-weighted functions, per zone, skipped with a usage fit', () => {
+  it('mirrors the kernel: area-weighted functions, per project zone', () => {
     const block = { usageFunction: 'office', setpoints: { heatingC: 21, coolingC: 24 } };
-    expect(setpointChecks(block)).toEqual([expect.objectContaining({ zoneId: null, expected: { heatingC: 21, coolingC: 24 } })]);
+    expect(setpointChecks(block, [])).toEqual([expect.objectContaining({ zoneId: null, expected: { heatingC: 21, coolingC: 24 } })]);
     const zones = { ...block, zoneData: [
       { zoneId: 'a', functionAreas: [{ function: 'office', areaM2: 300 }, { function: 'sport', areaM2: 100 }] },
       { zoneId: 'b', usageFunction: 'residential', setpoints: { heatingC: 20, coolingC: 24, sourceReference: '' } },
+      { zoneId: 'orphan', usageFunction: 'sport' },
     ] };
-    const rows = setpointChecks(zones);
+    // The kernel walks the project zones: zone c has no zoneData entry, the orphan entry is not a zone.
+    const rows = setpointChecks(zones, ['a', 'b', 'c']);
     // (21·300 + 16·100) / 400 = 19.75 °C; zone a uses the block setpoints.
     expect(rows[0]).toMatchObject({ zoneId: 'a', zoneIndex: 0, expected: { heatingC: 19.75, coolingC: 24 }, path: ['setpoints'], ownSetpoints: false });
     expect(rows[1]).toMatchObject({ zoneId: 'b', zoneIndex: 1, expected: { heatingC: 20 }, path: ['zoneData', 1, 'setpoints'], ownSetpoints: true });
-    expect(setpointChecks({ ...block, usageFit: { spatialFraction: 1 } })).toEqual([]);
+    expect(rows[2]).toMatchObject({ zoneId: 'c', zoneIndex: null, expected: { heatingC: 21 }, path: ['setpoints'], ownSetpoints: false });
+    expect(rows.map((row) => row.zoneId)).not.toContain('orphan');
+  });
+
+  it('writes table values with a source reference the kernel accepts', () => {
+    const draft = { usageFunction: 'office', setpoints: { heatingC: 20, coolingC: 24, sourceReference: 'bestek' },
+      zoneData: [{ zoneId: 'a', usageFunction: 'sport' }] };
+    const [rowA, rowB] = setpointChecks(draft, ['a', 'b']);
+    // Shared block setpoints, different targets: each zone gets its own setpoints.
+    expect(setpointWriteBack(draft, rowA, true, 'bestek')).toEqual([['zoneData', 0, 'setpoints'],
+      { sourceReference: 'bestek', heatingC: 16, coolingC: 24 }]);
+    expect(setpointWriteBack(draft, rowB, true, 'bestek')).toEqual([['zoneData'],
+      [...draft.zoneData, { zoneId: 'b', setpoints: { sourceReference: 'bestek', heatingC: 21, coolingC: 24 } }]]);
+    const bare = { usageFunction: 'office', setpoints: { heatingC: 20, coolingC: 24, sourceReference: '' } };
+    const [row] = setpointChecks(bare, []);
+    expect(setpointWriteBack(bare, row, false, TABLE_713_SOURCE)[1]).toMatchObject({ sourceReference: 'NTA 8800 tabel 7.13', heatingC: 21 });
   });
 });
 

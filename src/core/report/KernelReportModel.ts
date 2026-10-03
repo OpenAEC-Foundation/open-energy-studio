@@ -11,6 +11,16 @@ export interface KernelIndicatorRow {
   higherIsBetter: boolean;
 }
 
+/**
+ * Decimals for a BENG value and its limit. Both use the same precision so a
+ * row can never print a limit that contradicts its own toets (the kernel
+ * compares unrounded values with unrounded limits): EP1/EP2 and TO_juli to
+ * 0,01, EP3 to 0,1 (NTA 8800 §5.3.1, p. 72–74; TO_juli p. 120).
+ */
+export function indicatorDecimals(key: KernelIndicatorRow['key'] | 'tojuli'): number {
+  return key === 'beng3' ? 1 : 2;
+}
+
 export interface KernelReportModel {
   indicators: KernelIndicatorRow[];
   /** TO_juli for dwellings; null for utility (§5.7 applies to the woonfunctie only). */

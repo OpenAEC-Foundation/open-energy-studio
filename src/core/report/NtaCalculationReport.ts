@@ -6,7 +6,7 @@ import type {
 import { escapeHtml } from './HtmlEscaping';
 import { summarizeExtras } from '../nta/NtaResultSummary';
 import { summarizeServiceEnergy } from '../nta/ServiceEnergy';
-import { dutchCodeCell, dutchNumber, dutchTimestamp } from './DutchReportText';
+import { dutchCodeCell, dutchNumber, dutchTimeHtml } from './DutchReportText';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
@@ -154,7 +154,8 @@ export function readinessText(assessment: RegistrationAssessment | null | undefi
 }
 
 /** Report header of BRL 9500 §4.2.5/§4.2.6: advisers, dates and validity. */
-function registrationSection(registration: NtaRegistration | undefined, assessment: RegistrationAssessment | null | undefined): string {
+function registrationSection(registration: NtaRegistration | undefined, assessment: RegistrationAssessment | null | undefined,
+  constructionYear?: number | null): string {
   if (!registration) {
     return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie).</p>';
   }
@@ -174,7 +175,7 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     <tr><th>Doel</th>${cell(PURPOSE[registration.purpose ?? ''] ?? '—')}<th>Opname</th>${cell(SURVEY[registration.surveyType ?? ''] ?? '—')}</tr>
     <tr><th>Representativiteit</th>${cell(REPRESENTATION[registration.representation ?? ''] ?? '—')}<th>Berichttype</th>${cell(MESSAGE_TYPE[messageType] ?? messageType)}</tr>
     <tr><th>Adres (postcode, huisnummer)</th>${cell(address || '—')}<th>BAG-verblijfsobject</th>${cell(registration.bagObjectId ?? '—')}</tr>
-    <tr><th>Bouwjaar</th>${cell(registration.constructionYear ?? '—')}<th>Woningtype / gebruiksfunctie</th>${cell(registration.buildingType ?? '—')}</tr>
+    <tr><th>Bouwjaar</th>${cell(constructionYear ?? registration.constructionYear ?? '—')}<th>Woningtype / gebruiksfunctie</th>${cell(registration.buildingType ?? '—')}</tr>
     <tr><th>Opdrachtgever</th>${cell(registration.client ?? '—')}<th>Certificaatnummer</th>${cell(registration.certificateNumber ?? '—')}</tr>
     <tr><th>Opnemend adviseur</th>${cell(advisor(registration.surveyingAdvisor))}<th>Registrerend adviseur</th>${cell(advisor(registration.registeringAdvisor))}</tr>
     <tr><th>Opnamedatum</th>${cell(registration.surveyDate ?? '—')}<th>Registratiedatum</th>${cell(registration.registrationDate ?? '—')}</tr>
@@ -214,6 +215,7 @@ export function generateNtaCalculationReportHTML(
   project: IProject,
   assessment: ProjectPerformanceAssessment,
   interpretations?: NtaInterpretationGroup[],
+  generatedAt: Date = new Date(),
 ): string {
   const performance = assessment.performance;
   // Project plausibility and the kernel's own warnings (e.g. 10.15, 13.25).
@@ -221,7 +223,7 @@ export function generateNtaCalculationReportHTML(
     ...(assessment.warnings ?? []),
     ...(performance?.warnings ?? []),
   ];
-  const generatedAt = dutchTimestamp();
+  const generatedTime = dutchTimeHtml(generatedAt);
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>NTA 8800-rekenrapport — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -230,7 +232,7 @@ export function generateNtaCalculationReportHTML(
     .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kpi div{border:1px solid #cdd5dd;padding:10px}.kpi strong{display:block;font-size:22px}
     @media print{body{margin:12mm;padding:0;font-size:11px}table{break-inside:avoid}}</style></head><body>
     <h1>NTA 8800-rekenrapport</h1>
-    <p>Project: ${escapeHtml(project.name)} · Project-ID: ${escapeHtml(project.id)} · Gegenereerd: ${escapeHtml(generatedAt)}</p>
+    <p>Project: ${escapeHtml(project.name)} · Project-ID: ${escapeHtml(project.id)} · Gegenereerd: ${generatedTime}</p>
     <div class="notice"><strong>Onverifieerde berekening — geen officieel energielabel, niet geattesteerd.</strong>
     Deze uitkomst komt uit de Rust-rekenkern van Open Energy Studio. De kern is getranscribeerd uit de gelicentieerde normtekst maar nog niet met referentiegevallen geverifieerd; niet-ondersteunde situaties worden afgewezen of als opgegeven waarde vermeld. Een energielabel wordt pas vastgesteld na registratie door een gecertificeerde adviseur met een BRL 9501-geattesteerd rekenprogramma (Omgevingsregeling art. 5.11/5.12).</div>
     <h2>Herleidbaarheid</h2><table><tbody>
@@ -240,7 +242,7 @@ export function generateNtaCalculationReportHTML(
       ${assessment.geometry ? `<tr><th>A<sub>g</sub> / A<sub>ls</sub></th><td>${num(assessment.geometry.usableFloorAreaM2, 1)} / ${num(assessment.geometry.lossAreaM2, 1)} m²</td>
         <th>A<sub>ls</sub>/A<sub>g</sub></th><td>${num(assessment.geometry.lossAreaRatio, 3)}</td></tr>` : ''}
     </tbody></table>
-    ${registrationSection(project.registration, assessment.registration)}
+    ${registrationSection(project.registration, assessment.registration, assessment.labelData?.general.constructionYear)}
     ${warnings.length > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen. De invoer of de uitkomst botst met de norm of met andere invoer, of is extreem volgens de letter van de norm.</p>
       <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${warnings
         .map((warning) => `<tr>${dutchCodeCell(warning.code)}${cell(warning.path)}${cell(warning.detail ?? '')}</tr>`).join('')}</tbody></table>` : ''}`;

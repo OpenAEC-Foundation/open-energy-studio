@@ -650,6 +650,18 @@ fn registration_construction_year(project_value: &Value) -> Option<u32> {
     year_at(project_value, "/registration/constructionYear")
 }
 
+fn nta_block_construction_year(project_value: &Value) -> Option<u32> {
+    year_at(project_value, "/ntaCalculation/constructionYear")
+}
+
+/// The bouwjaar of §5.3.2 (p. 75–76) and of the label data (Regeling art.
+/// 4 a): the registration, else the NTA block. The chapter 11 year is not
+/// used: table 11.13 (p. 486) also takes a renovatiejaar.
+pub(crate) fn resolved_construction_year(project_value: &Value) -> Option<u32> {
+    registration_construction_year(project_value)
+        .or_else(|| nta_block_construction_year(project_value))
+}
+
 /// The chapter 11 bouwjaar (table 11.13): the block-level ventilation, else
 /// the first calculation zone that states one.
 fn ventilation_construction_year(project_value: &Value) -> Option<u32> {
@@ -671,21 +683,38 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
     use crate::monthly_demand::CeilingColumn;
     let mut warnings = Vec::new();
 
-    // One building construction year feeds §5.3.2, the label data (art. 4)
-    // and table 11.13: a registration year that differs from the chapter 11
-    // bouwjaar means one of the two is wrong.
-    if let (Some(registered), Some(ventilation)) = (
-        registration_construction_year(project_value),
-        ventilation_construction_year(project_value),
-    ) {
-        if registered != ventilation {
+    // One building bouwjaar feeds §5.3.2 (p. 75–76) and the label data
+    // (Regeling art. 4 a): the registration year, else the NTA block. A
+    // differing NTA block year means one of the two is wrong.
+    let registered = registration_construction_year(project_value);
+    let block = nta_block_construction_year(project_value);
+    if let (Some(registered), Some(block)) = (registered, block) {
+        if registered != block {
             warnings.push(InputGap {
                 detail: Some(format!(
-                    "registration {registered} against ventilation (table 11.13) {ventilation}"
+                    "registration {registered} against ntaCalculation {block}"
                 )),
                 ..gap(
                     "construction_year_mismatch",
-                    "registration.constructionYear",
+                    "ntaCalculation.constructionYear",
+                )
+            });
+        }
+    }
+    // Table 11.13 (p. 486) reads a bouwjaar or renovatiejaar, so a later
+    // ventilation year is normal; an earlier one contradicts the bouwjaar.
+    if let (Some(building), Some(ventilation)) = (
+        registered.or(block),
+        ventilation_construction_year(project_value),
+    ) {
+        if ventilation < building {
+            warnings.push(InputGap {
+                detail: Some(format!(
+                    "ventilation (table 11.13) {ventilation} before bouwjaar {building}"
+                )),
+                ..gap(
+                    "ventilation_year_before_construction_year",
+                    "ntaCalculation.ventilation.constructionYear",
                 )
             });
         }
@@ -2871,6 +2900,25 @@ fn derive_input(
             regeneration_hot_water: None,
         });
     }
+    // Remark 1 (p. 323): a rest set beside an annex Q heat pump estimated
+    // at β ≥ 1 needs all its nominal powers or none.
+    let partial_rest = |generator: &crate::space_heating_chain::Generator,
+                        path: &str,
+                        gaps: &mut Vec<InputGap>| {
+        if let crate::space_heating_chain::Generator::Multiple(set) = generator {
+            for item in crate::space_heating_chain::rest_set_partial_power_paths(set) {
+                gaps.push(gap("rest_set_power_partial", format!("{path}.{item}")));
+            }
+        }
+    };
+    partial_rest(&nta.generator, "ntaCalculation.generator", gaps);
+    for (index, system) in nta.additional_heating_systems.iter().enumerate() {
+        partial_rest(
+            &system.generator,
+            &format!("ntaCalculation.additionalHeatingSystems[{index}].generator"),
+            gaps,
+        );
+    }
     if zones.is_empty() && !nta.additional_heating_systems.is_empty() {
         gaps.push(gap(
             "main_heating_system_without_zones",
@@ -2954,10 +3002,7 @@ fn derive_input(
         label_functions: nta.label_functions.clone(),
         // One building construction year: the NTA block, else the registration, else the
         // chapter 11 bouwjaar of table 11.13 (the same quantity).
-        construction_year: nta
-            .construction_year
-            .or_else(|| registration_construction_year(project_value))
-            .or_else(|| ventilation_construction_year(project_value)),
+        construction_year: resolved_construction_year(project_value),
         fossil_appliances_outside_calculation: nta.fossil_appliances_outside_calculation,
         bbl_function: nta.bbl_function,
         bbl_functions: nta.bbl_functions.clone(),
@@ -3332,10 +3377,11 @@ mod tests {
         }
     }
 
-    /// One building construction year: without one in the NTA block the
-    /// registration, else the chapter 11 bouwjaar (table 11.13), is used.
+    /// One building bouwjaar (§5.3.2, Regeling art. 4 a): the registration,
+    /// else the NTA block; the chapter 11 year (bouw- of renovatiejaar) is
+    /// never used and only warned about when it predates the bouwjaar.
     #[test]
-    fn construction_year_falls_back_to_registration_then_ventilation() {
+    fn construction_year_follows_registration_then_nta_block() {
         let base: Value = serde_json::from_str(include_str!(
             "../../../training-data/nta8800-example-terraced-dwelling.json"
         ))
@@ -3344,43 +3390,57 @@ mod tests {
             let mut gaps = Vec::new();
             derive_input(value, &mut gaps).and_then(|input| input.construction_year)
         };
-        assert!(base["ntaCalculation"].get("constructionYear").is_none());
-        assert_eq!(year(&base), Some(2020));
-        let mut registered = base.clone();
-        registered["registration"] = serde_json::json!({"constructionYear": 1975});
-        assert_eq!(year(&registered), Some(1975));
-        registered["ntaCalculation"]["constructionYear"] = serde_json::json!(1990);
-        assert_eq!(year(&registered), Some(1990));
-
-        // The chapter 11 bouwjaar of a calculation zone counts too.
-        let zoned = serde_json::json!({"ntaCalculation": {"zoneData": [
-            {"zoneId": "a"},
-            {"zoneId": "b", "ventilation": {"constructionYear": 1984}}
-        ]}});
-        assert_eq!(ventilation_construction_year(&zoned), Some(1984));
-        assert_eq!(ventilation_construction_year(&base), Some(2020));
-
-        // Registration 1975 against bouwjaar 2020: a warning, none when equal.
-        let mut mismatch = base.clone();
-        mismatch["registration"] = serde_json::json!({"constructionYear": 1975});
         let codes = |value: &Value| {
             plausibility_warnings(value)
                 .into_iter()
                 .map(|item| item.code)
                 .collect::<Vec<_>>()
         };
-        assert!(codes(&mismatch).contains(&"construction_year_mismatch"));
-        mismatch["registration"]["constructionYear"] = serde_json::json!(2020);
-        assert!(!codes(&mismatch).contains(&"construction_year_mismatch"));
+        assert_eq!(year(&base), Some(2020));
+        assert!(codes(&base).is_empty());
+
+        // Without the NTA block year the ventilation year is not a fallback.
+        let mut bare = base.clone();
+        bare["ntaCalculation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("constructionYear");
+        assert_eq!(year(&bare), None);
+        assert_eq!(resolved_construction_year(&bare), None);
+
+        // The registration year comes first; a differing block year warns.
+        let mut registered = base.clone();
+        registered["registration"] = serde_json::json!({"constructionYear": 2010});
+        assert_eq!(year(&registered), Some(2010));
+        assert!(codes(&registered).contains(&"construction_year_mismatch"));
+        registered["registration"]["constructionYear"] = serde_json::json!(2020);
+        assert!(!codes(&registered).contains(&"construction_year_mismatch"));
+
+        // A later ventilation year is a renovatiejaar (table 11.13): no
+        // warning; an earlier one contradicts the bouwjaar.
+        let mut renovated = base.clone();
+        renovated["ntaCalculation"]["constructionYear"] = serde_json::json!(1975);
+        assert!(!codes(&renovated).contains(&"ventilation_year_before_construction_year"));
+        let mut earlier = base.clone();
+        earlier["ntaCalculation"]["constructionYear"] = serde_json::json!(2024);
+        assert!(codes(&earlier).contains(&"ventilation_year_before_construction_year"));
+
+        // The chapter 11 bouwjaar of a calculation zone is still read.
+        let zoned = serde_json::json!({"ntaCalculation": {"zoneData": [
+            {"zoneId": "a"},
+            {"zoneId": "b", "ventilation": {"constructionYear": 1984}}
+        ]}});
+        assert_eq!(ventilation_construction_year(&zoned), Some(1984));
 
         // The label data (art. 4 a) carry the same resolved year as §5.3.2.
+        registered["registration"]["constructionYear"] = serde_json::json!(2010);
         let assessment = assess_project_performance(&registered);
         assert_eq!(
             assessment
                 .label_data
                 .as_ref()
                 .and_then(|data| data.general.construction_year),
-            Some(1990)
+            Some(2010)
         );
     }
 

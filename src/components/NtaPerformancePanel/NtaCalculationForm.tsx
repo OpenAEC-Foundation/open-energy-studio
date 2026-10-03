@@ -112,7 +112,7 @@ export function table713Setpoints(usageFunction: unknown): { heatingC: number; c
 /** One setpoint check: the zone (null for the block), the table value and where its setpoints live. */
 export interface SetpointCheckRow {
   zoneId: string | null;
-  /** Index in `zoneData`, null for the block. */
+  /** Index in `zoneData`, null for the block or a zone without a `zoneData` entry. */
   zoneIndex: number | null;
   expected: { heatingC: number; coolingC: number };
   actual: { heatingC: unknown; coolingC: unknown };
@@ -141,14 +141,16 @@ function profileSetpoints(usageFunction: unknown, functionAreas: unknown): { hea
 }
 
 /**
- * The checks the kernel makes (monthly_demand.rs `function_profile`, setpoints_table_7_13_mismatch):
- * per zone of `zoneData` its own function or function areas against the setpoints it uses
- * (its own or the block's), otherwise the block. Empty when a usage fit replaces table 7.13.
+ * The checks the kernel makes (monthly_demand.rs `function_profile`, setpoints_table_7_13_mismatch).
+ * Like the kernel it walks the calculation zones of the project (`zoneIds`): each zone with its own
+ * `zoneData` function or function areas, else the block's, against the setpoints it uses (its own
+ * or the block's). Without zones it checks the block. The project route has no usage fit
+ * (annex Z belongs to the maatwerkadvies), so table 7.13 always applies here.
  */
-export function setpointChecks(draft: Draft): SetpointCheckRow[] {
-  if (read(draft, ['usageFit']) != null) return [];
+export function setpointChecks(draft: Draft, zoneIds?: string[]): SetpointCheckRow[] {
   const blockFunction = read(draft, ['usageFunction']);
-  const zones = (read(draft, ['zoneData']) as Draft[] | undefined) ?? [];
+  const zoneData = (read(draft, ['zoneData']) as Draft[] | undefined) ?? [];
+  const ids = zoneIds ?? zoneData.map((zone, index) => String(zone?.zoneId ?? index + 1));
   const rows: SetpointCheckRow[] = [];
   const add = (zoneId: string | null, zoneIndex: number | null, expected: SetpointCheckRow['expected'] | null,
     path: Path, ownSetpoints: boolean) => {
@@ -158,13 +160,15 @@ export function setpointChecks(draft: Draft): SetpointCheckRow[] {
       actual: { heatingC: read(draft, [...path, 'heatingC']), coolingC: read(draft, [...path, 'coolingC']) },
     });
   };
-  if (zones.length === 0) {
+  if (ids.length === 0) {
     add(null, null, profileSetpoints(blockFunction, read(draft, ['functionAreas'])), ['setpoints'], true);
     return rows;
   }
-  zones.forEach((zone, index) => {
+  ids.forEach((zoneId) => {
+    const index = zoneData.findIndex((zone) => String(zone?.zoneId) === zoneId);
+    const zone = index >= 0 ? zoneData[index] : undefined;
     const own = zone?.setpoints != null;
-    add(String(zone?.zoneId ?? index + 1), index, profileSetpoints(zone?.usageFunction ?? blockFunction, zone?.functionAreas),
+    add(zoneId, index >= 0 ? index : null, profileSetpoints(zone?.usageFunction ?? blockFunction, zone?.functionAreas),
       own ? ['zoneData', index, 'setpoints'] : ['setpoints'], own);
   });
   return rows;
@@ -172,37 +176,50 @@ export function setpointChecks(draft: Draft): SetpointCheckRow[] {
 
 const close = (value: unknown, expected: number) => typeof value === 'number' && Math.abs(value - expected) <= 1e-9;
 const tableValue = (value: number) => Math.round(value * 1000) / 1000;
+/** Source of setpoints written from table 7.13 when the block has no reference of its own. */
+export const TABLE_713_SOURCE = 'NTA 8800 tabel 7.13';
 
 /** The kernel refuses setpoints other than table 7.13 (setpoints_table_7_13_mismatch); say so before saving. */
-function SetpointCheck({ draft, change }: { draft: Draft; change: (path: Path, value: unknown) => void }) {
+function SetpointCheck({ draft, change, zoneIds }: { draft: Draft; change: (path: Path, value: unknown) => void; zoneIds: string[] }) {
   const { t } = useI18n();
-  if (read(draft, ['usageFit']) != null) return <p className="nta-form-note">{t('nta.form.setpointsUsageFit')}</p>;
-  const rows = setpointChecks(draft);
+  const rows = setpointChecks(draft, zoneIds);
   if (rows.length === 0) return <p className="nta-form-note">{t('nta.form.setpointsTableNote')}</p>;
   // Zones that share the block setpoints but need different table values cannot all match the block.
   const sharedTargets = new Set(rows.filter((row) => !row.ownSetpoints)
     .map((row) => `${tableValue(row.expected.heatingC)}/${tableValue(row.expected.coolingC)}`));
+  const blockSource = read(draft, ['setpoints', 'sourceReference']);
+  const source = typeof blockSource === 'string' && blockSource.trim() !== '' ? blockSource : TABLE_713_SOURCE;
   return <div data-testid="nta-setpoint-check">{rows.map((row) => {
     const matches = close(row.actual.heatingC, row.expected.heatingC) && close(row.actual.coolingC, row.expected.coolingC);
-    const target: Path = !row.ownSetpoints && sharedTargets.size > 1 && row.zoneIndex != null
-      ? ['zoneData', row.zoneIndex, 'setpoints'] : row.path;
+    const zoneTarget = !row.ownSetpoints && sharedTargets.size > 1 && row.zoneId != null;
     const message = t(matches ? 'nta.form.setpointsTableMatch' : 'nta.form.setpointsTableMismatch',
       { heating: tableValue(row.expected.heatingC), cooling: tableValue(row.expected.coolingC) });
     return <p key={row.zoneId ?? 'block'} className={matches ? 'nta-form-note' : 'nta-form-note nta-form-error'}
       role={matches ? undefined : 'alert'}>
       {row.zoneId != null && <strong>{t('nta.form.setpointsZone', { zone: row.zoneId })}: </strong>}
       {message}
-      {!matches && <> <button type="button" onClick={() => {
-        const current = (read(draft, target) as Draft | undefined) ?? {};
-        change(target, {
-          sourceReference: '',
-          ...current,
-          heatingC: row.expected.heatingC,
-          coolingC: row.expected.coolingC,
-        });
-      }}>{t('nta.form.setpointsUseTable')}</button></>}
+      {!matches && <> <button type="button" onClick={() => change(...setpointWriteBack(draft, row, zoneTarget, source))}>
+        {t('nta.form.setpointsUseTable')}</button></>}
     </p>;
   })}</div>;
+}
+
+/**
+ * Where and what "use table values" writes: the setpoints the zone uses, or, when zones sharing the
+ * block need different values, the zone's own setpoints (a new `zoneData` entry when it has none).
+ * The source reference is kept, else the block's, else table 7.13 itself: the kernel refuses an
+ * empty one (check_reference).
+ */
+export function setpointWriteBack(draft: Draft, row: SetpointCheckRow, zoneTarget: boolean, source: string): [Path, unknown] {
+  const values = { heatingC: row.expected.heatingC, coolingC: row.expected.coolingC };
+  if (zoneTarget && row.zoneIndex == null) {
+    const zoneData = (read(draft, ['zoneData']) as Draft[] | undefined) ?? [];
+    return [['zoneData'], [...zoneData, { zoneId: row.zoneId, setpoints: { sourceReference: source, ...values } }]];
+  }
+  const target: Path = zoneTarget ? ['zoneData', row.zoneIndex as number, 'setpoints'] : row.path;
+  const current = (read(draft, target) as Draft | undefined) ?? {};
+  const own = typeof current.sourceReference === 'string' && current.sourceReference.trim() !== '' ? current.sourceReference : source;
+  return [target, { ...current, sourceReference: own, ...values }];
 }
 
 export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
@@ -289,7 +306,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <NumberField {...field} path={['setpoints', 'heatingC']} label={t('nta.form.heatingSetpoint')} />
       <NumberField {...field} path={['setpoints', 'coolingC']} label={t('nta.form.coolingSetpoint')} />
       <TextField {...field} path={['setpoints', 'sourceReference']} label={t('nta.form.source')} />
-      <SetpointCheck draft={draft} change={change} />
+      <SetpointCheck draft={draft} change={change} zoneIds={project.zones.map((zone) => zone.id)} />
     </Section>
     <Section title={t('nta.form.mass')}>
       {(['floor', 'wall'] as const).map((part) => <SelectField key={part} {...field} path={['thermalMass', part]}

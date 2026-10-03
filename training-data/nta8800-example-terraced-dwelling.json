@@ -145,6 +145,7 @@
   ],
   "ntaCalculation": {
     "calculationScope": "residential",
+    "constructionYear": 2020,
     "areaSourceReference": "synthetic floor plan",
     "usageFunction": "residential",
     "dwellingType": "other",
