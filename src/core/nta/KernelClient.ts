@@ -1560,6 +1560,8 @@ export interface SpaceHeatingChainInput {
   collectiveConnection?: { connectedUsableAreaM2: number; sourceReference: string } | null;
   /** §9.1: number of identical physical generators modelled as one system. */
   identicalSystems?: number | null;
+  /** Annex V V.1: hot water of a heat pump on the same ground source. */
+  regenerationHotWater?: { annualKwh: number; generationEfficiency: number } | null;
   generator:
     | {
         kind: 'gas_boiler';
@@ -2717,11 +2719,16 @@ export interface UtilitySurvey {
     fanCoilCount?: number;
     waterBased: boolean;
     designTemperature?: 't6_to12' | 't12_to16' | 't12_to18' | 't17_to21' | null;
-    balanced?: boolean | null;
+    /** Table 10.6; `true`/`false` of older surveys mean static / none. */
+    balanced?: 'none' | 'static' | 'dynamic' | boolean | null;
     control?: 'standalone' | 'central_with_room_control' | 'other_or_unknown' | null;
     pipesInsulated?: boolean | null;
     pipeInsulationYear?: number | null;
     aquiferPermitYear?: number | null;
+    /** NTA 10.84: a heat pump uses this ground storage; unknown follows the heating heat pump. */
+    heatPumpSource?: boolean | null;
+    /** ISSO 82.1 p. 129: ground source demonstrably always above 0 °C. */
+    groundAboveZeroDemonstrated?: boolean;
     sourceReference: string;
   } | null;
   ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference'> & {

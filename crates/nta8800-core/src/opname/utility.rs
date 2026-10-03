@@ -201,8 +201,10 @@ pub struct SurveyCooling {
     pub water_based: bool,
     #[serde(default)]
     pub design_temperature: Option<CoolingDesignAnswer>,
+    /// Table 10.6 (ISSO table 10.6): none, static or dynamic balancing;
+    /// `true`/`false` of older surveys mean static / none.
     #[serde(default)]
-    pub balanced: Option<bool>,
+    pub balanced: Option<CoolingBalanceAnswer>,
     #[serde(default)]
     pub control: Option<CoolingControlAnswer>,
     /// Pipes insulated; `None` unknown (table 10.7).
@@ -213,7 +215,32 @@ pub struct SurveyCooling {
     /// Permit year of an ATES of unknown realisation year (p. 131).
     #[serde(default)]
     pub aquifer_permit_year: Option<i32>,
+    /// NTA 10.84: a heat pump of the building uses this ground storage as
+    /// its source; unknown follows the survey's heating heat pump.
+    #[serde(default)]
+    pub heat_pump_source: Option<bool>,
+    /// ISSO 82.1 p. 129 / 75.1: the ground source is demonstrably always
+    /// above 0 °C (e.g. an EED calculation).
+    #[serde(default)]
+    pub ground_above_zero_demonstrated: bool,
     pub source_reference: String,
+}
+
+/// Table 10.6 balancing of a water-based cooling distribution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum CoolingBalanceAnswer {
+    /// Older surveys: `true` static, `false` none.
+    Flag(bool),
+    Kind(CoolingBalanceKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingBalanceKind {
+    None,
+    Static,
+    Dynamic,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -1133,6 +1160,14 @@ pub(crate) enum CoolingBook {
 }
 
 impl CoolingBook {
+    /// Table 10.34: an aquifer realised before 2013.
+    fn aquifer_before_2013(self) -> &'static str {
+        match self {
+            Self::Residential => "aquifer_dwellings_before2013",
+            Self::Utility => "aquifer_utility_before2013",
+        }
+    }
+
     fn cite(self, rule: &str) -> &'static str {
         match (self, rule) {
             (Self::Utility, "aquifer") => "ISSO 75.1 p. 131",
@@ -1157,6 +1192,65 @@ impl CoolingBook {
     }
 }
 
+/// NTA 10.84 for free cooling from ground storage: the heat-pump source
+/// flag follows the answer, or the survey's heating heat pump on a ground
+/// source when unknown (ISSO 82.1 p. 129, 75.1 p. 131).
+pub(crate) fn apply_cooling_heat_pump_source(
+    cooling_value: &mut Value,
+    cooling: &SurveyCooling,
+    heating_generator: &Value,
+    book: CoolingBook,
+    recorder: &mut Recorder,
+) {
+    let ground_heat_pump = ground_source_heat_pump(heating_generator);
+    let Some(generators) = cooling_value["generators"].as_array_mut() else {
+        return;
+    };
+    for generator in generators {
+        let kind = &mut generator["generator"];
+        let ground_storage = kind["kind"] == json!("free_cooling")
+            && matches!(
+                kind["source"].as_str(),
+                Some(
+                    "aquifer_from2013"
+                        | "aquifer_utility_before2013"
+                        | "aquifer_dwellings_before2013"
+                        | "closed_ground_loop"
+                )
+            );
+        if !ground_storage {
+            continue;
+        }
+        let source = cooling.heat_pump_source.unwrap_or_else(|| {
+            recorder.record(
+                "cooling_heat_pump_source_from_heating",
+                "cooling.heatPumpSource",
+                ground_heat_pump.to_string(),
+                book.cite("aquifer"),
+            );
+            ground_heat_pump
+        });
+        kind["heatPumpSource"] = json!(source);
+        kind["groundAboveZeroDemonstrated"] = json!(cooling.ground_above_zero_demonstrated);
+    }
+}
+
+/// A heat pump on a ground or groundwater source in a derived heating
+/// generator (forfait, annex Q or inside `multiple`).
+fn ground_source_heat_pump(generator: &Value) -> bool {
+    if let Some(parts) = generator["generators"].as_array() {
+        if generator["kind"] == json!("multiple") {
+            return parts
+                .iter()
+                .any(|part| ground_source_heat_pump(&part["generator"]));
+        }
+    }
+    let forfait = generator["forfait"]["source"].as_str();
+    let annex_q = generator["heatPump"]["source"].as_str();
+    matches!(forfait, Some("ground" | "groundwater_below15_c"))
+        || matches!(annex_q, Some("brine_water" | "water_water"))
+}
+
 pub(crate) fn cooling_value(
     cooling: &SurveyCooling,
     construction_year: i32,
@@ -1172,8 +1266,9 @@ pub(crate) fn cooling_value(
         CoolingGeneratorAnswer::GasAbsorption => json!({"kind": "gas_absorption"}),
         CoolingGeneratorAnswer::ExternalCold => json!({"kind": "external_cold"}),
         CoolingGeneratorAnswer::UnknownCollective => json!({"kind": "unknown_collective"}),
+        // Table 10.34: before 2013 dwellings EER 14, utility buildings 16.
         CoolingGeneratorAnswer::AquiferBefore2013 => {
-            json!({"kind": "free_cooling", "source": "aquifer_utility_before2013"})
+            json!({"kind": "free_cooling", "source": book.aquifer_before_2013()})
         }
         CoolingGeneratorAnswer::AquiferFrom2013 => {
             json!({"kind": "free_cooling", "source": "aquifer_from2013"})
@@ -1181,7 +1276,7 @@ pub(crate) fn cooling_value(
         CoolingGeneratorAnswer::AquiferYearUnknown => {
             let source = match cooling.aquifer_permit_year {
                 Some(year) if year >= 2013 => "aquifer_from2013",
-                _ => "aquifer_utility_before2013",
+                _ => book.aquifer_before_2013(),
             };
             recorder.record(
                 "aquifer_year_unknown",
@@ -1244,12 +1339,20 @@ pub(crate) fn cooling_value(
         }
         CoolingEmitterAnswer::Other => ("other_or_unknown", false),
     };
+    // ISSO 82.1 p. 136 / 75.1: fan convectors and split indoor units need
+    // their number for the fan energy (10.17).
+    if emitter.starts_with("fan_coil") && cooling.fan_coil_count == 0 {
+        recorder.issue("cooling_fan_coil_count_required", "cooling.fanCoilCount");
+    }
     let balancing = if !cooling.water_based {
         "not_applicable"
     } else {
         match cooling.balanced {
-            Some(true) => "static",
-            Some(false) => "none_or_unknown",
+            Some(CoolingBalanceAnswer::Flag(true))
+            | Some(CoolingBalanceAnswer::Kind(CoolingBalanceKind::Static)) => "static",
+            Some(CoolingBalanceAnswer::Kind(CoolingBalanceKind::Dynamic)) => "dynamic",
+            Some(CoolingBalanceAnswer::Flag(false))
+            | Some(CoolingBalanceAnswer::Kind(CoolingBalanceKind::None)) => "none_or_unknown",
             None => {
                 recorder.record(
                     "cooling_balancing_unknown_none",
@@ -2380,8 +2483,15 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     if let Some(storage) = storage {
         input["storage"] = storage;
     }
-    if let Some(cooling) = cooling {
-        input["cooling"] = cooling;
+    if let (Some(mut value), Some(answer)) = (cooling, survey.cooling.as_ref()) {
+        apply_cooling_heat_pump_source(
+            &mut value,
+            answer,
+            &input["spaceHeating"]["generator"],
+            CoolingBook::Utility,
+            recorder,
+        );
+        input["cooling"] = value;
     }
     if let Some(renewable) = heating.heat_pump_renewable {
         input["heatPumpRenewable"] = renewable;
@@ -2943,8 +3053,96 @@ mod tests {
             pipes_insulated: None,
             pipe_insulation_year: None,
             aquifer_permit_year: None,
+            heat_pump_source: None,
+            ground_above_zero_demonstrated: false,
             source_reference: "survey".into(),
         }
+    }
+
+    #[test]
+    fn cooling_survey_book_balancing_fans_and_heat_pump_source() {
+        // Table 10.34: an aquifer before 2013 is EER 14 for dwellings.
+        let mut recorder = Recorder::default();
+        let mut aquifer = cooling(CoolingEmitterAnswer::CeilingCooling);
+        aquifer.generator = CoolingGeneratorAnswer::AquiferBefore2013;
+        let value = cooling_value(
+            &aquifer,
+            2010,
+            1,
+            CoolingBook::Residential,
+            true,
+            &mut recorder,
+        );
+        assert_eq!(
+            value["generators"][0]["generator"]["source"],
+            "aquifer_dwellings_before2013"
+        );
+        let value = cooling_value(
+            &aquifer,
+            2010,
+            1,
+            CoolingBook::Utility,
+            false,
+            &mut recorder,
+        );
+        assert_eq!(
+            value["generators"][0]["generator"]["source"],
+            "aquifer_utility_before2013"
+        );
+        // Table 10.6: dynamic balancing, and the old boolean still works.
+        aquifer.balanced = Some(CoolingBalanceAnswer::Kind(CoolingBalanceKind::Dynamic));
+        let value = cooling_value(
+            &aquifer,
+            2010,
+            1,
+            CoolingBook::Utility,
+            false,
+            &mut recorder,
+        );
+        assert_eq!(value["emission"]["balancing"], "dynamic");
+        let old: SurveyCooling = serde_json::from_value(json!({
+            "generator": "compression", "emitter": "ceiling_cooling", "waterBased": true,
+            "balanced": true, "sourceReference": "survey"
+        }))
+        .unwrap();
+        let value = cooling_value(&old, 2010, 1, CoolingBook::Utility, false, &mut recorder);
+        assert_eq!(value["emission"]["balancing"], "static");
+        // 10.84: the heating heat pump on a ground source sets the flag.
+        let mut value = cooling_value(
+            &aquifer,
+            2010,
+            1,
+            CoolingBook::Residential,
+            true,
+            &mut recorder,
+        );
+        let heating = json!({"kind": "heat_pump_forfait", "forfait": {"source": "ground"}});
+        apply_cooling_heat_pump_source(
+            &mut value,
+            &aquifer,
+            &heating,
+            CoolingBook::Residential,
+            &mut recorder,
+        );
+        assert_eq!(value["generators"][0]["generator"]["heatPumpSource"], true);
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "cooling_heat_pump_source_from_heating"));
+        // ISSO p. 136: fan convectors need their number.
+        let mut fans = Recorder::default();
+        cooling_value(
+            &cooling(CoolingEmitterAnswer::FanCoilOnCeiling),
+            2010,
+            1,
+            CoolingBook::Utility,
+            false,
+            &mut fans,
+        );
+        assert!(fans
+            .issues
+            .iter()
+            .any(|item| item.code == "cooling_fan_coil_count_required"));
     }
 
     #[test]

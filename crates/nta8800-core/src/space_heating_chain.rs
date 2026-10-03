@@ -130,6 +130,20 @@ pub struct SpaceHeatingChainInput {
     /// per appliance; the 500 m² limits use the area per appliance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identical_systems: Option<u32>,
+    /// Annex V (V.1, p. 1115): hot water made by a heat pump on the same
+    /// ground source; its extraction joins the V.1 denominator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regeneration_hot_water: Option<RegenerationHotWater>,
+}
+
+/// Annual hot water of a heat pump on the regenerated ground source.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RegenerationHotWater {
+    /// Σ Q_W;dis;nren delivered by that heat pump, kWh.
+    pub annual_kwh: f64,
+    /// η_W;gen of that heat pump with c_source = 1.
+    pub generation_efficiency: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1088,6 +1102,7 @@ fn twelve_finite(values: &[f64]) -> bool {
 }
 
 /// Monthly terms of one valid zone.
+#[derive(Clone)]
 struct ZoneTerms {
     zone_id: String,
     area_m2: f64,
@@ -1105,6 +1120,9 @@ struct ZoneTerms {
     fan_power_w: f64,
     /// θ_int;op;H = θ_int;calc;H (7.9.6) per month, °C.
     operative_c: [f64; 12],
+    /// Σ H_zi,j;ztu to the unheated spaces (unreduced), W/K: the weight
+    /// F_j;ztu (7.6.4) of this zone in ϑ_ztu (7.82).
+    unheated_conductance_w_per_k: f64,
 }
 
 /// Validates one zone; `None` when invalid.
@@ -1270,6 +1288,20 @@ fn zone_terms(
                 .get(month)
                 .map_or(setpoint, |row| row.heating.calculation_temperature_c)
         }),
+        unheated_conductance_w_per_k: match &demand_input.transmission {
+            crate::monthly_demand::Transmission::Components(components) => components
+                .unheated
+                .as_ref()
+                .map(crate::unheated_transmission::assess_unheated_transmission)
+                .map_or(0.0, |assessed| {
+                    assessed
+                        .spaces
+                        .iter()
+                        .map(|space| space.unreduced_conductance_w_per_k)
+                        .sum()
+                }),
+            crate::monthly_demand::Transmission::Explicit(_) => 0.0,
+        },
         increment_k: increment,
         hydronic: !matches!(
             emission.system,
@@ -1437,6 +1469,7 @@ fn calculate_distribution(
     system: Option<&DistributionSystem>,
     building_fraction: f64,
     connected_area_m2: f64,
+    appliances: f64,
     generator: &Generator,
     issues: &mut Vec<ChainIssue>,
 ) -> DistributionResult {
@@ -1550,7 +1583,7 @@ fn calculate_distribution(
     let unheated_with_fittings = unheated_length
         + equivalent_length_m(unheated_length, psi_unheated, system.valves_insulated);
     let unheated_ambient =
-        |month: usize| system.unheated_ambient(month, zones.first().map_or(20.0, |z| z.setpoint_c));
+        |month: usize| system.unheated_ambient(month, unheated_setpoint_c(zones));
 
     // 9.26 and 9.38 for zones on the calculated route.
     for (index, zone) in zones.iter().enumerate() {
@@ -1588,8 +1621,10 @@ fn calculate_distribution(
         let hydronic: Vec<usize> = (0..zones.len())
             .filter(|&zone| zones[zone].hydronic)
             .collect();
+        // §9.1: with identical systems the pump is sized per physical
+        // system (area and flow / n) and its energy counted n times.
         let max_length = pump.max_pipe_length_m.unwrap_or_else(|| {
-            forfait_max_pipe_length_m(system.connected_storeys, connected_area_m2)
+            forfait_max_pipe_length_m(system.connected_storeys, connected_area_m2 / appliances)
         });
         let emitter = hydronic
             .iter()
@@ -1629,7 +1664,7 @@ fn calculate_distribution(
                     ));
                     return result;
                 }
-                design_flow_m3_per_h(totals[peak], t, spread, building_fraction)
+                design_flow_m3_per_h(totals[peak] / appliances, t, spread, building_fraction)
             }
         };
         let hydraulic = hydraulic_power_kw(pressure, flow);
@@ -1644,7 +1679,7 @@ fn calculate_distribution(
         for (month, operating) in system_hours.iter().enumerate() {
             // 9.41 with β = 1 and 9.51 summed over the zones.
             let hydraulic_energy = hydraulic * operating * balance;
-            let total = hydraulic_energy * factor * building_fraction;
+            let total = hydraulic_energy * factor * building_fraction * appliances;
             result.pump_electricity[month] = total;
             for (index, zone) in zones.iter().enumerate() {
                 let share = total * zone.area_m2 / zone_area;
@@ -2021,6 +2056,7 @@ fn assess_chain_pass(
             input.distribution_system.as_ref(),
             building_fraction,
             connected_area,
+            f64::from(input.identical_systems.unwrap_or(1).max(1)),
             &input.generator,
             &mut issues,
         );
@@ -2445,6 +2481,9 @@ struct GeneratorConditions {
     return_c: Option<[f64; 12]>,
     /// Area-weighted heating setpoint, °C.
     indoor_c: f64,
+    /// Area-weighted θ_int;op;H = θ_int;calc;H (7.9.6) per month, °C; the
+    /// ambient of a generator in a heated space (9.4.2, M.12).
+    operative_c: [f64; 12],
     /// `t_H;op;si;mi` per 9.32a (with f_H;red and f_H;red;pmp;op), longest
     /// over the zones.
     operating_hours: Option<[f64; 12]>,
@@ -2577,10 +2616,22 @@ fn generator_conditions(
             std::array::from_fn(|month| hours[month] * factor)
         }),
     };
+    let operative_c = std::array::from_fn(|month| {
+        if area > 0.0 {
+            zones
+                .iter()
+                .map(|zone| zone.operative_c[month] * zone.area_m2)
+                .sum::<f64>()
+                / area
+        } else {
+            indoor_c
+        }
+    });
     GeneratorConditions {
         hours,
         return_c,
         indoor_c,
+        operative_c,
         operating_hours,
         levelled_c: None,
         collective: collective_installation(input),
@@ -2670,6 +2721,7 @@ fn generate_annex_q(
     outputs: &[MonthlyEnergy],
     building: HeatPumpBuildingContext,
     building_fraction: f64,
+    regeneration_hot_water: Option<RegenerationHotWater>,
     monthly: &mut [ChainMonth],
     annex_q_result: &mut Option<AnnexQOutput>,
     issues: &mut Vec<ChainIssue>,
@@ -2730,16 +2782,17 @@ fn generate_annex_q(
         issues.push(issue("annex_q_efficiency_invalid", "generator.heatPump"));
         return None;
     }
-    // Annex V on the heat-pump heat (hot water on the same source is not
-    // part of the space-heating chain).
+    // Annex V on the heat-pump heat plus, when supplied, the hot water of a
+    // heat pump on the same source (V.1).
     let regeneration = generator.regeneration.as_ref().map(|input| {
         calculate_regeneration(
             input,
             RegenerationContext {
                 heating_kwh: fraction * annual,
                 heating_efficiency: efficiency,
-                hot_water_kwh: 0.0,
-                hot_water_efficiency: 0.0,
+                hot_water_kwh: regeneration_hot_water.map_or(0.0, |item| item.annual_kwh),
+                hot_water_efficiency: regeneration_hot_water
+                    .map_or(0.0, |item| item.generation_efficiency),
                 annual_cooling_need_kwh: building.cooling_need_kwh,
                 electricity_efficiency: ELECTRICITY_EFFICIENCY,
             },
@@ -2865,17 +2918,45 @@ impl DistributionSystem {
     }
 }
 
+/// 7.82 with several zones: θ_int;set;H weighted by F_j;ztu (7.6.4), the
+/// share of each zone in the heat transfer to the unheated spaces; by usable
+/// area when no zone gives that transfer.
+fn unheated_setpoint_c(zones: &[ZoneTerms]) -> f64 {
+    let conductance: f64 = zones
+        .iter()
+        .map(|zone| zone.unheated_conductance_w_per_k)
+        .sum();
+    if conductance > 0.0 {
+        return zones
+            .iter()
+            .map(|zone| zone.setpoint_c * zone.unheated_conductance_w_per_k)
+            .sum::<f64>()
+            / conductance;
+    }
+    let area: f64 = zones.iter().map(|zone| zone.area_m2).sum();
+    if area > 0.0 {
+        zones
+            .iter()
+            .map(|zone| zone.setpoint_c * zone.area_m2)
+            .sum::<f64>()
+            / area
+    } else {
+        20.0
+    }
+}
+
 /// M.12 ϑ_brm as ϑ_H,amb of 9.4.2: the heating setpoint (taken for
 /// θ_int;op;H, 7.9.6) in a heated space, ϑ_ztu of the distribution system
 /// (7.82) in an installation room when entered; otherwise table M.6.
 fn boiler_ambient_c(
     placement: BoilerPlacement,
     input: &SpaceHeatingChainInput,
-    indoor_c: f64,
+    operative_c: f64,
     month: usize,
 ) -> Option<f64> {
     match placement {
-        BoilerPlacement::HeatedSpace => Some(indoor_c),
+        // M.12 with ϑ_H,amb of 9.4.2: θ_int;op;H = θ_int;calc;H (7.9.6).
+        BoilerPlacement::HeatedSpace => Some(operative_c),
         BoilerPlacement::InstallationRoom => {
             input.distribution_system.as_ref().and_then(|system| {
                 (system.unheated_ambient_c.is_some() || system.unheated_reduction_factor.is_some())
@@ -3291,7 +3372,12 @@ fn generate(
                     "generator.sourceCorrectionFactor",
                 ));
             }
-            if !correction.is_finite() || correction <= 0.0 {
+            // Annex V: c_source is one of the table V.1 (1,00/1,02/1,04) or
+            // V.3 (1,00/1,04) values.
+            if ![1.0, 1.02, 1.04]
+                .iter()
+                .any(|value| (correction - value).abs() < 1e-9)
+            {
                 issues.push(issue(
                     "source_correction_invalid",
                     "generator.sourceCorrectionFactor",
@@ -3551,8 +3637,12 @@ fn generate(
                         RegenerationContext {
                             heating_kwh: annual,
                             heating_efficiency: cop,
-                            hot_water_kwh: 0.0,
-                            hot_water_efficiency: 0.0,
+                            hot_water_kwh: input
+                                .regeneration_hot_water
+                                .map_or(0.0, |item| item.annual_kwh),
+                            hot_water_efficiency: input
+                                .regeneration_hot_water
+                                .map_or(0.0, |item| item.generation_efficiency),
                             annual_cooling_need_kwh: building.cooling_need_kwh,
                             electricity_efficiency: ELECTRICITY_EFFICIENCY,
                         },
@@ -3711,6 +3801,7 @@ fn generate(
                 outputs,
                 building,
                 building_fraction,
+                input.regeneration_hot_water,
                 monthly,
                 annex_q_result,
                 issues,
@@ -3869,7 +3960,7 @@ fn generate(
                         ambient_temperature_c: boiler_ambient_c(
                             generator.boiler.placement,
                             input,
-                            conditions.indoor_c,
+                            conditions.operative_c[index],
                             index,
                         ),
                     },
@@ -4115,6 +4206,7 @@ mod tests {
             distribution_system: None,
             collective_connection: None,
             identical_systems: None,
+            regeneration_hot_water: None,
             generator: serde_json::from_value(json!({
                 "kind": "gas_boiler",
                 "boiler": {
@@ -4188,6 +4280,22 @@ mod tests {
                 .any(|value| (ratio - value).abs() < 1e-9),
             "{ratio}"
         );
+        // V.1: hot water of a heat pump on the same source enlarges the
+        // extraction, so R and c_source can only drop.
+        let mut with_hot_water = input.clone();
+        with_hot_water.regeneration_hot_water = Some(RegenerationHotWater {
+            annual_kwh: 1.0e6,
+            generation_efficiency: 2.5,
+        });
+        let shared = assess_space_heating_chain(&with_hot_water);
+        assert_eq!(
+            shared.status, "calculated_unverified",
+            "{:?}",
+            shared.issues
+        );
+        let shared_ratio = shared.generation_efficiency.unwrap() / table;
+        assert!(shared_ratio <= ratio + 1e-12);
+        assert!((shared_ratio - 1.0).abs() < 1e-9);
         // A declared c_source together with annex V is rejected.
         if let Generator::HeatPumpForfait(generator) = &mut input.generator {
             generator.forfait.source_correction_factor = Some(1.0);
@@ -5098,8 +5206,12 @@ mod tests {
                     month_hours: MONTH_HOURS[index],
                     return_temperature_c: ret,
                     outdoor_temperature_c: OUTDOOR_TEMPERATURE_C[index],
-                    // 9.4.2: heated space at the setpoint.
-                    ambient_temperature_c: Some(20.0),
+                    // 9.4.2: heated space at θ_int;op;H = θ_int;calc;H (7.9.6).
+                    ambient_temperature_c: Some(
+                        result.demand.monthly[index]
+                            .heating
+                            .calculation_temperature_c,
+                    ),
                 },
             );
             assert!((row.natural_gas_kwh - expected.input_kwh).abs() < 1e-9);
@@ -5579,11 +5691,49 @@ mod tests {
         generator.source = GasHeatPumpSource::Ground;
         generator.design_supply_temperature_c = 30.0;
         assert_eq!(generator.table_cop(), Some(1.35));
+        // Annex V: c_source is a table V.1/V.3 value (1,00, 1,02 or 1,04).
+        let mut corrected = generator.clone();
+        corrected.source_correction_factor = Some(1.03);
+        input.generator = Generator::GasHeatPump(corrected.clone());
+        assert!(codes(&input).contains(&"source_correction_invalid"));
+        corrected.source_correction_factor = Some(1.04);
+        input.generator = Generator::GasHeatPump(corrected);
+        assert!(!codes(&input).contains(&"source_correction_invalid"));
         // The gas rows end at 55 °C.
         generator.design_supply_temperature_c = 60.0;
         assert_eq!(generator.table_cop(), None);
         input.generator = Generator::GasHeatPump(generator);
         assert!(codes(&input).contains(&"gas_heat_pump_table_cell_unavailable"));
+    }
+
+    #[test]
+    fn unheated_ambient_weights_zones_by_their_transfer_7_82() {
+        let input = boiler_chain();
+        let assessed = assess_monthly_demand(&input.demand);
+        let mut issues = Vec::new();
+        let base = zone_terms(
+            &input.demand,
+            &assessed,
+            &input.emission,
+            &input.distribution,
+            "",
+            &mut issues,
+        )
+        .unwrap();
+        let mut warm = base.clone();
+        warm.setpoint_c = 22.0;
+        warm.area_m2 = 100.0;
+        warm.unheated_conductance_w_per_k = 30.0;
+        let mut cool = base.clone();
+        cool.setpoint_c = 16.0;
+        cool.area_m2 = 300.0;
+        cool.unheated_conductance_w_per_k = 10.0;
+        // F_j;ztu by transfer: (22·30 + 16·10)/40 = 20,5.
+        assert!((unheated_setpoint_c(&[warm.clone(), cool.clone()]) - 20.5).abs() < 1e-12);
+        // Without transfer data: by area, (22·100 + 16·300)/400 = 17,5.
+        warm.unheated_conductance_w_per_k = 0.0;
+        cool.unheated_conductance_w_per_k = 0.0;
+        assert!((unheated_setpoint_c(&[warm, cool]) - 17.5).abs() < 1e-12);
     }
 
     #[test]
@@ -5602,6 +5752,58 @@ mod tests {
         );
         input.identical_systems = Some(0);
         assert!(codes(&input).contains(&"identical_systems_invalid"));
+    }
+
+    #[test]
+    fn identical_systems_size_the_pump_per_physical_system() {
+        // §9.1: one pump per dwelling, sized on the dwelling's share.
+        let mut input = boiler_chain();
+        input.generator = Generator::Chp(ChpGenerator {
+            chp: Some(crate::space_cooling::ChpClass {
+                power_kw: 50.0,
+                built_after_2006: true,
+                hre_declared: false,
+                low_temperature: false,
+            }),
+            method1: None,
+            auxiliary: Some(OtherGeneratorAuxiliary {
+                electrically_connected_devices: 1,
+                nominal_power_kw: Some(80.0),
+                source_reference: "datasheet".into(),
+            }),
+            equipment_reference: "CHP datasheet".into(),
+        });
+        input.distribution_system = Some(system(calculated_pump()));
+        let single = assess_space_heating_chain(&input);
+        assert_eq!(
+            single.status, "calculated_unverified",
+            "{:?}",
+            single.issues
+        );
+        input.identical_systems = Some(20);
+        let many = assess_space_heating_chain(&input);
+        assert_eq!(many.status, "calculated_unverified", "{:?}", many.issues);
+        let pump = |result: &SpaceHeatingChainAssessment| {
+            result
+                .distribution
+                .as_ref()
+                .and_then(|summary| summary.pump.as_ref())
+                .map(|pump| (pump.design_flow_m3_per_h, pump.hydraulic_power_kw))
+                .unwrap()
+        };
+        let (flow_1, _) = pump(&single);
+        let (flow_20, hydraulic_20) = pump(&many);
+        assert!((flow_20 - flow_1 / 20.0).abs() < 1e-9);
+        // 9.42 floor of 0,01 kW per pump, energy counted 20 times.
+        assert!(hydraulic_20 >= 0.01 - 1e-12);
+        let energy = |result: &SpaceHeatingChainAssessment| -> f64 {
+            result
+                .monthly
+                .iter()
+                .map(|row| row.distribution_auxiliary_electricity_kwh)
+                .sum()
+        };
+        assert!(energy(&many) > energy(&single));
     }
 
     #[test]

@@ -377,6 +377,11 @@ export function BasisopnamePanel() {
         <NumberField {...field} path={['cooling', 'fanCoilCount']} label={t('opname.cooling.fanCoilCount')} step="1" />
         <NumberField {...field} path={['cooling', 'capacityKw']} label={t('opname.cooling.capacityKw')} />
         <CheckField {...field} path={['cooling', 'waterBased']} label={t('opname.cooling.waterBased')} />
+        <SelectField {...field} path={['cooling', 'balanced']} label={t('opname.cooling.balanced')}
+          options={[['none', t('opname.cooling.balanced.none')], ['static', t('opname.cooling.balanced.static')],
+            ['dynamic', t('opname.cooling.balanced.dynamic')]]} />
+        <CheckField {...field} path={['cooling', 'heatPumpSource']} label={t('opname.cooling.heatPumpSource')} />
+        <CheckField {...field} path={['cooling', 'groundAboveZeroDemonstrated']} label={t('opname.cooling.groundAboveZero')} />
         {kind === 'residential' &&
           <CheckField {...field} path={['coolingCollective']} label={t('opname.cooling.collective')} />}
         <TextField {...field} path={['cooling', 'sourceReference']} label={t('opname.sourceReference')} />

@@ -1240,15 +1240,15 @@ fn cooling_assessment(
             },
         ));
     }
-    // §10.2: each system for its own zones. The 10.84 source extraction of
-    // the space-heating heat pump goes to the first system only, so it is
-    // not counted twice.
+    // §10.2: each system for its own zones. The 10.84 test is evaluated
+    // once over the cold all ground-storage free-cooling generators with
+    // `heatPumpSource` return; the surcharge is split over those systems
+    // by their returned cold (equally when none returns any).
     let ids = input.zone_ids();
     let parts: Vec<crate::space_cooling::ServedCoolingResult> = input
         .cooling_systems
         .iter()
-        .enumerate()
-        .map(|(system_index, served)| {
+        .map(|served| {
             let zone_indexes: Vec<usize> = ids
                 .iter()
                 .enumerate()
@@ -1262,11 +1262,7 @@ fn cooling_assessment(
                 CoolingContext {
                     zones: &own,
                     residential,
-                    heat_pump_source_extraction_kwh: if system_index == 0 {
-                        extraction
-                    } else {
-                        [0.0; 12]
-                    },
+                    heat_pump_source_extraction_kwh: [0.0; 12],
                 },
             );
             crate::space_cooling::ServedCoolingResult {
@@ -1275,6 +1271,27 @@ fn cooling_assessment(
             }
         })
         .collect();
+    let mut parts = parts;
+    let extracted: f64 = extraction.iter().sum();
+    let returns: Vec<(usize, f64)> = parts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, part)| part.assessment.regeneration_return_kwh.map(|r| (index, r)))
+        .collect();
+    let returned: f64 = returns.iter().map(|(_, value)| value).sum();
+    let surcharge = crate::space_cooling::regeneration_surcharge_kwh(extracted, returned);
+    if surcharge > 0.0 {
+        for (index, value) in &returns {
+            let share = if returned > 0.0 {
+                value / returned
+            } else {
+                1.0 / returns.len() as f64
+            };
+            for row in parts[*index].assessment.months.iter_mut().skip(3).take(6) {
+                row.electricity_kwh += surcharge * share;
+            }
+        }
+    }
     Some(crate::space_cooling::combine_cooling(parts, zones.len()))
 }
 
@@ -5155,6 +5172,100 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn regeneration_surcharge_follows_the_ground_storage_system() {
+        use crate::space_heating_chain::ChainZone;
+        let mut sample = input();
+        let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            generator_id: "hp".into(),
+            classification_source_reference: "system design".into(),
+            scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
+            source: TableSource::OutdoorAir,
+            sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
+            design_supply_temperature_c: Some(35.0),
+            source_correction_factor: None,
+            source_correction_reference: None,
+            thermal_capacity_kw: Some(8.0),
+            capacity_source_reference: Some("rated".into()),
+            collective_building_installation: Some(false),
+            row_variant: crate::forfait_heat_pump_draft::TableRowVariant::Base,
+            high_efficiency_evidence: None,
+            source_temperature_c: None,
+            source_temperature_evidence_reference: None,
+            source_quality_declaration_reference: None,
+        };
+        sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
+            forfait,
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own unit".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        sample.heat_pump_renewable = Some(HeatPumpRenewableEvidence {
+            source_below_20_c: true,
+            exhaust_air_source: false,
+            source_reference: "unit".into(),
+            combined_outdoor_and_exhaust_air: false,
+            outdoor_air_heat_fraction: None,
+            outdoor_air_fraction_reference: None,
+        });
+        let mut second = sample.space_heating.demand.clone();
+        second.zone_id = "z2".into();
+        sample.space_heating.additional_zones.push(ChainZone {
+            demand: second,
+            emission: sample.space_heating.emission.clone(),
+            distribution: sample.space_heating.distribution.clone(),
+        });
+        sample.total_usable_floor_area_m2 *= 2.0;
+        let first_zone = sample.space_heating.demand.zone_id.clone();
+        let free = |heat_pump_source: bool| {
+            cooling_system(CoolingGeneratorKind::FreeCooling {
+                source: FreeCoolingSource::AquiferFrom2013,
+                heat_pump_source,
+                ground_above_zero_demonstrated: false,
+            })
+        };
+        // System 0 is a compression machine; the ground storage is system 1.
+        sample.cooling_systems = vec![
+            ServedCoolingSystem {
+                zone_ids: vec![first_zone],
+                system: cooling_system(CoolingGeneratorKind::Compression {
+                    heat_rejection: None,
+                    declared: None,
+                    performance: None,
+                }),
+            },
+            ServedCoolingSystem {
+                zone_ids: vec!["z2".into()],
+                system: free(true),
+            },
+        ];
+        let with = assess_building_performance(&sample);
+        assert_eq!(with.status, "calculated_unverified", "{:?}", with.issues);
+        let with_cooling = cooling_assessment(&sample, &with.space_heating).unwrap();
+        sample.cooling_systems[1].system = free(false);
+        let without = assess_building_performance(&sample);
+        let without_cooling = cooling_assessment(&sample, &without.space_heating).unwrap();
+        let extracted: f64 = with
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| (row.heat_pump_output_kwh - row.generator_electricity_kwh).max(0.0))
+            .sum();
+        let returned = with_cooling.regeneration_return_kwh.unwrap();
+        let surcharge = crate::space_cooling::regeneration_surcharge_kwh(extracted, returned);
+        assert!(surcharge > 0.0);
+        // 10.85 April–September, booked on the ground-storage system.
+        let july = with_cooling.systems[1].assessment.months[6].electricity_kwh
+            - without_cooling.systems[1].assessment.months[6].electricity_kwh;
+        assert!((july - surcharge).abs() < 1e-9);
+        assert_eq!(
+            with_cooling.systems[0].assessment.months[6].electricity_kwh,
+            without_cooling.systems[0].assessment.months[6].electricity_kwh
+        );
     }
 
     #[test]

@@ -831,6 +831,10 @@ pub struct GeneratorShare {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoolingAssessment {
+    /// 10.84: cold returned to ground storage that feeds a heat pump (free
+    /// cooling with `heatPumpSource`); `None` without such a generator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub regeneration_return_kwh: Option<f64>,
     pub cooling_limit_c: f64,
     pub internal_temperature_shift_k: f64,
     pub generator_shares: Vec<GeneratorShare>,
@@ -914,7 +918,12 @@ pub fn combine_cooling(parts: Vec<ServedCoolingResult>, zone_count: usize) -> Co
         }
     }
     let first = parts.first().map(|part| &part.assessment);
+    let returns: Vec<f64> = parts
+        .iter()
+        .filter_map(|part| part.assessment.regeneration_return_kwh)
+        .collect();
     CoolingAssessment {
+        regeneration_return_kwh: (!returns.is_empty()).then(|| returns.iter().sum()),
         cooling_limit_c: first.map_or(0.0, |item| item.cooling_limit_c),
         internal_temperature_shift_k: first.map_or(0.0, |item| item.internal_temperature_shift_k),
         generator_shares: shares,
@@ -2351,27 +2360,33 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         });
     }
     // 10.84/10.85: regeneration surcharge for ground storage that feeds a
-    // heat pump and receives less than 70 % of the extracted heat back.
+    // heat pump and receives less than 70 % of the extracted heat back,
+    // evaluated once over the cold returned by all such generators.
     let extracted: f64 = context.heat_pump_source_extraction_kwh.iter().sum();
-    let regeneration_months = 6.0;
-    for (generator_index, generator) in system.generators.iter().enumerate() {
-        if let CoolingGeneratorKind::FreeCooling {
-            source,
-            heat_pump_source: true,
-            ground_above_zero_demonstrated: false,
-        } = generator.generator
-        {
-            if !source.ground_storage() {
-                continue;
-            }
-            let returned: f64 = free_cold_by_generator[generator_index].iter().sum();
-            if extracted > 0.0 && returned < REGENERATION_SHARE * extracted {
-                let surcharge = (REGENERATION_SHARE * extracted - returned)
-                    / (REGENERATION_EFFICIENCY * regeneration_months);
-                for row in months.iter_mut().skip(3).take(6) {
-                    row.electricity_kwh += surcharge;
-                }
-            }
+    let qualifying: Vec<usize> = system
+        .generators
+        .iter()
+        .enumerate()
+        .filter(|(_, generator)| {
+            matches!(
+                generator.generator,
+                CoolingGeneratorKind::FreeCooling {
+                    source,
+                    heat_pump_source: true,
+                    ground_above_zero_demonstrated: false,
+                } if source.ground_storage()
+            )
+        })
+        .map(|(index, _)| index)
+        .collect();
+    let returned: f64 = qualifying
+        .iter()
+        .map(|index| free_cold_by_generator[*index].iter().sum::<f64>())
+        .sum();
+    if !qualifying.is_empty() {
+        let surcharge = regeneration_surcharge_kwh(extracted, returned);
+        for row in months.iter_mut().skip(3).take(6) {
+            row.electricity_kwh += surcharge;
         }
     }
     let zone_booster = context
@@ -2395,6 +2410,17 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         interpretations: COOLING_INTERPRETATIONS.to_vec(),
         zone_booster_extraction_kwh: zone_booster,
         systems: Vec::new(),
+        regeneration_return_kwh: (!qualifying.is_empty()).then_some(returned),
+    }
+}
+
+/// 10.85: monthly regeneration electricity (April–September) for the heat
+/// `extracted` by heat pumps and the cold `returned` to the ground storage.
+pub fn regeneration_surcharge_kwh(extracted: f64, returned: f64) -> f64 {
+    if extracted > 0.0 && returned < REGENERATION_SHARE * extracted {
+        (REGENERATION_SHARE * extracted - returned) / (REGENERATION_EFFICIENCY * 6.0)
+    } else {
+        0.0
     }
 }
 
