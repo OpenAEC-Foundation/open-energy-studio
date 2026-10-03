@@ -8,6 +8,7 @@ import type { IProject } from '../../core/energy/types';
 import { BENGIndicatorCompact } from './BENGIndicatorCompact';
 import { MonthlyBarChart } from './MonthlyBarChart';
 import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
+import { formatNumber } from '../../i18n/format';
 import { PanelRightClose } from 'lucide-react';
 import './PreviewPanel.css';
 
@@ -20,13 +21,11 @@ type KernelState =
   | { kind: 'error'; project: IProject; message: string }
   | { kind: 'done'; project: IProject; summary: PreviewSummary };
 
-function kwh(value: number | null): string {
-  return value == null ? '–' : `${Math.round(value).toLocaleString('nl-NL')} kWh`;
-}
 
 export function PreviewPanel() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useEnergy();
+  const kwh = (value: number | null) => (value == null ? '–' : `${formatNumber(value, locale)} kWh`);
   const { project } = state;
   const invalidArea = project.zones.length > 0 && validProjectFloorArea(project) === null;
   const hasStandaloneHeatPumps = Boolean(project.ntaHeatPumps?.length);
@@ -167,15 +166,15 @@ export function PreviewPanel() {
                 higherIsBetter
               />
 
-              <div className="preview-to-juli">
+              {summary.tojuliApplies && <div className="preview-to-juli">
                 <div className="preview-to-juli-header">
                   <span className="preview-to-juli-label">{t('preview.toJuliKernel')}</span>
                   <span className="preview-beng-badge">{t('nta.performance.unverified')}</span>
                 </div>
                 <div className="preview-to-juli-value">
-                  {summary.tojuliMaxK == null ? '–' : `${summary.tojuliMaxK.toFixed(2)} K`} / 1.20 K
+                  {summary.tojuliMaxK == null ? '–' : `${formatNumber(summary.tojuliMaxK, locale, 2)} K`} / {formatNumber(1.2, locale, 2)} K
                 </div>
-              </div>
+              </div>}
 
               <div className="preview-section-title">{t('preview.monthlyDemand')}</div>
               <MonthlyBarChart heating={summary.monthlyHeatingKwh} cooling={summary.monthlyCoolingKwh} />
@@ -184,7 +183,7 @@ export function PreviewPanel() {
               <div className="preview-key-figures">
                 <div className="preview-key-row">
                   <span className="preview-key-label">{t('preview.zebIndicator')}</span>
-                  <span className="preview-key-value">{summary.zebIndicator == null ? '–' : `${summary.zebIndicator.toFixed(2)} kWh/m²`}</span>
+                  <span className="preview-key-value">{summary.zebIndicator == null ? '–' : `${formatNumber(summary.zebIndicator, locale, 2)} kWh/m²`}</span>
                 </div>
                 <div className="preview-key-row">
                   <span className="preview-key-label">{t('preview.finalEnergy')}</span>
@@ -192,7 +191,7 @@ export function PreviewPanel() {
                 </div>
                 <div className="preview-key-row">
                   <span className="preview-key-label">{t('preview.co2')}</span>
-                  <span className="preview-key-value">{summary.co2KgPerM2 == null ? '–' : `${summary.co2KgPerM2.toFixed(1)} kg/m²`}</span>
+                  <span className="preview-key-value">{summary.co2KgPerM2 == null ? '–' : `${formatNumber(summary.co2KgPerM2, locale, 1)} kg/m²`}</span>
                 </div>
               </div>
             </>}

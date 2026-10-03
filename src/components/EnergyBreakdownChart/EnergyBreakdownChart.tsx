@@ -1,18 +1,24 @@
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import type { IEnergyBreakdown } from '../../core/energy/types';
 import './EnergyBreakdownChart.css';
 
 interface EnergyBreakdownChartProps {
   breakdown: IEnergyBreakdown;
+  /** The balance comes from the NTA kernel; infiltration is then part of the ventilation term. */
+  source?: 'kernel' | 'indicative';
 }
 
-export function EnergyBreakdownChart({ breakdown }: EnergyBreakdownChartProps) {
-  const { t } = useI18n();
+export function EnergyBreakdownChart({ breakdown, source = 'indicative' }: EnergyBreakdownChartProps) {
+  const { t, locale } = useI18n();
 
   const losses = [
     { key: 'transmissionLoss', label: t('results.transmissionLoss'), value: breakdown.transmissionLoss, color: '#ef4444' },
-    { key: 'ventilationLoss', label: t('results.ventilationLoss'), value: breakdown.ventilationLoss, color: '#f97316' },
-    { key: 'infiltrationLoss', label: t('results.infiltrationLoss'), value: breakdown.infiltrationLoss, color: '#f59e0b' },
+    { key: 'ventilationLoss', label: source === 'kernel' ? t('results.ventilationInfiltrationLoss') : t('results.ventilationLoss'),
+      value: breakdown.ventilationLoss, color: '#f97316' },
+    ...(source === 'kernel' ? [] : [
+      { key: 'infiltrationLoss', label: t('results.infiltrationLoss'), value: breakdown.infiltrationLoss, color: '#f59e0b' },
+    ]),
   ];
 
   const gains = [
@@ -49,31 +55,34 @@ export function EnergyBreakdownChart({ breakdown }: EnergyBreakdownChartProps) {
           }}
         />
       </div>
-      <span className="breakdown-bar-value">{item.value.toFixed(0)} kWh</span>
+      <span className="breakdown-bar-value">{formatNumber(item.value, locale)} kWh</span>
     </div>
   );
 
   return (
     <div className="energy-breakdown-chart">
       <h3>{t('results.breakdown')}</h3>
+      <p className="breakdown-source" data-testid="breakdown-source">
+        {source === 'kernel' ? t('results.breakdownSourceKernel') : t('results.breakdownSourceIndicative')}
+      </p>
 
       <div className="breakdown-section">
-        <h4>Verliezen</h4>
+        <h4>{t('results.breakdownLosses')}</h4>
         {losses.map(renderBar)}
       </div>
 
       <div className="breakdown-section">
-        <h4>Winsten</h4>
+        <h4>{t('results.breakdownGains')}</h4>
         {gains.map(renderBar)}
       </div>
 
       <div className="breakdown-section">
-        <h4>Geleverde energie</h4>
+        <h4>{t('results.breakdownDelivered')}</h4>
         {delivered.map(renderBar)}
       </div>
 
       <div className="breakdown-section">
-        <h4>Opwek</h4>
+        <h4>{t('results.breakdownProduction')}</h4>
         {production.map(renderBar)}
       </div>
     </div>

@@ -138,7 +138,7 @@ export function NtaConstructionSection({ layers, onApply }: {
           <option value="floor">{t('nta.construction.element.floor')}</option>
         </select>
       </label>
-      <label>{t('nta.vent.constructionYear')}
+      <label>{t('nta.construction.forfaitYear')}
         <input type="number" step="1" value={forfait.constructionYear}
           onChange={(event) => editForfait({ ...forfait, constructionYear: Number(event.target.value) })} />
       </label>

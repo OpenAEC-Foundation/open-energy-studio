@@ -100,6 +100,34 @@ export function GroundEdgeBridgesFields({ draft, change, base }: {
   </>;
 }
 
+/** Table 7.13 θ_int;set;H;stc and θ_int;set;C;stc for a usage function, °C. */
+export function table713Setpoints(usageFunction: unknown): { heatingC: number; coolingC: number } | null {
+  if (typeof usageFunction !== 'string' || usageFunction === '') return null;
+  const heatingC = usageFunction === 'healthcare_with_beds' ? 22
+    : usageFunction === 'sport' ? 16
+      : usageFunction === 'residential' ? 20 : 21;
+  return { heatingC, coolingC: 24 };
+}
+
+/** The kernel refuses setpoints other than table 7.13 (setpoints_table_7_13_mismatch); say so before saving. */
+function SetpointCheck({ draft, change }: { draft: Draft; change: (path: Path, value: unknown) => void }) {
+  const { t } = useI18n();
+  const expected = table713Setpoints(read(draft, ['usageFunction']));
+  if (!expected) return <p className="nta-form-note">{t('nta.form.setpointsTableNote')}</p>;
+  const heating = read(draft, ['setpoints', 'heatingC']);
+  const cooling = read(draft, ['setpoints', 'coolingC']);
+  const matches = heating === expected.heatingC && cooling === expected.coolingC;
+  return <p className={matches ? 'nta-form-note' : 'nta-form-note nta-form-error'} role={matches ? undefined : 'alert'}
+    data-testid="nta-setpoint-check">
+    {t(matches ? 'nta.form.setpointsTableMatch' : 'nta.form.setpointsTableMismatch',
+      { heating: expected.heatingC, cooling: expected.coolingC })}
+    {!matches && <> <button type="button" onClick={() => {
+      change(['setpoints', 'heatingC'], expected.heatingC);
+      change(['setpoints', 'coolingC'], expected.coolingC);
+    }}>{t('nta.form.setpointsUseTable')}</button></>}
+  </p>;
+}
+
 export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   project: IProject;
   initial: Draft;
@@ -184,6 +212,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <NumberField {...field} path={['setpoints', 'heatingC']} label={t('nta.form.heatingSetpoint')} />
       <NumberField {...field} path={['setpoints', 'coolingC']} label={t('nta.form.coolingSetpoint')} />
       <TextField {...field} path={['setpoints', 'sourceReference']} label={t('nta.form.source')} />
+      <SetpointCheck draft={draft} change={change} />
     </Section>
     <Section title={t('nta.form.mass')}>
       {(['floor', 'wall'] as const).map((part) => <SelectField key={part} {...field} path={['thermalMass', part]}
@@ -404,9 +433,9 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     </Section>
     {emptyPaths.length > 0 && <p className="nta-form-note" role="status" data-testid="nta-open-fields">
       {t('nta.form.openFields', { n: emptyPaths.length, paths: emptyPaths.join(', ') })}</p>}
-    <div className="nta-form-actions">
-      <button type="button" onClick={onCancel}>{t('dialog.cancel')}</button>
-      <button type="submit">{t('dialog.save')}</button>
+    <div className="nta-form-actions nta-form-footer">
+      <button type="button" className="btn" onClick={onCancel}>{t('dialog.cancel')}</button>
+      <button type="submit" className="btn btn-primary">{t('dialog.save')}</button>
     </div>
   </form>;
 }

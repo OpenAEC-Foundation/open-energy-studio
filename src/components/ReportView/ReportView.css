@@ -4,6 +4,15 @@
 }
 
 .report-content {
+  /* The report is a white sheet in every theme: pin the theme tokens to print colours. */
+  --text-primary: #1f2329;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --bg-tertiary: #e5e7eb;
+  --border: #d1d5db;
+  --border-light: #e5e7eb;
   background: #ffffff;
   color: #36363E;
   border: 1px solid var(--border);

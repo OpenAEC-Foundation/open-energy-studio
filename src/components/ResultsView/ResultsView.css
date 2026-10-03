@@ -121,3 +121,21 @@
   font-weight: 400;
   color: var(--text-secondary);
 }
+
+.results-stale {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--warning, #d97706);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warning, #d97706) 12%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.results-indicative-note {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.results-stale-block { opacity: 0.6; }

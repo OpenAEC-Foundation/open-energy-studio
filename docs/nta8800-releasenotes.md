@@ -2,6 +2,11 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — resultatenweergave en bouwjaar
+
+- **Bouwjaar.** Zonder `ntaCalculation.constructionYear` neemt de projectroute het bouwjaar uit de registratie, en anders het bouwjaar van de ventilatiesectie (tabel 11.13, dezelfde grootheid). Projecten die alleen het ventilatiebouwjaar hadden, krijgen nu de standaard voor woningisolatie (§5.3.2) in plaats van de melding `standard_insulation_construction_year_missing`.
+- **Resultaten.** Met een berekende NTA-kernuitkomst tonen de BENG-kaarten, TOjuli en de energiebalans (inclusief PV-opwek uit hoofdstuk 16) de kernwaarden; de vereenvoudigde rekenmethode verschijnt alleen nog als de kern geen volledige uitkomst heeft. Rekenresultaten blijven na een projectwijziging zichtbaar als verouderd, zodat het maatwerkadvies- en herlabelpaneel niet verdwijnen.
+
 ## 3 oktober 2026 — hoofdstuk 5, label, Bbl-functies en maatwerkadvies
 
 ### Uitkomsten die veranderen

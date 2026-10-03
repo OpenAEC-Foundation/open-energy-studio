@@ -68,3 +68,37 @@
   list-style: none;
   padding: 0;
 }
+
+.opname-panel .opname-zone {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.opname-panel .opname-zone-heading {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.opname-panel .opname-defaults input.opname-reason {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.opname-panel .opname-result-heading {
+  margin: 16px 0 4px;
+  font-size: 14px;
+}
