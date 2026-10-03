@@ -1038,9 +1038,10 @@ fn adjust_utility_generator(
         // the residential table only.
         generator["forfait"]["sourceCorrectionFactor"] = Value::Null;
         generator["forfait"]["sourceCorrectionReference"] = Value::Null;
-        recorder
-            .applied
-            .retain(|item| item.rule != "source_regeneration_none_c_source_1");
+        recorder.applied.retain(|item| {
+            item.rule != "source_regeneration_none_c_source_1"
+                && item.rule != "groundwater_system_unknown_recirculation"
+        });
         generator["forfait"]["collectiveBuildingInstallation"] = json!(installation.collective);
         if let Some(power) = capacity {
             generator["forfait"]["thermalCapacityKw"] = json!(power);
@@ -1053,6 +1054,23 @@ fn adjust_utility_generator(
                 auxiliary["nominalPowerKw"] = json!(power);
             }
             generator["auxiliary"] = auxiliary;
+        }
+    }
+    if kind == "gas_heat_pump" {
+        // Table 9.29 "GWP" rows for utility; c_source is a table 9.27 item.
+        generator["table"] = json!("utility_collective_or_above25_kw");
+        generator["sourceCorrectionFactor"] = Value::Null;
+        recorder
+            .applied
+            .retain(|item| item.rule != "groundwater_system_unknown_recirculation");
+        if generator["auxiliary"]["nominalPowerKw"].is_null() {
+            if let Some(power) = capacity {
+                // The installation capacity supplies P_H;gen (9.91).
+                generator["auxiliary"]["nominalPowerKw"] = json!(power);
+                recorder
+                    .issues
+                    .retain(|item| item.code != "gas_heat_pump_capacity_required");
+            }
         }
     }
     if installation.collective && matches!(kind.as_str(), "gas_boiler" | "heat_pump_forfait") {
@@ -3269,6 +3287,12 @@ mod tests {
             capacity_kw: None,
             source_regeneration_factor: None,
             high_efficiency_evidence: None,
+            drive: Default::default(),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
         };
         let (input, _) = derive(&survey);
         let forfait = &input["spaceHeating"]["generator"]["forfait"];
@@ -3282,6 +3306,48 @@ mod tests {
             "{:?}",
             result.performance.map(|p| p.issues)
         );
+    }
+
+    #[test]
+    fn gas_heat_pump_uses_the_utility_gwp_row() {
+        let mut survey = fixture("2005");
+        survey.heating.generator = super::super::heating::HeatingGenerator::HeatPump {
+            source: super::super::heating::HeatPumpSource::OutdoorAir,
+            air_sink: false,
+            high_temperature: false,
+            capacity_kw: None,
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
+            drive: Some(super::super::heating::HeatPumpDrive::GasEngine),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
+        };
+        let (input, _) = derive(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["kind"], "gas_heat_pump");
+        assert_eq!(generator["table"], "utility_collective_or_above25_kw");
+        assert_eq!(generator["auxiliary"]["nominalPowerKw"], 200.0);
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|p| &p.issues)
+        );
+        // Table 9.29 GWP ground/outdoor air row: 1,4 at 55 °C … 1,65 ≤ 30 °C.
+        let efficiency = result
+            .performance
+            .unwrap()
+            .space_heating
+            .generation_efficiency
+            .unwrap();
+        assert!([1.65, 1.6, 1.55, 1.5, 1.45, 1.4]
+            .iter()
+            .any(|value| (efficiency - value).abs() < 1e-9));
     }
 
     fn cooling(emitter: CoolingEmitterAnswer) -> SurveyCooling {

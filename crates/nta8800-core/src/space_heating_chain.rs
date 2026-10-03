@@ -292,6 +292,11 @@ pub struct PumpInput {
     /// Label or design electric power of all pumps (9.47), kW.
     #[serde(default)]
     pub electric_power_kw: Option<f64>,
+    /// One-pipe system (p. 317, below table 9.20): the emitters `n_j` on
+    /// the loop, each adding its table 9.21 resistance in series; absent
+    /// means a two-pipe system with one emitter resistance.
+    #[serde(default)]
+    pub one_pipe_emitter_count: Option<u32>,
     pub source_reference: String,
 }
 
@@ -1667,6 +1672,12 @@ fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<Ch
                     issues.push(issue("pump_value_invalid", format!("{path}.pump.{field}")));
                 }
             }
+            if pump.one_pipe_emitter_count == Some(0) {
+                issues.push(issue(
+                    "pump_value_invalid",
+                    format!("{path}.pump.onePipeEmitterCount"),
+                ));
+            }
         }
     }
 }
@@ -1839,7 +1850,10 @@ fn calculate_distribution(
             .map(|&zone| zones[zone].emitter.kpa())
             .fold(0.0_f64, f64::max);
         let generator_spread = generator.generator_spread_k().unwrap_or(design_spread);
-        let additional = emitter
+        // Table 9.21; a one-pipe loop sums n_j × Δp_H;add;j over its
+        // emitters (p. 317), the meter and the generator count once.
+        let emitters = pump.one_pipe_emitter_count.map_or(1.0, f64::from);
+        let additional = emitters * emitter
             + if pump.heat_meter_present { 10.0 } else { 0.0 }
             + generator_resistance_kpa(design_spread, generator_spread);
         let pressure = design_pressure_kpa(max_length, additional);
@@ -4305,7 +4319,9 @@ fn generate(
                 // Table 9.25 defines the air-heater classes for gas only.
                 issues.push(issue("forfait_air_heater_gas_only", "generator.fuel"));
             }
-            validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+            // P_H;gen is optional here: without it 9.92 is not capped by
+            // t_mi (see below).
+            validate_other_auxiliary(generator.auxiliary.as_ref(), false, issues);
             if generator.pilot_flames > 0
                 && (!generator.kind.air_heater() || generator.fuel != ForfaitHeaterFuel::NaturalGas)
             {
@@ -4331,8 +4347,17 @@ fn generate(
                     }
                     ForfaitHeaterFuel::Oil => row.oil_kwh = fuel,
                 }
+                // 9.92 without P_H;gen (ISSO 82.1 table 9.3 records no
+                // power): the burner runs t_on = t_mi, the upper bound the
+                // cap allows, so W_H;aux;gen is never understated.
+                let mut auxiliary = auxiliary.clone();
+                if auxiliary.nominal_power_kw.is_none() && row.generator_output_kwh > 0.0 {
+                    auxiliary.nominal_power_kw = Some(
+                        row.generator_output_kwh / building_fraction * 1.1 / MONTH_HOURS[index],
+                    );
+                }
                 row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
-                    auxiliary,
+                    &auxiliary,
                     OTHER_AUX_GAS_OIL_W_PER_KW,
                     row.generator_output_kwh,
                     MONTH_HOURS[index],
@@ -5700,6 +5725,24 @@ mod tests {
         let jan = &gas.monthly[0];
         let pilot = 2.0 * 695.0 * 744.0 / 8760.0;
         assert!((jan.natural_gas_kwh - (jan.generator_output_kwh / 0.75 + pilot)).abs() < 1e-9);
+        // Without P_H;gen, 9.92 runs the burner the whole month: 10 W
+        // stand-by plus 1 W/kW × 1,1 × Q_out (f_gebouw = 1).
+        input.generator = Generator::ForfaitHeater(ForfaitHeaterGenerator {
+            kind: ForfaitHeaterKind::AirHeaterConventional,
+            fuel: ForfaitHeaterFuel::NaturalGas,
+            equipment_reference: "survey".into(),
+            pilot_flames: 0,
+            auxiliary: other_aux(1, None),
+        });
+        let unknown = assess_space_heating_chain(&input);
+        assert_eq!(
+            unknown.status, "calculated_unverified",
+            "{:?}",
+            unknown.issues
+        );
+        let jan = &unknown.monthly[0];
+        let expected = (10.0 * 744.0 + 1.1 * jan.generator_output_kwh) / 1000.0;
+        assert!((jan.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
     }
 
     #[test]
@@ -5750,6 +5793,7 @@ mod tests {
             design_flow_m3_per_h: None,
             energy_efficiency_index: None,
             electric_power_kw: None,
+            one_pipe_emitter_count: None,
             source_reference: "design".into(),
         })
     }

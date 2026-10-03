@@ -25,6 +25,8 @@ export function heatingGeneratorTemplate(kind: string): Record<string, unknown> 
     case 'electric': return { kind, connectedDevices: 1 };
     case 'biomass': return { kind, appliance: 'pellet_stove', insideThermalBoundary: true, soleHeatingInServedRooms: false };
     case 'chp': return { kind, electricalPowerKw: 20 };
+    case 'local_fired': return { kind, appliance: 'gas_heater', flueGasExhaust: true, electricityConnected: null };
+    case 'gas_air_heater': return { kind, heaterType: 'conventional', pilotFlame: null, count: null };
     default: return { kind };
   }
 }
