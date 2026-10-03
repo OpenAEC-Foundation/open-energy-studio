@@ -1120,6 +1120,7 @@ pub fn system_performance_checks(
             F_P_GAS * row.natural_gas_kwh
                 + F_P_OIL * row.oil_kwh
                 + F_P_BIOMASS_B * row.biomass_kwh
+                + row.biomass_class_c_kwh
                 + F_P_DISTRICT_HEAT_FORFAIT * row.district_heat_kwh
                 + F_P_ELECTRICITY
                     * (row.generator_electricity_kwh + row.auxiliary_electricity_kwh.unwrap_or(0.0))
