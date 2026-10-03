@@ -21,7 +21,7 @@ describe('registration dialog', () => {
   it('stores the message type, WLC-GWP and program, and warns about a second label on one BAG object', async () => {
     localStorage.setItem('nta-bag-registrations', JSON.stringify([{
       bagObjectId: '0363010000000001', projectId: 'other', projectName: 'Woning elders',
-      residential: true, messageType: 'regular',
+      residential: true, messageType: 'regular', epOnlineNumber: 'EP-0',
     }]));
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
@@ -40,6 +40,7 @@ describe('registration dialog', () => {
       wlcGwp: { valueKgCo2EqPerM2Year: 7.5, reportReference: 'wlc.pdf' }, software: softwareIdentity(),
     });
     const ledger = JSON.parse(localStorage.getItem('nta-bag-registrations') ?? '[]');
-    expect(ledger.map((item: { messageType: string }) => item.messageType)).toEqual(['regular', 'replacement']);
+    // Not registered yet (no EP-Online number), so not in the ledger.
+    expect(ledger.map((item: { projectId: string }) => item.projectId)).toEqual(['other']);
   }, 60000);
 });

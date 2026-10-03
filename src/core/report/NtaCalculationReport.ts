@@ -150,7 +150,7 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
   const issues = [...(assessment?.issues ?? []), ...(assessment?.plausibility ?? [])].map((item) =>
     `<tr>${cell(item.severity === 'error' ? 'fout' : item.severity === 'warning' ? 'plausibiliteit' : 'ontbreekt')}${cell(item.code)}${cell(item.path)}</tr>`).join('');
   const messageType = assessment?.messageType ?? registration.messageType ?? (registration.relabel ? 'relabel' : 'regular');
-  const software = registration.software;
+  const software = assessment?.software ?? registration.software;
   const softwareText = software
     ? `${software.name} ${software.version}, ${software.attestNumber ? `attest ${software.attestNumber}` : 'nog niet geattesteerd (BRL 9501)'}`
     : '—';
@@ -168,7 +168,7 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     <tr><th>Opnemend adviseur</th>${cell(advisor(registration.surveyingAdvisor))}<th>Registrerend adviseur</th>${cell(advisor(registration.registeringAdvisor))}</tr>
     <tr><th>Opnamedatum</th>${cell(registration.surveyDate ?? '—')}<th>Registratiedatum</th>${cell(registration.registrationDate ?? '—')}</tr>
     <tr><th>Uiterste registratiedatum</th>${cell(assessment?.registrationDeadline ?? assessment?.relabelDeadline ?? '—')}<th>Geldig tot (opnamedatum + 10 jaar)</th>${cell(assessment?.validUntil ?? '—')}</tr>
-    <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Gereed voor registratie</th>${cell(assessment?.readyForRegistration ? 'ja' : 'nee')}</tr>
+    <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Gereed voor registratie</th>${cell(assessment?.readyForRegistration ? (assessment.softwareAttested === false ? 'ja, dossier compleet; rekenprogramma nog niet geattesteerd' : 'ja') : 'nee')}</tr>
     <tr><th>Rekenprogramma (Regeling art. 5)</th>${cell(softwareText)}<th>WLC-GWP</th>${cell(wlcText)}</tr>
     ${messageType === 'replacement' ? `<tr><th>Vervangt label</th>${cell(registration.replacedEpOnlineNumber ?? '—')}<th>Uiterste vervangdatum</th>${cell(assessment?.replacementDeadline ?? '—')}</tr>` : ''}
   </tbody></table>

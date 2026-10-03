@@ -2,11 +2,32 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — reviewcorrecties registratie en combi-tapwater
+
+### Uitkomsten die veranderen
+
+- **Combi-aandeel per systeem (13.184/13.185, p. 653; 9.1, p. 288).** Het tapwateraandeel van een combi- of afleverset wordt nu berekend met de opwekkeroutput van het hoofdsysteem, het enige systeem met de tapwaterbelasting, en alleen op de dragers van dat systeem toegepast. Een extra verwarmingssysteem (bijvoorbeeld een gasketel naast een warmtepomp-combi) blijft volledig E_H × f_BACS. Projecten met meerdere verwarmingssystemen, een combi en f_BACS ≠ 1 krijgen daardoor een ander gebruik en EPTot. Projecten met één verwarmingssysteem veranderen niet.
+
+### Invoer
+
+- **Lege waarden in getagde enums.** Een lege waarde (null) binnen bijvoorbeeld een opwekker of een PV-piekvermogen gaf nog `nta_calculation_block_invalid`. De route zoekt de lege velden nu in de JSON zelf en meldt `nta_value_missing` op het exacte pad. Een optioneel veld dat leeg mag zijn wordt niet gemeld.
+
+### Registratie
+
+- **Attest apart van de dossiercontrole.** `software_attest_number_missing` en `software_required` zijn geen registratiepunten meer. De beoordeling geeft `software` (het opgeslagen programma, of dit programma met de kernversie voor projecten zonder) en `softwareAttested`. `readyForRegistration` hangt alleen nog van het dossier af; het rapport noemt een ontbrekend attest naast "gereed".
+- **Herlabelen en vervangen** houden bij opslaan het programma van de oorspronkelijke berekening (BRL 9500-W §4.2.4, p. 23–24); een gewone registratie krijgt het huidige programma.
+- **Dossierchecklist.** De punten van Bijlage 6a/6b verschijnen ook bij `messageType: relabel` zonder het oude veld `relabel`.
+- **BAG-id.** Een pand-id (type 10) is toegestaan voor andere gebouwen dan woningen (Regeling art. 5 lid 1 onder a, p. 6). Voor een woninglabel blijft het adresseerbare object verplicht (Praktijkhandboek p. 46).
+- **WLC-GWP bij oplevering.** De plicht volgt de toets Bbl (BRL 9500-W p. 21, 62). Een oplevering gebruikt de nieuwe datum `bblCheckDate`. Zonder die datum is de plicht onbeslist en volgt een plausibiliteitsmelding (`wlc_gwp_bbl_check_date_unknown`) in plaats van een blokkerende melding. De grens van 1000 m² geldt per gebouw: `buildingUsableFloorAreaM2`; bij één woning onder de grens zonder gebouw-A_g volgt `wlc_gwp_building_area_unknown`.
+- **Vorige labelklasse.** Hoofdletters doen er niet toe ("a+" is A+); een onbekende klasse geeft een plausibiliteitsmelding in plaats van een fout.
+- **Lokaal BAG-register.** Alleen een geregistreerd label (met EP-Online-nummer) komt in het register. Het leegmaken van het BAG-id of het nummer verwijdert de regel. Een label waarvan de geldigheid (opnamedatum + 10 jaar) vóór de nieuwe opname of registratie verliep, telt niet als conflict.
+- **Bronverwijzing.** "Regeling art. 5 lid b" is nu "art. 5 lid 1 onder b".
+
 ## 3 oktober 2026 — registratie: rekenprogramma, berichttypen, WLC-GWP, BAG en plausibiliteit
 
 Rekenuitkomsten veranderen niet. De registratiecontrole wordt strenger:
 
-- **Rekenprogramma (Regeling art. 5 lid b, p. 6):** de app schrijft `registration.software` bij het opslaan van de projectgegevens. Zolang het programma niet volgens BRL 9501 is geattesteerd, meldt de kern `software_attest_number_missing` (ontbreekt); `readyForRegistration` blijft dan `false`. Opgeslagen projecten zonder dit blok krijgen `software_required` tot de projectgegevens opnieuw worden opgeslagen.
+- **Rekenprogramma (Regeling art. 5 lid 1 onder b, p. 6):** de app schrijft `registration.software` bij het opslaan van de projectgegevens. Zolang het programma niet volgens BRL 9501 is geattesteerd, meldt de kern `software_attest_number_missing` (ontbreekt); `readyForRegistration` blijft dan `false`. Opgeslagen projecten zonder dit blok krijgen `software_required` tot de projectgegevens opnieuw worden opgeslagen.
 - **BAG-id:** een id dat niet uit 16 cijfers bestaat of geen verblijfsobject, ligplaats of standplaats is, geeft nu een fout (`bag_object_id_invalid`, `bag_object_id_not_addressable`; Praktijkhandboek v2 p. 46).
 - **Berichttype (BRL 9500-W p. 24–25):** nieuw veld `messageType` met `regular`, `relabel` en `replacement`. Het oude `relabel: true` blijft werken. Vervangen vraagt het EP-Online-nummer van het vervangen label en moet binnen 24 maanden na de oorspronkelijke opname.
 - **WLC-GWP (BRL 9500-W p. 18, 21, 62):** vanaf 1-1-2028 is bij toets Bbl en oplevering van een gebouw > 1000 m² de uitkomst met rapportverwijzing verplicht.

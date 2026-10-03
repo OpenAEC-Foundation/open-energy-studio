@@ -3046,7 +3046,7 @@ pub fn assess_building_performance(
     for (system, assessed) in input.additional_heating_systems.iter().zip(&others) {
         heat_pump_systems.extend(system_heat_pump(&system.generator, assessed));
     }
-    let main_heating = heating.clone();
+    let mut main_heating = heating.clone();
     let mut heating = combine_heating_systems(heating, others);
     heating.heat_pump_systems = heat_pump_systems;
     validate(input, &mut issues);
@@ -3085,7 +3085,6 @@ pub fn assess_building_performance(
     // 13.69/13.137b: the levelled setpoint of 7.76 from the chain's demand.
     hot_water_context.levelled_setpoint_c = levelled_setpoint(input, &heating);
     let extras = hot_water_extras(input, &heating);
-    let hot_water_from_heating = hot_water_from_heating(&heating);
     // Table V.1 c_source and W.3 Q_C;HP;si;mi for the hot-water systems.
     // Annex V belongs to the regenerated (main) system only.
     let coupled = regeneration_source_correction(input, &chain_input, &main_heating);
@@ -3113,8 +3112,11 @@ pub fn assess_building_performance(
     if let (Some(result), Some(product)) = (&hot_water, input.space_heating.generator.micro_chp()) {
         if let Some(shares) = &result.combi_chp_heating {
             apply_combi_chp_heating(&mut heating, shares, product.fuel);
+            apply_combi_chp_heating(&mut main_heating, shares, product.fuel);
         }
     }
+    // 13.184 per system: only the main system carries the hot-water load.
+    let hot_water_from_heating = hot_water_from_heating(&main_heating);
     let mut warnings = result_warnings(input, &heating, cooling.as_ref(), hot_water.as_ref());
     let mut external = resolve_external(input, &mut issues);
     let mut forfait_totals = None;
@@ -3122,6 +3124,7 @@ pub fn assess_building_performance(
         totals = Some(compute(
             input,
             &heating,
+            &main_heating,
             cooling.as_ref(),
             hot_water.as_ref(),
             standalone_solar.as_ref(),
@@ -3136,6 +3139,7 @@ pub fn assess_building_performance(
             forfait_totals = Some(compute(
                 input,
                 &heating,
+                &main_heating,
                 cooling.as_ref(),
                 hot_water.as_ref(),
                 standalone_solar.as_ref(),
@@ -3649,6 +3653,7 @@ fn storage_correction_factor(input: &BuildingPerformanceInput) -> f64 {
 fn compute(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
+    main_heating: &SpaceHeatingChainAssessment,
     cooling: Option<&CoolingAssessment>,
     hot_water: Option<&HotWaterAssessment>,
     standalone_solar: Option<&crate::domestic_hot_water::StandaloneSolarHeating>,
@@ -3739,23 +3744,35 @@ fn compute(
         // delivery-set generator is E_W, not E_H. 5.20a (p. 89) weights only
         // E_H by f_BACS, so that share is booked under hot water without it.
         // The generator's auxiliary energy stays with heating (p. 653).
-        let combi_share = combi_hot_water_share(row);
-        let heating_weight = bacs * (1.0 - combi_share);
-        let carrier_weight = heating_weight + combi_share;
-        let mut used_el = carrier_weight * row.generator_electricity_kwh
-            + bacs * row.auxiliary_electricity_kwh.unwrap_or(0.0);
-        let mut used_gas = carrier_weight * row.natural_gas_kwh;
-        let mut used_oil = carrier_weight * row.oil_kwh;
+        // 13.184 splits per system: the share comes from the main system
+        // (the only one carrying the hot-water load) and applies only to the
+        // main system's carriers; additional systems stay E_H × f_BACS.
+        let main_row = &main_heating.monthly[index];
+        let combi_share = combi_hot_water_share(main_row);
+        // E_W part of a carrier, and the carrier as booked (E_H × f_BACS + E_W).
+        let hot_water_part = |main: f64| combi_share * main;
+        let booked =
+            |total: f64, main: f64| bacs * (total - hot_water_part(main)) + hot_water_part(main);
+        let heating_part = |total: f64, main: f64| bacs * (total - hot_water_part(main));
+        let mut used_el = booked(
+            row.generator_electricity_kwh,
+            main_row.generator_electricity_kwh,
+        ) + bacs * row.auxiliary_electricity_kwh.unwrap_or(0.0);
+        let mut used_gas = booked(row.natural_gas_kwh, main_row.natural_gas_kwh);
+        let mut used_oil = booked(row.oil_kwh, main_row.oil_kwh);
         by.add(
             F_HEATING,
             C_EL,
-            heating_weight * row.generator_electricity_kwh,
+            heating_part(
+                row.generator_electricity_kwh,
+                main_row.generator_electricity_kwh,
+            ),
             0.0,
         );
         by.add(
             F_HOT_WATER,
             C_EL,
-            combi_share * row.generator_electricity_kwh,
+            hot_water_part(main_row.generator_electricity_kwh),
             0.0,
         );
         by.add(
@@ -3767,32 +3784,43 @@ fn compute(
         by.add(
             F_HEATING,
             C_GAS,
-            heating_weight * row.natural_gas_kwh,
+            heating_part(row.natural_gas_kwh, main_row.natural_gas_kwh),
             F_P_GAS,
         );
         by.add(
             F_HOT_WATER,
             C_GAS,
-            combi_share * row.natural_gas_kwh,
+            hot_water_part(main_row.natural_gas_kwh),
             F_P_GAS,
         );
-        by.add(F_HEATING, C_OIL, heating_weight * row.oil_kwh, F_P_OIL);
-        by.add(F_HOT_WATER, C_OIL, combi_share * row.oil_kwh, F_P_OIL);
+        by.add(
+            F_HEATING,
+            C_OIL,
+            heating_part(row.oil_kwh, main_row.oil_kwh),
+            F_P_OIL,
+        );
+        by.add(
+            F_HOT_WATER,
+            C_OIL,
+            hot_water_part(main_row.oil_kwh),
+            F_P_OIL,
+        );
         // Table 5.4: forfait external heat has f_Pren = 0, so it only adds EPTot.
         // 5.20: f_BACS applies to space heating on every carrier.
         // 9.84: E = Q/(η·f_prac) with η_H;gen;equiv;dh = 1.
         let dh_input = row.district_heat_kwh / factors.practice_heat;
-        let mut used_dh = carrier_weight * dh_input;
+        let main_dh_input = main_row.district_heat_kwh / factors.practice_heat;
+        let mut used_dh = booked(dh_input, main_dh_input);
         by.add(
             F_HEATING,
             C_DH,
-            heating_weight * dh_input,
+            heating_part(dh_input, main_dh_input),
             factors.district_heat.primary_factor,
         );
         by.add(
             F_HOT_WATER,
             C_DH,
-            combi_share * dh_input,
+            hot_water_part(main_dh_input),
             factors.district_heat.primary_factor,
         );
         // 5.39g: the renewable share counts Q_H;gen;out of external heat and
@@ -4005,17 +4033,17 @@ fn compute(
         // 5.20 books Q_HD;hp;in;bron as carrier dh (its own factors above).
         let reported_dh = used_dh + if source.is_some() { source_heat } else { 0.0 };
         // Tables 5.2/5.3: bmA f_P 0,0, bmB 0,5, bmC 1,0 (× 0,104 for CO2).
-        let used_bm_b = carrier_weight * row.biomass_kwh + hot_water_biomass;
-        let used_bm_a = carrier_weight * row.biomass_class_a_kwh;
-        let used_bm_c = carrier_weight * row.biomass_class_c_kwh;
+        let used_bm_b = booked(row.biomass_kwh, main_row.biomass_kwh) + hot_water_biomass;
+        let used_bm_a = booked(row.biomass_class_a_kwh, main_row.biomass_class_a_kwh);
+        let used_bm_c = booked(row.biomass_class_c_kwh, main_row.biomass_class_c_kwh);
         let used_bm = used_bm_a + used_bm_b + used_bm_c;
-        for (kwh, primary) in [
-            (row.biomass_kwh, F_P_BIOMASS_B),
-            (row.biomass_class_a_kwh, 0.0),
-            (row.biomass_class_c_kwh, 1.0),
+        for (kwh, main, primary) in [
+            (row.biomass_kwh, main_row.biomass_kwh, F_P_BIOMASS_B),
+            (row.biomass_class_a_kwh, main_row.biomass_class_a_kwh, 0.0),
+            (row.biomass_class_c_kwh, main_row.biomass_class_c_kwh, 1.0),
         ] {
-            by.add(F_HEATING, C_BM, heating_weight * kwh, primary);
-            by.add(F_HOT_WATER, C_BM, combi_share * kwh, primary);
+            by.add(F_HEATING, C_BM, heating_part(kwh, main), primary);
+            by.add(F_HOT_WATER, C_BM, hot_water_part(main), primary);
         }
         by.add(F_HOT_WATER, C_BM, hot_water_biomass, F_P_BIOMASS_B);
         fossil += used_bm_b * F_P_BIOMASS_B + used_bm_c;
@@ -6071,6 +6099,133 @@ mod tests {
         };
         assert!((service_gas("hotWater") - combi_gas).abs() < 1e-6);
         assert!((service_gas("heating") - 1.05 * space_gas).abs() < 1e-6);
+    }
+
+    #[test]
+    fn combi_share_is_per_system_with_an_additional_boiler() {
+        use crate::domestic_hot_water::{
+            HotWaterEmission, HotWaterGenerator, HotWaterNeed, UtilityArea,
+        };
+        use crate::monthly_demand::{LightingRecovery, UsageFunction};
+        // 13.184 (p. 653) and 9.1 (p. 288) split per system: a heat pump
+        // with the hot-water load plus an additional gas boiler for zone 2.
+        let mut sample = input();
+        sample.calculation_scope = CalculationScope::Utility;
+        sample.label_function = Some(LabelFunction::Office);
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let demand = &mut sample.space_heating.demand;
+        demand.usage_function = UsageFunction::Office;
+        demand.dwelling_type = None;
+        demand.setpoints.heating_c = 21.0;
+        demand.internal_gains = InternalGains::Utility {
+            lighting: UtilityLighting::Declared {
+                annual_kwh: 0.0,
+                recovery: LightingRecovery::Other,
+            },
+            hot_water_recoverable_kwh: Vec::new(),
+            source_reference: "tables 7.2/7.3".into(),
+        };
+        let area = demand.usable_floor_area_m2;
+        let boiler_system = sample.space_heating.clone();
+        sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
+            forfait: crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+                generator_id: "hp".into(),
+                classification_source_reference: "system design".into(),
+                scope: crate::forfait_heat_pump_draft::TableScope::UtilityCollectiveOrOver25Kw,
+                source: TableSource::OutdoorAir,
+                sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
+                design_supply_temperature_c: Some(35.0),
+                source_correction_factor: None,
+                source_correction_reference: None,
+                thermal_capacity_kw: Some(30.0),
+                capacity_source_reference: Some("rated".into()),
+                collective_building_installation: Some(false),
+                row_variant: crate::forfait_heat_pump_draft::TableRowVariant::Base,
+                high_efficiency_evidence: None,
+                source_temperature_c: None,
+                source_temperature_evidence_reference: None,
+                source_quality_declaration_reference: None,
+            },
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own unit".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        let mut second = boiler_system.demand.clone();
+        second.zone_id = "z2".into();
+        let mut boiler = boiler_system;
+        boiler.demand = second;
+        boiler.additional_zones.clear();
+        sample.additional_heating_systems.push(boiler);
+        sample.total_usable_floor_area_m2 *= 2.0;
+        let mut system = hot_water_system(HotWaterGenerator::HeatingSystem);
+        system.need = HotWaterNeed::Utility {
+            areas: vec![UtilityArea {
+                function: LabelFunction::Office,
+                area_m2: area,
+            }],
+            source_reference: "plan".into(),
+        };
+        system.emission = HotWaterEmission::Utility {
+            mean_length_m: 2.0,
+            source_reference: "plan".into(),
+        };
+        sample.hot_water = Some(system);
+        sample.heat_pump_renewable = Some(HeatPumpRenewableEvidence {
+            source_below_20_c: true,
+            exhaust_air_source: false,
+            source_reference: "unit".into(),
+            combined_outdoor_and_exhaust_air: false,
+            outdoor_air_heat_fraction: None,
+            outdoor_air_fraction_reference: None,
+        });
+        sample.bacs_factor = 1.05;
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert_services_reconcile(&result);
+        let service = |name: &str, carrier: &str| -> f64 {
+            result
+                .energy_by_service
+                .annual
+                .iter()
+                .filter(|row| row.service == name && row.carrier == carrier)
+                .map(|row| row.used_kwh)
+                .sum()
+        };
+        // Only the boiler burns gas: all of it is E_H × f_BACS.
+        let boiler_gas: f64 = result
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| row.natural_gas_kwh)
+            .sum();
+        assert!(boiler_gas > 0.0);
+        assert!(result
+            .hot_water_from_heating
+            .iter()
+            .all(|split| split.natural_gas_kwh == 0.0));
+        assert!(service("hotWater", "gas").abs() < 1e-9);
+        assert!((service("heating", "gas") - 1.05 * boiler_gas).abs() < 1e-6);
+        // The heat pump's hot-water share of its own electricity is E_W.
+        let combi_el: f64 = result
+            .hot_water_from_heating
+            .iter()
+            .map(|split| split.electricity_kwh)
+            .sum();
+        assert!(combi_el > 0.0);
+        assert!(service("hotWater", "el") >= combi_el - 1e-9);
+        // The share is relative to the heat pump's own output, so it is
+        // larger than the share of the combined output of both systems.
+        let jan = &result.space_heating.monthly[0];
+        let combined_share = jan.hot_water_load_kwh / jan.generator_output_kwh;
+        assert!(result.hot_water_from_heating[0].share > combined_share);
     }
 
     #[test]

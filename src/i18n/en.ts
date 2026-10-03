@@ -167,6 +167,8 @@ export const en: Record<string, string> = {
   'reg.wlcGwpHint': "Required from 1-1-2028 for new buildings > 1000 m² checked against the Bbl and at delivery (BRL 9500-W p. 18, 21). Enter the result of the WLC-GWP adviser.",
   'reg.wlcGwp.value': "WLC-GWP, kg CO₂-eq/m²·yr",
   'reg.wlcGwp.reference': "Report in the project dossier",
+  'reg.bblCheckDate': "Date of the Bbl check this delivery follows (WLC-GWP)",
+  'reg.buildingUsableFloorArea': "A_g of the whole building, m² (WLC-GWP threshold; when calculating one dwelling)",
   'reg.software': "Calculation program",
   'reg.software.attest': "attest number",
   'reg.software.unattested': "not yet attested under BRL 9501",

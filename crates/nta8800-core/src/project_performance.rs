@@ -1051,6 +1051,103 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
     }
 }
 
+/// A deserialization error caused by a blank (null) value.
+fn is_blank_error(message: &str) -> bool {
+    message.starts_with("invalid type: null") || message.starts_with("invalid type: unit value")
+}
+
+/// The null leaves under `prefix` (a serde_path_to_error path, `.` for the
+/// root) that make the block fail. A null member is a culprit when removing
+/// it changes the error, so optional members that may be null are not
+/// reported; a null array element always is.
+fn blank_paths(block: &Value, prefix: &str) -> Vec<String> {
+    fn collect(
+        value: &Value,
+        path: String,
+        out: &mut Vec<(String, Vec<PathStep>)>,
+        steps: Vec<PathStep>,
+    ) {
+        match value {
+            Value::Null => out.push((path, steps)),
+            Value::Object(map) => {
+                for (key, item) in map {
+                    let next = if path.is_empty() {
+                        key.clone()
+                    } else {
+                        format!("{path}.{key}")
+                    };
+                    let mut more = steps.clone();
+                    more.push(PathStep::Key(key.clone()));
+                    collect(item, next, out, more);
+                }
+            }
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    let mut more = steps.clone();
+                    more.push(PathStep::Index(index));
+                    collect(item, format!("{path}[{index}]"), out, more);
+                }
+            }
+            _ => {}
+        }
+    }
+    let first_error = |candidate: &Value| -> Option<String> {
+        serde_path_to_error::deserialize::<_, NtaCalculationInput>(candidate.clone())
+            .err()
+            .map(|error| error.to_string())
+    };
+    let original = first_error(block);
+    let mut leaves = Vec::new();
+    collect(block, String::new(), &mut leaves, Vec::new());
+    let root = prefix == "." || prefix.is_empty();
+    leaves
+        .into_iter()
+        .filter(|(path, _)| {
+            root || path == prefix
+                || path.starts_with(&format!("{prefix}."))
+                || path.starts_with(&format!("{prefix}["))
+        })
+        .filter(|(_, steps)| match steps.last() {
+            Some(PathStep::Index(_)) => true,
+            Some(PathStep::Key(_)) => {
+                let mut trial = block.clone();
+                remove_member(&mut trial, steps);
+                first_error(&trial) != original
+            }
+            None => false,
+        })
+        .map(|(path, _)| path)
+        .collect()
+}
+
+#[derive(Clone)]
+enum PathStep {
+    Key(String),
+    Index(usize),
+}
+
+fn remove_member(value: &mut Value, steps: &[PathStep]) {
+    let Some((last, parents)) = steps.split_last() else {
+        return;
+    };
+    let mut current = value;
+    for step in parents {
+        current = match step {
+            PathStep::Key(key) => match current.get_mut(key.as_str()) {
+                Some(next) => next,
+                None => return,
+            },
+            PathStep::Index(index) => match current.get_mut(*index) {
+                Some(next) => next,
+                None => return,
+            },
+        };
+    }
+    if let (PathStep::Key(key), Value::Object(map)) = (last, current) {
+        map.remove(key);
+    }
+}
+
 fn derive_input(
     project_value: &Value,
     gaps: &mut Vec<InputGap>,
@@ -1074,19 +1171,26 @@ fn derive_input(
                     // A blank value (null) where the kernel needs a number,
                     // e.g. one month of a 12-month row or one pump power, is
                     // a missing input at its own path, not a malformed block.
-                    let blank = error.inner().to_string().starts_with("invalid type: null");
-                    let found = if blank {
-                        gap(
-                            "nta_value_missing",
-                            format!("ntaCalculation.{}", error.path()),
-                        )
+                    // Inside internally tagged enums serde reports the null as
+                    // a unit value and stops the path at the enum, so the
+                    // blank leaves are located in the JSON itself.
+                    let blanks = if is_blank_error(&error.inner().to_string()) {
+                        blank_paths(value, &error.path().to_string())
                     } else {
-                        gap("nta_calculation_block_invalid", "ntaCalculation")
+                        Vec::new()
                     };
-                    gaps.push(InputGap {
-                        detail: Some(error.to_string()),
-                        ..found
-                    });
+                    if blanks.is_empty() {
+                        gaps.push(InputGap {
+                            detail: Some(error.to_string()),
+                            ..gap("nta_calculation_block_invalid", "ntaCalculation")
+                        });
+                    }
+                    for path in blanks {
+                        gaps.push(InputGap {
+                            detail: Some(error.to_string()),
+                            ..gap("nta_value_missing", format!("ntaCalculation.{path}"))
+                        });
+                    }
                     None
                 }
             }
@@ -2181,6 +2285,52 @@ mod tests {
             result.gaps[0].path,
             "ntaCalculation.ventilationFlows[0].months[3].conductanceWPerK"
         );
+    }
+
+    #[test]
+    fn blank_values_inside_tagged_enums_are_missing_inputs() {
+        // Internally tagged enums buffer the value, so serde reports a unit
+        // value and stops the path at the enum; the blank leaf is found in
+        // the JSON itself.
+        let mut value = project();
+        value["ntaCalculation"]["generator"]["boiler"]["averageDesignEmissionTemperatureC"] =
+            Value::Null;
+        let result = assess_project_performance(&value);
+        let missing: Vec<&str> = result
+            .gaps
+            .iter()
+            .filter(|gap| gap.code == "nta_value_missing")
+            .map(|gap| gap.path.as_str())
+            .collect();
+        assert_eq!(
+            missing,
+            ["ntaCalculation.generator.boiler.averageDesignEmissionTemperatureC"],
+            "{:?}",
+            result.gaps
+        );
+        assert!(!result
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "nta_calculation_block_invalid"));
+        // A blank power inside a tagged peak-power enum.
+        let mut value = project();
+        value["ntaCalculation"]["pvSystems"][0]["peakPower"]["panelPeakPowerW"] = Value::Null;
+        let result = assess_project_performance(&value);
+        assert!(
+            result.gaps.iter().any(|gap| gap.code == "nta_value_missing"
+                && gap.path == "ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW"),
+            "{:?}",
+            result.gaps
+        );
+        // An optional member that may be null is not reported.
+        let mut value = project();
+        value["ntaCalculation"]["generator"]["boiler"]["averageDesignEmissionTemperatureC"] =
+            Value::Null;
+        value["ntaCalculation"]["verticalPipes"] = Value::Null;
+        let result = assess_project_performance(&value);
+        assert!(!result.gaps.iter().any(
+            |gap| gap.path == "ntaCalculation.verticalPipes" && gap.code == "nta_value_missing"
+        ));
     }
 
     #[test]

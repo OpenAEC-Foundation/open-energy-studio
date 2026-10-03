@@ -14,14 +14,16 @@
 //! p. 61–63). BRL 9500-U mirrors these clauses.
 //!
 //! Added on 3 October 2026:
-//! - the attested software of the registration (Regeling art. 5 lid b,
+//! - the attested software of the registration (Regeling art. 5 lid 1 onder b,
 //!   p. 6; Regeling art. 2/3 require a BRL 9501-attested program, p. 4–5);
 //! - the separate relabel message type and the replacement of an incorrect
 //!   label within 24 months (BRL 9500-W §4.2.5 opmerking 4 and 5, p. 24–25);
 //! - the WLC-GWP result for new buildings over 1000 m² checked against the
 //!   Bbl from 1-1-2028 (BRL 9500-W p. 18, 21 and 62);
-//! - the BAG addressable object as the lowest registration level
-//!   (Praktijkhandboek v2 p. 46) and A_g to two decimals (p. 70);
+//! - the BAG addressable object as the lowest registration level of a
+//!   residential label (Praktijkhandboek v2 p. 46); other buildings may use
+//!   the pand or verblijfsobject id (Regeling art. 5 lid 1 onder a, p. 6);
+//!   A_g to two decimals (Praktijkhandboek p. 70);
 //! - plausibility warnings modelled on the dossier selection of BRL
 //!   9500-W §7.2.2 (p. 42). Their thresholds are this program's own choice.
 //!
@@ -76,7 +78,7 @@ pub enum MessageType {
     Replacement,
 }
 
-/// The program that made the calculation (Regeling art. 5 lid b, p. 6).
+/// The program that made the calculation (Regeling art. 5 lid 1 onder b, p. 6).
 /// The application fills it in; the attest number stays empty until the
 /// program is attested under BRL 9501.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -260,12 +262,21 @@ pub struct Registration {
     /// Replacement: EP-Online number of the label that is replaced.
     #[serde(default)]
     pub replaced_ep_online_number: Option<String>,
-    /// The program that made the calculation (Regeling art. 5 lid b).
+    /// The program that made the calculation (Regeling art. 5 lid 1 onder b).
     #[serde(default)]
     pub software: Option<SoftwareIdentity>,
     /// WLC-GWP result (BRL 9500-W p. 18, 21, 62).
     #[serde(default)]
     pub wlc_gwp: Option<WlcGwp>,
+    /// Delivery: date of the toets Bbl the delivery follows, YYYY-MM-DD.
+    /// The WLC-GWP duty from 1-1-2028 follows that check (BRL 9500-W p. 21,
+    /// 62).
+    #[serde(default)]
+    pub bbl_check_date: Option<String>,
+    /// A_g of the whole building, m², when the calculation covers only part
+    /// of it (one dwelling); the WLC-GWP threshold is per building.
+    #[serde(default)]
+    pub building_usable_floor_area_m2: Option<f64>,
     /// Class of the label that was registered before, for the plausibility
     /// check on large class jumps.
     #[serde(default)]
@@ -319,6 +330,13 @@ pub struct RegistrationAssessment {
     /// Whether the WLC-GWP result is required (new building > 1000 m²,
     /// toets Bbl or delivery from 1-1-2028); `None` when undecidable.
     pub wlc_gwp_required: Option<bool>,
+    /// The program of the registration: the stored identity, or this
+    /// program for projects saved before the identity was recorded.
+    pub software: SoftwareIdentity,
+    /// Whether that program carries a BRL 9501 attest number (Regeling
+    /// art. 2/3, p. 4–5). Reported apart from `issues`: it is a property of
+    /// the program, not of the dossier.
+    pub software_attested: bool,
     pub ready_for_registration: bool,
     pub issues: Vec<RegistrationIssue>,
     /// Plausibility findings (severity `warning`); they never block
@@ -346,7 +364,7 @@ pub struct RegistrationContext {
     pub envelope: Vec<EnvelopeSummary>,
 }
 
-/// Name of this program in the registration (Regeling art. 5 lid b).
+/// Name of this program in the registration (Regeling art. 5 lid 1 onder b).
 pub const SOFTWARE_NAME: &str = "Open Energy Studio";
 
 /// First day on which the WLC-GWP result is required (BRL 9500-W p. 18).
@@ -464,12 +482,19 @@ impl Registration {
 
 /// BAG ids are 16 digits; digits 5–6 give the object type. Praktijkhandboek
 /// v2 p. 46: a residential label is registered on an addressable object,
-/// a verblijfsobject (01), ligplaats (02) or standplaats (03).
-fn check_bag_object_id(id: &str, issues: &mut Vec<RegistrationIssue>) {
+/// a verblijfsobject (01), ligplaats (02) or standplaats (03). Regeling
+/// art. 5 lid 1 onder a (p. 6) also allows the pand id (10), which other
+/// buildings may use.
+fn check_bag_object_id(id: &str, residential: bool, issues: &mut Vec<RegistrationIssue>) {
     let id = id.trim();
+    let allowed: &[&str] = if residential {
+        &["01", "02", "03"]
+    } else {
+        &["01", "02", "03", "10"]
+    };
     if id.len() != 16 || !id.chars().all(|c| c.is_ascii_digit()) {
         issues.push(issue("bag_object_id_invalid", "bagObjectId", "error"));
-    } else if !matches!(&id[4..6], "01" | "02" | "03") {
+    } else if !allowed.contains(&&id[4..6]) {
         issues.push(issue(
             "bag_object_id_not_addressable",
             "bagObjectId",
@@ -478,22 +503,25 @@ fn check_bag_object_id(id: &str, issues: &mut Vec<RegistrationIssue>) {
     }
 }
 
-fn check_software(software: &Option<SoftwareIdentity>, issues: &mut Vec<RegistrationIssue>) {
-    match software {
-        None => issues.push(issue("software_required", "software", "missing")),
-        Some(software) => {
-            if software.name.trim().is_empty() || software.version.trim().is_empty() {
-                issues.push(issue("software_required", "software", "missing"));
-            }
-            // Regeling art. 2/3 (p. 4–5): only a BRL 9501-attested program.
-            if blank(&software.attest_number) {
-                issues.push(issue(
-                    "software_attest_number_missing",
-                    "software.attestNumber",
-                    "missing",
-                ));
-            }
-        }
+/// The program of the registration (Regeling art. 5 lid 1 onder b, p. 6).
+/// Projects saved before the identity was recorded get this program with
+/// the kernel version; blank fields are filled the same way.
+fn effective_software(software: &Option<SoftwareIdentity>) -> SoftwareIdentity {
+    let stored = software.clone().unwrap_or_default();
+    SoftwareIdentity {
+        name: if stored.name.trim().is_empty() {
+            SOFTWARE_NAME.to_owned()
+        } else {
+            stored.name
+        },
+        version: if stored.version.trim().is_empty() {
+            KERNEL_VERSION.to_owned()
+        } else {
+            stored.version
+        },
+        attest_number: stored
+            .attest_number
+            .filter(|number| !number.trim().is_empty()),
     }
 }
 
@@ -504,6 +532,7 @@ fn check_wlc_gwp(
     registration: &Registration,
     context: &RegistrationContext,
     issues: &mut Vec<RegistrationIssue>,
+    warnings: &mut Vec<RegistrationIssue>,
 ) -> Option<bool> {
     if let Some(wlc) = &registration.wlc_gwp {
         if wlc
@@ -517,22 +546,53 @@ fn check_wlc_gwp(
             ));
         }
     }
-    let new_building = matches!(
-        registration.purpose,
-        Some(RegistrationPurpose::BblCheck | RegistrationPurpose::Delivery)
-    );
-    if !new_building {
-        return Some(false);
-    }
-    let date = registration
-        .registration_date
-        .as_deref()
-        .or(registration.survey_date.as_deref())
-        .and_then(Date::parse)?;
+    // The duty follows the toets Bbl: a delivery inherits it from the
+    // check it follows (p. 21, 62), so it is keyed on that check's date.
+    let check_date = match registration.purpose {
+        Some(RegistrationPurpose::BblCheck) => registration
+            .registration_date
+            .as_deref()
+            .or(registration.survey_date.as_deref()),
+        Some(RegistrationPurpose::Delivery) => match registration.bbl_check_date.as_deref() {
+            Some(date) => Some(date),
+            None => {
+                let late = registration
+                    .registration_date
+                    .as_deref()
+                    .or(registration.survey_date.as_deref())
+                    .and_then(Date::parse)
+                    .is_some_and(|date| date >= WLC_GWP_FROM);
+                if late {
+                    warnings.push(warning(
+                        "wlc_gwp_bbl_check_date_unknown",
+                        "registration.bblCheckDate",
+                    ));
+                }
+                return None;
+            }
+        },
+        _ => return Some(false),
+    };
+    let date = check_date.and_then(Date::parse)?;
     if date < WLC_GWP_FROM {
         return Some(false);
     }
-    let area = context.usable_floor_area_m2?;
+    // The threshold is per building; a dwelling's own A_g decides only when
+    // it already exceeds it.
+    let area = match registration.building_usable_floor_area_m2 {
+        Some(area) => area,
+        None => {
+            let area = context.usable_floor_area_m2?;
+            if context.residential && area <= WLC_GWP_AREA_M2 {
+                warnings.push(warning(
+                    "wlc_gwp_building_area_unknown",
+                    "registration.buildingUsableFloorAreaM2",
+                ));
+                return None;
+            }
+            area
+        }
+    };
     if area <= WLC_GWP_AREA_M2 {
         return Some(false);
     }
@@ -560,6 +620,11 @@ fn warning(code: &'static str, path: &str) -> RegistrationIssue {
         path: path.to_owned(),
         severity: "warning",
     }
+}
+
+/// A label class as entered, trimmed and upper case ("a+" is "A+").
+fn normalised_class(text: &str) -> String {
+    text.trim().to_uppercase()
 }
 
 /// Plausibility warnings after BRL 9500-W §7.2.2 (p. 42): the certification
@@ -595,7 +660,7 @@ pub fn plausibility_warnings(
             }
         }
         if let Some(previous) = registration.previous_label_class.as_deref() {
-            match (class_rank(previous), class_rank(class)) {
+            match (class_rank(&normalised_class(previous)), class_rank(class)) {
                 (Some(before), Some(now)) if before >= now + 3 => found.push(warning(
                     "plausibility_label_class_jump",
                     "registration.previousLabelClass",
@@ -695,7 +760,9 @@ pub fn assess_registration_with(
         _ => {}
     }
     match registration.bag_object_id.as_deref() {
-        Some(id) if !id.trim().is_empty() => check_bag_object_id(id, &mut issues),
+        Some(id) if !id.trim().is_empty() => {
+            check_bag_object_id(id, context.residential, &mut issues)
+        }
         _ => issues.push(issue("bag_object_id_required", "bagObjectId", "missing")),
     }
     if blank(&registration.postcode) {
@@ -871,17 +938,20 @@ pub fn assess_registration_with(
     }
     check_detail_survey(registration, &mut issues);
     check_evidence(&registration.evidence, &mut issues);
-    check_software(&registration.software, &mut issues);
-    let wlc_gwp_required = check_wlc_gwp(registration, context, &mut issues);
+    let software = effective_software(&registration.software);
+    let mut plausibility = plausibility_warnings(registration, context);
+    let wlc_gwp_required = check_wlc_gwp(registration, context, &mut issues, &mut plausibility);
+    // Only used for the class-jump warning, so an unknown class warns.
     if registration
         .previous_label_class
         .as_deref()
-        .is_some_and(|class| !class.trim().is_empty() && class_rank(class).is_none())
+        .is_some_and(|class| {
+            !class.trim().is_empty() && class_rank(&normalised_class(class)).is_none()
+        })
     {
-        issues.push(issue(
+        plausibility.push(warning(
             "previous_label_class_invalid",
-            "previousLabelClass",
-            "error",
+            "registration.previousLabelClass",
         ));
     }
 
@@ -893,9 +963,11 @@ pub fn assess_registration_with(
         relabel_deadline: relabel_deadline.map(|date| date.to_string()),
         replacement_deadline: replacement_deadline.map(|date| date.to_string()),
         wlc_gwp_required,
+        software_attested: software.attest_number.is_some(),
+        software,
         ready_for_registration: issues.is_empty(),
         issues,
-        plausibility: plausibility_warnings(registration, context),
+        plausibility,
     }
 }
 
@@ -1220,19 +1292,51 @@ mod tests {
 
     #[test]
     fn software_bag_and_message_types() {
-        // Regeling art. 5 lid b: the attested program is part of the data.
+        // Regeling art. 5 lid 1 onder b: the attested program is part of
+        // the data. The attest is a property of the program, reported apart
+        // from the dossier issues, so it does not block readiness.
         let mut unattested = complete();
         unattested.software.as_mut().unwrap().attest_number = None;
-        assert_eq!(codes(&unattested), vec!["software_attest_number_missing"]);
+        let result = assess_registration(&unattested);
+        assert!(result.ready_for_registration, "{:?}", result.issues);
+        assert!(!result.software_attested);
+        assert!(assess_registration(&complete()).software_attested);
+        // Saved before the identity was recorded: this program, kernel version.
         unattested.software = None;
-        assert_eq!(codes(&unattested), vec!["software_required"]);
+        let result = assess_registration(&unattested);
+        assert!(result.issues.is_empty(), "{:?}", result.issues);
+        assert_eq!(result.software.name, SOFTWARE_NAME);
+        assert_eq!(result.software.version, KERNEL_VERSION);
 
-        // Praktijkhandboek p. 46: an addressable object, 16 digits.
+        // Praktijkhandboek p. 46: a residential label on an addressable
+        // object; Regeling art. 5 lid 1 onder a (p. 6) also allows the pand
+        // id, which a utility building may use.
+        let dwelling = RegistrationContext {
+            residential: true,
+            ..RegistrationContext::default()
+        };
+        let utility = RegistrationContext::default();
+        let bag_codes = |registration: &Registration, context: &RegistrationContext| {
+            assess_registration_with(registration, context)
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
         let mut bag = complete();
         bag.bag_object_id = Some("0363100000000001".into());
-        assert_eq!(codes(&bag), vec!["bag_object_id_not_addressable"]);
+        assert_eq!(
+            bag_codes(&bag, &dwelling),
+            vec!["bag_object_id_not_addressable"]
+        );
+        assert!(bag_codes(&bag, &utility).is_empty());
+        bag.bag_object_id = Some("0363200000000001".into());
+        assert_eq!(
+            bag_codes(&bag, &utility),
+            vec!["bag_object_id_not_addressable"]
+        );
         bag.bag_object_id = Some("0363020000000001".into());
-        assert!(codes(&bag).is_empty());
+        assert!(bag_codes(&bag, &dwelling).is_empty());
         bag.bag_object_id = Some("36301000000001".into());
         assert_eq!(codes(&bag), vec!["bag_object_id_invalid"]);
 
@@ -1306,6 +1410,50 @@ mod tests {
             assess_registration_with(&complete(), &large).wlc_gwp_required,
             Some(false)
         );
+        // A delivery follows its toets Bbl (p. 21, 62): a 2028 delivery after
+        // a 2027 check needs no WLC-GWP; without the check date it warns.
+        let mut delivery = bbl.clone();
+        delivery.purpose = Some(RegistrationPurpose::Delivery);
+        delivery.survey_date = Some("2028-02-01".into());
+        delivery.registration_date = Some("2028-02-01".into());
+        delivery.bbl_check_date = Some("2027-11-01".into());
+        let result = assess_registration_with(&delivery, &large);
+        assert_eq!(result.wlc_gwp_required, Some(false));
+        assert!(result.issues.is_empty(), "{:?}", result.issues);
+        delivery.bbl_check_date = None;
+        let result = assess_registration_with(&delivery, &large);
+        assert_eq!(result.wlc_gwp_required, None);
+        assert!(result.issues.is_empty(), "{:?}", result.issues);
+        assert!(result
+            .plausibility
+            .iter()
+            .any(|item| item.code == "wlc_gwp_bbl_check_date_unknown"));
+        delivery.bbl_check_date = Some("2028-01-05".into());
+        assert_eq!(
+            assess_registration_with(&delivery, &large).wlc_gwp_required,
+            Some(true)
+        );
+        // The threshold is per building: one dwelling of 90 m² does not
+        // decide it, the building's A_g does.
+        let dwelling = RegistrationContext {
+            usable_floor_area_m2: Some(90.0),
+            residential: true,
+            ..RegistrationContext::default()
+        };
+        let mut apartment = bbl.clone();
+        apartment.survey_date = Some("2028-01-10".into());
+        apartment.registration_date = Some("2028-01-10".into());
+        let result = assess_registration_with(&apartment, &dwelling);
+        assert_eq!(result.wlc_gwp_required, None);
+        assert!(result
+            .plausibility
+            .iter()
+            .any(|item| item.code == "wlc_gwp_building_area_unknown"));
+        apartment.building_usable_floor_area_m2 = Some(4800.0);
+        assert_eq!(
+            assess_registration_with(&apartment, &dwelling).wlc_gwp_required,
+            Some(true)
+        );
         // Undecidable without A_g.
         bbl.survey_date = Some("2028-03-01".into());
         bbl.registration_date = Some("2028-03-01".into());
@@ -1369,8 +1517,20 @@ mod tests {
         assert!(assess_registration_with(&registration, &calm)
             .plausibility
             .is_empty());
+        // Case does not matter; an unknown class only warns.
+        registration.previous_label_class = Some("e".into());
+        let result = assess_registration_with(&registration, &context);
+        assert!(result
+            .plausibility
+            .iter()
+            .any(|item| item.code == "plausibility_label_class_jump"));
         registration.previous_label_class = Some("Z".into());
-        assert!(codes(&registration).contains(&"previous_label_class_invalid"));
+        let result = assess_registration(&registration);
+        assert!(result.ready_for_registration, "{:?}", result.issues);
+        assert!(result
+            .plausibility
+            .iter()
+            .any(|item| item.code == "previous_label_class_invalid"));
     }
 
     fn evidence(id: &str) -> EvidenceItem {
