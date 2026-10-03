@@ -69,12 +69,14 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
       layers,
       rcValue: ntaResult?.rc ?? Math.round(rcValue * 100) / 100,
       uValue: ntaResult?.u ?? Math.round(uValue * 1000) / 1000,
+      // Only stored when it differs from the R_se = 0,04 the kernel assumes (C.10).
+      exteriorSurfaceResistance: ntaResult && Math.abs(ntaResult.rse - 0.04) > 1e-9 ? ntaResult.rse : undefined,
     };
 
     if (existing) {
       dispatch({
         type: 'UPDATE_CONSTRUCTION',
-        payload: { id: existing.id, data: { name, layers, rcValue: construction.rcValue, uValue: construction.uValue } },
+        payload: { id: existing.id, data: { name, layers, rcValue: construction.rcValue, uValue: construction.uValue, exteriorSurfaceResistance: construction.exteriorSurfaceResistance } },
       });
     } else {
       dispatch({ type: 'ADD_CONSTRUCTION', payload: construction });

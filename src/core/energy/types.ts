@@ -48,6 +48,12 @@ export interface IConstruction {
   layers: IConstructionLayer[];
   rcValue: number;        // m²·K/W  (computed or manual)
   uValue: number;         // W/(m²·K)
+  /**
+   * Exterior resistance contained in uValue, m²·K/W (NTA 8800 table C.2 /
+   * C.3.3). Absent means R_se = 0,04. Towards an unheated space the kernel
+   * replaces it by the space-side R_si (8.4.2.1).
+   */
+  exteriorSurfaceResistance?: number;
 }
 
 // ------------------------------------------------------------

@@ -2,6 +2,26 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — R_se en R_si bij grenzen met een onverwarmde ruimte (8.4.2.1)
+
+Volgens 8.4.2.1 (p. 266) wordt bij een grens met een onverwarmde ruimte R_se vervangen door de R_si van tabel C.2 (p. 778). Een projectconstructie draagt R_se = 0,04 (C.10, p. 777). Deze release regelt de gevallen waarin dat niet zo is.
+
+### Projecten die nu `invalid` worden
+
+- **Horizontaal `internal` vlak naar een onverwarmde ruimte.** De warmtestroomrichting en daarmee R_si (0,10 omhoog, 0,17 omlaag) is niet bekend. Dit geeft nu `unheated_surface_direction_required`; kies het type vloer of dak. Een niet-horizontaal `internal` vlak telt als wand (R_si 0,13, tabel C.2 opmerking 3).
+- **Ongeldige `exteriorSurfaceResistance`.** Een negatieve waarde, of een waarde van ten minste 1/U, geeft `construction_exterior_resistance_invalid`.
+
+### Uitkomsten die veranderen
+
+- **Constructie zonder buitenlucht** (tabel C.2 opmerking 1). Wordt de kernberekening van een constructie toegepast terwijl "Buitenvlak in contact met lucht" uit staat, dan bewaart het project `exteriorSurfaceResistance: 0`. Naar een onverwarmde ruimte trekt de kern dan geen 0,04 meer af, maar telt hij alleen R_si op. Hetzelfde geldt voor de stilstaande-luchtwaarde achter een sterk geventileerde spouw (C.3.3). Bestaande constructies zonder dit veld blijven op 0,04.
+- **VABI-import.** Een geïmporteerde constructie krijgt de R_si van haar elementtype: wand 0,13, dak 0,10, vloer 0,17. Dat was altijd 0,17. Een naam die op een wand en op een dak voorkomt, geeft nu twee constructies.
+- **Eenvoudige U-berekening voor `internal`.** Die gebruikt nu R_se 0,04 in plaats van een tweede R_si van 0,13. Zo gaat de 8.4.2.1-correctie in de kern niet dubbel.
+
+### Overig
+
+- **Het label van het vinkje is aangepast.** "Grenst aan buitenlucht" heet nu "Buitenvlak in contact met lucht". Het hoort ook aan te staan bij een grens met een onverwarmde ruimte.
+- **`towardsUnheatedSpace` in het forfaitaire envelopmodel geldt alleen voor de basisopname.** Een U-waarde uit die route hoort niet in een projectconstructie thuis.
+
 ## 5 oktober 2026 — hoofdstuk 8 na de herberekening
 
 ### Projecten die nu `incomplete` worden

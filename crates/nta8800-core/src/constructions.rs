@@ -860,6 +860,12 @@ pub struct OpaqueResult {
     pub r_c: f64,
     pub r_c_rounded: f64,
     pub r_equivalent: Option<f64>,
+    /// Exterior resistance contained in R_T: R_se of table C.2 (or 0,05 of
+    /// table C.4), 0 without exterior air (table C.2 note 1, p. 778), or
+    /// the still-air value of C.3.3 behind a strongly ventilated cavity.
+    /// A project U-value carries this value; 8.4.2.1 (p. 266) replaces it
+    /// by R_si towards an unheated space.
+    pub exterior_surface_resistance: f64,
 }
 
 impl OpaqueConstruction {
@@ -1235,6 +1241,17 @@ impl OpaqueConstruction {
         let delta_u = if total > 0.03 * u_t { total } else { 0.0 };
         let u_c = u_t / F_PRAC_OPAQUE + delta_u;
         let r_se = self.r_se();
+        let first_layers = match &self.build {
+            Build::Homogeneous { layers } => layers.as_slice(),
+            Build::Composite { sections, .. } => sections[0].layers.as_slice(),
+        };
+        let exterior_surface_resistance = match strong_cavity_index(first_layers) {
+            Some(index) => still_air_exterior_resistance(
+                self.heat_flow,
+                first_layers[index].effective_reflective(),
+            ),
+            None => r_se,
+        };
         // C.2 with β = R_T·ΔU (C.8).
         let r_c = r_t / (1.0 + r_t * delta_u) - self.heat_flow.r_si() - r_se;
         let r_equivalent = self
@@ -1255,6 +1272,7 @@ impl OpaqueConstruction {
             r_c,
             r_c_rounded: round_half_up(r_c, 2),
             r_equivalent,
+            exterior_surface_resistance,
         }
     }
 }
@@ -1448,6 +1466,15 @@ mod tests {
     }
 
     #[test]
+    fn exterior_surface_resistance_follows_table_c2_note_1() {
+        let wall = cavity_wall();
+        assert_eq!(wall.calculate().exterior_surface_resistance, R_SE);
+        let mut buried = cavity_wall();
+        buried.exterior_air = false;
+        assert_eq!(buried.calculate().exterior_surface_resistance, 0.0);
+    }
+
+    #[test]
     fn homogeneous_wall_follows_c3_and_8_4() {
         let wall = cavity_wall();
         assert!(wall.validate("e").is_empty());
@@ -1584,6 +1611,8 @@ mod tests {
         let lower = 0.10 + 0.10 + skin + 0.15 / lambda;
         assert!((r.r_t_upper.unwrap() - upper).abs() < 1e-12);
         assert!((r.r_t_lower.unwrap() - lower).abs() < 1e-12);
+        // The still-air value stands in for R_se in the project U-value.
+        assert_eq!(r.exterior_surface_resistance, 0.10);
 
         // The cavity must sit at the same position in every section.
         let mut mixed = roof.clone();

@@ -448,6 +448,21 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
                 "Construction IDs must be nonempty and unique",
             ));
         }
+        if let Some(raw) = construction.get("exteriorSurfaceResistance") {
+            let u_value = construction.get("uValue").and_then(Value::as_f64);
+            if !raw.as_f64().is_some_and(|r_se| {
+                r_se.is_finite()
+                    && r_se >= 0.0
+                    && u_value.map_or(true, |u| u <= 0.0 || u.is_nan() || r_se < 1.0 / u)
+            }) {
+                issues.push(issue(
+                    Severity::Error,
+                    "construction_exterior_resistance_invalid",
+                    format!("{path}.exteriorSurfaceResistance"),
+                    "Exterior resistance must be nonnegative and below 1/U (table C.2)",
+                ));
+            }
+        }
         for (field, require_positive) in [("rcValue", false), ("uValue", true)] {
             match construction.get(field) {
                 Some(raw)
@@ -1442,6 +1457,16 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
         ] {
             for (index, record) in records.unwrap_or(&[]).iter().enumerate() {
                 if record.get("thermalBoundary").and_then(Value::as_str) == Some("unheated_space") {
+                    if collection == "surfaces"
+                        && unheated_side_surface_resistance(record).is_none()
+                    {
+                        issues.push(issue(
+                            Severity::Error,
+                            "unheated_surface_direction_required",
+                            format!("zones[{zone_index}].{collection}[{index}].type"),
+                            "Give wall, floor or roof for a horizontal surface towards an unheated space (8.4.2.1, table C.2)",
+                        ));
+                    }
                     let id = record
                         .get("unheatedSpaceId")
                         .and_then(Value::as_str)
@@ -1739,15 +1764,30 @@ fn bridge_sides(bridge: &Value) -> Option<Vec<direct_transmission::EnvelopeSide>
         .collect()
 }
 
-/// Table C.2 R_si on the unheated side of a separation (8.4.2.1): heat
-/// flows up through a ceiling or roof (0,10), down through a floor (0,17)
-/// and horizontally through a wall or a surface without a type (0,13).
-pub(crate) fn unheated_side_surface_resistance(surface_type: &str) -> f64 {
-    match surface_type {
-        "roof" | "ceiling" => 0.10,
-        "floor" => 0.17,
-        _ => 0.13,
+/// Table C.2 R_si (p. 778) on the unheated side of a separation (8.4.2.1,
+/// p. 266): heat flows up through a roof or ceiling (0,10), down through a
+/// floor (0,17) and horizontally through a wall (0,13). An `internal`
+/// surface is a wall when its orientation is not horizontal; a horizontal
+/// one has no known direction (`None`), which validation reports as
+/// `unheated_surface_direction_required`.
+pub(crate) fn unheated_side_surface_resistance(surface: &Value) -> Option<f64> {
+    let horizontal = surface.get("orientation").and_then(Value::as_str) == Some("horizontal");
+    match surface.get("type").and_then(Value::as_str).unwrap_or("") {
+        "roof" => Some(0.10),
+        "floor" => Some(0.17),
+        "wall" => Some(0.13),
+        _ if horizontal => None,
+        _ => Some(0.13),
     }
+}
+
+/// Exterior resistance contained in a project construction's `uValue`
+/// (`exteriorSurfaceResistance`, default R_se = 0,04 of C.10, p. 777).
+pub(crate) fn construction_exterior_resistance(construction: &Value) -> f64 {
+    construction
+        .get("exteriorSurfaceResistance")
+        .and_then(Value::as_f64)
+        .unwrap_or(constructions::R_SE)
 }
 
 pub(crate) fn direct_boundary_input(
@@ -1792,13 +1832,14 @@ pub(crate) fn direct_boundary_input_zone(
             // 8.4.2.1 (p. 266): H_D;zi,j;ztu follows 8.2.1 with R_se replaced
             // by the R_si of table C.2 that applies on the unheated side.
             // Project U-values carry R_se = 0,04 (C.1.2 with table C.2).
-            let unheated_side = (target == ThermalBoundary::UnheatedSpace).then(|| {
-                unheated_side_surface_resistance(
-                    surface.get("type").and_then(Value::as_str).unwrap_or(""),
-                )
-            });
-            let boundary_u = |u_value: f64| match unheated_side {
-                Some(r_si) => 1.0 / (1.0 / u_value - constructions::R_SE + r_si),
+            let unheated_side = if target == ThermalBoundary::UnheatedSpace {
+                Some(unheated_side_surface_resistance(surface)?)
+            } else {
+                None
+            };
+            // Windows carry R_se = 0,04; a construction may declare its own.
+            let boundary_u = |u_value: f64, r_se: f64| match unheated_side {
+                Some(r_si) => 1.0 / (1.0 / u_value - r_se + r_si),
                 None => u_value,
             };
             let note = if unheated_side.is_some() {
@@ -1818,7 +1859,7 @@ pub(crate) fn direct_boundary_input_zone(
                 elements.push(DirectElement {
                     id: format!("window:{window_id}"),
                     area_m2: area,
-                    u_value_w_per_m2k: boundary_u(u_value),
+                    u_value_w_per_m2k: boundary_u(u_value, constructions::R_SE),
                     source_reference: format!("project:window:{window_id}.uValue{note}"),
                 });
             }
@@ -1836,7 +1877,10 @@ pub(crate) fn direct_boundary_input_zone(
                 elements.push(DirectElement {
                     id: format!("surface:{surface_id}:opaque"),
                     area_m2: opaque_area,
-                    u_value_w_per_m2k: boundary_u(u_value),
+                    u_value_w_per_m2k: boundary_u(
+                        u_value,
+                        construction_exterior_resistance(construction),
+                    ),
                     source_reference: format!(
                         "project:construction:{construction_id}.uValue{note}"
                     ),
@@ -2370,9 +2414,79 @@ mod tests {
         assert!((assessed.spaces[0].reduction_factor - 30.0 / (30.0 + h_iu + other)).abs() < 1e-12);
 
         // A floor above the space uses R_si 0,17 and a ceiling below it 0,10.
-        assert_eq!(unheated_side_surface_resistance("floor"), 0.17);
-        assert_eq!(unheated_side_surface_resistance("roof"), 0.10);
-        assert_eq!(unheated_side_surface_resistance("wall"), 0.13);
+        let side = |surface: Value| unheated_side_surface_resistance(&surface);
+        assert_eq!(side(json!({"type":"floor"})), Some(0.17));
+        assert_eq!(side(json!({"type":"roof"})), Some(0.10));
+        assert_eq!(
+            side(json!({"type":"wall", "orientation":"horizontal"})),
+            Some(0.13)
+        );
+        // An internal surface is a wall unless it is horizontal (table C.2
+        // note 3); a horizontal one needs a type.
+        assert_eq!(
+            side(json!({"type":"internal", "orientation":"N"})),
+            Some(0.13)
+        );
+        assert_eq!(
+            side(json!({"type":"internal", "orientation":"horizontal"})),
+            None
+        );
+    }
+
+    #[test]
+    fn unheated_boundary_swaps_the_declared_exterior_resistance() {
+        let mut value = sample();
+        // A construction calculated without exterior air (table C.2 note 1)
+        // carries no R_se, so 8.4.2.1 only adds R_si.
+        value["constructions"] = json!([{
+            "id":"c1", "rcValue":2.33, "uValue":0.4, "layers":[],
+            "exteriorSurfaceResistance": 0.0
+        }]);
+        value["zones"][0]["surfaces"] = json!([{
+            "id":"wall", "type":"wall", "orientation":"N", "area":10.0,
+            "constructionId":"c1", "zoneId":"z1",
+            "thermalBoundary":"unheated_space", "unheatedSpaceId":"garage", "windows":[]
+        }]);
+        value["zones"][0]["thermalBridges"] = json!([]);
+        value["zones"][0]["pointThermalBridges"] = json!([]);
+        value["zones"][0]["pointBridgeInventoryComplete"] = json!(true);
+        value["unheatedSpaces"] = json!([{"id":"garage", "name":"Garage", "reductionFactor": 0.5,
+            "factorSourceReference": "survey"}]);
+        let project: ProjectInput = serde_json::from_value(value.clone()).unwrap();
+        let input = direct_boundary_input(&project, ThermalBoundary::UnheatedSpace, Some("garage"))
+            .unwrap();
+        let expected = 1.0 / (1.0 / 0.4 + 0.13);
+        assert!((input.elements[0].u_value_w_per_m2k - expected).abs() < 1e-12);
+
+        // Without the field the U carries R_se 0,04 (C.10).
+        value["constructions"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("exteriorSurfaceResistance");
+        let project: ProjectInput = serde_json::from_value(value.clone()).unwrap();
+        let input = direct_boundary_input(&project, ThermalBoundary::UnheatedSpace, Some("garage"))
+            .unwrap();
+        let expected = 1.0 / (1.0 / 0.4 - 0.04 + 0.13);
+        assert!((input.elements[0].u_value_w_per_m2k - expected).abs() < 1e-12);
+
+        // A resistance at or above 1/U is rejected.
+        value["constructions"][0]["exteriorSurfaceResistance"] = json!(2.5);
+        let invalid = assess_json(value.clone()).unwrap();
+        assert!(invalid
+            .issues
+            .iter()
+            .any(|issue| issue.code == "construction_exterior_resistance_invalid"));
+
+        // A horizontal internal surface needs a direction.
+        value["constructions"][0]["exteriorSurfaceResistance"] = json!(0.04);
+        value["zones"][0]["surfaces"][0]["type"] = json!("internal");
+        value["zones"][0]["surfaces"][0]["orientation"] = json!("horizontal");
+        let invalid = assess_json(value).unwrap();
+        assert!(invalid
+            .issues
+            .iter()
+            .any(|issue| issue.code == "unheated_surface_direction_required"
+                && issue.path == "zones[0].surfaces[0].type"));
     }
 
     #[test]
