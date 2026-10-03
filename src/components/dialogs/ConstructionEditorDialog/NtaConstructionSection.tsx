@@ -11,6 +11,8 @@ export interface NtaConstructionResult {
   rc: number | null;
   u: number;
   route: string;
+  /** Exterior resistance contained in U (table C.2 / C.3.3); 8.4.2.1 swaps it for R_si. */
+  rse: number;
 }
 
 const cell = { padding: '2px 4px' } as const;
@@ -159,7 +161,7 @@ export function NtaConstructionSection({ layers, onApply }: {
       {element && <>
         <span role="status">{t('nta.construction.result')}: U = {element.uRounded.toFixed(2)} W/m²K
           {element.rCRounded != null && <> · R<sub>c</sub> = {element.rCRounded.toFixed(2)} m²K/W</>}</span>
-        <button type="button" className="btn btn-sm" onClick={() => onApply({ rc: element.rCRounded, u: element.uRounded, route: element.route })}>
+        <button type="button" className="btn btn-sm" onClick={() => onApply({ rc: element.rCRounded, u: element.uRounded, route: element.route, rse: element.opaque?.exteriorSurfaceResistance ?? 0.04 })}>
           {t('nta.construction.apply')}</button>
       </>}
     </div>

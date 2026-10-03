@@ -219,7 +219,12 @@ pub struct ForfaitOpaque {
     #[serde(default)]
     pub r_si_override: Option<f64>,
     /// Bordering an unheated space: R_se becomes the space-side R_si of
-    /// table C.2 for the same heat-flow direction (8.4.2.1).
+    /// table C.2 for the same heat-flow direction (8.4.2.1, p. 266).
+    ///
+    /// Only for the basisopname route that feeds H_U directly
+    /// (`transmission.unheated`). A project construction `uValue` must
+    /// carry R_se = 0,04 (C.10, p. 777): the project route applies the
+    /// 8.4.2.1 swap itself, so a U from this flag would be corrected twice.
     #[serde(default)]
     pub towards_unheated_space: bool,
     /// Post-insulation at a renovation or in an extension, thickness not
