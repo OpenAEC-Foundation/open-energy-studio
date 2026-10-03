@@ -1,5 +1,7 @@
-//! Consultation chapter 9: table 9.1, equations 9.2/9.3 and 9.56/9.60,
-//! and table 9.23. The upstream node input and installed powers are supplied.
+//! NTA 8800:2025+C1:2026 chapter 9: table 9.1, equations 9.2/9.3 and
+//! 9.56/9.60, and table 9.23 (p. 289–290, 323–324), first taken from the
+//! consultation draft and checked against the final edition. The upstream
+//! node input and installed powers are supplied.
 
 use crate::final_energy_draft::MonthlyEnergy;
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -7,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 
-const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, tabel 9.1 en formules 9.2/9.3 (p. 289–290), formules 9.56/9.60 en tabel 9.23 (p. 323–324)";
 const WINTER: [f64; 11] = [
     0.0, 0.20, 0.40, 0.59, 0.75, 0.87, 0.95, 0.98, 0.99, 1.0, 1.0,
 ];

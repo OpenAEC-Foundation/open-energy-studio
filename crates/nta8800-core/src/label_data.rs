@@ -307,9 +307,11 @@ pub fn general_data(
             .and_then(|value| value.get("constructionYear"))
             .and_then(Value::as_u64)
             .and_then(|year| u32::try_from(year).ok()),
+        // Praktijkhandboek v2 p. 70: A_g is given to two decimals.
         usable_floor_area_m2: derived
             .map(|input| input.total_usable_floor_area_m2)
-            .or((zone_area > 0.0).then_some(zone_area)),
+            .or((zone_area > 0.0).then_some(zone_area))
+            .map(|area| (area * 100.0).round() / 100.0),
         dwelling_type: if residential {
             text("buildingType").or_else(|| {
                 derived

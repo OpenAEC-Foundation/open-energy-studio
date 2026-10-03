@@ -3,7 +3,9 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { BuildingFunction } from '../../../core/energy/types';
 import type { NtaDetailSurveyTriggers, NtaRegistration } from '../../../core/nta/KernelClient';
-import { cleanRegistration } from '../../../core/nta/Registration';
+import {
+  bagConflicts, cleanRegistration, readBagLedger, recordBagRegistration, softwareIdentity,
+} from '../../../core/nta/Registration';
 import { DialogShell } from '../DialogShell';
 import { EvidenceRegister } from './EvidenceRegister';
 
@@ -18,14 +20,15 @@ const buildingFunctions: BuildingFunction[] = [
 
 type TextKey = 'referenceObjectId' | 'bagObjectId' | 'postcode' | 'houseNumber' | 'houseNumberAddition'
   | 'buildingType' | 'client' | 'certificateNumber' | 'surveyDate' | 'registrationDate'
-  | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate' | 'improvementDate';
+  | 'originalKernelVersion' | 'epOnlineNumber' | 'completionDate' | 'improvementDate'
+  | 'replacedEpOnlineNumber' | 'previousLabelClass';
 
 const textFields: Array<{ key: TextKey; type?: 'date' }> = [
   { key: 'bagObjectId' }, { key: 'postcode' }, { key: 'houseNumber' }, { key: 'houseNumberAddition' },
   { key: 'buildingType' }, { key: 'client' }, { key: 'certificateNumber' },
   { key: 'surveyDate', type: 'date' }, { key: 'registrationDate', type: 'date' }, { key: 'completionDate', type: 'date' },
   { key: 'referenceObjectId' }, { key: 'originalKernelVersion' }, { key: 'improvementDate', type: 'date' },
-  { key: 'epOnlineNumber' },
+  { key: 'epOnlineNumber' }, { key: 'replacedEpOnlineNumber' }, { key: 'previousLabelClass' },
 ];
 
 /** BRL 9500 §3.1 situations that require a detailed survey. */
@@ -49,7 +52,21 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
   const advisor = (key: 'surveyingAdvisor' | 'registeringAdvisor') =>
     registration[key] ?? { name: '', competenceNumber: '' };
 
+  const messageType = registration.messageType ?? (registration.relabel ? 'relabel' : 'regular');
+  const ledgerEntry = {
+    bagObjectId: registration.bagObjectId ?? '',
+    projectId: project.id,
+    projectName: name,
+    residential: buildingFunction === 'residential',
+    messageType,
+    epOnlineNumber: registration.epOnlineNumber,
+    registrationDate: registration.registrationDate,
+  };
+  const conflicts = bagConflicts(ledgerEntry, readBagLedger());
+  const software = softwareIdentity();
+
   const handleSave = () => {
+    if (ledgerEntry.bagObjectId.trim()) recordBagRegistration(ledgerEntry);
     dispatch({
       type: 'UPDATE_PROJECT_INFO',
       payload: { name, description, buildingFunction, address, city, registration: cleanRegistration(registration) },
@@ -173,11 +190,37 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
             onChange={(e) => update({ serialProject: e.target.checked })} />
           {t('reg.serialProject')}
         </label>
-        <label className="dialog-check">
-          <input type="checkbox" checked={registration.relabel ?? false}
-            onChange={(e) => update({ relabel: e.target.checked })} />
-          {t('reg.relabel')}
-        </label>
+        <div className="dialog-field">
+          <label htmlFor="reg-message-type">{t('reg.messageType')}</label>
+          <select id="reg-message-type" value={messageType}
+            onChange={(e) => update({ messageType: e.target.value as NonNullable<NtaRegistration['messageType']>, relabel: undefined })}>
+            <option value="regular">{t('reg.messageType.regular')}</option>
+            <option value="relabel">{t('reg.messageType.relabel')}</option>
+            <option value="replacement">{t('reg.messageType.replacement')}</option>
+          </select>
+        </div>
+        {conflicts.length > 0 && (
+          <p className="dialog-hint" role="alert">
+            {t('reg.bagConflict')} {conflicts.map((item) => item.projectName || item.projectId).join(', ')}
+          </p>
+        )}
+
+        <h3 className="dialog-section-title">{t('reg.wlcGwp')}</h3>
+        <p className="dialog-hint">{t('reg.wlcGwpHint')}</p>
+        <div className="dialog-field">
+          <label htmlFor="reg-wlc-value">{t('reg.wlcGwp.value')}</label>
+          <input id="reg-wlc-value" type="number" step="any" value={registration.wlcGwp?.valueKgCo2EqPerM2Year ?? ''}
+            onChange={(e) => update({ wlcGwp: { ...registration.wlcGwp, valueKgCo2EqPerM2Year: e.target.value ? Number(e.target.value) : undefined } })} />
+        </div>
+        <div className="dialog-field">
+          <label htmlFor="reg-wlc-reference">{t('reg.wlcGwp.reference')}</label>
+          <input id="reg-wlc-reference" type="text" value={registration.wlcGwp?.reportReference ?? ''}
+            onChange={(e) => update({ wlcGwp: { ...registration.wlcGwp, reportReference: e.target.value || undefined } })} />
+        </div>
+        <p className="dialog-hint" data-testid="reg-software">
+          {t('reg.software')}: {software.name} {software.version} — {software.attestNumber
+            ? `${t('reg.software.attest')} ${software.attestNumber}` : t('reg.software.unattested')}
+        </p>
 
         <h3 className="dialog-section-title">{t('reg.detailSurveyTriggers')}</h3>
         <p className="dialog-hint">{t('reg.detailSurveyTriggersHint')}</p>

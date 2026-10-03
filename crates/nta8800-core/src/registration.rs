@@ -13,9 +13,23 @@
 //! 9500-U §3.1 p. 11) and Bijlage 3 (project dossier with evidence,
 //! p. 61–63). BRL 9500-U mirrors these clauses.
 //!
+//! Added on 3 October 2026:
+//! - the attested software of the registration (Regeling art. 5 lid b,
+//!   p. 6; Regeling art. 2/3 require a BRL 9501-attested program, p. 4–5);
+//! - the separate relabel message type and the replacement of an incorrect
+//!   label within 24 months (BRL 9500-W §4.2.5 opmerking 4 and 5, p. 24–25);
+//! - the WLC-GWP result for new buildings over 1000 m² checked against the
+//!   Bbl from 1-1-2028 (BRL 9500-W p. 18, 21 and 62);
+//! - the BAG addressable object as the lowest registration level
+//!   (Praktijkhandboek v2 p. 46) and A_g to two decimals (p. 70);
+//! - plausibility warnings modelled on the dossier selection of BRL
+//!   9500-W §7.2.2 (p. 42). Their thresholds are this program's own choice.
+//!
 //! The kernel checks the data; it does not register anything. EP-Online
 //! registration needs the RVO exchange specification.
 
+use crate::label_class::{class_rank, class_upper_bound, LabelFunction};
+use crate::label_data::{ElementCategory, EnvelopeSummary};
 use crate::KERNEL_VERSION;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -48,6 +62,45 @@ pub enum Representation {
     Unique,
     Reference,
     Similar,
+}
+
+/// Message type of the registration (BRL 9500-W §4.2.5 opmerking 4 and 5,
+/// p. 24–25): a regular registration, the separate relabel message
+/// (improvements within 24 months, §4.2.3) or the replacement of an
+/// incorrect label through EP-Online replacement rights.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageType {
+    Regular,
+    Relabel,
+    Replacement,
+}
+
+/// The program that made the calculation (Regeling art. 5 lid b, p. 6).
+/// The application fills it in; the attest number stays empty until the
+/// program is attested under BRL 9501.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SoftwareIdentity {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub attest_number: Option<String>,
+}
+
+/// Outcome of the WLC-GWP calculation that the EP adviser enters (BRL
+/// 9500-W p. 21). The calculation itself is outside the BRL scope.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WlcGwp {
+    /// kg CO2-eq per m² usable floor area per year.
+    #[serde(default)]
+    pub value_kg_co2_eq_per_m2_year: Option<f64>,
+    /// The WLC-GWP report in the project dossier.
+    #[serde(default)]
+    pub report_reference: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -196,9 +249,27 @@ pub struct Registration {
     /// Serial new build or renovation project: six months (§4.2.5).
     #[serde(default)]
     pub serial_project: bool,
-    /// Relabel message type (§4.2.3/4.2.4).
+    /// Relabel message type (§4.2.3/4.2.4). Kept for saved projects;
+    /// `messageType` supersedes it.
     #[serde(default)]
     pub relabel: bool,
+    /// Message type; without it `relabel` decides between regular and
+    /// relabel.
+    #[serde(default)]
+    pub message_type: Option<MessageType>,
+    /// Replacement: EP-Online number of the label that is replaced.
+    #[serde(default)]
+    pub replaced_ep_online_number: Option<String>,
+    /// The program that made the calculation (Regeling art. 5 lid b).
+    #[serde(default)]
+    pub software: Option<SoftwareIdentity>,
+    /// WLC-GWP result (BRL 9500-W p. 18, 21, 62).
+    #[serde(default)]
+    pub wlc_gwp: Option<WlcGwp>,
+    /// Class of the label that was registered before, for the plausibility
+    /// check on large class jumps.
+    #[serde(default)]
+    pub previous_label_class: Option<String>,
     /// Relabel: date of the improvement, YYYY-MM-DD, from the quote with
     /// order or the specified invoice (§4.2.3, p. 23); it must lie within
     /// 24 months of the original survey date.
@@ -225,7 +296,8 @@ pub struct RegistrationIssue {
     pub code: &'static str,
     pub path: String,
     /// `error`: registration not allowed as entered; `missing`: data still
-    /// needed before registration.
+    /// needed before registration; `warning`: plausibility finding that
+    /// does not block registration.
     pub severity: &'static str,
 }
 
@@ -233,15 +305,59 @@ pub struct RegistrationIssue {
 #[serde(rename_all = "camelCase")]
 pub struct RegistrationAssessment {
     pub source: &'static str,
+    /// Effective message type (`messageType`, else `relabel`).
+    pub message_type: MessageType,
     /// Survey date + 10 years (Bep art. 2.1 lid 7).
     pub valid_until: Option<String>,
-    /// Last allowed registration date (§4.2.5); `None` for a relabel.
+    /// Last allowed registration date (§4.2.5); `None` for a relabel or a
+    /// replacement.
     pub registration_deadline: Option<String>,
     /// Last date for a relabel (§4.2.3).
     pub relabel_deadline: Option<String>,
+    /// Last date for a replacement (§4.2.5 opmerking 5).
+    pub replacement_deadline: Option<String>,
+    /// Whether the WLC-GWP result is required (new building > 1000 m²,
+    /// toets Bbl or delivery from 1-1-2028); `None` when undecidable.
+    pub wlc_gwp_required: Option<bool>,
     pub ready_for_registration: bool,
     pub issues: Vec<RegistrationIssue>,
+    /// Plausibility findings (severity `warning`); they never block
+    /// registration.
+    pub plausibility: Vec<RegistrationIssue>,
 }
+
+/// Calculation results the registration checks need; filled by the
+/// project route. Every field is optional so the block can be checked on
+/// its own.
+#[derive(Debug, Clone, Default)]
+pub struct RegistrationContext {
+    /// A_g of the calculation, m².
+    pub usable_floor_area_m2: Option<f64>,
+    /// A_g per zone as entered, to check the two-decimal measuring rule.
+    pub zone_floor_areas_m2: Vec<f64>,
+    /// A_ls/A_g.
+    pub loss_area_ratio: Option<f64>,
+    pub residential: bool,
+    /// Label function when the building has one (borderline check).
+    pub label_function: Option<LabelFunction>,
+    /// EP2 rounded to 0,01 kWh/m²·yr.
+    pub primary_fossil_kwh_per_m2: Option<f64>,
+    pub label_class: Option<&'static str>,
+    pub envelope: Vec<EnvelopeSummary>,
+}
+
+/// Name of this program in the registration (Regeling art. 5 lid b).
+pub const SOFTWARE_NAME: &str = "Open Energy Studio";
+
+/// First day on which the WLC-GWP result is required (BRL 9500-W p. 18).
+const WLC_GWP_FROM: Date = Date {
+    year: 2028,
+    month: 1,
+    day: 1,
+};
+
+/// Usable floor area above which the WLC-GWP result is required, m².
+const WLC_GWP_AREA_M2: f64 = 1000.0;
 
 /// Calendar date without time zone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -335,8 +451,232 @@ fn check_advisor(advisor: &Option<Advisor>, path: &str, issues: &mut Vec<Registr
     }
 }
 
+impl Registration {
+    /// `messageType`, else `relabel` (saved projects).
+    pub fn effective_message_type(&self) -> MessageType {
+        self.message_type.unwrap_or(if self.relabel {
+            MessageType::Relabel
+        } else {
+            MessageType::Regular
+        })
+    }
+}
+
+/// BAG ids are 16 digits; digits 5–6 give the object type. Praktijkhandboek
+/// v2 p. 46: a residential label is registered on an addressable object,
+/// a verblijfsobject (01), ligplaats (02) or standplaats (03).
+fn check_bag_object_id(id: &str, issues: &mut Vec<RegistrationIssue>) {
+    let id = id.trim();
+    if id.len() != 16 || !id.chars().all(|c| c.is_ascii_digit()) {
+        issues.push(issue("bag_object_id_invalid", "bagObjectId", "error"));
+    } else if !matches!(&id[4..6], "01" | "02" | "03") {
+        issues.push(issue(
+            "bag_object_id_not_addressable",
+            "bagObjectId",
+            "error",
+        ));
+    }
+}
+
+fn check_software(software: &Option<SoftwareIdentity>, issues: &mut Vec<RegistrationIssue>) {
+    match software {
+        None => issues.push(issue("software_required", "software", "missing")),
+        Some(software) => {
+            if software.name.trim().is_empty() || software.version.trim().is_empty() {
+                issues.push(issue("software_required", "software", "missing"));
+            }
+            // Regeling art. 2/3 (p. 4–5): only a BRL 9501-attested program.
+            if blank(&software.attest_number) {
+                issues.push(issue(
+                    "software_attest_number_missing",
+                    "software.attestNumber",
+                    "missing",
+                ));
+            }
+        }
+    }
+}
+
+/// BRL 9500-W p. 18, 21 and 62: from 1-1-2028 a new building over
+/// 1000 m² checked against the Bbl (and its later delivery) needs a
+/// WLC-GWP calculation, whose result the adviser enters.
+fn check_wlc_gwp(
+    registration: &Registration,
+    context: &RegistrationContext,
+    issues: &mut Vec<RegistrationIssue>,
+) -> Option<bool> {
+    if let Some(wlc) = &registration.wlc_gwp {
+        if wlc
+            .value_kg_co2_eq_per_m2_year
+            .is_some_and(|value| !value.is_finite() || value <= 0.0)
+        {
+            issues.push(issue(
+                "wlc_gwp_invalid",
+                "wlcGwp.valueKgCo2EqPerM2Year",
+                "error",
+            ));
+        }
+    }
+    let new_building = matches!(
+        registration.purpose,
+        Some(RegistrationPurpose::BblCheck | RegistrationPurpose::Delivery)
+    );
+    if !new_building {
+        return Some(false);
+    }
+    let date = registration
+        .registration_date
+        .as_deref()
+        .or(registration.survey_date.as_deref())
+        .and_then(Date::parse)?;
+    if date < WLC_GWP_FROM {
+        return Some(false);
+    }
+    let area = context.usable_floor_area_m2?;
+    if area <= WLC_GWP_AREA_M2 {
+        return Some(false);
+    }
+    let wlc = registration.wlc_gwp.clone().unwrap_or_default();
+    if wlc.value_kg_co2_eq_per_m2_year.is_none() {
+        issues.push(issue(
+            "wlc_gwp_required",
+            "wlcGwp.valueKgCo2EqPerM2Year",
+            "missing",
+        ));
+    }
+    if blank(&wlc.report_reference) {
+        issues.push(issue(
+            "wlc_gwp_reference_required",
+            "wlcGwp.reportReference",
+            "missing",
+        ));
+    }
+    Some(true)
+}
+
+fn warning(code: &'static str, path: &str) -> RegistrationIssue {
+    RegistrationIssue {
+        code,
+        path: path.to_owned(),
+        severity: "warning",
+    }
+}
+
+/// Plausibility warnings after BRL 9500-W §7.2.2 (p. 42): the certification
+/// body selects dossiers on A+ labels made with the basic survey, on
+/// borderline labels and on impossible or unrealistic values. The
+/// thresholds below are this program's own; they never block registration.
+pub fn plausibility_warnings(
+    registration: &Registration,
+    context: &RegistrationContext,
+) -> Vec<RegistrationIssue> {
+    let mut found = Vec::new();
+    let a_plus = class_rank("A+").unwrap_or(usize::MAX);
+    if let Some(class) = context.label_class {
+        if registration.survey_type == Some(SurveyType::Basic)
+            && class_rank(class).is_some_and(|rank| rank <= a_plus)
+        {
+            found.push(warning(
+                "plausibility_high_class_basic_survey",
+                "registration.surveyType",
+            ));
+        }
+        if let (Some(function), Some(ep2)) =
+            (context.label_function, context.primary_fossil_kwh_per_m2)
+        {
+            if let Some(bound) = class_upper_bound(function, class) {
+                let margin = (0.01 * bound.abs()).max(1.0);
+                if ep2 <= bound && bound - ep2 < margin {
+                    found.push(warning(
+                        "plausibility_borderline_label",
+                        "performance.primaryFossilIndicatorKwhPerM2Year",
+                    ));
+                }
+            }
+        }
+        if let Some(previous) = registration.previous_label_class.as_deref() {
+            match (class_rank(previous), class_rank(class)) {
+                (Some(before), Some(now)) if before >= now + 3 => found.push(warning(
+                    "plausibility_label_class_jump",
+                    "registration.previousLabelClass",
+                )),
+                _ => {}
+            }
+        }
+    }
+    if let Some(ep2) = context.primary_fossil_kwh_per_m2 {
+        if !(-500.0..=1500.0).contains(&ep2) {
+            found.push(warning(
+                "plausibility_ep2_out_of_range",
+                "performance.primaryFossilIndicatorKwhPerM2Year",
+            ));
+        }
+    }
+    if let Some(ratio) = context.loss_area_ratio {
+        if !(0.2..=5.0).contains(&ratio) {
+            found.push(warning(
+                "plausibility_loss_area_ratio",
+                "geometry.lossAreaRatio",
+            ));
+        }
+    }
+    if let Some(area) = context.usable_floor_area_m2 {
+        let implausible = if context.residential {
+            !(15.0..=1000.0).contains(&area)
+        } else {
+            area < 1.0
+        };
+        if implausible {
+            found.push(warning(
+                "plausibility_usable_floor_area",
+                "geometry.usableFloorAreaM2",
+            ));
+        }
+    }
+    // Praktijkhandboek v2 p. 70: A_g is measured to two decimals.
+    if context
+        .zone_floor_areas_m2
+        .iter()
+        .any(|area| ((area * 100.0).round() - area * 100.0).abs() > 1e-6)
+    {
+        found.push(warning("usable_floor_area_precision", "zones"));
+    }
+    for summary in &context.envelope {
+        let Some(u) = summary.mean_u_w_per_m2k else {
+            continue;
+        };
+        let range = match summary.category {
+            ElementCategory::Glazing => 0.4..=6.0,
+            _ => 0.08..=4.5,
+        };
+        if !range.contains(&u) {
+            found.push(warning(
+                "plausibility_u_value",
+                match summary.category {
+                    ElementCategory::Facade => "labelData.envelope.facade",
+                    ElementCategory::Roof => "labelData.envelope.roof",
+                    ElementCategory::Floor => "labelData.envelope.floor",
+                    ElementCategory::Glazing => "labelData.envelope.glazing",
+                },
+            ));
+        }
+    }
+    found
+}
+
 pub fn assess_registration(registration: &Registration) -> RegistrationAssessment {
+    assess_registration_with(registration, &RegistrationContext::default())
+}
+
+pub fn assess_registration_with(
+    registration: &Registration,
+    context: &RegistrationContext,
+) -> RegistrationAssessment {
     let mut issues = Vec::new();
+    let message_type = registration.effective_message_type();
+    if registration.relabel && message_type != MessageType::Relabel {
+        issues.push(issue("message_type_conflict", "messageType", "error"));
+    }
     if registration.purpose.is_none() {
         issues.push(issue("purpose_required", "purpose", "missing"));
     }
@@ -354,8 +694,9 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
         ),
         _ => {}
     }
-    if blank(&registration.bag_object_id) {
-        issues.push(issue("bag_object_id_required", "bagObjectId", "missing"));
+    match registration.bag_object_id.as_deref() {
+        Some(id) if !id.trim().is_empty() => check_bag_object_id(id, &mut issues),
+        _ => issues.push(issue("bag_object_id_required", "bagObjectId", "missing")),
     }
     if blank(&registration.postcode) {
         issues.push(issue("postcode_required", "postcode", "missing"));
@@ -422,8 +763,29 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
     let valid_until = survey.map(|date| date.add_months(120));
     let mut registration_deadline = None;
     let mut relabel_deadline = None;
+    let mut replacement_deadline = None;
+    if message_type == MessageType::Replacement && blank(&registration.replaced_ep_online_number) {
+        issues.push(issue(
+            "replaced_ep_online_number_required",
+            "replacedEpOnlineNumber",
+            "missing",
+        ));
+    }
     if let Some(survey) = survey {
-        if registration.relabel {
+        if message_type == MessageType::Replacement {
+            // §4.2.5 opmerking 5 (p. 25): an incorrect label is replaced
+            // through EP-Online replacement rights within 24 months of the
+            // original survey; the survey date stays the original one.
+            let deadline = survey.add_months(24);
+            replacement_deadline = Some(deadline);
+            if registered.is_some_and(|date| date > deadline) {
+                issues.push(issue(
+                    "replacement_deadline_exceeded",
+                    "registrationDate",
+                    "error",
+                ));
+            }
+        } else if message_type == MessageType::Relabel {
             // §4.2.3/4.2.4: improvements within 24 months of the original
             // survey, calculated with the original kernel.
             // §4.2.3 (p. 23): the improvement, proven by a quote with
@@ -496,7 +858,7 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
         }
     }
     // §4.2.3 (W p. 23, U p. 18): relabelling only for existing buildings.
-    if registration.relabel
+    if message_type == MessageType::Relabel
         && registration
             .purpose
             .is_some_and(|purpose| purpose != RegistrationPurpose::ExistingBuilding)
@@ -509,14 +871,31 @@ pub fn assess_registration(registration: &Registration) -> RegistrationAssessmen
     }
     check_detail_survey(registration, &mut issues);
     check_evidence(&registration.evidence, &mut issues);
+    check_software(&registration.software, &mut issues);
+    let wlc_gwp_required = check_wlc_gwp(registration, context, &mut issues);
+    if registration
+        .previous_label_class
+        .as_deref()
+        .is_some_and(|class| !class.trim().is_empty() && class_rank(class).is_none())
+    {
+        issues.push(issue(
+            "previous_label_class_invalid",
+            "previousLabelClass",
+            "error",
+        ));
+    }
 
     RegistrationAssessment {
         source: REGISTRATION_SOURCE,
+        message_type,
         valid_until: valid_until.map(|date| date.to_string()),
         registration_deadline: registration_deadline.map(|date| date.to_string()),
         relabel_deadline: relabel_deadline.map(|date| date.to_string()),
+        replacement_deadline: replacement_deadline.map(|date| date.to_string()),
+        wlc_gwp_required,
         ready_for_registration: issues.is_empty(),
         issues,
+        plausibility: plausibility_warnings(registration, context),
     }
 }
 
@@ -710,8 +1089,9 @@ fn referenced_evidence(text: &str) -> impl Iterator<Item = &str> {
 pub fn assess_project_registration(
     registration: &Registration,
     project: &Value,
+    context: &RegistrationContext,
 ) -> RegistrationAssessment {
-    let mut result = assess_registration(registration);
+    let mut result = assess_registration_with(registration, context);
     result
         .issues
         .extend(check_evidence_links(project, registration));
@@ -743,6 +1123,11 @@ mod tests {
             }),
             survey_date: Some("2026-01-31".into()),
             registration_date: Some("2026-04-30".into()),
+            software: Some(SoftwareIdentity {
+                name: SOFTWARE_NAME.into(),
+                version: "0.1.6-alpha".into(),
+                attest_number: Some("TEST-ATTEST".into()),
+            }),
             ..Registration::default()
         }
     }
@@ -833,6 +1218,161 @@ mod tests {
         assert_eq!(codes(&similar), vec!["reference_object_required"]);
     }
 
+    #[test]
+    fn software_bag_and_message_types() {
+        // Regeling art. 5 lid b: the attested program is part of the data.
+        let mut unattested = complete();
+        unattested.software.as_mut().unwrap().attest_number = None;
+        assert_eq!(codes(&unattested), vec!["software_attest_number_missing"]);
+        unattested.software = None;
+        assert_eq!(codes(&unattested), vec!["software_required"]);
+
+        // Praktijkhandboek p. 46: an addressable object, 16 digits.
+        let mut bag = complete();
+        bag.bag_object_id = Some("0363100000000001".into());
+        assert_eq!(codes(&bag), vec!["bag_object_id_not_addressable"]);
+        bag.bag_object_id = Some("0363020000000001".into());
+        assert!(codes(&bag).is_empty());
+        bag.bag_object_id = Some("36301000000001".into());
+        assert_eq!(codes(&bag), vec!["bag_object_id_invalid"]);
+
+        // §4.2.5 opmerking 4/5: relabel and replacement message types.
+        let mut relabel = complete();
+        relabel.message_type = Some(MessageType::Relabel);
+        let result = assess_registration(&relabel);
+        assert_eq!(result.message_type, MessageType::Relabel);
+        assert!(result.relabel_deadline.is_some());
+        let mut conflict = complete();
+        conflict.relabel = true;
+        conflict.message_type = Some(MessageType::Regular);
+        assert!(codes(&conflict).contains(&"message_type_conflict"));
+
+        let mut replacement = complete();
+        replacement.message_type = Some(MessageType::Replacement);
+        replacement.registration_date = Some("2027-06-01".into());
+        let result = assess_registration(&replacement);
+        assert_eq!(result.replacement_deadline.as_deref(), Some("2028-01-31"));
+        assert!(result.registration_deadline.is_none());
+        assert_eq!(
+            codes(&replacement),
+            vec!["replaced_ep_online_number_required"]
+        );
+        replacement.replaced_ep_online_number = Some("EP-123".into());
+        assert!(codes(&replacement).is_empty());
+        replacement.registration_date = Some("2028-02-01".into());
+        assert_eq!(codes(&replacement), vec!["replacement_deadline_exceeded"]);
+    }
+
+    #[test]
+    fn wlc_gwp_from_2028_for_new_buildings_over_1000_m2() {
+        let mut bbl = complete();
+        bbl.purpose = Some(RegistrationPurpose::BblCheck);
+        bbl.survey_type = Some(SurveyType::Detailed);
+        bbl.survey_date = Some("2028-01-10".into());
+        bbl.registration_date = Some("2028-01-10".into());
+        let large = RegistrationContext {
+            usable_floor_area_m2: Some(1200.0),
+            ..RegistrationContext::default()
+        };
+        let result = assess_registration_with(&bbl, &large);
+        assert_eq!(result.wlc_gwp_required, Some(true));
+        let found: Vec<_> = result.issues.iter().map(|item| item.code).collect();
+        assert_eq!(
+            found,
+            vec!["wlc_gwp_required", "wlc_gwp_reference_required"]
+        );
+        bbl.wlc_gwp = Some(WlcGwp {
+            value_kg_co2_eq_per_m2_year: Some(7.5),
+            report_reference: Some("evidence:wlc".into()),
+        });
+        assert!(assess_registration_with(&bbl, &large).issues.is_empty());
+        // Not required before 2028, at 1000 m² or for an existing building.
+        let small = RegistrationContext {
+            usable_floor_area_m2: Some(1000.0),
+            ..RegistrationContext::default()
+        };
+        assert_eq!(
+            assess_registration_with(&bbl, &small).wlc_gwp_required,
+            Some(false)
+        );
+        bbl.wlc_gwp = None;
+        bbl.survey_date = Some("2027-12-31".into());
+        bbl.registration_date = Some("2027-12-31".into());
+        assert_eq!(
+            assess_registration_with(&bbl, &large).wlc_gwp_required,
+            Some(false)
+        );
+        assert_eq!(
+            assess_registration_with(&complete(), &large).wlc_gwp_required,
+            Some(false)
+        );
+        // Undecidable without A_g.
+        bbl.survey_date = Some("2028-03-01".into());
+        bbl.registration_date = Some("2028-03-01".into());
+        assert_eq!(assess_registration(&bbl).wlc_gwp_required, None);
+        bbl.wlc_gwp = Some(WlcGwp {
+            value_kg_co2_eq_per_m2_year: Some(-1.0),
+            report_reference: None,
+        });
+        assert!(codes(&bbl).contains(&"wlc_gwp_invalid"));
+    }
+
+    #[test]
+    fn plausibility_warnings_never_block() {
+        let mut registration = complete();
+        registration.previous_label_class = Some("E".into());
+        let context = RegistrationContext {
+            usable_floor_area_m2: Some(12.0),
+            zone_floor_areas_m2: vec![12.005],
+            loss_area_ratio: Some(6.0),
+            residential: true,
+            label_function: Some(LabelFunction::Residential),
+            primary_fossil_kwh_per_m2: Some(104.5),
+            label_class: Some("A+"),
+            envelope: vec![EnvelopeSummary {
+                category: ElementCategory::Facade,
+                area_m2: 50.0,
+                mean_u_w_per_m2k: Some(0.05),
+                min_rc_m2k_per_w: None,
+                max_rc_m2k_per_w: None,
+            }],
+        };
+        let result = assess_registration_with(&registration, &context);
+        assert!(result.ready_for_registration, "{:?}", result.issues);
+        let found: Vec<_> = result.plausibility.iter().map(|item| item.code).collect();
+        for code in [
+            "plausibility_high_class_basic_survey",
+            "plausibility_borderline_label",
+            "plausibility_label_class_jump",
+            "plausibility_loss_area_ratio",
+            "plausibility_usable_floor_area",
+            "usable_floor_area_precision",
+            "plausibility_u_value",
+        ] {
+            assert!(found.contains(&code), "{code}: {found:?}");
+        }
+        assert!(result
+            .plausibility
+            .iter()
+            .all(|item| item.severity == "warning"));
+        let calm = RegistrationContext {
+            usable_floor_area_m2: Some(96.25),
+            zone_floor_areas_m2: vec![96.25],
+            loss_area_ratio: Some(1.8),
+            residential: true,
+            label_function: Some(LabelFunction::Residential),
+            primary_fossil_kwh_per_m2: Some(150.0),
+            label_class: Some("A"),
+            envelope: Vec::new(),
+        };
+        registration.previous_label_class = Some("B".into());
+        assert!(assess_registration_with(&registration, &calm)
+            .plausibility
+            .is_empty());
+        registration.previous_label_class = Some("Z".into());
+        assert!(codes(&registration).contains(&"previous_label_class_invalid"));
+    }
+
     fn evidence(id: &str) -> EvidenceItem {
         EvidenceItem {
             id: id.into(),
@@ -897,7 +1437,8 @@ mod tests {
             "constructions": [{"evidenceReference": "evidence:ev-9."}],
             "registration": {"note": "evidence:ignored"}
         });
-        let result = assess_project_registration(&registration, &project);
+        let result =
+            assess_project_registration(&registration, &project, &RegistrationContext::default());
         assert!(result.ready_for_registration == result.issues.is_empty());
         let unknown: Vec<_> = result
             .issues
@@ -907,7 +1448,8 @@ mod tests {
             .collect();
         assert_eq!(unknown, vec!["/constructions/0/evidenceReference"]);
         registration.evidence[0].linked_paths = vec!["/zones/3".into()];
-        let result = assess_project_registration(&registration, &project);
+        let result =
+            assess_project_registration(&registration, &project, &RegistrationContext::default());
         assert!(result
             .issues
             .iter()

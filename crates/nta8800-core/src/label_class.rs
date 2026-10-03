@@ -81,6 +81,30 @@ fn utility_bounds(function: LabelFunction) -> Option<[f64; 11]> {
     })
 }
 
+/// Position of a class letter from best (A+++++ = 0) to worst (G); the
+/// utility list contains every residential letter, so ranks compare across
+/// both annexes. `None` for an unknown letter.
+pub fn class_rank(class: &str) -> Option<usize> {
+    UTILITY_CLASSES
+        .iter()
+        .position(|item| *item == class.trim())
+}
+
+/// Inclusive upper bound of `class` for one label function (annex IX or
+/// X), `None` for G (no upper bound) or a letter the annex does not use.
+pub fn class_upper_bound(function: LabelFunction, class: &str) -> Option<f64> {
+    match utility_bounds(function) {
+        None => {
+            let index = RESIDENTIAL.0.iter().position(|item| *item == class)?;
+            RESIDENTIAL.1.get(index).copied()
+        }
+        Some(bounds) => {
+            let index = UTILITY_CLASSES.iter().position(|item| *item == class)?;
+            bounds.get(index).copied()
+        }
+    }
+}
+
 fn classify(classes: &[&'static str], bounds: &[f64], value: f64) -> &'static str {
     bounds
         .iter()
