@@ -82,12 +82,14 @@ export function JsonField({ draft, path, label, onChange, invalid }: FieldProps 
   const [text, setText] = useState(() => (value == null ? '' : JSON.stringify(value, null, 2)));
   const [error, setError] = useState(false);
   return <label className="nta-form-json">{label}
-    <textarea rows={6} spellCheck={false} value={text} aria-invalid={error}
-      onChange={(event) => setText(event.target.value)}
-      onBlur={() => {
-        if (text.trim() === '') { setError(false); onChange(path, undefined); return; }
+    <textarea rows={6} spellCheck={false} value={text} aria-invalid={error} data-nta-json-field
+      onChange={(event) => {
+        const next = event.target.value;
+        event.target.setCustomValidity('');
+        setText(next);
+        if (next.trim() === '') { setError(false); onChange(path, undefined); return; }
         try {
-          onChange(path, JSON.parse(text));
+          onChange(path, JSON.parse(next));
           setError(false);
         } catch {
           setError(true);
@@ -100,4 +102,3 @@ export function JsonField({ draft, path, label, onChange, invalid }: FieldProps 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return <fieldset className="nta-form-section"><legend>{title}</legend><div className="nta-form-grid">{children}</div></fieldset>;
 }
-

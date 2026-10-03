@@ -8,6 +8,8 @@ Doeluitgave: **NTA 8800:2025+C1:2026**. Dit register beschrijft implementatiedek
 
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
+Vrije JSON-deelvelden in het NTA-formulier worden bij elke wijziging in de conceptinvoer verwerkt. Ongeldige JSON blokkeert nu het opslaan en houdt de fout bij het veld zichtbaar; een gerichte formulierproef en frontend-build zijn geslaagd. Deze UI-controle verandert de norminhoudelijke toets van de Rust-kern niet.
+
 De [debug-desktopbuild van commit `fc5a8a5`](nta8800-build-verificatie-2026-10-03-fc5a8a5.md) bundelt de actuele Rust-kern en NTA-interface. De build en de genoemde tests zijn technisch geslaagd; de referentie- en attestkolommen hieronder worden daardoor niet automatisch vrijgegeven.
 
 | Onderdeel | Model | Audit | Rekenroute | Referentie | Attest | Volgende verificatie |

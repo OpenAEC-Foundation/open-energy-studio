@@ -101,7 +101,20 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   const setConstantVentilation = (value: number | null) => change(['ventilationFlows', 0, 'months'],
     Array.from({ length: 12 }, (_, index) => ({ ...(months[index] ?? {}), month: index + 1, conductanceWPerK: value })));
 
-  return <form className="nta-form" aria-label={t('nta.form.title')} onSubmit={(event) => { event.preventDefault(); onSave(syncVentilation(draft, project)); }}>
+  return <form className="nta-form" aria-label={t('nta.form.title')} onSubmit={(event) => {
+    event.preventDefault();
+    const jsonFields = event.currentTarget.querySelectorAll<HTMLTextAreaElement>('textarea[data-nta-json-field]');
+    for (const field of jsonFields) {
+      if (field.value.trim() === '') continue;
+      try { JSON.parse(field.value); } catch {
+        field.setCustomValidity(t('nta.form.jsonInvalid'));
+        field.reportValidity();
+        field.focus();
+        return;
+      }
+    }
+    onSave(syncVentilation(draft, project));
+  }}>
     <p>{t('nta.form.help')}</p>
     <Section title={t('nta.form.general')}>
       <SelectField {...field} path={['calculationScope']} label={t('nta.form.scope')}
