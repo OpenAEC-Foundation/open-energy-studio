@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { IProject } from '../core/energy/types';
 import {
-  AdditionalHeatingSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields, SpaceGeneratorFields,
+  AdditionalHeatingSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields, SpaceGeneratorFields,
   WindowObstructionFields,
 } from '../components/NtaPerformancePanel/NtaSystemSections';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
@@ -151,6 +151,46 @@ describe('NTA system sections', () => {
     // 13.8.4.9.3: hot water from the heating system has no own fields.
     await user.selectOptions(screen.getAllByLabelText('Hot-water generator')[0], 'heating_system');
     expect(current().hotWater.generator).toEqual({ kind: 'heating_system' });
+  });
+
+  it('edits an EN 16147 heat pump with the 13.153b/c corrections', { timeout: 60000 }, async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ hotWater: { generator: { kind: 'electric_boiler' } } }}
+      body={(draft, change) => <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />} />);
+    await user.selectOptions(screen.getByLabelText('Hot-water generator'), 'heat_pump_en16147');
+    await user.type(screen.getByLabelText('Electricity Q_elec, kWh/day'), '3.2');
+    await user.type(screen.getByLabelText('Smart control factor (SCF)'), '0.08');
+    await user.type(screen.getByLabelText('Measured maximum temperature T_max;test, °C'), '52');
+    await user.type(screen.getByLabelText('Design set temperature T_set;design, °C (default 55)'), '50');
+    await user.click(screen.getByLabelText('Storage appliance tested without weekly legionella cycle (f_prac 0.9)'));
+    expect(current().hotWater.generator).toEqual({
+      kind: 'heat_pump_en16147', profile: 'l', deliveredKwhPerDay: 11.655, inputKwhPerDay: 3.2,
+      exhaustAirSource: false, storageWithoutLegionellaCycle: true, outdoorAirFraction: null,
+      smartControlFactor: 0.08, maxTestTemperatureC: 52, designSetTemperatureC: 50, sourceReference: '',
+    });
+  });
+
+  it('adds hot-water vessels with every loss route (13.58–13.60)', { timeout: 60000 }, async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ hotWater: { generator: { kind: 'measured_two_profiles' } } }}
+      body={(draft, change) => <HotWaterStorageFields draft={draft} change={change} />} />);
+    await user.click(screen.getByRole('button', { name: 'Add vessel' }));
+    await user.type(screen.getByLabelText('Volume, l'), '150');
+    await user.selectOptions(screen.getByLabelText('Connection factor f_sto;dis;ls (§13.6.3)'), '2');
+    await user.selectOptions(screen.getByLabelText('Storage loss'), 'measured_standby');
+    await user.type(screen.getByLabelText('Standby loss Q_stb;ls;ref, kWh per 24 h'), '1.2');
+    await user.click(screen.getByLabelText('Placed in a heated zone'));
+    await user.type(screen.getByLabelText('Ambient temperature of the unheated space, °C (empty: 13 °C)'), '10');
+    await user.click(screen.getByLabelText('Appliance tested without this vessel (note 1 of §13.6.2)'));
+    expect(current().hotWater.storage).toEqual([{
+      id: 'vessel-1', volumeL: 150, connectionFactor: 2, inHeatedZone: false, unheatedAmbientC: 10,
+      notInApplianceTest: true, sourceReference: '',
+      loss: { method: 'measured_standby', standbyKwhPerDay: 1.2, referenceStorageC: 65, referenceAmbientC: 20 },
+    }]);
+    await user.selectOptions(screen.getByLabelText('Storage loss'), 'label');
+    expect(current().hotWater.storage[0].loss).toEqual({ method: 'label', label: 'c' });
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(current().hotWater.storage).toEqual([]);
   });
 
   it('edits a calculated and a tested solar water heater (13.7)', async () => {

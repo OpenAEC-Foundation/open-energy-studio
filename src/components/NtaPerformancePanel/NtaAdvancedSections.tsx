@@ -1,7 +1,7 @@
 import { useI18n } from '../../i18n/i18n';
 import { airHeatersTemplate, bacsTemplate } from '../../core/nta/NtaSystemTemplates';
 import {
-  JsonField, NumberField, read, SelectField, TextField, TriStateField, type Draft, type Path,
+  CheckField, JsonField, NumberField, read, SelectField, TextField, TriStateField, type Draft, type Path,
 } from './NtaFormFields';
 
 // Less common NTA calculation inputs: area-weighted use functions (§5.3.1,
@@ -78,6 +78,75 @@ export function AirHeatersFields({ draft, change }: SectionProps) {
   </>;
 }
 
+const BACS_CLASSES: Array<[string, string]> = ['A', 'B', 'C', 'D'].map((key) => [key, key]);
+
+/** NEN-EN 15232 evidence of one system or the whole building; omitted means none stated. */
+function BacsEvidenceFields({ draft, change, base, label }: SectionProps & { base: Path; label: string }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const present = read(draft, base) != null;
+  return <>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present}
+        onChange={(event) => change(base, event.target.checked ? { present: false, sourceReference: '' } : undefined)} />
+      {label}
+    </label>
+    {present && <>
+      <CheckField {...field} path={[...base, 'present']} label={t('nta.form.bacs.present')} />
+      <SelectField {...field} path={[...base, 'automaticControlsClass']} label={t('nta.form.bacs.controlsClass')} options={BACS_CLASSES} />
+      <SelectField {...field} path={[...base, 'energyManagementClass']} label={t('nta.form.bacs.managementClass')} options={BACS_CLASSES} />
+      <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
+    </>}
+  </>;
+}
+
+/** §5.5.8: the heating and cooling systems with their generator powers, and the BACS evidence. */
+export function BacsFields({ draft, change }: SectionProps) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const systems = Array.isArray(read(draft, ['bacs', 'systems'])) ? read(draft, ['bacs', 'systems']) as Draft[] : [];
+  return <div className="nta-form-subsection">
+    <SelectField {...field} path={['bacs', 'buildingUse']} label={t('nta.form.bacs.use')} options={[
+      ['residential', t('nta.form.bacs.use.residential')], ['utility', t('nta.form.bacs.use.utility')]]} />
+    <CheckField {...field} path={['bacs', 'systemInventoryComplete']} label={t('nta.form.bacs.complete')} />
+    <BacsEvidenceFields draft={draft} change={change} base={['bacs', 'bacs']} label={t('nta.form.bacs.building')} />
+    {systems.map((system, index) => {
+      const at = (...rest: Path): Path => ['bacs', 'systems', index, ...rest];
+      const generators = Array.isArray(system.generators) ? system.generators as Draft[] : [];
+      return <fieldset key={index} className="nta-form-row">
+        <legend>{t('nta.form.bacs.system')} {index + 1}</legend>
+        <TextField {...field} path={at('id')} label={t('nta.form.bacs.systemId')} />
+        <SelectField {...field} path={at('service')} label={t('nta.form.bacs.service')} options={[
+          ['heating', t('nta.form.bacs.service.heating')], ['cooling', t('nta.form.bacs.service.cooling')]]} />
+        <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
+        {generators.map((_, generator) => <div key={generator} className="nta-form-row">
+          <TextField {...field} path={at('generators', generator, 'id')} label={t('nta.form.bacs.generatorId')} />
+          <NumberField {...field} path={at('generators', generator, 'nominalThermalCapacityKw')} label={t('nta.form.bacs.capacity')} />
+          <TextField {...field} path={at('generators', generator, 'sourceReference')} label={t('nta.form.source')} />
+          <button type="button" className="nta-form-remove"
+            onClick={() => change(at('generators'), generators.filter((__, other) => other !== generator))}>
+            {t('nta.form.bacs.removeGenerator')}
+          </button>
+        </div>)}
+        <button type="button" onClick={() => change(at('generators'), [...generators,
+          { id: `generator-${generators.length + 1}`, nominalThermalCapacityKw: null, sourceReference: '' }])}>
+          {t('nta.form.bacs.addGenerator')}
+        </button>
+        <BacsEvidenceFields draft={draft} change={change} base={at('bacs')} label={t('nta.form.bacs.systemEvidence')} />
+        <button type="button" className="nta-form-remove"
+          onClick={() => change(['bacs', 'systems'], systems.filter((__, other) => other !== index))}>
+          {t('nta.form.bacs.removeSystem')}
+        </button>
+      </fieldset>;
+    })}
+    <button type="button" onClick={() => change(['bacs', 'systems'], [...systems, {
+      id: `system-${systems.length + 1}`, service: 'heating', sourceReference: '',
+      generators: [{ id: 'generator-1', nominalThermalCapacityKw: null, sourceReference: '' }] }])}>
+      {t('nta.form.bacs.addSystem')}
+    </button>
+  </div>;
+}
+
 /** §5.5.8 BACS evidence (replaces bacsFactor) and annex P external supply. */
 export function BacsAndSupplyFields({ draft, change, residential }: SectionProps & { residential: boolean }) {
   const { t } = useI18n();
@@ -89,7 +158,7 @@ export function BacsAndSupplyFields({ draft, change, residential }: SectionProps
         onChange={(event) => change(['bacs'], event.target.checked ? bacsTemplate(residential) : undefined)} />
       {t('nta.form.bacsDraft')}
     </label>
-    {bacs && <JsonField key="bacs" {...field} path={['bacs']} label={t('nta.form.bacsDraftJson')} invalid={t('nta.form.jsonInvalid')} />}
+    {bacs && <BacsFields draft={draft} change={change} />}
     <JsonField key="externalSupply" {...field} path={['externalSupply']} label={t('nta.form.externalSupplyJson')}
       invalid={t('nta.form.jsonInvalid')} />
     <p className="nta-form-note">{t('nta.form.externalSupplyNote')}</p>

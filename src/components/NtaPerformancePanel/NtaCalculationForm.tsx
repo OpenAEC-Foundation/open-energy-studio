@@ -10,7 +10,7 @@ import {
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import {
-  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields,
+  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
   SpaceGeneratorFields, WindowObstructionFields,
 } from './NtaSystemSections';
 import {
@@ -317,6 +317,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <TextField {...field} path={['hotWater', 'emission', 'sourceReference']} label={t('nta.form.source')} />
       <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
       <HotWaterGeneratorsFields draft={draft} change={change} />
+      <HotWaterStorageFields draft={draft} change={change} />
       <TextField {...field} path={['hotWater', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
     </Section>}
     {read(draft, ['hotWater']) != null && <Section title={t('nta.form.dhwSystems.title')}>

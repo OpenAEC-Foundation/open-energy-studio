@@ -91,21 +91,28 @@ describe('advanced NTA calculation fields', () => {
     expect(current().generator).not.toHaveProperty('regeneration');
   });
 
-  it('switches a CHP between method 2 and method 1 (exclusive)', async () => {
+  it('switches a CHP between method 2 and method 1 (exclusive)', { timeout: 60000 }, async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{ generator: spaceGeneratorTemplate('chp') }}
       body={(draft, change) => <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} />} />);
     await user.selectOptions(screen.getByRole('combobox', { name: 'CHP method' }), 'method1');
     expect(current().generator).toMatchObject({ kind: 'chp', chp: null, method1: { kind: 'stirling_engine' } });
-    const json = screen.getByRole('textbox', { name: 'Micro-CHP test data (JSON)' });
-    const edited = { ...microChpTemplate(), fullLoad: { thermalPowerKw: 6 }, chpOnly: { thermalPowerKw: 5 } };
-    fireEvent.change(json, { target: { value: JSON.stringify(edited) } });
-    fireEvent.blur(json);
-    expect(current().generator.method1).toEqual(edited);
-    fireEvent.change(json, { target: { value: '{ not json' } });
-    fireEvent.blur(json);
-    expect(screen.getByText('Not valid JSON; the previous value is kept.')).toBeInTheDocument();
-    expect(current().generator.method1).toEqual(edited);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Micro-CHP type' }), 'pem_fuel_cell');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Hydraulic connection' }), 'decoupled');
+    const thermal = screen.getAllByRole('spinbutton', { name: 'Thermal power, kW' });
+    await user.type(thermal[0], '6');
+    await user.type(thermal[1], '5');
+    await user.type(screen.getAllByRole('spinbutton', { name: 'Electric efficiency' })[0], '0.35');
+    await user.click(screen.getByRole('checkbox', { name: 'Storage outside the test configuration (9.6.6.2.2.8)' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Storage heat loss, W/K' }), '1.8');
+    await user.type(screen.getByRole('textbox', { name: 'Test report (NEN-EN 50465)' }), 'TR-1');
+    expect(current().generator.method1).toMatchObject({
+      kind: 'pem_fuel_cell', fuel: 'natural_gas', hydraulics: 'decoupled', testReportReference: 'TR-1',
+      fullLoad: { thermalPowerKw: 6, electricEfficiency: 0.35 }, chpOnly: { thermalPowerKw: 5 },
+      storage: { lossWPerK: 1.8, setTemperatureC: null, chargingAuxiliaryW: null, sourceReference: '' },
+    });
+    await user.click(screen.getByRole('checkbox', { name: 'Storage outside the test configuration (9.6.6.2.2.8)' }));
+    expect(current().generator.method1.storage).toBeNull();
     await user.selectOptions(screen.getByRole('combobox', { name: 'CHP method' }), 'method2');
     expect(current().generator).toMatchObject({ chp: { powerKw: null, builtAfter2006: true }, method1: null });
   });
@@ -166,12 +173,31 @@ describe('advanced NTA calculation fields', () => {
     expect(current().labelFunctions).toEqual([{ function: 'office', areaM2: 80 }]);
   });
 
-  it('edits BACS evidence and annex P external supply as JSON', async () => {
+  it('edits BACS systems and evidence, and annex P external supply as JSON', { timeout: 60000 }, async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}}
       body={(draft, change) => <BacsAndSupplyFields draft={draft} change={change} residential />} />);
     await user.click(screen.getByRole('checkbox', { name: /Systems and BACS evidence/ }));
     expect(current().bacs).toEqual(bacsTemplate(true));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Building use for §5.5.8' }), 'utility');
+    await user.click(screen.getByRole('checkbox', { name: 'All heating and cooling systems are listed' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Nominal thermal capacity, kW' }), '60');
+    await user.click(screen.getByRole('button', { name: 'Add system' }));
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Service' })[1], 'cooling');
+    await user.click(screen.getByRole('checkbox', { name: 'BACS present' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Automatic controls class (NEN-EN 15232)' }), 'B');
+    expect(current().bacs).toEqual({
+      buildingUse: 'utility', systemInventoryComplete: true,
+      bacs: { present: true, automaticControlsClass: 'B', sourceReference: '' },
+      systems: [
+        { id: 'heating-1', service: 'heating', sourceReference: '',
+          generators: [{ id: 'generator-1', nominalThermalCapacityKw: 60, sourceReference: '' }] },
+        { id: 'system-2', service: 'cooling', sourceReference: '',
+          generators: [{ id: 'generator-1', nominalThermalCapacityKw: null, sourceReference: '' }] },
+      ],
+    });
+    await user.click(screen.getAllByRole('button', { name: 'Remove system' })[1]);
+    expect(current().bacs.systems).toHaveLength(1);
     const supply = screen.getByRole('textbox', { name: 'External supply, annex P (JSON)' });
     const value = { heating: { method: 'forfait' }, areaElectricity: [] };
     fireEvent.change(supply, { target: { value: JSON.stringify(value) } });
