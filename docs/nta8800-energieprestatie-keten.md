@@ -933,3 +933,17 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 **Biomassawarmte bij meerdere opwekkers (5.39f).** Alleen de warmte die de biomassatoestellen zelf leveren (`biomassOutputKwh`) telt als hernieuwbare biomassawarmte. Eerder telde bij een set met meerdere opwekkers de output van alle opwekkers mee, dus ook die van een warmtepomp.
 
 **Interpretatie bij bijlage AA.** Voor g_gl;C;juli rekent de kern met de volledige g-waarde van 7.6.6.1.2, inclusief diffuus glas en vaste of draaibare lamellen (7.41a/b). Draaibare lamellen gelden daarbij als dicht. Strikt gelezen verwijst AA.6b alleen naar F_W·g_gl;n. De kern kiest de fysisch consistente lezing.
+
+
+## Koppelingen van tapwater met verwarming en koeling (13.51, 13.20a, bijlage V, W.3)
+
+- **Douche-WTW bij meerdere systemen (13.51, p. 563).**
+  - Q_W;nd;d is de nettowarmtebehoefte van de woning volgens 13.1.
+  - Bij een splitsing volgens 13.19a rekent de terugwinning daarom met de ongesplitste behoefte. Het systeem met de douche-WTW krijgt de hele terugwinning, begrensd tot zijn eigen afgiftebehoefte.
+- **Circulatie bij utiliteit (13.20a, p. 541).** De lengte (13.31) en L_max (13.32) van een niet-collectief utiliteitssysteem gaan uit van A_g;si;W. Dat is het oppervlak dat het systeem bedient (Σ `need.areas`), en niet het hele gebouw.
+- **Bijlage V voor tapwater.** Een tapwaterwarmtepomp met `sameGroundSource` gebruikt dezelfde geregenereerde bodembron als de verwarmingswarmtepomp.
+  - Zijn tapwater, met c_source = 1 berekend, telt mee in de noemer van V.1 (`regenerationHotWater` van de keten). Dit wordt automatisch ingevuld als de keten zelf geen waarde opgeeft.
+  - Hij neemt de c_source van tabel V.1 over: bij bijlage Q uit de gerapporteerde R, en bij de forfaitaire route op dezelfde manier berekend als in de keten.
+  - Een opgegeven `sourceCorrection` gaat voor.
+  - c_source moet 1,00, 1,02 of 1,04 zijn (tabel V.1/V.3). Eerder werd alles boven 1,0 afgewezen.
+- **W.3.** Q_C;HP;si;mi van de koelketen (10.6/10.9) vult `coolingExtractionKwh` in van boosterwarmtepompen die zelf geen waarde opgeven. Bij meer boosters wordt het gelijk verdeeld (W.3, opmerking 3).

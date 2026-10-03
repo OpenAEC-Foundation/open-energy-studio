@@ -1024,6 +1024,186 @@ pub fn usage_fit_applied(input: &BuildingPerformanceInput) -> bool {
 }
 
 /// The hot-water systems of the building with their input path.
+/// Annex V regeneration of the space-heating heat pump, if any.
+fn heating_regeneration(
+    input: &BuildingPerformanceInput,
+) -> Option<&crate::annex_v::RegenerationInput> {
+    match &input.space_heating.generator {
+        Generator::HeatPumpForfait(generator) => generator.regeneration.as_ref(),
+        Generator::HeatPumpAnnexQ(generator) => generator.regeneration.as_ref(),
+        _ => None,
+    }
+}
+
+fn same_source_heat_pump(system: &HotWaterSystem) -> bool {
+    matches!(
+        system.generator,
+        crate::domestic_hot_water::HotWaterGenerator::HeatPump {
+            same_ground_source: true,
+            ..
+        }
+    )
+}
+
+/// Annex V (V.1, p. 1115): Σ Q_W;dis;nren and η_W;gen (c_source = 1) of the
+/// hot-water heat pumps on the regenerated ground source, for the V.1
+/// denominator of the space-heating chain.
+fn regeneration_hot_water(
+    input: &BuildingPerformanceInput,
+    context: HotWaterContext,
+) -> Option<crate::space_heating_chain::RegenerationHotWater> {
+    heating_regeneration(input)?;
+    let fractions = hot_water_need_fractions(input).ok()?;
+    let mut delivered = 0.0;
+    let mut energy = 0.0;
+    for ((system, _), fraction) in hot_water_system_list(input).into_iter().zip(fractions) {
+        if !same_source_heat_pump(system) {
+            continue;
+        }
+        let mut probe = system.clone();
+        if let crate::domestic_hot_water::HotWaterGenerator::HeatPump {
+            source_correction, ..
+        } = &mut probe.generator
+        {
+            *source_correction = Some(1.0);
+        }
+        let mut context = context;
+        context.need_fraction = fraction;
+        let result = crate::domestic_hot_water::assess_hot_water(&probe, context).ok()?;
+        for month in &result.months {
+            delivered += month.generator_output_kwh;
+            if month.generation_efficiency > 0.0 {
+                energy += month.generator_output_kwh / month.generation_efficiency;
+            }
+        }
+    }
+    (delivered > 0.0 && energy > 0.0).then_some(crate::space_heating_chain::RegenerationHotWater {
+        annual_kwh: delivered,
+        generation_efficiency: delivered / energy,
+    })
+}
+
+/// Table V.1 c_source of the regenerated ground source for the hot-water
+/// heat pumps on it: annex Q reports R; the forfait route is evaluated as the
+/// chain does (table COP with c_source = 1, V.1).
+fn regeneration_source_correction(
+    input: &BuildingPerformanceInput,
+    chain_input: &SpaceHeatingChainInput,
+    heating: &SpaceHeatingChainAssessment,
+) -> Option<f64> {
+    let regeneration = heating_regeneration(input)?;
+    if let Some(output) = &heating.annex_q {
+        return output
+            .regeneration_degree
+            .map(crate::annex_v::regeneration_correction);
+    }
+    let Generator::HeatPumpForfait(generator) = &input.space_heating.generator else {
+        return None;
+    };
+    let mut probe = generator.forfait.clone();
+    probe.source_correction_factor = Some(1.0);
+    probe.source_correction_reference = Some("annex V".into());
+    let cop = crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(&probe).table_cop?;
+    let heating_kwh: f64 = heating
+        .monthly
+        .iter()
+        .map(|row| row.generator_output_kwh)
+        .sum();
+    let cooling: f64 = std::iter::once(&heating.demand)
+        .chain(&heating.additional_zone_demands)
+        .map(|zone| zone.annual_cooling_need_kwh.unwrap_or(0.0))
+        .sum();
+    let hot_water = chain_input.regeneration_hot_water;
+    Some(
+        crate::annex_v::calculate_regeneration(
+            regeneration,
+            crate::annex_v::RegenerationContext {
+                heating_kwh,
+                heating_efficiency: cop,
+                hot_water_kwh: hot_water.map_or(0.0, |item| item.annual_kwh),
+                hot_water_efficiency: hot_water.map_or(0.0, |item| item.generation_efficiency),
+                annual_cooling_need_kwh: cooling,
+                electricity_efficiency: 1.0 / 1.45,
+            },
+        )
+        .correction,
+    )
+}
+
+/// The hot-water input coupled to the other chains: the annex V c_source on
+/// heat pumps on the regenerated ground source (table V.1), and W.3
+/// Q_C;HP;si;mi from the cooling chain (10.6/10.9) on boosters without a
+/// declared extraction, split equally (W.3 note 3). `None` when nothing
+/// changes.
+fn coupled_hot_water_input(
+    input: &BuildingPerformanceInput,
+    source_correction: Option<f64>,
+    cooling: Option<&CoolingAssessment>,
+) -> Option<BuildingPerformanceInput> {
+    use crate::domestic_hot_water::HotWaterGenerator;
+    let extraction: Option<Vec<f64>> = cooling
+        .map(|assessment| {
+            assessment
+                .months
+                .iter()
+                .map(|month| month.booster_extraction_kwh)
+                .collect::<Vec<f64>>()
+        })
+        .filter(|months| months.len() == 12 && months.iter().any(|value| *value > 0.0));
+    let systems = || {
+        input
+            .hot_water
+            .iter()
+            .chain(input.additional_hot_water_systems.iter())
+    };
+    let boosters = systems()
+        .filter(|system| {
+            matches!(&system.generator, HotWaterGenerator::BoosterHeatPump(pump)
+                if pump.cooling_extraction_kwh.is_none())
+        })
+        .count();
+    let needs_source = source_correction.is_some()
+        && systems().any(|system| {
+            matches!(
+                system.generator,
+                HotWaterGenerator::HeatPump {
+                    same_ground_source: true,
+                    source_correction: None,
+                    ..
+                }
+            )
+        });
+    if !needs_source && (extraction.is_none() || boosters == 0) {
+        return None;
+    }
+    let patch = |system: &mut HotWaterSystem| match &mut system.generator {
+        HotWaterGenerator::HeatPump {
+            same_ground_source: true,
+            source_correction: correction @ None,
+            ..
+        } => *correction = source_correction,
+        HotWaterGenerator::BoosterHeatPump(pump) if pump.cooling_extraction_kwh.is_none() => {
+            if let Some(months) = &extraction {
+                pump.cooling_extraction_kwh = Some(
+                    months
+                        .iter()
+                        .map(|value| value / boosters.max(1) as f64)
+                        .collect(),
+                );
+            }
+        }
+        _ => {}
+    };
+    let mut coupled = input.clone();
+    if let Some(system) = coupled.hot_water.as_mut() {
+        patch(system);
+    }
+    for system in coupled.additional_hot_water_systems.iter_mut() {
+        patch(system);
+    }
+    Some(coupled)
+}
+
 fn hot_water_system_list(input: &BuildingPerformanceInput) -> Vec<(&HotWaterSystem, String)> {
     input
         .hot_water
@@ -2279,6 +2459,11 @@ pub fn assess_building_performance(
     let mut hot_water_context = hot_water_context(input);
     let mut chain_input =
         with_hot_water_gains(input, hot_water_context, with_lighting_gains(input));
+    // Annex V (V.1): hot water of heat pumps on the same regenerated source.
+    let regeneration_water = regeneration_hot_water(input, hot_water_context);
+    if chain_input.regeneration_hot_water.is_none() {
+        chain_input.regeneration_hot_water = regeneration_water;
+    }
     let mut heating = assess_space_heating_chain(&chain_input);
     // 13.7.2.2.3: solar combi systems need the node output of a run without
     // solar gains; the second run takes their node gain (9.2.3.4).
@@ -2305,6 +2490,9 @@ pub fn assess_building_performance(
             hot_water_context.space_heating = space_heating;
         }
         chain_input = with_hot_water_gains(input, hot_water_context, with_lighting_gains(input));
+        if chain_input.regeneration_hot_water.is_none() {
+            chain_input.regeneration_hot_water = regeneration_water;
+        }
         if standalone_needed
             && crate::domestic_hot_water::validate_standalone_solar(
                 &input.space_heating_solar,
@@ -2370,8 +2558,12 @@ pub fn assess_building_performance(
     hot_water_context.levelled_setpoint_c = levelled_setpoint(input, &heating);
     let extras = hot_water_extras(input, &heating);
     let hot_water_from_heating = hot_water_from_heating(&heating);
+    // Table V.1 c_source and W.3 Q_C;HP;si;mi for the hot-water systems.
+    let coupled = regeneration_source_correction(input, &chain_input, &heating);
+    let coupled_input = coupled_hot_water_input(input, coupled, cooling.as_ref());
+    let hot_water_input = coupled_input.as_ref().unwrap_or(input);
     let hot_water = if issues.is_empty() {
-        match assess_hot_water_systems(input, hot_water_context, &extras) {
+        match assess_hot_water_systems(hot_water_input, hot_water_context, &extras) {
             Ok(Some(mut result)) => {
                 if let Some(fit) = &input.hot_water_need_fit {
                     fit_hot_water_need(&mut result, fit.annual_need_kwh);
@@ -4382,6 +4574,149 @@ mod tests {
         );
     }
 
+    #[test]
+    fn hot_water_couples_to_annex_v_and_the_booster_cooling_extraction() {
+        use crate::annex_w::{
+            BoosterClass, BoosterHeatPump, BoosterHeatSource, BoosterSourceCarrier, BoosterTest,
+        };
+        use crate::domestic_hot_water::HotWaterGenerator;
+        let mut sample = input();
+        sample.hot_water = Some(hot_water_system(HotWaterGenerator::HeatPump {
+            exhaust_air_source: false,
+            source_correction: None,
+            measured_class: None,
+            outdoor_air_fraction: None,
+            same_ground_source: true,
+        }));
+        let booster = BoosterHeatPump {
+            low_test: BoosterTest {
+                source_temperature_c: 24.0,
+                cop: 3.0,
+            },
+            high_test: BoosterTest {
+                source_temperature_c: 40.0,
+                cop: 4.2,
+            },
+            measured_class: BoosterClass::Class2,
+            standing_loss_kw: 0.02,
+            source_temperatures_c: vec![30.0],
+            cooling_extraction_kwh: None,
+            heat_source: BoosterHeatSource::CollectiveGenerator {
+                generation_efficiency: 0.9,
+                carrier: BoosterSourceCarrier::Gas,
+                source_reference: "collective boiler".into(),
+            },
+            test_report_reference: "synthetic".into(),
+        };
+        let mut second = hot_water_system(HotWaterGenerator::BoosterHeatPump(Box::new(booster)));
+        second.connected_taps = None;
+        sample.additional_hot_water_systems = vec![second];
+        // Table V.1 c_source goes to the heat pump on the same source.
+        let month = crate::space_cooling::CoolingMonth {
+            booster_extraction_kwh: 30.0,
+            ..Default::default()
+        };
+        let cooling = CoolingAssessment {
+            regeneration_return_kwh: None,
+            cooling_limit_c: 15.0,
+            internal_temperature_shift_k: 0.0,
+            generator_shares: Vec::new(),
+            months: vec![month; 12],
+            zone_booster_extraction_kwh: Vec::new(),
+            interpretations: Vec::new(),
+            systems: Vec::new(),
+        };
+        let coupled = coupled_hot_water_input(&sample, Some(1.02), Some(&cooling)).unwrap();
+        assert!(matches!(
+            coupled.hot_water.as_ref().unwrap().generator,
+            HotWaterGenerator::HeatPump {
+                source_correction: Some(value),
+                ..
+            } if (value - 1.02).abs() < 1e-12
+        ));
+        // W.3: Q_C;HP;si;mi of the cooling chain (10.6/10.9) on the booster.
+        let HotWaterGenerator::BoosterHeatPump(pump) =
+            &coupled.additional_hot_water_systems[0].generator
+        else {
+            unreachable!()
+        };
+        assert_eq!(pump.cooling_extraction_kwh, Some(vec![30.0; 12]));
+        // Nothing to couple: no change.
+        let mut plain = sample.clone();
+        plain.additional_hot_water_systems.clear();
+        assert!(coupled_hot_water_input(&plain, None, None).is_none());
+    }
+
+    #[test]
+    fn same_source_hot_water_heat_pump_joins_v1_and_takes_its_c_source() {
+        use crate::domestic_hot_water::HotWaterGenerator;
+        let mut sample = input();
+        let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            generator_id: "hp".into(),
+            classification_source_reference: "system design".into(),
+            scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
+            source: TableSource::Ground,
+            sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
+            design_supply_temperature_c: Some(35.0),
+            source_correction_factor: None,
+            source_correction_reference: None,
+            thermal_capacity_kw: Some(8.0),
+            capacity_source_reference: Some("rated".into()),
+            collective_building_installation: Some(false),
+            row_variant: crate::forfait_heat_pump_draft::TableRowVariant::Base,
+            high_efficiency_evidence: None,
+            source_temperature_c: None,
+            source_temperature_evidence_reference: None,
+            source_quality_declaration_reference: None,
+        };
+        sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: Some(crate::annex_v::RegenerationInput {
+                free_cooling_from_source: false,
+                solar: Vec::new(),
+                source_reference: "design".into(),
+            }),
+            forfait,
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own borehole".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        sample.hot_water = Some(hot_water_system(HotWaterGenerator::HeatPump {
+            exhaust_air_source: false,
+            source_correction: None,
+            measured_class: None,
+            outdoor_air_fraction: None,
+            same_ground_source: true,
+        }));
+        let context = hot_water_context(&sample);
+        // V.1 denominator: the hot water delivered with c_source = 1.
+        let water = regeneration_hot_water(&sample, context).unwrap();
+        assert!(water.annual_kwh > 0.0);
+        assert!(water.generation_efficiency > 0.0, "{water:?}");
+        // Without the flag nothing joins V.1.
+        let mut plain = sample.clone();
+        if let Some(HotWaterSystem {
+            generator:
+                HotWaterGenerator::HeatPump {
+                    same_ground_source, ..
+                },
+            ..
+        }) = plain.hot_water.as_mut()
+        {
+            *same_ground_source = false;
+        }
+        assert!(regeneration_hot_water(&plain, context).is_none());
+        // The whole run gives the heat pump on the same source a table V.1
+        // value (no regeneration here: R < 0,5 → 1,00).
+        let mut chain_input = sample.space_heating.clone();
+        chain_input.regeneration_hot_water = Some(water);
+        let heating = assess_space_heating_chain(&chain_input);
+        assert_eq!(
+            regeneration_source_correction(&sample, &chain_input, &heating),
+            Some(1.0)
+        );
+    }
+
     fn hot_water_system(generator: crate::domestic_hot_water::HotWaterGenerator) -> HotWaterSystem {
         use crate::domestic_hot_water::{HotWaterEmission, HotWaterNeed, ServedTaps};
         HotWaterSystem {
@@ -4707,6 +5042,7 @@ mod tests {
         demand.ventilation = Some(ventilation.clone());
         let area = demand.usable_floor_area_m2;
         let mut system = hot_water_system(HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
             measured_class: None,
@@ -4779,6 +5115,7 @@ mod tests {
         demand.ventilation_flows.clear();
         demand.ventilation = Some(ventilation);
         let mut system = hot_water_system(HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
             measured_class: None,
