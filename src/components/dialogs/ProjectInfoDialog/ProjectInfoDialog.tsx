@@ -61,12 +61,15 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
     messageType,
     epOnlineNumber: registration.epOnlineNumber,
     registrationDate: registration.registrationDate,
+    surveyDate: registration.surveyDate,
   };
   const conflicts = bagConflicts(ledgerEntry, readBagLedger());
-  const software = softwareIdentity();
+  const software = messageType !== 'regular' && registration.software ? registration.software : softwareIdentity();
 
   const handleSave = () => {
-    if (ledgerEntry.bagObjectId.trim()) recordBagRegistration(ledgerEntry);
+    // Keeps registered labels only and drops this project's entry when the
+    // BAG id or the EP-Online number was cleared.
+    recordBagRegistration(ledgerEntry);
     dispatch({
       type: 'UPDATE_PROJECT_INFO',
       payload: { name, description, buildingFunction, address, city, registration: cleanRegistration(registration) },
@@ -216,6 +219,16 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
           <label htmlFor="reg-wlc-reference">{t('reg.wlcGwp.reference')}</label>
           <input id="reg-wlc-reference" type="text" value={registration.wlcGwp?.reportReference ?? ''}
             onChange={(e) => update({ wlcGwp: { ...registration.wlcGwp, reportReference: e.target.value || undefined } })} />
+        </div>
+        <div className="dialog-field">
+          <label htmlFor="reg-bbl-check-date">{t('reg.bblCheckDate')}</label>
+          <input id="reg-bbl-check-date" type="date" value={registration.bblCheckDate ?? ''}
+            onChange={(e) => update({ bblCheckDate: e.target.value || undefined })} />
+        </div>
+        <div className="dialog-field">
+          <label htmlFor="reg-building-area">{t('reg.buildingUsableFloorArea')}</label>
+          <input id="reg-building-area" type="number" step="any" value={registration.buildingUsableFloorAreaM2 ?? ''}
+            onChange={(e) => update({ buildingUsableFloorAreaM2: e.target.value ? Number(e.target.value) : undefined })} />
         </div>
         <p className="dialog-hint" data-testid="reg-software">
           {t('reg.software')}: {software.name} {software.version} — {software.attestNumber

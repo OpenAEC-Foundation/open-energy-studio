@@ -4366,10 +4366,14 @@ export interface NtaRegistration {
   messageType?: NtaMessageType;
   /** Replacement: EP-Online number of the replaced label. */
   replacedEpOnlineNumber?: string;
-  /** Program that made the calculation (Regeling art. 5 lid b); filled in by the app. */
+  /** Program that made the calculation (Regeling art. 5 lid 1 onder b); filled in by the app. */
   software?: NtaSoftwareIdentity;
   /** WLC-GWP result, required for new buildings > 1000 m² checked against the Bbl from 2028. */
   wlcGwp?: { valueKgCo2EqPerM2Year?: number; reportReference?: string };
+  /** Delivery: date of the toets Bbl it follows (YYYY-MM-DD); the WLC-GWP duty follows that check. */
+  bblCheckDate?: string;
+  /** A_g of the whole building when the calculation covers one dwelling (WLC-GWP threshold per building). */
+  buildingUsableFloorAreaM2?: number;
   /** Class of the label registered before, for the class-jump plausibility check. */
   previousLabelClass?: string;
   /** Relabel: date of the improvement (quote with order or invoice), YYYY-MM-DD; within 24 months of the survey (BRL 9500 §4.2.3). */
@@ -4761,6 +4765,10 @@ export interface RegistrationAssessment {
   replacementDeadline?: string | null;
   /** WLC-GWP required; null when A_g or the date is unknown. */
   wlcGwpRequired?: boolean | null;
+  /** Program of the registration; this program for projects saved without one. */
+  software?: NtaSoftwareIdentity;
+  /** Whether that program has a BRL 9501 attest number; does not block readiness. */
+  softwareAttested?: boolean;
   readyForRegistration: boolean;
   issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
   /** BRL 9500 §7.2.2-style plausibility warnings; never block registration. */

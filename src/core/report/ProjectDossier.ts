@@ -162,7 +162,7 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel 
   }
 
   // Herlabelen
-  if (registration.relabel) {
+  if ((registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) === 'relabel') {
     add('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
       relabel ? relabel.allowed : false,
       relabel == null ? 'geen herlabelvergelijking uitgevoerd' : relabel.allowed ? undefined : 'wijziging volgens Bijlage 6b');

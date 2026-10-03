@@ -125,6 +125,13 @@ describe('project dossier', () => {
     expect(relabelStatus('relabel_invoice')).toBe('ok');
     expect(relabelStatus('relabel_improvement_date')).toBe('missing');
     expect(relabelStatus('relabel_production_photos')).toBe('missing');
+    // The message type replaces the old `relabel` flag (BRL 9500-W p. 24).
+    const typed = checkDossierCompleteness({
+      project: project({ messageType: 'relabel', evidence: [evidence('ev-1', 'invoice', 'A')] }),
+    });
+    expect(typed.some((item) => item.id === 'relabel_invoice')).toBe(true);
+    const replacement = checkDossierCompleteness({ project: project({ messageType: 'replacement' }) });
+    expect(replacement.some((item) => item.group === 'relabel')).toBe(false);
   });
 
   it('requires a collapse reason for every applied default of a basic survey', () => {

@@ -52,7 +52,11 @@ describe('registration block', () => {
     const store = { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => { memory.set(key, value); } };
     const first: BagLedgerEntry = {
       bagObjectId: '0363010000000001', projectId: 'p1', projectName: 'Woning A', residential: true, messageType: 'regular',
+      epOnlineNumber: 'EP-1', surveyDate: '2026-01-31',
     };
+    // A draft or scenario copy without an EP-Online number is no label.
+    recordBagRegistration({ ...first, projectId: 'draft', epOnlineNumber: undefined }, store);
+    expect(readBagLedger(store)).toEqual([]);
     recordBagRegistration(first, store);
     recordBagRegistration({ ...first, projectName: 'Woning A (herzien)' }, store);
     expect(readBagLedger(store)).toHaveLength(1);
@@ -62,7 +66,21 @@ describe('registration block', () => {
     expect(bagConflicts({ ...second, residential: false }, readBagLedger(store))).toEqual([]);
     expect(bagConflicts({ ...second, bagObjectId: '0363010000000002' }, readBagLedger(store))).toEqual([]);
     expect(bagConflicts(first, readBagLedger(store))).toEqual([]);
+    // One label per object at a time: after ten years the old one expired.
+    expect(bagConflicts({ ...second, surveyDate: '2036-02-01' }, readBagLedger(store))).toEqual([]);
+    expect(bagConflicts({ ...second, surveyDate: '2036-01-31' }, readBagLedger(store))).toHaveLength(1);
+    // Clearing the BAG id (or the number) removes the project's entry.
+    recordBagRegistration({ ...first, bagObjectId: '' }, store);
+    expect(readBagLedger(store)).toEqual([]);
     expect(readBagLedger({ getItem: () => 'not json', setItem: () => {} })).toEqual([]);
+  });
+
+  it('keeps the program of the original calculation on a relabel (BRL 9500-W §4.2.4)', () => {
+    const original = { name: SOFTWARE_NAME, version: '0.1.0-alpha' };
+    expect(cleanRegistration({ messageType: 'relabel', client: 'X', software: original })?.software).toEqual(original);
+    expect(cleanRegistration({ relabel: true, client: 'X', software: original })?.software).toEqual(original);
+    expect(cleanRegistration({ messageType: 'regular', client: 'X', software: original })?.software).toEqual(softwareIdentity());
+    expect(cleanRegistration({ messageType: 'relabel', client: 'X' })?.software).toEqual(softwareIdentity());
   });
 
   it('prints advisers, dates, validity and label data in the report', () => {

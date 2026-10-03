@@ -167,6 +167,8 @@ export const nl: Record<string, string> = {
   'reg.wlcGwpHint': "Verplicht vanaf 1-1-2028 voor nieuwe gebouwen > 1000 m² bij toets Bbl en oplevering (BRL 9500-W p. 18, 21). Voer de uitkomst van de WLC-GWP-adviseur in.",
   'reg.wlcGwp.value': "WLC-GWP, kg CO₂-eq/m²·jr",
   'reg.wlcGwp.reference': "Rapport in het projectdossier",
+  'reg.bblCheckDate': "Datum van de toets Bbl waarop deze oplevering volgt (WLC-GWP)",
+  'reg.buildingUsableFloorArea': "A_g van het hele gebouw, m² (WLC-GWP-grens; bij berekening van één woning)",
   'reg.software': "Rekenprogramma",
   'reg.software.attest': "attestnummer",
   'reg.software.unattested': "nog niet geattesteerd volgens BRL 9501",
