@@ -311,9 +311,86 @@ pub enum Generator {
     /// Building CHP with heat-led operation, method 2 (9.6.6.1, table 9.31),
     /// gas.
     Chp(ChpGenerator),
+    /// Gas-engine or gas-absorption heat pump, forfait COP of table 9.27
+    /// (collective dwellings ≤ 25 kW) or 9.29 (utility, collective, > 25 kW).
+    GasHeatPump(GasHeatPumpGenerator),
     /// Several unequal generators on one system, split by preference with
     /// 9.56–9.60 and table 9.23 (9.6.1).
     Multiple(Box<MultipleGenerators>),
+}
+
+/// Table 9.27/9.29 row of a gas-driven heat pump.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GasHeatPumpTable {
+    /// Table 9.27: dwellings, collective installation of at most 25 kW,
+    /// not external heat supply.
+    ResidentialAtMost25Kw,
+    /// Table 9.29: utility, collective installations and > 25 kW.
+    UtilityCollectiveOrAbove25Kw,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GasHeatPumpSource {
+    Ground,
+    /// Groundwater (< 15 °C) or aquifer.
+    Groundwater,
+    OutdoorAir,
+    ExhaustAir,
+    SurfaceWater,
+}
+
+/// 9.6.3.1 with tables 9.27/9.29: a gas-engine (GMWP) or gas-absorption
+/// (GAWP) heat pump; both rows are the same.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GasHeatPumpGenerator {
+    pub table: GasHeatPumpTable,
+    pub source: GasHeatPumpSource,
+    pub design_supply_temperature_c: f64,
+    /// Table 9.27 footnote a: c_source of annex V for ground and
+    /// groundwater; absent means 1,0.
+    #[serde(default)]
+    pub source_correction_factor: Option<f64>,
+    /// 9.91 inputs (gas-fired generator).
+    #[serde(default)]
+    pub auxiliary: Option<OtherGeneratorAuxiliary>,
+    pub equipment_reference: String,
+}
+
+impl GasHeatPumpGenerator {
+    /// Tables 9.27/9.29 for θ_sup ≤ 30, 35, 40, 45, 50 and 55 °C; the gas
+    /// rows end at 55 °C.
+    pub fn table_cop(&self) -> Option<f64> {
+        const BOUNDS: [f64; 6] = [30.0, 35.0, 40.0, 45.0, 50.0, 55.0];
+        let column = BOUNDS
+            .iter()
+            .position(|bound| self.design_supply_temperature_c <= *bound + 1e-9)?;
+        use GasHeatPumpSource::*;
+        let row: [f64; 6] = match (self.table, self.source) {
+            (GasHeatPumpTable::ResidentialAtMost25Kw, Ground | Groundwater) => {
+                [1.35, 1.3, 1.25, 1.2, 1.15, 1.1]
+            }
+            (GasHeatPumpTable::ResidentialAtMost25Kw, OutdoorAir) => {
+                [1.25, 1.2, 1.15, 1.1, 1.05, 1.0]
+            }
+            (GasHeatPumpTable::ResidentialAtMost25Kw, ExhaustAir | SurfaceWater) => return None,
+            (GasHeatPumpTable::UtilityCollectiveOrAbove25Kw, Ground | OutdoorAir) => {
+                [1.65, 1.6, 1.55, 1.5, 1.45, 1.4]
+            }
+            (GasHeatPumpTable::UtilityCollectiveOrAbove25Kw, ExhaustAir) => {
+                [2.7, 2.6, 2.4, 2.2, 2.1, 2.0]
+            }
+            (GasHeatPumpTable::UtilityCollectiveOrAbove25Kw, Groundwater) => {
+                [2.2, 2.1, 2.0, 1.9, 1.85, 1.8]
+            }
+            (GasHeatPumpTable::UtilityCollectiveOrAbove25Kw, SurfaceWater) => {
+                [1.95, 1.9, 1.85, 1.8, 1.75, 1.7]
+            }
+        };
+        Some(row[column])
+    }
 }
 
 /// 9.6.6.1 building CHP (gas, forfait conversion factors of table 9.31).
@@ -599,11 +676,24 @@ impl Generator {
             | Self::ProductBoiler(_)
             | Self::LocalHeater(_)
             | Self::ForfaitHeater(_)
-            | Self::Chp(_) => None,
+            | Self::Chp(_)
+            | Self::GasHeatPump(_) => None,
             Self::Multiple(set) => set
                 .generators
                 .iter()
                 .find_map(|part| part.generator.heat_pump()),
+        }
+    }
+
+    /// A gas-driven heat pump (table 9.27/9.29) is part of this generator.
+    pub fn has_gas_heat_pump(&self) -> bool {
+        match self {
+            Self::GasHeatPump(_) => true,
+            Self::Multiple(set) => set
+                .generators
+                .iter()
+                .any(|part| part.generator.has_gas_heat_pump()),
+            _ => false,
         }
     }
 
@@ -637,7 +727,8 @@ impl Generator {
             | Self::ProductBoiler(_)
             | Self::LocalHeater(_)
             | Self::ForfaitHeater(_)
-            | Self::Chp(_) => false,
+            | Self::Chp(_)
+            | Self::GasHeatPump(_) => false,
             Self::Multiple(set) => set
                 .generators
                 .iter()
@@ -649,9 +740,10 @@ impl Generator {
     /// external heat, which takes the emitter design spread.
     fn generator_spread_k(&self) -> Option<f64> {
         match self {
-            Self::HeatPumpForfait(_) | Self::HybridHeatPump(_) | Self::HeatPumpAnnexQ(_) => {
-                Some(10.0)
-            }
+            Self::HeatPumpForfait(_)
+            | Self::HybridHeatPump(_)
+            | Self::HeatPumpAnnexQ(_)
+            | Self::GasHeatPump(_) => Some(10.0),
             Self::ExternalHeat(_) => None,
             // The preferred generator decides the design spread.
             Self::Multiple(set) => set
@@ -2897,7 +2989,10 @@ fn generate_multiple(
                 None => format!("{prefix}{}", item.path),
             },
         }));
-        if part.generator.heat_pump().is_some() || part.generator.annex_q().is_some() {
+        if part.generator.heat_pump().is_some()
+            || part.generator.annex_q().is_some()
+            || part.generator.has_gas_heat_pump()
+        {
             hp_efficiency = hp_efficiency.or(efficiency);
         }
         for (row, sub) in monthly.iter_mut().zip(&sub_rows) {
@@ -3043,6 +3138,57 @@ fn generate(
                 annex_q_result,
                 issues,
             );
+        }
+        Generator::GasHeatPump(generator) => {
+            validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
+            if generator.equipment_reference.trim().is_empty() {
+                issues.push(issue(
+                    "source_reference_required",
+                    "generator.equipmentReference",
+                ));
+            }
+            let correction = generator.source_correction_factor.unwrap_or(1.0);
+            let correction_allowed = generator.table == GasHeatPumpTable::ResidentialAtMost25Kw
+                && matches!(
+                    generator.source,
+                    GasHeatPumpSource::Ground | GasHeatPumpSource::Groundwater
+                );
+            if generator.source_correction_factor.is_some() && !correction_allowed {
+                issues.push(issue(
+                    "source_correction_not_applicable",
+                    "generator.sourceCorrectionFactor",
+                ));
+            }
+            if !correction.is_finite() || correction <= 0.0 {
+                issues.push(issue(
+                    "source_correction_invalid",
+                    "generator.sourceCorrectionFactor",
+                ));
+            }
+            let Some(table) = generator.table_cop() else {
+                // The gas rows end at 55 °C; exhaust air and surface water
+                // are not in table 9.27.
+                issues.push(issue("gas_heat_pump_table_cell_unavailable", "generator"));
+                return None;
+            };
+            if !issues.is_empty() {
+                return None;
+            }
+            // 9.62 with f_prac = 1: gas input (gross value) = Q/COP.
+            let cop = table * correction;
+            generation_efficiency = Some(cop);
+            let auxiliary = generator.auxiliary.as_ref().expect("validated auxiliary");
+            for (index, row) in monthly.iter_mut().enumerate() {
+                row.natural_gas_kwh = row.generator_output_kwh / cop;
+                row.heat_pump_output_kwh = row.generator_output_kwh;
+                row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
+                    auxiliary,
+                    OTHER_AUX_GAS_OIL_W_PER_KW,
+                    row.generator_output_kwh,
+                    MONTH_HOURS[index],
+                    building_fraction,
+                ));
+            }
         }
         Generator::Chp(generator) => {
             if generator.equipment_reference.trim().is_empty() {
@@ -5096,6 +5242,41 @@ mod tests {
         };
         input.distribution_system = Some(system(calculated_pump()));
         input
+    }
+
+    #[test]
+    fn gas_heat_pump_uses_tables_9_27_and_9_29() {
+        let mut generator = GasHeatPumpGenerator {
+            table: GasHeatPumpTable::UtilityCollectiveOrAbove25Kw,
+            source: GasHeatPumpSource::Groundwater,
+            design_supply_temperature_c: 45.0,
+            source_correction_factor: None,
+            auxiliary: other_aux(1, Some(40.0)),
+            equipment_reference: "GAWP datasheet".into(),
+        };
+        // Table 9.29 GWP grondwater: 40 < θ ≤ 45 → 1,9.
+        assert_eq!(generator.table_cop(), Some(1.9));
+        let mut input = collective_boiler_chain();
+        input.generator = Generator::GasHeatPump(generator.clone());
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 1.9).abs() < 1e-9);
+        assert_eq!(jan.heat_pump_output_kwh, jan.generator_output_kwh);
+        // Table 9.27 residential, ground, ≤ 30 °C: 1,35 × c_source.
+        generator.table = GasHeatPumpTable::ResidentialAtMost25Kw;
+        generator.source = GasHeatPumpSource::Ground;
+        generator.design_supply_temperature_c = 30.0;
+        assert_eq!(generator.table_cop(), Some(1.35));
+        // The gas rows end at 55 °C.
+        generator.design_supply_temperature_c = 60.0;
+        assert_eq!(generator.table_cop(), None);
+        input.generator = Generator::GasHeatPump(generator);
+        assert!(codes(&input).contains(&"gas_heat_pump_table_cell_unavailable"));
     }
 
     #[test]

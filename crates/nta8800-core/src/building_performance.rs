@@ -1451,6 +1451,21 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
                     }
                 }
             }
+            // Gas-driven heat pumps (tables 9.27/9.29) also need 5.31 evidence.
+            (None, Some(evidence)) if input.space_heating.generator.has_gas_heat_pump() => {
+                if evidence.source_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "source_reference_required",
+                        "heatPumpRenewable.sourceReference",
+                    ));
+                }
+            }
+            (None, None) if input.space_heating.generator.has_gas_heat_pump() => {
+                issues.push(issue(
+                    "heat_pump_renewable_evidence_required",
+                    "heatPumpRenewable",
+                ));
+            }
             (None, Some(_)) => {
                 issues.push(issue(
                     "heat_pump_evidence_without_heat_pump",
@@ -2367,8 +2382,10 @@ fn compute(
             .as_ref()
             .is_some_and(|storage| storage.building_bound_electrical_kwh >= 5.0);
     let zeb_direct_use = zeb_direct_use_fraction(input);
+    // 5.31 for electric and gas-driven heat pumps (COP ≥ 1, source < 20 °C).
     let heat_pump_renewable = (input.space_heating.generator.heat_pump().is_some()
-        || input.space_heating.generator.annex_q().is_some())
+        || input.space_heating.generator.annex_q().is_some()
+        || input.space_heating.generator.has_gas_heat_pump())
         && input
             .heat_pump_renewable
             .as_ref()
