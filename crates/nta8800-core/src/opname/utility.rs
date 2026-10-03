@@ -7,14 +7,16 @@
 //! ISSO 75.1 pages. Utility-specific parts are added here: use functions
 //! (small functions merged into the main function, p. 39–40), building type
 //! for infiltration (p. 55–56), BACS (table 7.3, p. 62–63), collective
-//! heating (table 9.7, p. 108–115), cooling (chapter 10, p. 128–138),
+//! heating (§9.3, p. 108–123), cooling (chapter 10, p. 128–138),
 //! utility ventilation with AHU, recirculation and flow control (chapter 11,
 //! p. 140–158), humidification (chapter 12, p. 161), utility hot water
 //! (chapter 13, p. 164–178) and lighting (chapter 14, p. 182–189).
 //!
 //! One calculation zone per building. Small functions are merged into the
 //! main function up to 25 % of A_g (p. 39–40); larger ones stay separate in
-//! a mixed calculation zone with area-weighted values (NTA §6.5.3).
+//! a mixed calculation zone with area-weighted values (NTA §6.5.3). When
+//! afb. 6.6 (p. 53) requires separate calculation zones the survey stops
+//! (`calculation_zone_split_required`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -28,8 +30,8 @@ use super::hot_water::{
 };
 use super::production::{derive_pv, SurveyPv};
 use super::ventilation::{
-    apply_passive_cooling, ExchangerAnswer, MotorAnswer, PressureClass, SurveyPassiveCooling,
-    VentilationPrinciple,
+    apply_passive_cooling, ExchangerAnswer, MotorAnswer, PressureClass, RecoveryLayout,
+    SurveyCombined, SurveyGrilleHeatingStrips, SurveyPassiveCooling, VentilationPrinciple,
 };
 use super::{
     loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, OpnameIssue, Recorder,
@@ -123,7 +125,8 @@ pub struct SurveyBacs {
     pub evidence_reference: Option<String>,
 }
 
-/// Table 9.7/§9.3 (p. 108–115): installation type and generator power.
+/// §9.3 (p. 108–109): installation type; the generator power as table 9.7
+/// (p. 115) prescribes it.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HeatingInstallation {
@@ -150,6 +153,50 @@ pub enum CoolingGeneratorAnswer {
     SurfaceWater,
     ClosedGroundLoop,
     DewPointCooling,
+    /// Compression chiller driven by a gas engine (table 10.2, p. 130);
+    /// needs `gasEngine`.
+    GasEngineCompression,
+}
+
+/// Table 10.2 (p. 130): manufacture year and electric power of the gas
+/// engine of a gas-driven chiller.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyGasEngine {
+    /// Manufactured from 2007; `None` unknown (up to 2006).
+    #[serde(default)]
+    pub from_2007: Option<bool>,
+    /// Electric power P_el, kW; no default ("niet van toepassing").
+    #[serde(default)]
+    pub electric_power_kw: Option<f64>,
+    /// P_el ≤ 2 kW with an HRe declaration.
+    #[serde(default)]
+    pub hre_declared: bool,
+}
+
+/// §10.4.1 (p. 133): where a direct-expansion evaporator delivers cold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectExpansionAnswer {
+    /// In the room or the air duct (split units, room air conditioners).
+    Room,
+    /// In the air handling unit: cold is delivered through the AHU
+    /// cooling coil (ventilation).
+    AirHandlingUnit,
+}
+
+/// A further cooling generator on the same distribution (§10.3.2, p. 131).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyCoolingGenerator {
+    pub generator: CoolingGeneratorAnswer,
+    /// Nominal power, kW (table 10.3); needed for the priority split.
+    #[serde(default)]
+    pub capacity_kw: Option<f64>,
+    #[serde(default)]
+    pub aquifer_permit_year: Option<i32>,
+    #[serde(default)]
+    pub gas_engine: Option<SurveyGasEngine>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -220,6 +267,32 @@ pub struct SurveyCooling {
     /// above 0 °C (e.g. an EED calculation).
     #[serde(default)]
     pub ground_above_zero_demonstrated: bool,
+    /// Gas engine of a gas-driven chiller (table 10.2).
+    #[serde(default)]
+    pub gas_engine: Option<SurveyGasEngine>,
+    /// Direct expansion (not water-based): in the room or in the AHU
+    /// (§10.4.1, p. 133); `None` in the room.
+    #[serde(default)]
+    pub direct_expansion: Option<DirectExpansionAnswer>,
+    /// Valves, brackets and fittings fully insulated; `None` unknown (not
+    /// insulated, table 10.9).
+    #[serde(default)]
+    pub fittings_insulated: Option<bool>,
+    /// Cold meters in the distribution; `None` unknown (present, table
+    /// 10.11).
+    #[serde(default)]
+    pub cold_meters: Option<bool>,
+    /// Actual pipe length L, m (table 10.10); `None` forfait.
+    #[serde(default)]
+    pub pipe_length_m: Option<f64>,
+    /// Actual length of the pipes through uncooled spaces, m (table
+    /// 10.10); `None` forfait.
+    #[serde(default)]
+    pub uncooled_pipe_length_m: Option<f64>,
+    /// Further generators on the same distribution (§10.3.2, p. 131); the
+    /// kernel ranks them by table 10.15 and sums equal priorities.
+    #[serde(default)]
+    pub additional_generators: Vec<SurveyCoolingGenerator>,
     pub source_reference: String,
 }
 
@@ -331,10 +404,73 @@ pub struct UtilityVentilation {
     pub recirculation_percent: Option<u32>,
     #[serde(default)]
     pub flow_control: Option<SurveyFlowControl>,
-    /// ISSO 75.1 §11.5.6: proven passive cooling.
+    /// ISSO 75.1 §11.5.6 (p. 152): proven passive cooling.
     #[serde(default)]
     pub passive_cooling: Option<SurveyPassiveCooling>,
+    /// Table 11.13 (p. 152): duct airtightness class; overrides
+    /// `ductsLukaAbc`. `None`: that flag, else unknown (1,1).
+    #[serde(default)]
+    pub duct_airtightness: Option<DuctAirtightnessAnswer>,
+    /// System E (§11.3.6, p. 145): decentral balanced units with heat
+    /// recovery and CO₂ control in part of the zone; `principle` describes
+    /// the other part and `heatRecovery` the decentral units.
+    #[serde(default)]
+    pub combined: Option<SurveyCombined>,
+    /// Supply grilles with electric heating strips (§11.3.7, p. 145–146).
+    #[serde(default)]
+    pub grille_heating_strips: Option<SurveyGrilleHeatingStrips>,
+    /// Installed ventilation capacity of the calculation zone, dm³/s
+    /// (§11.4.1, p. 146–148); `None`: unknown (regulatory flow).
+    #[serde(default)]
+    pub installed_capacity_dm3_per_s: Option<f64>,
+    /// Central or decentral heat recovery (table 11.6, p. 145); `None`:
+    /// central.
+    #[serde(default)]
+    pub heat_recovery_layout: Option<RecoveryLayout>,
+    /// Supply duct between outside and the heat-recovery unit (table
+    /// 11.10, p. 150); `None`: not insulated.
+    #[serde(default)]
+    pub supply_duct_insulation: Option<SupplyDuctInsulationAnswer>,
+    /// Length of that duct inside the envelope, m; `None`: kernel default
+    /// by central/decentral system (11.109).
+    #[serde(default)]
+    pub supply_duct_length_m: Option<f64>,
+    /// Constant-volume control at all flows (table 11.11, p. 151); `None`:
+    /// unknown (none).
+    #[serde(default)]
+    pub constant_volume_control: Option<bool>,
+    /// Partial bypass percentage, rounded down to tens (table 11.12, p.
+    /// 151); `None`: bypass or percentage unknown (kernel "unknown").
+    #[serde(default)]
+    pub bypass_percent: Option<u32>,
     pub source_reference: String,
+}
+
+/// Table 11.13 (p. 152) duct airtightness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DuctAirtightnessAnswer {
+    LukaAbc,
+    LukaD,
+    NoDucts,
+    Unknown,
+}
+
+/// Table 11.10 (p. 150) insulation of the outside connection of the
+/// heat-recovery unit.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SupplyDuctInsulationAnswer {
+    Uninsulated,
+    /// Insulated (R ≥ 0,3 m²K/W over ≥ 90 % of the length), properties
+    /// unknown.
+    Insulated,
+    Specified {
+        #[serde(rename = "thicknessM")]
+        thickness_m: f64,
+        #[serde(rename = "conductivityWPerMK")]
+        conductivity_w_per_mk: f64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -614,6 +750,22 @@ pub struct UtilitySurvey {
     /// Building-bound electrical or thermal storage (§15.5).
     #[serde(default)]
     pub storage: Option<super::production::SurveyStorage>,
+    /// §7.1.7 (p. 61–62): building-bound installations on the plot burning
+    /// fossil fuel; `None` not established (the calculation decides).
+    #[serde(default)]
+    pub fossil_fuel_on_plot: Option<bool>,
+    /// p. 65: A_g of the sport and swimming halls when a sport function is
+    /// present and the building has A_g ≥ 1 000 m² (NTA 13.32a).
+    #[serde(default)]
+    pub sport_hall_area_m2: Option<f64>,
+    /// p. 65: A_g of the room with a swimming pool (walkway plus basin);
+    /// part of the sport function (NTA §11.2.2.5.1, q × 2).
+    #[serde(default)]
+    pub swimming_pool_area_m2: Option<f64>,
+    /// Afb. 6.6 (p. 53): the residence areas are openly connected, so the
+    /// ventilation-capacity criterion does not split the zone.
+    #[serde(default)]
+    pub openly_connected_residence_areas: bool,
     pub source_reference: String,
     /// Reason per applied default (path or rule) for falling back on the
     /// forfait (BRL 9500-U §4.2.2).
@@ -653,7 +805,12 @@ fn utility_source(rule: &str) -> Option<&'static str> {
         "several_emitters_surface_heating_first" => "ISSO 75.1 p. 125",
         "hydronic_balancing_unknown_none" => "ISSO 75.1 p. 118",
         "emission_control_unknown_other" => "ISSO 75.1 p. 126",
-        "pipe_insulation_unknown_uninsulated" => "ISSO 75.1 p. 120",
+        "pipe_insulation_unknown_uninsulated"
+        | "pipe_fittings_unknown_uninsulated"
+        | "pipe_insulation_year_unknown_construction_year" => "ISSO 75.1 p. 120 (table 9.12)",
+        "renovated_one_pipe_as_two_pipe" => {
+            "ISSO 75.1 p. 117 (§9.4.2); NTA 8800 p. 317 (one-pipe rule only)"
+        }
         "heat_meter_unknown_present" => "ISSO 75.1 p. 123",
         "pump_unknown_forfait" => "ISSO 75.1 p. 119",
         "no_hot_water_system_electric_instantaneous" => "ISSO 75.1 p. 164",
@@ -818,6 +975,79 @@ pub fn function_groups(
     })
 }
 
+/// Table 6.4 (p. 54): heating setpoint (°C) and ventilation capacity
+/// (dm³/(s·m²)) per use function; `None` for functions outside the table.
+fn table_6_4(function: LabelFunction) -> Option<(f64, f64)> {
+    Some(match function {
+        LabelFunction::AssemblyWithDayCare => (21.0, 2.78),
+        LabelFunction::AssemblyWithoutDayCare => (21.0, 1.71),
+        LabelFunction::Cell => (21.0, 0.84),
+        LabelFunction::HealthcareWithBeds => (22.0, 2.04),
+        LabelFunction::HealthcareWithoutBeds => (21.0, 1.11),
+        LabelFunction::Office => (21.0, 1.11),
+        LabelFunction::Lodging => (21.0, 0.84),
+        LabelFunction::Education => (21.0, 3.64),
+        LabelFunction::Retail => (21.0, 0.28),
+        LabelFunction::Sport => (16.0, 0.46),
+        LabelFunction::Residential => return None,
+    })
+}
+
+/// Afb. 6.6 with table 6.4 (p. 53–54): the criteria that force a split of
+/// the climate zone into several calculation zones, on the use functions
+/// left after the merge of p. 39–40. The basic survey derives one
+/// calculation zone (the envelope is not surveyed per zone), so a required
+/// split stops the survey (`calculation_zone_split_required`). The third
+/// criterion (internal heat capacity differing by more than a factor 3)
+/// cannot arise: the survey records one construction for the building.
+fn check_zone_split(groups: &FunctionGroups, survey: &UtilitySurvey, recorder: &mut Recorder) {
+    let rows: Vec<(f64, f64, f64)> = groups
+        .groups
+        .iter()
+        .filter_map(|(function, area)| table_6_4(*function).map(|(t, q)| (t, q, *area)))
+        .collect();
+    if rows.len() < 2 || groups.total_m2 <= 0.0 {
+        return;
+    }
+    let largest = rows.iter().map(|row| row.2).fold(0.0, f64::max);
+    let (t_min, t_max) = rows
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), row| {
+            (lo.min(row.0), hi.max(row.0))
+        });
+    // Setpoints more than 4 K apart, unless the largest function holds at
+    // least 90 % of the zone.
+    if t_max - t_min > 4.0 && largest < 0.9 * groups.total_m2 {
+        recorder.issue("calculation_zone_split_required", "functions");
+        return;
+    }
+    // Ventilation types A, B, C and E: capacities more than a factor 4
+    // apart, unless the residence areas are openly connected or more than
+    // 80 % of them has the same requirement.
+    let vent = &survey.ventilation;
+    let type_d = vent.principle == VentilationPrinciple::Balanced && vent.combined.is_none();
+    if type_d || survey.openly_connected_residence_areas {
+        return;
+    }
+    let (q_min, q_max) = rows
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), row| {
+            (lo.min(row.1), hi.max(row.1))
+        });
+    let same_requirement = rows
+        .iter()
+        .map(|row| {
+            rows.iter()
+                .filter(|other| (other.1 - row.1).abs() < 1e-9)
+                .map(|other| other.2)
+                .sum::<f64>()
+        })
+        .fold(0.0, f64::max);
+    if q_max > 4.0 * q_min && same_requirement <= 0.8 * groups.total_m2 {
+        recorder.issue("calculation_zone_split_required", "functions");
+    }
+}
+
 /// The main function and the total area (see [`function_groups`]).
 pub fn main_function(
     functions: &[FunctionArea],
@@ -894,15 +1124,40 @@ pub fn utility_airtightness(
 /// Table 7.3 and §5.5.8: f_BACS 1,05 when a system above 290 kW (or
 /// serving more than 2 500 m² when the power is unknown) lacks a compliant
 /// BACS.
-/// With the power and the served area both unknown, the system is taken to
-/// serve the whole building A_g (p. 62: the served A_g decides).
+/// Without `systemPowerKw` the surveyed heating and cooling systems decide
+/// (`system_powers_kw`: the summed nominal power per system, `None` when a
+/// generator's power is unknown; p. 63: generators of one system are
+/// summed, systems are not). Only when a power is unknown does the served
+/// A_g decide; with the power and the served area both unknown, the system
+/// is taken to serve the whole building A_g (p. 62).
 pub fn bacs_factor(
     bacs: &SurveyBacs,
+    system_powers_kw: &[Option<f64>],
     building_area_m2: f64,
     recorder: &mut Recorder,
 ) -> (f64, String) {
+    let surveyed_large = system_powers_kw
+        .iter()
+        .flatten()
+        .any(|power| *power > 290.0);
+    let all_known =
+        !system_powers_kw.is_empty() && system_powers_kw.iter().all(|power| power.is_some());
     let large = match bacs.system_power_kw {
         Some(power) => power > 290.0,
+        None if surveyed_large || all_known => {
+            let largest = system_powers_kw
+                .iter()
+                .flatten()
+                .copied()
+                .fold(0.0, f64::max);
+            recorder.record(
+                "bacs_power_from_surveyed_systems",
+                "bacs.systemPowerKw",
+                format!("{largest} kW (largest surveyed heating or cooling system)"),
+                "ISSO 75.1 p. 62–63 (table 7.3)",
+            );
+            largest > 290.0
+        }
         None => {
             let area = bacs.served_area_m2.unwrap_or_else(|| {
                 recorder.record(
@@ -971,6 +1226,36 @@ pub fn bacs_factor(
                 .into(),
         )
     }
+}
+
+/// Table 7.3 (p. 63): the nominal power of each surveyed heating and
+/// cooling system, the generators of one system summed; `None` when a
+/// generator's power is unknown.
+fn surveyed_system_powers(survey: &UtilitySurvey) -> Vec<Option<f64>> {
+    let sum = |powers: Vec<Option<f64>>| -> Option<f64> { powers.into_iter().sum() };
+    let heating = survey.heating_installation.capacity_kw.or_else(|| {
+        let mut powers = vec![survey.heating.nominal_power_kw];
+        powers.extend(
+            survey
+                .heating
+                .additional_generators
+                .iter()
+                .map(|extra| extra.nominal_power_kw),
+        );
+        sum(powers)
+    });
+    let mut systems = vec![heating];
+    if let Some(cooling) = &survey.cooling {
+        let mut powers = vec![cooling.capacity_kw];
+        powers.extend(
+            cooling
+                .additional_generators
+                .iter()
+                .map(|extra| extra.capacity_kw),
+        );
+        systems.push(sum(powers));
+    }
+    systems
 }
 
 fn design_class_from_mean(mean: f64) -> &'static str {
@@ -1173,12 +1458,14 @@ fn derive_utility_heating(
                 })
             });
         let mut system = derived.distribution_system.take().unwrap_or_else(|| {
-            recorder.record(
-                "pipe_insulation_unknown_uninsulated",
-                "heating.distribution",
-                "uninsulated".into(),
-                "ISSO 75.1 p. 120",
+            // Table 9.12 (p. 120) and the one-pipe loop of §9.4.2 (p. 117),
+            // as in the residential survey.
+            let (transmittance, valves) = super::heating::pipe_insulation(
+                &survey.heating,
+                survey.construction_year,
+                recorder,
             );
+            let one_pipe = super::heating::one_pipe_emitters(&survey.heating, recorder);
             recorder.record(
                 "heat_meter_unknown_present",
                 "heating.distribution.pump",
@@ -1193,9 +1480,9 @@ fn derive_utility_heating(
             );
             json!({
                 "designTemperatureClass": mean.map(design_class_from_mean).unwrap_or("90_70"),
-                "pipeTransmittance": {"method": "forfait", "insulation": {"state": "uninsulated"}},
-                "valvesInsulated": false,
-                "pump": {"method": "calculated", "heatMeterPresent": true, "sourceReference": "basisopname forfait"},
+                "pipeTransmittance": transmittance,
+                "valvesInsulated": valves,
+                "pump": {"method": "calculated", "heatMeterPresent": true, "onePipeEmitterCount": one_pipe, "sourceReference": "basisopname forfait"},
                 "sourceReference": format!("{reference}; basisopname"),
             })
         });
@@ -1260,7 +1547,17 @@ impl CoolingBook {
             (Self::Utility, "control") => "ISSO 75.1 p. 138 (table 10.12)",
             (Self::Utility, "design") => "ISSO 75.1 p. 132 (table 10.4)",
             (Self::Utility, "pipe") => "ISSO 75.1 p. 135 (table 10.7)",
+            (Self::Utility, "fittings") => "ISSO 75.1 p. 136 (table 10.9)",
+            (Self::Utility, "length") => "ISSO 75.1 p. 137 (table 10.10)",
+            (Self::Utility, "meters") => "ISSO 75.1 p. 137 (table 10.11)",
+            (Self::Utility, "gas_engine") => "ISSO 75.1 p. 130 (table 10.2)",
+            (Self::Utility, "expansion") => "ISSO 75.1 p. 130, 133 (§10.3.1.1, §10.4.1)",
             (Self::Utility, _) => "ISSO 75.1 p. 136–137 (tables 10.8–10.11)",
+            (Self::Residential, "fittings") => "ISSO 82.1 p. 135 (table 10.9)",
+            (Self::Residential, "length") => "ISSO 82.1 p. 135 (table 10.10)",
+            (Self::Residential, "meters") => "ISSO 82.1 p. 136 (table 10.11)",
+            (Self::Residential, "gas_engine") => "ISSO 82.1 p. 128 (table 10.2)",
+            (Self::Residential, "expansion") => "ISSO 82.1 p. 128, 131 (§10.3.1.1, §10.4.1)",
             (Self::Residential, "aquifer") => "ISSO 82.1 p. 129",
             (Self::Residential, "power") => "ISSO 82.1 p. 130 (table 10.3)",
             (Self::Residential, "concrete") => "ISSO 82.1 p. 136",
@@ -1333,16 +1630,16 @@ fn ground_source_heat_pump(generator: &Value) -> bool {
         || matches!(annex_q, Some("brine_water" | "water_water"))
 }
 
-pub(crate) fn cooling_value(
-    cooling: &SurveyCooling,
-    construction_year: i32,
-    storeys: u32,
+/// One surveyed cooling generator as the kernel generator kind.
+fn cooling_generator_value(
+    answer: CoolingGeneratorAnswer,
+    aquifer_permit_year: Option<i32>,
+    gas_engine: Option<&SurveyGasEngine>,
+    path: &str,
     book: CoolingBook,
-    individual_dwelling: bool,
     recorder: &mut Recorder,
 ) -> Value {
-    let reference = cooling.source_reference.as_str();
-    let generator = match cooling.generator {
+    match answer {
         CoolingGeneratorAnswer::Compression => json!({"kind": "compression"}),
         CoolingGeneratorAnswer::RoomAirConditioner => json!({"kind": "room_air_conditioner"}),
         CoolingGeneratorAnswer::GasAbsorption => json!({"kind": "gas_absorption"}),
@@ -1356,14 +1653,14 @@ pub(crate) fn cooling_value(
             json!({"kind": "free_cooling", "source": "aquifer_from2013"})
         }
         CoolingGeneratorAnswer::AquiferYearUnknown => {
-            let source = match cooling.aquifer_permit_year {
+            let source = match aquifer_permit_year {
                 Some(year) if year >= 2013 => "aquifer_from2013",
                 _ => book.aquifer_before_2013(),
             };
             recorder.record(
                 "aquifer_year_unknown",
-                "cooling.generator",
-                format!("{source} (permit year {:?})", cooling.aquifer_permit_year),
+                &format!("{path}.generator"),
+                format!("{source} (permit year {aquifer_permit_year:?})"),
                 book.cite("aquifer"),
             );
             json!({"kind": "free_cooling", "source": source})
@@ -1377,13 +1674,125 @@ pub(crate) fn cooling_value(
         CoolingGeneratorAnswer::DewPointCooling => {
             json!({"kind": "free_cooling", "source": "dew_point_cooling"})
         }
-    };
+        // Table 10.2: year unknown → up to 2006; the electric power has no
+        // default. NTA table 10.29 with ε_ge from table 9.31.
+        CoolingGeneratorAnswer::GasEngineCompression => {
+            let engine = gas_engine.cloned().unwrap_or_default();
+            let after_2006 = engine.from_2007.unwrap_or_else(|| {
+                recorder.record(
+                    "gas_engine_year_unknown_up_to_2006",
+                    &format!("{path}.gasEngine.from2007"),
+                    "up to 2006".into(),
+                    book.cite("gas_engine"),
+                );
+                false
+            });
+            let power = match engine.electric_power_kw {
+                Some(power) if power.is_finite() && power > 0.0 && power <= 25_000.0 => power,
+                Some(_) => {
+                    recorder.issue(
+                        "gas_engine_power_invalid",
+                        format!("{path}.gasEngine.electricPowerKw"),
+                    );
+                    0.0
+                }
+                None => {
+                    recorder.issue(
+                        "gas_engine_power_required",
+                        format!("{path}.gasEngine.electricPowerKw"),
+                    );
+                    0.0
+                }
+            };
+            json!({
+                "kind": "gas_engine_compression",
+                "gasEngine": {
+                    "powerKw": power,
+                    "builtAfter2006": after_2006,
+                    "hreDeclared": engine.hre_declared,
+                },
+            })
+        }
+    }
+}
+
+pub(crate) fn cooling_value(
+    cooling: &SurveyCooling,
+    construction_year: i32,
+    storeys: u32,
+    book: CoolingBook,
+    individual_dwelling: bool,
+    recorder: &mut Recorder,
+) -> Value {
+    let reference = cooling.source_reference.as_str();
+    let generator = cooling_generator_value(
+        cooling.generator,
+        cooling.aquifer_permit_year,
+        cooling.gas_engine.as_ref(),
+        "cooling",
+        book,
+        recorder,
+    );
+    let mut generators = vec![json!({
+        "id": "koeling",
+        "generator": generator,
+        "capacityKw": cooling.capacity_kw,
+        "equipmentReference": reference,
+    })];
+    for (index, extra) in cooling.additional_generators.iter().enumerate() {
+        let path = format!("cooling.additionalGenerators[{index}]");
+        let generator = cooling_generator_value(
+            extra.generator,
+            extra.aquifer_permit_year,
+            extra.gas_engine.as_ref(),
+            &path,
+            book,
+            recorder,
+        );
+        generators.push(json!({
+            "id": format!("koeling-{}", index + 2),
+            "generator": generator,
+            "capacityKw": extra.capacity_kw,
+            "equipmentReference": reference,
+        }));
+    }
+    // 10.49/10.50 (§10.3.2, p. 131): the priority split needs the nominal
+    // power of every generator.
+    if !cooling.additional_generators.is_empty() {
+        if cooling.capacity_kw.is_none() {
+            recorder.issue("cooling_generator_capacity_required", "cooling.capacityKw");
+        }
+        for (index, extra) in cooling.additional_generators.iter().enumerate() {
+            if extra.capacity_kw.is_none() {
+                recorder.issue(
+                    "cooling_generator_capacity_required",
+                    format!("cooling.additionalGenerators[{index}].capacityKw"),
+                );
+            }
+        }
+    }
     if cooling.capacity_kw.is_none() {
         recorder.record(
             "cooling_power_unknown_forfait",
             "cooling.capacityKw",
             "forfait".into(),
             book.cite("power"),
+        );
+    }
+    if cooling.water_based && cooling.direct_expansion.is_some() {
+        recorder.issue(
+            "cooling_direct_expansion_not_water_based",
+            "cooling.directExpansion",
+        );
+    }
+    if !cooling.water_based
+        && cooling.direct_expansion == Some(DirectExpansionAnswer::AirHandlingUnit)
+    {
+        recorder.record(
+            "cooling_direct_expansion_in_ahu",
+            "cooling.directExpansion",
+            "no distribution; cold through the AHU cooling coil".into(),
+            book.cite("expansion"),
         );
     }
     let (emitter, radiant) = match cooling.emitter {
@@ -1466,12 +1875,7 @@ pub(crate) fn cooling_value(
             "fanCoilCount": cooling.fan_coil_count,
             "sourceReference": format!("{reference}; basisopname"),
         },
-        "generators": [{
-            "id": "koeling",
-            "generator": generator,
-            "capacityKw": cooling.capacity_kw,
-            "equipmentReference": reference,
-        }],
+        "generators": generators,
     });
     if cooling.water_based {
         let design = match cooling.design_temperature {
@@ -1524,20 +1928,53 @@ pub(crate) fn cooling_value(
                 "uninsulated"
             }
         };
-        recorder.record(
-            "cooling_fittings_unknown_uninsulated_meters_present",
-            "cooling.distribution",
-            "fittings uninsulated, length forfait, cold meters present".into(),
-            book.cite("fittings"),
-        );
+        let fittings = cooling.fittings_insulated.unwrap_or_else(|| {
+            recorder.record(
+                "cooling_fittings_unknown_uninsulated",
+                "cooling.fittingsInsulated",
+                "not insulated".into(),
+                book.cite("fittings"),
+            );
+            false
+        });
+        // Table 10.11 (NTA table 10.12): cold meters unknown → present.
+        let meters = cooling.cold_meters.unwrap_or_else(|| {
+            recorder.record(
+                "cooling_meters_unknown_present",
+                "cooling.coldMeters",
+                "present".into(),
+                book.cite("meters"),
+            );
+            true
+        });
+        if cooling.pipe_length_m.is_none() || cooling.uncooled_pipe_length_m.is_none() {
+            recorder.record(
+                "cooling_pipe_length_unknown_forfait",
+                "cooling.pipeLengthM",
+                "forfait (10.27, 15 % in uncooled spaces)".into(),
+                book.cite("length"),
+            );
+        }
+        for (field, value) in [
+            ("pipeLengthM", cooling.pipe_length_m),
+            ("uncooledPipeLengthM", cooling.uncooled_pipe_length_m),
+        ] {
+            if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+                recorder.issue("cooling_pipe_length_invalid", format!("cooling.{field}"));
+            }
+        }
+        // NTA table 10.11: any performed balancing, static or dynamic
+        // (ISSO table 10.6), gives f_HB 1,0.
         system["distribution"] = json!({
             "designTemperature": design,
             "pipe": {"kind": pipe},
-            "fittingsInsulated": false,
+            "fittingsInsulated": fittings,
+            "pipeLengthM": cooling.pipe_length_m,
+            "unconditionedPipeLengthM": cooling.uncooled_pipe_length_m,
             "pump": {
-                "hydraulicallyBalanced": balancing == "static",
+                "hydraulicallyBalanced": balancing != "none_or_unknown",
                 "floorCount": storeys.max(1),
-                "heatMeter": true,
+                "heatMeter": meters,
                 "individualDwellingInstallation": individual_dwelling,
                 "sourceReference": "basisopname forfait",
             },
@@ -1591,6 +2028,114 @@ fn pressure_variant(
     format!("{prefix}{suffix}")
 }
 
+/// The kernel `heatRecovery` from tables 11.10–11.12 (p. 150–151).
+fn recovery_value(
+    vent: &UtilityVentilation,
+    exchanger: &str,
+    combined: bool,
+    recorder: &mut Recorder,
+) -> Value {
+    let reference = vent.source_reference.as_str();
+    // Table 11.6 (p. 145): central or decentral; a system E unit is
+    // decentral (D.5b).
+    let layout = if combined || vent.heat_recovery_layout == Some(RecoveryLayout::Decentral) {
+        "decentral"
+    } else {
+        "central"
+    };
+    let insulation = match vent.supply_duct_insulation {
+        Some(SupplyDuctInsulationAnswer::Uninsulated) => json!({"kind": "uninsulated"}),
+        Some(SupplyDuctInsulationAnswer::Insulated) => json!({"kind": "insulated"}),
+        Some(SupplyDuctInsulationAnswer::Specified {
+            thickness_m,
+            conductivity_w_per_mk,
+        }) => {
+            if !(thickness_m.is_finite()
+                && thickness_m > 0.0
+                && conductivity_w_per_mk.is_finite()
+                && conductivity_w_per_mk > 0.0)
+            {
+                recorder.issue(
+                    "supply_duct_insulation_invalid",
+                    "ventilation.supplyDuctInsulation",
+                );
+            }
+            json!({
+                "kind": "specified",
+                "thicknessM": thickness_m,
+                "conductivityWPerMK": conductivity_w_per_mk,
+            })
+        }
+        None => {
+            recorder.record(
+                "supply_duct_insulation_unknown",
+                "ventilation.supplyDuctInsulation",
+                "not insulated (R < 0,3)".into(),
+                "ISSO 75.1 p. 150 (table 11.10)",
+            );
+            json!({"kind": "uninsulated"})
+        }
+    };
+    let constant_volume = vent.constant_volume_control.unwrap_or_else(|| {
+        recorder.record(
+            "constant_volume_unknown_none",
+            "ventilation.constantVolumeControl",
+            "false".into(),
+            "ISSO 75.1 p. 151 (table 11.11)",
+        );
+        false
+    });
+    // Table 11.12 (p. 151): a partial bypass rounded down to tens; with the
+    // bypass or its share unknown the kernel's "unknown" (11.3.2.2).
+    let bypass = match vent.bypass_percent {
+        Some(percent) if percent > 100 => {
+            recorder.issue("bypass_percent_invalid", "ventilation.bypassPercent");
+            json!({"kind": "none"})
+        }
+        Some(percent) => match percent / 10 * 10 {
+            0 => json!({"kind": "none"}),
+            100 => json!({"kind": "full"}),
+            tens => json!({"kind": "partial", "fraction": f64::from(tens) / 100.0}),
+        },
+        None => {
+            recorder.record(
+                "bypass_table_11_12",
+                "ventilation.bypassPercent",
+                "unknown (NTA 11.3.2.2 defaults)".into(),
+                "ISSO 75.1 p. 151 (table 11.12)",
+            );
+            json!({"kind": "unknown", "bypassPresent": vent.bypass_present.unwrap_or(false)})
+        }
+    };
+    let mut recovery = json!({
+        "efficiency": {"method": "table", "exchanger": exchanger},
+        "bypass": bypass,
+        "layout": layout,
+        "constantVolumeControl": constant_volume,
+        "supplyDuctInsulation": insulation,
+        "equipmentReference": reference,
+    });
+    match vent.supply_duct_length_m {
+        Some(length) if length.is_finite() && length >= 0.0 => {
+            recovery["supplyDuctLengthM"] = json!(length);
+        }
+        Some(_) => recorder.issue(
+            "supply_duct_length_invalid",
+            "ventilation.supplyDuctLengthM",
+        ),
+        None => recorder.record(
+            "supply_duct_length_unknown_default",
+            "ventilation.supplyDuctLengthM",
+            format!("kernel default for a {layout} system (11.109)"),
+            "ISSO 75.1 p. 150 (table 11.10)",
+        ),
+    }
+    if let Some(year) = vent.unit_manufacture_year {
+        recovery["manufactureYear"] = json!(year);
+    }
+    recovery
+}
+
 #[allow(clippy::too_many_arguments)]
 fn ventilation_value(
     survey: &UtilitySurvey,
@@ -1625,15 +2170,23 @@ fn ventilation_value(
         }
     };
     let mechanical = vent.principle != VentilationPrinciple::Natural;
+    // Table 11.13 (p. 152): the class from a measurement or the p. 153
+    // recognition rules; unknown 1,1.
+    let duct_class = vent.duct_airtightness.or(match vent.ducts_luka_abc {
+        Some(true) => Some(DuctAirtightnessAnswer::LukaAbc),
+        _ => None,
+    });
     let ducts = if !mechanical {
         "no_ducts"
     } else {
-        match vent.ducts_luka_abc {
-            Some(true) => "luka_a_b_c",
-            Some(false) | None => {
+        match duct_class {
+            Some(DuctAirtightnessAnswer::LukaAbc) => "luka_a_b_c",
+            Some(DuctAirtightnessAnswer::LukaD) => "luka_d",
+            Some(DuctAirtightnessAnswer::NoDucts) => "no_ducts",
+            Some(DuctAirtightnessAnswer::Unknown) | None => {
                 recorder.record(
                     "duct_airtightness_unknown",
-                    "ventilation.ductsLukaAbc",
+                    "ventilation.ductAirtightness",
                     "unknown (f_lea;du 1,1)".into(),
                     "ISSO 75.1 p. 152–153 (table 11.13)",
                 );
@@ -1642,7 +2195,14 @@ fn ventilation_value(
         }
     };
     let mut unit = json!({"variant": variant, "ducts": ducts, "equipmentReference": reference});
-    if vent.principle == VentilationPrinciple::Balanced {
+    // System E (§11.3.6, p. 145): the decentral part has heat recovery,
+    // the other part follows `principle`.
+    let combined = vent.combined.as_ref();
+    if combined.is_some() && vent.principle == VentilationPrinciple::Balanced {
+        recorder.issue("combined_other_part_not_balanced", "ventilation.combined");
+    }
+    let mut recovery = None;
+    if vent.principle == VentilationPrinciple::Balanced || combined.is_some() {
         let exchanger = match vent.heat_recovery {
             None | Some(ExchangerAnswer::Unknown) => {
                 recorder.record(
@@ -1670,41 +2230,36 @@ fn ventilation_value(
             Some(ExchangerAnswer::Enthalpy) => Some("enthalpy"),
             Some(ExchangerAnswer::HeatPipe) => Some("heat_pipe"),
             Some(ExchangerAnswer::TwoElement) => Some("two_element"),
+            Some(ExchangerAnswer::ColdStorageWithAhu) => Some("run_around_coil_ahu"),
         };
+        if combined.is_some() && exchanger.is_none() {
+            recorder.issue(
+                "combined_requires_heat_recovery",
+                "ventilation.heatRecovery",
+            );
+        }
         if let Some(exchanger) = exchanger {
-            if vent.declared_variant.is_none() {
+            if vent.declared_variant.is_none() && combined.is_none() {
                 unit["variant"] = json!("d2");
             }
-            recorder.record(
-                "supply_duct_insulation_unknown",
-                "ventilation.heatRecovery",
-                "uninsulated; length by kernel default (4 m utility)".into(),
-                "ISSO 75.1 p. 150 (table 11.10)",
-            );
-            recorder.record(
-                "constant_volume_unknown_none",
-                "ventilation.heatRecovery",
-                "false".into(),
-                "ISSO 75.1 p. 151 (table 11.11)",
-            );
-            recorder.record(
-                "bypass_table_11_12",
-                "ventilation.bypass",
-                "unknown (partial bypass of unknown share: 0 %)".into(),
-                "ISSO 75.1 p. 151 (table 11.12)",
-            );
-            let mut recovery = json!({
-                "efficiency": {"method": "table", "exchanger": exchanger},
-                "bypass": {"kind": "unknown", "bypassPresent": vent.bypass_present.unwrap_or(false)},
-                "layout": "central",
-                "supplyDuctInsulation": {"kind": "uninsulated"},
-                "equipmentReference": reference,
-            });
-            if let Some(year) = vent.unit_manufacture_year {
-                recovery["manufactureYear"] = json!(year);
-            }
-            unit["heatRecovery"] = recovery;
+            recovery = Some(recovery_value(
+                vent,
+                exchanger,
+                combined.is_some(),
+                recorder,
+            ));
         }
+    }
+    if vent.ahu.is_none()
+        && survey.cooling.as_ref().is_some_and(|cooling| {
+            !cooling.water_based
+                && cooling.direct_expansion == Some(DirectExpansionAnswer::AirHandlingUnit)
+        })
+    {
+        recorder.issue(
+            "cooling_direct_expansion_ahu_requires_ahu",
+            "cooling.directExpansion",
+        );
     }
     if let Some(ahu) = &vent.ahu {
         if !matches!(
@@ -1796,7 +2351,28 @@ fn ventilation_value(
             );
             false
         });
+        // §10.4.1 (p. 133): direct expansion in the AHU delivers its cold
+        // through the AHU cooling coil.
+        let dx_in_ahu = survey.cooling.as_ref().is_some_and(|cooling| {
+            !cooling.water_based
+                && cooling.direct_expansion == Some(DirectExpansionAnswer::AirHandlingUnit)
+        });
+        if dx_in_ahu && ahu.cooling_connected == Some(false) {
+            recorder.issue(
+                "cooling_direct_expansion_ahu_requires_cooling_coil",
+                "ventilation.ahu.coolingConnected",
+            );
+        }
         let cooling_coil = ahu.cooling_connected.unwrap_or_else(|| {
+            if dx_in_ahu {
+                recorder.record(
+                    "ahu_cooling_from_direct_expansion",
+                    "ventilation.ahu.coolingConnected",
+                    "cooling coil: direct expansion in the AHU".into(),
+                    "ISSO 75.1 p. 130, 133, 152",
+                );
+                return true;
+            }
             recorder.record(
                 "ahu_cooling_unknown_none",
                 "ventilation.ahu.coolingConnected",
@@ -1910,6 +2486,37 @@ fn ventilation_value(
             current
         }
     };
+    let system = match combined {
+        Some(combined) => {
+            recorder.record(
+                "combined_system_e1",
+                "ventilation.combined",
+                "decentral part D.5b, other part per principle".into(),
+                "ISSO 75.1 p. 145 (§11.3.6); NTA table 11.5 E.1",
+            );
+            let mut decentral = json!({
+                "variant": "d5b",
+                "ducts": "no_ducts",
+                "equipmentReference": reference,
+            });
+            if let Some(recovery) = recovery {
+                decentral["heatRecovery"] = recovery;
+            }
+            json!({
+                "kind": "combined",
+                "decentralAreaM2": combined.decentral_area_m2,
+                "totalResidenceAreaM2": combined.total_residence_area_m2,
+                "decentral": decentral,
+                "other": unit,
+            })
+        }
+        None => {
+            if let Some(recovery) = recovery {
+                unit["heatRecovery"] = recovery;
+            }
+            json!({"kind": "single", "unit": unit})
+        }
+    };
     let infiltration = match &survey.measured_infiltration {
         Some(item) => json!({
             "method": "measured", "qv10DmPerSM2": item.qv10_dm3_per_s_m2,
@@ -1927,22 +2534,47 @@ fn ventilation_value(
         "zoneId": "utiliteit",
         "usableFloorAreaM2": area,
         "category": "utility",
-        "functions": ventilation_functions
-            .iter()
-            .map(|(function, part)| json!({"function": function, "areaM2": part}))
-            .collect::<Vec<_>>(),
+        "functions": ventilation_function_values(survey, ventilation_functions, recorder),
         "dwellingCount": 0,
         "buildingHeightM": survey.building_height_m,
         "constructionYear": year,
         "floorAboveCrawlspace": floor_above_crawlspace,
         "heatingSetpointC": heating_c,
         "coolingSetpointC": 24.0,
-        "system": {"kind": "single", "unit": unit},
+        "system": system,
         "flowReduction": flow_reduction,
         "infiltration": infiltration,
         "fans": {"method": "forfait", "current": current, "manufactureYear": fan_year},
         "sourceReference": format!("{reference}; basisopname"),
     });
+    // §11.4.1 (p. 146–148): the installed capacity for systems B–E; with a
+    // swimming pool in the zone the flow counts as unknown (p. 148).
+    if let Some(total) = vent.installed_capacity_dm3_per_s {
+        let pool = survey.swimming_pool_area_m2.is_some_and(|pool| pool > 0.0);
+        if !mechanical {
+            recorder.issue(
+                "installed_capacity_requires_mechanical_ventilation",
+                "ventilation.installedCapacityDm3PerS",
+            );
+        } else if !(total.is_finite() && total > 0.0) {
+            recorder.issue(
+                "installed_capacity_invalid",
+                "ventilation.installedCapacityDm3PerS",
+            );
+        } else if pool {
+            recorder.record(
+                "swimming_pool_installed_capacity_unknown",
+                "ventilation.installedCapacityDm3PerS",
+                "unknown (regulatory flow): swimming pool in the zone".into(),
+                "ISSO 75.1 p. 148",
+            );
+        } else {
+            input["installedCapacity"] = json!({
+                "totalDm3PerS": total,
+                "sourceReference": reference,
+            });
+        }
+    }
     apply_passive_cooling(
         &mut input,
         vent.passive_cooling.as_ref(),
@@ -1951,7 +2583,145 @@ fn ventilation_value(
         vent.bypass_present,
         recorder,
     );
+    if let Some(strips) = &vent.grille_heating_strips {
+        input["grillePreheating"] = grille_preheating_value(strips, recorder);
+    }
     input
+}
+
+/// §11.3.7 (p. 145–146): the grille settings from product data; without
+/// all four the kernel's 11.124 fallback. Share unknown: all grilles.
+fn grille_preheating_value(strips: &SurveyGrilleHeatingStrips, recorder: &mut Recorder) -> Value {
+    let control = match (
+        strips.max_power_w_per_dm3_per_s,
+        strips.max_temperature_rise_k,
+        strips.switch_on_below_c,
+        strips.max_supply_temperature_c,
+    ) {
+        (Some(power), Some(rise), Some(switch_on), Some(supply)) => json!({
+            "method": "specified",
+            "maxPowerWPerDm3PerS": power,
+            "maxTemperatureRiseK": rise,
+            "switchOnBelowC": switch_on,
+            "maxSupplyTemperatureC": supply,
+        }),
+        _ => {
+            recorder.record(
+                "grille_heating_strip_settings_unknown",
+                "ventilation.grilleHeatingStrips",
+                "NTA 11.124 fallback".into(),
+                "ISSO 75.1 p. 146 (§11.3.7)",
+            );
+            json!({"method": "fallback"})
+        }
+    };
+    recorder.record(
+        "grille_heating_strips_all_grilles",
+        "ventilation.grilleHeatingStrips",
+        "all grilles".into(),
+        "ISSO 75.1 p. 146 (§11.3.7)",
+    );
+    json!({"control": control, "sourceReference": strips.source_reference})
+}
+
+/// The ventilation functions with the swimming-pool room split off the
+/// sport function (p. 65; NTA §11.2.2.5.1).
+fn ventilation_function_values(
+    survey: &UtilitySurvey,
+    functions: &[(&'static str, f64)],
+    recorder: &mut Recorder,
+) -> Vec<Value> {
+    let mut values: Vec<Value> = functions
+        .iter()
+        .map(|(function, part)| json!({"function": function, "areaM2": part}))
+        .collect();
+    let Some(pool) = survey.swimming_pool_area_m2.filter(|pool| *pool > 0.0) else {
+        return values;
+    };
+    let Some(sport) = values.iter_mut().find(|value| value["function"] == "sport") else {
+        if survey
+            .functions
+            .iter()
+            .any(|item| item.function == LabelFunction::Sport)
+        {
+            // p. 54: only the functions left after the merge of p. 39–40
+            // occur in the calculation zone.
+            recorder.record(
+                "swimming_pool_in_merged_sport_function",
+                "swimmingPoolAreaM2",
+                "sport merged into the main function: no pool factor".into(),
+                "ISSO 75.1 p. 39–40, 54",
+            );
+        } else {
+            recorder.issue(
+                "swimming_pool_requires_sport_function",
+                "swimmingPoolAreaM2",
+            );
+        }
+        return values;
+    };
+    let sport_area = sport["areaM2"].as_f64().unwrap_or(0.0);
+    if !pool.is_finite() || pool > sport_area + 1e-6 {
+        recorder.issue("swimming_pool_area_invalid", "swimmingPoolAreaM2");
+        return values;
+    }
+    sport["areaM2"] = json!(sport_area - pool);
+    values.retain(|value| value["areaM2"].as_f64().unwrap_or(0.0) > 1e-9);
+    values.push(json!({"function": "sport", "areaM2": pool, "swimmingPool": true}));
+    values
+}
+
+/// p. 65 and NTA 13.32a: the sport and swimming halls served by a
+/// hot-water system with circulation, when the building has A_g ≥
+/// 1 000 m²; unknown counts as 0 m² (the longer forfait loop).
+fn sport_hall_area(
+    survey: &UtilitySurvey,
+    served: &[(LabelFunction, f64)],
+    recorder: &mut Recorder,
+) -> f64 {
+    let total: f64 = survey.functions.iter().map(|item| item.area_m2).sum();
+    let sport: f64 = survey
+        .functions
+        .iter()
+        .filter(|item| item.function == LabelFunction::Sport)
+        .map(|item| item.area_m2)
+        .sum();
+    if sport <= 0.0 || total < 1000.0 {
+        return 0.0;
+    }
+    // The group holding the sport function: itself, or the main function
+    // it was merged into (p. 39–40).
+    let Some(groups) = function_groups(&survey.functions, &mut Recorder::default()) else {
+        return 0.0;
+    };
+    let sport_group = if groups
+        .groups
+        .iter()
+        .any(|(function, _)| *function == LabelFunction::Sport)
+    {
+        LabelFunction::Sport
+    } else {
+        groups.main
+    };
+    if !served.iter().any(|(function, _)| *function == sport_group) {
+        return 0.0;
+    }
+    match survey.sport_hall_area_m2 {
+        Some(area) if area.is_finite() && area >= 0.0 && area <= sport + 1e-6 => area,
+        Some(_) => {
+            recorder.issue("sport_hall_area_invalid", "sportHallAreaM2");
+            0.0
+        }
+        None => {
+            recorder.record(
+                "sport_hall_area_unknown_0",
+                "sportHallAreaM2",
+                "0 m² (no reduction of A_g in 13.32a)".into(),
+                "ISSO 75.1 p. 65 (interpretation: conservative)",
+            );
+            0.0
+        }
+    }
 }
 
 fn hot_water_value(
@@ -2051,6 +2821,7 @@ fn hot_water_value(
                 "insulation": "unknown",
                 "fittingsInsulated": false,
                 "floorCount": survey.storeys.max(1),
+                "sportHallAreaM2": sport_hall_area(survey, groups, recorder),
                 "pump": {"control": "uncontrolled_or_unknown"},
                 "sourceReference": format!("{reference}; basisopname"),
             });
@@ -2479,11 +3250,22 @@ fn validate(survey: &UtilitySurvey, recorder: &mut Recorder) {
 
 /// Kernel input derived from the utility survey.
 pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> Option<Value> {
+    let input = derive_utility_input_cited(survey, recorder);
+    // The shared (ISSO 82.1) translations cite the ISSO 75.1 pages.
+    remap_sources(&mut recorder.applied);
+    input
+}
+
+fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -> Option<Value> {
     validate(survey, recorder);
     if !recorder.issues.is_empty() {
         return None;
     }
     let groups = function_groups(&survey.functions, recorder)?;
+    check_zone_split(&groups, survey, recorder);
+    if !recorder.issues.is_empty() {
+        return None;
+    }
     let (main, area) = (groups.main, groups.total_m2);
     let (usage, _, reduction_function) = kernel_names(main);
     // §6.5.3: area-weighted values of a mixed calculation zone.
@@ -2609,7 +3391,12 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         .iter()
         .map(|item| derive_pv(item, year, recorder))
         .collect();
-    let (bacs, bacs_reference) = bacs_factor(&survey.bacs, area, recorder);
+    let (bacs, bacs_reference) = bacs_factor(
+        &survey.bacs,
+        &surveyed_system_powers(survey),
+        area,
+        recorder,
+    );
     let (storage_present, storage) =
         super::production::derive_storage(survey.storage.as_ref(), !survey.pv.is_empty(), recorder);
     // Table 7.8 (p. 68): one uninsulated pipe per toilet group through all
@@ -2734,6 +3521,17 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     });
     if let Some(storage) = storage {
         input["storage"] = storage;
+    }
+    // §7.1.7 (p. 61–62): fossil installations on the plot that may fall
+    // outside the calculation decide "lokaal koolstofemissievrij" (§5.5.7).
+    match survey.fossil_fuel_on_plot {
+        Some(present) => input["fossilAppliancesOutsideCalculation"] = json!(present),
+        None => recorder.record(
+            "fossil_fuel_on_plot_not_established",
+            "fossilFuelOnPlot",
+            "not established: only the calculated carriers decide".into(),
+            "ISSO 75.1 p. 61–62 (§7.1.7)",
+        ),
     }
     if let (Some(mut value), Some(answer)) = (cooling, survey.cooling.as_ref()) {
         apply_cooling_heat_pump_source(
@@ -3183,22 +3981,22 @@ mod tests {
             system_power_kw: Some(290.0),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&small, 4000.0, &mut recorder).0, 1.0);
+        assert_eq!(bacs_factor(&small, &[], 4000.0, &mut recorder).0, 1.0);
         // Power and served area unknown: the building A_g decides.
         assert_eq!(
-            bacs_factor(&SurveyBacs::default(), 4000.0, &mut recorder).0,
+            bacs_factor(&SurveyBacs::default(), &[], 4000.0, &mut recorder).0,
             1.05
         );
         assert!(applied(&recorder, "bacs_served_area_unknown_building"));
         assert_eq!(
-            bacs_factor(&SurveyBacs::default(), 2000.0, &mut recorder).0,
+            bacs_factor(&SurveyBacs::default(), &[], 2000.0, &mut recorder).0,
             1.0
         );
         let unknown = SurveyBacs {
             served_area_m2: Some(2600.0),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&unknown, 4000.0, &mut recorder).0, 1.05);
+        assert_eq!(bacs_factor(&unknown, &[], 4000.0, &mut recorder).0, 1.05);
         assert!(applied(&recorder, "bacs_power_unknown_served_area"));
         assert!(applied(&recorder, "bacs_presence_unknown_no"));
         let present = SurveyBacs {
@@ -3206,7 +4004,7 @@ mod tests {
             present: Some(true),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&present, 4000.0, &mut recorder).0, 1.05);
+        assert_eq!(bacs_factor(&present, &[], 4000.0, &mut recorder).0, 1.05);
         assert!(applied(&recorder, "bacs_automation_class_unknown_d"));
         assert!(applied(&recorder, "bacs_management_class_unknown_c_d"));
         let compliant = SurveyBacs {
@@ -3217,7 +4015,7 @@ mod tests {
             evidence_reference: Some("BACS inspection".into()),
             ..SurveyBacs::default()
         };
-        assert_eq!(bacs_factor(&compliant, 4000.0, &mut recorder).0, 1.0);
+        assert_eq!(bacs_factor(&compliant, &[], 4000.0, &mut recorder).0, 1.0);
         assert!(recorder.issues.is_empty());
     }
 
@@ -3366,6 +4164,13 @@ mod tests {
             aquifer_permit_year: None,
             heat_pump_source: None,
             ground_above_zero_demonstrated: false,
+            gas_engine: None,
+            direct_expansion: None,
+            fittings_insulated: None,
+            cold_meters: None,
+            pipe_length_m: None,
+            uncooled_pipe_length_m: None,
+            additional_generators: Vec::new(),
             source_reference: "survey".into(),
         }
     }
@@ -3481,7 +4286,9 @@ mod tests {
             "cooling_pipes_insulation_unknown_no",
             "cooling_balancing_unknown_none",
             "cooling_control_unknown_other",
-            "cooling_fittings_unknown_uninsulated_meters_present",
+            "cooling_fittings_unknown_uninsulated",
+            "cooling_meters_unknown_present",
+            "cooling_pipe_length_unknown_forfait",
         ] {
             assert!(applied(&recorder, rule), "{rule}");
         }
@@ -3917,5 +4724,467 @@ mod tests {
             .find(|item| item.rule == "pilot_flame_unknown_present")
             .unwrap();
         assert_eq!(rule.source, "ISSO 75.1 p. 110");
+        // derive_utility_input cites ISSO 75.1 on its own as well.
+        let (_, recorder) = derive(&fixture("1970"));
+        assert!(recorder
+            .applied
+            .iter()
+            .all(|item| !item.source.contains("82.1")));
+    }
+
+    #[test]
+    fn bacs_uses_the_surveyed_generator_powers() {
+        // Table 7.3 (p. 62–63): a 350 kW boiler without BACS data is a
+        // system above 290 kW without BACS, whatever the served area.
+        let mut recorder = Recorder::default();
+        let (factor, _) = bacs_factor(
+            &SurveyBacs::default(),
+            &[Some(350.0)],
+            1300.0,
+            &mut recorder,
+        );
+        assert_eq!(factor, 1.05);
+        assert!(applied(&recorder, "bacs_power_from_surveyed_systems"));
+        // All systems known and at most 290 kW: 1,0 even above 2 500 m².
+        let mut recorder = Recorder::default();
+        let small = [Some(200.0), Some(150.0)];
+        assert_eq!(
+            bacs_factor(&SurveyBacs::default(), &small, 4000.0, &mut recorder).0,
+            1.0
+        );
+        // One power unknown: the served A_g decides (p. 62).
+        let mut recorder = Recorder::default();
+        let partial = [Some(200.0), None];
+        assert_eq!(
+            bacs_factor(&SurveyBacs::default(), &partial, 4000.0, &mut recorder).0,
+            1.05
+        );
+        assert!(applied(&recorder, "bacs_power_unknown_served_area"));
+        // In the survey: the installation capacity, else the summed
+        // generator powers, and the cooling capacities.
+        let mut survey = fixture("1985");
+        survey.bacs = SurveyBacs::default();
+        survey.heating_installation.capacity_kw = Some(350.0);
+        let (input, _) = derive(&survey);
+        assert_eq!(input["bacsFactor"], 1.05);
+        survey.heating_installation.capacity_kw = None;
+        survey.heating.nominal_power_kw = Some(120.0);
+        assert_eq!(surveyed_system_powers(&survey), vec![Some(120.0)]);
+        let mut chiller = cooling(CoolingEmitterAnswer::FanCoilOnCeiling);
+        chiller.fan_coil_count = 10;
+        chiller.capacity_kw = Some(200.0);
+        chiller.additional_generators.push(SurveyCoolingGenerator {
+            generator: CoolingGeneratorAnswer::AquiferFrom2013,
+            capacity_kw: Some(150.0),
+            aquifer_permit_year: None,
+            gas_engine: None,
+        });
+        survey.cooling = Some(chiller);
+        assert_eq!(
+            surveyed_system_powers(&survey),
+            vec![Some(120.0), Some(350.0)]
+        );
+    }
+
+    #[test]
+    fn calculation_zone_split_follows_afb_6_6() {
+        let split =
+            |functions: Vec<(LabelFunction, f64)>, principle: VentilationPrinciple, open: bool| {
+                let mut survey = fixture("2005");
+                survey.functions = functions
+                    .into_iter()
+                    .map(|(function, area_m2)| FunctionArea { function, area_m2 })
+                    .collect();
+                survey.ventilation.principle = principle;
+                survey.openly_connected_residence_areas = open;
+                let mut recorder = Recorder::default();
+                let groups = function_groups(&survey.functions, &mut recorder).unwrap();
+                check_zone_split(&groups, &survey, &mut recorder);
+                recorder
+                    .issues
+                    .iter()
+                    .any(|item| item.code == "calculation_zone_split_required")
+            };
+        // Table 6.4: education 21 °C, sport 16 °C (5 K), largest 58 %.
+        let mixed = vec![
+            (LabelFunction::Education, 1400.0),
+            (LabelFunction::Sport, 1000.0),
+        ];
+        assert!(split(mixed.clone(), VentilationPrinciple::Balanced, true));
+        // A sport function within 25 % is merged first (p. 39–40), so the
+        // criteria do not see it.
+        let merged = vec![
+            (LabelFunction::Education, 2300.0),
+            (LabelFunction::Sport, 250.0),
+        ];
+        assert!(!split(
+            merged,
+            VentilationPrinciple::MechanicalExtract,
+            false
+        ));
+        // Equal setpoints (healthcare beds 22, office 21: 1 K), capacities
+        // 2,04/1,11 within 4 ×: no split.
+        let care = vec![
+            (LabelFunction::HealthcareWithBeds, 1000.0),
+            (LabelFunction::Office, 800.0),
+        ];
+        assert!(!split(care, VentilationPrinciple::MechanicalExtract, false));
+        // Type C with capacities 3,64/0,46 but openly connected areas: the
+        // setpoint criterion still splits (16 vs 21 °C).
+        let gym = vec![
+            (LabelFunction::Education, 1000.0),
+            (LabelFunction::Sport, 400.0),
+        ];
+        assert!(split(gym, VentilationPrinciple::MechanicalExtract, true));
+        // Same setpoint, capacities 3,64 and 0,28 (13 ×): split under type
+        // C, not under type D or with more than 80 % one requirement.
+        let school_shop = vec![
+            (LabelFunction::Education, 1000.0),
+            (LabelFunction::Retail, 1000.0),
+        ];
+        assert!(split(
+            school_shop.clone(),
+            VentilationPrinciple::MechanicalExtract,
+            false
+        ));
+        assert!(!split(school_shop, VentilationPrinciple::Balanced, false));
+        let mostly_school = vec![
+            (LabelFunction::Education, 1700.0),
+            (LabelFunction::Retail, 400.0),
+        ];
+        // 400 m² > 25 % of 2 100? No: 19 %, merged into education.
+        assert!(!split(
+            mostly_school,
+            VentilationPrinciple::MechanicalExtract,
+            false
+        ));
+        // Office 1,11 and retail 0,28 (3,96 ×): no split.
+        let office_shop = vec![
+            (LabelFunction::Retail, 1800.0),
+            (LabelFunction::Office, 1200.0),
+        ];
+        assert!(!split(
+            office_shop,
+            VentilationPrinciple::MechanicalExtract,
+            false
+        ));
+        // The survey stops with the issue.
+        let mut survey = fixture("2005");
+        survey.functions = vec![
+            FunctionArea {
+                function: LabelFunction::Education,
+                area_m2: 1400.0,
+            },
+            FunctionArea {
+                function: LabelFunction::Sport,
+                area_m2: 1000.0,
+            },
+        ];
+        let mut recorder = Recorder::default();
+        assert!(derive_utility_input(&survey, &mut recorder).is_none());
+        assert_eq!(recorder.issues[0].code, "calculation_zone_split_required");
+    }
+
+    #[test]
+    fn cooling_options_of_chapter_10() {
+        // Table 10.6 with NTA table 10.11: dynamic balancing is balanced.
+        let mut recorder = Recorder::default();
+        let mut dynamic = cooling(CoolingEmitterAnswer::CeilingCooling);
+        dynamic.balanced = Some(CoolingBalanceAnswer::Kind(CoolingBalanceKind::Dynamic));
+        dynamic.fittings_insulated = Some(true);
+        dynamic.cold_meters = Some(false);
+        dynamic.pipe_length_m = Some(400.0);
+        dynamic.uncooled_pipe_length_m = Some(30.0);
+        let value = cooling_value(
+            &dynamic,
+            2000,
+            3,
+            CoolingBook::Utility,
+            false,
+            &mut recorder,
+        );
+        let distribution = &value["distribution"];
+        assert_eq!(distribution["pump"]["hydraulicallyBalanced"], true);
+        assert_eq!(distribution["pump"]["heatMeter"], false);
+        assert_eq!(distribution["fittingsInsulated"], true);
+        assert_eq!(distribution["pipeLengthM"], 400.0);
+        assert_eq!(distribution["unconditionedPipeLengthM"], 30.0);
+        assert!(!applied(&recorder, "cooling_pipe_length_unknown_forfait"));
+        let mut none = dynamic.clone();
+        none.balanced = Some(CoolingBalanceAnswer::Kind(CoolingBalanceKind::None));
+        let value = cooling_value(&none, 2000, 3, CoolingBook::Utility, false, &mut recorder);
+        assert_eq!(
+            value["distribution"]["pump"]["hydraulicallyBalanced"],
+            false
+        );
+        // Table 10.2: gas-engine chiller, year unknown → up to 2006.
+        let mut gas = cooling(CoolingEmitterAnswer::CeilingCooling);
+        gas.generator = CoolingGeneratorAnswer::GasEngineCompression;
+        gas.gas_engine = Some(SurveyGasEngine {
+            from_2007: None,
+            electric_power_kw: Some(50.0),
+            hre_declared: false,
+        });
+        let mut recorder = Recorder::default();
+        let value = cooling_value(&gas, 2000, 3, CoolingBook::Utility, false, &mut recorder);
+        let generator = &value["generators"][0]["generator"];
+        assert_eq!(generator["kind"], "gas_engine_compression");
+        assert_eq!(generator["gasEngine"]["powerKw"], 50.0);
+        assert_eq!(generator["gasEngine"]["builtAfter2006"], false);
+        assert!(applied(&recorder, "gas_engine_year_unknown_up_to_2006"));
+        assert!(recorder.issues.is_empty());
+        gas.gas_engine = None;
+        let mut recorder = Recorder::default();
+        cooling_value(&gas, 2000, 3, CoolingBook::Utility, false, &mut recorder);
+        assert_eq!(recorder.issues[0].code, "gas_engine_power_required");
+        // §10.3.2: further generators, each with its power.
+        let mut two = cooling(CoolingEmitterAnswer::CeilingCooling);
+        two.capacity_kw = Some(300.0);
+        two.additional_generators.push(SurveyCoolingGenerator {
+            generator: CoolingGeneratorAnswer::AquiferYearUnknown,
+            capacity_kw: None,
+            aquifer_permit_year: Some(2015),
+            gas_engine: None,
+        });
+        let mut recorder = Recorder::default();
+        let value = cooling_value(&two, 2000, 3, CoolingBook::Utility, false, &mut recorder);
+        let generators = value["generators"].as_array().unwrap();
+        assert_eq!(generators.len(), 2);
+        assert_eq!(generators[1]["id"], "koeling-2");
+        assert_eq!(generators[1]["generator"]["source"], "aquifer_from2013");
+        assert_eq!(
+            recorder.issues[0].code,
+            "cooling_generator_capacity_required"
+        );
+        assert_eq!(
+            recorder.issues[0].path,
+            "cooling.additionalGenerators[0].capacityKw"
+        );
+        // §10.4.1: direct expansion only without water distribution.
+        let mut dx = cooling(CoolingEmitterAnswer::Other);
+        dx.direct_expansion = Some(DirectExpansionAnswer::AirHandlingUnit);
+        let mut recorder = Recorder::default();
+        cooling_value(&dx, 2000, 3, CoolingBook::Utility, false, &mut recorder);
+        assert_eq!(
+            recorder.issues[0].code,
+            "cooling_direct_expansion_not_water_based"
+        );
+        dx.water_based = false;
+        let mut recorder = Recorder::default();
+        let value = cooling_value(&dx, 2000, 3, CoolingBook::Utility, false, &mut recorder);
+        assert!(value.get("distribution").is_none());
+        assert!(applied(&recorder, "cooling_direct_expansion_in_ahu"));
+    }
+
+    #[test]
+    fn direct_expansion_in_the_ahu_needs_its_cooling_coil() {
+        let mut survey = fixture("1985");
+        let mut dx = cooling(CoolingEmitterAnswer::Other);
+        dx.water_based = false;
+        dx.direct_expansion = Some(DirectExpansionAnswer::AirHandlingUnit);
+        survey.cooling = Some(dx);
+        survey.ventilation.ahu = None;
+        let mut recorder = Recorder::default();
+        assert!(derive_utility_input(&survey, &mut recorder).is_none());
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "cooling_direct_expansion_ahu_requires_ahu"));
+        survey.ventilation.ahu = Some(SurveyAhu {
+            inside_thermal_zone: Some(false),
+            ducts_outside_thermal_zone: Some(false),
+            duct_length: None,
+            ducts_insulated: None,
+            heating_connected: Some(false),
+            cooling_connected: None,
+        });
+        let (input, recorder) = derive(&survey);
+        assert_eq!(
+            input["spaceHeating"]["demand"]["ventilation"]["system"]["unit"]["airHandlingUnit"]
+                ["coolingCoil"],
+            true
+        );
+        assert!(applied(&recorder, "ahu_cooling_from_direct_expansion"));
+    }
+
+    #[test]
+    fn utility_ventilation_options_of_chapter_11() {
+        let mut survey = fixture("1985");
+        let vent = &mut survey.ventilation;
+        vent.principle = VentilationPrinciple::Balanced;
+        vent.heat_recovery = Some(ExchangerAnswer::ColdStorageWithAhu);
+        vent.duct_airtightness = Some(DuctAirtightnessAnswer::LukaD);
+        vent.heat_recovery_layout = Some(RecoveryLayout::Decentral);
+        vent.supply_duct_insulation = Some(SupplyDuctInsulationAnswer::Specified {
+            thickness_m: 0.03,
+            conductivity_w_per_mk: 0.035,
+        });
+        vent.supply_duct_length_m = Some(2.0);
+        vent.constant_volume_control = Some(true);
+        vent.bypass_percent = Some(45);
+        vent.installed_capacity_dm3_per_s = Some(1500.0);
+        vent.grille_heating_strips = Some(SurveyGrilleHeatingStrips {
+            max_power_w_per_dm3_per_s: None,
+            max_temperature_rise_k: Some(8.0),
+            switch_on_below_c: None,
+            max_supply_temperature_c: None,
+            source_reference: "datasheet".into(),
+        });
+        let (input, recorder) = derive(&survey);
+        let ventilation = &input["spaceHeating"]["demand"]["ventilation"];
+        let unit = &ventilation["system"]["unit"];
+        assert_eq!(unit["ducts"], "luka_d");
+        let recovery = &unit["heatRecovery"];
+        assert_eq!(recovery["efficiency"]["exchanger"], "run_around_coil_ahu");
+        assert_eq!(recovery["layout"], "decentral");
+        assert_eq!(recovery["constantVolumeControl"], true);
+        assert_eq!(recovery["supplyDuctInsulation"]["kind"], "specified");
+        assert_eq!(recovery["supplyDuctLengthM"], 2.0);
+        // Table 11.12: 45 % rounds down to 40 %.
+        assert_eq!(recovery["bypass"]["kind"], "partial");
+        assert_eq!(recovery["bypass"]["fraction"], 0.4);
+        assert_eq!(ventilation["installedCapacity"]["totalDm3PerS"], 1500.0);
+        assert_eq!(
+            ventilation["grillePreheating"]["control"]["method"],
+            "fallback"
+        );
+        assert!(applied(&recorder, "grille_heating_strip_settings_unknown"));
+        // System E: decentral D.5b with heat recovery, the rest type C.
+        let mut survey = fixture("1985");
+        survey.ventilation.principle = VentilationPrinciple::MechanicalExtract;
+        survey.ventilation.ahu = None;
+        survey.ventilation.heat_recovery = Some(ExchangerAnswer::CounterFlowPlastic);
+        survey.ventilation.combined = Some(SurveyCombined {
+            decentral_area_m2: 300.0,
+            total_residence_area_m2: 1000.0,
+        });
+        let (input, recorder) = derive(&survey);
+        let system = &input["spaceHeating"]["demand"]["ventilation"]["system"];
+        assert_eq!(system["kind"], "combined");
+        assert_eq!(system["decentral"]["variant"], "d5b");
+        assert_eq!(system["decentral"]["heatRecovery"]["layout"], "decentral");
+        assert!(system["other"]["variant"]
+            .as_str()
+            .unwrap()
+            .starts_with('c'));
+        assert!(applied(&recorder, "combined_system_e1"));
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // The bypass percentage and capacity are checked.
+        let mut survey = fixture("1985");
+        survey.ventilation.bypass_percent = Some(120);
+        let mut recorder = Recorder::default();
+        derive_utility_input(&survey, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "bypass_percent_invalid"));
+    }
+
+    #[test]
+    fn utility_distribution_reads_the_table_9_12_answers() {
+        // The coordinator's review: the utility fallback distribution used
+        // to ignore the pipe-insulation and one-pipe answers.
+        let mut survey = fixture("1985");
+        survey.heating.pipe_insulation = Some(super::super::heating::PipeInsulationAnswer {
+            insulated: true,
+            insulation_year: Some(1990),
+            fittings_insulated: Some(true),
+        });
+        survey.heating.distribution_type =
+            Some(super::super::heating::DistributionTypeAnswer::OnePipe { emitter_count: 12 });
+        let (input, recorder) = derive(&survey);
+        let system = &input["spaceHeating"]["distributionSystem"];
+        assert_eq!(
+            system["pipeTransmittance"]["insulation"]["state"],
+            "insulated"
+        );
+        assert_eq!(
+            system["pipeTransmittance"]["insulation"]["period"],
+            "from1980_to1995"
+        );
+        assert_eq!(system["valvesInsulated"], true);
+        assert_eq!(system["pump"]["onePipeEmitterCount"], 12);
+        assert!(!applied(&recorder, "pipe_insulation_unknown_uninsulated"));
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+    }
+
+    #[test]
+    fn fossil_fuel_sport_halls_and_swimming_pool() {
+        let mut survey = fixture("2005");
+        survey.fossil_fuel_on_plot = Some(true);
+        let (input, _) = derive(&survey);
+        assert_eq!(input["fossilAppliancesOutsideCalculation"], true);
+        let (input, recorder) = derive(&fixture("2005"));
+        assert!(input.get("fossilAppliancesOutsideCalculation").is_none());
+        assert!(applied(&recorder, "fossil_fuel_on_plot_not_established"));
+        // p. 65: sport and swimming halls in a building of ≥ 1 000 m², and
+        // the pool room ventilated as sport × 2 (NTA §11.2.2.5.1).
+        // A sport function merged into education (20 %): the hall area
+        // still shortens the loop; the pool factor lapses (p. 54).
+        let mut survey = fixture("2005");
+        survey.functions = vec![
+            FunctionArea {
+                function: LabelFunction::Education,
+                area_m2: 1900.0,
+            },
+            FunctionArea {
+                function: LabelFunction::Sport,
+                area_m2: 500.0,
+            },
+        ];
+        survey.hot_water.circulation = Some(true);
+        survey.sport_hall_area_m2 = Some(450.0);
+        survey.swimming_pool_area_m2 = Some(200.0);
+        let (input, recorder) = derive(&survey);
+        assert_eq!(input["hotWater"]["circulation"]["sportHallAreaM2"], 450.0);
+        assert!(applied(&recorder, "swimming_pool_in_merged_sport_function"));
+        // A separate sport function (an own zone needs no split here: the
+        // pool hall is surveyed as a sports building).
+        let mut survey = fixture("2005");
+        survey.functions = vec![FunctionArea {
+            function: LabelFunction::Sport,
+            area_m2: 2400.0,
+        }];
+        survey.hot_water.circulation = Some(true);
+        survey.sport_hall_area_m2 = Some(450.0);
+        survey.swimming_pool_area_m2 = Some(200.0);
+        let (input, _) = derive(&survey);
+        assert_eq!(input["hotWater"]["circulation"]["sportHallAreaM2"], 450.0);
+        let functions = input["spaceHeating"]["demand"]["ventilation"]["functions"]
+            .as_array()
+            .unwrap();
+        let pool = functions
+            .iter()
+            .find(|item| item["swimmingPool"] == true)
+            .unwrap();
+        assert_eq!(pool["areaM2"], 200.0);
+        let sport = functions
+            .iter()
+            .find(|item| item["function"] == "sport" && item.get("swimmingPool").is_none())
+            .unwrap();
+        assert_eq!(sport["areaM2"], 2200.0);
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        survey.swimming_pool_area_m2 = Some(2600.0);
+        let mut recorder = Recorder::default();
+        assert!(derive_utility_input(&survey, &mut recorder).is_none());
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "swimming_pool_area_invalid"));
     }
 }

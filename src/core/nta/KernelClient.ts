@@ -2699,7 +2699,7 @@ export interface ResidentialSurvey {
     selfRegulatingVents?: boolean | null;
     pressureClass?: 'at_most1_pa' | 'from1_to5_pa' | 'from5_to10_pa' | null;
     installationYear?: number | null;
-    heatRecovery?: 'counter_flow_aluminium' | 'counter_flow_plastic' | 'counter_flow_unknown_material' | 'cross_flow' | 'plate_or_tube' | 'rotary' | 'enthalpy' | 'heat_pipe' | 'two_element' | 'unknown' | null;
+    heatRecovery?: 'counter_flow_aluminium' | 'counter_flow_plastic' | 'counter_flow_unknown_material' | 'cross_flow' | 'plate_or_tube' | 'rotary' | 'enthalpy' | 'heat_pipe' | 'two_element' | 'cold_storage_with_ahu' | 'unknown' | null;
     bypassPresent?: boolean | null;
     unitManufactureYear?: number | null;
     motor?: 'ac' | 'dc' | 'unknown' | null;
@@ -2806,7 +2806,7 @@ export interface UtilitySurvey {
     generator:
       | 'compression' | 'room_air_conditioner' | 'gas_absorption' | 'external_cold' | 'unknown_collective'
       | 'aquifer_before2013' | 'aquifer_from2013' | 'aquifer_year_unknown' | 'surface_water'
-      | 'closed_ground_loop' | 'dew_point_cooling';
+      | 'closed_ground_loop' | 'dew_point_cooling' | 'gas_engine_compression';
     capacityKw?: number | null;
     emitter:
       | 'floor_cooling' | 'concrete_core_activation' | 'wall_cooling' | 'ceiling_cooling'
@@ -2825,10 +2825,42 @@ export interface UtilitySurvey {
     heatPumpSource?: boolean | null;
     /** ISSO 82.1 p. 129: ground source demonstrably always above 0 °C. */
     groundAboveZeroDemonstrated?: boolean;
+    /** ISSO 75.1 table 10.2: gas engine of a gas-driven chiller (power required, year unknown: up to 2006). */
+    gasEngine?: OpnameGasEngine | null;
+    /** §10.4.1: direct expansion (not water-based) in the room or in the AHU; absent: room. */
+    directExpansion?: 'room' | 'air_handling_unit' | null;
+    /** Table 10.9: valves and brackets fully insulated; unknown: not insulated. */
+    fittingsInsulated?: boolean | null;
+    /** Table 10.11: cold meters; unknown: present. */
+    coldMeters?: boolean | null;
+    /** Table 10.10: actual pipe length L and the length through uncooled spaces, m; absent: forfait. */
+    pipeLengthM?: number | null;
+    uncooledPipeLengthM?: number | null;
+    /** §10.3.2: further generators on the same distribution, each with its nominal power. */
+    additionalGenerators?: Array<{
+      generator: NonNullable<UtilitySurvey['cooling']>['generator'];
+      capacityKw?: number | null;
+      aquiferPermitYear?: number | null;
+      gasEngine?: OpnameGasEngine | null;
+    }>;
     sourceReference: string;
   } | null;
-  ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference' | 'heatRecoveryLayout' | 'controls' | 'combined' | 'grilleHeatingStrips'> & {
+  ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference' | 'controls'> & {
     ductsLukaAbc?: boolean | null;
+    /** ISSO 75.1 table 11.13; overrides `ductsLukaAbc`. */
+    ductAirtightness?: 'luka_abc' | 'luka_d' | 'no_ducts' | 'unknown' | null;
+    /** §11.4.1 installed capacity of the zone, dm³/s; absent: regulatory flow. */
+    installedCapacityDm3PerS?: number | null;
+    /** Table 11.10: the outside connection of the heat-recovery unit; absent: not insulated. */
+    supplyDuctInsulation?:
+      | { kind: 'uninsulated' | 'insulated' }
+      | { kind: 'specified'; thicknessM: number; conductivityWPerMK: number }
+      | null;
+    supplyDuctLengthM?: number | null;
+    /** Table 11.11: constant-volume control at all flows; unknown: none. */
+    constantVolumeControl?: boolean | null;
+    /** Table 11.12: partial bypass percentage (rounded down to tens); absent: unknown. */
+    bypassPercent?: number | null;
     ahu?: {
       insideThermalZone?: boolean | null;
       ductsOutsideThermalZone?: boolean | null;
@@ -2918,9 +2950,25 @@ export interface UtilitySurvey {
     evidenceReference?: string | null;
   };
   storage?: OpnameStorage | null;
+  /** ISSO 75.1 §7.1.7: fossil-fuel installations on the plot; absent: not established. */
+  fossilFuelOnPlot?: boolean | null;
+  /** p. 65: A_g of the sport and swimming halls (sport function, building ≥ 1 000 m²). */
+  sportHallAreaM2?: number | null;
+  /** p. 65: A_g of the room with a swimming pool (part of the sport function). */
+  swimmingPoolAreaM2?: number | null;
+  /** Afb. 6.6: residence areas openly connected (no split on ventilation capacity). */
+  openlyConnectedResidenceAreas?: boolean;
   sourceReference: string;
   /** Adviser's reason per applied default (path or rule) for the forfait (BRL 9500 §4.2.2). */
   inklapRedenen?: Record<string, string>;
+}
+
+/** ISSO 75.1 table 10.2: the gas engine of a gas-driven chiller. */
+export interface OpnameGasEngine {
+  /** Manufactured from 2007; unknown: up to 2006. */
+  from2007?: boolean | null;
+  electricPowerKw?: number | null;
+  hreDeclared?: boolean;
 }
 
 export async function assessUtilitySurveyWithRust(survey: UtilitySurvey): Promise<OpnameAssessment> {

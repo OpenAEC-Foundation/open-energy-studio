@@ -32,8 +32,11 @@ const HOT_WATER_KINDS: Record<SurveyKind, string[]> = {
   utility: ['gas_appliance', 'gas_storage_heater', 'electric_boiler', 'electric_instantaneous', 'heat_pump',
     'district_heat', 'collective_unknown', 'none'],
 };
-const COOLING_GENERATORS = ['room_air_conditioner', 'compression', 'gas_absorption', 'external_cold', 'unknown_collective',
-  'aquifer_before2013', 'aquifer_from2013', 'aquifer_year_unknown', 'surface_water', 'closed_ground_loop', 'dew_point_cooling'];
+const COOLING_GENERATORS = ['room_air_conditioner', 'compression', 'gas_engine_compression', 'gas_absorption', 'external_cold',
+  'unknown_collective', 'aquifer_before2013', 'aquifer_from2013', 'aquifer_year_unknown', 'surface_water', 'closed_ground_loop',
+  'dew_point_cooling'];
+const HEAT_RECOVERY = ['counter_flow_aluminium', 'counter_flow_plastic', 'counter_flow_unknown_material', 'cross_flow',
+  'plate_or_tube', 'rotary', 'enthalpy', 'heat_pipe', 'two_element', 'cold_storage_with_ahu', 'unknown'];
 const COOLING_EMITTERS = ['split_indoor_units_on_wall', 'split_indoor_units_on_ceiling', 'fan_coil_on_outer_wall',
   'fan_coil_on_ceiling', 'floor_cooling', 'concrete_core_activation', 'wall_cooling', 'ceiling_cooling', 'other'];
 const UTILITY_FUNCTIONS = ['office', 'assembly_without_day_care', 'assembly_with_day_care', 'education',
@@ -142,7 +145,11 @@ const CONTROL_TARGETS = ['none', 'supply', 'extract', 'supply_and_extract'];
  * ISSO 82.1 §11.3 (p. 143–146): controls of tables 11.4–11.6, central or
  * decentral heat recovery, system E and grilles with heating strips.
  */
-export function VentilationSurveyFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+export function VentilationSurveyFields({ draft, change, t, withControls = true }: {
+  draft: Draft; change: Change; t: T;
+  /** The utility survey has no table 11.4–11.6 control answers (declared variant only). */
+  withControls?: boolean;
+}) {
   const field = { draft, onChange: change };
   const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
   const controls = read(draft, ['ventilation', 'controls']) != null;
@@ -156,8 +163,8 @@ export function VentilationSurveyFields({ draft, change, t }: { draft: Draft; ch
   return <>
     <SelectField {...field} path={['ventilation', 'heatRecoveryLayout']} label={t('opname.ventilation.recoveryLayout')}
       options={opts(t, 'opname.ventilation.recoveryLayoutKind', ['central', 'decentral'])} />
-    {toggle(['ventilation', 'controls'], t('opname.ventilation.controls'), controls, { evidenceReference: '' })}
-    {controls && <>
+    {withControls && toggle(['ventilation', 'controls'], t('opname.ventilation.controls'), controls, { evidenceReference: '' })}
+    {withControls && controls && <>
       <SelectField {...field} path={['ventilation', 'controls', 'co2Measurement']} label={t('opname.ventilation.co2Measurement')}
         options={opts(t, 'opname.ventilation.co2MeasurementKind', CO2_MEASUREMENTS)} />
       <SelectField {...field} path={['ventilation', 'controls', 'co2Control']} label={t('opname.ventilation.co2Control')}
@@ -184,6 +191,85 @@ export function VentilationSurveyFields({ draft, change, t }: { draft: Draft; ch
       <TextField {...field} path={['ventilation', 'grilleHeatingStrips', 'sourceReference']} label={t('opname.sourceReference')} />
     </>}
     <p className="nta-form-note">{t('opname.ventilation.note')}</p>
+  </>;
+}
+
+/**
+ * ISSO 75.1 chapter 11 (p. 145–153) for the utility survey: heat recovery
+ * with tables 11.9–11.12, duct airtightness (table 11.13), the installed
+ * capacity (§11.4.1), system E and grilles with heating strips.
+ */
+export function UtilityVentilationFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
+  const duct = read(draft, ['ventilation', 'supplyDuctInsulation', 'kind']);
+  return <>
+    <SelectField {...field} path={['ventilation', 'heatRecovery']} label={t('opname.ventilation.heatRecovery')}
+      options={opts(t, 'opname.ventilation.heatRecoveryKind', HEAT_RECOVERY)} />
+    <SelectField {...field} path={['ventilation', 'ductAirtightness']} label={t('opname.ventilation.ductAirtightness')}
+      options={opts(t, 'opname.ventilation.ductAirtightnessKind', ['luka_abc', 'luka_d', 'no_ducts', 'unknown'])} />
+    <NumberField {...field} path={['ventilation', 'installedCapacityDm3PerS']} label={t('opname.ventilation.installedCapacity')} />
+    <SelectField {...field} path={['ventilation', 'supplyDuctInsulation', 'kind']} label={t('opname.ventilation.supplyDuct')}
+      options={opts(t, 'opname.ventilation.supplyDuctKind', ['uninsulated', 'insulated', 'specified'])}
+      onChange={(_, value) => change(['ventilation', 'supplyDuctInsulation'], value == null ? null
+        : value === 'specified' ? { kind: value, thicknessM: 0.02, conductivityWPerMK: 0.04 } : { kind: value })} />
+    {duct === 'specified' && <>
+      <NumberField {...field} path={['ventilation', 'supplyDuctInsulation', 'thicknessM']} label={t('opname.ventilation.supplyDuctThickness')} />
+      <NumberField {...field} path={['ventilation', 'supplyDuctInsulation', 'conductivityWPerMK']} label={t('opname.ventilation.supplyDuctLambda')} />
+    </>}
+    <NumberField {...field} path={['ventilation', 'supplyDuctLengthM']} label={t('opname.ventilation.supplyDuctLength')} />
+    <TriStateField {...field} {...yesNo} path={['ventilation', 'constantVolumeControl']} label={t('opname.ventilation.constantVolume')} />
+    <NumberField {...field} path={['ventilation', 'bypassPercent']} label={t('opname.ventilation.bypassPercent')} step="1" />
+    <VentilationSurveyFields draft={draft} change={change} t={t} withControls={false} />
+  </>;
+}
+
+/** ISSO 75.1 table 10.2: the gas engine of a gas-driven chiller. */
+function GasEngineFields({ draft, base, change, t }: { draft: Draft; base: Path; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  return <>
+    <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={[...base, 'gasEngine', 'from2007']}
+      label={t('opname.cooling.gasEngineFrom2007')} />
+    <NumberField {...field} path={[...base, 'gasEngine', 'electricPowerKw']} label={t('opname.cooling.gasEnginePower')} />
+    <CheckField {...field} path={[...base, 'gasEngine', 'hreDeclared']} label={t('opname.cooling.gasEngineHre')} />
+  </>;
+}
+
+/** ISSO 75.1 §10.3.2–§10.4.5 (p. 131–137): further generators and the distribution answers. */
+export function UtilityCoolingFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
+  const waterBased = read(draft, ['cooling', 'waterBased']) === true;
+  const extras = list(draft, ['cooling', 'additionalGenerators']);
+  return <>
+    {read(draft, ['cooling', 'generator']) === 'gas_engine_compression' &&
+      <GasEngineFields draft={draft} base={['cooling']} change={change} t={t} />}
+    {!waterBased && <SelectField {...field} path={['cooling', 'directExpansion']} label={t('opname.cooling.directExpansion')}
+      options={opts(t, 'opname.cooling.directExpansionKind', ['room', 'air_handling_unit'])} />}
+    {waterBased && <>
+      <TriStateField {...field} {...yesNo} path={['cooling', 'fittingsInsulated']} label={t('opname.cooling.fittingsInsulated')} />
+      <TriStateField {...field} {...yesNo} path={['cooling', 'coldMeters']} label={t('opname.cooling.coldMeters')} />
+      <NumberField {...field} path={['cooling', 'pipeLengthM']} label={t('opname.cooling.pipeLength')} />
+      <NumberField {...field} path={['cooling', 'uncooledPipeLengthM']} label={t('opname.cooling.uncooledPipeLength')} />
+    </>}
+    {extras.map((_, index) => {
+      const base: Path = ['cooling', 'additionalGenerators', index];
+      return <div key={index} className="opname-item">
+        <strong>{t('opname.additionalGenerator')} {index + 1}</strong>
+        <SelectField {...field} path={[...base, 'generator']} label={t('opname.cooling.generator')}
+          options={opts(t, 'opname.cooling.generatorKind', COOLING_GENERATORS)} />
+        <NumberField {...field} path={[...base, 'capacityKw']} label={t('opname.cooling.capacityKw')} />
+        {read(draft, [...base, 'generator']) === 'aquifer_year_unknown' &&
+          <NumberField {...field} path={[...base, 'aquiferPermitYear']} label={t('opname.cooling.aquiferPermitYear')} step="1" />}
+        {read(draft, [...base, 'generator']) === 'gas_engine_compression' &&
+          <GasEngineFields draft={draft} base={base} change={change} t={t} />}
+        <RemoveButton label={t('opname.remove')}
+          onRemove={() => change(['cooling', 'additionalGenerators'], extras.filter((_, item) => item !== index))} />
+      </div>;
+    })}
+    <ListControls label={t('opname.addGenerator')}
+      onAdd={() => change(['cooling', 'additionalGenerators'], [...extras, { generator: 'compression', capacityKw: null }])} />
+    <p className="nta-form-note">{t('opname.cooling.priorityNote')}</p>
   </>;
 }
 
@@ -424,7 +510,13 @@ export function BasisopnamePanel() {
       {kind === 'residential' && read(draft, ['dwelling', 'kind']) === 'apartment' &&
         <SelectField {...field} path={['dwelling', 'floor']} label={t('opname.dwelling.floor')}
           options={opts(t, 'opname.dwelling.floorKind', ['ground_or_intermediate', 'top', 'roof_and_floor'])} />}
-      {kind === 'utility' && <NumberField {...field} path={['toiletStacks']} label={t('opname.toiletStacks')} step="1" />}
+      {kind === 'utility' && <>
+        <NumberField {...field} path={['toiletStacks']} label={t('opname.toiletStacks')} step="1" />
+        <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['fossilFuelOnPlot']} label={t('opname.fossilFuelOnPlot')} />
+        <NumberField {...field} path={['sportHallAreaM2']} label={t('opname.sportHallArea')} />
+        <NumberField {...field} path={['swimmingPoolAreaM2']} label={t('opname.swimmingPoolArea')} />
+        <CheckField {...field} path={['openlyConnectedResidenceAreas']} label={t('opname.openlyConnected')} />
+      </>}
       <label>{t('opname.verticalPipes')}
         <select value={verticalPipes == null ? 'default' : Array.isArray(verticalPipes) && verticalPipes.length === 0 ? 'none' : 'count'}
           onChange={(event) => change(['verticalPipes'], event.target.value === 'default' ? null
@@ -650,6 +742,10 @@ export function BasisopnamePanel() {
       <VentilationSurveyFields draft={draft} change={change} t={t} />
     </Section>}
 
+    {kind === 'utility' && <Section title={t('opname.ventilation')}>
+      <UtilityVentilationFields draft={draft} change={change} t={t} />
+    </Section>}
+
     <Section title={t('opname.passiveCooling')}>
       <PassiveCoolingFields draft={draft} change={change} t={t} />
     </Section>
@@ -682,6 +778,7 @@ export function BasisopnamePanel() {
         <CheckField {...field} path={['cooling', 'groundAboveZeroDemonstrated']} label={t('opname.cooling.groundAboveZero')} />
         {kind === 'residential' &&
           <CheckField {...field} path={['coolingCollective']} label={t('opname.cooling.collective')} />}
+        {kind === 'utility' && <UtilityCoolingFields draft={draft} change={change} t={t} />}
         <TextField {...field} path={['cooling', 'sourceReference']} label={t('opname.sourceReference')} />
       </>}
     </Section>

@@ -863,7 +863,7 @@ pub fn derive_heating(
 /// Table 9.12 (p. 118) as NTA table 9.16 forfait Ψ and the 9.27a/9.27b
 /// valves: not insulated when unknown, the year of insulation unknown →
 /// the construction year, fittings unknown → not insulated.
-fn pipe_insulation(
+pub(crate) fn pipe_insulation(
     heating: &SurveyHeating,
     construction_year: i32,
     recorder: &mut Recorder,
@@ -920,7 +920,7 @@ fn pipe_insulation(
 /// §9.4.2 (p. 115): the emitters of a one-pipe loop for table 9.21; a
 /// renovated one-pipe system (WD 2025 p. 50) has no NTA rule of its own
 /// and counts as two-pipe.
-fn one_pipe_emitters(heating: &SurveyHeating, recorder: &mut Recorder) -> Option<u32> {
+pub(crate) fn one_pipe_emitters(heating: &SurveyHeating, recorder: &mut Recorder) -> Option<u32> {
     match heating.distribution_type {
         Some(DistributionTypeAnswer::OnePipe { emitter_count }) => {
             if emitter_count == 0 {
