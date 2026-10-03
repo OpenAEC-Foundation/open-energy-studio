@@ -2967,6 +2967,8 @@ export type NtaAnnexPGenerator =
         | { kind: 'heat_pump'; efficiency: NtaHeatPumpEfficiency };
       flexHeatKwh?: number;
       flexReference?: string;
+      /** Whole-network heat (heating and hot water) for the 15 % cap. */
+      networkProductionKwh?: number;
       connections: number;
       heatBuffer: boolean;
       registrationReference: string;
@@ -3025,6 +3027,10 @@ export interface NtaAnnexPSystemGenerator {
     heatRejection?: 'closed_cooling_tower' | 'open_cooling_tower' | 'dry_cooler';
     heatRejectionWPerKw?: number;
     sourceReference?: string;
+    /** Hot water: heating carries the standby (P.6.9.4.3). */
+    alsoServesHeating?: boolean;
+    /** Hot water: no auxiliary energy, e.g. a traditional gas boiler. */
+    withoutAuxiliaryEnergy?: boolean;
   };
   kind: NtaAnnexPGenerator;
 }

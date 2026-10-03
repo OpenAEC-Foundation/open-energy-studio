@@ -41,7 +41,19 @@
 //!   (`W = t_on·ΣP/1 000`, `t_on = Q·F·1,1/P` with P in kW);
 //! - P.74 uses `max(0, θ_in;ref − θ_e;avg;mi)` so that summer months with a
 //!   mean above 18 °C get no negative delivery;
-//! - P.53 takes the efficiency of each compression chiller itself;
+//! - P.53 takes the efficiency of each compression chiller itself; for a
+//!   gas-engine chiller the shaft power `P_in` takes the table P.9 COP,
+//!   because its `η_CD;gen = COP·η_ge` relates to the fuel input;
+//! - P.74 is applied only to the plots (parts) without monthly values;
+//! - rule a) counts solid biomass as renewable (class 0); an electrode
+//!   boiler in flex mode is ranked last; `priority` overrides both;
+//! - P.25 takes the whole `Q_HD;in;tot`, collective solar included;
+//! - the full-load deduction of P.6.6.5.2 ("aftrek van 5 %") is read as
+//!   5 percentage points, as for heat; a full-load value on a preferred
+//!   hot-water boiler is refused;
+//! - without `networkProductionKwh` the 15 % flex cap of 5.8 is taken on
+//!   the network heat of the function being calculated; f_Pren of a flex
+//!   generator is clamped at 0;
 //! - without monthly values the hot-water delivery is split by month
 //!   length, as in P.82;
 //! - the preference rules a)–e) of P.6.5.3.2 are also used for hot water;
@@ -847,6 +859,11 @@ pub enum GeneratorKind {
         flex_heat_kwh: Option<f64>,
         #[serde(default, rename = "flexReference")]
         flex_reference: Option<String>,
+        /// Annual heat production of the whole network, heating and hot
+        /// water together, for the 15 % cap (5.8); absent: the network heat
+        /// of the function being calculated.
+        #[serde(default, rename = "networkProductionKwh")]
+        network_production_kwh: Option<f64>,
         /// Connections of the heat network (at least 500, 5.8).
         connections: u32,
         /// A heat buffer that decouples production from demand (5.8).
@@ -1031,6 +1048,15 @@ pub struct GeneratorAuxiliary {
     /// Measured component data behind deviating values.
     #[serde(default)]
     pub source_reference: Option<String>,
+    /// Hot water: the generator also serves the heating supply, whose
+    /// function carries its standby (P.6.8.4.1 a), P.6.9.4.3): the forfait
+    /// `P_WD;aux;gen;e` becomes 0 W.
+    #[serde(default)]
+    pub also_serves_heating: bool,
+    /// Hot water: the generator works without auxiliary energy, such as a
+    /// traditional gas boiler (P.6.9.4.3): forfait 0 W and 0 W/kW.
+    #[serde(default)]
+    pub without_auxiliary_energy: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1184,6 +1210,7 @@ pub enum PipePlacement {
     /// P.17; `coverDepthM` is `h_j`.
     Buried {
         cover_depth_m: f64,
+        /// Deviating from table P.1 (1,75): a measured soil value.
         #[serde(default)]
         ground_conductivity: Option<f64>,
         ambient: PipeAmbient,
@@ -1191,6 +1218,7 @@ pub enum PipePlacement {
     /// P.18; `h_a;j` 8 in enclosed spaces, 25 elsewhere (table P.1).
     InAir {
         ambient: PipeAmbient,
+        /// Deviating from table P.1: a measured `h_a;j`.
         #[serde(default)]
         surface_coefficient: Option<f64>,
     },
@@ -1208,7 +1236,8 @@ pub enum PipeCorrection {
     OldSlidingSystem,
     /// Surface-mounted or recessed: 0,90.
     SurfaceOrRecessed,
-    /// One pipe in a trench without rigid connections: 1,00.
+    /// One pipe in a trench without rigid connections: 1,00. Deviating:
+    /// table P.1 has no single-pipe case; it takes the neutral factor.
     SinglePipeInTrench,
 }
 
@@ -2214,11 +2243,21 @@ fn factors(
                 }
                 BoilerEfficiency::FullLoad {
                     source_reference, ..
-                } => reference(
-                    source_reference,
-                    format!("{kpath}.efficiency.sourceReference"),
-                    issues,
-                ),
+                } => {
+                    reference(
+                        source_reference,
+                        format!("{kpath}.efficiency.sourceReference"),
+                        issues,
+                    );
+                    // P.6.6.5.2 (p. 994): deviating hot-water values only for
+                    // non-preferred boilers (bijstook).
+                    if function == SystemFunction::HotWater && ctx.preferred {
+                        issues.push(issue(
+                            "hot_water_full_load_requires_non_preferred",
+                            format!("{kpath}.efficiency"),
+                        ));
+                    }
+                }
             }
             let Some(eta) =
                 boiler_efficiency(efficiency, function, ctx.preferred).filter(|v| positive(*v))
@@ -2259,6 +2298,7 @@ fn factors(
             generator,
             flex_heat_kwh,
             flex_reference,
+            network_production_kwh,
             connections,
             heat_buffer,
             registration_reference,
@@ -2315,7 +2355,18 @@ fn factors(
                 }
                 None => match ctx.nominal_power_kw {
                     Some(power) if positive(power) => {
-                        (power * FLEX_HOURS).min(FLEX_MAX_SHARE * ctx.network_heat_kwh)
+                        let network = match network_production_kwh {
+                            Some(value) if value.is_finite() && *value >= 0.0 => *value,
+                            Some(_) => {
+                                issues.push(issue(
+                                    "value_invalid",
+                                    format!("{kpath}.networkProductionKwh"),
+                                ));
+                                return None;
+                            }
+                            None => ctx.network_heat_kwh,
+                        };
+                        (power * FLEX_HOURS).min(FLEX_MAX_SHARE * network)
                     }
                     _ => {
                         issues.push(issue(
@@ -2332,7 +2383,10 @@ fn factors(
                 0.0
             };
             // P.6.5.4.11 with f_P;del;flex = 0, K_CO2;del;flex = 0 (tables
-            // 5.5/5.6) and 5.8.3.1 g).
+            // 5.5/5.6) and 5.8.3.1 g). f_Pren = 1 − (1 − share)/η is
+            // clamped at 0: below the break-even share the electricity
+            // outside the flex hours exceeds the heat, which is no
+            // negative renewable share (interpretation).
             Some(GenFactors {
                 f: (1.0 - share) * F_P_EL / eta,
                 k: (1.0 - share) * K_CO2_EL / eta,
@@ -2609,35 +2663,54 @@ fn area_demand(
             format!("{ppath}.sourceReference"),
             issues,
         );
+        // Each part with the function whose profile it takes when it has
+        // no months.
         let parts = match function {
             SystemFunction::Heating => vec![
-                heating_part(plot, &ppath, issues),
-                optional_part(
-                    plot.sorption_cooling.as_ref(),
-                    format!("{ppath}.sorptionCooling"),
-                    issues,
+                (heating_part(plot, &ppath, issues), SystemFunction::Heating),
+                (
+                    optional_part(
+                        plot.sorption_cooling.as_ref(),
+                        format!("{ppath}.sorptionCooling"),
+                        issues,
+                    ),
+                    SystemFunction::Cooling,
                 ),
-                if plot.hot_water_via_delivery_set {
-                    hot_water_part(plot, &ppath, issues)
-                } else {
-                    ZERO_PART
-                },
+                (
+                    if plot.hot_water_via_delivery_set {
+                        hot_water_part(plot, &ppath, issues)
+                    } else {
+                        ZERO_PART
+                    },
+                    SystemFunction::HotWater,
+                ),
             ],
-            SystemFunction::HotWater => vec![hot_water_part(plot, &ppath, issues)],
+            SystemFunction::HotWater => vec![(
+                hot_water_part(plot, &ppath, issues),
+                SystemFunction::HotWater,
+            )],
             SystemFunction::Cooling => vec![
-                optional_part(plot.cooling.as_ref(), format!("{ppath}.cooling"), issues),
-                optional_part(
-                    plot.dehumidification.as_ref(),
-                    format!("{ppath}.dehumidification"),
-                    issues,
+                (
+                    optional_part(plot.cooling.as_ref(), format!("{ppath}.cooling"), issues),
+                    SystemFunction::Cooling,
+                ),
+                (
+                    optional_part(
+                        plot.dehumidification.as_ref(),
+                        format!("{ppath}.dehumidification"),
+                        issues,
+                    ),
+                    SystemFunction::Cooling,
                 ),
             ],
         };
-        for part in parts {
+        for (part, profile) in parts {
             match part {
                 Some((value, months)) => {
                     annual += value;
-                    match months {
+                    // P.74 (P.82 for hot water) only for the parts without
+                    // months; the supplied months of the others stay.
+                    match months.or_else(|| annual_profile(profile, value)) {
                         Some(months) => {
                             for (total, value) in monthly.iter_mut().zip(months) {
                                 *total += value;
@@ -3345,10 +3418,21 @@ fn generator_power(
         ));
         return None;
     }
+    // P.53 multiplies the shaft power P_in by the cooling COP. For a
+    // gas-engine chiller η_CD;gen = COP·η_ge relates to the fuel input, so
+    // the shaft power takes the table P.9 COP itself (p. 1000).
+    let shaft_cop = match &generator.kind {
+        GeneratorKind::CompressionChiller {
+            variant,
+            drive,
+            engine_efficiency,
+        } => chiller_efficiency(*variant, drive, engine_efficiency.as_ref()).map(|(_, cop)| cop),
+        _ => eta,
+    };
     let power = match cooling {
-        CoolingPower::CompressorShaft { shaft_power_kw } => eta
-            .filter(|eta| positive(*eta))
-            .map(|eta| eta * shaft_power_kw),
+        CoolingPower::CompressorShaft { shaft_power_kw } => shaft_cop
+            .filter(|cop| positive(*cop))
+            .map(|cop| cop * shaft_power_kw),
         CoolingPower::Aquifer {
             flow_m3_per_s,
             supply_c,
@@ -3390,12 +3474,26 @@ struct Fractions {
 }
 
 /// Rules a)–e) of P.6.5.3.2 and a)–b) of P.6.7.3.2: 0 renewable or free
-/// cooling, 1 heat pumps and CHP, 2 the highest efficiency.
+/// cooling, 1 heat pumps and CHP, 2 the highest efficiency, 3 an electrode
+/// boiler in flex mode.
+///
+/// Rule a) lists renewable generators open-endedly ("zoals geothermie en
+/// collectieve zonnecollectoren", p. 966); solid biomass is renewable heat
+/// and takes class 0. An electrode boiler in flex mode runs only in the
+/// flex hours (5.8) and is ranked last instead of winning rule e) on its
+/// 0,99 efficiency; `priority` overrides both choices.
 fn preference_class(kind: &GeneratorKind, function: SystemFunction) -> u8 {
     match (function, kind) {
         (SystemFunction::Cooling, GeneratorKind::FreeCooling { .. }) => 0,
         (SystemFunction::Cooling, _) => 2,
-        (_, GeneratorKind::Geothermal { .. }) => 0,
+        (_, GeneratorKind::Geothermal { .. } | GeneratorKind::SolidBiomassBoiler { .. }) => 0,
+        (
+            _,
+            GeneratorKind::ElectricFlex {
+                generator: FlexGenerator::ElectrodeBoiler { .. },
+                ..
+            },
+        ) => 3,
         (
             _,
             GeneratorKind::HeatPump { .. }
@@ -3407,6 +3505,14 @@ fn preference_class(kind: &GeneratorKind, function: SystemFunction) -> u8 {
             },
         ) => 1,
         _ => 2,
+    }
+}
+
+fn chiller_carrier(kind: &GeneratorKind) -> Option<SystemCarrier> {
+    match kind {
+        GeneratorKind::CompressionChiller { drive, .. }
+        | GeneratorKind::FreeCooling { drive, .. } => Some(*drive),
+        _ => None,
     }
 }
 
@@ -3455,39 +3561,61 @@ fn preference_groups(
         .iter()
         .map(|&i| preference_class(&generators[i].kind, input.function))
         .min()?;
-    let preferred: Vec<usize> = if class < 2 {
+    let preferred: Vec<usize> = if class != 2 {
         others
             .iter()
             .copied()
             .filter(|&i| preference_class(&generators[i].kind, input.function) == class)
             .collect()
     } else {
-        if others.iter().any(|&i| input.efficiencies[i].is_none()) {
+        // Rule e) among the class-2 generators only.
+        let candidates: Vec<usize> = others
+            .iter()
+            .copied()
+            .filter(|&i| preference_class(&generators[i].kind, input.function) == 2)
+            .collect();
+        if candidates.iter().any(|&i| input.efficiencies[i].is_none()) {
             issues.push(issue(
                 "generator_priority_required",
                 format!("{path}.generators"),
             ));
             return None;
         }
-        let best = others
+        let best = candidates
             .iter()
             .filter_map(|&i| input.efficiencies[i])
             .fold(f64::NEG_INFINITY, f64::max);
-        others
+        let best_units: Vec<usize> = candidates
             .iter()
             .copied()
             .filter(|&i| input.efficiencies[i].is_some_and(|eta| eta >= best - 1e-9))
-            .collect()
+            .collect();
+        // P.6.7.3: chillers form one preferred group only with the same
+        // efficiency and the same carrier.
+        match input.function {
+            SystemFunction::Cooling => {
+                let carrier = chiller_carrier(&generators[best_units[0]].kind);
+                best_units
+                    .into_iter()
+                    .filter(|&i| chiller_carrier(&generators[i].kind) == carrier)
+                    .collect()
+            }
+            _ => best_units,
+        }
     };
+    let is_last = |i: usize| preference_class(&generators[i].kind, input.function) == 3;
     let rest: Vec<usize> = others
         .iter()
         .copied()
-        .filter(|i| !preferred.contains(i))
+        .filter(|&i| !preferred.contains(&i) && !is_last(i))
+        .collect();
+    let last: Vec<usize> = others
+        .iter()
+        .copied()
+        .filter(|&i| !preferred.contains(&i) && is_last(i))
         .collect();
     let mut groups = vec![preferred];
-    if !rest.is_empty() {
-        groups.push(rest);
-    }
+    groups.extend([rest, last].into_iter().filter(|group| !group.is_empty()));
     Some(groups)
 }
 
@@ -3642,9 +3770,11 @@ fn energy_fractions(
             SystemFunction::Heating => {
                 // P.24/P.25 on the heat left after solar, table P.2, the
                 // cascade of P.6.5.3.2 and P.23 for the remainder.
+                // P.25 literally uses Q_HD;in;tot, the whole heat delivered
+                // by all generators, collective solar included (p. 968).
                 let reference_power = input
                     .reference_power_kw
-                    .unwrap_or(input.input_kwh * rest * 3.6 / REFERENCE_POWER_DIVISOR);
+                    .unwrap_or(input.input_kwh * 3.6 / REFERENCE_POWER_DIVISOR);
                 fractions.reference_power_kw = Some(reference_power);
                 let last = groups.len() - 1;
                 let mut cumulative = 0.0;
@@ -3900,8 +4030,18 @@ fn auxiliary_energy(
     let mut ok = true;
     for (index, generator) in ctx.generators.iter().enumerate() {
         let gpath = format!("{path}.generators[{index}]");
-        let defaults = default_auxiliary(&generator.kind, ctx.function);
+        let mut defaults = default_auxiliary(&generator.kind, ctx.function);
         let aux = generator.auxiliary.clone().unwrap_or_default();
+        if ctx.function == SystemFunction::HotWater {
+            // P.6.9.4.3: no standby when the heating function carries it,
+            // none at all for a generator without auxiliary energy.
+            if aux.also_serves_heating || aux.without_auxiliary_energy {
+                defaults[0] = 0.0;
+            }
+            if aux.without_auxiliary_energy {
+                defaults[1] = 0.0;
+            }
+        }
         let overrides = [
             aux.standby_w,
             aux.burner_w_per_kw,
@@ -3961,7 +4101,8 @@ fn auxiliary_energy(
                 ));
                 ok = false;
             }
-            // P.59/P.60 and P.64/P.65.
+            // P.59/P.60 and P.64/P.65. The norm cites P.32 under P.59 where
+            // the monthly input of P.33 is meant (p. 1008); P.33 is used.
             let specific = aux.burner_w_per_kw.unwrap_or(defaults[1])
                 + aux.source_w_per_kw.unwrap_or(defaults[2])
                 + aux.solution_pump_w_per_kw.unwrap_or(defaults[3]);
@@ -5242,12 +5383,13 @@ mod tests {
             solar,
         ]);
         let result = calculated(&input, "s").unwrap();
-        // P.32: 125 000/1 250 000 = 0,1; P_ref = 1 250 000·0,9·3,6/5 400 =
-        // 750 kW, β = 0,2667 → 0,70 + (0,0667/0,1)·0,14.
+        // P.32: 125 000/1 250 000 = 0,1; P.25 on the whole Q_HD;in;tot:
+        // P_ref = 1 250 000·3,6/5 400 = 833,3 kW, β = 0,24 → 0,70 +
+        // (0,04/0,1)·0,14.
         close(result.generators[2].energy_fraction, 0.1);
         close(result.generators[2].primary_factor, 0.0);
         close(result.generators[2].renewable_factor, 1.0);
-        let preferred = 0.70 + (200.0 / 750.0 - 0.2) / 0.1 * 0.14;
+        let preferred = 0.70 + (0.24 - 0.2) / 0.1 * 0.14;
         close(result.generators[1].energy_fraction, 0.9 * preferred);
         close(
             result.generators[0].energy_fraction,
@@ -5255,7 +5397,7 @@ mod tests {
         );
         close(
             result.calculation.unwrap().reference_power_kw.unwrap(),
-            750.0,
+            1_250_000.0 * 3.6 / 5400.0,
         );
     }
 
@@ -5396,6 +5538,108 @@ mod tests {
     }
 
     #[test]
+    fn hot_water_full_load_and_auxiliary_flags() {
+        let full_load = GeneratorKind::Boiler {
+            carrier: SystemCarrier::NaturalGas,
+            efficiency: BoilerEfficiency::FullLoad {
+                value: 0.88,
+                outdoor_installation: false,
+                source_reference: "test 80/60".into(),
+            },
+        };
+        let mut wd = system(vec![
+            generator("hr", Some(20.0), full_load.clone()),
+            generator("old", Some(100.0), full_load),
+        ]);
+        wd.function = SystemFunction::HotWater;
+        wd.delivered_kwh = Some(500_000.0);
+        wd.distribution = SystemDistribution::Flows {
+            input_kwh: None,
+            loss_kwh: Some(100_000.0),
+            source_reference: "x".into(),
+        };
+        wd.hot_water_storage = Some(WdStorage::Forfait {
+            insulation: WdStorageInsulation::AtLeast20Mm,
+        });
+        // P.6.6.5.2: a preferred hot-water boiler takes table P.3 HT.
+        assert!(codes(calculated(&wd, "w")).contains(&"hot_water_full_load_requires_non_preferred"));
+        wd.generators[0].kind = GeneratorKind::Boiler {
+            carrier: SystemCarrier::NaturalGas,
+            efficiency: BoilerEfficiency::TableP3 {
+                boiler: BoilerClass::Hr107,
+                temperature_level: None,
+                emission: None,
+            },
+        };
+        wd.auxiliary_electricity_kwh = None;
+        wd.auxiliary = Some(AuxiliaryInput {
+            distribution: DistributionAuxiliary::Pumps {
+                pump_powers_w: vec![0.0],
+                operating_hours: None,
+                source_reference: "pump schedule".into(),
+            },
+            solar_kwh: None,
+        });
+        let base = calculated(&wd, "w").unwrap();
+        // P.6.9.4.3: no standby when the boiler also serves heating, nothing
+        // at all without auxiliary energy.
+        wd.generators[0].auxiliary = Some(GeneratorAuxiliary {
+            also_serves_heating: true,
+            ..GeneratorAuxiliary::default()
+        });
+        wd.generators[1].auxiliary = Some(GeneratorAuxiliary {
+            without_auxiliary_energy: true,
+            ..GeneratorAuxiliary::default()
+        });
+        let flagged = calculated(&wd, "w").unwrap();
+        close(
+            flagged.generators[0].auxiliary_kwh.unwrap(),
+            base.generators[0].auxiliary_kwh.unwrap() - 876.0,
+        );
+        assert!(base.generators[1].auxiliary_kwh.unwrap() > 876.0);
+        close(flagged.generators[1].auxiliary_kwh.unwrap(), 0.0);
+    }
+
+    #[test]
+    fn biomass_first_and_electrode_boiler_last() {
+        // Rule a): solid biomass is renewable and preferred over gas.
+        let biomass = generator(
+            "bio",
+            Some(200.0),
+            GeneratorKind::SolidBiomassBoiler {
+                carrier: SystemCarrier::BiomassAbove500Kw,
+                net_efficiency: 0.95,
+                source_reference: "EN 303-5".into(),
+            },
+        );
+        let input = system(vec![generator("boiler", Some(1000.0), gas(0.95)), biomass]);
+        let result = calculated(&input, "s").unwrap();
+        // P.25: 1 250 000·3,6/5 400 = 833,3 kW, β = 0,24.
+        close(result.generators[1].energy_fraction, table_p2(0.24));
+        // An electrode boiler in flex mode comes after the gas boiler.
+        let flex = GeneratorKind::ElectricFlex {
+            generator: FlexGenerator::ElectrodeBoiler {
+                efficiency: None,
+                efficiency_reference: None,
+            },
+            flex_heat_kwh: None,
+            network_production_kwh: None,
+            flex_reference: None,
+            connections: 600,
+            heat_buffer: true,
+            registration_reference: "hourly register".into(),
+        };
+        let input = system(vec![
+            generator("e-boiler", Some(400.0), flex),
+            generator("boiler", Some(500.0), gas(0.9)),
+        ]);
+        let result = calculated(&input, "s").unwrap();
+        // β = 500/833,3 = 0,6 for the gas boiler.
+        close(result.generators[1].energy_fraction, table_p2(0.6));
+        close(result.generators[0].energy_fraction, 1.0 - table_p2(0.6));
+    }
+
+    #[test]
     fn cold_fractions_follow_p52_to_p55() {
         let mut aquifer = generator(
             "wko",
@@ -5449,6 +5693,75 @@ mod tests {
             result.generation_primary_factor.unwrap(),
             preferred * 1.45 / 23.0 + (1.0 - preferred) * 1.45 / 3.0,
         );
+    }
+
+    #[test]
+    fn chillers_group_only_with_the_same_carrier() {
+        // P.6.7.3: equal η but another carrier is no common group.
+        let chiller = |id: &str, share, shaft| SystemGenerator {
+            cooling_power: Some(CoolingPower::CompressorShaft {
+                shaft_power_kw: shaft,
+            }),
+            ..generator(
+                id,
+                None,
+                GeneratorKind::CompressionChiller {
+                    variant: ChillerVariant::Unspecified,
+                    drive: SystemCarrier::Electricity {
+                        direct_renewable_share: share,
+                    },
+                    engine_efficiency: None,
+                },
+            )
+        };
+        let mut cd = system(vec![chiller("a", 0.0, 200.0), chiller("b", 0.5, 100.0)]);
+        cd.function = SystemFunction::Cooling;
+        cd.delivered_kwh = Some(400_000.0);
+        cd.distribution = SystemDistribution::SmallColdForfait {
+            supply_below_10_c: true,
+        };
+        cd.auxiliary_electricity_kwh = Some(0.0);
+        let result = calculated(&cd, "c").unwrap();
+        let beta = 600.0 / 900.0;
+        close(result.calculation.clone().unwrap().beta.unwrap(), beta);
+        close(result.generators[0].energy_fraction, table_p8(beta));
+        close(result.generators[1].energy_fraction, 1.0 - table_p8(beta));
+    }
+
+    #[test]
+    fn gas_engine_chiller_power_uses_the_cop_on_the_shaft() {
+        // P.53: P_CD = COP × P_in; η_CD;gen = COP·η_ge relates to fuel.
+        let gas = SystemGenerator {
+            cooling_power: Some(CoolingPower::CompressorShaft {
+                shaft_power_kw: 100.0,
+            }),
+            ..generator(
+                "gas",
+                None,
+                GeneratorKind::CompressionChiller {
+                    variant: ChillerVariant::Unspecified,
+                    drive: SystemCarrier::NaturalGas,
+                    engine_efficiency: Some(EngineEfficiency::Declared {
+                        value: 0.30,
+                        source_reference: "datasheet".into(),
+                    }),
+                },
+            )
+        };
+        let mut issues = Vec::new();
+        let power = generator_power(
+            &gas,
+            efficiency_of(&gas.kind, SystemFunction::Cooling),
+            SystemFunction::Cooling,
+            "g",
+            &mut issues,
+        )
+        .unwrap();
+        close(
+            power,
+            table_p9_cop(ChillerVariant::Unspecified, true) * 100.0,
+        );
+        assert!(issues.is_empty());
     }
 
     #[test]
@@ -5605,6 +5918,7 @@ mod tests {
                 efficiency_reference: None,
             },
             flex_heat_kwh: None,
+            network_production_kwh: None,
             flex_reference: None,
             connections: 600,
             heat_buffer: true,
@@ -5623,6 +5937,17 @@ mod tests {
         close(item.co2_kg_per_kwh, 0.4 * 0.268 / 0.99);
         // 5.8.3.1 g).
         close(item.renewable_factor, 1.0 - 0.4 / 0.99);
+        // The 15 % cap on a supplied network total (heat and hot water):
+        // min(150 000, 0,15·600 000) = 90 000 → 36 % flex.
+        if let GeneratorKind::ElectricFlex {
+            network_production_kwh,
+            ..
+        } = &mut input.generators[1].kind
+        {
+            *network_production_kwh = Some(600_000.0);
+        }
+        let item = &calculated(&input, "s").unwrap().generators[1];
+        close(item.primary_factor, 0.64 * 1.45 / 0.99);
         // Fewer than 500 connections (5.8).
         if let GeneratorKind::ElectricFlex { connections, .. } = &mut input.generators[1].kind {
             *connections = 100;
@@ -5832,10 +6157,11 @@ mod tests {
             894.0 + 2917.0 * 744.0 / 8760.0,
             1e-6,
         );
+        let forfait_months = heat.monthly.unwrap();
         let water = area_demand(&area, SystemFunction::HotWater, "a", &mut issues).unwrap();
         near(water.annual, 2917.0, 1e-6);
         // A supplied annual value overrides the forfait; without months P.74
-        // splits the total.
+        // splits that plot only, the other plot keeps its months.
         let supplied = AreaPlot {
             id: "p2".into(),
             heating: Some(PlotFlow {
@@ -5857,9 +6183,13 @@ mod tests {
             .map(|t| (18.0 - t).max(0.0))
             .collect();
         let sum: f64 = weights.iter().sum();
-        near(heat.monthly.unwrap()[0], 17_503.0 * weights[0] / sum, 1e-6);
-        // July and August are above 18 °C.
-        close(heat.monthly.unwrap()[6], 0.0);
+        near(
+            heat.monthly.unwrap()[0],
+            forfait_months[0] + 10_000.0 * weights[0] / sum,
+            1e-6,
+        );
+        // July and August are above 18 °C: only the first plot's months.
+        near(heat.monthly.unwrap()[6], forfait_months[6], 1e-6);
         assert!(issues.is_empty(), "{issues:?}");
         // As the delivery of a heat system.
         let mut input = system(vec![generator("boiler", None, gas(0.9))]);
