@@ -46,7 +46,8 @@ Ventilatiestromen hebben per maand een geleiding en optionele toevoertemperatuur
 Twee optionele bijlagen (beide met bron):
 
 - **Bijlage B (p. 772)**: `thermalMass.annexBElements` vervangt tabel 7.10. Per constructieonderdeel geef je de oppervlakte en de lagen vanaf de zonezijde (dikte, λ, ρ, c). De werkzame dikte loopt vanaf het binnenoppervlak zolang R < 0,25 m²K/W, met een maximum van 100 mm en van de halve constructiedikte. Een binnenwand met `bothSides` telt van twee kanten. `D_m = Σ ρ·c·d·A / A_g`.
-- **Bijlage A (p. 766–771)**: `windows[].dynamic` geeft een dynamisch transparant element. Methode A (`weighted_states`) middelt g en U per maand over de toestanden. Daarvoor geef je per maand het aandeel van `Σ I_sol·Δt` (A.2) en van `Σ Δθ·Δt` (A.1) per toestand op. Methode B (`single_state`) gebruikt één toestand. De maandelijkse g werkt in de zonwinst; het verschil met de nominale U van het raam wordt per maand bij `H_D` opgeteld.
+- **Bijlage A (p. 766–771)**: `windows[].dynamic` geeft een dynamisch transparant element. Methode A (`weighted_states`) middelt g en U per maand over de toestanden. Daarvoor geef je per maand het aandeel van `Σ I_sol·Δt` (A.2) en van `Σ Δθ·Δt` (A.1) per toestand op. Methode B (`single_state`) gebruikt één toestand. De maandelijkse g werkt in de zonwinst; het verschil met de nominale U van het raam wordt per maand bij `H_D` opgeteld. Een toestand mag ook `tauSolar` en `tauVisual` hebben (τ_sol en τ_vis, A.3/A.4). De kern middelt die dan met de zonnegewichten (`tau_solar_for_month`, `tau_visual_for_month`). Ontbreekt τ bij één toestand, dan is er geen maandwaarde. De daglichtinvoer van hoofdstuk 14 neemt τ_vis nog niet automatisch over.
+- **Bijlage A stap 2 (p. 770)**: de norm zegt alleen dat correctiefactoren voor dynamische effecten uit uurberekeningen "kunnen worden afgeleid". Hij geeft geen waarden en geen manier om de aandelen per toestand uit maandgegevens af te leiden. `correction` (bij beide methoden) neemt daarom twaalf opgegeven factoren voor U (`uFactors`) en voor g (`gFactors`) met een bron (`sourceReference`). Die factoren vermenigvuldigen de maandwaarden. Minder of meer dan twaalf waarden, of een waarde die niet positief is, geeft `dynamic_correction_invalid`; zonder bron volgt `source_reference_required`. Zonder `correction` zijn de factoren 1.
 
 Elk onderdeel heeft een bronverwijzing. Een onvolledige inventaris, een ongeldige waarde, een onbekend veld of een helling buiten 0–180° geeft `invalid` zonder getallen.
 
@@ -94,7 +95,7 @@ Invoer voor de zontoetreding per raam:
 6. Een maand met `H_tr + H_g;adj + H_ve ≤ 0` (bijvoorbeeld door warme toevoerlucht met negatieve `b_v`) wordt geweigerd; de tijdconstante is dan niet gedefinieerd.
 7. TOjuli (§5.7) gebruikt in de balans en in 5.40 de juliwaarde `H_gr;an`, en in de tijdconstante `H_C;g;adj`.
 8. Bijlage B: een vrijhangend plafond met ten minste 15 % open oppervlak telt niet mee voor de weerstand vanaf het binnenoppervlak. Omdat het geen bouwconstructie is, telt de module ook de massa ervan niet mee.
-9. Bijlage A: de correctiefactoren van stap 2 hebben geen forfaitaire waarde en zijn 1. De kern heeft geen uurklimaat, dus de gewichten van stap 1 worden opgegeven. De nominale U van het raam moet in de transmissie-invoer staan, omdat de module per maand alleen het verschil corrigeert. TOjuli gebruikt per oriëntatie nog de nominale U.
+9. Bijlage A: de correctiefactoren van stap 2 hebben geen forfaitaire waarde. Zonder opgegeven `correction` zijn ze 1. De kern heeft geen uurklimaat, dus de gewichten van stap 1 worden opgegeven. De nominale U van het raam moet in de transmissie-invoer staan, omdat de module per maand alleen het verschil corrigeert. TOjuli gebruikt per oriëntatie nog de nominale U.
 
 ## Toetsing
 

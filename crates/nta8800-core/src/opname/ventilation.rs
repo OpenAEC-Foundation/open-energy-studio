@@ -17,6 +17,12 @@
 //!   year; motor type unknown → installed ≤ 2006 AC, ≥ 2007 DC.
 //! - Flow: without a documented capacity the regulatory minimum applies
 //!   (p. 147), which is the kernel's 11.56 route.
+//! - Passive cooling (p. 146, 152; ISSO 75.1 likewise): only with a supplier
+//!   project document proving automatic control on the measured indoor and
+//!   outdoor temperature, for systems B–E; D with heat recovery (and E) also
+//!   needs a bypass. Without it τ_sysC = 0. The installed capacity including
+//!   the extra capacity for passive cooling comes from the commissioning
+//!   report (p. 146).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -91,7 +97,74 @@ pub struct SurveyVentilation {
     pub unit_manufacture_year: Option<i32>,
     #[serde(default)]
     pub motor: Option<MotorAnswer>,
+    #[serde(default)]
+    pub passive_cooling: Option<SurveyPassiveCooling>,
     pub source_reference: String,
+}
+
+/// ISSO 82.1 §11.4.1/§11.5.6 (p. 146, 152): proven passive cooling.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyPassiveCooling {
+    /// Supplier project document proving automatic control on the measured
+    /// indoor and outdoor temperature.
+    pub evidence_reference: String,
+    /// Installed capacity including the extra capacity for passive cooling,
+    /// from the commissioning report, dm³/s; `None`: regulatory flow.
+    #[serde(default)]
+    pub installed_capacity_dm3_per_s: Option<f64>,
+}
+
+/// Maps a passive-cooling answer onto the kernel's ventilation input:
+/// `maximumCapacityForCooling` (11.2.2.3.2) and `installedCapacity` (11.62).
+pub(crate) fn apply_passive_cooling(
+    input: &mut Value,
+    passive: Option<&SurveyPassiveCooling>,
+    principle: VentilationPrinciple,
+    bypass_present: Option<bool>,
+    recorder: &mut Recorder,
+) {
+    let Some(passive) = passive else {
+        return;
+    };
+    if principle == VentilationPrinciple::Natural {
+        recorder.issue(
+            "passive_cooling_requires_mechanical_ventilation",
+            "ventilation.passiveCooling",
+        );
+        return;
+    }
+    if passive.evidence_reference.trim().is_empty() {
+        recorder.issue(
+            "passive_cooling_evidence_required",
+            "ventilation.passiveCooling.evidenceReference",
+        );
+        return;
+    }
+    // p. 152: with heat recovery the bypass is a precondition (p. 151).
+    let recovery = input["system"]["unit"].get("heatRecovery").is_some();
+    if recovery && bypass_present != Some(true) {
+        recorder.issue(
+            "passive_cooling_requires_bypass",
+            "ventilation.bypassPresent",
+        );
+        return;
+    }
+    input["maximumCapacityForCooling"] = json!(passive.evidence_reference);
+    match passive.installed_capacity_dm3_per_s {
+        Some(total) => {
+            input["installedCapacity"] = json!({
+                "totalDm3PerS": total,
+                "sourceReference": passive.evidence_reference,
+            });
+        }
+        None => recorder.record(
+            "passive_cooling_capacity_unknown_regulatory",
+            "ventilation.passiveCooling.installedCapacityDm3PerS",
+            "regulatory design flow (no extra capacity)".into(),
+            "ISSO 82.1 p. 146–147",
+        ),
+    }
 }
 
 fn pressure_variant(
@@ -300,7 +373,7 @@ pub fn derive_ventilation(
             value
         }
     };
-    let input = json!({
+    let mut input = json!({
         "zoneId": "woning",
         "usableFloorAreaM2": usable_floor_area_m2,
         "category": "residential",
@@ -317,6 +390,13 @@ pub fn derive_ventilation(
         "fans": {"method": "forfait", "current": current, "manufactureYear": fan_year},
         "sourceReference": format!("{reference}; basisopname"),
     });
+    apply_passive_cooling(
+        &mut input,
+        survey.passive_cooling.as_ref(),
+        survey.principle,
+        survey.bypass_present,
+        recorder,
+    );
     DerivedVentilation {
         input,
         exhaust_air_heat_pump_possible: matches!(
@@ -341,8 +421,82 @@ mod tests {
             bypass_present: None,
             unit_manufacture_year: None,
             motor: None,
+            passive_cooling: None,
             source_reference: "survey".into(),
         }
+    }
+
+    fn derive_with(survey: &SurveyVentilation) -> (Value, Recorder) {
+        let mut recorder = Recorder::default();
+        let input = derive_ventilation(
+            survey,
+            DwellingKind::SingleFamily,
+            2015,
+            None,
+            100.0,
+            9.0,
+            false,
+            "pitched_roof_terraced",
+            None,
+            &mut recorder,
+        )
+        .input;
+        (input, recorder)
+    }
+
+    #[test]
+    fn passive_cooling_needs_evidence_and_a_bypass_with_heat_recovery() {
+        let passive = SurveyPassiveCooling {
+            evidence_reference: "supplier project document".into(),
+            installed_capacity_dm3_per_s: Some(90.0),
+        };
+        // Without the answer τ_sysC stays 0.
+        let (plain, _) = derive_with(&survey(VentilationPrinciple::MechanicalExtract));
+        assert!(plain.get("maximumCapacityForCooling").is_none());
+        // System C with proven control.
+        let mut extract = survey(VentilationPrinciple::MechanicalExtract);
+        extract.passive_cooling = Some(passive.clone());
+        let (input, recorder) = derive_with(&extract);
+        assert!(recorder.issues.is_empty());
+        assert_eq!(
+            input["maximumCapacityForCooling"],
+            "supplier project document"
+        );
+        assert_eq!(input["installedCapacity"]["totalDm3PerS"], 90.0);
+        let kernel: crate::ventilation::VentilationInput =
+            serde_json::from_value(input).expect("kernel input");
+        assert!(kernel.maximum_capacity_for_cooling.is_some());
+        // Capacity unknown: regulatory flow, recorded.
+        extract
+            .passive_cooling
+            .as_mut()
+            .unwrap()
+            .installed_capacity_dm3_per_s = None;
+        let (input, recorder) = derive_with(&extract);
+        assert!(input.get("installedCapacity").is_none());
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "passive_cooling_capacity_unknown_regulatory"));
+        // System A cannot cool passively with fans.
+        let mut natural = survey(VentilationPrinciple::Natural);
+        natural.passive_cooling = Some(passive.clone());
+        let (input, recorder) = derive_with(&natural);
+        assert!(input.get("maximumCapacityForCooling").is_none());
+        assert_eq!(
+            recorder.issues[0].code,
+            "passive_cooling_requires_mechanical_ventilation"
+        );
+        // D with heat recovery needs the bypass (p. 152).
+        let mut balanced = survey(VentilationPrinciple::Balanced);
+        balanced.heat_recovery = Some(ExchangerAnswer::CounterFlowPlastic);
+        balanced.passive_cooling = Some(passive);
+        let (_, recorder) = derive_with(&balanced);
+        assert_eq!(recorder.issues[0].code, "passive_cooling_requires_bypass");
+        balanced.bypass_present = Some(true);
+        let (input, recorder) = derive_with(&balanced);
+        assert!(recorder.issues.is_empty());
+        assert!(input.get("maximumCapacityForCooling").is_some());
     }
 
     fn derive(survey: &SurveyVentilation, year: i32) -> Value {

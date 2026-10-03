@@ -21,13 +21,16 @@ use serde_json::{json, Value};
 
 use super::envelope::{derive_envelope_with_cooling, SurveyEnvelope};
 use super::general::{infiltration_year, thermal_mass, Construction, Renovation};
-use super::heating::{derive_heating, SurveyHeating};
+use super::heating::{derive_heating, AirHeatingAnswer, SurveyHeating};
 use super::hot_water::{
     derive_hot_water, GasApplianceType, GaskeurAnswer, HotWaterGeneratorAnswer,
     ShowerRecoveryAnswer, SurveyHotWater, TapsServed,
 };
 use super::production::{derive_pv, SurveyPv};
-use super::ventilation::{ExchangerAnswer, MotorAnswer, PressureClass, VentilationPrinciple};
+use super::ventilation::{
+    apply_passive_cooling, ExchangerAnswer, MotorAnswer, PressureClass, SurveyPassiveCooling,
+    VentilationPrinciple,
+};
 use super::{
     loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, OpnameIssue, Recorder,
 };
@@ -328,6 +331,9 @@ pub struct UtilityVentilation {
     pub recirculation_percent: Option<u32>,
     #[serde(default)]
     pub flow_control: Option<SurveyFlowControl>,
+    /// ISSO 75.1 §11.5.6: proven passive cooling.
+    #[serde(default)]
+    pub passive_cooling: Option<SurveyPassiveCooling>,
     pub source_reference: String,
 }
 
@@ -1742,7 +1748,28 @@ fn ventilation_value(
         };
         // p. 149: heating and cooling connected to the AHU become the
         // reheating and cooling coils of NTA table 11.15.
+        // ISSO 82.1 p. 123: air heating through the AHU is also entered with
+        // the ventilation, so it implies the reheating coil.
+        let via_ahu = matches!(
+            survey.heating.air_heating,
+            Some(AirHeatingAnswer::ViaAirHandlingUnit)
+        );
+        if via_ahu && ahu.heating_connected == Some(false) {
+            recorder.issue(
+                "air_heating_via_ahu_requires_heating_coil",
+                "ventilation.ahu.heatingConnected",
+            );
+        }
         let heating_coil = ahu.heating_connected.unwrap_or_else(|| {
+            if via_ahu {
+                recorder.record(
+                    "ahu_heating_from_air_heating",
+                    "ventilation.ahu.heatingConnected",
+                    "reheating coil: heating is air heating via the AHU".into(),
+                    "ISSO 82.1 p. 123 (table 9.16); ISSO 75.1 p. 149",
+                );
+                return true;
+            }
             recorder.record(
                 "ahu_heating_unknown_none",
                 "ventilation.ahu.heatingConnected",
@@ -1867,7 +1894,7 @@ fn ventilation_value(
             value
         }
     };
-    json!({
+    let mut input = json!({
         "zoneId": "utiliteit",
         "usableFloorAreaM2": area,
         "category": "utility",
@@ -1886,7 +1913,15 @@ fn ventilation_value(
         "infiltration": infiltration,
         "fans": {"method": "forfait", "current": current, "manufactureYear": fan_year},
         "sourceReference": format!("{reference}; basisopname"),
-    })
+    });
+    apply_passive_cooling(
+        &mut input,
+        vent.passive_cooling.as_ref(),
+        vent.principle,
+        vent.bypass_present,
+        recorder,
+    );
+    input
 }
 
 fn hot_water_value(
@@ -3516,6 +3551,44 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "ahu_cooling_requires_cooling_system"));
+        // Air heating via the AHU (ISSO 82.1 table 9.16) implies the coil.
+        let mut air = fixture("1970");
+        air.heating.emitters = crate::opname::heating::Emitters::AirHeating;
+        air.heating.air_heating = Some(AirHeatingAnswer::ViaAirHandlingUnit);
+        let (input, recorder) = derive(&air);
+        let ahu =
+            &input["spaceHeating"]["demand"]["ventilation"]["system"]["unit"]["airHandlingUnit"];
+        assert_eq!(ahu["heatingCoil"], true);
+        assert!(applied(&recorder, "ahu_heating_from_air_heating"));
+        air.ventilation.ahu.as_mut().unwrap().heating_connected = Some(false);
+        let mut recorder = Recorder::default();
+        derive_utility_input(&air, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "air_heating_via_ahu_requires_heating_coil"));
+    }
+
+    #[test]
+    fn passive_cooling_maps_to_the_kernel_with_evidence() {
+        let mut survey = fixture("1970");
+        survey.ventilation.bypass_present = Some(true);
+        survey.ventilation.passive_cooling = Some(SurveyPassiveCooling {
+            evidence_reference: "supplier project document".into(),
+            installed_capacity_dm3_per_s: None,
+        });
+        let (input, recorder) = derive(&survey);
+        let ventilation = &input["spaceHeating"]["demand"]["ventilation"];
+        assert_eq!(
+            ventilation["maximumCapacityForCooling"],
+            "supplier project document"
+        );
+        assert!(applied(
+            &recorder,
+            "passive_cooling_capacity_unknown_regulatory"
+        ));
+        let result = assess_utility_survey(&survey);
+        assert!(result.issues.is_empty(), "{:?}", result.issues);
     }
 
     #[test]

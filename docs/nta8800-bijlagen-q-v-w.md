@@ -44,4 +44,5 @@ Opwekker `booster_heat_pump` in de tapwaterketen.
 - Warmte uit het koelsysteem (W.3) bij opgave van `Q_C;HP;si;mi` per maand.
 - De warmte uit het collectieve systeem telt op de drager van dat systeem: externe warmte (`dh`, η 1,0) of een opgegeven collectieve opwekker met rendement. De elektriciteit van de booster is hulpenergie.
 - De brontemperatuur moet binnen 4 K van de gemeten temperaturen liggen (W.3.1).
-- Niet uitgevoerd: de indicatieve koelrendementen W.4–W.7 en methoden 1 en 2 van W.3.3 (interpolatie tussen klassen, tabel 13.27).
+- De koelkengetallen W.4–W.7 (p. 1121–1123) noemt de norm "ter indicatie". `annex_w::booster_cooling_indication` rekent ze uit, maar alleen ter rapportage: W.7 de looptijd t = Q [MJ] / P_bron [W] (P_bron bij een bron van 24 °C), W.6 de circulatiepomp met 2 W/m² over de gekoelde A_g, W.4 η = Q / E en W.5 F = Q / (Q + Q van de andere koudeopwekkers). De hulpenergie voor de koudedistributie volgt uit hoofdstuk 10; deze waarden gaan dus niet in de keten.
+- Niet uitgevoerd: methoden 1 en 2 van W.3.3 (interpolatie tussen klassen, tabel 13.27).

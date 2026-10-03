@@ -46,7 +46,7 @@ Status: **ongeverifieerd**. Er zijn nog geen referentiegevallen vergeleken.
 
 ## Niet ondersteund (expliciete foutcode)
 
-- Luchtlagen dunner dan 20 mm, behalve via bijlage F (`air_cavity_below_20_mm_unsupported`). Luchtlagen dikker dan 300 mm (`air_cavity_above_300_mm_requires_heat_balance`).
+- Luchtlagen dunner dan 20 mm, behalve via bijlage F (`air_cavity_below_20_mm_unsupported`). Tabel C.3/C.4 voetnoot c (p. 784) geeft zelf geen waarden. De voetnoot verwijst naar tabel 8 en bijlage D van NEN-EN-ISO 6946:2017, die niet in de NTA staan. Zo'n spouw voer je in als `resistance`-laag met een R_cav die volgens NEN-EN-ISO 6946 is berekend, met bron. Luchtlagen dikker dan 300 mm (`air_cavity_above_300_mm_requires_heat_balance`).
 - Afschotdaken met een helling boven 5 % (`tapered_roof_above_5_percent_requires_numerical_method`).
 - Numerieke 2D- en 3D-berekeningen (§8.6). De kern verwerkt alleen de resulterende L_2D/L_3D (8.25–8.29) of L_C (8.5). Vliesgevels (NEN-EN-ISO 12631), bedrijfsdeuren (NEN-EN 12428) en dakkoepels (NEN-EN 1873) worden als opgegeven productwaarde ingevoerd.
 - Bijlage J (statistische bepaling van gedeclareerde waarden) en de grafische schematiseringsregels van bijlage K. A_T, A_con, ℓ_gl en A_fr worden als invoer gevraagd.

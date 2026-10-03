@@ -2862,8 +2862,11 @@ mod tests {
                 id: "tinted".into(),
                 g_perpendicular: 0.3,
                 u_value_w_per_m2k: 1.7,
+                tau_solar: None,
+                tau_visual: None,
             },
             source_reference: "product".into(),
+            correction: None,
         });
         let result = valid(&input);
         let window = &input.windows[0];

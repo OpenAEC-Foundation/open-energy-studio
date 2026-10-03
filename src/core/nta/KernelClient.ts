@@ -2593,6 +2593,8 @@ export interface ResidentialSurvey {
       connectedStoreys?: number | null;
       heatMetersPresent?: boolean | null;
     } | null;
+    /** ISSO table 9.16 with emitters `air_heating`; absent: type unknown (no fans). */
+    airHeating?: OpnameAirHeating | null;
     sourceReference: string;
   };
   hotWater: {
@@ -2635,6 +2637,7 @@ export interface ResidentialSurvey {
     bypassPresent?: boolean | null;
     unitManufactureYear?: number | null;
     motor?: 'ac' | 'dc' | 'unknown' | null;
+    passiveCooling?: OpnamePassiveCooling | null;
     sourceReference: string;
   };
   pv?: Array<{
@@ -2768,6 +2771,7 @@ export interface UtilitySurvey {
       method: 'throttle' | 'inlet_vane' | 'blade_pitch' | 'speed_control' | 'other';
       minimumPercent?: number | null;
     } | null;
+    passiveCooling?: OpnamePassiveCooling | null;
     sourceReference: string;
   };
   humidification?: {
@@ -3197,20 +3201,57 @@ export interface NtaAnnexAaResult extends NtaAnnexAaLoads {
   sufficient: boolean;
 }
 
+/** ISSO 82.1/75.1 table 9.16 air-heating type. */
+export type OpnameAirHeating =
+  | { kind: 'direct'; radialFan?: boolean | null; count?: number | null }
+  | {
+      kind: 'indirect';
+      roomHeightAbove8M?: boolean | null;
+      warmAirReturn?: boolean | null;
+      ecMotor?: boolean | null;
+      count?: number | null;
+    }
+  | { kind: 'via_air_handling_unit' };
+
+/** ISSO §11.4.1/§11.5.6: passive cooling proven by a supplier project document. */
+export interface OpnamePassiveCooling {
+  evidenceReference: string;
+  /** Commissioning report, including the extra capacity; absent: regulatory flow. */
+  installedCapacityDm3PerS?: number | null;
+}
+
+/** Annex A state; τ values (A.3/A.4) are optional. */
+export interface NtaDynamicState {
+  id: string;
+  gPerpendicular: number;
+  uValueWPerM2k: number;
+  tauSolar?: number;
+  tauVisual?: number;
+}
+
+/** Annex A step 2: twelve declared factors per property (p. 770). */
+export interface NtaDynamicCorrection {
+  uFactors: number[];
+  gFactors: number[];
+  sourceReference: string;
+}
+
 /** Annex A dynamic transparent element. */
 export type NtaDynamicTransparent =
   | {
       method: 'weighted_states';
-      states: Array<{ id: string; gPerpendicular: number; uValueWPerM2k: number }>;
+      states: NtaDynamicState[];
       /** 12 rows, one weight per state, each row summing to 1. */
       solarWeights: number[][];
       temperatureWeights: number[][];
       sourceReference: string;
+      correction?: NtaDynamicCorrection;
     }
   | {
       method: 'single_state';
-      state: { id: string; gPerpendicular: number; uValueWPerM2k: number };
+      state: NtaDynamicState;
       sourceReference: string;
+      correction?: NtaDynamicCorrection;
     };
 
 /** Annex B construction element; layers from the zone side outwards. */

@@ -269,7 +269,37 @@ pub struct SurveyHeating {
     /// Collective installation serving several dwellings (p. 106, 121).
     #[serde(default)]
     pub collective: Option<CollectiveHeating>,
+    /// ISSO 82.1 table 9.16 / 75.1: the air-heating type with emitters
+    /// `air_heating`.
+    #[serde(default)]
+    pub air_heating: Option<AirHeatingAnswer>,
     pub source_reference: String,
+}
+
+/// ISSO table 9.16: direct or indirect air heaters, or air heating
+/// through the air-handling unit (then entered with the ventilation).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AirHeatingAnswer {
+    Direct {
+        /// Radial recirculation fan; `None` unknown (radial).
+        #[serde(default, rename = "radialFan")]
+        radial_fan: Option<bool>,
+        /// Number of air heaters (table 9.16).
+        #[serde(default)]
+        count: Option<u32>,
+    },
+    Indirect {
+        #[serde(default, rename = "roomHeightAbove8M")]
+        room_height_above_8_m: Option<bool>,
+        #[serde(default, rename = "warmAirReturn")]
+        warm_air_return: Option<bool>,
+        #[serde(default, rename = "ecMotor")]
+        ec_motor: Option<bool>,
+        #[serde(default)]
+        count: Option<u32>,
+    },
+    ViaAirHandlingUnit,
 }
 
 /// One further generator with its table 9.7 nominal power.
@@ -448,10 +478,74 @@ pub fn derive_heating(
             "other_or_unknown"
         }
     };
-    let emission = json!({
+    let mut emission = json!({
         "system": system, "balancing": balancing, "control": control,
         "sourceReference": format!("{reference}; basisopname"),
     });
+    // Table 9.16 → NTA 9.23 (tables 9.12/9.13); unknown properties take the
+    // highest factor, as the kernel does for a missing value.
+    match (heating.emitters, heating.air_heating) {
+        (Emitters::AirHeating, Some(answer)) => {
+            let kind = match answer {
+                AirHeatingAnswer::Direct { radial_fan, .. } => {
+                    if radial_fan.is_none() {
+                        recorder.record(
+                            "air_heater_fan_unknown_radial",
+                            "heating.airHeating.radialFan",
+                            "radial recirculation fan".into(),
+                            "ISSO 82.1 p. 123 (table 9.16)",
+                        );
+                    }
+                    Some(json!({"kind": "direct", "radialFan": radial_fan}))
+                }
+                AirHeatingAnswer::Indirect {
+                    room_height_above_8_m,
+                    warm_air_return,
+                    ec_motor,
+                    ..
+                } => {
+                    if room_height_above_8_m.is_none()
+                        || warm_air_return.is_none()
+                        || ec_motor.is_none()
+                    {
+                        recorder.record(
+                            "air_heater_indirect_unknown_highest",
+                            "heating.airHeating",
+                            "AC fans, room higher than 8 m, without warm-air return".into(),
+                            "ISSO 82.1 p. 123 (table 9.16)",
+                        );
+                    }
+                    Some(json!({
+                        "kind": "indirect",
+                        "roomHeightAbove8M": room_height_above_8_m,
+                        "warmAirReturn": warm_air_return,
+                        "ecMotor": ec_motor,
+                    }))
+                }
+                // The AHU fans count in chapter 11.
+                AirHeatingAnswer::ViaAirHandlingUnit => None,
+            };
+            if let Some(kind) = kind {
+                emission["airHeaters"] = json!({
+                    "kind": kind,
+                    "sourceReference": format!("{reference}; ISSO table 9.16"),
+                });
+            }
+        }
+        (Emitters::AirHeating, None) => {
+            recorder.record(
+                "air_heating_type_unknown",
+                "heating.airHeating",
+                "not applicable: no air-heater fan energy".into(),
+                "ISSO 82.1 p. 123 (table 9.16)",
+            );
+        }
+        (_, Some(_)) => recorder.issue(
+            "air_heating_requires_air_heating_emitters",
+            "heating.airHeating",
+        ),
+        (_, None) => {}
+    }
 
     let collective = heating.collective.is_some();
     // Table 9.9 per generator (p. 114): with several generators a heat
@@ -546,7 +640,7 @@ pub fn derive_heating(
                         "heat_meters_unknown_present",
                         "heating.collective.heatMetersPresent",
                         "present".into(),
-                        "ISSO 82.1 p. 122 (table 9.16)",
+                        "ISSO 82.1 p. 123 (table 9.16)",
                     );
                     true
                 });
@@ -1138,8 +1232,64 @@ mod tests {
             additional_generators: Vec::new(),
             added_preferred_generator: false,
             collective: None,
+            air_heating: None,
             source_reference: "survey".into(),
         }
+    }
+
+    #[test]
+    fn air_heating_maps_table_9_16_to_air_heaters() {
+        let mut recorder = Recorder::default();
+        let mut survey = heating(HeatingGenerator::NonePresent, Emitters::AirHeating);
+        survey.air_heating = Some(AirHeatingAnswer::Direct {
+            radial_fan: None,
+            count: Some(3),
+        });
+        let derived = derive_heating(&survey, 1990, &mut recorder);
+        assert_eq!(derived.emission["airHeaters"]["kind"]["kind"], "direct");
+        assert!(derived.emission["airHeaters"]["kind"]["radialFan"].is_null());
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "air_heater_fan_unknown_radial"));
+
+        let mut recorder = Recorder::default();
+        survey.air_heating = Some(AirHeatingAnswer::Indirect {
+            room_height_above_8_m: Some(false),
+            warm_air_return: Some(true),
+            ec_motor: Some(true),
+            count: None,
+        });
+        let derived = derive_heating(&survey, 1990, &mut recorder);
+        let heaters = &derived.emission["airHeaters"]["kind"];
+        assert_eq!(heaters["kind"], "indirect");
+        assert_eq!(heaters["ecMotor"], true);
+        assert!(recorder
+            .applied
+            .iter()
+            .all(|item| !item.rule.starts_with("air_heater")));
+
+        // Via the AHU: no air-heater fans; unknown type: not applicable.
+        survey.air_heating = Some(AirHeatingAnswer::ViaAirHandlingUnit);
+        let derived = derive_heating(&survey, 1990, &mut recorder);
+        assert!(derived.emission.get("airHeaters").is_none());
+        survey.air_heating = None;
+        let mut recorder = Recorder::default();
+        derive_heating(&survey, 1990, &mut recorder);
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "air_heating_type_unknown"));
+
+        // An air-heating answer with other emitters is inconsistent.
+        let mut recorder = Recorder::default();
+        let mut radiators = heating(HeatingGenerator::NonePresent, Emitters::Radiators);
+        radiators.air_heating = Some(AirHeatingAnswer::ViaAirHandlingUnit);
+        derive_heating(&radiators, 1990, &mut recorder);
+        assert_eq!(
+            recorder.issues[0].code,
+            "air_heating_requires_air_heating_emitters"
+        );
     }
 
     #[test]
