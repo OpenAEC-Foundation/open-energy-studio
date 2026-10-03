@@ -2169,9 +2169,11 @@ fn lighting_gains_for(
                     .iter()
                     .find(|item| item.zone_id == demand.zone_id);
                 if let Some(zone) = zone {
-                    if validate_lighting(zone, demand.usable_floor_area_m2, "").is_empty() {
+                    if let Ok(result) =
+                        assess_zone_lighting(zone, demand.usable_floor_area_m2, context)
+                    {
                         *lighting = UtilityLighting::Resolved {
-                            gain_w: assess_zone_lighting(zone, context).internal_gain_w,
+                            gain_w: result.internal_gain_w,
                         };
                     }
                 }
@@ -2718,10 +2720,18 @@ pub fn assess_building_performance(
     };
     let lighting: Vec<ZoneLightingResult> = if issues.is_empty() {
         let context = lighting_context(input);
+        let zones = input.zone_inputs();
+        // Validated above, so every zone resolves; a refused zone is skipped.
         input
             .lighting
             .iter()
-            .map(|zone| assess_zone_lighting(zone, context))
+            .filter_map(|zone| {
+                let area = zones
+                    .iter()
+                    .find(|item| item.zone_id == zone.zone_id)?
+                    .usable_floor_area_m2;
+                assess_zone_lighting(zone, area, context).ok()
+            })
             .collect()
     } else {
         Vec::new()

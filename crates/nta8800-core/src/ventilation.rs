@@ -108,6 +108,9 @@ pub const INTERPRETATIONS: &[&str] = &[
     "at H = 50 m the zone is split into two airflow zones (11.6/11.7)",
     "9.29 is applied literally: Q_air uses θ_SUP;dis;out − Δθ_hr − Δθ_rca − Δθ_fan, added to Q_H;ve without changing H_ve or τ",
     "q_V;comb;out counts as an outflow in the mass balance (11.3), although 11.82 defines it as positive",
+    "AHU with both coils (11.100/11.101, p. 493–494): table 11.15 sets θ_SUP;dis;out only when the coil active in the balance is needed; the cooling balance assumes no reheating (θ_rh = 0) and the heating balance no cooling (Q_C;ahu = 0), as the last paragraph on p. 494 states; the p. 494 reference to table 11.16 is read as table 11.15",
+    "Q_H;ahu (11.119) and Q_C;ahu (11.115) use θ_SUP;dis;in after the supply fan as printed, so the coil load includes the fan rise ΔT_fan (figure 11.1 places the coil before the fan)",
+    "flow-reduction x of 11.60/11.61 more favourable than 20/80 needs an evidenceReference (notes 1 and 2, p. 468); the opname passes the survey reference for a surveyed percentage",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -946,7 +949,15 @@ pub struct FlowReduction {
     /// x of 11.61 (multiple of 10); `None` without flow control.
     #[serde(default)]
     pub flow_control_percent: Option<u32>,
+    /// Notes 1 and 2 under 11.60/11.61: evidence from the system design for
+    /// a recirculation x above 20 or a flow-control x below 80.
+    #[serde(default)]
+    pub evidence_reference: Option<String>,
 }
+
+/// Default x of 11.60 (recirculation) and 11.61 (flow control).
+const RECIRCULATION_DEFAULT_PERCENT: u32 = 20;
+const FLOW_CONTROL_DEFAULT_PERCENT: u32 = 80;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1262,12 +1273,35 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             }
         }
     }
+    // Notes 1 and 2 under 11.60/11.61: only a demonstrated system design
+    // replaces the default x by a more favourable value.
+    let favourable = input
+        .flow_reduction
+        .recirculation_percent
+        .is_some_and(|x| x > RECIRCULATION_DEFAULT_PERCENT)
+        || input
+            .flow_reduction
+            .flow_control_percent
+            .is_some_and(|x| x < FLOW_CONTROL_DEFAULT_PERCENT);
+    let evidence = input
+        .flow_reduction
+        .evidence_reference
+        .as_deref()
+        .is_some_and(|reference| !reference.trim().is_empty());
+    if favourable && !evidence {
+        issues.push(issue(
+            "flow_reduction_evidence_required",
+            "flowReduction.evidenceReference",
+        ));
+    }
     match &input.infiltration {
         Infiltration::Measured {
             qv10_dm3_per_s_m2,
             source_reference,
         } => {
-            if !qv10_dm3_per_s_m2.is_finite() || *qv10_dm3_per_s_m2 < 0.0 {
+            // A measured q_v10 of zero leaves no leakage path, so the mass
+            // balance of 11.3 cannot close.
+            if !qv10_dm3_per_s_m2.is_finite() || *qv10_dm3_per_s_m2 <= 0.0 {
                 issues.push(issue("infiltration_invalid", "infiltration.qv10DmPerSM2"));
             }
             if source_reference.trim().is_empty() {
@@ -3773,6 +3807,40 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+    }
+
+    #[test]
+    fn favourable_flow_reduction_and_zero_qv10_are_rejected() {
+        let codes = |input: &VentilationInput| -> Vec<&'static str> {
+            validate_ventilation(input)
+                .into_iter()
+                .map(|i| i.code)
+                .collect()
+        };
+        let mut input = dwelling(SystemVariant::D2);
+        input.category = Category::Utility;
+        input.dwelling_count = 0;
+        input.functions[0].function = VentilationFunction::Office;
+        // Defaults of 11.60/11.61 (and less favourable values) need no evidence.
+        input.flow_reduction.recirculation_percent = Some(20);
+        input.flow_reduction.flow_control_percent = Some(90);
+        assert!(!codes(&input).contains(&"flow_reduction_evidence_required"));
+        // Notes 1 and 2: x above 20 or below 80 must be demonstrated.
+        input.flow_reduction.recirculation_percent = Some(30);
+        assert!(codes(&input).contains(&"flow_reduction_evidence_required"));
+        input.flow_reduction.recirculation_percent = Some(20);
+        input.flow_reduction.flow_control_percent = Some(50);
+        assert!(codes(&input).contains(&"flow_reduction_evidence_required"));
+        input.flow_reduction.evidence_reference = Some("  ".into());
+        assert!(codes(&input).contains(&"flow_reduction_evidence_required"));
+        input.flow_reduction.evidence_reference = Some("design note".into());
+        assert!(!codes(&input).contains(&"flow_reduction_evidence_required"));
+        // A measured q_v10 of zero leaves no leakage path in 11.3.
+        input.infiltration = Infiltration::Measured {
+            qv10_dm3_per_s_m2: 0.0,
+            source_reference: "NEN 2686 report".into(),
+        };
+        assert!(codes(&input).contains(&"infiltration_invalid"));
     }
 
     #[test]

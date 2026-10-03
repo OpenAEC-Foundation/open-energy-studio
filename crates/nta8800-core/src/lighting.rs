@@ -15,6 +15,16 @@ use crate::climate::MONTH_HOURS;
 use crate::label_class::LabelFunction;
 use serde::{Deserialize, Serialize};
 
+/// Interpretation choices where the norm text leaves room; recorded in the
+/// verification dossier.
+pub const INTERPRETATIONS: &[&str] = &[
+    "14.41 (p. 673): the rooflight daylight factor D_SNA is multiplied by 100, because the legend and table 14.8 use % while the printed formula yields a fraction",
+    "chapter 14 is annual only; months follow t_mi/t_an as in 7.28",
+    "table 14.7 below D = 0,13 % keeps the first value 0,12 (the norm gives no extrapolation); above 18 % the last value 0,91",
+    "the 7.28 internal gain uses W_t = W_L + W_P (see docs/nta8800-maandbehoefte.md)",
+    "§14.5.1 (p. 664): the office group rule (F_o;D = 1 above 30 m²) is only accepted in a zone with an office function",
+];
+
 /// 14.10: hours per year.
 pub const YEAR_HOURS: f64 = 8760.0;
 /// 14.28/14.32: height of the visual task, m.
@@ -593,6 +603,18 @@ pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> 
         if !positive(item.area_m2) {
             push("lighting_zone_area_invalid", format!("{base}.areaM2"));
         }
+        // §14.5.1 (p. 664): the group rule only covers areas in an office function.
+        if item.occupancy.large_office_group
+            && !zone
+                .functions
+                .iter()
+                .any(|use_area| use_area.function == LabelFunction::Office)
+        {
+            push(
+                "lighting_large_office_group_without_office",
+                format!("{base}.occupancy.largeOfficeGroup"),
+            );
+        }
         if let InstalledPower::Installed {
             luminaires,
             dynamic_factor,
@@ -857,8 +879,21 @@ fn sector_geometry(sector: &DaylightSector) -> Option<(f64, f64)> {
     }
 }
 
-/// Annual lighting per calculation zone; call after [`validate_lighting`].
-pub fn assess_zone_lighting(zone: &ZoneLighting, context: LightingContext) -> ZoneLightingResult {
+/// Annual lighting per calculation zone. Refuses with the issues of
+/// [`validate_lighting`] when the input is invalid (e.g. a mixed forfait).
+pub fn assess_zone_lighting(
+    zone: &ZoneLighting,
+    zone_area_m2: f64,
+    context: LightingContext,
+) -> Result<ZoneLightingResult, Vec<LightingIssue>> {
+    let issues = validate_lighting(zone, zone_area_m2, "");
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    Ok(calculate_zone_lighting(zone, context))
+}
+
+fn calculate_zone_lighting(zone: &ZoneLighting, context: LightingContext) -> ZoneLightingResult {
     let hours_factor = zone.burning_hours_factor.unwrap_or(1.0);
     let t_day = weighted(&zone.functions, |function| burning_hours(function).0) * hours_factor;
     let t_night = weighted(&zone.functions, |function| burning_hours(function).1) * hours_factor;
@@ -1022,11 +1057,11 @@ mod tests {
     #[test]
     fn maatwerkadvies_burning_hours_factor_scales_t_d_and_t_n() {
         let zone = office(vec![forfait_zone(200.0)]);
-        let base = assess_zone_lighting(&zone, context());
+        let base = assess_zone_lighting(&zone, 200.0, context()).unwrap();
         let mut busy = zone.clone();
         busy.burning_hours_factor = Some(1.2);
         assert!(validate_lighting(&busy, 200.0, "lighting").is_empty());
-        let result = assess_zone_lighting(&busy, context());
+        let result = assess_zone_lighting(&busy, 200.0, context()).unwrap();
         let (a, b) = (&base.lighting_zones[0], &result.lighting_zones[0]);
         assert!((b.lighting_kwh - 1.2 * a.lighting_kwh).abs() < 1e-9);
         assert!((b.parasitic_kwh - a.parasitic_kwh).abs() < 1e-9);
@@ -1064,7 +1099,7 @@ mod tests {
     fn forfait_office_follows_14_7_14_13_and_14_14() {
         let zone = office(vec![forfait_zone(200.0)]);
         assert!(validate_lighting(&zone, 200.0, "lighting").is_empty());
-        let result = assess_zone_lighting(&zone, context());
+        let result = assess_zone_lighting(&zone, 200.0, context()).unwrap();
         // P_n = 12·200; F_o;D = 1 + 0,2 − 0,2 ... F_A;D = 0,2 → F_oc + 0 = 1,0;
         // F_A;N = 0,5 → 1 + 0,2 − 0,5 = 0,7; F_D = 1 (forfait power).
         let lighting = 2400.0 * (2200.0 * 1.0 * 1.0 + 300.0 * 0.7) / 1000.0;
@@ -1113,7 +1148,7 @@ mod tests {
         };
         let input = office(vec![zone]);
         assert!(validate_lighting(&input, 200.0, "lighting").is_empty());
-        let result = assess_zone_lighting(&input, context());
+        let result = assess_zone_lighting(&input, 200.0, context()).unwrap();
         let item = &result.lighting_zones[0];
         // 40·1,10·56 = 2 464 W → annex X 2 600 W.
         assert!((item.installed_power_w - 2600.0).abs() < 1e-9);
@@ -1288,5 +1323,10 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
+        // The assessment refuses invalid input instead of calculating it.
+        let refused = assess_zone_lighting(&zone, 200.0, context()).unwrap_err();
+        assert!(refused
+            .iter()
+            .any(|item| item.code == "lighting_forfait_mixed"));
     }
 }

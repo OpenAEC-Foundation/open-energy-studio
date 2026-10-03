@@ -78,7 +78,12 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - TOjuli: AOR/AVR;
 - θ_ztu = 13 °C zonder b_U;
 - C.12;
-- de afronding in 13.77 en 13.130.
+- de afronding in 13.77 en 13.130;
+- luchtbehandelingskast met verwarmer en koeler (11.100/11.101, p. 493–494): tabel 11.15 alleen als de batterij die in die balans actief is nodig is (zie hieronder);
+- Q_H;ahu (11.119) en Q_C;ahu (11.115) bevatten de ventilatorwarmte ΔT_fan;
+- daklichten (14.41, p. 673): de daglichtfactor maal 100, zodat hij in % is;
+- de maandverdeling van verlichting via t_mi/t_an;
+- W_t in de interne warmtelast van 7.28 is W_L + W_P (zie [maandbehoefte](nta8800-maandbehoefte.md)).
 
 Ze staan per module in `INTERPRETATIONS` en in de docs.
 
@@ -107,6 +112,21 @@ De herberekeningen brachten wel invoer- en validatiepunten aan het licht:
 - onrealistische opgegeven gebruiken in de voorbeelden.
 
 Deze punten zijn afgewerkt in `3eec124`. De herberekende waarden in de tabel gelden voor de voorbeeldinvoer van vóór die correctie. De actuele uitkomsten staan in `docs/nta8800-voorbeeldproject-smoketest-2026-10-03.md`.
+
+**Herberekening van ventilatie (H11) en verlichting (H14), 4 oktober 2026.** Ook dit is gedaan met een eigen Python-implementatie vanuit de normpagina's. Getest zijn drie utiliteitsscenario's voor ventilatie (onder meer D5a met CO2-regeling, twee luchtstroomzones, een luchtbehandelingskast met verwarmer en koeler, en gedeclareerde en forfaitaire ventilatoren) en vier voor verlichting (installatie en forfait, daglichtsectoren met verticale ramen en daklichten, de forfaitaire daglichtmethode). Alle vergeleken maandtermen kwamen overeen tot op de rekenprecisie (≤ 1e-14). Wat er is vastgelegd of aangepast:
+- **11.100/11.101 bij een kast met verwarmer en koeler (interpretatie).**
+  - De kern past tabel 11.15 alleen toe als de batterij die in die balans actief is nodig is. De koudebalans rekent zonder naverwarming (θ_rh = 0) en de warmtebalans zonder koeling (Q_C;ahu = 0), zoals de slotalinea op p. 494 zegt.
+  - Een letterlijke lezing van p. 493 ("koeling en naverwarming → tabel 11.15") zou altijd de tabelwaarde geven. De energie van de batterijen verandert daardoor niet; de warmtestroom per setpoint wel.
+  - De verwijzing naar tabel 11.16 op p. 494 lezen we als drukfout voor tabel 11.15.
+- **Ventilatorwarmte in de batterijlast (11.119/11.115).** De formules gebruiken θ_SUP;dis;in na de toevoerventilator, terwijl figuur 11.1 de batterij vóór de ventilator plaatst. De kern volgt de formule, dus de batterijlast bevat ΔT_fan. Dit is een normpunt, geen fout in de kern.
+- **Daklichten (14.41, p. 673).** De legenda en tabel 14.8 rekenen in %, de gedrukte formule geeft een fractie. De kern vermenigvuldigt met 100.
+- **Maandverdeling van verlichting.** Hoofdstuk 14 rekent alleen per jaar. De kern verdeelt volgens t_mi/t_an.
+- **Tabel 14.7 onder D = 0,13 %.** De kern houdt de eerste tabelwaarde 0,12 aan; de norm geeft geen extrapolatieregel.
+- **Nieuwe validatie.**
+  - Een gemeten q_v10 ≤ 0 wordt afgewezen (`infiltration_invalid`): zonder lekpad sluit de massabalans van 11.3 niet.
+  - Een terugregel-x die gunstiger is dan de standaard (recirculatie > 20 %, debietregeling < 80 %) vraagt `flowReduction.evidenceReference` (opmerkingen 1 en 2 bij 11.60/11.61, p. 468), anders `flow_reduction_evidence_required`. De basisopname geeft de bron van de ventilatieopname mee bij een opgenomen percentage.
+  - `largeOfficeGroup` mag alleen in een zone met kantoorfunctie (§14.5.1, p. 664), anders `lighting_large_office_group_without_office`.
+  - `assess_zone_lighting` controleert de invoer zelf en weigert ongeldige invoer, zoals een gemengd forfait.
 
 **Herberekening van de berekende routes voor tapwater (H13) en koeling (H10, methode 2), 4 oktober 2026.** Ook deze controle is gedaan met een eigen Python-implementatie vanuit de normpagina's. Vergeleken scenario's:
 - tapwater: vijf scenario's (circulatie, voorraadvaten, warmtepompen volgens 13.160b, alle standaardwaarden);

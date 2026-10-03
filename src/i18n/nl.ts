@@ -1659,6 +1659,7 @@ export const nl: Record<string, string> = {
   'nta.vent.collective': "Collectieve ventilatievoorziening",
   'nta.vent.recirculation': "Recirculatie x, % (veelvoud van 10)",
   'nta.vent.flowControl': "Debietregeling tot x %, % (veelvoud van 10)",
+  'nta.vent.flowReductionEvidence': "Onderbouwing bij recirculatie boven 20 % of debietregeling onder 80 % (11.60/11.61)",
   'nta.vent.infiltration': "Infiltratie (11.2.5)",
   'nta.vent.infiltrationMethod': "Bepaling",
   'nta.vent.measured': "gemeten q_v10 (NEN 2686)",

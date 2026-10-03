@@ -176,6 +176,7 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
         <CheckField {...field} path={[...base, 'flowReduction', 'collective']} label={t('nta.vent.collective')} />
         <NumberField {...field} path={[...base, 'flowReduction', 'recirculationPercent']} label={t('nta.vent.recirculation')} step="10" />
         <NumberField {...field} path={[...base, 'flowReduction', 'flowControlPercent']} label={t('nta.vent.flowControl')} step="10" />
+        <TextField {...field} path={[...base, 'flowReduction', 'evidenceReference']} label={t('nta.vent.flowReductionEvidence')} />
       </>}
     </Section>
     <Section title={t('nta.vent.infiltration')}>
