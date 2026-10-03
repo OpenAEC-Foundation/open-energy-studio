@@ -7,7 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+pub const DRAFT_SOURCE: &str =
+    "NTA 8800:2025+C1:2026, §9.3, formules 9.9–9.12a en tabellen 9.2–9.4 (p. 294–297)";
 
 /// 9.12a: upper bound of the relative emission loss.
 pub const MAX_RELATIVE_LOSS: f64 = 0.15;

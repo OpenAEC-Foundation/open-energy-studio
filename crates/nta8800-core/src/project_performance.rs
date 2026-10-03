@@ -431,6 +431,40 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
     })
 }
 
+/// Calculation results for the registration checks (A_g, A_ls/A_g, EP2,
+/// label class and envelope summary).
+fn registration_context(
+    project: Option<&ProjectInput>,
+    project_value: &Value,
+    derived: Option<&BuildingPerformanceInput>,
+    performance: Option<&BuildingPerformanceAssessment>,
+    label_data: Option<&crate::label_data::LabelData>,
+) -> crate::registration::RegistrationContext {
+    crate::registration::RegistrationContext {
+        usable_floor_area_m2: derived
+            .map(|input| input.total_usable_floor_area_m2)
+            .or_else(|| project_geometry(project_value).map(|item| item.usable_floor_area_m2))
+            .filter(|area| *area > 0.0),
+        zone_floor_areas_m2: project
+            .map(|project| project.zones.iter().map(|zone| zone.floor_area).collect())
+            .unwrap_or_default(),
+        loss_area_ratio: project_geometry(project_value).and_then(|item| item.loss_area_ratio),
+        residential: project.is_some_and(|project| {
+            matches!(
+                project.building_function,
+                crate::BuildingFunction::Residential
+            )
+        }),
+        label_function: derived.and_then(|input| input.label_function),
+        primary_fossil_kwh_per_m2: performance
+            .and_then(|result| result.primary_fossil_indicator_kwh_per_m2_year),
+        label_class: performance.and_then(|result| result.indicative_label_class),
+        envelope: label_data
+            .map(|data| data.envelope.clone())
+            .unwrap_or_default(),
+    }
+}
+
 /// 8.2.1 and 8.3.3.1: a forfait floor edge (0,5·P of 8.37/8.38) selects
 /// the forfait treatment of linear thermal bridges for the whole building,
 /// so H_D takes ΔU_for of 8.3 and no ψ-values may be entered; mixing the
@@ -949,16 +983,36 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         _ => "invalid",
     };
     let project: Option<ProjectInput> = serde_json::from_value(project_value.clone()).ok();
+    let label_data = project.as_ref().map(|project| {
+        let mut data = crate::label_data::label_data(project, derived.as_ref());
+        data.indicators = performance
+            .as_ref()
+            .filter(|result| result.status == "calculated_unverified")
+            .map(crate::label_data::LabelIndicators::from_performance);
+        data
+    });
     let registration = match project_value.get("registration") {
         None | Some(Value::Null) => None,
         Some(block) => {
             match serde_path_to_error::deserialize::<_, crate::registration::Registration>(
                 block.clone(),
             ) {
-                Ok(registration) => Some(crate::registration::assess_project_registration(
-                    &registration,
-                    project_value,
-                )),
+                Ok(registration) => {
+                    let context = registration_context(
+                        project.as_ref(),
+                        project_value,
+                        derived.as_ref(),
+                        performance
+                            .as_ref()
+                            .filter(|result| result.status == "calculated_unverified"),
+                        label_data.as_ref(),
+                    );
+                    Some(crate::registration::assess_project_registration(
+                        &registration,
+                        project_value,
+                        &context,
+                    ))
+                }
                 Err(error) => {
                     gaps.push(InputGap {
                         detail: Some(error.to_string()),
@@ -969,14 +1023,6 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
             }
         }
     };
-    let label_data = project.as_ref().map(|project| {
-        let mut data = crate::label_data::label_data(project, derived.as_ref());
-        data.indicators = performance
-            .as_ref()
-            .filter(|result| result.status == "calculated_unverified")
-            .map(crate::label_data::LabelIndicators::from_performance);
-        data
-    });
     let bacs = project_value
         .pointer("/ntaCalculation/bacs")
         .filter(|value| !value.is_null())

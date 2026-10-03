@@ -2,6 +2,18 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — registratie: rekenprogramma, berichttypen, WLC-GWP, BAG en plausibiliteit
+
+Rekenuitkomsten veranderen niet. De registratiecontrole wordt strenger:
+
+- **Rekenprogramma (Regeling art. 5 lid b, p. 6):** de app schrijft `registration.software` bij het opslaan van de projectgegevens. Zolang het programma niet volgens BRL 9501 is geattesteerd, meldt de kern `software_attest_number_missing` (ontbreekt); `readyForRegistration` blijft dan `false`. Opgeslagen projecten zonder dit blok krijgen `software_required` tot de projectgegevens opnieuw worden opgeslagen.
+- **BAG-id:** een id dat niet uit 16 cijfers bestaat of geen verblijfsobject, ligplaats of standplaats is, geeft nu een fout (`bag_object_id_invalid`, `bag_object_id_not_addressable`; Praktijkhandboek v2 p. 46).
+- **Berichttype (BRL 9500-W p. 24–25):** nieuw veld `messageType` met `regular`, `relabel` en `replacement`. Het oude `relabel: true` blijft werken. Vervangen vraagt het EP-Online-nummer van het vervangen label en moet binnen 24 maanden na de oorspronkelijke opname.
+- **WLC-GWP (BRL 9500-W p. 18, 21, 62):** vanaf 1-1-2028 is bij toets Bbl en oplevering van een gebouw > 1000 m² de uitkomst met rapportverwijzing verplicht.
+- **Plausibiliteit (BRL 9500-W p. 42):** nieuwe, nooit blokkerende lijst `registration.plausibility`, ook in het rapport.
+- **A<sub>g</sub> (Praktijkhandboek v2 p. 70):** labelgegevens tonen A<sub>g</sub> op twee decimalen; meer decimalen in de invoer geeft een plausibiliteitsmelding.
+- **Bronnen:** de laatste verwijzingen naar de internetconsultatie (afgifte H9, hulpenergie warmtepompen, gaswarmtepompen, opwekkerverdeling en de collectieve bron) zijn vervangen door paginanummers van NTA 8800:2025+C1:2026.
+
 ## 3 oktober 2026 — energie per energiefunctie, rapportaanvullingen en opgegeven interne warmte
 
 Uitkomsten veranderen niet; er komen uitvoervelden en waarschuwingen bij.

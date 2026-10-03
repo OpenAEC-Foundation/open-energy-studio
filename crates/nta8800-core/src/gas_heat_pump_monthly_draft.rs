@@ -1,4 +1,5 @@
-//! Provisional gas-driven heat-pump month terms from draft 9.62 and 9.6.8.1.1.2.3.
+//! Gas-driven heat-pump month terms from NTA 8800:2025+C1:2026 formula 9.62
+//! (p. 331) and §9.6.8.1.1.2.3 (p. 362).
 //! Carrier allocation, gas input and auxiliaries require a separate audit.
 
 use crate::final_energy_draft::MonthlyEnergy;
@@ -10,7 +11,8 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+const DRAFT_SOURCE: &str =
+    "NTA 8800:2025+C1:2026, formule 9.62 (p. 331) en §9.6.8.1.1.2.3 (p. 362)";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

@@ -1,4 +1,5 @@
-//! Draft collective source heat transfer and forfait primary factors for a linked gas heat pump.
+//! Collective source heat transfer and forfait primary factors for a linked gas heat pump,
+//! NTA 8800:2025+C1:2026 formula 5.20 (p. 89–90) and §9.6.8.1.1.2.3 (p. 362).
 //! This is a separate district-heat (`dh`) contribution, not gas-generator input or a BENG result.
 
 use crate::forfait_heat_pump_monthly_draft::SourceSystem;
@@ -10,8 +11,8 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-const CHAPTER_5: &str = "https://www.internetconsultatie.nl/epg2026/document/14147";
-const CHAPTER_9: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+const CHAPTER_5: &str = "NTA 8800:2025+C1:2026, formule 5.20 (p. 89–90)";
+const CHAPTER_9: &str = "NTA 8800:2025+C1:2026, formule 9.62 (p. 331) en §9.6.8.1.1.2.3 (p. 362)";
 const ELECTRICITY_PRIMARY_FACTOR: f64 = 1.45;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

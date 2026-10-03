@@ -1,11 +1,13 @@
-//! Gas-engine and gas-absorption heat-pump COP lookup from public draft tables 9.27/9.29.
+//! Gas-engine and gas-absorption heat-pump COP lookup from NTA 8800:2025+C1:2026
+//! tables 9.27/9.29 (p. 333–334, 337–338), first transcribed from the
+//! consultation draft and checked against the final edition.
 //! This selects a row only; gas input and auxiliary energy require a separate carrier audit.
 
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, tabellen 9.27 (p. 333–334) en 9.29 (p. 337–338)";
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -298,7 +300,12 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(fixture.kind, "source_table_transcription_not_edr_reference");
-        assert_eq!(fixture.source_url, DRAFT_SOURCE);
+        // The transcription was made from the consultation draft; the final
+        // edition (DRAFT_SOURCE) has the same gas rows.
+        assert_eq!(
+            fixture.source_url,
+            "https://www.internetconsultatie.nl/epg2026/document/14150"
+        );
         assert_eq!(
             fixture.source_pdf_sha256,
             "92053f92d0490bc2fc5ae9fac3c99904f4d80aaf80a3bacc0f6c00f41661118a"

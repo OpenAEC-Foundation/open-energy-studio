@@ -4360,7 +4360,18 @@ export interface NtaRegistration {
   /** YYYY-MM-DD. */
   registrationDate?: string;
   serialProject?: boolean;
+  /** Kept for saved projects; `messageType` supersedes it. */
   relabel?: boolean;
+  /** BRL 9500-W §4.2.5 opmerking 4/5: regular, relabel or replacement of an incorrect label. */
+  messageType?: NtaMessageType;
+  /** Replacement: EP-Online number of the replaced label. */
+  replacedEpOnlineNumber?: string;
+  /** Program that made the calculation (Regeling art. 5 lid b); filled in by the app. */
+  software?: NtaSoftwareIdentity;
+  /** WLC-GWP result, required for new buildings > 1000 m² checked against the Bbl from 2028. */
+  wlcGwp?: { valueKgCo2EqPerM2Year?: number; reportReference?: string };
+  /** Class of the label registered before, for the class-jump plausibility check. */
+  previousLabelClass?: string;
   /** Relabel: date of the improvement (quote with order or invoice), YYYY-MM-DD; within 24 months of the survey (BRL 9500 §4.2.3). */
   improvementDate?: string;
   originalKernelVersion?: string;
@@ -4371,6 +4382,15 @@ export interface NtaRegistration {
   detailSurveyTriggers?: NtaDetailSurveyTriggers;
   /** Evidence register of the project dossier (BRL 9500 Bijlage 3). */
   evidence?: NtaEvidenceItem[];
+}
+
+export type NtaMessageType = 'regular' | 'relabel' | 'replacement';
+
+export interface NtaSoftwareIdentity {
+  name: string;
+  version: string;
+  /** BRL 9501 attest number; empty until the program is attested. */
+  attestNumber?: string;
 }
 
 export interface NtaDetailSurveyTriggers {
@@ -4733,11 +4753,18 @@ export async function assessMaatwerkadviesWithRust(project: IProject, definition
 
 export interface RegistrationAssessment {
   source: string;
+  /** Effective message type (`messageType`, else `relabel`). */
+  messageType?: NtaMessageType;
   validUntil: string | null;
   registrationDeadline: string | null;
   relabelDeadline: string | null;
+  replacementDeadline?: string | null;
+  /** WLC-GWP required; null when A_g or the date is unknown. */
+  wlcGwpRequired?: boolean | null;
   readyForRegistration: boolean;
   issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
+  /** BRL 9500 §7.2.2-style plausibility warnings; never block registration. */
+  plausibility?: Array<{ code: string; path: string; severity: 'warning' }>;
 }
 
 export interface NtaBacsEvidence {

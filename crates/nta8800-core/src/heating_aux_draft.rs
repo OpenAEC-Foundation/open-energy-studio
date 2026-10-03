@@ -1,4 +1,5 @@
-//! Provisional §9.6.8.1.1 equation 9.85 for one individual electric heat pump.
+//! NTA 8800:2025+C1:2026 §9.6.8.1.1 equation 9.85 (p. 357–359) for one
+//! individual electric heat pump.
 //! All coefficients and generator input electricity must be independently supplied.
 
 use crate::final_energy_draft::{as_f64, decimal};
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 
-pub const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+pub const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §9.6.8.1.1, formule 9.85 (p. 357–359)";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

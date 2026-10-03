@@ -5,7 +5,7 @@ import type { NtaEvidenceItem, ProjectPerformanceAssessment } from '../core/nta/
 import {
   clearSessionEvidence, createEvidenceItem, guessEvidenceKind, nextEvidenceId, sha256Hex,
 } from '../core/nta/Evidence';
-import { cleanRegistration } from '../core/nta/Registration';
+import { cleanRegistration, softwareIdentity } from '../core/nta/Registration';
 import { buildProjectDossier, checkDossierCompleteness, zipProjectDossier } from '../core/report/ProjectDossier';
 import { parseGps } from '../components/dialogs/ProjectInfoDialog/EvidenceRegister';
 
@@ -56,6 +56,7 @@ describe('evidence register', () => {
     expect(cleaned).toEqual({
       evidence: [evidence('ev-1', 'invoice')],
       detailSurveyTriggers: { energyPerformanceFee: true },
+      software: softwareIdentity(),
     });
     expect(cleanRegistration({ evidence: [], detailSurveyTriggers: { addedAfter2021: false } })).toBeUndefined();
   });

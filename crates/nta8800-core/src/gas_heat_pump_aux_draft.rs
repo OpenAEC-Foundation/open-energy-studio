@@ -1,4 +1,5 @@
-//! Provisional gas-driven heat-pump generator auxiliary electricity, draft §9.6.8.2.
+//! Gas-driven heat-pump generator auxiliary electricity, NTA 8800:2025+C1:2026
+//! §9.6.8.2 (p. 363–364).
 //! Equation 9.91/9.92 only; month hours and generator heat are supplied inputs.
 
 use crate::gas_heat_pump_forfait_draft::GasPumpDrive;
@@ -7,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 
-const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §9.6.8.2, formules 9.91 en 9.92 (p. 363–364)";
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

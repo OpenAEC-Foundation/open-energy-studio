@@ -133,6 +133,10 @@ function interpretationsSection(groups: NtaInterpretationGroup[] | undefined): s
     ${groups.map((group) => `<h3>${escapeHtml(group.part)} <small>(${escapeHtml(group.module)})</small></h3><ul>${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`).join('')}`;
 }
 
+const MESSAGE_TYPE: Record<string, string> = {
+  regular: 'registratie', relabel: 'herlabelen', replacement: 'vervangen onjuist label',
+};
+
 function advisor(value: NtaRegistration['surveyingAdvisor']): string {
   if (!value) return '—';
   return `${value.name || '—'} (vakbekwaamheid ${value.competenceNumber || '—'})`;
@@ -143,12 +147,21 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
   if (!registration) {
     return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie).</p>';
   }
-  const issues = (assessment?.issues ?? []).map((item) =>
-    `<tr>${cell(item.severity === 'error' ? 'fout' : 'ontbreekt')}${cell(item.code)}${cell(item.path)}</tr>`).join('');
+  const issues = [...(assessment?.issues ?? []), ...(assessment?.plausibility ?? [])].map((item) =>
+    `<tr>${cell(item.severity === 'error' ? 'fout' : item.severity === 'warning' ? 'plausibiliteit' : 'ontbreekt')}${cell(item.code)}${cell(item.path)}</tr>`).join('');
+  const messageType = assessment?.messageType ?? registration.messageType ?? (registration.relabel ? 'relabel' : 'regular');
+  const software = registration.software;
+  const softwareText = software
+    ? `${software.name} ${software.version}, ${software.attestNumber ? `attest ${software.attestNumber}` : 'nog niet geattesteerd (BRL 9501)'}`
+    : '—';
+  const wlc = registration.wlcGwp;
+  const wlcText = wlc?.valueKgCo2EqPerM2Year != null
+    ? `${num(wlc.valueKgCo2EqPerM2Year, 2)} kg CO₂-eq/m²·jr${wlc.reportReference ? ` (${wlc.reportReference})` : ''}`
+    : assessment?.wlcGwpRequired ? 'vereist, niet ingevuld' : 'niet vereist';
   const address = [registration.postcode, registration.houseNumber, registration.houseNumberAddition].filter(Boolean).join(' ');
   return `<h2>Registratie</h2><table><tbody>
     <tr><th>Doel</th>${cell(PURPOSE[registration.purpose ?? ''] ?? '—')}<th>Opname</th>${cell(SURVEY[registration.surveyType ?? ''] ?? '—')}</tr>
-    <tr><th>Representativiteit</th>${cell(REPRESENTATION[registration.representation ?? ''] ?? '—')}<th>Herlabelen</th>${cell(registration.relabel ? 'ja' : 'nee')}</tr>
+    <tr><th>Representativiteit</th>${cell(REPRESENTATION[registration.representation ?? ''] ?? '—')}<th>Berichttype</th>${cell(MESSAGE_TYPE[messageType] ?? messageType)}</tr>
     <tr><th>Adres (postcode, huisnummer)</th>${cell(address || '—')}<th>BAG-verblijfsobject</th>${cell(registration.bagObjectId ?? '—')}</tr>
     <tr><th>Bouwjaar</th>${cell(registration.constructionYear ?? '—')}<th>Woningtype / gebruiksfunctie</th>${cell(registration.buildingType ?? '—')}</tr>
     <tr><th>Opdrachtgever</th>${cell(registration.client ?? '—')}<th>Certificaatnummer</th>${cell(registration.certificateNumber ?? '—')}</tr>
@@ -156,6 +169,8 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     <tr><th>Opnamedatum</th>${cell(registration.surveyDate ?? '—')}<th>Registratiedatum</th>${cell(registration.registrationDate ?? '—')}</tr>
     <tr><th>Uiterste registratiedatum</th>${cell(assessment?.registrationDeadline ?? assessment?.relabelDeadline ?? '—')}<th>Geldig tot (opnamedatum + 10 jaar)</th>${cell(assessment?.validUntil ?? '—')}</tr>
     <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Gereed voor registratie</th>${cell(assessment?.readyForRegistration ? 'ja' : 'nee')}</tr>
+    <tr><th>Rekenprogramma (Regeling art. 5)</th>${cell(softwareText)}<th>WLC-GWP</th>${cell(wlcText)}</tr>
+    ${messageType === 'replacement' ? `<tr><th>Vervangt label</th>${cell(registration.replacedEpOnlineNumber ?? '—')}<th>Uiterste vervangdatum</th>${cell(assessment?.replacementDeadline ?? '—')}</tr>` : ''}
   </tbody></table>
   ${issues ? `<table><thead><tr><th>Soort</th><th>Code</th><th>Pad</th></tr></thead><tbody>${issues}</tbody></table>` : ''}
   ${assessment ? `<p>Bron termijnen: ${escapeHtml(assessment.source)}.</p>` : ''}`;
