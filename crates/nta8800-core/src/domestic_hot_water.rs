@@ -621,6 +621,13 @@ pub enum HotWaterGenerator {
         #[serde(rename = "insideBoundary")]
         inside_boundary: bool,
     },
+    /// §13.8.4.10: two or more electric heat pumps in series as one
+    /// notional device over the whole rise (f_pref;serie = 1), with table
+    /// 9.29 at 65 °C < θ_sup ≤ 70 °C for the source of the last heat pump.
+    HeatPumpSeries {
+        #[serde(rename = "lastSource")]
+        last_source: crate::forfait_heat_pump_draft::TableSource,
+    },
     /// §13.8.4.7.4 heat pump with an indirectly heated vessel, 1,4.
     IndirectHeatPump {
         #[serde(rename = "alsoSpaceHeating")]
@@ -2623,6 +2630,11 @@ fn generation(
             ))
         }
         HotWaterGenerator::IndirectHeatPump { .. } => Ok((1.4, 1.0)),
+        HotWaterGenerator::HeatPumpSeries { last_source } => {
+            crate::forfait_heat_pump_draft::utility_cop_65_to_70(*last_source)
+                .map(|cop| (cop, 1.0))
+                .ok_or("hot_water_heat_pump_series_source_invalid")
+        }
         HotWaterGenerator::ExternalHeat => Ok((1.0, 1.0)),
         // Annex W per month; see the month loop.
         HotWaterGenerator::BoosterHeatPump(_) => Ok((1.0, 1.0)),
@@ -2752,6 +2764,7 @@ fn category(generator: &HotWaterGenerator) -> u8 {
         HotWaterGenerator::HeatPump { .. }
         | HotWaterGenerator::HeatPumpEn16147 { .. }
         | HotWaterGenerator::IndirectHeatPump { .. }
+        | HotWaterGenerator::HeatPumpSeries { .. }
         | HotWaterGenerator::BoosterHeatPump(_)
         | HotWaterGenerator::Chp(_) => 1,
         _ => 2,
@@ -2939,6 +2952,13 @@ fn book_generator(
                 }
             }
             HotWaterGenerator::IndirectHeatPump { .. } => 1.0,
+            HotWaterGenerator::HeatPumpSeries { last_source } => {
+                if *last_source == crate::forfait_heat_pump_draft::TableSource::ExhaustAir {
+                    0.0
+                } else {
+                    1.0
+                }
+            }
             HotWaterGenerator::MeasuredTwoProfiles(test) if test.electric() => {
                 if test.exhaust_air_source {
                     test.outdoor_air_fraction.unwrap_or(0.0)
@@ -4681,6 +4701,21 @@ mod tests {
         let extra = 695.0 * 744.0 / crate::climate::YEAR_HOURS;
         assert!((pilot(false, true) - pilot(false, false) - extra).abs() < 1e-9);
         assert!((pilot(true, true) - pilot(true, false)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn heat_pump_series_uses_table_9_29_above_65() {
+        use crate::forfait_heat_pump_draft::TableSource;
+        // §13.8.4.10: outdoor air, 65–70 °C column of table 9.29: 2,0.
+        let input = system(HotWaterGenerator::HeatPumpSeries {
+            last_source: TableSource::OutdoorAir,
+        });
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert!((jan.electricity_kwh - jan.generator_output_kwh / 2.0).abs() < 1e-9);
+        assert!(
+            (jan.ambient_heat_kwh - jan.generator_output_kwh * (1.0 - 1.0 / 2.0)).abs() < 1e-9
+        );
     }
 
     fn combi() -> HotWaterGenerator {

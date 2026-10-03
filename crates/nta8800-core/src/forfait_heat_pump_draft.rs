@@ -214,6 +214,12 @@ fn table_values(scope: TableScope, source: TableSource) -> Option<[Option<f64>; 
     Some(full.map(Some))
 }
 
+/// Table 9.29 (utility, collective or > 25 kW) at 65 °C < θ_sup ≤ 70 °C,
+/// used by 13.8.4.10 for a series of electric heat pumps.
+pub fn utility_cop_65_to_70(source: TableSource) -> Option<f64> {
+    table_values(TableScope::UtilityCollectiveOrOver25Kw, source)?[8]
+}
+
 fn high_row_values(source: TableSource) -> Option<[f64; 6]> {
     match source {
         TableSource::Ground => Some([4.55, 4.4, 4.25, 4.1, 3.9, 3.7]),
