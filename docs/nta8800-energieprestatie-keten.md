@@ -809,3 +809,44 @@ De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indic
 - **Samenvoegen.** Rendementen in het samengevoegde resultaat zijn naar energie gewogen. De maatwerkadviesfit schaalt de opgetelde behoefte.
 
 De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijvoorbeeld een keukengeiser naast het badkamertoestel. Onbekende aangesloten badruimten en keukens worden afgeleid uit `served`; dat wordt als standaardwaarde vastgelegd.
+
+**Correcties na de review van de hoofdstuk 5-indicatoren:**
+- De Standaard voor woningisolatie wordt met decimale rekenkunde berekend. Een exacte helft rondt nu naar boven af; in f64 kwam bijvoorbeeld 82,5 net onder de helft uit.
+- De standaard wordt alleen bepaald bij één woning in de berekening (N_woon = 1).
+- De renovatiestandaard (tabel 5.7) wordt ook decimaal afgerond.
+- Hernieuwbare externe koude (5.39h) wordt niet meer met f_BACS gewogen.
+- Lokaal CO2-vrij is "nee" zodra er gas of olie in de berekening zit. Alleen anders beslist `fossilAppliancesOutsideCalculation`.
+- Bij een kwaliteitsverklaring staat EwePrenTot;EMGforf er nu naast.
+- In de projectroute moet het gebruik in het BACS-blok kloppen met de rekenscope (`bacs_building_use_mismatch`).
+- Interpretatie bij 5.19a: dw en dc worden niet nog eens als m³ aeq meegeteld. Letterlijk sluit 5.19a alleen el en dh uit, maar 5.18a telt dw en dc al.
+
+## Ketenpunten uit de dekkingsaudit (4 oktober 2026)
+
+**f_prac bij externe levering (9.84, 13.152, 10.78).** Externe warmte, externe warmte voor tapwater en externe koude krijgen f_prac (koude: f_prpr) = 0,95 als de factor uit bijlage P op berekende waarden rust. De factor is 1,0 bij de forfaitaire factor en bij een bijlage P-route op uitsluitend gemeten waarden. Een kwaliteitsverklaring (`declared`) telt als berekend, tenzij `measuredOnly` is opgegeven. Het EMG-forfaitscenario van §5.3.1 houdt 1,0.
+
+**ϑ_ztu (7.82) en ϑ_int;op;H (7.9.6).**
+- Leidingen en buffervaten in een onverwarmde ruimte rekenen met ϑ_ztu = ϑ_int;set;H − b_U·(ϑ_int;set;H − ϑ_e;avg). b_U komt uit `distributionSystem.unheatedReductionFactor`.
+- In de projectroute wordt die b_U automatisch ingevuld als er precies één onverwarmde ruimte is. Dat kan een opgegeven of een afgeleide b_U zijn.
+- Opgegeven ϑ_ztu-waarden gaan voor. Zonder beide geldt 13 °C.
+- Leidingen in de zone rekenen met ϑ_int;op;H = ϑ_int;calc;H uit de maandbehoefte, in plaats van de setpoint.
+- Niet gedaan: voorraadvaten voor tapwater in onverwarmde ruimten gebruiken nog 13 °C.
+
+**Warmtepompen.**
+- Bijlage V koppelt c_source aan de forfaitaire COP (tabel 9.27 voetnoot a, via `regeneration`). V.1 rekent daarbij met de tabel-COP zonder c_source.
+- Boven 55 °C vraagt elke warmtepomp voor ruimteverwarming bijlage Q, ook zonder bijverwarming (§9.6.3, p. 331, interpretatie). "(hybride) systemen" lees ik letterlijk als alle systemen, hybride of niet. De kolommen tot 70 °C van tabel 9.27/9.29 horen volgens opmerking 7 bij tapwater via afleversets.
+- W_H;aux;hp;an wordt niet nog eens geboekt, omdat Q.4 het al in η_H;gen;hp opneemt. Deze keuze staat in `OMITTED_TERMS`.
+
+**Identieke installaties (§9.1).** Met `identicalSystems` = N rekent de opwekker per toestel op Q/N; ook de vraag voor bijlage Q en V wordt per toestel genomen. Dragers, hulpenergie (bijvoorbeeld de 9.85-constante) en verliezen worden met N vermenigvuldigd. Voor de 500 m²-grens van 9.2.5.1 telt het oppervlak per toestel. 6.6.5 (A_g per woning) wordt volgens de opmerking bij 6.6.5 in de berekening niet gebruikt.
+
+**Gaswarmtepomp (`gas_heat_pump`).** Een gasmotor- of gasabsorptiewarmtepomp gebruikt tabel 9.27 (woningbouw, collectief ≤ 25 kW: bodem/grondwater × c_source, buitenlucht) of tabel 9.29 (utiliteit, collectief of > 25 kW). De gasrijen lopen tot 55 °C.
+- Gasverbruik: E = Q/COP (9.62, f_prac 1).
+- Hulpenergie: volgens 9.91.
+- Omgevingswarmte: volgens 5.31.
+
+**Boosterwarmtepomp op het eigen verwarmingssysteem (9.4).** Met `heatSource: heating_system` belast de W.2-warmte het knooppunt van de verwarmingsketen (Q_W;BWP;si;in). Er komt dan geen aparte drager met een opgegeven rendement.
+
+**Luchtverwarmers (9.23, tabel 9.12/9.13).**
+- Formule: W = factor · Q_h;b · t_H;op/1000; n_H;aux valt weg.
+- Factor: direct gestookt axiaal 0,014, radiaal 0,022; indirect 0,004–0,013. Bij een onbekende eigenschap geldt de hoogste waarde.
+- Q_h;b komt uit NEN-EN 12831-1, of anders uit de schatting van tabel 9.12: Q_H;ht van januari van 21 °C naar −10 °C, plus (√A_g·4·3 + A_g)·5 W.
+- Het resultaat telt bij de afgiftehulpenergie (`emissionFanElectricityKwh`).

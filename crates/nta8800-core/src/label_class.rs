@@ -171,11 +171,19 @@ pub fn renovation_standard_limit(function: LabelFunction) -> Option<f64> {
 /// usable floor area over table 5.7 and rounded to two decimals.
 pub fn renovation_standard(functions: &[LabelFunctionArea]) -> Option<f64> {
     let total = utility_parts(functions)?;
-    let mut weighted = 0.0;
+    use rust_decimal::prelude::ToPrimitive;
+    use rust_decimal::RoundingStrategy;
+    // Decimal arithmetic so that x,xx5 rounds up.
+    let total = crate::final_energy_draft::decimal(total)?;
+    let mut weighted = rust_decimal::Decimal::ZERO;
     for part in functions {
-        weighted += renovation_standard_limit(part.function)? * part.area_m2 / total;
+        weighted += crate::final_energy_draft::decimal(renovation_standard_limit(part.function)?)?
+            * crate::final_energy_draft::decimal(part.area_m2)?
+            / total;
     }
-    Some((weighted * 100.0).round() / 100.0)
+    weighted
+        .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+        .to_f64()
 }
 
 #[cfg(test)]
