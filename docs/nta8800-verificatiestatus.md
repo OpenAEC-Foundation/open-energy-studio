@@ -12,7 +12,7 @@
 
 **BRL 9500.** De volgende onderdelen zijn tegen BRL 9500-W/U, de Regeling en het Praktijkhandboek gelegd:
 - registratie: programma-identiteit, WLC-GWP, BAG-controle, berichttypen en plausibiliteit;
-- het dwellinglabel op EMGforf;
+- het woninglabel op EMGforf;
 - herlabelen: 6a/6b, een vergelijking die bij registratie opnieuw wordt gedraaid en de verankering van het origineel.
 
 `readyForRegistration` blijft onwaar tot het programma een BRL 9501-attestnummer heeft.
