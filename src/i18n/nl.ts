@@ -111,6 +111,13 @@ export const nl: Record<string, string> = {
   // Dialogs
   'dialog.save': 'Opslaan',
   'dialog.cancel': 'Annuleren',
+  'item.deleteConfirm': "\"{{name}}\" verwijderen? Verwijzingen in NTA-invoer, herlabelvergelijking of maatwerkadvies naar dit onderdeel worden ongeldig.",
+  'item.deleteYes': "Ja, verwijderen",
+  'item.constructionInUse': "Deze constructie is in gebruik bij {{count}} vlak(ken): {{list}}. Koppel die vlakken eerst aan een andere constructie.",
+  'envelope.actions': "Acties",
+  'envelope.windowsOf': "Ramen",
+  'envelope.surfaceOf': "Vlak",
+  'envelope.emptyHint': "Voeg een zone toe via het Ribbon-menu om te beginnen.",
   'dialog.delete': 'Verwijderen',
   'dialog.add': 'Toevoegen',
   'dialog.edit': 'Bewerken',

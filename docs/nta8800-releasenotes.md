@@ -2,6 +2,20 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — bestaande schildelen bewerken en toetsenbord in dialogen
+
+Geen rekenwijziging; alleen de invoer verandert.
+
+- **Bewerken en verwijderen.** Bestaande zones, vlakken, ramen, koudebruggen, puntkoudebruggen en constructies zijn te bewerken en te verwijderen vanuit:
+  - de schilweergave, die nu ook een ramentabel per zone heeft;
+  - de projectboom, met dubbelklik;
+  - het eigenschappenpaneel.
+- **Stabiele ids.** De bestaande dialogen werken het onderdeel ter plekke bij. Id en volgorde blijven gelijk, zodat herlabelvergelijkingen en maatwerkadviessjablonen hun verwijzingen houden.
+- **Verwijderen.** Elke verwijdering vraagt om bevestiging. Een constructie die nog door vlakken wordt gebruikt, kan niet worden verwijderd; de melding noemt die vlakken.
+- **Toetsenbord in dialogen.** Een dialoog zet de focus in het eerste veld en houdt Tab binnen de dialoog. Escape sluit de dialoog en de focus keert terug naar de knop die hem opende.
+- **Labels.** Alle velden in de zone-, raam-, vlak-, constructie- en installatiedialogen hebben een gekoppeld label.
+- **Getallen.** De schilweergave toont getallen volgens de taalinstelling.
+
 ## 3 oktober 2026 — herlabelvergelijking: getallen, anker van het origineel en dossieroordeel
 
 ### Registraties die nu een fout of ontbrekend gegeven melden

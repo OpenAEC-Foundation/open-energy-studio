@@ -98,3 +98,9 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
 }
+
+.properties-actions {
+  padding: 0 0 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}

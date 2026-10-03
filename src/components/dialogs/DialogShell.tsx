@@ -1,6 +1,15 @@
 import { useRef, useCallback, useEffect, useId, useState } from 'react';
 import i18next from 'i18next';
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), '
+  + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Visible, enabled focusable elements inside the dialog, in tab order. */
+function focusableIn(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
+    .filter((element) => !element.closest('[hidden], [inert]') && element.getAttribute('aria-hidden') !== 'true');
+}
+
 interface DialogShellProps {
   title: string;
   onClose: () => void;
@@ -67,6 +76,45 @@ export function DialogShell({
     };
   }, []);
 
+  // ── Keyboard: focus into the dialog, trap Tab, Escape closes, focus returns to the trigger ──
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const first = focusableIn(dialog).find((element) => !element.classList.contains('dialog-close-btn'))
+      ?? focusableIn(dialog)[0];
+    (first ?? dialog).focus();
+    return () => {
+      if (trigger && trigger.isConnected) trigger.focus();
+    };
+  }, []);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      event.preventDefault();
+      onCloseRef.current();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const items = focusableIn(dialog);
+    if (items.length === 0) { event.preventDefault(); dialog.focus(); return; }
+    const firstItem = items[0];
+    const lastItem = items[items.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === firstItem || !dialog.contains(active))) {
+      event.preventDefault();
+      lastItem.focus();
+    } else if (!event.shiftKey && (active === lastItem || !dialog.contains(active))) {
+      event.preventDefault();
+      firstItem.focus();
+    }
+  }, []);
+
   const [shake, setShake] = useState(false);
   const justFocused = useRef(false);
 
@@ -121,6 +169,8 @@ export function DialogShell({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
       >
         <div className="dialog-header" onMouseDown={handleHeaderMouseDown}>
           <span className="dialog-header-title" id={titleId}>{title}</span>

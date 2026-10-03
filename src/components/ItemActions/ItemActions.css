@@ -1,0 +1,12 @@
+.item-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-actions-confirm,
+.item-actions-blocked {
+  font-size: 12px;
+  color: var(--color-warning, #b45309);
+}

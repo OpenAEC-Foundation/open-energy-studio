@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISurface, SurfaceType, Orientation, ThermalBoundary } from '../../../core/energy/types';
@@ -14,6 +14,7 @@ const orientations: Orientation[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW',
 const thermalBoundaries: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
 
 export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
   const { project } = state;
@@ -91,8 +92,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.surface.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.surface.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: '' })); }}
@@ -111,8 +112,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         </div>}
 
         <div className="dialog-field">
-          <label>{t('dialog.surface.type')}</label>
-          <select value={type} onChange={(e) => setType(e.target.value as SurfaceType)}>
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.surface.type')}</label>
+          <select id={`${fieldId}-2`} value={type} onChange={(e) => setType(e.target.value as SurfaceType)}>
             {surfaceTypes.map((st) => (
               <option key={st} value={st}>
                 {t(`dialog.surface.${st}`)}
@@ -134,8 +135,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.surface.area')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.surface.area')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             step={0.1}
@@ -145,8 +146,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.surface.orientation')}</label>
-          <select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.surface.orientation')}</label>
+          <select id={`${fieldId}-4`} value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
             {orientations.map((o) => (
               <option key={o} value={o}>
                 {t(`orientation.${o}`)}
@@ -156,8 +157,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.surface.construction')}</label>
-          <select value={constructionId} onChange={(e) => setConstructionId(e.target.value)}>
+          <label htmlFor={`${fieldId}-5`}>{t('dialog.surface.construction')}</label>
+          <select id={`${fieldId}-5`} value={constructionId} onChange={(e) => setConstructionId(e.target.value)}>
             <option value="">--</option>
             {project.constructions.map((c) => (
               <option key={c.id} value={c.id}>
@@ -168,8 +169,8 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.surface.zone')}</label>
-          <select
+          <label htmlFor={`${fieldId}-6`}>{t('dialog.surface.zone')}</label>
+          <select id={`${fieldId}-6`}
             value={zoneId}
             onChange={(e) => { setZoneId(e.target.value); setErrors(prev => ({ ...prev, zoneId: '' })); }}
             disabled={!!existingSurface}

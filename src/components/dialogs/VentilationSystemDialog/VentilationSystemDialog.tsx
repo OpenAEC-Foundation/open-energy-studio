@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IVentilationSystem, VentilationType } from '../../../core/energy/types';
@@ -18,6 +18,7 @@ const ventilationTypeLabels: Record<VentilationType, string> = {
 };
 
 export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -64,8 +65,8 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.ventilation.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.ventilation.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -73,8 +74,8 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.ventilation.type')}</label>
-          <select value={type} onChange={(e) => setType(e.target.value as VentilationType)}>
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.ventilation.type')}</label>
+          <select id={`${fieldId}-2`} value={type} onChange={(e) => setType(e.target.value as VentilationType)}>
             {ventilationTypes.map((vt) => (
               <option key={vt} value={vt}>
                 {t(ventilationTypeLabels[vt])}
@@ -84,8 +85,8 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.ventilation.heatRecovery')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.ventilation.heatRecovery')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             max={100}
@@ -96,8 +97,8 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.ventilation.sfp')}</label>
-          <input
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.ventilation.sfp')}</label>
+          <input id={`${fieldId}-4`}
             type="number"
             min={0}
             step={0.1}

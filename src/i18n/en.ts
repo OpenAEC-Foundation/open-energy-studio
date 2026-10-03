@@ -111,6 +111,13 @@ export const en: Record<string, string> = {
   // Dialogs
   'dialog.save': 'Save',
   'dialog.cancel': 'Cancel',
+  'item.deleteConfirm': "Delete \"{{name}}\"? References to this item in the NTA input, relabel comparison or tailored advice become invalid.",
+  'item.deleteYes': "Yes, delete",
+  'item.constructionInUse': "This construction is used by {{count}} surface(s): {{list}}. Assign those surfaces another construction first.",
+  'envelope.actions': "Actions",
+  'envelope.windowsOf': "Windows",
+  'envelope.surfaceOf': "Surface",
+  'envelope.emptyHint': "Add a zone from the ribbon menu to get started.",
   'dialog.delete': 'Delete',
   'dialog.add': 'Add',
   'dialog.edit': 'Edit',
