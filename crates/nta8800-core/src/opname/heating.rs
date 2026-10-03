@@ -127,10 +127,14 @@ pub enum HeatingGenerator {
         /// Electrical power P_el, kW (table 9.31 row).
         #[serde(rename = "electricalPowerKw")]
         electrical_power_kw: f64,
-        /// Thermal power, kW; unknown → 1,5 × P_el for gas engines
-        /// (table 9.7).
+        /// Thermal power, kW; unknown → table 9.7 rule of thumb on P_el
+        /// by `engine`.
         #[serde(default, rename = "thermalPowerKw")]
         thermal_power_kw: Option<f64>,
+        /// Table 9.7: gas engine (1,5), diesel engine (1,2) or micro
+        /// turbine (2,5); unknown → gas engine.
+        #[serde(default)]
+        engine: Option<ChpEngine>,
         #[serde(default, rename = "manufactureYear")]
         manufacture_year: Option<i32>,
         /// HRe declaration for P_el ≤ 2 kW (table 9.31).
@@ -142,6 +146,26 @@ pub enum HeatingGenerator {
     },
     /// No generator present (renovation), previous one unknown.
     NonePresent,
+}
+
+/// Prime mover of a CHP for the table 9.7 rule of thumb.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChpEngine {
+    GasEngine,
+    DieselEngine,
+    MicroTurbine,
+}
+
+impl ChpEngine {
+    /// Table 9.7 (ISSO 82.1 p. 113): thermal / electrical power.
+    pub fn thermal_ratio(self) -> f64 {
+        match self {
+            Self::GasEngine => 1.5,
+            Self::DieselEngine => 1.2,
+            Self::MicroTurbine => 2.5,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -660,16 +684,33 @@ pub fn apply_unheated_pipes(
 }
 
 /// Table 9.7 (ISSO 82.1 p. 113, 75.1 equally): the thermal power of a
-/// CHP; unknown → 1,5 × the electrical power (gas engine).
-fn chp_thermal_power(electrical: f64, thermal: Option<f64>, recorder: &mut Recorder) -> f64 {
+/// CHP; unknown → the rule of thumb on the electrical power: 1,5 for gas
+/// engines, 1,2 for diesel engines and 2,5 for micro turbines (engine
+/// unknown → gas engine).
+fn chp_thermal_power(
+    electrical: f64,
+    thermal: Option<f64>,
+    engine: Option<ChpEngine>,
+    recorder: &mut Recorder,
+) -> f64 {
     thermal.unwrap_or_else(|| {
+        let engine = engine.unwrap_or_else(|| {
+            recorder.record(
+                "chp_engine_unknown_gas",
+                "heating.generator.engine",
+                "gas_engine".into(),
+                "ISSO 82.1 p. 113 (table 9.7)",
+            );
+            ChpEngine::GasEngine
+        });
+        let ratio = engine.thermal_ratio();
         recorder.record(
             "chp_thermal_power_from_electrical",
             "heating.generator.thermalPowerKw",
-            format!("1,5 × {electrical} kW"),
+            format!("{ratio} × {electrical} kW"),
             "ISSO 82.1 p. 113 (table 9.7)",
         );
-        1.5 * electrical
+        ratio * electrical
     })
 }
 
@@ -1019,6 +1060,7 @@ fn convert_generator(
         HeatingGenerator::Chp {
             electrical_power_kw,
             thermal_power_kw,
+            engine,
             manufacture_year,
             hre_declared,
             low_temperature,
@@ -1031,7 +1073,8 @@ fn convert_generator(
                 recorder,
                 "heating.generator",
             );
-            let thermal = chp_thermal_power(*electrical_power_kw, *thermal_power_kw, recorder);
+            let thermal =
+                chp_thermal_power(*electrical_power_kw, *thermal_power_kw, *engine, recorder);
             json!({
                 "kind": "chp",
                 "chp": {

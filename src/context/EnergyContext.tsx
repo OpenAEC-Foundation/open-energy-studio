@@ -49,6 +49,7 @@ export type EnergyAction =
   | { type: 'SET_UNHEATED_SPACES'; payload: NonNullable<IProject['unheatedSpaces']> }
   | { type: 'SET_NTA_CALCULATION'; payload: IProject['ntaCalculation'] }
   | { type: 'SET_MAATWERKADVIES'; payload: IProject['maatwerkadvies'] }
+  | { type: 'SET_BASISOPNAME'; payload: IProject['basisopname'] }
   // Zones
   | { type: 'ADD_ZONE'; payload: IZone }
   | { type: 'UPDATE_ZONE'; payload: { id: string; data: Partial<IZone> } }
@@ -419,6 +420,9 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
 
     case 'SET_MAATWERKADVIES':
       return { ...state, project: { ...state.project, maatwerkadvies: action.payload }, isDirty: true };
+
+    case 'SET_BASISOPNAME':
+      return { ...state, project: { ...state.project, basisopname: action.payload }, isDirty: true };
 
     // ----------------------------------------------------------
     // Zones

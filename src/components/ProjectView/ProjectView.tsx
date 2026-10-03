@@ -5,6 +5,7 @@ import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInventoryPanel';
 import { UnheatedSpacesPanel } from '../UnheatedSpacesPanel/UnheatedSpacesPanel';
+import { BasisopnamePanel } from '../BasisopnamePanel/BasisopnamePanel';
 import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainReferencePanel';
 import './ProjectView.css';
 
@@ -30,6 +31,7 @@ export function ProjectView() {
 
       <KernelAuditPanel project={project} />
       <NtaPerformancePanel />
+      <BasisopnamePanel />
       <UnheatedSpacesPanel />
       <HeatPumpInventoryPanel />
       <GasChainReferencePanel />

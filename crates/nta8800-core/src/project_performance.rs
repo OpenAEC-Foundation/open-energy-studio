@@ -385,17 +385,22 @@ fn orientation(value: &str) -> Option<Option<Orientation>> {
 }
 
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
-    // The maatwerkadvies definition (measures, tariffs) does not change the
-    // energy performance and stays out of the fingerprint.
-    let fingerprint = match project_value.get("maatwerkadvies") {
-        Some(_) => {
+    // The maatwerkadvies definition (measures, tariffs) and the kept
+    // basisopname survey do not change the energy performance of the
+    // project route and stay out of the fingerprint.
+    let fingerprint = match (
+        project_value.get("maatwerkadvies"),
+        project_value.get("basisopname"),
+    ) {
+        (None, None) => input_fingerprint(project_value),
+        _ => {
             let mut stripped = project_value.clone();
             if let Some(map) = stripped.as_object_mut() {
                 map.remove("maatwerkadvies");
+                map.remove("basisopname");
             }
             input_fingerprint(&stripped)
         }
-        None => input_fingerprint(project_value),
     };
     let mut gaps = Vec::new();
     let derived = derive_input(project_value, &mut gaps);

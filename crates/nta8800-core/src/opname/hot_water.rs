@@ -544,7 +544,7 @@ fn solar_heater(
 }
 
 /// One survey answer as a kernel hot-water generator.
-fn convert_generator(
+pub(crate) fn convert_generator(
     answer: &HotWaterGeneratorAnswer,
     kitchen_only: bool,
     path: &str,
