@@ -3394,6 +3394,8 @@ export type NtaHotWaterGenerator =
 export interface NtaHotWaterSystem {
   /** 13.19a: bathrooms and kitchens on this system when a dwelling has several systems. */
   connectedTaps?: { bathrooms: number; kitchens: number } | null;
+  /** 7.82: b_U of the unheated space with pipes or vessels; ϑ_ztu = ϑ_set − b_U·(ϑ_set − ϑ_e). */
+  unheatedReductionFactor?: number | null;
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
     | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
@@ -3407,6 +3409,8 @@ export interface NtaHotWaterSystem {
       | { unit: 'declared'; efficiency: number; testClass?: 'class2' | 'class3' | 'class4'; sourceReference: string }
       | { unit: 'annex_u'; test: NtaAnnexUTest }
     >;
+    /** Utility (p. 564): assignment of showers to units unknown; above 80 % connected the minimum applies. */
+    assignmentUnknown?: boolean;
     connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
     sourceReference: string;
   } | null;

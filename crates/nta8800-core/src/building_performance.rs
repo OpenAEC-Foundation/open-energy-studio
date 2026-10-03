@@ -3913,6 +3913,7 @@ mod tests {
         sample.hot_water = Some(HotWaterSystem {
             declared_share: None,
             connected_taps: None,
+            unheated_reduction_factor: None,
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
@@ -3989,6 +3990,7 @@ mod tests {
         sample.hot_water = Some(HotWaterSystem {
             declared_share: None,
             connected_taps: None,
+            unheated_reduction_factor: None,
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
@@ -4090,6 +4092,7 @@ mod tests {
             collective: None,
             equipment_reference: "plate".into(),
             connected_taps: None,
+            unheated_reduction_factor: None,
         };
         sample.hot_water = Some(system.clone());
         let doubled = assess_building_performance(&sample);
@@ -4159,6 +4162,7 @@ mod tests {
             collective: None,
             equipment_reference: "plate".into(),
             connected_taps: None,
+            unheated_reduction_factor: None,
         };
         sample.hot_water = Some(system.clone());
         let plain = assess_building_performance(&sample);
@@ -4232,6 +4236,7 @@ mod tests {
             collective: None,
             equipment_reference: "plate".into(),
             connected_taps: None,
+            unheated_reduction_factor: None,
         }
     }
 
@@ -4751,6 +4756,7 @@ mod tests {
             collective: None,
             equipment_reference: "plate".into(),
             connected_taps: None,
+            unheated_reduction_factor: None,
         });
         let result = assess_building_performance(&sample);
         assert_eq!(

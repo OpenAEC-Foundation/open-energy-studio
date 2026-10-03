@@ -446,8 +446,13 @@ pub struct AnnexTConditions {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ShowerHeatRecovery {
-    /// One entry per shower of the system (13.53).
+    /// One entry per shower of the system (13.53); `none` for a shower
+    /// without a unit.
     pub showers: Vec<ShowerUnit>,
+    /// Utility buildings (p. 564): it is not known which shower is on which
+    /// unit; with more than 80 % connected the lowest efficiency applies.
+    #[serde(default)]
+    pub assignment_unknown: bool,
     pub connection: ShowerConnection,
     pub source_reference: String,
 }
@@ -1382,6 +1387,12 @@ pub struct HotWaterSystem {
     pub solar: Vec<SolarWaterHeater>,
     #[serde(default)]
     pub collective: Option<CollectiveHotWater>,
+    /// `b_U` of the unheated space with circulation pipes or vessels (8.53–
+    /// 8.59): ϑ_ztu = ϑ_int;set;H − b_U·(ϑ_int;set;H − ϑ_e;avg) (7.82).
+    /// Explicit `unheatedAmbientC` values take precedence; without both,
+    /// 13 °C applies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unheated_reduction_factor: Option<f64>,
     /// §13.2.4.1 (13.19a): bathrooms and kitchens connected to this system
     /// when a dwelling has several hot-water systems.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1720,6 +1731,15 @@ pub fn validate_hot_water(
             path: format!("{path}.{field}"),
         })
     };
+    if system
+        .unheated_reduction_factor
+        .is_some_and(|b| !(0.0..=1.0).contains(&b))
+    {
+        push(
+            "hot_water_unheated_reduction_factor_invalid",
+            "unheatedReductionFactor",
+        );
+    }
     match &system.need {
         HotWaterNeed::Residential {
             dwelling_count,
@@ -2362,6 +2382,45 @@ fn exhaust_air_heat_pump(generator: &HotWaterGenerator) -> bool {
     }
 }
 
+/// ϑ_ztu of the unheated space of month `index` for pipes and vessels:
+/// the entered value, else 7.82 with `b_U`, else 13 °C.
+fn unheated_ambient(
+    system: &HotWaterSystem,
+    explicit: Option<f64>,
+    setpoint_c: f64,
+    index: usize,
+) -> f64 {
+    explicit.unwrap_or_else(|| match system.unheated_reduction_factor {
+        Some(b) => setpoint_c - b * (setpoint_c - crate::climate::OUTDOOR_TEMPERATURE_C[index]),
+        None => UNHEATED_AMBIENT_C,
+    })
+}
+
+/// 13.53: the mean efficiency over all showers of the system (0 for a
+/// shower without a unit). Utility buildings where the assignment of
+/// showers to units is unknown and more than 80 % of the showers are
+/// connected take the lowest unit efficiency (p. 564).
+pub fn shower_recovery_efficiency(recovery: &ShowerHeatRecovery, residential: bool) -> f64 {
+    let count = recovery.showers.len();
+    if count == 0 {
+        return 0.0;
+    }
+    let efficiencies: Vec<f64> = recovery
+        .showers
+        .iter()
+        .map(ShowerUnit::efficiency)
+        .collect();
+    let connected: Vec<f64> = efficiencies
+        .iter()
+        .copied()
+        .filter(|eta| *eta > 0.0)
+        .collect();
+    if !residential && recovery.assignment_unknown && connected.len() as f64 > 0.8 * count as f64 {
+        return connected.iter().copied().fold(f64::INFINITY, f64::min);
+    }
+    efficiencies.iter().sum::<f64>() / count as f64
+}
+
 /// Annual net need `Q_W;nd` in kWh (13.15/13.19) and the shower share.
 fn annual_need(system: &HotWaterSystem, area: f64) -> (f64, f64) {
     match &system.need {
@@ -2747,7 +2806,7 @@ fn book_generator(
                     .levelled_setpoint_c
                     .map_or(context.heated_ambient_c, |values| values[index])
             } else {
-                UNHEATED_AMBIENT_C
+                unheated_ambient(system, None, context.heated_ambient_c, index)
             };
             let standing =
                 f_building * (mean - ambient) / 45.0 * MONTH_HOURS[index] / 24.0 * standby;
@@ -3499,8 +3558,7 @@ pub fn assess_hot_water_with(
     let eta_em = emission_efficiency(system);
     // 13.51/13.52 with 13.53.
     let recovery_factor = system.shower_heat_recovery.as_ref().map_or(0.0, |item| {
-        let mean = item.showers.iter().map(ShowerUnit::efficiency).sum::<f64>()
-            / item.showers.len() as f64;
+        let mean = shower_recovery_efficiency(item, context.residential);
         shower
             * mean
             * SHOWER_PRACTICAL_FACTOR
@@ -3551,12 +3609,17 @@ pub fn assess_hot_water_with(
                 0.15
             };
         let equivalent = |pipe: f64| pipe + fitting / psi * pipe;
-        let unheated_ambient = circulation.unheated_ambient_c.unwrap_or(UNHEATED_AMBIENT_C);
         for (index, loss) in circulation_loss.iter_mut().enumerate() {
+            let unheated_c = unheated_ambient(
+                system,
+                circulation.unheated_ambient_c,
+                context.heated_ambient_c,
+                index,
+            );
             *loss = f_building * MONTH_HOURS[index] / 1000.0
                 * psi
                 * ((CIRCULATION_MEAN_C - heated_ambient(index)) * equivalent(heated)
-                    + (CIRCULATION_MEAN_C - unheated_ambient) * equivalent(unheated));
+                    + (CIRCULATION_MEAN_C - unheated_c) * equivalent(unheated));
         }
         let floors = f64::from(circulation.floor_count.max(1));
         let max_length = 12.0 + 3.0 * floors + 0.089 * reduced / floors;
@@ -3605,7 +3668,12 @@ pub fn assess_hot_water_with(
             if vessel.in_heated_zone {
                 heated_ambient(index)
             } else {
-                vessel.unheated_ambient_c.unwrap_or(UNHEATED_AMBIENT_C)
+                unheated_ambient(
+                    system,
+                    vessel.unheated_ambient_c,
+                    context.heated_ambient_c,
+                    index,
+                )
             }
         };
         let factor = f64::from(vessel.connection_factor);
@@ -3920,6 +3988,7 @@ mod tests {
             collective: None,
             equipment_reference: "plate".into(),
             connected_taps: None,
+            unheated_reduction_factor: None,
         }
     }
 
@@ -4566,9 +4635,81 @@ mod tests {
     }
 
     #[test]
+    fn shower_recovery_follows_13_53_and_the_utility_minimum() {
+        let recovery = |showers: Vec<ShowerUnit>, unknown: bool| ShowerHeatRecovery {
+            assignment_unknown: unknown,
+            showers,
+            connection: ShowerConnection::MixerAndHeater,
+            source_reference: "plan".into(),
+        };
+        // 13.57: two showers, one with a unit: (0,40 + 0)/2.
+        let one = recovery(vec![ShowerUnit::Vertical, ShowerUnit::None], false);
+        assert!((shower_recovery_efficiency(&one, true) - 0.20).abs() < 1e-12);
+        // 13.56: two different units: (0,40 + 0,20)/2.
+        let two = recovery(vec![ShowerUnit::Vertical, ShowerUnit::Horizontal], false);
+        assert!((shower_recovery_efficiency(&two, true) - 0.30).abs() < 1e-12);
+        // Utility, assignment unknown, 9 of 10 connected (> 80 %): the minimum.
+        let mut showers = vec![ShowerUnit::Vertical; 8];
+        showers.push(ShowerUnit::Horizontal);
+        showers.push(ShowerUnit::None);
+        let utility = recovery(showers.clone(), true);
+        assert!((shower_recovery_efficiency(&utility, false) - 0.20).abs() < 1e-12);
+        // Dwellings keep the mean of 13.53.
+        let mean = (8.0 * 0.40 + 0.20) / 10.0;
+        assert!((shower_recovery_efficiency(&utility, true) - mean).abs() < 1e-12);
+        // At 80 % connected the minimum rule does not apply.
+        showers[8] = ShowerUnit::None;
+        let at_80 = recovery(showers, true);
+        assert!((shower_recovery_efficiency(&at_80, false) - 0.32).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unheated_pipes_use_theta_ztu_from_b_u() {
+        let mut input = system(HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: None,
+        });
+        input.circulation = Some(Circulation {
+            outer_diameter_mm: Some(15.0),
+            insulation: PipeInsulation::Mm15,
+            declared_psi_w_per_mk: None,
+            fittings_insulated: true,
+            length_m: None,
+            unheated_length_m: None,
+            unheated_ambient_c: None,
+            floor_count: 2,
+            sport_hall_area_m2: 0.0,
+            connected_dwellings: None,
+            pump: CirculationPump {
+                control: PumpControl::UncontrolledOrUnknown,
+                label_power_kw: None,
+                energy_efficiency_index: None,
+            },
+            source_reference: "design".into(),
+        });
+        let base = assess_hot_water(&input, context()).unwrap();
+        input.unheated_reduction_factor = Some(0.5);
+        let derived = assess_hot_water(&input, context()).unwrap();
+        // 7.82 in January: 20 − 0,5·(20 − 2,61) = 11,305 °C instead of 13.
+        let psi = 0.174;
+        let equivalent = |pipe: f64| pipe + 0.03 / psi * pipe;
+        let ztu = 20.0 - 0.5 * (20.0 - crate::climate::OUTDOOR_TEMPERATURE_C[0]);
+        let delta = 744.0 / 1000.0 * psi * (13.0 - ztu) * equivalent(6.0);
+        assert!(
+            (derived.months[0].circulation_loss_kwh - base.months[0].circulation_loss_kwh - delta)
+                .abs()
+                < 1e-9
+        );
+    }
+
+    #[test]
     fn shower_recovery_is_subtracted_after_emission_efficiency() {
         let mut input = system(combi());
         input.shower_heat_recovery = Some(ShowerHeatRecovery {
+            assignment_unknown: false,
             showers: vec![ShowerUnit::Vertical, ShowerUnit::None],
             connection: ShowerConnection::MixerAndHeater,
             source_reference: "plan".into(),
@@ -4808,6 +4949,7 @@ mod tests {
             shower_kj: 100.0,
         };
         input.shower_heat_recovery = Some(ShowerHeatRecovery {
+            assignment_unknown: false,
             showers: vec![ShowerUnit::AnnexU {
                 test: AnnexUTest {
                     class: ShowerTestClass::Class2,
@@ -4853,6 +4995,7 @@ mod tests {
             source_reference: "report".into(),
         };
         input.shower_heat_recovery = Some(ShowerHeatRecovery {
+            assignment_unknown: false,
             showers: vec![declared(ShowerTestClass::Class2)],
             connection: ShowerConnection::MixerAndHeater,
             source_reference: "plan".into(),

@@ -850,3 +850,7 @@ De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijv
 - Factor: direct gestookt axiaal 0,014, radiaal 0,022; indirect 0,004–0,013. Bij een onbekende eigenschap geldt de hoogste waarde.
 - Q_h;b komt uit NEN-EN 12831-1, of anders uit de schatting van tabel 9.12: Q_H;ht van januari van 21 °C naar −10 °C, plus (√A_g·4·3 + A_g)·5 W.
 - Het resultaat telt bij de afgiftehulpenergie (`emissionFanElectricityKwh`).
+
+**ϑ_ztu voor tapwaterleidingen en -vaten (7.82).** Met `unheatedReductionFactor` (b_U) op het tapwatersysteem rekenen circulatieleidingen (13.26) en voorraadvaten (13.58) in een onverwarmde ruimte met ϑ_ztu = ϑ_int;set;H − b_U·(ϑ_int;set;H − ϑ_e;avg). Dat geldt ook voor de gasboiler buiten de verwarmde zone (13.168). Een opgegeven `unheatedAmbientC` gaat voor; zonder beide geldt 13 °C.
+
+**Douche-WTW met meerdere douches (13.53–13.57, p. 563–564).** Het rendement is het gemiddelde over alle douches van het systeem, met 0 voor een douche zonder unit. In de utiliteitsbouw kan bekend zijn dat meer dan 80 % van de douches op een unit is aangesloten, terwijl niet bekend is welke douche op welke unit zit (`assignmentUnknown`). Dan geldt het laagste rendement van de aangesloten units.
