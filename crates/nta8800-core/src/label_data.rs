@@ -101,8 +101,9 @@ impl LabelIndicators {
     ) -> Self {
         let chapter5 = result.chapter5.as_ref();
         Self {
-            primary_fossil_kwh_per_m2: result.primary_fossil_indicator_kwh_per_m2_year,
-            renewable_share_percent: result.renewable_share_percent,
+            // Regeling art. 2 lid 3 / art. 3 lid 3: the label scenario.
+            primary_fossil_kwh_per_m2: result.label_primary_fossil_indicator_kwh_per_m2_year,
+            renewable_share_percent: result.label_renewable_share_percent,
             tojuli_max_k: result.tojuli_max_k,
             heating_need_kwh_per_m2: chapter5.map(|item| item.heating_need_kwh_per_m2),
             standard_insulation_kwh_per_m2: chapter5

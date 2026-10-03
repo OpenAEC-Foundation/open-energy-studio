@@ -853,7 +853,8 @@ export interface IndicatorsDraftAssessment {
   scenarios: Array<{
     kind: IndicatorsDraftInput['scenarios'][number]['kind'];
     primaryFossilIndicatorKwhPerM2Year: number;
-    renewableSharePercent: number;
+    /** 5.3 RER; null when EPTot + EPrenTot ≤ 0 (undefined). */
+    renewableSharePercent: number | null;
     renewableIndicatorKwhPerM2Year: number;
   }>;
   issues: Array<{ code: string; path: string }>;
@@ -4101,6 +4102,10 @@ export interface BuildingPerformanceAssessment {
   needIndicatorKwhPerM2Year: number | null;
   primaryFossilIndicatorKwhPerM2Year: number | null;
   renewableSharePercent: number | null;
+  /** EP2 of the label scenario: EMGforf for a dwelling with area measures (Regeling art. 2 lid 3), otherwise BENG 2. */
+  labelPrimaryFossilIndicatorKwhPerM2Year?: number | null;
+  /** RER of the label scenario. */
+  labelRenewableSharePercent?: number | null;
   indicativeLabelClass: string | null;
   labelSource: string;
   bblCheck: NtaBblCheck | null;
