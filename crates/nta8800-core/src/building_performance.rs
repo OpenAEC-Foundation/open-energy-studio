@@ -3188,8 +3188,9 @@ fn compute(
         // delivered heat, split by fuel when classes are mixed.
         let biomass_fuel = row.biomass_kwh + row.biomass_class_a_kwh + row.biomass_class_c_kwh;
         let biomass_heat = if biomass_fuel > 0.0 {
-            row.generator_output_kwh
-                * (row.biomass_class_a_kwh / F_PREN_BIOMASS_B + row.biomass_kwh)
+            // Only the heat of the biomass appliances (a `multiple` set
+            // also holds other generators).
+            row.biomass_output_kwh * (row.biomass_class_a_kwh / F_PREN_BIOMASS_B + row.biomass_kwh)
                 / biomass_fuel
         } else {
             0.0

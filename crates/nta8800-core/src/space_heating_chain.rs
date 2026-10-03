@@ -894,6 +894,8 @@ pub struct ChainMonth {
     pub biomass_kwh: f64,
     /// Biomass of appliances above 500 kW per installation (bmA, table 5.2:
     /// f_P 0,0, f_Pren 1,0), kWh.
+    /// 5.39f: heat delivered by biomass appliances, kWh.
+    pub biomass_output_kwh: f64,
     pub biomass_class_a_kwh: f64,
     /// Other biomass (bmC, table 5.2: f_P 1,0, f_Pren 0), kWh.
     pub biomass_class_c_kwh: f64,
@@ -2241,6 +2243,7 @@ fn assess_chain_pass(
                 biomass_kwh: 0.0,
                 biomass_class_a_kwh: 0.0,
                 biomass_class_c_kwh: 0.0,
+                biomass_output_kwh: 0.0,
                 generator_electricity_kwh: 0.0,
                 auxiliary_electricity_kwh: None,
                 distribution_auxiliary_electricity_kwh: distribution.pump_electricity[index],
@@ -3208,6 +3211,7 @@ fn generate_multiple(
             row.district_heat_kwh += sub.district_heat_kwh;
             row.biomass_kwh += sub.biomass_kwh;
             row.biomass_class_a_kwh += sub.biomass_class_a_kwh;
+            row.biomass_output_kwh += sub.biomass_output_kwh;
             row.biomass_class_c_kwh += sub.biomass_class_c_kwh;
             row.oil_kwh += sub.oil_kwh;
             row.generator_recoverable_loss_kwh += sub.generator_recoverable_loss_kwh;
@@ -3315,6 +3319,7 @@ fn generate_identical(
         row.district_heat_kwh = n * one.district_heat_kwh;
         row.biomass_kwh = n * one.biomass_kwh;
         row.biomass_class_a_kwh = n * one.biomass_class_a_kwh;
+        row.biomass_output_kwh = n * one.biomass_output_kwh;
         row.biomass_class_c_kwh = n * one.biomass_class_c_kwh;
         row.oil_kwh = n * one.oil_kwh;
         row.generator_recoverable_loss_kwh = n * one.generator_recoverable_loss_kwh;
@@ -4103,6 +4108,13 @@ fn generate(
             }
         }
     }
+    // 5.39f: heat delivered by biomass appliances (the whole output of a
+    // single biomass generator; `multiple` sums its parts).
+    for row in monthly.iter_mut() {
+        if row.biomass_kwh + row.biomass_class_a_kwh + row.biomass_class_c_kwh > 0.0 {
+            row.biomass_output_kwh = row.generator_output_kwh;
+        }
+    }
     generation_efficiency
 }
 
@@ -4660,6 +4672,27 @@ mod tests {
             let f = preferred_energy_fraction(beta, month);
             assert!((row.heat_pump_output_kwh - f * row.generator_output_kwh).abs() < 1e-6);
         }
+        // 5.39f: with a biomass boiler at preference 2 only its own share is
+        // biomass heat.
+        let mut biomass = input.clone();
+        if let Generator::Multiple(set) = &mut biomass.generator {
+            set.generators[0].generator = Generator::Biomass(BiomassGenerator {
+                appliance: BiomassAppliance::CentralBoiler,
+                location: BiomassLocation::OutsideThermalBoundary,
+                annex_r_compliant_at_most_500_kw: true,
+                annex_r_reference: "type test".into(),
+                equipment_reference: "plate".into(),
+                sole_heating_in_served_rooms: None,
+                automatic_fuel_feed: false,
+                auxiliary: other_aux(1, Some(20.0)),
+            });
+        }
+        biomass.distribution_system = Some(system(calculated_pump()));
+        let mixed = assess_space_heating_chain(&biomass);
+        assert_eq!(mixed.status, "calculated_unverified", "{:?}", mixed.issues);
+        let jan = &mixed.monthly[0];
+        let f = preferred_energy_fraction(beta, 0);
+        assert!((jan.biomass_output_kwh - (1.0 - f) * jan.generator_output_kwh).abs() < 1e-6);
         // Each part equals its own single-generator chain on that share:
         // the heat pump's COP is the reported efficiency.
         let mut alone = boiler_chain();

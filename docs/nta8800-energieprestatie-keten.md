@@ -929,3 +929,7 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
   - Met `regenerationHotWater` op de verwarmingsketen komt het tapwater van een warmtepomp op dezelfde bodembron in de noemer van V.1, zowel bij de forfaitaire COP als bij bijlage Q.
   - Het automatisch invullen vanuit het tapwatersysteem en het doorgeven van c_source aan de tapwaterwarmtepomp staan nog open.
 - **ϑ_ztu (7.82) met meerdere zones.** θ_int;set;H wordt per zone gewogen met F_j;ztu (7.6.4): het aandeel van de zone in de warmteoverdracht naar de onverwarmde ruimten. Zonder die gegevens wordt naar oppervlak gewogen. Voorheen werd de eerste zone gebruikt.
+
+**Biomassawarmte bij meerdere opwekkers (5.39f).** Alleen de warmte die de biomassatoestellen zelf leveren (`biomassOutputKwh`) telt als hernieuwbare biomassawarmte. Eerder telde bij een set met meerdere opwekkers de output van alle opwekkers mee, dus ook die van een warmtepomp.
+
+**Interpretatie bij bijlage AA.** Voor g_gl;C;juli rekent de kern met de volledige g-waarde van 7.6.6.1.2, inclusief diffuus glas en vaste of draaibare lamellen (7.41a/b). Draaibare lamellen gelden daarbij als dicht. Strikt gelezen verwijst AA.6b alleen naar F_W·g_gl;n. De kern kiest de fysisch consistente lezing.
