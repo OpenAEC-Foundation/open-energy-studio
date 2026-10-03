@@ -107,6 +107,75 @@ export function PassiveCoolingFields({ draft, change, t }: { draft: Draft; chang
   </>;
 }
 
+const CO2_MEASUREMENTS = ['none', 'living_room', 'living_room_and_main_bedroom', 'every_habitable_room'];
+const CONTROL_TARGETS = ['none', 'supply', 'extract', 'supply_and_extract'];
+
+/**
+ * ISSO 82.1 §11.3 (p. 143–146): controls of tables 11.4–11.6, central or
+ * decentral heat recovery, system E and grilles with heating strips.
+ */
+export function VentilationSurveyFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
+  const controls = read(draft, ['ventilation', 'controls']) != null;
+  const combined = read(draft, ['ventilation', 'combined']) != null;
+  const strips = read(draft, ['ventilation', 'grilleHeatingStrips']) != null;
+  const toggle = (path: Path, label: string, present: boolean, template: Record<string, unknown>) =>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present} onChange={(event) => change(path, event.target.checked ? template : null)} />
+      {label}
+    </label>;
+  return <>
+    <SelectField {...field} path={['ventilation', 'heatRecoveryLayout']} label={t('opname.ventilation.recoveryLayout')}
+      options={opts(t, 'opname.ventilation.recoveryLayoutKind', ['central', 'decentral'])} />
+    {toggle(['ventilation', 'controls'], t('opname.ventilation.controls'), controls, { evidenceReference: '' })}
+    {controls && <>
+      <SelectField {...field} path={['ventilation', 'controls', 'co2Measurement']} label={t('opname.ventilation.co2Measurement')}
+        options={opts(t, 'opname.ventilation.co2MeasurementKind', CO2_MEASUREMENTS)} />
+      <SelectField {...field} path={['ventilation', 'controls', 'co2Control']} label={t('opname.ventilation.co2Control')}
+        options={opts(t, 'opname.ventilation.target', CONTROL_TARGETS)} />
+      <SelectField {...field} path={['ventilation', 'controls', 'timeControl']} label={t('opname.ventilation.timeControl')}
+        options={opts(t, 'opname.ventilation.target', CONTROL_TARGETS)} />
+      <TriStateField {...field} {...yesNo} path={['ventilation', 'controls', 'zoning']} label={t('opname.ventilation.zoning')} />
+      <TriStateField {...field} {...yesNo} path={['ventilation', 'controls', 'extractPerHabitableRoom']}
+        label={t('opname.ventilation.extractPerRoom')} />
+      <TextField {...field} path={['ventilation', 'controls', 'evidenceReference']} label={t('opname.ventilation.controlsEvidence')} />
+    </>}
+    {toggle(['ventilation', 'combined'], t('opname.ventilation.combined'), combined,
+      { decentralAreaM2: 0, totalResidenceAreaM2: 0 })}
+    {combined && <>
+      <NumberField {...field} path={['ventilation', 'combined', 'decentralAreaM2']} label={t('opname.ventilation.decentralArea')} />
+      <NumberField {...field} path={['ventilation', 'combined', 'totalResidenceAreaM2']} label={t('opname.ventilation.totalResidenceArea')} />
+    </>}
+    {toggle(['ventilation', 'grilleHeatingStrips'], t('opname.ventilation.grilleStrips'), strips, { sourceReference: '' })}
+    {strips && <>
+      <NumberField {...field} path={['ventilation', 'grilleHeatingStrips', 'maxPowerWPerDm3PerS']} label={t('opname.ventilation.stripPower')} />
+      <NumberField {...field} path={['ventilation', 'grilleHeatingStrips', 'maxTemperatureRiseK']} label={t('opname.ventilation.stripRise')} />
+      <NumberField {...field} path={['ventilation', 'grilleHeatingStrips', 'switchOnBelowC']} label={t('opname.ventilation.stripSwitchOn')} />
+      <NumberField {...field} path={['ventilation', 'grilleHeatingStrips', 'maxSupplyTemperatureC']} label={t('opname.ventilation.stripSupply')} />
+      <TextField {...field} path={['ventilation', 'grilleHeatingStrips', 'sourceReference']} label={t('opname.sourceReference')} />
+    </>}
+    <p className="nta-form-note">{t('opname.ventilation.note')}</p>
+  </>;
+}
+
+/** ISSO 82.1 p. 94: solar-control glass or film with the product g-value. */
+export function SolarControlField({ draft, base, change, t }: { draft: Draft; base: Path; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const present = read(draft, [...base, 'solarControl']) != null;
+  return <>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present} onChange={(event) => change([...base, 'solarControl'],
+        event.target.checked ? { gValue: null, sourceReference: '' } : null)} />
+      {t('opname.window.solarControl')}
+    </label>
+    {present && <>
+      <NumberField {...field} path={[...base, 'solarControl', 'gValue']} label={t('opname.window.solarControlG')} />
+      <TextField {...field} path={[...base, 'solarControl', 'sourceReference']} label={t('opname.window.solarControlSource')} />
+    </>}
+  </>;
+}
+
 function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path: Path; change: Change; t: T }) {
   const field = { draft, onChange: change };
   const kind = read(draft, [...path, 'kind']);
@@ -263,6 +332,9 @@ export function BasisopnamePanel() {
       {kind === 'residential' && <NumberField {...field} path={['usableFloorAreaM2']} label={t('opname.usableFloorArea')} />}
       <NumberField {...field} path={['buildingHeightM']} label={t('opname.buildingHeight')} />
       <NumberField {...field} path={['storeys']} label={t('opname.storeys')} step="1" />
+      {kind === 'residential' && read(draft, ['dwelling', 'kind']) === 'apartment' &&
+        <SelectField {...field} path={['dwelling', 'floor']} label={t('opname.dwelling.floor')}
+          options={opts(t, 'opname.dwelling.floorKind', ['ground_or_intermediate', 'top', 'roof_and_floor'])} />}
       {kind === 'utility' && <NumberField {...field} path={['toiletStacks']} label={t('opname.toiletStacks')} step="1" />}
       <label>{t('opname.verticalPipes')}
         <select value={verticalPipes == null ? 'default' : Array.isArray(verticalPipes) && verticalPipes.length === 0 ? 'none' : 'count'}
@@ -351,6 +423,7 @@ export function BasisopnamePanel() {
             <NumberField {...field} path={[...base, 'shading', 'relativeHeight']} label={t('opname.window.relativeHeight')} />}
           {situation === 'overhang_with_obstructions' &&
             <NumberField {...field} path={[...base, 'shading', 'overhangRelativeHeight']} label={t('opname.window.relativeHeight')} />}
+          <SolarControlField draft={draft} base={base} change={change} t={t} />
           <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'windows'], windows.filter((_, item) => item !== index))} />
         </div>;
       })}
@@ -382,6 +455,10 @@ export function BasisopnamePanel() {
       <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} />
       <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
       <EmitterFields draft={draft} change={change} t={t} />
+      <SelectField {...field} path={['heating', 'designClass']} label={t('opname.heating.designClass')}
+        options={opts(t, 'opname.heating.designClassKind', ['c45_40', 'c55_47', 'c70_50', 'c90_70'])} />
+      {read(draft, ['heating', 'designClass']) === 'c90_70' &&
+        <TextField {...field} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} />}
       <CheckField {...field} path={['heating', 'addedPreferredGenerator']} label={t('opname.heating.addedPreferred')} />
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, ['heating', 'collective']) != null}
@@ -477,6 +554,10 @@ export function BasisopnamePanel() {
     {kind === 'utility' && ahu != null && <Section title={t('opname.ahu')}>
       <CheckField {...field} path={['ventilation', 'ahu', 'heatingConnected']} label={t('opname.ahu.heatingConnected')} />
       <CheckField {...field} path={['ventilation', 'ahu', 'coolingConnected']} label={t('opname.ahu.coolingConnected')} />
+    </Section>}
+
+    {kind === 'residential' && <Section title={t('opname.ventilation')}>
+      <VentilationSurveyFields draft={draft} change={change} t={t} />
     </Section>}
 
     <Section title={t('opname.passiveCooling')}>

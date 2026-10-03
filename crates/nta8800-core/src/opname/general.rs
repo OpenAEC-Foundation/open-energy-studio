@@ -148,8 +148,13 @@ pub enum RoofType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApartmentFloor {
+    /// Positions 1, 2, 5 and 6 of afb. 7.1 (p. 51).
     GroundOrIntermediate,
+    /// Positions 3 and 7.
     Top,
+    /// Positions 4 and 8 ("dak + vloer"): a single-storey apartment with
+    /// a roof and a floor in the loss area.
+    RoofAndFloor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -255,6 +260,21 @@ pub fn airtightness_type(dwelling: &DwellingType, recorder: &mut Recorder) -> Ai
                 }
                 (ApartmentFloor::Top, ApartmentSide::Middle) => AirtightnessType::StoreyMiddleTop,
                 (ApartmentFloor::Top, _) => AirtightnessType::StoreyEndTop,
+                (ApartmentFloor::RoofAndFloor, side) => {
+                    // NTA table 11.14 has no roof-and-floor row; the roof
+                    // makes it a top-storey dwelling (interpretation).
+                    recorder.record(
+                        "apartment_roof_and_floor_top_type",
+                        "dwelling.floor",
+                        "top storey (table 11.14)".into(),
+                        "ISSO 82.1 p. 51 (positions 4/8); NTA table 11.14",
+                    );
+                    if side == ApartmentSide::Middle {
+                        AirtightnessType::StoreyMiddleTop
+                    } else {
+                        AirtightnessType::StoreyEndTop
+                    }
+                }
             }
         }
     }

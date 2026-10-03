@@ -15,7 +15,10 @@ use serde_json::{json, Value};
 use super::Recorder;
 
 /// Building-bound energy storage (§15.5, p. 193): only with a PV system,
-/// fixed to the installation (no plug-in batteries).
+/// fixed to the installation (no plug-in batteries). In an apartment
+/// building every storage system behind the main meter counts (erratum
+/// §6 on §15.5.1/§15.5.2): the capacities are the totals behind that
+/// meter, including those of other apartments surveyed with it.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SurveyStorage {

@@ -11,7 +11,9 @@
 //!   unknown material: aluminium (p. 151); supply-duct insulation unknown:
 //!   not insulated, length unknown: 4 m (single family) or half the
 //!   building height (apartment) (table 11.10, p. 150); constant volume
-//!   unknown: none (table 11.11); bypass unknown per table 11.12 (p. 151).
+//!   unknown: none (table 11.11); bypass unknown per table 11.12
+//!   (p. 151-152): the unit manufacture year governs, the construction
+//!   year is only the fallback.
 //! - Duct airtightness unknown: 1,1 (table 11.13, p. 153).
 //! - Fans (table 11.15, p. 154): manufacture year unknown → construction
 //!   year; motor type unknown → installed ≤ 2006 AC, ≥ 2007 DC.
@@ -99,6 +101,91 @@ pub struct SurveyVentilation {
     pub motor: Option<MotorAnswer>,
     #[serde(default)]
     pub passive_cooling: Option<SurveyPassiveCooling>,
+    /// Central or decentral heat recovery (table 11.6); `None`: central.
+    #[serde(default)]
+    pub heat_recovery_layout: Option<RecoveryLayout>,
+    /// Controls of tables 11.4–11.6 (p. 143–145); `None` or unknown
+    /// answers: no control, no zoning. `declaredVariant` overrides them.
+    #[serde(default)]
+    pub controls: Option<SurveyControls>,
+    /// System E (§11.3.6, p. 145): decentral balanced units with heat
+    /// recovery and CO₂ control in part of the zone. `principle` then
+    /// describes the other part and `heatRecovery` the decentral units.
+    #[serde(default)]
+    pub combined: Option<SurveyCombined>,
+    /// Supply grilles with electric heating strips (§11.3.7, p. 145–146).
+    #[serde(default)]
+    pub grille_heating_strips: Option<SurveyGrilleHeatingStrips>,
+    pub source_reference: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryLayout {
+    Central,
+    Decentral,
+}
+
+/// Where CO₂ is measured (tables 11.4–11.6), in increasing coverage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Co2Measurement {
+    None,
+    LivingRoom,
+    LivingRoomAndMainBedroom,
+    EveryHabitableRoom,
+}
+
+/// What a control acts on (tables 11.4–11.6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlTarget {
+    None,
+    Supply,
+    Extract,
+    SupplyAndExtract,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyControls {
+    #[serde(default)]
+    pub co2_measurement: Option<Co2Measurement>,
+    #[serde(default)]
+    pub co2_control: Option<ControlTarget>,
+    #[serde(default)]
+    pub time_control: Option<ControlTarget>,
+    #[serde(default)]
+    pub zoning: Option<bool>,
+    /// System C: separate extract points in every habitable room (C.5b).
+    #[serde(default)]
+    pub extract_per_habitable_room: Option<bool>,
+    /// Product documentation or commissioning report for the controls.
+    pub evidence_reference: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyCombined {
+    /// Residence area ventilated by the decentral units, m².
+    pub decentral_area_m2: f64,
+    /// Total residence area of the zone, m².
+    pub total_residence_area_m2: f64,
+}
+
+/// §11.3.7: the grille settings from product data; without all four the
+/// kernel's 11.124 fallback applies. Share unknown: all grilles (p. 146).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyGrilleHeatingStrips {
+    #[serde(default)]
+    pub max_power_w_per_dm3_per_s: Option<f64>,
+    #[serde(default)]
+    pub max_temperature_rise_k: Option<f64>,
+    #[serde(default)]
+    pub switch_on_below_c: Option<f64>,
+    #[serde(default)]
+    pub max_supply_temperature_c: Option<f64>,
     pub source_reference: String,
 }
 
@@ -142,7 +229,8 @@ pub(crate) fn apply_passive_cooling(
         return;
     }
     // p. 152: with heat recovery the bypass is a precondition (p. 151).
-    let recovery = input["system"]["unit"].get("heatRecovery").is_some();
+    let recovery = input["system"]["unit"].get("heatRecovery").is_some()
+        || input["system"]["decentral"].get("heatRecovery").is_some();
     if recovery && bypass_present != Some(true) {
         recorder.issue(
             "passive_cooling_requires_bypass",
@@ -165,6 +253,213 @@ pub(crate) fn apply_passive_cooling(
             "ISSO 82.1 p. 146–147",
         ),
     }
+}
+
+/// Table 11.9 exchanger with its unknown defaults (p. 150–151).
+fn exchanger_kind(
+    answer: Option<ExchangerAnswer>,
+    recorder: &mut Recorder,
+) -> Option<&'static str> {
+    match answer {
+        None | Some(ExchangerAnswer::Unknown) => {
+            recorder.record(
+                "heat_recovery_unknown_none",
+                "ventilation.heatRecovery",
+                "none".into(),
+                "ISSO 82.1 p. 150 (table 11.9)",
+            );
+            None
+        }
+        Some(ExchangerAnswer::CounterFlowUnknownMaterial) => {
+            recorder.record(
+                "counterflow_material_unknown_aluminium",
+                "ventilation.heatRecovery",
+                "counter_flow_aluminium".into(),
+                "ISSO 82.1 p. 151",
+            );
+            Some("counter_flow_aluminium")
+        }
+        Some(ExchangerAnswer::CounterFlowAluminium) => Some("counter_flow_aluminium"),
+        Some(ExchangerAnswer::CounterFlowPlastic) => Some("counter_flow_plastic"),
+        Some(ExchangerAnswer::CrossFlow) => Some("cross_flow"),
+        Some(ExchangerAnswer::PlateOrTube) => Some("plate_or_tube"),
+        Some(ExchangerAnswer::Rotary) => Some("rotary"),
+        Some(ExchangerAnswer::Enthalpy) => Some("enthalpy"),
+        Some(ExchangerAnswer::HeatPipe) => Some("heat_pipe"),
+        Some(ExchangerAnswer::TwoElement) => Some("two_element"),
+    }
+}
+
+/// The kernel `heatRecovery` with the tables 11.10–11.12 defaults.
+fn recovery_input(
+    survey: &SurveyVentilation,
+    exchanger: &str,
+    layout: &str,
+    construction_year: i32,
+    recorder: &mut Recorder,
+) -> Value {
+    recorder.record(
+        "supply_duct_insulation_unknown",
+        "ventilation.heatRecovery",
+        "uninsulated; length by kernel default (4 m / ½ H)".into(),
+        "ISSO 82.1 p. 150 (table 11.10)",
+    );
+    recorder.record(
+        "constant_volume_unknown_none",
+        "ventilation.heatRecovery",
+        "false".into(),
+        "ISSO 82.1 p. 151 (table 11.11)",
+    );
+    // Table 11.12 with p. 152: the manufacture year of the unit governs;
+    // the construction year is only the fallback. The NTA 11.3.2.2 list
+    // reads "bouw- of fabricagejaar", so the explicit fraction is passed to
+    // keep a pre-2010 unit in a newer dwelling off the 100 % default.
+    let (bypass_year, year_source) = match survey.unit_manufacture_year {
+        Some(year) => (year, "unit manufacture year"),
+        None => (
+            construction_year,
+            "construction year (manufacture year unknown)",
+        ),
+    };
+    let (bypass, share) = if bypass_year >= 2010 {
+        (json!({"kind": "full"}), "100 %")
+    } else if survey.bypass_present == Some(true) {
+        (json!({"kind": "partial", "fraction": 0.7}), "70 %")
+    } else {
+        (json!({"kind": "none"}), "0 %")
+    };
+    recorder.record(
+        "bypass_table_11_12",
+        "ventilation.bypass",
+        format!("{share} ({year_source} {bypass_year})"),
+        "ISSO 82.1 p. 151-152 (table 11.12)",
+    );
+    let mut recovery = json!({
+        "efficiency": {"method": "table", "exchanger": exchanger},
+        "bypass": bypass,
+        "layout": layout,
+        "supplyDuctInsulation": {"kind": "uninsulated"},
+        "equipmentReference": survey.source_reference,
+    });
+    if let Some(year) = survey.unit_manufacture_year {
+        recovery["manufactureYear"] = json!(year);
+    }
+    recovery
+}
+
+/// NTA table 11.5 variant (residential rows) from the controls of ISSO
+/// tables 11.4–11.6 (p. 143–145). Only a combination that is a row of
+/// table 11.5 earns that variant; anything else falls back to the variant
+/// without control.
+fn controls_variant(
+    survey: &SurveyVentilation,
+    construction_year: i32,
+    central_recovery: bool,
+    recovery: bool,
+    recorder: &mut Recorder,
+) -> String {
+    let controls = survey.controls.clone().unwrap_or_default();
+    if survey.controls.is_none() {
+        recorder.record(
+            "ventilation_controls_unknown_none",
+            "ventilation",
+            "no CO₂, time control or zoning".into(),
+            "ISSO 82.1 p. 143–145 (tables 11.4–11.6)",
+        );
+    }
+    let measurement = controls.co2_measurement.unwrap_or(Co2Measurement::None);
+    let co2 = controls.co2_control.unwrap_or(ControlTarget::None);
+    let time = controls.time_control.unwrap_or(ControlTarget::None);
+    let zoning = controls.zoning.unwrap_or(false);
+    let co2_active = co2 != ControlTarget::None && measurement != Co2Measurement::None;
+    let living_and_bedroom = measurement >= Co2Measurement::LivingRoomAndMainBedroom;
+    let variant: String = match survey.principle {
+        VentilationPrinciple::Natural => pressure_variant(survey, construction_year, 'a', recorder),
+        VentilationPrinciple::MechanicalSupply => {
+            if co2 == ControlTarget::Supply
+                && measurement == Co2Measurement::EveryHabitableRoom
+                && zoning
+            {
+                "b3".into()
+            } else if time == ControlTarget::Supply && !zoning {
+                "b2".into()
+            } else {
+                "b1".into()
+            }
+        }
+        VentilationPrinciple::MechanicalExtract => {
+            let pressure = pressure_variant(survey, construction_year, 'c', recorder);
+            let low_pressure = pressure == "c2a";
+            let extract_co2 = co2_active
+                && matches!(
+                    co2,
+                    ControlTarget::Extract | ControlTarget::SupplyAndExtract
+                );
+            if low_pressure && extract_co2 && living_and_bedroom && zoning {
+                if controls.extract_per_habitable_room == Some(true) {
+                    "c5b".into()
+                } else {
+                    "c5a".into()
+                }
+            } else if low_pressure
+                && co2 == ControlTarget::SupplyAndExtract
+                && co2_active
+                && living_and_bedroom
+                && !zoning
+            {
+                "c4b".into()
+            } else if low_pressure && extract_co2 && living_and_bedroom && !zoning {
+                "c4c".into()
+            } else if low_pressure && extract_co2 && !zoning {
+                "c4a".into()
+            } else if time == ControlTarget::SupplyAndExtract && !zoning {
+                "c3c".into()
+            } else if low_pressure && time == ControlTarget::Extract && !zoning {
+                "c3b".into()
+            } else if time == ControlTarget::Extract && !zoning {
+                "c3a".into()
+            } else {
+                pressure
+            }
+        }
+        VentilationPrinciple::Balanced => {
+            let decentral = recovery && !central_recovery;
+            if co2_active && living_and_bedroom && zoning {
+                if decentral {
+                    "d5b".into()
+                } else {
+                    "d5a".into()
+                }
+            } else if co2_active && living_and_bedroom && !zoning && central_recovery {
+                "d5c".into()
+            } else if co2_active && !zoning && central_recovery {
+                "d3".into()
+            } else if time != ControlTarget::None && zoning {
+                "d4b".into()
+            } else if time != ControlTarget::None {
+                "d4a".into()
+            } else if recovery {
+                "d2".into()
+            } else {
+                "d1".into()
+            }
+        }
+    };
+    if let Some(given) = &survey.controls {
+        if given.evidence_reference.trim().is_empty() {
+            recorder.issue(
+                "ventilation_controls_evidence_required",
+                "ventilation.controls.evidenceReference",
+            );
+        }
+        recorder.record(
+            "ventilation_controls_table_11_5",
+            "ventilation.controls",
+            variant.clone(),
+            "ISSO 82.1 p. 143–145 (tables 11.4–11.6); NTA table 11.5",
+        );
+    }
+    variant
 }
 
 fn pressure_variant(
@@ -230,110 +525,89 @@ pub fn derive_ventilation(
     recorder: &mut Recorder,
 ) -> DerivedVentilation {
     let reference = survey.source_reference.as_str();
+    // System E (§11.3.6, p. 145): `principle` describes the other part.
+    let combined = survey.combined.as_ref();
+    if combined.is_some() && survey.principle == VentilationPrinciple::Balanced {
+        recorder.issue("combined_other_part_not_balanced", "ventilation.combined");
+    }
+    let recovery_unit = survey.principle == VentilationPrinciple::Balanced || combined.is_some();
+    let exchanger = if recovery_unit {
+        exchanger_kind(survey.heat_recovery, recorder)
+    } else {
+        None
+    };
+    let central_recovery = exchanger.is_some()
+        && combined.is_none()
+        && survey.heat_recovery_layout != Some(RecoveryLayout::Decentral);
     let variant = match &survey.declared_variant {
         Some(variant) => variant.clone(),
-        None => {
-            recorder.record(
-                "ventilation_controls_unknown_none",
-                "ventilation",
-                "no CO₂, time control or zoning".into(),
-                "ISSO 82.1 p. 143–145 (tables 11.4–11.6)",
-            );
-            match survey.principle {
-                VentilationPrinciple::Natural => {
-                    pressure_variant(survey, construction_year, 'a', recorder)
-                }
-                VentilationPrinciple::MechanicalExtract => {
-                    pressure_variant(survey, construction_year, 'c', recorder)
-                }
-                VentilationPrinciple::MechanicalSupply => "b1".into(),
-                VentilationPrinciple::Balanced => "d1".into(),
-            }
-        }
+        None => controls_variant(
+            survey,
+            construction_year,
+            central_recovery,
+            exchanger.is_some(),
+            recorder,
+        ),
     };
-    let mechanical = survey.principle != VentilationPrinciple::Natural;
-    let ducts = if mechanical {
-        recorder.record(
-            "duct_airtightness_unknown",
-            "ventilation.ducts",
-            "unknown (f_lea;du 1,1)".into(),
-            "ISSO 82.1 p. 153 (table 11.13)",
-        );
-        "unknown"
-    } else {
-        "no_ducts"
+    let ducts = |principle: VentilationPrinciple, recorder: &mut Recorder| {
+        if principle != VentilationPrinciple::Natural {
+            recorder.record(
+                "duct_airtightness_unknown",
+                "ventilation.ducts",
+                "unknown (f_lea;du 1,1)".into(),
+                "ISSO 82.1 p. 153 (table 11.13)",
+            );
+            "unknown"
+        } else {
+            "no_ducts"
+        }
     };
     let mut unit = json!({
         "variant": variant,
-        "ducts": ducts,
+        "ducts": ducts(survey.principle, recorder),
         "equipmentReference": reference,
     });
-    if survey.principle == VentilationPrinciple::Balanced {
-        let exchanger = match survey.heat_recovery {
-            None | Some(ExchangerAnswer::Unknown) => {
-                recorder.record(
-                    "heat_recovery_unknown_none",
-                    "ventilation.heatRecovery",
-                    "none".into(),
-                    "ISSO 82.1 p. 150 (table 11.9)",
-                );
-                None
-            }
-            Some(ExchangerAnswer::CounterFlowUnknownMaterial) => {
-                recorder.record(
-                    "counterflow_material_unknown_aluminium",
-                    "ventilation.heatRecovery",
-                    "counter_flow_aluminium".into(),
-                    "ISSO 82.1 p. 151",
-                );
-                Some("counter_flow_aluminium")
-            }
-            Some(ExchangerAnswer::CounterFlowAluminium) => Some("counter_flow_aluminium"),
-            Some(ExchangerAnswer::CounterFlowPlastic) => Some("counter_flow_plastic"),
-            Some(ExchangerAnswer::CrossFlow) => Some("cross_flow"),
-            Some(ExchangerAnswer::PlateOrTube) => Some("plate_or_tube"),
-            Some(ExchangerAnswer::Rotary) => Some("rotary"),
-            Some(ExchangerAnswer::Enthalpy) => Some("enthalpy"),
-            Some(ExchangerAnswer::HeatPipe) => Some("heat_pipe"),
-            Some(ExchangerAnswer::TwoElement) => Some("two_element"),
+    let recovery = exchanger.map(|exchanger| {
+        let layout = if combined.is_some()
+            || survey.heat_recovery_layout == Some(RecoveryLayout::Decentral)
+        {
+            "decentral"
+        } else {
+            "central"
         };
-        if let Some(exchanger) = exchanger {
-            if survey.declared_variant.is_none() {
-                unit["variant"] = json!("d2");
-            }
+        recovery_input(survey, exchanger, layout, construction_year, recorder)
+    });
+    let system = match combined {
+        Some(combined) => {
             recorder.record(
-                "supply_duct_insulation_unknown",
-                "ventilation.heatRecovery",
-                "uninsulated; length by kernel default (4 m / ½ H)".into(),
-                "ISSO 82.1 p. 150 (table 11.10)",
+                "combined_system_e1",
+                "ventilation.combined",
+                "decentral part D.5b, other part per principle".into(),
+                "ISSO 82.1 p. 145 (§11.3.6); NTA table 11.5 E.1",
             );
-            recorder.record(
-                "constant_volume_unknown_none",
-                "ventilation.heatRecovery",
-                "false".into(),
-                "ISSO 82.1 p. 151 (table 11.11)",
-            );
-            let bypass =
-                json!({"kind": "unknown", "bypassPresent": survey.bypass_present.unwrap_or(false)});
-            recorder.record(
-                "bypass_table_11_12",
-                "ventilation.bypass",
-                "unknown → 100 % from 2010, 70 % with bypass, else 0 %".into(),
-                "ISSO 82.1 p. 151 (table 11.12)",
-            );
-            let mut recovery = json!({
-                "efficiency": {"method": "table", "exchanger": exchanger},
-                "bypass": bypass,
-                "layout": "central",
-                "supplyDuctInsulation": {"kind": "uninsulated"},
+            let mut decentral = json!({
+                "variant": "d5b",
+                "ducts": "no_ducts",
                 "equipmentReference": reference,
             });
-            if let Some(year) = survey.unit_manufacture_year {
-                recovery["manufactureYear"] = json!(year);
+            if let Some(recovery) = recovery {
+                decentral["heatRecovery"] = recovery;
             }
-            unit["heatRecovery"] = recovery;
+            json!({
+                "kind": "combined",
+                "decentralAreaM2": combined.decentral_area_m2,
+                "totalResidenceAreaM2": combined.total_residence_area_m2,
+                "decentral": decentral,
+                "other": unit,
+            })
         }
-    }
+        None => {
+            if let Some(recovery) = recovery {
+                unit["heatRecovery"] = recovery;
+            }
+            json!({"kind": "single", "unit": unit})
+        }
+    };
     // Table 11.15: fan manufacture year unknown → construction year. This
     // specific rule takes precedence over the general installation-year
     // fallback (and is the conservative one).
@@ -385,7 +659,7 @@ pub fn derive_ventilation(
         "floorAboveCrawlspace": floor_above_crawlspace,
         "heatingSetpointC": 20.0,
         "coolingSetpointC": 24.0,
-        "system": {"kind": "single", "unit": unit},
+        "system": system,
         "infiltration": infiltration,
         "fans": {"method": "forfait", "current": current, "manufactureYear": fan_year},
         "sourceReference": format!("{reference}; basisopname"),
@@ -397,6 +671,43 @@ pub fn derive_ventilation(
         survey.bypass_present,
         recorder,
     );
+    if let Some(strips) = &survey.grille_heating_strips {
+        let control = match (
+            strips.max_power_w_per_dm3_per_s,
+            strips.max_temperature_rise_k,
+            strips.switch_on_below_c,
+            strips.max_supply_temperature_c,
+        ) {
+            (Some(power), Some(rise), Some(switch_on), Some(supply)) => json!({
+                "method": "specified",
+                "maxPowerWPerDm3PerS": power,
+                "maxTemperatureRiseK": rise,
+                "switchOnBelowC": switch_on,
+                "maxSupplyTemperatureC": supply,
+            }),
+            _ => {
+                recorder.record(
+                    "grille_heating_strip_settings_unknown",
+                    "ventilation.grilleHeatingStrips",
+                    "NTA 11.124 fallback".into(),
+                    "ISSO 82.1 p. 146 (§11.3.7)",
+                );
+                json!({"method": "fallback"})
+            }
+        };
+        // p. 146: share of grilles unknown → all grilles have a strip; the
+        // basic survey records no installed capacity, so no split.
+        recorder.record(
+            "grille_heating_strips_all_grilles",
+            "ventilation.grilleHeatingStrips",
+            "all grilles".into(),
+            "ISSO 82.1 p. 146 (§11.3.7)",
+        );
+        input["grillePreheating"] = json!({
+            "control": control,
+            "sourceReference": strips.source_reference,
+        });
+    }
     DerivedVentilation {
         input,
         exhaust_air_heat_pump_possible: matches!(
@@ -422,6 +733,10 @@ mod tests {
             unit_manufacture_year: None,
             motor: None,
             passive_cooling: None,
+            heat_recovery_layout: None,
+            controls: None,
+            combined: None,
+            grille_heating_strips: None,
             source_reference: "survey".into(),
         }
     }
@@ -544,5 +859,157 @@ mod tests {
         );
         assert_eq!(derived["fans"]["current"], "dc");
         assert_eq!(derived["system"]["unit"]["ducts"], "unknown");
+    }
+
+    fn controls(
+        measurement: Co2Measurement,
+        co2: ControlTarget,
+        time: ControlTarget,
+        zoning: bool,
+    ) -> Option<SurveyControls> {
+        Some(SurveyControls {
+            co2_measurement: Some(measurement),
+            co2_control: Some(co2),
+            time_control: Some(time),
+            zoning: Some(zoning),
+            extract_per_habitable_room: None,
+            evidence_reference: "product sheet".into(),
+        })
+    }
+
+    #[test]
+    fn controls_map_tables_11_4_to_11_6_onto_table_11_5_rows() {
+        use Co2Measurement as M;
+        use ControlTarget as T;
+        let variant = |survey: &SurveyVentilation, year| {
+            derive(survey, year)["system"]["unit"]["variant"].clone()
+        };
+        // Table 11.4: system B.
+        let mut supply = survey(VentilationPrinciple::MechanicalSupply);
+        supply.controls = controls(M::None, T::None, T::Supply, false);
+        assert_eq!(variant(&supply, 2015), "b2");
+        supply.controls = controls(M::EveryHabitableRoom, T::Supply, T::None, true);
+        assert_eq!(variant(&supply, 2015), "b3");
+        // Not a row (living room only): no control credit.
+        supply.controls = controls(M::LivingRoom, T::Supply, T::None, true);
+        assert_eq!(variant(&supply, 2015), "b1");
+        // Table 11.6: system D.
+        let mut balanced = survey(VentilationPrinciple::Balanced);
+        balanced.heat_recovery = Some(ExchangerAnswer::CounterFlowPlastic);
+        balanced.controls = controls(M::LivingRoom, T::Extract, T::None, false);
+        assert_eq!(variant(&balanced, 2015), "d3");
+        balanced.controls = controls(M::LivingRoomAndMainBedroom, T::Supply, T::None, false);
+        assert_eq!(variant(&balanced, 2015), "d5c");
+        balanced.controls = controls(M::LivingRoomAndMainBedroom, T::Supply, T::None, true);
+        assert_eq!(variant(&balanced, 2015), "d5a");
+        balanced.heat_recovery_layout = Some(RecoveryLayout::Decentral);
+        assert_eq!(variant(&balanced, 2015), "d5b");
+        balanced.controls = controls(M::None, T::None, T::Supply, true);
+        assert_eq!(variant(&balanced, 2015), "d4b");
+        balanced.controls = controls(M::None, T::None, T::None, false);
+        assert_eq!(variant(&balanced, 2015), "d2");
+        // Table 11.5 (ISSO): system C with self-regulating vents ≤ 1 Pa.
+        let mut extract = survey(VentilationPrinciple::MechanicalExtract);
+        extract.self_regulating_vents = Some(true);
+        extract.pressure_class = Some(PressureClass::AtMost1Pa);
+        extract.controls = controls(M::LivingRoom, T::Extract, T::None, false);
+        assert_eq!(variant(&extract, 2015), "c4a");
+        extract.controls = controls(M::LivingRoomAndMainBedroom, T::Extract, T::None, true);
+        assert_eq!(variant(&extract, 2015), "c5a");
+        extract.controls = controls(M::None, T::None, T::Extract, false);
+        assert_eq!(variant(&extract, 2015), "c3b");
+        // Controls without evidence are rejected.
+        let mut recorder = Recorder::default();
+        let mut missing = survey(VentilationPrinciple::MechanicalSupply);
+        missing.controls = controls(M::None, T::None, T::Supply, false);
+        missing.controls.as_mut().unwrap().evidence_reference = " ".into();
+        derive_ventilation(
+            &missing,
+            DwellingKind::SingleFamily,
+            2015,
+            None,
+            100.0,
+            9.0,
+            false,
+            "pitched_roof_terraced",
+            None,
+            &mut recorder,
+        );
+        assert_eq!(
+            recorder.issues[0].code,
+            "ventilation_controls_evidence_required"
+        );
+    }
+
+    #[test]
+    fn system_e_combines_decentral_d5b_with_the_other_principle() {
+        let mut combined = survey(VentilationPrinciple::MechanicalExtract);
+        combined.heat_recovery = Some(ExchangerAnswer::CounterFlowPlastic);
+        combined.combined = Some(SurveyCombined {
+            decentral_area_m2: 30.0,
+            total_residence_area_m2: 80.0,
+        });
+        let input = derive(&combined, 2015);
+        assert_eq!(input["system"]["kind"], "combined");
+        assert_eq!(input["system"]["decentral"]["variant"], "d5b");
+        assert_eq!(
+            input["system"]["decentral"]["heatRecovery"]["layout"],
+            "decentral"
+        );
+        assert_eq!(input["system"]["other"]["variant"], "c2a");
+        assert!(input["system"]["other"].get("heatRecovery").is_none());
+        let parsed: crate::ventilation::VentilationInput =
+            serde_json::from_value(input).expect("kernel input");
+        assert!(crate::ventilation::validate_ventilation(&parsed).is_empty());
+        // The other part cannot be balanced.
+        combined.principle = VentilationPrinciple::Balanced;
+        let (_, recorder) = derive_with(&combined);
+        assert_eq!(recorder.issues[0].code, "combined_other_part_not_balanced");
+    }
+
+    #[test]
+    fn grille_heating_strips_use_the_settings_or_the_fallback() {
+        let mut natural = survey(VentilationPrinciple::Natural);
+        natural.grille_heating_strips = Some(SurveyGrilleHeatingStrips {
+            max_power_w_per_dm3_per_s: Some(20.0),
+            max_temperature_rise_k: Some(10.0),
+            switch_on_below_c: Some(5.0),
+            max_supply_temperature_c: Some(15.0),
+            source_reference: "grille data".into(),
+        });
+        let input = derive(&natural, 2015);
+        assert_eq!(input["grillePreheating"]["control"]["method"], "specified");
+        natural
+            .grille_heating_strips
+            .as_mut()
+            .unwrap()
+            .switch_on_below_c = None;
+        let input = derive(&natural, 2015);
+        assert_eq!(input["grillePreheating"]["control"]["method"], "fallback");
+        let parsed: crate::ventilation::VentilationInput =
+            serde_json::from_value(input).expect("kernel input");
+        assert!(crate::ventilation::validate_ventilation(&parsed).is_empty());
+    }
+
+    #[test]
+    fn bypass_follows_the_unit_manufacture_year_before_the_construction_year() {
+        let mut wtw = survey(VentilationPrinciple::Balanced);
+        wtw.heat_recovery = Some(ExchangerAnswer::CounterFlowUnknownMaterial);
+        let bypass = |survey: &SurveyVentilation, year| {
+            derive(survey, year)["system"]["unit"]["heatRecovery"]["bypass"].clone()
+        };
+        // Manufacture year unknown: the construction year decides (p. 152).
+        assert_eq!(bypass(&wtw, 2012), json!({"kind": "full"}));
+        assert_eq!(bypass(&wtw, 2005), json!({"kind": "none"}));
+        // A pre-2010 unit in a 2012 dwelling: the unit year governs.
+        wtw.unit_manufacture_year = Some(2008);
+        assert_eq!(bypass(&wtw, 2012), json!({"kind": "none"}));
+        wtw.bypass_present = Some(true);
+        assert_eq!(
+            bypass(&wtw, 2012),
+            json!({"kind": "partial", "fraction": 0.7})
+        );
+        wtw.unit_manufacture_year = Some(2011);
+        assert_eq!(bypass(&wtw, 1990), json!({"kind": "full"}));
     }
 }

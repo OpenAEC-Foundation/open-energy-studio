@@ -283,6 +283,16 @@ fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
     if !(survey.building_height_m.is_finite() && survey.building_height_m > 0.0) {
         recorder.issue("building_height_invalid", "buildingHeightM");
     }
+    if survey.construction.closed_or_suspended_ceiling {
+        // ISSO 82.1 table 7.4 (p. 62) has no closed-ceiling column: only a
+        // (very) heavy floor whose top is heavier than the ceiling above
+        // takes the first column (`lighterCeiling`). The closed or
+        // suspended ceiling is the ISSO 75.1 utility criterion.
+        recorder.issue(
+            "closed_ceiling_not_in_dwelling_survey",
+            "construction.closedOrSuspendedCeiling",
+        );
+    }
     if survey.cooling_present && survey.cooling.is_none() {
         // ISSO 82.1 §10.2: a cooled zone needs the cooling system data.
         recorder.issue("cooling_system_data_required", "cooling");
@@ -664,6 +674,38 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn dwelling_survey_rejects_the_utility_closed_ceiling_criterion() {
+        // 82.1 table 7.4 (p. 62) only knows the lighter-ceiling criterion.
+        let mut survey = fixture("1975");
+        survey.construction.closed_or_suspended_ceiling = true;
+        let result = assess_residential_survey(&survey);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "closed_ceiling_not_in_dwelling_survey"));
+    }
+
+    #[test]
+    fn roof_and_floor_apartment_calculates_as_a_top_storey_dwelling() {
+        // Positions 4/8 of afb. 7.1 (p. 51).
+        let mut survey = fixture("1975");
+        survey.dwelling = DwellingType::Apartment {
+            floor: general::ApartmentFloor::RoofAndFloor,
+            side: general::ApartmentSide::Middle,
+        };
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(result
+            .applied_defaults
+            .iter()
+            .any(|item| item.rule == "apartment_roof_and_floor_top_type"));
     }
 
     #[test]

@@ -27,7 +27,7 @@
 //!   uses NTA 9.58/9.59.
 //! - Collective installations (p. 106, 121–122): the connected usable area
 //!   unknown → dwellings × the dwelling's area (p. 121); heat meters
-//!   unknown → present (table 9.16, p. 122); pipes forfait (table 9.14).
+//!   unknown → present (table 9.16a, p. 122); pipes forfait (table 9.14).
 //! - Biomass annex R compliance unknown: not compliant (p. 111–112, 28).
 
 use serde::{Deserialize, Serialize};
@@ -208,11 +208,16 @@ impl DesignClass {
         }
     }
 
+    /// Mean design emission temperature of the NTA table 9.14 class used
+    /// for the distribution (`kernel`), so the boiler and the distribution
+    /// describe the same circuit: 70/50 maps to 70/60 and takes 65 °C. Only
+    /// the 50 °C threshold of the boiler forfait reads it, so the choice
+    /// has no effect on the result.
     fn mean_c(self) -> f64 {
         match self {
             Self::C45_40 => 42.5,
             Self::C55_47 => 51.0,
-            Self::C70_50 => 60.0,
+            Self::C70_50 => 65.0,
             Self::C90_70 => 80.0,
         }
     }
@@ -245,6 +250,12 @@ pub struct SurveyHeating {
     pub emitters: Emitters,
     #[serde(default)]
     pub design_class: Option<DesignClass>,
+    /// Controlled declaration (gecontroleerde verklaring) that a heat pump
+    /// delivers a supply temperature above 70 °C; required when an explicit
+    /// class above 70 °C applies to a heat pump (table 9.9 footnotes 9–11,
+    /// erratum §4).
+    #[serde(default)]
+    pub heat_pump_above_70_declaration: Option<String>,
     /// `None`: not determinable.
     #[serde(default)]
     pub balanced: Option<bool>,
@@ -269,14 +280,14 @@ pub struct SurveyHeating {
     /// Collective installation serving several dwellings (p. 106, 121).
     #[serde(default)]
     pub collective: Option<CollectiveHeating>,
-    /// ISSO 82.1 table 9.16 / 75.1: the air-heating type with emitters
+    /// ISSO 82.1 table 9.16b / 75.1: the air-heating type with emitters
     /// `air_heating`.
     #[serde(default)]
     pub air_heating: Option<AirHeatingAnswer>,
     pub source_reference: String,
 }
 
-/// ISSO table 9.16: direct or indirect air heaters, or air heating
+/// ISSO table 9.16b: direct or indirect air heaters, or air heating
 /// through the air-handling unit (then entered with the ventilation).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -285,7 +296,7 @@ pub enum AirHeatingAnswer {
         /// Radial recirculation fan; `None` unknown (radial).
         #[serde(default, rename = "radialFan")]
         radial_fan: Option<bool>,
-        /// Number of air heaters (table 9.16).
+        /// Number of air heaters (table 9.16b).
         #[serde(default)]
         count: Option<u32>,
     },
@@ -324,7 +335,7 @@ pub struct CollectiveHeating {
     /// Storeys on the installation (9.37); `None`: the dwelling's storeys.
     #[serde(default)]
     pub connected_storeys: Option<u32>,
-    /// Table 9.16: `None` unknown → present.
+    /// Table 9.16a: `None` unknown → present.
     #[serde(default)]
     pub heat_meters_present: Option<bool>,
 }
@@ -482,7 +493,7 @@ pub fn derive_heating(
         "system": system, "balancing": balancing, "control": control,
         "sourceReference": format!("{reference}; basisopname"),
     });
-    // Table 9.16 → NTA 9.23 (tables 9.12/9.13); unknown properties take the
+    // Table 9.16b → NTA 9.23 (tables 9.12/9.13); unknown properties take the
     // highest factor, as the kernel does for a missing value.
     match (heating.emitters, heating.air_heating) {
         (Emitters::AirHeating, Some(answer)) => {
@@ -493,7 +504,7 @@ pub fn derive_heating(
                             "air_heater_fan_unknown_radial",
                             "heating.airHeating.radialFan",
                             "radial recirculation fan".into(),
-                            "ISSO 82.1 p. 123 (table 9.16)",
+                            "ISSO 82.1 p. 123 (table 9.16b)",
                         );
                     }
                     Some(json!({"kind": "direct", "radialFan": radial_fan}))
@@ -512,7 +523,7 @@ pub fn derive_heating(
                             "air_heater_indirect_unknown_highest",
                             "heating.airHeating",
                             "AC fans, room higher than 8 m, without warm-air return".into(),
-                            "ISSO 82.1 p. 123 (table 9.16)",
+                            "ISSO 82.1 p. 123 (table 9.16b)",
                         );
                     }
                     Some(json!({
@@ -528,7 +539,7 @@ pub fn derive_heating(
             if let Some(kind) = kind {
                 emission["airHeaters"] = json!({
                     "kind": kind,
-                    "sourceReference": format!("{reference}; ISSO table 9.16"),
+                    "sourceReference": format!("{reference}; ISSO table 9.16b"),
                 });
             }
         }
@@ -537,7 +548,7 @@ pub fn derive_heating(
                 "air_heating_type_unknown",
                 "heating.airHeating",
                 "not applicable: no air-heater fan energy".into(),
-                "ISSO 82.1 p. 123 (table 9.16)",
+                "ISSO 82.1 p. 123 (table 9.16b)",
             );
         }
         (_, Some(_)) => recorder.issue(
@@ -545,6 +556,33 @@ pub fn derive_heating(
             "heating.airHeating",
         ),
         (_, None) => {}
+    }
+
+    // Table 9.9 footnotes 9–11 as corrected by erratum §4: a heat pump
+    // with a supply temperature above 70 °C needs a controlled declaration.
+    // Only an explicit class can exceed 70 °C for a heat pump; the defaults
+    // above stop at 70/50.
+    let heat_pump_present = std::iter::once(&generator)
+        .chain(
+            heating
+                .additional_generators
+                .iter()
+                .map(|item| &item.generator),
+        )
+        .any(is_heat_pump);
+    if heat_pump_present
+        && heating
+            .design_class
+            .is_some_and(|class| class.supply_c() > 70.0)
+        && heating
+            .heat_pump_above_70_declaration
+            .as_deref()
+            .map_or(true, |value| value.trim().is_empty())
+    {
+        recorder.issue(
+            "heat_pump_above_70_requires_declaration",
+            "heating.heatPumpAbove70Declaration",
+        );
     }
 
     let collective = heating.collective.is_some();
@@ -634,13 +672,13 @@ pub fn derive_heating(
         );
         match &heating.collective {
             Some(collective) => {
-                // Table 9.16 (p. 122): heat meters unknown → present.
+                // Table 9.16a (p. 122): heat meters unknown → present.
                 let meters = collective.heat_meters_present.unwrap_or_else(|| {
                     recorder.record(
                         "heat_meters_unknown_present",
                         "heating.collective.heatMetersPresent",
                         "present".into(),
-                        "ISSO 82.1 p. 123 (table 9.16)",
+                        "ISSO 82.1 p. 122 (table 9.16a)",
                     );
                     true
                 });
@@ -1224,6 +1262,7 @@ mod tests {
             generator,
             emitters,
             design_class: None,
+            heat_pump_above_70_declaration: None,
             balanced: None,
             control: ControlAnswer::Unknown,
             unheated_pipes: None,
@@ -1340,6 +1379,41 @@ mod tests {
         assert!(derived.heat_pump_renewable.is_some());
         // p. 110: no solar regeneration, c_source 1,0.
         assert_eq!(derived.generator["forfait"]["sourceCorrectionFactor"], 1.0);
+    }
+
+    #[test]
+    fn heat_pump_above_70_needs_a_controlled_declaration() {
+        // Erratum §4 on table 9.9 footnotes 9–11.
+        let hp: HeatingGenerator = serde_json::from_value(json!({
+            "kind": "heat_pump",
+            "source": "water_based_unknown",
+            "highTemperature": true,
+        }))
+        .unwrap();
+        let mut survey = heating(hp, Emitters::Radiators);
+        survey.design_class = Some(DesignClass::C90_70);
+        let mut recorder = Recorder::default();
+        derive_heating(&survey, 2015, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "heat_pump_above_70_requires_declaration"));
+        survey.heat_pump_above_70_declaration = Some("BCRG verklaring 123".into());
+        let mut recorder = Recorder::default();
+        derive_heating(&survey, 2015, &mut recorder);
+        assert!(recorder.issues.is_empty());
+        // 70/50 is not above 70 °C.
+        survey.heat_pump_above_70_declaration = None;
+        survey.design_class = Some(DesignClass::C70_50);
+        let mut recorder = Recorder::default();
+        derive_heating(&survey, 2015, &mut recorder);
+        assert!(recorder.issues.is_empty());
+        // A boiler at 90/70 needs no declaration.
+        let mut boiler = heating(HeatingGenerator::NonePresent, Emitters::Radiators);
+        boiler.design_class = Some(DesignClass::C90_70);
+        let mut recorder = Recorder::default();
+        derive_heating(&boiler, 2015, &mut recorder);
+        assert!(recorder.issues.is_empty());
     }
 
     #[test]
