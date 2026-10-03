@@ -1212,6 +1212,7 @@ export const nl: Record<string, string> = {
   'nta.gap.cold_network_gain_outside_cooling_months': "Leidingen van het koudenet winnen warmte in maanden zonder koudelevering (P.13–P.18); geef die maanden geen watertemperatuur",
   'nta.gap.humidifier_zone_duplicate': "Tweede bevochtiger in dezelfde rekenzone; §12.1 gaat uit van één systeem per rekenzone",
   'nta.gap.micro_chp_capacity_exceeded': 'Warmte van de micro-WKK boven Pth;chp_100+sup_100 (9.66): het overschot levert geen elektriciteit en telt als bijstookwarmte',
+  'nta.gap.biomass_class_conflict': 'Bijlage R opgegeven bij een biomassa-installatie boven 500 kW: gerekend als bmA (tabellen 5.2/5.4, per installatie)',
   'nta.gap.micro_chp_total_efficiency_invalid': 'Totaalrendement micro-WKK η_th + η_el boven 1,2 (tabel 9.33)',
   'nta.gap.micro_chp_electric_values_inconsistent': 'Elektrisch vermogen en elektrisch rendement van een meetpunt van de micro-WKK sluiten niet op elkaar aan (P_el ≠ P_th·η_el/η_th)',
   'nta.gap.solar_tested_backup_distribution_below_one': 'Geteste zonneboiler met geïntegreerde naverwarming en Σ f_dis onder 1: 13.134 verhoogt dan de zonne-opbrengst (gebrek in de norm)',

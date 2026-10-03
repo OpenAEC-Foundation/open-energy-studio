@@ -1158,49 +1158,94 @@ struct BlankSearch {
 /// One null leaf of the block.
 struct NullLeaf {
     path: String,
-    parent: String,
     steps: Vec<PathStep>,
-    state: LeafState,
+    /// A null object member is taken out of the working copy first; an
+    /// array element stays in place as null.
+    removed: bool,
+}
+
+/// A location the repair has given a placeholder value, with the values it
+/// may still try there.
+#[derive(Clone)]
+struct Slot {
+    path: String,
+    steps: Vec<PathStep>,
+    candidates: Vec<Value>,
+    next: usize,
+    /// Names of the blank members taken out next to this location. A
+    /// variant chosen here must know them (`deny_unknown_fields`), so the
+    /// variant the input was written for is preferred.
+    siblings: Vec<String>,
+    /// A member that was never in the block (not a blank), filled only so
+    /// the search can go on.
+    absent: bool,
+}
+
+impl Slot {
+    fn new(path: String, steps: Vec<PathStep>) -> Self {
+        Slot {
+            path,
+            steps,
+            candidates: vec![
+                Value::from(0),
+                Value::from(1),
+                Value::from(""),
+                Value::from(false),
+                Value::Array(Vec::new()),
+                Value::Object(serde_json::Map::new()),
+            ],
+            next: 0,
+            siblings: Vec::new(),
+            absent: false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum LeafState {
-    Open,
-    Blank,
-    Allowed,
+enum Verdict {
+    Accept,
+    Weak,
+    /// Accepted, but a variant that does not know a blank member next to it.
+    Poor,
+    Refuse,
 }
+
+type FirstError = Option<(String, String)>;
 
 /// The null leaves of the block that the kernel does not accept.
 ///
 /// Design: serde gives no type information at runtime, and inside internally
 /// tagged enums and flattened structs it buffers the input, so a null there
 /// is reported as a unit value with the error path stopped at the enum. The
-/// search therefore works in two phases on a working copy:
+/// search therefore does not try to read the culprit from the error.
+/// Instead it works in two phases:
 ///
-/// 1. Reach a copy that deserializes. Every null object member is removed
-///    (optional members then default, required ones give `missing field X`
-///    naming the culprit at its parent path); a null array element that
-///    errors is located at its exact path, or, under a tagged enum, as the
-///    first element in visit order whose replacement changes the error
-///    (elements before it in that order leave the error unchanged, so they
-///    accept null and are marked allowed). Each culprit is filled with a
-///    placeholder the kernel accepts (number, text, boolean, list, object, or
-///    the first variant an enum names), so the next blank can surface. A
-///    missing field that matches no removed null is a truly absent field: it
-///    is not reported as blank, only filled to continue, and makes the result
-///    `residual`.
-/// 2. Classify the leaves not yet classified by putting them back as null in
-///    the copy from phase 1. When that copy deserializes, an error can only
-///    come from a null put back, so `#[serde(default)]` members that are not
-///    `Option` (which phase 1 silently defaulted) are found too, while
-///    allowed nulls never are. The leaves are tested in halving groups, so
-///    any number of allowed nulls costs one deserialization. When the copy
-///    still fails elsewhere (`residual`), each leaf is tested once on its own.
+/// 1. Repair: build a copy that deserializes. Null object members are taken
+///    out (optional ones then default); every remaining error is resolved by
+///    giving a value to the location it points at: the missing member, the
+///    null array element, or, when the path stops at an enum, the nulls
+///    under it in turn. Values are tried in a fixed order (numbers, text,
+///    boolean, list, object, then the variants an enum names) and the first
+///    one the kernel does not refuse is kept. Whether a null was allowed is
+///    not decided here; a wrong guess only costs another round. A required
+///    member that was never in the block (absent, not null) is filled too,
+///    so the search can go on, but makes the result `residual`.
+/// 2. Classify: with a copy that deserializes, every null leaf is put back
+///    as null. A set of put-back nulls fails exactly when it contains one the
+///    kernel rejects, so the leaves are tested in halving groups: all allowed
+///    nulls together cost one deserialization, and each reported leaf was
+///    tested on its own.
 ///
-/// Cost: a few deserializations per culprit (placeholder tries) plus, in
-/// phase 2, about 2·k·log2(n) for k blanks among n remaining nulls.
+/// If the repair cannot finish (an untagged enum, a value outside the tried
+/// set), each null is tested on its own against the partial copy and counts
+/// only when it moves the first error to a blank at or above its path; the
+/// result is then `residual`.
+///
+/// Cost: phase 1 is bounded by a few deserializations per null leaf and per
+/// filled location (guarded), phase 2 by about 2·k·log2(n) deserializations
+/// for k blanks among n nulls.
 fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
-    let first_error = |candidate: &Value| -> Option<(String, String)> {
+    let first_error = |candidate: &Value| -> FirstError {
         serde_path_to_error::deserialize::<_, T>(candidate.clone())
             .err()
             .map(|error| {
@@ -1212,126 +1257,72 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
     };
     let mut raw = Vec::new();
     collect_nulls(block, String::new(), Vec::new(), &mut raw);
-    let mut leaves: Vec<NullLeaf> = raw
+    let leaves: Vec<NullLeaf> = raw
         .into_iter()
         .map(|(path, steps)| NullLeaf {
-            parent: render_path(&steps[..steps.len().saturating_sub(1)]),
+            removed: matches!(steps.last(), Some(PathStep::Key(_))),
             path,
             steps,
-            state: LeafState::Open,
         })
         .collect();
     let mut work = block.clone();
-    for leaf in &leaves {
-        if matches!(leaf.steps.last(), Some(PathStep::Key(_))) {
-            remove_member(&mut work, &leaf.steps);
-        }
+    for leaf in leaves.iter().filter(|leaf| leaf.removed) {
+        remove_member(&mut work, &leaf.steps);
     }
-    let mut residual = false;
+    let mut slots: Vec<Slot> = Vec::new();
     let mut guard = 0;
-    // Phase 1: reach a copy that deserializes.
-    let settled = loop {
+    let limit = 12 * leaves.len() + 200;
+    let mut current = first_error(&work);
+    // Phase 1: repair.
+    while let Some((at, message)) = current.clone() {
         guard += 1;
-        if guard > 4 * leaves.len() + 64 {
-            break false;
+        if guard > limit {
+            break;
         }
-        let Some((at, message)) = first_error(&work) else {
-            break true;
-        };
-        if let Some(field) = missing_field(&message) {
-            let is_key = |leaf: &NullLeaf| matches!(leaf.steps.last(), Some(PathStep::Key(key)) if key == field);
-            // A removed null member at exactly this parent, or (under a
-            // tagged enum whose path stops early) one deeper under it.
-            let exact = leaves.iter().position(|leaf| {
-                leaf.state == LeafState::Open && leaf.parent == at && is_key(leaf)
-            });
-            let found = exact.or_else(|| {
-                leaves.iter().position(|leaf| {
-                    leaf.state == LeafState::Open && is_under(&leaf.path, &at) && is_key(leaf) && {
-                        let mut trial = work.clone();
-                        fill(&mut trial, &leaf.steps, &leaf.path, &first_error)
-                            && first_error(&trial) != Some((at.clone(), message.clone()))
-                    }
-                })
-            });
-            match found {
-                Some(index) => {
-                    leaves[index].state = LeafState::Blank;
-                    let (steps, path) = (leaves[index].steps.clone(), leaves[index].path.clone());
-                    if !fill(&mut work, &steps, &path, &first_error) {
-                        residual = true;
-                        break false;
-                    }
-                }
-                None => {
-                    // A truly absent required field: not a blank.
-                    residual = true;
-                    let Some(steps) = parse_path(&at, field) else {
-                        break false;
-                    };
-                    let path = render_path(&steps);
-                    if walk_mut(&mut work, &steps[..steps.len() - 1]).is_none()
-                        || !fill(&mut work, &steps, &path, &first_error)
-                    {
-                        break false;
-                    }
-                }
-            }
+        let progressed = if let Some(field) = missing_field(&message) {
+            repair_missing(
+                &mut work,
+                &mut slots,
+                &leaves,
+                &at,
+                field,
+                &first_error,
+                &current,
+            )
         } else if is_blank_error(&message) {
-            let is_element =
-                |leaf: &NullLeaf| matches!(leaf.steps.last(), Some(PathStep::Index(_)));
-            let exact = leaves.iter().position(|leaf| {
-                leaf.state == LeafState::Open && leaf.path == at && is_element(leaf)
-            });
-            let found = exact.or_else(|| {
-                // Under a tagged enum: the first element in visit order
-                // whose replacement changes the error.
-                let mut hit = None;
-                for (index, leaf) in leaves.iter_mut().enumerate() {
-                    if leaf.state != LeafState::Open
-                        || !is_under(&leaf.path, &at)
-                        || !is_element(leaf)
-                    {
-                        continue;
-                    }
-                    let unchanged = PLACEHOLDERS.iter().any(|make| {
-                        let mut trial = work.clone();
-                        set_at(&mut trial, &leaf.steps, make());
-                        first_error(&trial) == Some((at.clone(), message.clone()))
-                    });
-                    if unchanged {
-                        leaf.state = LeafState::Allowed;
-                    } else {
-                        hit = Some(index);
-                        break;
-                    }
-                }
-                hit
-            });
-            let Some(index) = found else {
-                residual = true;
-                break false;
-            };
-            leaves[index].state = LeafState::Blank;
-            let (steps, path) = (leaves[index].steps.clone(), leaves[index].path.clone());
-            if !fill(&mut work, &steps, &path, &first_error) {
-                residual = true;
-                break false;
-            }
+            repair_blank(&mut work, &mut slots, &leaves, &at, &first_error, &current)
         } else {
-            residual = true;
-            break false;
+            // A placeholder refused late (it passed while an earlier error
+            // hid it), or a variant that does not fit its fields: try the
+            // next value at the latest filled location at or around the
+            // error.
+            let near: Vec<usize> = (0..slots.len())
+                .rev()
+                .filter(|&index| {
+                    let slot = &slots[index];
+                    slot.path == at || is_under(&slot.path, &at) || is_under(&at, &slot.path)
+                })
+                .collect();
+            retry(
+                &mut work,
+                &mut slots,
+                &leaves,
+                &near,
+                &first_error,
+                &current,
+            )
+        };
+        if !progressed {
+            break;
         }
-    };
-    // Phase 2: classify the remaining leaves against the copy. Once the copy
-    // deserializes, a set of nulls put back fails exactly when it contains
-    // one the kernel rejects, so the leaves are tested in halving groups:
-    // all allowed nulls together cost one deserialization.
-    let open: Vec<usize> = (0..leaves.len())
-        .filter(|&index| leaves[index].state == LeafState::Open)
-        .collect();
+        current = first_error(&work);
+    }
+    let settled = current.is_none();
+    let absent = slots.iter().any(|slot| slot.absent);
+    // Phase 2: classify every null leaf against the repaired copy.
+    let mut blank = vec![false; leaves.len()];
     if settled {
-        let mut groups = vec![open];
+        let mut groups = vec![(0..leaves.len()).collect::<Vec<_>>()];
         while let Some(group) = groups.pop() {
             if group.is_empty() {
                 continue;
@@ -1341,11 +1332,10 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
                 set_at(&mut trial, &leaves[index].steps, Value::Null);
             }
             if first_error(&trial).is_none() {
-                for &index in &group {
-                    leaves[index].state = LeafState::Allowed;
-                }
-            } else if group.len() == 1 {
-                leaves[group[0]].state = LeafState::Blank;
+                continue;
+            }
+            if group.len() == 1 {
+                blank[group[0]] = true;
             } else {
                 let (left, right) = group.split_at(group.len() / 2);
                 groups.push(right.to_vec());
@@ -1356,12 +1346,11 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
         // The copy still fails elsewhere: a null counts only when it moves
         // the first error to a blank at (or above) its own path.
         let baseline = first_error(&work);
-        for index in open {
-            let leaf = &leaves[index];
+        for (index, leaf) in leaves.iter().enumerate() {
             let mut trial = work.clone();
             set_at(&mut trial, &leaf.steps, Value::Null);
             let error = first_error(&trial);
-            let caused = match &error {
+            blank[index] = match &error {
                 None => false,
                 Some((at, message)) => {
                     error != baseline
@@ -1369,82 +1358,385 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
                         && (*at == leaf.path || is_under(&leaf.path, at))
                 }
             };
-            leaves[index].state = if caused {
-                LeafState::Blank
-            } else {
-                LeafState::Allowed
-            };
         }
     }
     BlankSearch {
         paths: leaves
             .into_iter()
-            .filter(|leaf| leaf.state == LeafState::Blank)
-            .map(|leaf| leaf.path)
+            .zip(blank)
+            .filter(|(_, blank)| *blank)
+            .map(|(leaf, _)| leaf.path)
             .collect(),
-        residual,
+        residual: absent || !settled,
     }
 }
 
-const PLACEHOLDERS: [fn() -> Value; 5] = [
-    || Value::from(0),
-    || Value::from(""),
-    || Value::from(false),
-    || Value::Array(Vec::new()),
-    || Value::Object(serde_json::Map::new()),
-];
-
-/// Puts a value at `steps` that the kernel accepts there, so the search can
-/// move past this blank. An error that still points at (or into) the filled
-/// path, or that rejects the placeholder's own type, means the placeholder
-/// was refused; an enum's refusal names its variants, and the first is
-/// tried. Returns whether a placeholder was accepted.
-fn fill<F>(work: &mut Value, steps: &[PathStep], path: &str, first_error: &F) -> bool
+/// Resolves ``missing field `field` `` at `at`: the removed null member of
+/// that name, or a member that was never in the block.
+#[allow(clippy::too_many_arguments)]
+fn repair_missing<F>(
+    work: &mut Value,
+    slots: &mut Vec<Slot>,
+    leaves: &[NullLeaf],
+    at: &str,
+    field: &str,
+    first_error: &F,
+    current: &FirstError,
+) -> bool
 where
-    F: Fn(&Value) -> Option<(String, String)>,
+    F: Fn(&Value) -> FirstError,
 {
-    let refused = |error: &Option<(String, String)>, tried: &Value| -> bool {
-        let Some((at, message)) = error else {
-            return false;
-        };
-        if at == path || is_under(at, path) {
+    let filled = |slots: &[Slot], path: &str| slots.iter().any(|slot| slot.path == path);
+    let target = join_path(at, field);
+    if let Some(leaf) = leaves
+        .iter()
+        .find(|leaf| leaf.removed && leaf.path == target && !filled(slots, &leaf.path))
+    {
+        return place(
+            work,
+            slots,
+            leaves,
+            &leaf.path,
+            &leaf.steps,
+            first_error,
+            current,
+        );
+    }
+    // Under a tagged enum the path stops early: a removed member with this
+    // name deeper under it, when giving it a value clears this error.
+    for leaf in leaves.iter().filter(|leaf| {
+        leaf.removed
+            && is_under(&leaf.path, at)
+            && matches!(leaf.steps.last(), Some(PathStep::Key(key)) if key == field)
+            && !filled(slots, &leaf.path)
+    }) {
+        let mut trial = work.clone();
+        let mut trial_slots = Vec::new();
+        if place(
+            &mut trial,
+            &mut trial_slots,
+            leaves,
+            &leaf.path,
+            &leaf.steps,
+            first_error,
+            current,
+        ) && first_error(&trial) != *current
+        {
+            *work = trial;
+            slots.extend(trial_slots);
             return true;
-        }
-        // Under a tagged enum the path stops at the enum.
-        if !is_under(path, at) {
-            return false;
-        }
-        // A type or value refusal there concerns the placeholder; a blank
-        // error is the next blank surfacing.
-        (!is_blank_error(message)
-            && (message.starts_with("invalid type")
-                || message.starts_with("invalid value")
-                || message.starts_with("invalid length")
-                || message.starts_with("unknown variant")))
-            || (tried.is_object() && missing_field(message).is_some())
-    };
-    let mut variant = None;
-    for make in PLACEHOLDERS {
-        let tried = make();
-        set_at(work, steps, tried.clone());
-        let error = first_error(work);
-        if !refused(&error, &tried) {
-            return true;
-        }
-        if let Some((_, message)) = &error {
-            if variant.is_none() {
-                variant = first_variant(message);
-            }
         }
     }
-    if let Some(name) = variant {
-        let tried = Value::from(name);
-        set_at(work, steps, tried.clone());
-        if !refused(&first_error(work), &tried) {
+    // A variant chosen for a blank tag next to it may be the wrong one: one
+    // that needs members the input never had. Try the next variant first.
+    let tags: Vec<usize> = (0..slots.len())
+        .rev()
+        .filter(|&index| {
+            let slot = &slots[index];
+            render_path(&slot.steps[..slot.steps.len().saturating_sub(1)]) == at
+                && walk(work, &slot.steps)
+                    .is_some_and(|value| value.is_string() || value.is_number())
+        })
+        .collect();
+    if retry(work, slots, leaves, &tags, first_error, current) {
+        return true;
+    }
+    // A member that was never in the block. Inside a value the repair put
+    // there itself it is part of that placeholder, not an absent input.
+    let inside_placeholder = slots
+        .iter()
+        .any(|slot| slot.path == at || is_under(at, &slot.path));
+    let Some(steps) = parse_path(at, field) else {
+        return false;
+    };
+    let path = render_path(&steps);
+    if filled(slots, &path) || walk_mut(work, &steps[..steps.len() - 1]).is_none() {
+        return false;
+    }
+    let placed = place(work, slots, leaves, &path, &steps, first_error, current);
+    if placed && !inside_placeholder {
+        if let Some(slot) = slots.last_mut() {
+            slot.absent = true;
+        }
+    }
+    placed
+}
+
+/// Moves the given slots (in order) to their next accepted value until the
+/// error moves. Values the repair put next to a slot after it may belong to
+/// its previous value (the fields of a variant), so they are taken back
+/// first and filled again as needed.
+fn retry<F>(
+    work: &mut Value,
+    slots: &mut Vec<Slot>,
+    leaves: &[NullLeaf],
+    order: &[usize],
+    first_error: &F,
+    current: &FirstError,
+) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    for &index in order {
+        if index >= slots.len() {
+            continue;
+        }
+        let mut trial = work.clone();
+        let mut trial_slots = slots.clone();
+        reset_after(&mut trial, &mut trial_slots, leaves, index);
+        let advanced = advance(&mut trial, &mut trial_slots[index], first_error, current);
+        if advanced && first_error(&trial) != *current {
+            *work = trial;
+            *slots = trial_slots;
+            return true;
+        }
+        // Keep what was learned about this slot, but not the trial values.
+        slots[index].next = trial_slots[index].next;
+        slots[index].candidates = trial_slots[index].candidates.clone();
+    }
+    false
+}
+
+/// Takes back the values put after slot `index` next to or under its parent.
+fn reset_after(work: &mut Value, slots: &mut Vec<Slot>, leaves: &[NullLeaf], index: usize) {
+    let parent = render_path(&slots[index].steps[..slots[index].steps.len().saturating_sub(1)]);
+    let mut later = index + 1;
+    while later < slots.len() {
+        if slots[later].path != parent
+            && (parent.is_empty() || is_under(&slots[later].path, &parent))
+        {
+            let slot = slots.remove(later);
+            match leaves.iter().find(|leaf| leaf.path == slot.path) {
+                Some(leaf) if !leaf.removed => set_at(work, &slot.steps, Value::Null),
+                _ => remove_member(work, &slot.steps),
+            }
+        } else {
+            later += 1;
+        }
+    }
+}
+
+/// Resolves a blank error at `at`: the null element there or, when the path
+/// stops at an enum, the nulls under it in turn until the error moves.
+fn repair_blank<F>(
+    work: &mut Value,
+    slots: &mut Vec<Slot>,
+    leaves: &[NullLeaf],
+    at: &str,
+    first_error: &F,
+    current: &FirstError,
+) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let still_null =
+        |work: &Value, leaf: &NullLeaf| walk(work, &leaf.steps).is_some_and(Value::is_null);
+    if let Some(leaf) = leaves
+        .iter()
+        .find(|leaf| leaf.path == at && still_null(work, leaf))
+    {
+        return place(
+            work,
+            slots,
+            leaves,
+            &leaf.path,
+            &leaf.steps,
+            first_error,
+            current,
+        );
+    }
+    for leaf in leaves.iter() {
+        if !is_under(&leaf.path, at) || !still_null(work, leaf) {
+            continue;
+        }
+        if place(
+            work,
+            slots,
+            leaves,
+            &leaf.path,
+            &leaf.steps,
+            first_error,
+            current,
+        ) && first_error(work) != *current
+        {
             return true;
         }
     }
     false
+}
+
+/// Gives the location a value the kernel accepts and records it as a slot.
+/// Returns whether a value was accepted.
+fn place<F>(
+    work: &mut Value,
+    slots: &mut Vec<Slot>,
+    leaves: &[NullLeaf],
+    path: &str,
+    steps: &[PathStep],
+    first_error: &F,
+    before: &FirstError,
+) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let mut slot = Slot::new(path.to_string(), steps.to_vec());
+    let parent = &steps[..steps.len().saturating_sub(1)];
+    slot.siblings = leaves
+        .iter()
+        .filter(|leaf| {
+            leaf.removed
+                && leaf.path != path
+                && leaf.steps.len() == steps.len()
+                && render_path(&leaf.steps[..leaf.steps.len() - 1]) == render_path(parent)
+        })
+        .filter_map(|leaf| match leaf.steps.last() {
+            Some(PathStep::Key(key)) => Some(key.clone()),
+            _ => None,
+        })
+        .collect();
+    let accepted = advance(work, &mut slot, first_error, before);
+    if accepted {
+        slots.push(slot);
+    }
+    accepted
+}
+
+/// Tries the slot's next values in order and keeps the first one the kernel
+/// does not refuse; a weak acceptance (nothing moved, or a variant whose
+/// fields are not all there yet) is kept only when nothing better follows.
+fn advance<F>(work: &mut Value, slot: &mut Slot, first_error: &F, before: &FirstError) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let mut fallback: Option<(Verdict, usize)> = None;
+    while slot.next < slot.candidates.len() {
+        let index = slot.next;
+        slot.next += 1;
+        let tried = slot.candidates[index].clone();
+        set_at(work, &slot.steps, tried.clone());
+        let error = first_error(work);
+        let mut verdict = judge(&error, &tried, &slot.path, before);
+        if verdict != Verdict::Refuse && !knows_siblings(work, slot, first_error) {
+            verdict = Verdict::Poor;
+        }
+        if verdict == Verdict::Accept {
+            return true;
+        }
+        let rank = |verdict: Verdict| match verdict {
+            Verdict::Weak => 1,
+            Verdict::Poor => 2,
+            _ => 3,
+        };
+        if verdict != Verdict::Refuse
+            && fallback.map_or(true, |(best, _)| rank(verdict) < rank(best))
+        {
+            fallback = Some((verdict, index));
+        }
+        if let Some((_, message)) = &error {
+            learn(message, slot);
+        }
+    }
+    if let Some((_, index)) = fallback {
+        set_at(work, &slot.steps, slot.candidates[index].clone());
+        return true;
+    }
+    false
+}
+
+/// Whether the value now at the slot (a variant name) knows every blank
+/// member taken out next to it. A member it knows refuses a value of no
+/// kernel type; one it does not know is an unknown field, or is silently
+/// ignored (a unit variant of an internally tagged enum ignores the rest of
+/// the map). The repair works in serde's visiting order, so everything
+/// before the slot's parent already deserializes: a refusal of the probe
+/// shows at or under that parent, while an error elsewhere is a later one
+/// the probe never reached.
+fn knows_siblings<F>(work: &Value, slot: &Slot, first_error: &F) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let parent_steps = &slot.steps[..slot.steps.len().saturating_sub(1)];
+    let parent = render_path(parent_steps);
+    slot.siblings.iter().all(|key| {
+        let mut trial = work.clone();
+        let mut steps = parent_steps.to_vec();
+        steps.push(PathStep::Key(key.clone()));
+        set_at(&mut trial, &steps, serde_json::json!({ "\u{1}probe": [] }));
+        first_error(&trial).is_some_and(|(at, message)| {
+            // Inside a buffered enum the path stops at the enum, above it.
+            (at == parent || is_under(&at, &parent) || (!at.is_empty() && is_under(&parent, &at)))
+                && !message.starts_with(&format!("unknown field `{key}`"))
+        })
+    })
+}
+
+/// Adds the values an error suggests: the variants an enum names, or a list
+/// of the length an array needs.
+fn learn(message: &str, slot: &mut Slot) {
+    let mut suggested = Vec::new();
+    if message.starts_with("unknown variant") {
+        suggested.extend(variants(message).into_iter().map(Value::from));
+    }
+    if let Some(rest) = message.split("expected an array of length ").nth(1) {
+        if let Some(length) = rest
+            .split(|c: char| !c.is_ascii_digit())
+            .next()
+            .and_then(|digits| digits.parse::<usize>().ok())
+        {
+            suggested.push(Value::Array(vec![Value::from(0); length]));
+        }
+    }
+    for value in suggested {
+        if !slot.candidates.contains(&value) {
+            slot.candidates.push(value);
+        }
+    }
+}
+
+/// Whether the error after putting `tried` at `path` refuses that value.
+fn judge(error: &FirstError, tried: &Value, path: &str, before: &FirstError) -> Verdict {
+    let Some((at, message)) = error else {
+        return Verdict::Accept;
+    };
+    if at == path || is_under(at, path) {
+        // The error is at or inside the value just put there: a struct
+        // placeholder still missing its own members is fine, the repair
+        // fills those next.
+        return if is_blank_error(message) || missing_field(message).is_some() {
+            Verdict::Accept
+        } else {
+            Verdict::Refuse
+        };
+    }
+    if !is_under(path, at) {
+        return Verdict::Accept;
+    }
+    // Above it: an enum or flattened struct that stops the path.
+    let kind = match tried {
+        Value::Number(_) => "integer",
+        Value::String(_) => "string",
+        Value::Bool(_) => "boolean",
+        Value::Array(_) => "sequence",
+        Value::Object(_) => "map",
+        Value::Null => "null",
+    };
+    let refused = message.starts_with(&format!("invalid type: {kind}"))
+        || message.starts_with(&format!("invalid value: {kind}"))
+        || message.starts_with("invalid length")
+        || (tried.is_string()
+            && (message.starts_with("unknown variant") || message.starts_with("unknown field")));
+    if refused {
+        return Verdict::Refuse;
+    }
+    if tried.is_string() && missing_field(message).is_some() && error != before {
+        return Verdict::Weak;
+    }
+    if error == before && !tried.is_object() {
+        // Nothing moved: under a buffered enum the value may be refused with
+        // the same wording as the blank it replaced.
+        return Verdict::Weak;
+    }
+    Verdict::Accept
 }
 
 /// The field named by a ``missing field `X` `` error.
@@ -1454,13 +1746,36 @@ fn missing_field(message: &str) -> Option<&str> {
         .and_then(|rest| rest.split('`').next())
 }
 
-/// The first variant an `unknown variant` error lists as expected.
-fn first_variant(message: &str) -> Option<String> {
-    if !message.starts_with("unknown variant") {
-        return None;
+/// The variants an `unknown variant` error lists as expected.
+fn variants(message: &str) -> Vec<String> {
+    let Some(expected) = message.split("expected").nth(1) else {
+        return Vec::new();
+    };
+    expected
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_string)
+        .collect()
+}
+
+fn join_path(parent: &str, field: &str) -> String {
+    if parent.is_empty() {
+        field.to_string()
+    } else {
+        format!("{parent}.{field}")
     }
-    let expected = message.split("expected").nth(1)?;
-    expected.split('`').nth(1).map(str::to_string)
+}
+
+fn walk<'a>(value: &'a Value, steps: &[PathStep]) -> Option<&'a Value> {
+    let mut current = value;
+    for step in steps {
+        current = match step {
+            PathStep::Key(key) => current.get(key.as_str())?,
+            PathStep::Index(index) => current.get(*index)?,
+        };
+    }
+    Some(current)
 }
 
 /// serde_path_to_error renders the root as `.`; leaves use an empty parent.
@@ -3571,5 +3886,179 @@ mod tests {
             .find(|item| item.id == "surface:floor:opaque")
             .unwrap();
         assert_eq!(floor.tilt_deg, 180.0);
+    }
+}
+
+/// Random blanks in the example projects: every reported path must be one
+/// the kernel rejects as null on its own, and every such blank must be
+/// reported. Ground truth per leaf: the otherwise complete block fails with
+/// only that leaf null.
+#[cfg(test)]
+mod blank_fuzz {
+    use super::*;
+    use std::collections::{BTreeSet, HashMap};
+
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    /// Scalar leaves as (rendered path, JSON pointer).
+    fn scalar_leaves(
+        value: &Value,
+        path: String,
+        pointer: String,
+        out: &mut Vec<(String, String)>,
+    ) {
+        match value {
+            Value::Object(map) => {
+                for (key, item) in map {
+                    let next = if path.is_empty() {
+                        key.clone()
+                    } else {
+                        format!("{path}.{key}")
+                    };
+                    let next_pointer =
+                        format!("{pointer}/{}", key.replace('~', "~0").replace('/', "~1"));
+                    scalar_leaves(item, next, next_pointer, out);
+                }
+            }
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    scalar_leaves(
+                        item,
+                        format!("{path}[{index}]"),
+                        format!("{pointer}/{index}"),
+                        out,
+                    );
+                }
+            }
+            Value::Null => {}
+            _ => out.push((path, pointer)),
+        }
+    }
+
+    fn deserializes(value: &Value) -> bool {
+        serde_json::from_value::<NtaCalculationInput>(value.clone()).is_ok()
+    }
+
+    fn block(file: &str) -> Value {
+        let text = std::fs::read_to_string(format!(
+            "{}/../../training-data/{file}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        let project: Value = serde_json::from_str(&text).unwrap();
+        let block = project["ntaCalculation"].clone();
+        assert!(deserializes(&block), "{file} must deserialize");
+        block
+    }
+
+    /// `BLANK_FUZZ_TRIALS` and `BLANK_FUZZ_SEED` widen a local run.
+    fn check(file: &str, seed: u64, trials: usize) {
+        let trials = std::env::var("BLANK_FUZZ_TRIALS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(trials);
+        let seed = std::env::var("BLANK_FUZZ_SEED")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .map_or(seed, |extra| {
+                seed ^ extra.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            });
+        let block = block(file);
+        let mut leaves = Vec::new();
+        scalar_leaves(&block, String::new(), String::new(), &mut leaves);
+        let required: HashMap<String, bool> = leaves
+            .iter()
+            .map(|(path, pointer)| {
+                let mut trial = block.clone();
+                *trial.pointer_mut(pointer).unwrap() = Value::Null;
+                (path.clone(), !deserializes(&trial))
+            })
+            .collect();
+        let mut rng = Rng(seed);
+        let (mut false_positive, mut missed) = (Vec::new(), Vec::new());
+        for _ in 0..trials {
+            let count = 1 + rng.below(2);
+            let mut picked: Vec<&(String, String)> = Vec::new();
+            while picked.len() < count {
+                let leaf = &leaves[rng.below(leaves.len())];
+                if !picked.iter().any(|other| other.0 == leaf.0) {
+                    picked.push(leaf);
+                }
+            }
+            let mut trial = block.clone();
+            for (_, pointer) in &picked {
+                *trial.pointer_mut(pointer).unwrap() = Value::Null;
+            }
+            let found: BTreeSet<String> = blank_paths::<NtaCalculationInput>(&trial)
+                .paths
+                .into_iter()
+                .collect();
+            let expected: BTreeSet<String> = picked
+                .iter()
+                .filter(|(path, _)| required[path])
+                .map(|(path, _)| path.clone())
+                .collect();
+            false_positive.extend(found.difference(&expected).cloned());
+            missed.extend(expected.difference(&found).cloned());
+        }
+        assert!(
+            false_positive.is_empty() && missed.is_empty(),
+            "{file}: false positives {false_positive:?}, missed {missed:?}"
+        );
+
+        // Every scalar leaf blank at once.
+        let mut all = block.clone();
+        for (_, pointer) in &leaves {
+            *all.pointer_mut(pointer).unwrap() = Value::Null;
+        }
+        let started = std::time::Instant::now();
+        let found: BTreeSet<String> = blank_paths::<NtaCalculationInput>(&all)
+            .paths
+            .into_iter()
+            .collect();
+        let elapsed = started.elapsed();
+        let expected: BTreeSet<String> = leaves
+            .iter()
+            .filter(|(path, _)| required[path])
+            .map(|(path, _)| path.clone())
+            .collect();
+        let wrong: Vec<_> = found.difference(&expected).collect();
+        let missed: Vec<_> = expected.difference(&found).collect();
+        assert!(
+            wrong.is_empty(),
+            "{file}: all blank, false positives {wrong:?}"
+        );
+        assert!(missed.is_empty(), "{file}: all blank, missed {missed:?}");
+        assert!(
+            elapsed < std::time::Duration::from_secs(2),
+            "{file}: all blank took {elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn random_blanks_in_the_terraced_dwelling() {
+        check(
+            "nta8800-example-terraced-dwelling.json",
+            0x9E37_79B9_7F4A_7C15,
+            300,
+        );
+    }
+
+    #[test]
+    fn random_blanks_in_the_office() {
+        check("nta8800-example-office.json", 0xD1B5_4A32_D192_ED03, 300);
     }
 }
