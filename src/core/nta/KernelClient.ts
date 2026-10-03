@@ -2495,7 +2495,8 @@ export interface ResidentialSurvey {
       id: string;
       element: 'facade' | 'roof' | 'floor';
       boundary:
-        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' | 'unheated_cellar' | 'strongly_ventilated' }
+        // sunroom: AOS as outdoor air (ISSO 82.1 §6.3.4); water: houseboat hull.
+        | { kind: 'outdoor' | 'ground' | 'crawlspace' | 'adjacent_heated' | 'unheated_cellar' | 'strongly_ventilated' | 'sunroom' | 'water' }
         | { kind: 'unheated_space'; spaceId: string };
       grossAreaM2: number;
       orientation?: NtaOrientation;
@@ -2551,6 +2552,17 @@ export interface ResidentialSurvey {
       sourceReference: string;
     }>;
     unheatedSpaces?: Array<{ id: string; description: string }>;
+    /** Rooflights with a BCRG quality declaration (ISSO 82.1 p. 68): A_rc and U_rc. */
+    rooflights?: Array<{
+      id: string;
+      surfaceId: string;
+      areaM2: number;
+      uValue: number;
+      glass: OpnameGlass;
+      qualityDeclarationReference: string;
+    }>;
+    /** Caravan or houseboat (ISSO 82.1 p. 49; NTA tables I.5–I.7); absent: regular. */
+    buildingKind?: { kind: 'regular' | 'caravan' } | { kind: 'floating'; newBerthSince2018: boolean } | null;
   };
   heating: {
     generator: OpnameHeatingGenerator;
@@ -2738,6 +2750,10 @@ export interface UtilitySurvey {
       ductsOutsideThermalZone?: boolean | null;
       ductLength?: 'at_most20_m' | 'from20_to40_m' | 'at_least40_m' | null;
       ductsInsulated?: boolean | null;
+      /** p. 149: reheating coil; null: not determinable (not connected). */
+      heatingConnected?: boolean | null;
+      /** p. 149: cooling coil; requires a cooling system. */
+      coolingConnected?: boolean | null;
     } | null;
     recirculation?: 'none' | 'present_percent_unknown' | 'unknown' | null;
     recirculationPercent?: number | null;
@@ -2777,8 +2793,12 @@ export interface UtilitySurvey {
     nominalPowerKw?: number | null;
     /** NTA 13.8.2 further generators with the utility generator types. */
     additionalGenerators?: Array<{ generator: UtilitySurvey['hotWater']['generator']; nominalPowerKw?: number | null }>;
+    /** Areas served by an additional system (13.20a); ignored on the main system. */
+    servedAreas?: UtilitySurvey['functions'];
     sourceReference: string;
   };
+  /** Further hot-water systems, each with its served areas; the main system serves the rest. */
+  additionalHotWaterSystems?: Array<UtilitySurvey['hotWater']>;
   lighting: Array<{
     id: string;
     areaM2: number;

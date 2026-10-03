@@ -57,6 +57,12 @@ pub enum SurfaceBoundary {
     },
     /// Adjacent heated space or other dwelling: no transmission (8.5).
     AdjacentHeated,
+    /// Adjacent unheated sunroom (AOS): as outdoor air in the basic survey
+    /// (ISSO 82.1 §6.3.4 p. 41; 75.1 idem).
+    Sunroom,
+    /// Water under a houseboat: the hull counts as towards outdoor air
+    /// (NTA C.2 note 2), with the floating-hull forfait (table I.7).
+    Water,
     /// Strongly ventilated space, such as a garage (NTA 3.134, 6.3; ISSO
     /// 82.1 §6.3.4 p. 41 with WD 2025 p. 22–24): losses as towards outdoor air,
     /// without solar gains on the parts facing it.
@@ -312,6 +318,30 @@ pub struct SurveyEnvelope {
     pub panels: Vec<SurveyPanel>,
     #[serde(default)]
     pub unheated_spaces: Vec<SurveyUnheatedSpace>,
+    /// Rooflights and roof domes with a controlled BCRG quality declaration
+    /// (ISSO 82.1 p. 68): A_rc and U_rc from the declaration. Without one,
+    /// enter them as windows or panels.
+    #[serde(default)]
+    pub rooflights: Vec<SurveyRooflight>,
+    /// Caravan or houseboat (ISSO 82.1 §7.1.1.1 p. 49; NTA tables I.5–I.7);
+    /// absent for a regular building.
+    #[serde(default)]
+    pub building_kind: Option<BuildingKind>,
+}
+
+/// A rooflight or roof dome with a quality declaration (ISSO 82.1 p. 68).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyRooflight {
+    pub id: String,
+    pub surface_id: String,
+    /// A_rc from the declaration, m².
+    pub area_m2: f64,
+    /// U_rc from the declaration, W/(m²·K).
+    pub u_value: f64,
+    /// Glazing of the light-transmitting part, for g (table 8.15).
+    pub glass: GlassAnswer,
+    pub quality_declaration_reference: String,
 }
 
 pub fn frame_group(frame: FrameAnswer, recorder: &mut Recorder, path: &str) -> FrameGroup {
@@ -524,10 +554,14 @@ fn thatch_rc(
 ///   R_si 0,10 (upward heat flow): `AtticFloor`.
 fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
     match (surface.element, &surface.boundary) {
+        (SurfaceElement::Floor, SurfaceBoundary::Water) => (ElementType::FloatingHull, None),
         (SurfaceElement::Facade, _) => (ElementType::Facade, None),
-        (SurfaceElement::Floor, SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated) => {
-            (ElementType::Roof, Some(0.17))
-        }
+        (
+            SurfaceElement::Floor,
+            SurfaceBoundary::Outdoor
+            | SurfaceBoundary::StronglyVentilated
+            | SurfaceBoundary::Sunroom,
+        ) => (ElementType::Roof, Some(0.17)),
         (SurfaceElement::Floor, _) => (ElementType::Floor, None),
         (SurfaceElement::Roof, SurfaceBoundary::UnheatedSpace { .. }) => {
             (ElementType::AtticFloor, None)
@@ -561,6 +595,38 @@ pub fn derive_envelope_with_cooling(
     let mut floor_above_crawlspace = false;
     let mut crawl_floors: Vec<usize> = Vec::new();
     let mut facade_parts: Vec<(f64, f64)> = Vec::new();
+    let building = envelope.building_kind.unwrap_or(BuildingKind::Regular);
+    // ISSO 82.1 §6.3.4 (p. 41): a sunroom (AOS) counts as outdoor air;
+    // water under a houseboat counts as outdoor air for the hull (NTA C.2).
+    for (index, surface) in envelope.surfaces.iter().enumerate() {
+        let path = format!("envelope.surfaces[{index}].boundary");
+        match surface.boundary {
+            SurfaceBoundary::Sunroom => {
+                recorder.record(
+                    "sunroom_as_outdoor",
+                    &path,
+                    "outdoor air (basisopname)".into(),
+                    "ISSO 82.1 §6.3.4 p. 41",
+                );
+            }
+            SurfaceBoundary::Water
+                if !matches!(building, BuildingKind::Floating { .. })
+                    || surface.element != SurfaceElement::Floor =>
+            {
+                recorder.issue("water_boundary_requires_houseboat_floor", path);
+            }
+            _ => {}
+        }
+    }
+    let exterior_boundary = |boundary: &SurfaceBoundary| {
+        matches!(
+            boundary,
+            SurfaceBoundary::Outdoor
+                | SurfaceBoundary::StronglyVentilated
+                | SurfaceBoundary::Sunroom
+                | SurfaceBoundary::Water
+        )
+    };
 
     for (index, surface) in envelope.surfaces.iter().enumerate() {
         let path = format!("envelope.surfaces[{index}]");
@@ -568,11 +634,11 @@ pub fn derive_envelope_with_cooling(
             recorder.issue("surface_area_invalid", format!("{path}.grossAreaM2"));
             continue;
         }
-        let exterior = matches!(
+        let exterior = exterior_boundary(&surface.boundary);
+        let solar = matches!(
             surface.boundary,
-            SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated
+            SurfaceBoundary::Outdoor | SurfaceBoundary::Sunroom
         );
-        let solar = matches!(surface.boundary, SurfaceBoundary::Outdoor);
         let orientation = match (surface.orientation, surface.element) {
             (Some(orientation), _) => orientation,
             (None, SurfaceElement::Facade) => {
@@ -628,6 +694,53 @@ pub fn derive_envelope_with_cooling(
                     obstruction,
                     solar,
                     reference: window.source_reference.clone(),
+                },
+            );
+        }
+        for (r_index, rooflight) in envelope.rooflights.iter().enumerate() {
+            if rooflight.surface_id != surface.id {
+                continue;
+            }
+            let r_path = format!("envelope.rooflights[{r_index}]");
+            if surface.element != SurfaceElement::Roof {
+                recorder.issue("rooflight_requires_roof", format!("{r_path}.surfaceId"));
+                continue;
+            }
+            if !(rooflight.area_m2.is_finite() && rooflight.area_m2 > 0.0)
+                || !(rooflight.u_value.is_finite() && rooflight.u_value > 0.0)
+            {
+                recorder.issue("rooflight_values_invalid", r_path.clone());
+                continue;
+            }
+            if rooflight.quality_declaration_reference.trim().is_empty() {
+                recorder.issue(
+                    "rooflight_quality_declaration_required",
+                    format!("{r_path}.qualityDeclarationReference"),
+                );
+                continue;
+            }
+            openings_area += rooflight.area_m2;
+            recorder.record(
+                "rooflight_from_quality_declaration",
+                &r_path,
+                format!("A_rc {} m², U_rc {}", rooflight.area_m2, rooflight.u_value),
+                "ISSO 82.1 p. 68",
+            );
+            let row = glass_row(rooflight.glass, recorder, &r_path);
+            push_window_or_partition(
+                &mut windows,
+                &mut partitions,
+                surface,
+                WindowPart {
+                    id: rooflight.id.clone(),
+                    area: rooflight.area_m2,
+                    u: rooflight.u_value,
+                    g: glass_g(row),
+                    orientation,
+                    tilt,
+                    obstruction: obstruction(None),
+                    solar,
+                    reference: rooflight.quality_declaration_reference.clone(),
                 },
             );
         }
@@ -869,7 +982,7 @@ pub fn derive_envelope_with_cooling(
         };
         let forfait = ForfaitOpaque {
             element: if cellar { ElementType::Floor } else { element },
-            building: BuildingKind::Regular,
+            building,
             construction_year,
             insulation,
             // The flat 1,95 (= 0,15 + 1,8) has no cavity term.
@@ -1186,7 +1299,10 @@ fn push_window_or_partition(
     part: WindowPart,
 ) {
     match &surface.boundary {
-        SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated => windows.push(part),
+        SurfaceBoundary::Outdoor
+        | SurfaceBoundary::StronglyVentilated
+        | SurfaceBoundary::Sunroom
+        | SurfaceBoundary::Water => windows.push(part),
         SurfaceBoundary::UnheatedSpace { space_id } => {
             partitions.push((space_id.clone(), part.area, part.u, part.reference))
         }
@@ -1201,7 +1317,10 @@ fn push_opaque_or_partition(
     part: OpaquePart,
 ) {
     match &surface.boundary {
-        SurfaceBoundary::Outdoor | SurfaceBoundary::StronglyVentilated => opaque.push(part),
+        SurfaceBoundary::Outdoor
+        | SurfaceBoundary::StronglyVentilated
+        | SurfaceBoundary::Sunroom
+        | SurfaceBoundary::Water => opaque.push(part),
         SurfaceBoundary::UnheatedSpace { space_id } => {
             partitions.push((space_id.clone(), part.area, part.u, part.reference))
         }
@@ -1230,6 +1349,183 @@ mod tests {
             renovation: None,
             source_reference: "survey".into(),
         }
+    }
+
+    fn bare(surfaces: Vec<SurveySurface>) -> SurveyEnvelope {
+        SurveyEnvelope {
+            surfaces,
+            windows: Vec::new(),
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
+        }
+    }
+
+    #[test]
+    fn sunroom_counts_as_outdoor_air() {
+        let envelope = bare(vec![
+            surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+            surface("serre", SurfaceElement::Facade, SurfaceBoundary::Sunroom),
+        ]);
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1975, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "sunroom_as_outdoor"));
+        let u = |id: &str| {
+            derived
+                .direct_elements
+                .iter()
+                .find(|v| v["id"].as_str().unwrap().contains(id))
+                .unwrap()["uValueWPerM2k"]
+                .as_f64()
+                .unwrap()
+        };
+        assert_eq!(u("gevel"), u("serre"));
+        // Solar gains as on an outdoor façade.
+        assert!(derived
+            .opaque_elements
+            .iter()
+            .any(|v| v["id"].as_str().unwrap().contains("serre")));
+        assert!((super::super::loss_area(&envelope) - 80.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn houseboat_hull_takes_the_floating_forfait() {
+        let mut envelope = bare(vec![
+            surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+            surface("romp", SurfaceElement::Floor, SurfaceBoundary::Water),
+        ]);
+        // Without a houseboat the water boundary is rejected.
+        let mut recorder = Recorder::default();
+        derive_envelope(&envelope, 1990, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "water_boundary_requires_houseboat_floor"));
+        let kind = BuildingKind::Floating {
+            new_berth_since_2018: false,
+        };
+        envelope.building_kind = Some(kind);
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1990, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        let hull = derived
+            .direct_elements
+            .iter()
+            .find(|v| v["id"].as_str().unwrap().contains("romp"))
+            .unwrap();
+        let expected = ForfaitOpaque {
+            element: ElementType::FloatingHull,
+            building: kind,
+            construction_year: 1990,
+            insulation: InsulationState::AbsentOrUnknown,
+            cavity: true,
+            r_si_override: None,
+            towards_unheated_space: false,
+            renovation: None,
+        }
+        .calculate();
+        assert!(hull.is_object());
+        let rule = recorder
+            .applied
+            .iter()
+            .find(|item| {
+                item.rule == "opaque_rc_forfait_annex_i" && item.path == "envelope.surfaces[1]"
+            })
+            .unwrap();
+        assert!(
+            rule.value.starts_with(&format!("R_c {:.2}", expected.r_c)),
+            "{}",
+            rule.value
+        );
+        assert!(derived.ground_floors.is_empty());
+    }
+
+    #[test]
+    fn rooflight_with_quality_declaration_uses_a_rc_and_u_rc() {
+        let mut envelope = bare(vec![
+            surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+            surface("dak", SurfaceElement::Roof, SurfaceBoundary::Outdoor),
+        ]);
+        envelope.rooflights.push(SurveyRooflight {
+            id: "lichtkoepel".into(),
+            surface_id: "dak".into(),
+            area_m2: 1.5,
+            u_value: 2.4,
+            glass: GlassAnswer::Double,
+            quality_declaration_reference: "BCRG-123".into(),
+        });
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1990, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        let dome = derived
+            .direct_elements
+            .iter()
+            .find(|v| v["id"] == "lichtkoepel")
+            .unwrap();
+        // U_rc plus the forfait ΔU for thermal bridges, as for windows.
+        let u = dome["uValueWPerM2k"].as_f64().unwrap();
+        assert!(u > 2.4 && u < 2.6, "{u}");
+        assert!(derived.windows.iter().any(|v| v["id"] == "lichtkoepel"));
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "rooflight_from_quality_declaration"));
+        // Without a declaration, or on a façade, it is rejected.
+        envelope.rooflights[0].quality_declaration_reference = " ".into();
+        let mut recorder = Recorder::default();
+        derive_envelope(&envelope, 1990, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "rooflight_quality_declaration_required"));
+        envelope.rooflights[0].surface_id = "gevel".into();
+        let mut recorder = Recorder::default();
+        derive_envelope(&envelope, 1990, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "rooflight_requires_roof"));
+    }
+
+    #[test]
+    fn caravan_walls_take_the_caravan_forfait() {
+        let mut envelope = bare(vec![surface(
+            "wand",
+            SurfaceElement::Facade,
+            SurfaceBoundary::Outdoor,
+        )]);
+        envelope.building_kind = Some(BuildingKind::Caravan);
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1985, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        let expected = ForfaitOpaque {
+            element: ElementType::Facade,
+            building: BuildingKind::Caravan,
+            construction_year: 1985,
+            insulation: InsulationState::AbsentOrUnknown,
+            cavity: true,
+            r_si_override: None,
+            towards_unheated_space: false,
+            renovation: None,
+        }
+        .calculate();
+        assert_eq!(derived.direct_elements.len(), 1);
+        let rule = recorder
+            .applied
+            .iter()
+            .find(|item| item.rule == "opaque_rc_forfait_annex_i")
+            .unwrap();
+        assert!(
+            rule.value.starts_with(&format!("R_c {:.2}", expected.r_c)),
+            "{}",
+            rule.value
+        );
     }
 
     #[test]
@@ -1311,6 +1607,8 @@ mod tests {
                 id: "garage".into(),
                 description: "garage".into(),
             }],
+            rooflights: Vec::new(),
+            building_kind: None,
         };
         let derived = derive_envelope(&envelope, 1975, &mut recorder);
         assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
@@ -1361,6 +1659,8 @@ mod tests {
             doors: Vec::new(),
             panels: Vec::new(),
             unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
         };
         let run = |shading, element, cooling| {
             let mut recorder = Recorder::default();
@@ -1468,6 +1768,8 @@ mod tests {
             doors: Vec::new(),
             panels: Vec::new(),
             unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
         };
         let mut recorder = Recorder::default();
         let derived = derive_envelope(&envelope, 1975, &mut recorder);
@@ -1517,6 +1819,8 @@ mod tests {
             doors: Vec::new(),
             panels: Vec::new(),
             unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
         };
         let mut recorder = Recorder::default();
         let derived = derive_envelope(&envelope, 1985, &mut recorder);
@@ -1540,6 +1844,8 @@ mod tests {
                 doors: Vec::new(),
                 panels: Vec::new(),
                 unheated_spaces: Vec::new(),
+                rooflights: Vec::new(),
+                building_kind: None,
             },
             1985,
             &mut recorder,
@@ -1562,6 +1868,8 @@ mod tests {
             doors: Vec::new(),
             panels: Vec::new(),
             unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
         };
         let derived = derive_envelope(&envelope, 1975, &mut recorder);
         assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
@@ -1614,6 +1922,8 @@ mod tests {
             doors: Vec::new(),
             panels: Vec::new(),
             unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
         };
         let derived = derive_envelope(&envelope, 1970, &mut recorder);
         assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);

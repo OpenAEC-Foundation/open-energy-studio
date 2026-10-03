@@ -285,6 +285,14 @@ pub struct SurveyAhu {
     /// R ≥ 1,0 m²K/W; `None` unknown (table 11.14).
     #[serde(default)]
     pub ducts_insulated: Option<bool>,
+    /// p. 149: heating connected to the AHU (reheating coil, NTA 11.118–
+    /// 11.121); `None` unknown.
+    #[serde(default)]
+    pub heating_connected: Option<bool>,
+    /// p. 149: cooling connected to the AHU (cooling coil, NTA 11.114–
+    /// 11.117); `None` unknown.
+    #[serde(default)]
+    pub cooling_connected: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1732,9 +1740,37 @@ fn ventilation_value(
                 }
             }
         };
+        // p. 149: heating and cooling connected to the AHU become the
+        // reheating and cooling coils of NTA table 11.15.
+        let heating_coil = ahu.heating_connected.unwrap_or_else(|| {
+            recorder.record(
+                "ahu_heating_unknown_none",
+                "ventilation.ahu.heatingConnected",
+                "no reheating coil (interpretation: not determinable is not connected)".into(),
+                "ISSO 75.1 p. 149",
+            );
+            false
+        });
+        let cooling_coil = ahu.cooling_connected.unwrap_or_else(|| {
+            recorder.record(
+                "ahu_cooling_unknown_none",
+                "ventilation.ahu.coolingConnected",
+                "no cooling coil (interpretation: not determinable is not connected)".into(),
+                "ISSO 75.1 p. 149",
+            );
+            false
+        });
+        if cooling_coil && survey.cooling.is_none() {
+            recorder.issue(
+                "ahu_cooling_requires_cooling_system",
+                "ventilation.ahu.coolingConnected",
+            );
+        }
         unit["airHandlingUnit"] = json!({
             "insideThermalZone": inside,
             "supplyDuctsOutside": situation,
+            "heatingCoil": heating_coil,
+            "coolingCoil": cooling_coil,
         });
     }
     // Tables 11.7/11.8 (p. 148–149).
@@ -2460,7 +2496,7 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         if served.is_empty() {
             recorder.issue(
                 "hot_water_served_areas_required",
-                &format!("additionalHotWaterSystems[{index}].servedAreas"),
+                format!("additionalHotWaterSystems[{index}].servedAreas"),
             );
             continue;
         }
@@ -2803,9 +2839,13 @@ mod tests {
         survey.additional_hot_water_systems = vec![extra];
         let result = assess_utility_survey(&survey);
         assert_eq!(
-            result.status, "calculated_unverified",
+            result.status,
+            "calculated_unverified",
             "{:?}",
-            (&result.issues, result.performance.as_ref().map(|item| &item.issues))
+            (
+                &result.issues,
+                result.performance.as_ref().map(|item| &item.issues)
+            )
         );
         let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
         let extras = input["additionalHotWaterSystems"].as_array().unwrap();
@@ -3448,6 +3488,37 @@ mod tests {
     }
 
     #[test]
+    fn ahu_heating_and_cooling_become_coils() {
+        let (input, recorder) = derive(&fixture("1970"));
+        let ahu =
+            &input["spaceHeating"]["demand"]["ventilation"]["system"]["unit"]["airHandlingUnit"];
+        assert_eq!(ahu["heatingCoil"], false);
+        assert_eq!(ahu["coolingCoil"], false);
+        assert!(applied(&recorder, "ahu_heating_unknown_none"));
+        let mut survey = fixture("1970");
+        let unit = survey.ventilation.ahu.as_mut().unwrap();
+        unit.heating_connected = Some(true);
+        unit.cooling_connected = Some(true);
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let chain = &result.performance.as_ref().unwrap().space_heating;
+        assert!(chain.monthly[0].ahu_heating_load_kwh > 0.0);
+        // Cooling connected without a cooling system is rejected.
+        let mut dry = survey.clone();
+        dry.cooling = None;
+        let mut recorder = Recorder::default();
+        assert!(derive_utility_input(&dry, &mut recorder).is_none());
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "ahu_cooling_requires_cooling_system"));
+    }
+
+    #[test]
     fn ahu_ducts_follow_table_11_14() {
         let (input, recorder) = derive(&fixture("1970"));
         let ahu =
@@ -3463,6 +3534,8 @@ mod tests {
             ducts_outside_thermal_zone: Some(true),
             duct_length: Some(DuctLengthAnswer::AtMost20M),
             ducts_insulated: Some(true),
+            heating_connected: None,
+            cooling_connected: None,
         });
         let (input, recorder) = derive(&survey);
         let ahu =

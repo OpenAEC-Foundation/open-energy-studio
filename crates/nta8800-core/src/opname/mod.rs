@@ -9,9 +9,11 @@
 //! ISSO page for the dossier. ISSO prose is not reproduced; values are
 //! transcribed and cited.
 //!
-//! Not covered (rejected with a code or reported as a warning): sunrooms
-//! (AOS), detail-survey (detailopname) routes and quality declarations
-//! other than a measured q_v10.
+//! Sunrooms (AOS) count as outdoor air (ISSO 82.1 §6.3.4); caravans and
+//! houseboats take the forfaits of NTA tables I.5–I.7 and light mass
+//! (p. 61). Quality declarations: a measured q_v10 and rooflights with a
+//! BCRG declaration (p. 68). Not covered: detail-survey (detailopname)
+//! routes.
 
 pub mod envelope;
 pub mod general;
@@ -335,6 +337,8 @@ pub(crate) fn loss_area(envelope: &SurveyEnvelope) -> f64 {
             let weight = match surface.boundary {
                 SurfaceBoundary::Outdoor
                 | SurfaceBoundary::StronglyVentilated
+                | SurfaceBoundary::Sunroom
+                | SurfaceBoundary::Water
                 | SurfaceBoundary::UnheatedSpace { .. } => 1.0,
                 SurfaceBoundary::Ground
                 | SurfaceBoundary::Crawlspace
@@ -403,7 +407,24 @@ pub fn derive_residential_input(
     let dwelling_kind = survey.dwelling.kind();
     let airtightness = general::airtightness_type(&survey.dwelling, recorder);
     let infiltration_year = general::infiltration_year(year, survey.renovation.as_ref(), recorder);
-    let (floor, wall, ceiling) = general::thermal_mass(&survey.construction);
+    let (mut floor, mut wall, ceiling) = general::thermal_mass(&survey.construction);
+    // p. 61: houseboats and caravans count as light floor and light wall.
+    if survey
+        .envelope
+        .building_kind
+        .is_some_and(|kind| !matches!(kind, crate::forfait_envelope::BuildingKind::Regular))
+        && (floor != crate::monthly_demand::MassClass::Light
+            || wall != crate::monthly_demand::MassClass::Light)
+    {
+        recorder.record(
+            "houseboat_caravan_light_mass",
+            "construction",
+            "light floor, light wall".into(),
+            "ISSO 82.1 p. 61",
+        );
+        floor = crate::monthly_demand::MassClass::Light;
+        wall = crate::monthly_demand::MassClass::Light;
+    }
     // Table 8.24/8.25: the shading rows depend on cooling in the zone.
     let envelope = envelope::derive_envelope_with_cooling(
         &survey.envelope,
@@ -707,6 +728,28 @@ mod tests {
         let codes: Vec<_> = result.issues.iter().map(|item| item.code).collect();
         assert!(codes.contains(&"tap_length_required"));
         assert!(codes.contains(&"cooling_system_data_required"));
+    }
+
+    #[test]
+    fn caravans_and_houseboats_have_light_floors_and_walls() {
+        let mut survey = fixture("1930");
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let regular = input["spaceHeating"]["demand"]["thermalMass"].clone();
+        survey.envelope.building_kind = Some(crate::forfait_envelope::BuildingKind::Caravan);
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).unwrap();
+        let mass = &input["spaceHeating"]["demand"]["thermalMass"];
+        assert_eq!(mass["floor"], "light");
+        assert_eq!(mass["wall"], "light");
+        assert_eq!(mass["ceiling"], regular["ceiling"]);
+        assert_eq!(
+            regular["floor"] != "light" || regular["wall"] != "light",
+            recorder
+                .applied
+                .iter()
+                .any(|item| item.rule == "houseboat_caravan_light_mass")
+        );
     }
 
     #[test]

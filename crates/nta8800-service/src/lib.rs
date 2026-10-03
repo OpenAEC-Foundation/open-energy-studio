@@ -1446,8 +1446,11 @@ mod tests {
         ]);
         let (status, result) =
             post_json("/v1/nta8800/opname/utility", json!({ "survey": mixed })).await;
-        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(result["issues"][0]["code"], "mixed_functions_require_zones");
+        // ISSO 75.1 p. 39–40: functions above 25 % stay apart in a mixed
+        // calculation zone (NTA §6.5.3).
+        assert_eq!(status, StatusCode::OK, "{result}");
+        let areas = &result["derivedInput"]["spaceHeating"]["demand"]["functionAreas"];
+        assert_eq!(areas.as_array().map(Vec::len), Some(2), "{areas}");
     }
 
     #[tokio::test]
