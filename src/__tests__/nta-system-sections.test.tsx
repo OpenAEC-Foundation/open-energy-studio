@@ -179,6 +179,8 @@ describe('NTA system sections', () => {
     await user.selectOptions(screen.getByLabelText('Connection factor f_sto;dis;ls (§13.6.3)'), '2');
     await user.selectOptions(screen.getByLabelText('Storage loss'), 'measured_standby');
     await user.type(screen.getByLabelText('Standby loss Q_stb;ls;ref, kWh per 24 h'), '1.2');
+    await user.type(screen.getByLabelText('Test storage temperature ϑ_sto;set;ref, °C'), '65');
+    await user.type(screen.getByLabelText('Test ambient temperature ϑ_amb;ref, °C'), '20');
     await user.click(screen.getByLabelText('Placed in a heated zone'));
     await user.type(screen.getByLabelText('Ambient temperature of the unheated space, °C (empty: 13 °C)'), '10');
     await user.click(screen.getByLabelText('Appliance tested without this vessel (note 1 of §13.6.2)'));

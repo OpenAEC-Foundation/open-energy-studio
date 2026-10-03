@@ -143,7 +143,7 @@ export function hotWaterStorageTemplate(index = 0): Block {
 export function storageLossTemplate(method: string): Block {
   if (method === 'label') return { method, label: 'c' };
   if (method === 'measured') return { method, transmissionWPerK: null };
-  if (method === 'measured_standby') return { method, standbyKwhPerDay: null, referenceStorageC: 65, referenceAmbientC: 20 };
+  if (method === 'measured_standby') return { method, standbyKwhPerDay: null, referenceStorageC: null, referenceAmbientC: null };
   return { method: 'unknown_label', producedFrom2018: false };
 }
 
