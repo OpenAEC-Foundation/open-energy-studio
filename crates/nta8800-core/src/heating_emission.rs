@@ -57,6 +57,93 @@ pub struct EmissionInput {
     /// required for fan-assisted radiators or convectors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fans: Option<EmissionFans>,
+    /// 9.23 with tables 9.12/9.13: fans and controls of direct-fired or
+    /// indirect air heaters in the zone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub air_heaters: Option<AirHeaterAuxiliary>,
+}
+
+/// Table 9.12 (direct-fired) or 9.13 (indirect) air heater type; unknown
+/// properties take the highest value of the category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AirHeaterKind {
+    /// Table 9.12: direct-fired air heater in the work space.
+    Direct {
+        #[serde(default, rename = "radialFan")]
+        radial_fan: Option<bool>,
+    },
+    /// Table 9.13: indirect air heater on a central generator.
+    Indirect {
+        #[serde(default, rename = "roomHeightAbove8M")]
+        room_height_above_8_m: Option<bool>,
+        #[serde(default, rename = "warmAirReturn")]
+        warm_air_return: Option<bool>,
+        #[serde(default, rename = "ecMotor")]
+        ec_motor: Option<bool>,
+    },
+}
+
+impl AirHeaterKind {
+    /// P_H,aux = factor · Q_h;b / n_H,aux (tables 9.12/9.13).
+    pub fn factor(self) -> f64 {
+        match self {
+            Self::Direct { radial_fan } => match radial_fan {
+                Some(false) => 0.014,
+                _ => 0.022,
+            },
+            Self::Indirect {
+                room_height_above_8_m,
+                warm_air_return,
+                ec_motor,
+            } => {
+                let cell = |high: bool, ret: bool, ec: bool| match (high, ret, ec) {
+                    (false, true, false) => 0.008,
+                    (false, true, true) => 0.004,
+                    (false, false, false) => 0.009,
+                    (false, false, true) => 0.005,
+                    (true, true, false) => 0.012,
+                    (true, true, true) => 0.006,
+                    (true, false, false) => 0.013,
+                    (true, false, true) => 0.007,
+                };
+                let options = |value: Option<bool>| match value {
+                    Some(value) => vec![value],
+                    None => vec![false, true],
+                };
+                let mut highest: f64 = 0.0;
+                for high in options(room_height_above_8_m) {
+                    for ret in options(warm_air_return) {
+                        for ec in options(ec_motor) {
+                            highest = highest.max(cell(high, ret, ec));
+                        }
+                    }
+                }
+                highest
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AirHeaterAuxiliary {
+    pub kind: AirHeaterKind,
+    /// Q_h;b per EN 12831-1, W; absent means the table 9.12 estimate.
+    #[serde(default)]
+    pub design_heat_load_w: Option<f64>,
+    pub source_reference: String,
+}
+
+/// Table 9.12 estimate of Q_h;b: Q_H;ht of January over t_jan scaled from
+/// 21 °C to −10 °C, plus (√A_g·4·3 + A_g)·5 W for heating up.
+pub fn estimated_design_heat_load_w(january_heat_transfer_kwh: f64, area_m2: f64) -> f64 {
+    let january_outdoor = crate::climate::OUTDOOR_TEMPERATURE_C[0];
+    let hours = crate::climate::MONTH_HOURS[0];
+    let transmission =
+        january_heat_transfer_kwh / (0.001 * hours) * (21.0 - (-10.0)) / (21.0 - january_outdoor);
+    let heating_up = (area_m2.max(0.0).sqrt() * 4.0 * 3.0 + area_m2) * 5.0;
+    transmission + heating_up
 }
 
 /// Table 9.11 decisive property of the room fans.
@@ -179,6 +266,7 @@ mod tests {
             control,
             source_reference: "test".into(),
             fans: None,
+            air_heaters: None,
         }
     }
 

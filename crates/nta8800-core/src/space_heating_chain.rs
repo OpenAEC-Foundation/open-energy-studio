@@ -1083,7 +1083,7 @@ struct ZoneTerms {
     /// Declared or zero loss; `None` for the calculated route.
     fixed_loss: Option<[f64; 12]>,
     heating_limit_extra: [f64; 12],
-    /// Σ P_fan·n_fan of 9.22, W.
+    /// Σ P_fan·n_fan of 9.22 plus factor·Q_h;b of 9.23 (air heaters), W.
     fan_power_w: f64,
     /// θ_int;op;H = θ_int;calc;H (7.9.6) per month, °C.
     operative_c: [f64; 12],
@@ -1116,6 +1116,24 @@ fn zone_terms(
             "emission_balancing_inconsistent",
             format!("{prefix}emission.balancing"),
         ));
+    }
+    // 9.23: air heater auxiliary energy (tables 9.12/9.13).
+    if let Some(heaters) = &emission.air_heaters {
+        if heaters
+            .design_heat_load_w
+            .is_some_and(|value| !value.is_finite() || value <= 0.0)
+        {
+            issues.push(issue(
+                "air_heater_design_load_invalid",
+                format!("{prefix}emission.airHeaters.designHeatLoadW"),
+            ));
+        }
+        if heaters.source_reference.trim().is_empty() {
+            issues.push(issue(
+                "source_reference_required",
+                format!("{prefix}emission.airHeaters.sourceReference"),
+            ));
+        }
     }
     // 9.21/9.22: room fans need their count and type (table 9.11).
     match &emission.fans {
@@ -1257,7 +1275,20 @@ fn zone_terms(
         fan_power_w: emission
             .fans
             .as_ref()
-            .map_or(0.0, |fans| fans.power_w() * f64::from(fans.count)),
+            .map_or(0.0, |fans| fans.power_w() * f64::from(fans.count))
+            + emission.air_heaters.as_ref().map_or(0.0, |heaters| {
+                // 9.23: Σ P_H,aux·n_H,aux = factor·Q_h;b.
+                let design = heaters.design_heat_load_w.unwrap_or_else(|| {
+                    crate::heating_emission::estimated_design_heat_load_w(
+                        demand
+                            .monthly
+                            .first()
+                            .map_or(0.0, |row| row.heating.heat_transfer_kwh),
+                        demand_input.usable_floor_area_m2,
+                    )
+                });
+                heaters.kind.factor() * design
+            }),
     })
 }
 
@@ -4518,6 +4549,57 @@ mod tests {
             assert_eq!(row.distribution_loss_kwh, 10.0);
             assert!((row.generator_output_kwh - (row.emission_input_kwh + 10.0)).abs() < 1e-9);
         }
+    }
+
+    #[test]
+    fn air_heater_auxiliary_follows_9_23() {
+        use crate::heating_emission::{AirHeaterAuxiliary, AirHeaterKind};
+        // Table 9.12/9.13 factors; unknown properties take the highest.
+        assert_eq!(
+            AirHeaterKind::Direct {
+                radial_fan: Some(false)
+            }
+            .factor(),
+            0.014
+        );
+        assert_eq!(AirHeaterKind::Direct { radial_fan: None }.factor(), 0.022);
+        let indirect = AirHeaterKind::Indirect {
+            room_height_above_8_m: Some(false),
+            warm_air_return: Some(true),
+            ec_motor: Some(true),
+        };
+        assert_eq!(indirect.factor(), 0.004);
+        let unknown = AirHeaterKind::Indirect {
+            room_height_above_8_m: None,
+            warm_air_return: None,
+            ec_motor: None,
+        };
+        assert_eq!(unknown.factor(), 0.013);
+        // Q_h;b estimate: Q_H;ht(jan)/(0,001·744)·31/(21 − 2,61) + (√A·12 + A)·5.
+        let estimate = crate::heating_emission::estimated_design_heat_load_w(1000.0, 100.0);
+        let expected = 1000.0 / 0.744 * 31.0 / (21.0 - crate::climate::OUTDOOR_TEMPERATURE_C[0])
+            + (10.0 * 12.0 + 100.0) * 5.0;
+        assert!((estimate - expected).abs() < 1e-9);
+        // In the chain: W = 0,014·Q_h;b·t_H;op/1000 joins the auxiliary energy.
+        let mut input = boiler_chain();
+        input.emission.system = EmissionSystem::AirHeating;
+        input.emission.balancing = HydronicBalancing::NotApplicable;
+        input.emission.air_heaters = Some(AirHeaterAuxiliary {
+            kind: AirHeaterKind::Direct {
+                radial_fan: Some(false),
+            },
+            design_heat_load_w: Some(10_000.0),
+            source_reference: "EN 12831-1".into(),
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        let hours = jan.emission_fan_electricity_kwh * 1000.0 / (0.014 * 10_000.0);
+        assert!(hours > 0.0 && hours <= 744.0 + 1e-9);
     }
 
     #[test]
