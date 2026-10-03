@@ -1138,7 +1138,7 @@ export const nl: Record<string, string> = {
   'nta.performance.unverified': 'Onverifieerd',
   'nta.performance.incomplete': 'Invoer onvolledig. Vul het NTA-invoerblok aan:',
   'nta.performance.invalid': 'De rekenkern keurt de invoer af:',
-  'nta.performance.warnings': 'Berekend volgens de norm, maar controleer:',
+  'nta.performance.buildingWarnings': 'Berekend volgens de norm, maar controleer:',
   'nta.performance.indicators': 'Indicatoren',
   'nta.performance.beng1RequiresC1': 'vereist vast ventilatiesysteem C1 (§5.4)',
   'nta.performance.heatingNeed': 'Warmtebehoefte',

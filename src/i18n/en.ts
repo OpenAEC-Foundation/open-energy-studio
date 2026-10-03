@@ -1138,7 +1138,7 @@ export const en: Record<string, string> = {
   'nta.performance.unverified': 'Unverified',
   'nta.performance.incomplete': 'Input incomplete. Complete the NTA input block:',
   'nta.performance.invalid': 'The kernel rejects the input:',
-  'nta.performance.warnings': 'Calculated per the standard, but check:',
+  'nta.performance.buildingWarnings': 'Calculated per the standard, but check:',
   'nta.performance.indicators': 'Indicators',
   'nta.performance.beng1RequiresC1': 'requires fixed ventilation system C1 (§5.4)',
   'nta.performance.heatingNeed': 'Heating need',
