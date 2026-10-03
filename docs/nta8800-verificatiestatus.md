@@ -87,6 +87,11 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - daklichten (14.41, p. 673): de daglichtfactor maal 100, zodat hij in % is;
 - de maandverdeling van verlichting via t_mi/t_an;
 - W_t in de interne warmtelast van 7.28 is W_L + W_P (zie [maandbehoefte](nta8800-maandbehoefte.md)).
+- bijlage P, maandprofielen: P.74 (p. 1020) per perceeldeel zonder maandwaarden, ook voor een sorptiedeel met alleen een jaarwaarde; P.78 (p. 1022) telt alleen E_C;dc;mi, dus ontvochtiging zit wel in de jaarwaarde (P.77) en niet in het maandprofiel;
+- f_Pren;dc (5.49, §5.8.3.2, p. 129) wordt niet afgerond; alleen 5.42 en 5.50 schrijven afronding naar beneden op 0,01 voor;
+- P.70 (p. 1016): de formule noemt Q_CD;dis;tot;an, de legenda Q_XD;in;tot; de legenda wordt gevolgd;
+- P.27 zonder MAX(0): een WKK op biogas geeft een negatieve K_CO2;gen, met de waarschuwing `chp_co2_factor_negative`;
+- 12.2.1 (p. 521): "grote opwekkers (A_g > 500 m²)" toetst de bediende oppervlakte van de bevochtiger (`servedAreaM2`), anders de oppervlakte aan het verwarmingssysteem;
 - energie per energiefunctie (§5.5.3, 5.20): de eigen benutte opwekking (5.22) is naar rato van het elektriciteitsgebruik over de energiefuncties verdeeld; de norm bepaalt E_pr;EPus;el alleen per drager. Export (5.10/5.13), de opslagcorrectie (5.14a) en hernieuwbare elektriciteit (5.39a) blijven gebouwtermen;
 - tapwater uit een combitoestel of afleverset op het verwarmingstoestel (13.184/13.185, p. 653): het aandeel is E_W, zonder f_BACS (5.20a, p. 89); het hulpenergiegebruik van het toestel blijft bij verwarming;
 - opgegeven interne warmteproductie (`internalGains.method = declared`): tabel 7.2/7.3 (p. 179–180) en 7.21 (p. 177) zijn rekenwaarden zonder alternatief. Een afwijkende waarde geeft een waarschuwing en geen blokkade, omdat de opgegeven flux ook de termen van 7.28 en 7.29 kan bevatten. De gebruiksaanpassing van het maatwerkadvies (bijlage Z) wordt niet getoetst.
@@ -213,6 +218,14 @@ Alles kwam op ongeveer 1e-6 overeen, op één punt na. Vastgelegd of aangepast:
 - **Raam-id in bijlage AA (gecorrigeerd).** De afgeleide rekenzone noemt projectramen `window:<id>`; het projectraam-id werd niet gevonden. Beide schrijfwijzen worden nu herkend. Een afgewezen bewijs voor actieve koeling (bijvoorbeeld `annex_aa_window_unknown`) staat nu als gat in de projectuitkomst, met de rekenzone in `detail`.
 - **Zonwering als bewijs (methode 3, tweede situatie).** Dit was alleen een verklaring. Nu toetst de kern de raamgegevens: meer dan 95 % van het beoordeelde glasoppervlak (oriëntatie 45°–315° en horizontaal) moet niet-beweegbare lamellen van tabel 7.4a/7.4b hebben, `g_gl ≤ 0,4` (7.40/7.41/7.41a/7.41b, juli, koeling) of `F_sh;obst;juli < 0,67`. Anders `solar_limitation_not_met`; een onvolledige raaminventaris geeft `window_inventory_incomplete`. Beweegbare zonwering telt niet mee: tabel 7.4a/7.4b gaan over niet-beweegbare zonwering.
 - **`ventilation.months[].conductanceWPerK`.** Dit is ρ·c·Σq zonder b_v; de toevoertemperaturen dragen b_v. Het is dus niet de H_ve van 7.19 (bij D met WTW 68,8 tegen 32,1 W/K). Nieuw veld `weightedConductanceWPerK` geeft H_ve volgens 7.19/7.20. Het paneel en het rapport tonen nu die waarde.
+
+**Herberekening van hoofdstuk 12 en bijlage P, 3 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's. Bevochtiging (12.1–12.5, tabellen 12.1/12.2), een warmtenet met warmtepomp, WKK en ketel (P.13–P.18 leidingdelen, P.25 cascade, P.26–P.30, P.56–P.60, P.72–P.83) en een koudenet (P.51–P.55, P.66–P.70) kwamen op ongeveer 1e-12 overeen. Vastgelegd of aangepast:
+- **P.78: ontvochtiging met alleen een jaarwaarde (gecorrigeerd).** De kern liet dan het hele maandprofiel van het koudenet vallen, zodat P.68 `monthly_cold_delivery_required` gaf en de standby van P.69 alle maanden liep. P.78 (p. 1022) telt alleen E_C;dc;mi; ontvochtiging telt nu alleen in de jaarwaarde (P.77).
+- **P.73/P.74: één deel met alleen een jaarwaarde (gecorrigeerd).** Een sorptiedeel met alleen een jaarwaarde verving de maandwaarden van alle percelen door het profiel van P.74. Nu krijgt alleen dat deel P.74; de opgegeven maanden blijven.
+- **f_Pren;dc (gewijzigd).** §5.8.3.2 (p. 129) schrijft bij 5.49 geen afronding voor, anders dan 5.42 en 5.50. De kern rondde naar beneden af; nu niet meer.
+- **`-0,0` in de uitvoer (gecorrigeerd).** Een primaire factor 0 kwam als `-0.0` uit de afronding naar boven; nu 0.
+- **Nieuwe meldingen:** `chp_co2_factor_negative` (P.27 met biogas), `cold_network_gain_outside_cooling_months` (leidingen van een koudenet die warmte winnen in maanden zonder koudelevering) en `humidifier_zone_duplicate` (§12.1: één systeem per rekenzone, blokkerend).
+- **Nieuwe invoer:** `sourcePumpIncluded` bij een opgegeven warmtepomprendement (P.6.8.4.3, p. 1009: 0 W/kW als de bronpomp in het rendement zit) en `servedAreaM2` bij een bevochtiger (12.2.1).
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 

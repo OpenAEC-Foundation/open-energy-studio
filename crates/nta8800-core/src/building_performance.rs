@@ -3119,6 +3119,19 @@ pub fn assess_building_performance(
     let hot_water_from_heating = hot_water_from_heating(&main_heating);
     let mut warnings = result_warnings(input, &heating, cooling.as_ref(), hot_water.as_ref());
     let mut external = resolve_external(input, &mut issues);
+    // Annex P warnings (P.27 with a renewable fuel, cold-network gains).
+    warnings.extend(
+        [
+            &external.heating,
+            &external.hot_water,
+            &external.cooling,
+            &external.heat_pump_source,
+        ]
+        .into_iter()
+        .flatten()
+        .flat_map(|result| &result.warnings)
+        .map(|item| issue(item.code, item.path.clone())),
+    );
     let mut forfait_totals = None;
     if issues.is_empty() {
         totals = Some(compute(

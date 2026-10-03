@@ -65,6 +65,11 @@ pub fn kernel_interpretations() -> Vec<InterpretationGroup> {
             crate::ventilation::INTERPRETATIONS,
         ),
         group(
+            "hoofdstuk 12",
+            "humidification",
+            crate::humidification::INTERPRETATIONS,
+        ),
+        group(
             "hoofdstuk 13, zonneboilers",
             "solar_thermal",
             crate::solar_thermal::INTERPRETATIONS,
@@ -72,6 +77,7 @@ pub fn kernel_interpretations() -> Vec<InterpretationGroup> {
         group("hoofdstuk 14", "lighting", crate::lighting::INTERPRETATIONS),
         group("hoofdstuk 16", "pv", crate::pv::INTERPRETATIONS),
         group("bijlage N", "annex_n", crate::annex_n::INTERPRETATIONS),
+        group("bijlage P", "annex_p", crate::annex_p::INTERPRETATIONS),
         group("bijlage Q", "annex_q", crate::annex_q::INTERPRETATIONS),
         group(
             "maatwerkadvies",

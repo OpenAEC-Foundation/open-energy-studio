@@ -14,6 +14,12 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Chapter 12 readings where the printed norm is not explicit.
+pub const INTERPRETATIONS: &[&str] = &[
+    "§12.1 (p. 520) assumes one humidification system per calculation zone; a second humidifier on the same zone is refused (humidifier_zone_duplicate)",
+    "12.2.1 (p. 521) sets the recoverable loss to 0 for \"grote opwekkers (A_g > 500 m²)\"; the served area of the humidification generator is used when given (servedAreaM2), otherwise the area connected to the space-heating system, as for 9.2.5.1",
+];
+
 /// h_we at 20 °C, kJ/kg.
 pub const LATENT_HEAT_KJ_PER_KG: f64 = 2538.2;
 /// ρ_a, kg/m³.

@@ -578,6 +578,8 @@ export interface NtaZoneHumidifier {
     rotaryWheel: boolean;
     equipmentReference: string;
   };
+  /** 12.2.1 (p. 521): A_g served by the humidification generator for the 500 m² limit; absent: the heating-system area. */
+  servedAreaM2?: number | null;
 }
 
 /** 7.30b adjacent unheated sunroom (AOS). */
@@ -3042,7 +3044,8 @@ export type NtaTableP5Source =
   | 'electric_source_at_least40_c' | 'gas_ground_or_outdoor_air' | 'gas_groundwater' | 'gas_surface_water';
 
 export type NtaHeatPumpEfficiency =
-  | { method: 'declared'; value: number; sourceReference: string }
+  /** `sourcePumpIncluded`: P.6.8.4.3 (p. 1009), the source pump or fan is part of the declared efficiency (0 W/kW). */
+  | { method: 'declared'; value: number; sourceReference: string; sourcePumpIncluded?: boolean }
   | { method: 'table_p5'; source: NtaTableP5Source; supplyTemperatureC: number };
 
 export type NtaTemperatureLevel = 'low' | 'high';

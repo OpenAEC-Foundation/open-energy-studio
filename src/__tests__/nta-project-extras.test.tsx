@@ -66,6 +66,18 @@ describe('NTA project input forms', () => {
     await user.type(screen.getAllByRole('spinbutton', { name: 'Priority (1 first)' })[1], '1');
     await user.click(screen.getByRole('checkbox', { name: 'Calculate the auxiliary energy (P.56–P.70)' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Network' }), 'secondary');
+    // P.6.8.4.3: a declared efficiency that includes the source pump.
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Heat-pump efficiency' })[0], 'declared');
+    await user.type(screen.getByRole('spinbutton', { name: 'Efficiency' }), '4.2');
+    await user.click(screen.getByRole('checkbox', {
+      name: 'Source pump or fan included in the declared efficiency (P.6.8.4.3: 0 W/kW)',
+    }));
+    expect(withoutNulls(current().externalSupply.heating.generators[1].kind.efficiency)).toEqual({
+      method: 'declared', value: 4.2, sourceReference: '', sourcePumpIncluded: true,
+    });
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Heat-pump efficiency' })[0], 'table_p5');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source (table P.5)' }), 'electric_ground');
+    await user.type(screen.getByRole('spinbutton', { name: 'Network design supply temperature, °C' }), '55');
     expect(withoutNulls(current().externalSupply.heating)).toEqual({
       method: 'calculated', function: 'heating', deliveredKwh: 120000,
       distribution: { method: 'small_system_forfait', connections: 40, connectionType: 'ground_bound' },
@@ -117,12 +129,16 @@ describe('NTA project input forms', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Calculation zone' }), 'zone-b');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Humidifier type' }), 'steam');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Steam generator' }), 'gas_or_oil');
+    await user.type(screen.getByRole('spinbutton', {
+      name: 'Area served by the steam humidifier, m² (12.2.1; empty: heating-system area)',
+    }), '650');
     const draft = withoutNulls(current());
     expect(draft.sunrooms).toEqual([{
       id: 'serre-1', glazingGHeating: 0.6, reductionFactor: 0.8, distributionFactor: 1, surfaces: [{ areaM2: 12 }], sourceReference: '',
     }]);
     expect(draft.humidifiers).toEqual([{
       zoneId: 'zone-b', humidification: { humidifier: { kind: 'steam', carrier: 'gas_or_oil' }, rotaryWheel: false, equipmentReference: '' },
+      servedAreaM2: 650,
     }]);
   }, 60000);
 

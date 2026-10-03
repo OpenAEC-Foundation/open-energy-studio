@@ -33,8 +33,9 @@
 //!
 //! Supplied values always override the derived ones. P.71 (electricity
 //! produced in the area with a direct physical connection) is reported by
-//! [`area_electricity`]. `f_P;XD;tot` is rounded up and `f_Pren;dX` down to a
-//! multiple of 0,01.
+//! [`area_electricity`]. `f_P;XD;tot` is rounded up and `f_Pren;dh`/`f_Pren;dw`
+//! down to a multiple of 0,01; `f_Pren;dc` is not rounded, because 5.49
+//! (p. 129) states no rounding, unlike 5.42 and 5.50.
 //!
 //! Readings where the printed norm is not explicit:
 //! - P.62 and P.65 are applied dimensionally consistent with P.57 and P.60
@@ -45,6 +46,20 @@
 //!   gas-engine chiller the shaft power `P_in` takes the table P.9 COP,
 //!   because its `η_CD;gen = COP·η_ge` relates to the fuel input;
 //! - P.74 is applied only to the plots (parts) without monthly values;
+//!   for heat every such part takes P.74, an annual-only sorption-cooling
+//!   part included, so the supplied months of the other parts stay;
+//! - P.78 (p. 1022) sums only `E_C;dc;mi`: dehumidification counts in the
+//!   annual cold delivery (P.77) but not in the monthly profile used for
+//!   `f_on;mi` and P.68, so the monthly values may sum below the annual;
+//! - P.70 (p. 1016) writes `Q_CD;dis;tot;an` in the formula while its
+//!   legend defines the network input `Q_XD;in;tot`; the legend is followed
+//!   (the cold the chillers produce, distribution loss included);
+//! - P.27 has no MAX(0): a renewable fuel in a CHP gives a negative
+//!   `K_CO2;gen`, kept as printed with the warning `chp_co2_factor_negative`;
+//! - P.13–P.18 for cold count heat gains in every month with a water
+//!   temperature; months without cold delivery then raise
+//!   `cold_network_gain_outside_cooling_months` (set those months to
+//!   `null` in a monthly temperature profile);
 //! - rule a) counts solid biomass as renewable (class 0); an electrode
 //!   boiler in flex mode is ranked last; `priority` overrides both;
 //! - P.25 takes the whole `Q_HD;in;tot`, collective solar included;
@@ -758,6 +773,11 @@ pub enum HeatPumpEfficiency {
         value: f64,
         #[serde(rename = "sourceReference")]
         source_reference: String,
+        /// P.6.8.4.3/P.6.9.4.3 (p. 1009): the source pump or fan is
+        /// included in the declared efficiency, so its default is 0 W/kW
+        /// instead of 10 W/kW.
+        #[serde(default, rename = "sourcePumpIncluded")]
+        source_pump_included: bool,
     },
     /// Table P.5 with the design supply temperature of the network.
     TableP5 {
@@ -1695,6 +1715,10 @@ pub struct SystemResult {
     pub generators: Vec<GeneratorResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub calculation: Option<CalculationDetails>,
+    /// Non-blocking findings: the factors follow the norm, but a literal
+    /// formula or an input gives a value worth checking.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<AnnexPIssue>,
 }
 
 fn issue(code: &'static str, path: impl Into<String>) -> AnnexPIssue {
@@ -1704,13 +1728,36 @@ fn issue(code: &'static str, path: impl Into<String>) -> AnnexPIssue {
     }
 }
 
+// `+ 0.0` turns a `-0.0` (for example `ceil(-1e-9)`) into `0.0`.
 fn round_up(value: f64) -> f64 {
-    (value * 100.0 - 1e-9).ceil() / 100.0
+    (value * 100.0 - 1e-9).ceil() / 100.0 + 0.0
 }
 
 fn round_down(value: f64) -> f64 {
-    (value * 100.0 + 1e-9).floor() / 100.0
+    (value * 100.0 + 1e-9).floor() / 100.0 + 0.0
 }
+
+/// `f_Pren;dX`: 5.42 (heat) and 5.50 (hot water) are rounded down to a
+/// multiple of 0,01; 5.49 for cold (§5.8.3.2, p. 129) states no rounding,
+/// so `f_Pren;dc` is kept unrounded.
+fn round_renewable(function: SystemFunction, value: f64) -> f64 {
+    match function {
+        SystemFunction::Cooling => value + 0.0,
+        _ => round_down(value),
+    }
+}
+
+/// Annex P and §5.8 readings where the printed norm is not explicit (for
+/// the report appendix; the module documentation lists all of them).
+pub const INTERPRETATIONS: &[&str] = &[
+    "P.74 (p. 1020) is applied per plot part without monthly values, with max(0, θ_in;ref − θ_e;avg;mi); an annual-only sorption-cooling part of a heat network also takes P.74, so the supplied months of the other parts stay",
+    "P.77/P.78 (p. 1022): dehumidification E_dhum;dc counts in the annual cold delivery but not in the monthly profile, because P.78 sums only E_C;dc;mi",
+    "5.49 (§5.8.3.2, p. 129) gives no rounding for f_Pren;dc, unlike 5.42 and 5.50 (rounded down to 0,01); f_Pren;dc is kept unrounded",
+    "P.70 (p. 1016) writes Q_CD;dis;tot;an in the formula while the legend defines Q_XD;in;tot; the legend (cold produced by the chillers) is followed",
+    "P.27 has no MAX(0); a CHP on a renewable fuel gives a negative K_CO2;gen, kept as printed with a warning",
+    "P.13–P.18 for a cold network count heat gains in every month with a water temperature; months without cold delivery give a warning and should have no water temperature",
+    "P.6.8.4.3 (p. 1009): the 10 W/kW source pump of a heat pump with a declared efficiency is 0 when the declaration includes it (sourcePumpIncluded)",
+];
 
 fn reference(value: &str, path: String, issues: &mut Vec<AnnexPIssue>) {
     if value.trim().is_empty() {
@@ -2664,17 +2711,27 @@ fn area_demand(
             issues,
         );
         // Each part with the function whose profile it takes when it has
-        // no months.
+        // no months, and whether it belongs to the monthly sum. For heat
+        // every part without months takes P.74, the only monthly rule the
+        // norm gives for Q_HD;nd;tot (p. 1020), so an annual-only sorption
+        // part does not replace the months of the other parts. P.78
+        // (p. 1022) sums only E_C;dc;mi, so dehumidification counts in the
+        // annual total (P.77) but not in the monthly cold profile.
         let parts = match function {
             SystemFunction::Heating => vec![
-                (heating_part(plot, &ppath, issues), SystemFunction::Heating),
+                (
+                    heating_part(plot, &ppath, issues),
+                    SystemFunction::Heating,
+                    true,
+                ),
                 (
                     optional_part(
                         plot.sorption_cooling.as_ref(),
                         format!("{ppath}.sorptionCooling"),
                         issues,
                     ),
-                    SystemFunction::Cooling,
+                    SystemFunction::Heating,
+                    true,
                 ),
                 (
                     if plot.hot_water_via_delivery_set {
@@ -2683,16 +2740,19 @@ fn area_demand(
                         ZERO_PART
                     },
                     SystemFunction::HotWater,
+                    true,
                 ),
             ],
             SystemFunction::HotWater => vec![(
                 hot_water_part(plot, &ppath, issues),
                 SystemFunction::HotWater,
+                true,
             )],
             SystemFunction::Cooling => vec![
                 (
                     optional_part(plot.cooling.as_ref(), format!("{ppath}.cooling"), issues),
                     SystemFunction::Cooling,
+                    true,
                 ),
                 (
                     optional_part(
@@ -2701,13 +2761,17 @@ fn area_demand(
                         issues,
                     ),
                     SystemFunction::Cooling,
+                    false,
                 ),
             ],
         };
-        for (part, profile) in parts {
+        for (part, profile, in_monthly) in parts {
             match part {
                 Some((value, months)) => {
                     annual += value;
+                    if !in_monthly {
+                        continue;
+                    }
                     // P.74 (P.82 for hot water) only for the parts without
                     // months; the supplied months of the others stay.
                     match months.or_else(|| annual_profile(profile, value)) {
@@ -3881,9 +3945,14 @@ fn default_auxiliary(kind: &GeneratorKind, function: SystemFunction) -> [f64; 4]
         SystemCarrier::Electricity { .. } => [STANDBY_W, 0.0, 0.0, 0.0],
         _ => [STANDBY_W, 1.0, 0.0, 0.0],
     };
-    // 0 W/kW with forfait efficiencies, 10 W/kW otherwise.
+    // 0 W/kW with forfait efficiencies or when the declared efficiency
+    // includes the source pump or fan, 10 W/kW otherwise.
     let source = |efficiency: &HeatPumpEfficiency| match efficiency {
         HeatPumpEfficiency::TableP5 { .. } => 0.0,
+        HeatPumpEfficiency::Declared {
+            source_pump_included: true,
+            ..
+        } => 0.0,
         HeatPumpEfficiency::Declared { .. } => 10.0,
     };
     match kind {
@@ -4215,6 +4284,22 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
         Some(months) if cold => months.map(|value| value > 0.0),
         _ => [true; 12],
     };
+    let mut warnings = Vec::new();
+    // P.13–P.18 for cold: the pipes gain heat in every month with a water
+    // temperature, also when no cold is delivered (the clamp at 0 only
+    // removes negative gains). Months without cooling should then have no
+    // water temperature (`null` in a monthly profile).
+    let pipe_months = distributed.as_ref().and_then(|item| item.monthly_loss);
+    if cold
+        && demand_months.is_some()
+        && pipe_months
+            .is_some_and(|loss| (0..12).any(|month| !cold_months[month] && loss[month] > 0.0))
+    {
+        warnings.push(issue(
+            "cold_network_gain_outside_cooling_months",
+            format!("{path}.distribution"),
+        ));
+    }
     let storage_efficiency = storage_efficiency(system, input, path, &mut issues);
     let eta_sto = storage_efficiency.unwrap_or(1.0);
     let generators = &system.generators;
@@ -4343,6 +4428,19 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
         f_gen += fraction * item.f;
         k_gen += fraction * item.k;
         let heat = fraction * network_heat;
+        // P.27 has no MAX(0): a renewable fuel (biogas) in a CHP gives a
+        // negative K_CO2;gen, which is kept as printed.
+        if item.k < 0.0
+            && matches!(
+                generator.kind,
+                GeneratorKind::ChpWithoutLoss { .. } | GeneratorKind::ChpWithLoss { .. }
+            )
+        {
+            warnings.push(issue(
+                "chp_co2_factor_negative",
+                format!("{path}.generators[{index}]"),
+            ));
+        }
         // 5.42/5.49/5.50: Q_gen;gi·f_Pren;gi + W_gen;ren·f_Pren;elec.
         renewable_energy += heat * item.pren + heat * item.renewable_drive * F_PREN_ELEC;
         results.push(GeneratorResult {
@@ -4366,7 +4464,7 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
     let co2 = k_gen / efficiency + aux / out * K_CO2_EL * (1.0 - aux_share);
     let e_prim = out * primary;
     let renewable = if renewable_energy + e_prim > 0.0 {
-        round_down(renewable_energy / (renewable_energy + e_prim))
+        round_renewable(function, renewable_energy / (renewable_energy + e_prim))
     } else {
         0.0
     };
@@ -4397,6 +4495,7 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
             fractions_derived: fractions.derived,
         }),
         generators: results,
+        warnings,
     })
 }
 
@@ -4551,7 +4650,7 @@ fn measured(system: &MeasuredSystem, path: &str) -> Result<SystemResult, Vec<Ann
     Ok(SystemResult {
         factors: SupplyFactors {
             primary_factor: round_up((primary / out).max(0.0)),
-            renewable_factor: round_down(system.renewable_factor),
+            renewable_factor: round_renewable(system.function, system.renewable_factor),
             co2_kg_per_kwh: co2 / out,
         },
         distribution_efficiency: None,
@@ -4559,6 +4658,7 @@ fn measured(system: &MeasuredSystem, path: &str) -> Result<SystemResult, Vec<Ann
         storage_efficiency: None,
         generators: Vec::new(),
         calculation: None,
+        warnings: Vec::new(),
     })
 }
 
@@ -4597,7 +4697,7 @@ pub fn assess_route(
             Ok(SystemResult {
                 factors: SupplyFactors {
                     primary_factor: round_up(*primary_factor),
-                    renewable_factor: round_down(*renewable_factor),
+                    renewable_factor: round_renewable(function, *renewable_factor),
                     co2_kg_per_kwh: *co2_kg_per_kwh,
                 },
                 distribution_efficiency: None,
@@ -4605,6 +4705,7 @@ pub fn assess_route(
                 storage_efficiency: None,
                 generators: Vec::new(),
                 calculation: None,
+                warnings: Vec::new(),
             })
         }
         AnnexPRoute::Calculated(system) => {
@@ -5133,6 +5234,128 @@ mod tests {
         .unwrap();
         close(pren, 0.4);
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn plot_profiles_follow_p74_and_p78() {
+        let mut issues = Vec::new();
+        let heat_months: Vec<f64> = (1..=12).map(|m| 100.0 * m as f64).collect();
+        // P.73/P.74: an annual-only sorption part takes P.74 itself; the
+        // supplied heating months stay.
+        let plot = AreaPlot {
+            heating: Some(PlotFlow {
+                annual_kwh: None,
+                monthly_kwh: heat_months.clone(),
+            }),
+            heating_forfait: None,
+            sorption_cooling: Some(PlotFlow {
+                annual_kwh: Some(5000.0),
+                monthly_kwh: Vec::new(),
+            }),
+            ..area_plot()
+        };
+        let area = AreaDemand { plots: vec![plot] };
+        let heat = area_demand(&area, SystemFunction::Heating, "a", &mut issues).unwrap();
+        near(heat.annual, 7800.0 + 5000.0, 1e-9);
+        let weights: Vec<f64> = OUTDOOR_TEMPERATURE_C
+            .iter()
+            .map(|t| (18.0 - t).max(0.0))
+            .collect();
+        let sum: f64 = weights.iter().sum();
+        let months = heat.monthly.unwrap();
+        for index in 0..12 {
+            near(
+                months[index],
+                heat_months[index] + 5000.0 * weights[index] / sum,
+                1e-9,
+            );
+        }
+        // July: no P.74 share, the supplied 700 kWh stays.
+        near(months[6], 700.0, 1e-9);
+        // P.77/P.78: annual-only dehumidification counts in the annual
+        // total only; the monthly cold profile stays known.
+        let cold_months = [
+            0.0, 0.0, 0.0, 0.0, 50.0, 100.0, 200.0, 200.0, 50.0, 0.0, 0.0, 0.0,
+        ];
+        let plot = AreaPlot {
+            heating_forfait: None,
+            cooling: Some(PlotFlow {
+                annual_kwh: None,
+                monthly_kwh: cold_months.to_vec(),
+            }),
+            dehumidification: Some(PlotFlow {
+                annual_kwh: Some(120.0),
+                monthly_kwh: Vec::new(),
+            }),
+            ..area_plot()
+        };
+        let area = AreaDemand { plots: vec![plot] };
+        let cold = area_demand(&area, SystemFunction::Cooling, "a", &mut issues).unwrap();
+        near(cold.annual, 600.0 + 120.0, 1e-9);
+        assert_eq!(cold.monthly.unwrap(), cold_months);
+        assert!(issues.is_empty(), "{issues:?}");
+    }
+
+    #[test]
+    fn cold_renewable_factor_is_not_rounded_and_zero_is_positive() {
+        let route = |renewable_factor: f64| AnnexPRoute::Declared {
+            primary_factor: 0.0,
+            renewable_factor,
+            co2_kg_per_kwh: 0.0,
+            declaration_reference: "EMG".into(),
+            measured_only: false,
+        };
+        let cold = assess_route(&route(0.782), SystemFunction::Cooling, "c").unwrap();
+        close(cold.factors.renewable_factor, 0.782);
+        let heat = assess_route(&route(0.782), SystemFunction::Heating, "h").unwrap();
+        close(heat.factors.renewable_factor, 0.78);
+        // ceil(-1e-9) is -0,0; the output must be +0,0.
+        assert!(cold.factors.primary_factor.is_sign_positive());
+        assert!(round_up(0.0).is_sign_positive());
+        assert!(round_down(0.0).is_sign_positive());
+    }
+
+    #[test]
+    fn biogas_chp_warns_on_negative_co2_and_source_pump_flag_applies() {
+        let chp = SystemGenerator {
+            id: "chp".into(),
+            energy_fraction: Some(1.0),
+            nominal_power_kw: None,
+            cooling_power: None,
+            priority: None,
+            auxiliary: None,
+            kind: GeneratorKind::ChpWithoutLoss {
+                carrier: SystemCarrier::Biogas,
+                thermal_efficiency: Some(0.5),
+                electrical_efficiency: Some(0.36),
+                efficiency_reference: Some("test".into()),
+                table_p6: None,
+            },
+        };
+        let result = calculated(&system(vec![chp]), "s").unwrap();
+        assert!(result.factors.co2_kg_per_kwh < 0.0);
+        assert_eq!(result.warnings.len(), 1);
+        assert_eq!(result.warnings[0].code, "chp_co2_factor_negative");
+        assert_eq!(result.warnings[0].path, "s.generators[0]");
+        // P.6.8.4.3: 10 W/kW source pump unless included in the declaration.
+        let declared = |included: bool| GeneratorKind::HeatPump {
+            efficiency: HeatPumpEfficiency::Declared {
+                value: 4.0,
+                source_reference: "test".into(),
+                source_pump_included: included,
+            },
+            drive: SystemCarrier::Electricity {
+                direct_renewable_share: 0.0,
+            },
+        };
+        assert_eq!(
+            default_auxiliary(&declared(false), SystemFunction::Heating)[2],
+            10.0
+        );
+        assert_eq!(
+            default_auxiliary(&declared(true), SystemFunction::Heating)[2],
+            0.0
+        );
     }
 
     fn near(a: f64, b: f64, tolerance: f64) {
@@ -6360,6 +6583,49 @@ mod tests {
             .auxiliary
             .unwrap();
         close(aux.distribution_kwh, 0.009 * 100_000.0);
+        assert!(result_warnings_of(&cd).is_empty());
+        // P.13–P.18 for cold: crawlspace pipes at a constant 6 °C gain heat
+        // in winter, when no cold is delivered.
+        let mut segment = buried_segment();
+        segment.placement = PipePlacement::Buried {
+            cover_depth_m: 0.8,
+            ground_conductivity: None,
+            ambient: PipeAmbient::Crawlspace,
+        };
+        cd.distribution = SystemDistribution::Pipes {
+            segments: vec![segment],
+            water_temperature: Some(NetworkWaterTemperature::Constant { temperature_c: 6.0 }),
+            buffers: Vec::new(),
+            supply_below_10_c: Some(true),
+            other_loss_kwh: 0.0,
+            source_reference: "network design".into(),
+        };
+        assert_eq!(
+            result_warnings_of(&cd),
+            vec!["cold_network_gain_outside_cooling_months"]
+        );
+        // Without a water temperature outside the cooling months, no gain.
+        if let SystemDistribution::Pipes {
+            water_temperature, ..
+        } = &mut cd.distribution
+        {
+            let months = (0..12)
+                .map(|month| (4..9).contains(&month).then_some(6.0))
+                .collect();
+            *water_temperature = Some(NetworkWaterTemperature::Monthly {
+                temperatures_c: months,
+            });
+        }
+        assert!(result_warnings_of(&cd).is_empty());
+    }
+
+    fn result_warnings_of(system: &CalculatedSystem) -> Vec<&'static str> {
+        calculated(system, "c")
+            .unwrap()
+            .warnings
+            .iter()
+            .map(|item| item.code)
+            .collect()
     }
 
     #[test]
