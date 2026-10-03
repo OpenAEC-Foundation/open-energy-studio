@@ -30,6 +30,8 @@ describe('gas chain reference comparison UI', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Submitted values within tolerance');
     expect(screen.getByRole('status')).toHaveTextContent('Reference not independently verified');
     expect(screen.getByRole('status')).toHaveTextContent('625.000');
+    expect(screen.getByRole('columnheader', { name: 'Assessment' })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /9.62 input term, unallocated/ })).toHaveTextContent('Within tolerance');
     const provenance = screen.getByLabelText('Reference case provenance');
     expect(provenance).toHaveTextContent('Open Energy Studio internal arithmetic');
     expect(provenance).toHaveTextContent('synthetic gas heat-pump hand calculation; not ISSO 54');
@@ -40,6 +42,22 @@ describe('gas chain reference comparison UI', () => {
     await user.click(screen.getByRole('button', { name: 'Compare draft values' }));
     expect(screen.getByRole('alert')).toHaveTextContent('SyntaxError');
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('states a failed metric in text as well as color', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({
+      status: 'compared_fail', caseId: 'failed-case', referenceVerified: false,
+      carrierAllocationAvailable: false, bengCalculationAvailable: false,
+      metrics: [{ metric: 'equipment_auxiliary_electricity', month: 2, expectedKwh: 50,
+        actualKwh: 51, absoluteDifferenceKwh: 1, absoluteToleranceKwh: 0.1, withinTolerance: false }],
+      inputFingerprint: 'sha256:input', caseFingerprint: 'sha256:case', issues: [],
+    }) }));
+    const user = userEvent.setup();
+    renderWithProviders(<GasChainReferencePanel />);
+    await user.click(screen.getByText('Gas heat pump reference comparison'));
+    await user.click(screen.getByRole('button', { name: 'Load synthetic example' }));
+    await user.click(screen.getByRole('button', { name: 'Compare draft values' }));
+    expect(await screen.findByRole('row', { name: /Equipment electricity/ })).toHaveTextContent('Outside tolerance');
   });
 
   it('shows incomplete-case issues without presenting a comparison table', async () => {
