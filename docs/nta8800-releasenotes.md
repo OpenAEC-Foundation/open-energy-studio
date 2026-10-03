@@ -2,6 +2,14 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — vakantiewoning in ZEB, reservevermogens, één bouwjaar en lege enum-tag
+
+- **ZEB-indicator (bijlage AB).** Een vakantiewoning (‘andere logiesfunctie’) telt in tabel AB.1 nu in de kolom woningbouw (f_du januari 0,75 in plaats van 0,55), zoals tabel 6.1 (p. 136) haar als woonfunctie behandelt. ZEB-uitkomsten van projecten met deze functie veranderen.
+- **Resterende opwekkers bij β ≥ 1 (9.56, p. 323; opmerking 1).** Een set waarin een bijlage Q-warmtepomp als preferentie 1 op β ≥ 1 is geschat, rekent de rest alleen nog met gelijke delen als **alle** resterende vermogens ontbreken. Ontbreekt een deel, dan meldt de kern `generator_nominal_power_invalid` bij elk ontbrekend vermogen; zulke opgeslagen projecten worden `incomplete`.
+- **Eén bouwjaar.** Het ventilatiebouwjaar wordt ook per rekenzone gelezen (`zoneData[i].ventilation.constructionYear`). De labelgegevens (Regeling art. 4 a) gebruiken nu hetzelfde bouwjaar als de standaard voor woningisolatie (§5.3.2). Een registratiebouwjaar dat afwijkt van het ventilatiebouwjaar geeft de waarschuwing `construction_year_mismatch`.
+- **Registratiewaarschuwingen.** `plausibility_borderline_label` en `plausibility_ep2_out_of_range` wijzen nu naar `performance.labelPrimaryFossilIndicatorKwhPerM2Year`.
+- **Lege enum-tag.** Is de tag van een variantblok leeg (bijvoorbeeld `method` of `kind`), dan meldt de kern alleen die tag; lege velden in hetzelfde blok worden pas beoordeeld als de variant gekozen is. Een tag is een enum-veld waarvan een andere variant de toegestane of verplichte velden van het blok verandert.
+
 ## 3 oktober 2026 — resultatenweergave en bouwjaar
 
 - **Bouwjaar.** Zonder `ntaCalculation.constructionYear` neemt de projectroute het bouwjaar uit de registratie, en anders het bouwjaar van de ventilatiesectie (tabel 11.13, dezelfde grootheid). Projecten die alleen het ventilatiebouwjaar hadden, krijgen nu de standaard voor woningisolatie (§5.3.2) in plaats van de melding `standard_insulation_construction_year_missing`.

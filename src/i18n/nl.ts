@@ -1250,6 +1250,7 @@ export const nl: Record<string, string> = {
   'nta.warning.ground_floor_resistance_below_surface_resistance': 'Vloer R_si + R_c lager dan R_si = 0,17 (8.32)',
   'nta.warning.ground_floor_perimeter_implausible': 'Blootgestelde vloeromtrek past bij een vloer smaller dan 1 m',
   'nta.warning.detailed_thermal_bridges_none_entered': 'Gedetailleerde koudebrugmethode zonder ψ-waarden naar buitenlucht (8.2.1)',
+  'nta.warning.construction_year_mismatch': 'Bouwjaar in de registratie wijkt af van het bouwjaar bij ventilatie (tabel 11.13)',
   'nta.warning.sunroom_values_differ_from_unheated_space': 'b_U of H_zi;ztu van de serre wijkt af van de onverwarmde ruimte (8.4.1)',
   'nta.performance.bblNotApplicable': 'niet van toepassing (alleen woonfunctie)',
   'nta.performance.labelEp2': 'EP2 voor het label met forfaitaire gebiedsmaatregelen (Regeling art. 2 lid 3): {{value}} kWh/m²·jr',

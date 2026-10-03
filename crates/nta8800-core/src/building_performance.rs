@@ -670,11 +670,14 @@ fn zeb_direct_use_fraction(input: &BuildingPerformanceInput) -> [f64; 12] {
     if !input.bbl_functions.is_empty() {
         for part in &input.bbl_functions {
             let column = match part.function {
+                // Table 6.1 (p. 136): 'andere logiesfunctie' (holiday home)
+                // counts as Woningbouw, the first column of table AB.1.
                 B::ResidentialBuilding
                 | B::OtherResidential
                 | B::Caravan
                 | B::FloatingBuildingAfter2018Berth
-                | B::FloatingBuildingOtherBerth => 0,
+                | B::FloatingBuildingOtherBerth
+                | B::OtherLodging => 0,
                 B::Education => 1,
                 _ => 2,
             };
@@ -5271,6 +5274,15 @@ mod tests {
         let f = zeb_direct_use_fraction(&sample);
         assert!((f[6] - 0.08).abs() < 1e-12);
         assert!((f[0] - 0.55).abs() < 1e-12);
+
+        // A holiday home ('andere logiesfunctie') is Woningbouw (table 6.1,
+        // p. 136): the first column of table AB.1, January 0,75.
+        sample.bbl_functions = vec![BblFunctionArea {
+            function: BblFunction::OtherLodging,
+            area_m2: 80.0,
+        }];
+        let f = zeb_direct_use_fraction(&sample);
+        assert!((f[0] - 0.75).abs() < 1e-12, "{f:?}");
     }
 
     #[test]

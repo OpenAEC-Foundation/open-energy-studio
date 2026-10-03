@@ -82,7 +82,7 @@ pub const OMITTED_TERMS: &[&str] = &[
     "annex M: stand-by losses (M.4/M.6) burn fuel in every hour of the month even when the 9.7 feedback of recoverable losses brings the generator output to 0 (a grossly oversized boiler in a small zone); the norm is followed literally",
     "tables 5.2/5.4 (biomass classes): a type-plate power above 500 kW classes the boiler as bmA regardless of the entered 500 kW flag",
     "tables 5.2/5.4 (p. 94, 'per installatie'): the biomass class follows how the stoves or boilers are modelled. The generators of one multiple set add up; identical systems (§9.1, p. 287, for example one stove per dwelling) and separate heating systems (for example local heaters in different zones) are separate installations and are classed one by one",
-    "9.56 (p. 323) with remark 4 (p. 324): when preference 1 of an annex Q set is estimated at β ≥ 1, the remaining preferences are weighted by their entered nominal powers; only when those are missing does each count with the same power (program choice)",
+    "9.56 (p. 323) with remark 4 (p. 324): when preference 1 of an annex Q set is estimated at β ≥ 1, the remaining preferences are weighted by their entered nominal powers; only when all of them are missing does each count with the same power (program choice); a partly known set must complete its powers (remark 1, p. 323)",
     "annex V, V.1 (p. 1115): η_H;gen is referred to 14.6, which in this edition is the lighting daylight factor; the kernel uses the delivered COP with η_el = 1/f_P;del;el, so extraction is Q·(1 − η_el/COP). Reading η_H;gen as COP·η_el gives Q·(1 − 1/COP) and a higher R; the kernel's reading is the conservative one",
 ];
 
@@ -3583,15 +3583,18 @@ fn generate_multiple_with_annex_q(
         // share left by preference 1 (interpretation), else nominal powers.
         // When preference 1 was estimated to cover everything (β ≥ 1) there
         // is nothing to rebase on. Entered nominal powers then weight the
-        // remaining preferences as 9.56 (p. 323) does; only when they are
-        // missing (the estimate stood in for them) does every remaining
-        // generator count with the same power (interpretation).
+        // remaining preferences as 9.56 (p. 323) does. Only when every
+        // remaining power is missing (the estimate stood in for them all)
+        // does each remaining generator count with the same power
+        // (interpretation). A partly known set is not mixed with equal
+        // shares: remark 1 (p. 323) asks for the powers or an estimated β,
+        // so the missing powers are reported by the rest set below.
         let first = set.estimated_beta.first().copied().unwrap_or(0.0);
-        let rest_powers_known = rest_indices.iter().all(|other| {
+        let rest_powers_missing = rest_indices.iter().all(|other| {
             let power = set.generators[*other].nominal_power_kw;
-            power.is_finite() && power > 0.0
+            !(power.is_finite() && power > 0.0)
         });
-        let equal_shares = !set.estimated_beta.is_empty() && first >= 1.0 && !rest_powers_known;
+        let equal_shares = !set.estimated_beta.is_empty() && first >= 1.0 && rest_powers_missing;
         let estimated_beta = if set.estimated_beta.len() > 1 && first < 1.0 {
             set.estimated_beta[1..]
                 .iter()
@@ -5849,6 +5852,34 @@ mod tests {
             large_boiler > small_boiler + 1.0,
             "{small_boiler} vs {large_boiler}"
         );
+
+        // A partly known rest (boiler 20 kW, heater unknown) is not padded
+        // with equal shares: remark 1 (p. 323) asks for the missing power.
+        let mut mixed = partial.clone();
+        mixed.distribution_system = Some(system(calculated_pump()));
+        if let Generator::Multiple(set) = &mut mixed.generator {
+            set.generators[1].nominal_power_kw = 20.0;
+            set.generators.push(PreferredGenerator {
+                preference: 3,
+                nominal_power_kw: 0.0,
+                generator: Generator::ElectricResistance(ElectricResistanceGenerator {
+                    equipment_reference: "panel heaters".into(),
+                    auxiliary: other_aux(1, None),
+                }),
+            });
+            set.estimated_beta = vec![1.0, 1.0];
+        }
+        let result = assess_space_heating_chain(&mixed);
+        assert_eq!(result.status, "invalid");
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "generator_nominal_power_invalid"
+                && item.path == "generator.generators[2].nominalPowerKw"));
+        assert!(!result
+            .issues
+            .iter()
+            .any(|item| item.path == "generator.generators[1].nominalPowerKw"));
     }
 
     #[test]

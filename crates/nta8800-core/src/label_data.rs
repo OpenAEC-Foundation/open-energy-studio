@@ -304,10 +304,17 @@ pub fn general_data(
             .and_then(|input| input.label_function)
             .and_then(|function| tag(&function))
             .or_else(|| tag(&project.building_function)),
-        construction_year: registration
-            .and_then(|value| value.get("constructionYear"))
-            .and_then(Value::as_u64)
-            .and_then(|year| u32::try_from(year).ok()),
+        // The same resolved year as §5.3.2 (NTA block, registration, then
+        // the chapter 11 bouwjaar); the registration alone without a kernel
+        // input.
+        construction_year: derived
+            .and_then(|input| input.construction_year)
+            .or_else(|| {
+                registration
+                    .and_then(|value| value.get("constructionYear"))
+                    .and_then(Value::as_u64)
+                    .and_then(|year| u32::try_from(year).ok())
+            }),
         // Praktijkhandboek v2 p. 70: A_g is given to two decimals.
         usable_floor_area_m2: derived
             .map(|input| input.total_usable_floor_area_m2)

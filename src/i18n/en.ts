@@ -1250,6 +1250,7 @@ export const en: Record<string, string> = {
   'nta.warning.ground_floor_resistance_below_surface_resistance': 'Floor R_si + R_c below R_si = 0.17 (8.32)',
   'nta.warning.ground_floor_perimeter_implausible': 'Exposed floor perimeter implies a floor narrower than 1 m',
   'nta.warning.detailed_thermal_bridges_none_entered': 'Detailed thermal-bridge route without ψ-values to outside air (8.2.1)',
+  'nta.warning.construction_year_mismatch': 'Construction year in the registration differs from the ventilation construction year (table 11.13)',
   'nta.warning.sunroom_values_differ_from_unheated_space': 'Sunroom b_U or H_zi;ztu differs from its unheated space (8.4.1)',
   'nta.performance.bblNotApplicable': 'not applicable (dwellings only)',
   'nta.performance.labelEp2': 'Label EP2 with forfait area measures (Regeling art. 2 lid 3): {{value}} kWh/m²·yr',
