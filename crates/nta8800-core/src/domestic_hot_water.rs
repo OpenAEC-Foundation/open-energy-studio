@@ -4713,9 +4713,7 @@ mod tests {
         let result = assess_hot_water(&input, context()).unwrap();
         let jan = &result.months[0];
         assert!((jan.electricity_kwh - jan.generator_output_kwh / 2.0).abs() < 1e-9);
-        assert!(
-            (jan.ambient_heat_kwh - jan.generator_output_kwh * (1.0 - 1.0 / 2.0)).abs() < 1e-9
-        );
+        assert!((jan.ambient_heat_kwh - jan.generator_output_kwh * (1.0 - 1.0 / 2.0)).abs() < 1e-9);
     }
 
     fn combi() -> HotWaterGenerator {

@@ -1186,15 +1186,36 @@ mod tests {
             lintel_height_m,
             opening_area_m2,
             ..
-        }) = annex_y_projection(80.0, 1.2, 0.5, 2.0, 3.5, 1.0, Some(&vertical), None, control)
+        }) = annex_y_projection(
+            80.0,
+            1.2,
+            0.5,
+            2.0,
+            3.5,
+            1.0,
+            Some(&vertical),
+            None,
+            control,
+        )
         else {
             panic!("vertical projection expected");
         };
         assert!((lintel_height_m - 3.5).abs() < 1e-12);
         assert!((opening_area_m2 - 1.2).abs() < 1e-12);
         // A1 under a 4 m ceiling keeps c_w: lintel 3,7.
-        let AnnexYProjection::Sector(DaylightSector::VerticalWindows { lintel_height_m, .. }) =
-            annex_y_projection(80.0, 1.2, 0.5, 2.0, 4.0, 1.0, Some(&vertical), None, control)
+        let AnnexYProjection::Sector(DaylightSector::VerticalWindows {
+            lintel_height_m, ..
+        }) = annex_y_projection(
+            80.0,
+            1.2,
+            0.5,
+            2.0,
+            4.0,
+            1.0,
+            Some(&vertical),
+            None,
+            control,
+        )
         else {
             panic!("vertical projection expected");
         };
@@ -1205,7 +1226,17 @@ mod tests {
             clear_height_m,
             opening_area_m2,
             ..
-        }) = annex_y_projection(30.0, 1.2, 0.5, 2.0, 3.0, 1.0, None, Some(&rooflight), control)
+        }) = annex_y_projection(
+            30.0,
+            1.2,
+            0.5,
+            2.0,
+            3.0,
+            1.0,
+            None,
+            Some(&rooflight),
+            control,
+        )
         else {
             panic!("rooflight projection expected");
         };

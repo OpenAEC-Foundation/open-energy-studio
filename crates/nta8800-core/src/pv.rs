@@ -397,7 +397,11 @@ pub fn monthly_yield_kwh(system: &PvSystem, assessed_usable_floor_area_m2: f64) 
         // 16.3
         let solar = irradiance * MONTH_HOURS[index] * obstruction / 1000.0;
         // 16.2 with table 16.3
-        *value = solar * peak * performance * shading_correction(obstruction) * F_PRAC_PV
+        *value = solar
+            * peak
+            * performance
+            * shading_correction(obstruction)
+            * F_PRAC_PV
             * system.pvt.and_then(PvtCover::factor).unwrap_or(1.0)
             / I_REF;
     }

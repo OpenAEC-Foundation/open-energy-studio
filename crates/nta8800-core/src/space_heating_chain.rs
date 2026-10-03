@@ -4425,7 +4425,11 @@ mod tests {
         }
         input.distribution_system = Some(system(calculated_pump()));
         let result = assess_space_heating_chain(&input);
-        assert_eq!(result.status, "calculated_unverified", "{:?}", result.issues);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
         assert_eq!(result.generation_efficiency, Some(0.70));
         let jan = &result.monthly[0];
         assert!(
@@ -4452,7 +4456,9 @@ mod tests {
         );
         assert!(issues.is_empty());
         validate_biomass_evidence(Some(true), true, None, &mut issues);
-        assert!(issues.iter().any(|item| item.code == "biomass_class_conflict"));
+        assert!(issues
+            .iter()
+            .any(|item| item.code == "biomass_class_conflict"));
         let mut rows = vec![ChainMonth {
             biomass_kwh: 100.0,
             ..ChainMonth::default()
@@ -4493,7 +4499,11 @@ mod tests {
             source_reference: "adviser estimate".into(),
         }));
         let result = assess_space_heating_chain(&input);
-        assert_eq!(result.status, "calculated_unverified", "{:?}", result.issues);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
         // January, β 0,3: f = 0,59 (table 9.23).
         let jan = &result.monthly[0];
         assert!((jan.heat_pump_output_kwh - 0.59 * jan.generator_output_kwh).abs() < 1e-6);

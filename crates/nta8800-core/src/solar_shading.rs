@@ -863,10 +863,16 @@ pub enum ShadeColour {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ShadingDevice {
-    ExternalScreen { colour: ShadeColour },
-    ExternalVenetianBlind { colour: ShadeColour },
+    ExternalScreen {
+        colour: ShadeColour,
+    },
+    ExternalVenetianBlind {
+        colour: ShadeColour,
+    },
     /// Table 7.5 has no dark row for roller shutters: dark counts as other.
-    ExternalRollerShutter { colour: ShadeColour },
+    ExternalRollerShutter {
+        colour: ShadeColour,
+    },
     /// Metallised fabric inside, R_s > 0,72 of the metal layer.
     InternalMetallisedFabric,
     /// Uitvalscherm (table 7.6).

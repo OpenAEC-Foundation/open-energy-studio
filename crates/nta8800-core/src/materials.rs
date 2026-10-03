@@ -160,6 +160,36 @@ impl TemperatureConversion {
     }
 }
 
+/// Basis of the moisture content in E.8 (volume, Ψ) or E.9 (mass, u).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MoistureBasis {
+    /// Ψ in m³/m³ with f_Ψ (E.8).
+    Volume,
+    /// u in kg/kg with f_u (E.9).
+    Mass,
+}
+
+/// E.8/E.9: F_M from the moisture content, instead of table E.2. λ_D is
+/// given for dry material (Ψ1 = 0, u1 = 0).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MoistureConversion {
+    pub basis: MoistureBasis,
+    /// f_Ψ or f_u from table 4 of NEN-EN-ISO 10456.
+    pub conversion_coefficient: f64,
+    /// Ψ2 (m³/m³) or u2 (kg/kg).
+    pub moisture_content: f64,
+    pub source_reference: String,
+}
+
+impl MoistureConversion {
+    pub fn factor(&self) -> f64 {
+        // E.8 and E.9 share the form e^{f·(x2 − 0)}.
+        (self.conversion_coefficient * self.moisture_content).exp()
+    }
+}
+
 /// Table E.10 (existing-building column λ_for), E.11 and E.12.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -538,6 +568,9 @@ pub enum Conductivity {
         ageing: Ageing,
         #[serde(default)]
         temperature: Option<TemperatureConversion>,
+        /// E.8/E.9 F_M; replaces the table E.2 factor of `moisture`.
+        #[serde(default, rename = "moistureConversion")]
+        moisture_conversion: Option<MoistureConversion>,
         /// F_conv when the modified Rayleigh number exceeds table E.6;
         /// `None` means 1,00.
         #[serde(default, rename = "convectionFactor")]
@@ -613,12 +646,28 @@ impl Conductivity {
             Self::DeclaredInsulation {
                 lambda_declared,
                 temperature,
+                moisture_conversion,
                 convection_factor,
                 source_reference,
                 ..
             } => {
                 if !positive(*lambda_declared) {
                     push("lambda_invalid", "lambdaDeclared");
+                }
+                if let Some(m) = moisture_conversion {
+                    if !(m.conversion_coefficient.is_finite()
+                        && m.conversion_coefficient >= 0.0
+                        && m.moisture_content.is_finite()
+                        && m.moisture_content >= 0.0)
+                    {
+                        push("moisture_conversion_invalid", "moistureConversion");
+                    }
+                    if m.source_reference.trim().is_empty() {
+                        push(
+                            "source_reference_required",
+                            "moistureConversion.sourceReference",
+                        );
+                    }
                 }
                 if source_reference.trim().is_empty() {
                     push("source_reference_required", "sourceReference");
@@ -714,6 +763,7 @@ impl Conductivity {
                 moisture,
                 ageing,
                 temperature,
+                moisture_conversion,
                 convection_factor,
                 ..
             } => round_lambda_up(
@@ -721,7 +771,9 @@ impl Conductivity {
                     * temperature
                         .as_ref()
                         .map_or(1.0, TemperatureConversion::factor)
-                    * moisture.factor()
+                    * moisture_conversion
+                        .as_ref()
+                        .map_or(moisture.factor(), MoistureConversion::factor)
                     * ageing.factor()
                     * convection_factor.unwrap_or(1.0),
             ),
@@ -839,11 +891,53 @@ mod tests {
             moisture: InsulationMoisture::InvertedRoofXpsSlopeUpTo1Percent,
             ageing: Ageing::FactoryMade,
             temperature: None,
+            moisture_conversion: None,
             convection_factor: None,
             source_reference: "DoP".into(),
         };
         // 0,035 × 1,04 = 0,0364 → 0,037.
         assert!((declared.lambda_calc() - 0.037).abs() < 1e-12);
+        // E.8: f_Ψ 2,5 at Ψ2 0,02 gives F_M = e^0,05 = 1,0513 instead of
+        // table E.2; 0,035 × 1,0513 = 0,0368 → 0,037. With f_u 4 at
+        // u2 0,1 (E.9) F_M = e^0,4 = 1,492: 0,0522 → 0,053.
+        let mut computed = declared.clone();
+        if let Conductivity::DeclaredInsulation {
+            moisture_conversion,
+            ..
+        } = &mut computed
+        {
+            *moisture_conversion = Some(MoistureConversion {
+                basis: MoistureBasis::Volume,
+                conversion_coefficient: 2.5,
+                moisture_content: 0.02,
+                source_reference: "ISO 10456 table 4".into(),
+            });
+        }
+        assert!((computed.lambda_calc() - 0.037).abs() < 1e-12);
+        if let Conductivity::DeclaredInsulation {
+            moisture_conversion: Some(m),
+            ..
+        } = &mut computed
+        {
+            m.basis = MoistureBasis::Mass;
+            m.conversion_coefficient = 4.0;
+            m.moisture_content = 0.1;
+        }
+        assert!((computed.lambda_calc() - 0.053).abs() < 1e-12);
+        assert!(computed.validate().is_empty());
+        if let Conductivity::DeclaredInsulation {
+            moisture_conversion: Some(m),
+            ..
+        } = &mut computed
+        {
+            m.moisture_content = -0.1;
+            m.source_reference.clear();
+        }
+        let codes: Vec<_> = computed.validate().iter().map(|issue| issue.code).collect();
+        assert_eq!(
+            codes,
+            ["moisture_conversion_invalid", "source_reference_required"]
+        );
         let cold = TemperatureConversion {
             mean_temperature_c: 0.0,
             conversion_coefficient: 0.003,

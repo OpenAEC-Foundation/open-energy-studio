@@ -250,8 +250,19 @@ pub struct ComponentTransmission {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VerticalPipe {
     pub id: String,
-    /// N_bouwlaag;j: storeys of the zone (all of them, note 2 of 7.3.3).
+    /// N_bouwlaag;j: storeys of the zone (all of them, note 2 of 7.3.3);
+    /// 0 when `building_height_m` derives it.
+    #[serde(default)]
     pub storeys: u32,
+    /// 7.17a for the fictitious pipe per toilet group of a utility
+    /// building: H, the external building height of 11.2.1.2, in m;
+    /// N_bouwlaag = ⌊H/3⌋, at least 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub building_height_m: Option<f64>,
+    /// 7.3.3 (7.17a): share of the zone in the usable area of the
+    /// building over which the fictitious pipe is distributed; default 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub area_share: Option<f64>,
     /// Table 7.1 footnote a: more than 90 % insulated with λ ≤ 0,1.
     pub insulated: bool,
     /// Zones or adjacent heated spaces the pipe borders, this zone
@@ -269,6 +280,16 @@ fn one_zone() -> u32 {
 pub const VERTICAL_PIPE_UNINSULATED_W_PER_K: f64 = 1.8;
 pub const VERTICAL_PIPE_INSULATED_W_PER_K: f64 = 0.5;
 
+impl VerticalPipe {
+    /// N_bouwlaag;j, from 7.17a when the building height is given.
+    pub fn storey_count(&self) -> u32 {
+        match self.building_height_m {
+            Some(height) => ((height / 3.0).floor() as u32).max(1),
+            None => self.storeys,
+        }
+    }
+}
+
 /// 7.17 with the split over the bordering zones.
 pub fn vertical_pipe_conductance_w_per_k(pipes: &[VerticalPipe]) -> f64 {
     pipes
@@ -279,7 +300,8 @@ pub fn vertical_pipe_conductance_w_per_k(pipes: &[VerticalPipe]) -> f64 {
             } else {
                 VERTICAL_PIPE_UNINSULATED_W_PER_K
             };
-            f64::from(pipe.storeys) * specific / f64::from(pipe.shared_zones.max(1))
+            f64::from(pipe.storey_count()) * specific / f64::from(pipe.shared_zones.max(1))
+                * pipe.area_share.unwrap_or(1.0)
         })
         .sum()
 }
@@ -1542,7 +1564,9 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                     ));
                 }
             }
-            if window.dynamic.is_some() && (glazing.glazing_type.is_some() || glazing.diffusing.is_some()) {
+            if window.dynamic.is_some()
+                && (glazing.glazing_type.is_some() || glazing.diffusing.is_some())
+            {
                 issues.push(issue(
                     "window_dynamic_and_glazing_exclusive",
                     format!("{path}.glazing"),
@@ -1781,7 +1805,29 @@ fn resolve_transmission(
                 if pipe.id.trim().is_empty() || !pipe_ids.insert(pipe.id.as_str()) {
                     issues.push(issue("vertical_pipe_id_invalid", format!("{path}.id")));
                 }
-                if pipe.storeys == 0 {
+                if let Some(height) = pipe.building_height_m {
+                    if pipe.storeys != 0 || !(height.is_finite() && height > 0.0) {
+                        issues.push(issue(
+                            "vertical_pipe_building_height_invalid",
+                            format!("{path}.buildingHeightM"),
+                        ));
+                    }
+                } else if pipe.area_share.is_some() {
+                    issues.push(issue(
+                        "vertical_pipe_area_share_requires_building_height",
+                        format!("{path}.areaShare"),
+                    ));
+                }
+                if pipe
+                    .area_share
+                    .is_some_and(|share| !(share.is_finite() && share > 0.0 && share <= 1.0))
+                {
+                    issues.push(issue(
+                        "vertical_pipe_area_share_invalid",
+                        format!("{path}.areaShare"),
+                    ));
+                }
+                if pipe.storeys == 0 && pipe.building_height_m.is_none() {
                     issues.push(issue(
                         "vertical_pipe_storeys_invalid",
                         format!("{path}.storeys"),
@@ -2682,8 +2728,8 @@ mod tests {
     #[test]
     fn glazing_tables_7_4_and_louvres_7_41() {
         use crate::solar_shading::{
-            DiffusingGlazing, FixedLouvres, GlazingSolar, GlazingType, ShadeColour,
-            ShadingControl, ShadingDevice,
+            DiffusingGlazing, FixedLouvres, GlazingSolar, GlazingType, ShadeColour, ShadingControl,
+            ShadingDevice,
         };
         let mut window = sample().windows[0].clone();
         window.dynamic = None;
@@ -3402,6 +3448,35 @@ mod tests {
         let pipes = 3.0 * 1.8 + 3.0 * 0.5 / 2.0;
         assert!((summary.vertical_pipe_conductance_w_per_k.unwrap() - pipes).abs() < 1e-12);
         assert!((summary.conductance_w_per_k - (20.0 + pipes)).abs() < 1e-12);
+
+        // 7.17a: fictitious utility pipe, H = 11,9 m gives ⌊3,97⌋ = 3
+        // storeys, H = 2,5 m the minimum of 1; area share 40 %.
+        let mut value = serde_json::to_value(&input).unwrap();
+        value["transmission"]["verticalPipes"] = json!([
+            {"id": "toilet", "buildingHeightM": 11.9, "areaShare": 0.4, "insulated": false, "sourceReference": "7.3.3"},
+            {"id": "low", "buildingHeightM": 2.5, "insulated": false, "sourceReference": "7.3.3"}
+        ]);
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        let summary = valid(&input).transmission.unwrap();
+        let pipes = 3.0 * 1.8 * 0.4 + 1.8;
+        assert!((summary.vertical_pipe_conductance_w_per_k.unwrap() - pipes).abs() < 1e-12);
+        let mut value = serde_json::to_value(&input).unwrap();
+        value["transmission"]["verticalPipes"] = json!([
+            {"id": "both", "storeys": 2, "buildingHeightM": 9.0, "insulated": false, "sourceReference": "x"},
+            {"id": "share", "storeys": 2, "areaShare": 0.5, "insulated": false, "sourceReference": "x"}
+        ]);
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        let codes: Vec<_> = assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert!(codes
+            .iter()
+            .any(|code| *code == "vertical_pipe_building_height_invalid"));
+        assert!(codes
+            .iter()
+            .any(|code| *code == "vertical_pipe_area_share_requires_building_height"));
     }
 
     #[test]
