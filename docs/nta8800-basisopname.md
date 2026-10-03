@@ -52,6 +52,9 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | PV | Kristallijn type bekend, jaar onbekend → bouwjaar (vóór 2001 telt als 2000). Type onbekend → polykristallijn met het installatiejaar, of "geplaatst vóór 2001" als ook dat onbekend is. Montage onbekend → niet geventileerd | p. 191 (tabel 15.7) |
 | PV-beschaduwing | `pv[].shading` neemt de situaties van §15.4.7 over met de collectortabellen van NTA §17.3 (17.6/17.12/17.15): minimaal, zijbelemmering(en), dakranden (alleen platte daken), volledig of overig, of factoren uit de uitgebreide methode (17.3.8). Niets opgegeven → minimale belemmering (tabel 16.1, niet aanwezig), vastgelegd als toegepaste standaardwaarde. `shading` en `obstructionFactors` tegelijk → `pv_shading_declared_twice` | p. 192–193, 195–196 (tabel 16.1) |
 | Energieopslag | Gebouwgebonden elektrische en thermische opslag (kWh), alleen met PV | p. 193 (§15.5) |
+| Serre (AOS) | Grensvlak `sunroom`: in de basisopname telt een aangrenzende onverwarmde serre als buitenlucht, met zontoetreding. Vastgelegd als `sunroom_as_outdoor` | §6.3.4 p. 41 |
+| Woonwagen en woonboot | `envelope.buildingKind`: `caravan` of `floating` (bestaande ligplaats van vóór 2018, of `newBerthSince2018`). De schil volgt dan de forfaits van NTA-tabellen I.5–I.7. Het grensvlak `water` (alleen een vloer van een woonboot, anders `water_boundary_requires_houseboat_floor`) geeft de romp (`floating_hull`), naar buitenlucht. Vloer en wand tellen voor de massa als licht (`houseboat_caravan_light_mass`) | p. 49, 61 |
+| Lichtkoepels en daklichten | Met een gecontroleerde kwaliteitsverklaring (BCRG): `envelope.rooflights` met A_rc en U_rc uit de verklaring en de beglazing voor g, als raam in een dak (`rooflight_from_quality_declaration`). Zonder verklaring voer je ze in als raam of paneel; een lege verwijzing geeft `rooflight_quality_declaration_required`, een niet-dakvlak `rooflight_requires_roof` | p. 68 |
 
 ## Bekende bronfouten
 
@@ -61,11 +64,10 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 
 ## Niet ondersteund
 
-- Koeling: geeft de fout `cooling_not_supported_in_basisopname`.
-- Serres (AOS), daklichten en woonboten/woonwagens.
+- Kwaliteitsverklaringen anders dan een gemeten q_v10 en lichtkoepels/daklichten (BCRG).
 - Het nominale vermogen van een tapwaterwarmtepomp (§13.3.2.5): de kern toetst de capaciteit van tapwatertoestellen (13.8.2) nog niet.
 - Een afvoerluchtwarmtepomp zonder tweede opwekker (WD p. 43): `exhaust_air_heat_pump_second_generator_required`. Met `additionalGenerators` wordt hij aanvaard.
-- Detailopname-routes en kwaliteitsverklaringen. De uitzondering is een gemeten q_v10.
+- Detailopname-routes.
 
 ## Interpretatievragen
 
@@ -103,15 +105,19 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 - verlichting;
 - BACS.
 
-**Eén rekenzone.** Het gebouw is één rekenzone met de grootste gebruiksfunctie als hoofdfunctie. Andere functies tot samen 25 % van A_g tellen mee als hoofdfunctie (p. 39–40). Liggen ze daarboven, dan meldt de laag `mixed_functions_require_zones`. Gebouwen met meer functies moeten dus nog per functie als aparte opname (één zone per functie) worden ingevoerd. De kern kan sinds §6.5.3 gemengde zones rekenen, maar de opnamelaag gebruikt dat nog niet.
+**Eén rekenzone, eventueel gemengd.** Het gebouw is één rekenzone met de grootste gebruiksfunctie als hoofdfunctie. De overige functies worden, de kleinste eerst, samengevoegd met de hoofdfunctie zolang ze samen niet meer dan 25 % van A_g beslaan (p. 39–40; `small_functions_merged_into_main`). Wat overblijft, blijft als aparte functie in een gemengde rekenzone (NTA §6.5.3; `larger_functions_kept_separate`): de laag geeft `functionAreas` door, met oppervlaktegewogen setpoints (`FunctionProfile::weighted`), ventilatie per functie, verlichting per functie en `labelFunctions` voor het label.
 
-**Bevochtiging.** Stoombevochtiging wordt in twee stappen berekend. De eerste kernrun levert de mechanische toevoerdebieten uit hoofdstuk 11. Daaruit volgt met 12.1–12.3 de maandelijkse stoomenergie. Die komt als `declaredUses`-post met de nieuwe dienst `humidification` (E_hum van 5.20, zonder f_BACS) in een tweede run. Adiabatische bevochtiging geeft de waarschuwing `adiabatic_humidification_load_not_in_heating_chain`: de latente last hoort bij de verwarming, maar de keten neemt die nog niet op. Ontvochtiging (tabel 12.2) is nog niet gekoppeld.
+**Bevochtiging.** Bevochtiging gaat als `humidifiers`-post (zone `utiliteit`) mee in de verwarmingsketen: stoom (elektrisch of met een brandstof) en adiabatisch, met terugwinning bij een sorptiewiel. De latente last en de stoomenergie volgen dan uit hoofdstuk 12 in de kern; de tweede kernrun en de waarschuwing voor adiabatische bevochtiging zijn vervallen. Ontvochtiging (tabel 12.2) is nog niet gekoppeld.
+
+**Meerdere tapwatersystemen.** `additionalHotWaterSystems` bevat verdere tapwatersystemen, elk met eigen opwekker(s), voorraadvaten en `servedAreas` (functie en oppervlakte). Het hoofdsysteem bedient de rest van het gebouw (13.20/13.20a). Een samengevoegde kleine functie telt als de hoofdfunctie. Een extra systeem zonder bediende oppervlakte geeft `hot_water_served_areas_required`; meer oppervlakte dan de functie heeft geeft `hot_water_served_areas_exceed_function`. `servedAreas` op het hoofdsysteem wordt genegeerd (`hot_water_main_served_areas_ignored`).
+
+**LBK-batterijen.** `ventilation.ahu.heatingConnected` en `coolingConnected` worden de naverwarmer en koelbatterij van NTA-tabel 11.15 (`heatingCoil`, `coolingCoil`). Niet vast te stellen → niet aangesloten (`ahu_heating_unknown_none`, `ahu_cooling_unknown_none`; interpretatie van p. 149). Een koelbatterij zonder koelsysteem geeft `ahu_cooling_requires_cooling_system`.
 
 ## Geïmplementeerde regels
 
 | Onderdeel | Regel | ISSO 75.1 |
 |---|---|---|
-| Functies | Andere functies tot 25 % van A_g worden samengevoegd met de hoofdfunctie. Een woonfunctie hoort in de woningopname | p. 39–40 |
+| Functies | Andere functies tot samen 25 % van A_g worden, de kleinste eerst, samengevoegd met de hoofdfunctie; grotere blijven apart in een gemengde rekenzone (NTA §6.5.3). Een woonfunctie hoort in de woningopname | p. 39–40 |
 | Gebouwtype | Eén- of meerlaags, ligging en daktype bepalen de rij van NTA-tabel 11.14. "Deels plat" geldt alleen bij vrijstaande gebouwen | p. 55–56 |
 | Toestel- en renovatiejaar | Zoals bij woningen | p. 30, 57–59 |
 | Zonwerende beglazing | Zichtbaar zonwerend glas of folie → g = 0,4 | p. 96 (tabel 8.14) |
@@ -130,16 +136,17 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 | Tapwater | Geen systeem → elektrisch doorstroomtoestel. Gastoestellen zoals bij woningen. Collectieve opwekker onbekend → overige direct verwarmde voorraadvaten. Gasboiler: jaar onbekend → bouwjaar, plaats onbekend → buiten de zone. Tappuntlengte onbekend → > 3 m. Circulatie forfaitair. DWTW alleen bij functies met douches | p. 164–178 |
 | Voorraadvaten | Verplicht bij elektrische en indirect gestookte boilers. Label onbekend → volgt het fabricagejaar. Fabricagejaar onbekend → tot en met 2017. Aansluiting onbekend → ongeïsoleerd (f_sto;dis;ls = 5; elektroboilers 2). Plaats onbekend → buiten de zone | p. 172–173 (tabel 13.10) |
 | Verlichting | Vermogen onbekend → forfait tabel 14.5. Bij forfait geldt centraal aan en geen daglichtregeling. Het forfait geldt dan voor alle verlichtingszones (NTA 14.3.4). De LED-waarde vraagt LED vanaf 2017 in alle zones: gemeten zones tellen alleen mee als al hun lampen LED zijn, een armaturenlijst telt als niet-LED. Alleen ruimteschakelaars → handmatig. Sensoren van onbekend type → automatisch aan, gedimd. Daglichtregeling van onbekend type → schakelend. Lamptype onbekend → toeslag 20 %. Parasitair vermogen forfaitair | p. 182–189 |
-| Bevochtiging | Type stoom (elektrisch of niet-elektrisch) of adiabatisch. Terugwinning alleen bij een sorptiewiel | p. 161 |
+| Bevochtiging | Type stoom (elektrisch of niet-elektrisch) of adiabatisch, als bevochtiger in de verwarmingsketen. Terugwinning alleen bij een sorptiewiel | p. 161 |
+| LBK-batterijen | Verwarming of koeling aangesloten op de LBK → naverwarmer of koelbatterij (tabel 11.15). Onbekend → niet aangesloten | p. 149 |
 | PV | Zoals bij woningen | p. 196–197 |
 | Energieopslag | Zoals bij woningen | §15.5 |
 
 ## Niet ondersteund
 
-- Meer dan één rekenzone, en functiemengsels boven 25 %.
-- Koeling via de LBK (DX of watergevoerd), passieve koeling met bypass, en koeling met warmtepompen die ook verwarmen.
-- Ontvochtiging en de latente last van adiabatische bevochtiging.
-- Meerdere tapwateropwekkers met eigen typen in de utiliteitsopname, en luchtverwarming via de LBK. WKK, meerdere verwarmingsopwekkers en zonneboilers zijn wel ondersteund (zie hieronder).
+- Meer dan één rekenzone (een gemengde rekenzone wordt wel ondersteund).
+- Passieve koeling met bypass, en koeling met warmtepompen die ook verwarmen.
+- Ontvochtiging.
+- Luchtverwarming via de LBK. WKK, meerdere verwarmingsopwekkers, meerdere tapwatersystemen en zonneboilers zijn wel ondersteund.
 - Daglichtsectoren. Een bekende daglichtregeling rekent met de forfaitaire daglichtmethode.
 
 ## Interpretatievragen
@@ -182,7 +189,7 @@ BRL 9500 §4.2.2 en bijlage 3 vragen een onderbouwing wanneer de adviseur terugv
 | Zijbelemmering | `side_obstruction` | `side_obstruction` (d) | alleen detailopname |
 
 - Een situatie die niet is toegestaan geeft `shading_situation_not_in_basic_survey`. Opgegeven maandfactoren (`obstruction`) samen met `shading` geven `window_obstruction_conflict`.
-- De woningopname kent geen koeling, dus daar is altijd de rij "zonder koeling" van toepassing. De utiliteitsopname gebruikt de rij "met koeling" zodra `cooling` is ingevuld.
+- In de woningopname geldt de rij "met koeling" alleen als `cooling` is ingevuld (hoofdstuk 10, zie onder). De utiliteitsopname gebruikt de rij "met koeling" zodra `cooling` is ingevuld.
 - Bij volledige belemmering geldt de koudetabel 17.14 alleen met `coolingConditionsMet`. Zonder dat veld rekent de kern conservatief met 1,00.
 
 

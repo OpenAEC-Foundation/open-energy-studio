@@ -54,6 +54,35 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.verticalPipes).toEqual([]);
   }, 15000);
 
+  it('edits houseboats, sunrooms and rooflights in the dwelling survey', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Building type' }), 'floating');
+    await user.click(screen.getByRole('checkbox', { name: 'New berth from 2018' }));
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Boundary' })[0], 'sunroom');
+    await user.click(screen.getByRole('button', { name: 'Add rooflight with quality declaration' }));
+    const survey = stored()!.survey;
+    expect(survey.envelope.buildingKind).toEqual({ kind: 'floating', newBerthSince2018: true });
+    expect(survey.envelope.surfaces[0].boundary).toEqual({ kind: 'sunroom' });
+    expect(survey.envelope.rooflights[0]).toMatchObject({ areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '' });
+  });
+
+  it('adds a utility hot-water system with served areas and AHU coils', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
+    await user.click(screen.getByRole('button', { name: 'Add hot-water system' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Served function' }), 'assembly_without_day_care');
+    await user.click(screen.getByRole('checkbox', { name: 'Heating connected (reheating coil)' }));
+    const survey = stored()!.survey;
+    expect(survey.additionalHotWaterSystems[0]).toMatchObject({
+      generator: { kind: 'electric_instantaneous' }, showerHeatRecovery: 'none',
+      servedAreas: [{ function: 'assembly_without_day_care', areaM2: 0 }],
+    });
+    expect(survey.ventilation.ahu.heatingConnected).toBe(true);
+  });
+
   it('adds a dwelling cooling system in the ISSO 82.1 chapter 10 shape', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);

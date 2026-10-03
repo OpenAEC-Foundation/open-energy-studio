@@ -1285,12 +1285,17 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         {
             issues.push(issue("function_areas_residential_mixed", "functionAreas"));
         }
+        // On a tie any of the largest functions may be the usage function.
         let largest = input
             .function_areas
             .iter()
-            .max_by(|a, b| a.area_m2.total_cmp(&b.area_m2))
-            .map(|part| part.function);
-        if largest != Some(function) {
+            .map(|part| part.area_m2)
+            .fold(f64::NEG_INFINITY, f64::max);
+        if !input
+            .function_areas
+            .iter()
+            .any(|part| part.function == function && part.area_m2 >= largest)
+        {
             issues.push(issue("usage_function_not_largest", "usageFunction"));
         }
     }

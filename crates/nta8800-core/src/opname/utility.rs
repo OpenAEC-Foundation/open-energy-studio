@@ -12,10 +12,9 @@
 //! p. 140–158), humidification (chapter 12, p. 161), utility hot water
 //! (chapter 13, p. 164–178) and lighting (chapter 14, p. 182–189).
 //!
-//! One calculation zone per building: the main use function carries the
-//! whole A_g. Buildings where the other functions exceed 25 % of A_g are
-//! rejected (`mixed_functions_require_zones`) until the kernel supports
-//! area-weighted multi-function zones (§6.5.3).
+//! One calculation zone per building. Small functions are merged into the
+//! main function up to 25 % of A_g (p. 39–40); larger ones stay separate in
+//! a mixed calculation zone with area-weighted values (NTA §6.5.3).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -32,13 +31,8 @@ use super::ventilation::{ExchangerAnswer, MotorAnswer, PressureClass, Ventilatio
 use super::{
     loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, OpnameIssue, Recorder,
 };
-use crate::building_performance::{
-    assess_building_performance, BuildingPerformanceAssessment, BuildingPerformanceInput,
-};
-use crate::humidification::{
-    calculate_humidity, CoolingDesignTemperature as DehumidificationDesign, Humidification,
-    Humidifier, HumidityFunction, HumidityFunctionArea, HumidityInput, SteamCarrier,
-};
+use crate::building_performance::{assess_building_performance, BuildingPerformanceInput};
+use crate::humidification::{Humidification, Humidifier, SteamCarrier};
 use crate::label_class::LabelFunction;
 use crate::monthly_demand::UsageFunction;
 use crate::ventilation::AirtightnessType;
@@ -291,6 +285,14 @@ pub struct SurveyAhu {
     /// R ≥ 1,0 m²K/W; `None` unknown (table 11.14).
     #[serde(default)]
     pub ducts_insulated: Option<bool>,
+    /// p. 149: heating connected to the AHU (reheating coil, NTA 11.118–
+    /// 11.121); `None` unknown.
+    #[serde(default)]
+    pub heating_connected: Option<bool>,
+    /// p. 149: cooling connected to the AHU (cooling coil, NTA 11.114–
+    /// 11.117); `None` unknown.
+    #[serde(default)]
+    pub cooling_connected: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -410,6 +412,11 @@ pub struct UtilityHotWater {
     /// generator types.
     #[serde(default)]
     pub additional_generators: Vec<UtilityAdditionalHotWater>,
+    /// NTA 13.20/13.20a: the use functions this system serves, for an
+    /// additional hot-water system (required there). The main system serves
+    /// the rest of the building.
+    #[serde(default)]
+    pub served_areas: Vec<FunctionArea>,
     pub source_reference: String,
 }
 
@@ -589,6 +596,10 @@ pub struct UtilitySurvey {
     #[serde(default)]
     pub humidification: Option<SurveyHumidification>,
     pub hot_water: UtilityHotWater,
+    /// Further hot-water systems, each with its served areas (NTA 13.2.4,
+    /// 13.20/13.20a).
+    #[serde(default)]
+    pub additional_hot_water_systems: Vec<UtilityHotWater>,
     pub lighting: Vec<SurveyLightingZone>,
     #[serde(default)]
     pub pv: Vec<SurveyPv>,
@@ -725,11 +736,23 @@ fn usage_name(function: UsageFunction) -> &'static str {
     }
 }
 
-/// p. 39–40: the main function and whether the others fit within 25 %.
-pub fn main_function(
+/// p. 39–40: the main function with the small functions merged into it,
+/// and the functions that stay separate.
+pub struct FunctionGroups {
+    pub main: LabelFunction,
+    pub total_m2: f64,
+    /// The main function first (with the merged functions), then the
+    /// functions kept apart, for the §6.5.3 mixed calculation zone.
+    pub groups: Vec<(LabelFunction, f64)>,
+}
+
+/// p. 39–40: the main function is the largest; starting with the smallest
+/// other function, functions are merged into it while their sum stays
+/// within 25 % of A_g. The rest stays separate (NTA §6.5.3).
+pub fn function_groups(
     functions: &[FunctionArea],
     recorder: &mut Recorder,
-) -> Option<(LabelFunction, f64)> {
+) -> Option<FunctionGroups> {
     let total: f64 = functions.iter().map(|item| item.area_m2).sum();
     let mut groups: Vec<(LabelFunction, f64)> = Vec::new();
     for item in functions {
@@ -741,25 +764,60 @@ pub fn main_function(
             None => groups.push((item.function, item.area_m2)),
         }
     }
-    let (main, area) = groups.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1))?;
-    let others = total - area;
-    if others > MERGE_LIMIT * total + 1e-9 {
-        recorder.issue("mixed_functions_require_zones", "functions");
-        return None;
+    let (main, main_area) = groups.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1))?;
+    let mut others: Vec<(LabelFunction, f64)> = groups
+        .iter()
+        .copied()
+        .filter(|(function, _)| *function != main)
+        .collect();
+    others.sort_by(|a, b| a.1.total_cmp(&b.1));
+    let mut merged = 0.0;
+    let mut separate = Vec::new();
+    for (function, area) in others {
+        if merged + area <= MERGE_LIMIT * total + 1e-9 {
+            merged += area;
+        } else {
+            separate.push((function, area));
+        }
     }
-    if others > 0.0 {
+    if merged > 0.0 {
         recorder.record(
             "small_functions_merged_into_main",
             "functions",
             format!(
                 "{} m² of other functions (≤ 25 %) counted as {}",
-                round1(others),
+                round1(merged),
                 label_name(main)
             ),
             "ISSO 75.1 p. 39–40",
         );
     }
-    Some((main, total))
+    if !separate.is_empty() {
+        recorder.record(
+            "larger_functions_kept_separate",
+            "functions",
+            format!(
+                "{} function(s) beyond the 25 % merge kept in a mixed calculation zone",
+                separate.len()
+            ),
+            "ISSO 75.1 p. 39–40; NTA 8800 §6.5.3",
+        );
+    }
+    let mut result = vec![(main, main_area + merged)];
+    result.extend(separate);
+    Some(FunctionGroups {
+        main,
+        total_m2: total,
+        groups: result,
+    })
+}
+
+/// The main function and the total area (see [`function_groups`]).
+pub fn main_function(
+    functions: &[FunctionArea],
+    recorder: &mut Recorder,
+) -> Option<(LabelFunction, f64)> {
+    function_groups(functions, recorder).map(|groups| (groups.main, groups.total_m2))
 }
 
 fn round1(value: f64) -> f64 {
@@ -1512,7 +1570,7 @@ fn pressure_variant(
 #[allow(clippy::too_many_arguments)]
 fn ventilation_value(
     survey: &UtilitySurvey,
-    ventilation_function: &str,
+    ventilation_functions: &[(&'static str, f64)],
     area: f64,
     heating_c: f64,
     floor_above_crawlspace: bool,
@@ -1682,9 +1740,37 @@ fn ventilation_value(
                 }
             }
         };
+        // p. 149: heating and cooling connected to the AHU become the
+        // reheating and cooling coils of NTA table 11.15.
+        let heating_coil = ahu.heating_connected.unwrap_or_else(|| {
+            recorder.record(
+                "ahu_heating_unknown_none",
+                "ventilation.ahu.heatingConnected",
+                "no reheating coil (interpretation: not determinable is not connected)".into(),
+                "ISSO 75.1 p. 149",
+            );
+            false
+        });
+        let cooling_coil = ahu.cooling_connected.unwrap_or_else(|| {
+            recorder.record(
+                "ahu_cooling_unknown_none",
+                "ventilation.ahu.coolingConnected",
+                "no cooling coil (interpretation: not determinable is not connected)".into(),
+                "ISSO 75.1 p. 149",
+            );
+            false
+        });
+        if cooling_coil && survey.cooling.is_none() {
+            recorder.issue(
+                "ahu_cooling_requires_cooling_system",
+                "ventilation.ahu.coolingConnected",
+            );
+        }
         unit["airHandlingUnit"] = json!({
             "insideThermalZone": inside,
             "supplyDuctsOutside": situation,
+            "heatingCoil": heating_coil,
+            "coolingCoil": cooling_coil,
         });
     }
     // Tables 11.7/11.8 (p. 148–149).
@@ -1785,7 +1871,10 @@ fn ventilation_value(
         "zoneId": "utiliteit",
         "usableFloorAreaM2": area,
         "category": "utility",
-        "functions": [{"function": ventilation_function, "areaM2": area}],
+        "functions": ventilation_functions
+            .iter()
+            .map(|(function, part)| json!({"function": function, "areaM2": part}))
+            .collect::<Vec<_>>(),
         "dwellingCount": 0,
         "buildingHeightM": survey.building_height_m,
         "constructionYear": year,
@@ -1802,11 +1891,11 @@ fn ventilation_value(
 
 fn hot_water_value(
     survey: &UtilitySurvey,
+    hot: &UtilityHotWater,
     main: LabelFunction,
-    area: f64,
+    groups: &[(LabelFunction, f64)],
     recorder: &mut Recorder,
 ) -> Value {
-    let hot = &survey.hot_water;
     let reference = hot.source_reference.as_str();
     // Generators shared with the residential layer go through its mapping.
     let shared = shared_hot_water_answer(&hot.generator);
@@ -1866,7 +1955,10 @@ fn hot_water_value(
     }
     system["need"] = json!({
         "method": "utility",
-        "areas": [{"function": label_name(main), "areaM2": area}],
+        "areas": groups
+            .iter()
+            .map(|(function, part)| json!({"function": label_name(*function), "areaM2": part}))
+            .collect::<Vec<_>>(),
         "sourceReference": "NTA table 13.1",
     });
     let length = hot.mean_draw_off_length_m.unwrap_or_else(|| {
@@ -2077,8 +2169,7 @@ fn storage_value(vessel: &SurveyStorage, electric_boiler: bool, recorder: &mut R
 
 fn lighting_value(
     survey: &UtilitySurvey,
-    main: LabelFunction,
-    area: f64,
+    groups: &[(LabelFunction, f64)],
     recorder: &mut Recorder,
 ) -> Value {
     let mut zones = Vec::new();
@@ -2244,7 +2335,10 @@ fn lighting_value(
     );
     json!({
         "zoneId": "utiliteit",
-        "functions": [{"function": label_name(main), "areaM2": area}],
+        "functions": groups
+            .iter()
+            .map(|(function, part)| json!({"function": label_name(*function), "areaM2": part}))
+            .collect::<Vec<_>>(),
         "lightingZones": zones,
         "sourceReference": format!("{}; basisopname", survey.source_reference),
     })
@@ -2324,9 +2418,28 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     if !recorder.issues.is_empty() {
         return None;
     }
-    let (main, area) = main_function(&survey.functions, recorder)?;
-    let (usage, ventilation_function, reduction_function) = kernel_names(main);
-    let heating_c = usage.heating_setpoint_c();
+    let groups = function_groups(&survey.functions, recorder)?;
+    let (main, area) = (groups.main, groups.total_m2);
+    let (usage, _, reduction_function) = kernel_names(main);
+    // §6.5.3: area-weighted values of a mixed calculation zone.
+    let function_areas: Vec<crate::monthly_demand::UsageFunctionArea> = groups
+        .groups
+        .iter()
+        .map(
+            |(function, part)| crate::monthly_demand::UsageFunctionArea {
+                function: kernel_names(*function).0,
+                area_m2: *part,
+            },
+        )
+        .collect();
+    let profile = crate::monthly_demand::FunctionProfile::weighted(&function_areas);
+    let heating_c = profile.heating_setpoint_c;
+    let cooling_c = profile.cooling_setpoint_c;
+    let ventilation_functions: Vec<(&'static str, f64)> = groups
+        .groups
+        .iter()
+        .map(|(function, part)| (kernel_names(*function).1, *part))
+        .collect();
     let year = survey.construction_year;
     let airtightness = utility_airtightness(&survey.building_type, recorder);
     let infiltration = infiltration_year(year, survey.renovation.as_ref(), recorder);
@@ -2347,7 +2460,7 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     }
     let ventilation = ventilation_value(
         survey,
-        ventilation_function,
+        &ventilation_functions,
         area,
         heating_c,
         envelope.floor_above_crawlspace,
@@ -2356,13 +2469,66 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         recorder,
     );
     let heating = derive_utility_heating(survey, reduction_function, area, recorder);
-    let mut hot_water = hot_water_value(survey, main, area, recorder);
+    // NTA 13.20/13.20a: each additional system serves its own areas (a
+    // merged small function counts as the main function); the main system
+    // serves the rest.
+    let to_group = |function: LabelFunction| {
+        if groups.groups.iter().any(|(group, _)| *group == function) {
+            function
+        } else {
+            main
+        }
+    };
+    let mut main_served = groups.groups.clone();
+    let mut extra_systems = Vec::new();
+    for (index, system) in survey.additional_hot_water_systems.iter().enumerate() {
+        let mut served: Vec<(LabelFunction, f64)> = Vec::new();
+        for part in &system.served_areas {
+            let function = to_group(part.function);
+            match served.iter_mut().find(|(item, _)| *item == function) {
+                Some(item) => item.1 += part.area_m2,
+                None => served.push((function, part.area_m2)),
+            }
+            if let Some(rest) = main_served.iter_mut().find(|(item, _)| *item == function) {
+                rest.1 -= part.area_m2;
+            }
+        }
+        if served.is_empty() {
+            recorder.issue(
+                "hot_water_served_areas_required",
+                format!("additionalHotWaterSystems[{index}].servedAreas"),
+            );
+            continue;
+        }
+        let mut value = hot_water_value(survey, system, main, &served, recorder);
+        super::hot_water::apply_exhaust_air_use(
+            &mut value,
+            survey.ventilation.principle,
+            survey.ventilation.heat_recovery.is_some(),
+        );
+        extra_systems.push(value);
+    }
+    if main_served.iter().any(|(_, part)| *part < -1e-6) {
+        recorder.issue(
+            "hot_water_served_areas_exceed_function",
+            "additionalHotWaterSystems",
+        );
+    }
+    main_served.retain(|(_, part)| *part > 1e-6);
+    if !survey.hot_water.served_areas.is_empty() {
+        recorder.warning(
+            "hot_water_main_served_areas_ignored",
+            "hotWater.servedAreas",
+            "the main hot-water system serves the areas not taken by additional systems",
+        );
+    }
+    let mut hot_water = hot_water_value(survey, &survey.hot_water, main, &main_served, recorder);
     super::hot_water::apply_exhaust_air_use(
         &mut hot_water,
         survey.ventilation.principle,
         survey.ventilation.heat_recovery.is_some(),
     );
-    let lighting = lighting_value(survey, main, area, recorder);
+    let lighting = lighting_value(survey, &groups.groups, recorder);
     let cooling = survey.cooling.as_ref().map(|cooling| {
         cooling_value(
             cooling,
@@ -2415,7 +2581,15 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         "usableFloorAreaM2": area,
         "areaSourceReference": survey.area_source_reference,
         "usageFunction": usage_name(usage),
-        "setpoints": {"heatingC": heating_c, "coolingC": 24.0, "sourceReference": "NTA 8800 table 7.13"},
+        "functionAreas": if function_areas.len() > 1 {
+            json!(function_areas
+                .iter()
+                .map(|part| json!({"function": usage_name(part.function), "areaM2": part.area_m2}))
+                .collect::<Vec<_>>())
+        } else {
+            json!([])
+        },
+        "setpoints": {"heatingC": heating_c, "coolingC": cooling_c, "sourceReference": "NTA 8800 table 7.13 (§6.5.3 weighted)"},
         "transmission": {
             "method": "components",
             "direct": {"elements": envelope.direct_elements, "linearBridges": [], "pointBridges": []},
@@ -2460,6 +2634,9 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     if let Some(system) = heating.distribution_system {
         chain["distributionSystem"] = system;
     }
+    if let Some(humidifier) = humidifier_value(survey) {
+        chain["humidifiers"] = json!([humidifier]);
+    }
     let mut input = json!({
         "calculationScope": "utility",
         "totalUsableFloorAreaM2": area,
@@ -2473,10 +2650,20 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         "onSiteProduction": [],
         "pvSystems": pv,
         "labelFunction": label_name(main),
+        "labelFunctions": if groups.groups.len() > 1 {
+            json!(groups
+                .groups
+                .iter()
+                .map(|(function, part)| json!({"function": label_name(*function), "areaM2": part}))
+                .collect::<Vec<_>>())
+        } else {
+            json!([])
+        },
         "lossAreaM2": loss_area(&survey.envelope),
         "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
         "lighting": [lighting],
         "hotWater": hot_water,
+        "additionalHotWaterSystems": extra_systems,
         "demandUsesFixedC1Ventilation": false,
         "batteryStoragePresent": storage_present,
     });
@@ -2499,27 +2686,11 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
     Some(input)
 }
 
-/// Monthly steam-humidifier energy (12.1–12.3) as a declared use, from the
-/// mechanical supply flow of the heating balance and the cooling need.
-fn humidification_use(
-    survey: &UtilitySurvey,
-    main: LabelFunction,
-    performance: &BuildingPerformanceAssessment,
-    recorder: &mut Recorder,
-) -> Option<Value> {
+/// Chapter 12 humidifier of the survey (p. 161) for the heating chain:
+/// atomising humidifiers load the space-heating node (12.1, 9.4), steam
+/// humidifiers book their own carrier (12.3) and recoverable loss (12.4).
+fn humidifier_value(survey: &UtilitySurvey) -> Option<Value> {
     let humidification = survey.humidification.as_ref()?;
-    let demand = &performance.space_heating.demand;
-    let Some(ventilation) = demand.ventilation.as_ref() else {
-        recorder.issue("humidification_requires_chapter_11", "humidification");
-        return None;
-    };
-    let function = match main {
-        LabelFunction::HealthcareWithBeds | LabelFunction::HealthcareWithoutBeds => {
-            HumidityFunction::Healthcare
-        }
-        LabelFunction::Sport => HumidityFunction::Sport,
-        _ => HumidityFunction::General,
-    };
     let humidifier = match humidification.humidifier {
         HumidifierAnswer::ElectricSteam => Humidifier::Steam {
             carrier: SteamCarrier::Electricity,
@@ -2529,67 +2700,22 @@ fn humidification_use(
         },
         HumidifierAnswer::Adiabatic => Humidifier::Atomising,
     };
-    let input = HumidityInput {
-        zone_id: "utiliteit".into(),
-        usable_floor_area_m2: survey.functions.iter().map(|item| item.area_m2).sum(),
-        installation_area_m2: None,
-        functions: vec![HumidityFunctionArea {
-            function,
-            area_m2: survey.functions.iter().map(|item| item.area_m2).sum(),
-        }],
-        humidification: Some(Humidification {
-            humidifier,
-            rotary_wheel: humidification.absorption_wheel,
-            equipment_reference: humidification.source_reference.clone(),
-        }),
-        supply_flow_m3_per_h: ventilation
-            .months
-            .iter()
-            .map(|month| month.heating.mechanical_supply_m3_per_h)
-            .collect(),
-        cooling_design: None::<DehumidificationDesign>,
-        cooling_need_kwh: Vec::new(),
+    let value = Humidification {
+        humidifier,
+        rotary_wheel: humidification.absorption_wheel,
+        equipment_reference: humidification.source_reference.clone(),
     };
-    let months = match calculate_humidity(&input) {
-        Ok(months) => months,
-        Err(issues) => {
-            for issue in issues {
-                recorder.issue(issue.code, format!("humidification.{}", issue.path));
-            }
-            return None;
-        }
-    };
-    match humidification.humidifier {
-        HumidifierAnswer::Adiabatic => {
-            recorder.warning(
-                "adiabatic_humidification_load_not_in_heating_chain",
-                "humidification",
-                "12.2: the latent load of atomising humidifiers is supplied by the heating system; the kernel does not add it to the heating chain yet",
-            );
-            None
-        }
-        HumidifierAnswer::ElectricSteam | HumidifierAnswer::NonElectricSteam => {
-            let electric = humidification.humidifier == HumidifierAnswer::ElectricSteam;
-            Some(json!({
-                "id": "bevochtiging",
-                "service": "humidification",
-                "carrier": if electric { "el" } else { "gas" },
-                "monthlyKwh": months.iter().map(|month| if electric {
-                    month.steam_electricity_kwh
-                } else {
-                    month.steam_fuel_kwh
-                }).collect::<Vec<_>>(),
-                "sourceReference": format!("NTA 12.1–12.3 (kernel humidification); {}", humidification.source_reference),
-            }))
-        }
-    }
+    Some(json!({
+        "zoneId": "utiliteit",
+        "humidification": serde_json::to_value(value).expect("typed humidification serializes"),
+    }))
 }
 
 /// Survey → kernel input → building performance (utility).
 pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
     let mut recorder = Recorder::default();
     let derived = derive_utility_input(survey, &mut recorder);
-    let mut derived_input =
+    let derived_input =
         derived.and_then(
             |value| match serde_json::from_value::<BuildingPerformanceInput>(value) {
                 Ok(input) => Some(input),
@@ -2602,28 +2728,7 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
                 }
             },
         );
-    let mut performance = derived_input.as_ref().map(assess_building_performance);
-    // 12.1–12.3: steam humidification energy needs the chapter 11 flows of
-    // the first run; it is then added as a declared use.
-    if let (Some(input), Some(result)) = (derived_input.as_mut(), performance.as_ref()) {
-        if result.status == "calculated_unverified" {
-            let main = main_function(&survey.functions, &mut Recorder::default())
-                .map(|(main, _)| main)
-                .unwrap_or(LabelFunction::Office);
-            if let Some(value) = humidification_use(survey, main, result, &mut recorder) {
-                match serde_json::from_value(value) {
-                    Ok(item) => {
-                        input.declared_uses.push(item);
-                        performance = Some(assess_building_performance(input));
-                    }
-                    Err(error) => recorder.issues.push(OpnameIssue {
-                        code: "derived_input_shape_invalid",
-                        path: error.to_string(),
-                    }),
-                }
-            }
-        }
-    }
+    let performance = derived_input.as_ref().map(assess_building_performance);
     remap_sources(&mut recorder.applied);
     super::apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
     let status = match &performance {
@@ -2715,6 +2820,50 @@ mod tests {
                 .any(|item| item.rule == "chp_engine_unknown_gas");
             assert_eq!(unknown_recorded, engine.is_none());
         }
+    }
+
+    #[test]
+    fn additional_hot_water_system_serves_its_own_areas() {
+        let mut survey = fixture("1985");
+        let main_area: f64 = survey.functions[0].area_m2;
+        let mut extra = survey.hot_water.clone();
+        extra.generator = UtilityHotWaterGenerator::ElectricInstantaneous;
+        extra.storage.clear();
+        extra.solar.clear();
+        extra.additional_generators.clear();
+        extra.nominal_power_kw = None;
+        extra.served_areas = vec![FunctionArea {
+            function: survey.functions[0].function,
+            area_m2: 200.0,
+        }];
+        survey.additional_hot_water_systems = vec![extra];
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?}",
+            (
+                &result.issues,
+                result.performance.as_ref().map(|item| &item.issues)
+            )
+        );
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        let extras = input["additionalHotWaterSystems"].as_array().unwrap();
+        assert_eq!(extras.len(), 1);
+        assert_eq!(extras[0]["need"]["areas"][0]["areaM2"], 200.0);
+        // NTA 13.20a: the main system serves the rest of that function.
+        let main_areas = input["hotWater"]["need"]["areas"].as_array().unwrap();
+        let first = main_areas[0]["areaM2"].as_f64().unwrap();
+        assert!(first < main_area + 1e-9 && first > 0.0);
+        // Serving more than the function has is rejected.
+        let mut over = survey.clone();
+        over.additional_hot_water_systems[0].served_areas[0].area_m2 = 1.0e6;
+        let mut recorder = Recorder::default();
+        assert!(derive_utility_input(&over, &mut recorder).is_none());
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "hot_water_served_areas_exceed_function"));
     }
 
     #[test]
@@ -2871,12 +3020,61 @@ mod tests {
         assert_eq!(input["labelFunction"], "office");
         assert_eq!(input["totalUsableFloorAreaM2"], 1300.0);
         assert!(applied(&recorder, "small_functions_merged_into_main"));
+        // Above 25 % the function stays separate: a §6.5.3 mixed zone.
         let mut survey = fixture("1985");
         survey.functions[1].area_m2 = 500.0;
         survey.lighting[1].area_m2 = 600.0;
+        let (input, recorder) = derive(&survey);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        assert!(applied(&recorder, "larger_functions_kept_separate"));
+        let areas = input["spaceHeating"]["demand"]["functionAreas"]
+            .as_array()
+            .unwrap();
+        assert_eq!(areas.len(), 2);
+        assert_eq!(input["labelFunctions"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            input["hotWater"]["need"]["areas"].as_array().unwrap().len(),
+            2
+        );
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+    }
+
+    #[test]
+    fn merging_starts_with_the_smallest_function() {
+        let functions = [
+            FunctionArea {
+                function: LabelFunction::Office,
+                area_m2: 600.0,
+            },
+            FunctionArea {
+                function: LabelFunction::Retail,
+                area_m2: 200.0,
+            },
+            FunctionArea {
+                function: LabelFunction::Education,
+                area_m2: 150.0,
+            },
+            FunctionArea {
+                function: LabelFunction::Sport,
+                area_m2: 50.0,
+            },
+        ];
         let mut recorder = Recorder::default();
-        assert!(derive_utility_input(&survey, &mut recorder).is_none());
-        assert_eq!(recorder.issues[0].code, "mixed_functions_require_zones");
+        let groups = function_groups(&functions, &mut recorder).unwrap();
+        // 25 % of 1000 m²: sport 50 + education 150 = 200 merge; retail stays.
+        assert_eq!(groups.main, LabelFunction::Office);
+        assert_eq!(
+            groups.groups,
+            vec![
+                (LabelFunction::Office, 800.0),
+                (LabelFunction::Retail, 200.0)
+            ]
+        );
     }
 
     #[test]
@@ -3290,6 +3488,37 @@ mod tests {
     }
 
     #[test]
+    fn ahu_heating_and_cooling_become_coils() {
+        let (input, recorder) = derive(&fixture("1970"));
+        let ahu =
+            &input["spaceHeating"]["demand"]["ventilation"]["system"]["unit"]["airHandlingUnit"];
+        assert_eq!(ahu["heatingCoil"], false);
+        assert_eq!(ahu["coolingCoil"], false);
+        assert!(applied(&recorder, "ahu_heating_unknown_none"));
+        let mut survey = fixture("1970");
+        let unit = survey.ventilation.ahu.as_mut().unwrap();
+        unit.heating_connected = Some(true);
+        unit.cooling_connected = Some(true);
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let chain = &result.performance.as_ref().unwrap().space_heating;
+        assert!(chain.monthly[0].ahu_heating_load_kwh > 0.0);
+        // Cooling connected without a cooling system is rejected.
+        let mut dry = survey.clone();
+        dry.cooling = None;
+        let mut recorder = Recorder::default();
+        assert!(derive_utility_input(&dry, &mut recorder).is_none());
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "ahu_cooling_requires_cooling_system"));
+    }
+
+    #[test]
     fn ahu_ducts_follow_table_11_14() {
         let (input, recorder) = derive(&fixture("1970"));
         let ahu =
@@ -3305,6 +3534,8 @@ mod tests {
             ducts_outside_thermal_zone: Some(true),
             duct_length: Some(DuctLengthAnswer::AtMost20M),
             ducts_insulated: Some(true),
+            heating_connected: None,
+            cooling_connected: None,
         });
         let (input, recorder) = derive(&survey);
         let ahu =
@@ -3461,24 +3692,37 @@ mod tests {
     }
 
     #[test]
-    fn steam_humidification_becomes_a_declared_use() {
+    fn humidification_runs_in_the_heating_chain() {
         let result = assess_utility_survey(&fixture("1970"));
-        let input = result.derived_input.as_ref().unwrap();
-        let steam = input
-            .declared_uses
-            .iter()
-            .find(|item| item.id == "bevochtiging")
-            .expect("steam use");
         assert_eq!(
-            steam.service,
-            crate::building_performance::Service::Humidification
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
         );
-        assert!(steam.monthly_kwh[0] > 0.0);
-        assert_eq!(steam.monthly_kwh[6], 0.0);
+        let input = result.derived_input.as_ref().unwrap();
+        assert_eq!(input.space_heating.humidifiers.len(), 1);
+        // 12.3: steam energy on its own carrier in the chain, winter only.
+        let chain = &result.performance.as_ref().unwrap().space_heating;
+        let steam = |month: usize| {
+            chain.monthly[month].humidification_electricity_kwh
+                + chain.monthly[month].humidification_fuel_kwh
+        };
+        assert!(steam(0) > 0.0);
+        assert_eq!(steam(6), 0.0);
+        // 12.1/9.4: an adiabatic humidifier loads the heating node.
         let mut survey = fixture("1970");
         survey.humidification.as_mut().unwrap().humidifier = HumidifierAnswer::Adiabatic;
         let result = assess_utility_survey(&survey);
-        assert!(result
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(
+            result.performance.as_ref().unwrap().space_heating.monthly[0].humidification_load_kwh
+                > 0.0
+        );
+        assert!(!result
             .warnings
             .iter()
             .any(|item| item.code == "adiabatic_humidification_load_not_in_heating_chain"));
