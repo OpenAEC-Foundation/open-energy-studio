@@ -852,6 +852,62 @@ pub struct BuildingPerformanceAssessment {
     /// Factors of the external supply and the EMGforf totals (§5.8).
     pub external_supply: Option<ExternalSupplyResult>,
     pub issues: Vec<PerformanceIssue>,
+    /// Non-blocking findings: the result follows the norm, but an input or
+    /// a literal formula gives an implausible value worth checking.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<PerformanceIssue>,
+}
+
+/// Annual η_W;dis (13.25) below which circulation defaults are flagged.
+pub const CIRCULATION_EFFICIENCY_WARNING: f64 = 0.2;
+
+/// Warnings on the cooling and hot-water results (no effect on the result).
+fn result_warnings(
+    input: &BuildingPerformanceInput,
+    cooling: Option<&CoolingAssessment>,
+    hot_water: Option<&HotWaterAssessment>,
+) -> Vec<PerformanceIssue> {
+    let mut warnings: Vec<PerformanceIssue> = cooling
+        .map(|result| {
+            result
+                .warnings
+                .iter()
+                .map(|item| issue(item.code, format!("cooling.{}", item.path)))
+                .collect()
+        })
+        .unwrap_or_default();
+    // 13.25 with the defaults of 13.31/table 13.4/13.29: correct per the
+    // norm, but an extreme η_W;dis usually means the defaults do not
+    // describe the installation.
+    let defaulted = input
+        .hot_water
+        .iter()
+        .chain(&input.additional_hot_water_systems)
+        .filter_map(|system| system.circulation.as_ref())
+        .any(|circulation| {
+            circulation.length_m.is_none()
+                || (circulation.outer_diameter_mm.is_none()
+                    && circulation.declared_psi_w_per_mk.is_none())
+        });
+    if let (true, Some(result)) = (defaulted, hot_water) {
+        let emission: f64 = result
+            .months
+            .iter()
+            .map(|month| month.emission_input_kwh)
+            .sum();
+        let loss: f64 = result
+            .months
+            .iter()
+            .map(|month| month.circulation_loss_kwh)
+            .sum();
+        if emission > 0.0 && emission / (emission + loss) < CIRCULATION_EFFICIENCY_WARNING {
+            warnings.push(issue(
+                "hot_water_circulation_defaults_low_efficiency",
+                "hotWater.circulation",
+            ));
+        }
+    }
+    warnings
 }
 
 fn issue(code: &'static str, path: impl Into<String>) -> PerformanceIssue {
@@ -2703,6 +2759,7 @@ pub fn assess_building_performance(
             apply_combi_chp_heating(&mut heating, shares, product.fuel);
         }
     }
+    let warnings = result_warnings(input, cooling.as_ref(), hot_water.as_ref());
     let mut external = resolve_external(input, &mut issues);
     let mut forfait_totals = None;
     if issues.is_empty() {
@@ -3110,6 +3167,7 @@ pub fn assess_building_performance(
         indicators: indicators.filter(|_| valid),
         external_supply: valid.then_some(external),
         issues,
+        warnings,
     }
 }
 
@@ -4482,6 +4540,92 @@ mod tests {
     }
 
     #[test]
+    fn circulation_defaults_with_extreme_efficiency_are_flagged() {
+        use crate::domestic_hot_water::{
+            Circulation, CirculationPump, HotWaterEmission, HotWaterGenerator, HotWaterNeed,
+            PipeInsulation, PumpControl, ServedTaps,
+        };
+        let mut sample = input();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let circulation = Circulation {
+            outer_diameter_mm: None,
+            insulation: PipeInsulation::None,
+            declared_psi_w_per_mk: None,
+            fittings_insulated: false,
+            length_m: None,
+            unheated_length_m: None,
+            unheated_ambient_c: None,
+            floor_count: 3,
+            sport_hall_area_m2: 0.0,
+            connected_dwellings: None,
+            pump: CirculationPump {
+                control: PumpControl::UncontrolledOrUnknown,
+                label_power_kw: None,
+                energy_efficiency_index: None,
+            },
+            source_reference: "defaults".into(),
+        };
+        sample.hot_water = Some(HotWaterSystem {
+            declared_share: None,
+            connected_taps: None,
+            unheated_reduction_factor: None,
+            need: HotWaterNeed::Residential {
+                dwelling_count: 1,
+                source_reference: "one dwelling".into(),
+            },
+            emission: HotWaterEmission::Residential {
+                served: ServedTaps::KitchenAndBathroom,
+                kitchen_length_m: Some(1.0),
+                bathroom_length_m: Some(1.0),
+                source_reference: "drawing".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: Some(circulation.clone()),
+            storage: Vec::new(),
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator: HotWaterGenerator::ElectricInstantaneous,
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
+            collective: None,
+            equipment_reference: "plate".into(),
+        });
+        let efficiency = |result: &BuildingPerformanceAssessment| {
+            let months = &result.hot_water.as_ref().unwrap().months;
+            let emission: f64 = months.iter().map(|month| month.emission_input_kwh).sum();
+            let loss: f64 = months.iter().map(|month| month.circulation_loss_kwh).sum();
+            emission / (emission + loss)
+        };
+        let flagged = |result: &BuildingPerformanceAssessment| {
+            result
+                .warnings
+                .iter()
+                .any(|item| item.code == "hot_water_circulation_defaults_low_efficiency")
+        };
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let eta = efficiency(&result);
+        assert!(eta < CIRCULATION_EFFICIENCY_WARNING, "{eta}");
+        assert!(flagged(&result));
+        // The same loss with a measured length and diameter is not flagged.
+        let mut measured = circulation;
+        measured.length_m = Some(200.0);
+        measured.outer_diameter_mm = Some(15.0);
+        sample.hot_water.as_mut().unwrap().circulation = Some(measured);
+        let result = assess_building_performance(&sample);
+        assert!(!flagged(&result));
+    }
+
+    #[test]
     fn hot_water_chp_electricity_is_own_production() {
         use crate::domestic_hot_water::{
             HotWaterChp, HotWaterEmission, HotWaterGenerator, HotWaterNeed, ServedTaps,
@@ -4763,6 +4907,7 @@ mod tests {
             zone_booster_extraction_kwh: Vec::new(),
             interpretations: Vec::new(),
             systems: Vec::new(),
+            warnings: Vec::new(),
         };
         let coupled = coupled_hot_water_input(&sample, Some(1.02), Some(&cooling)).unwrap();
         assert!(matches!(
@@ -5392,6 +5537,7 @@ mod tests {
                 connection_factor: 1,
                 in_heated_zone: true,
                 unheated_ambient_c: None,
+                not_in_appliance_test: false,
                 source_reference: "label".into(),
             }],
             delivery_sets: None,

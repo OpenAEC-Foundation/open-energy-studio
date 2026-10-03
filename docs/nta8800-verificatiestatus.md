@@ -72,6 +72,7 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - bijlage Q: F_H;gen = 1 bij volledige dekking; Q.48 bij L/W;
 - de teken-keuze van Δθ_fan in 9.29 tegenover 10.20;
 - 10.15 en tabel 10.16;
+- 10.23c: het gemiddelde van ϑ_in en ϑ_out van tabel 10.8, in plaats van tweemaal de aanvoertemperatuur;
 - bijlage N: N.69, N.52 en N.61;
 - micro-WKK: P_th;sb;
 - TOjuli: AOR/AVR;
@@ -106,6 +107,26 @@ De herberekeningen brachten wel invoer- en validatiepunten aan het licht:
 - onrealistische opgegeven gebruiken in de voorbeelden.
 
 Deze punten worden afgewerkt.
+
+**Herberekening van de berekende routes voor tapwater (H13) en koeling (H10, methode 2), 4 oktober 2026.** Ook deze controle is gedaan met een eigen Python-implementatie vanuit de normpagina's. Vergeleken scenario's:
+- tapwater: vijf scenario's (circulatie, voorraadvaten, warmtepompen volgens 13.160b, alle standaardwaarden);
+- koeling: twee scenario's.
+
+Hoofdstuk 13 kwam op elke maandterm overeen. In hoofdstuk 10 bleek één echte fout te zitten. Wat er is aangepast:
+- **10.73: uittredetemperatuur van de opwekker (gecorrigeerd).** Volgens §10.3.4 (p. 379–380) geldt ϑ_C;gen;req;out = ϑ_C;gen;out;set = ϑ_C;dis;flw;set. In tabel 10.8 is dat de ontwerp-aanvoertemperatuur min Δϑ_int;inc.
+  - De kern gebruikte de kale aanvoertemperatuur (6/12/17 °C) en ging zonder distributie uit van de kolom 6/12. Ze rekent nu met aanvoer − Δϑ_int;inc. Omdat Δϑ_int;inc negatief is, wordt de aanvoertemperatuur dus hoger.
+  - Bij verdamping in de ruimte geldt nu ϑ_C;int;inc = 24 + Δϑ_int;inc (10.10) in plaats van 24 °C.
+  - Het effect: een hogere EER. In het herberekende scenario met een luchtgekoelde 12/18-machine daalt het jaarverbruik met ongeveer 19 %.
+- **10.23c: gemiddelde mediumtemperatuur (interpretatie, ongewijzigd).** De gedrukte formule zet ϑ_C,in en ϑ_C,out allebei gelijk aan ϑ_C;dis;in;flw;req. Dat zou het gemiddelde laten samenvallen met de aanvoertemperatuur. De tekst erboven (p. 383) zegt echter dat de gemiddelde temperatuur "uit tabel 10.8" volgt, en die tabel geeft een aparte ϑ_in en ϑ_out. De kern volgt die tabel: (ϑ_in + ϑ_out)/2 − Δϑ_int;inc. De tweede regel van 10.23c lezen we als drukfout; anders zou de ϑ_out-rij van tabel 10.8 nergens gebruikt worden.
+- **10.15: afgifteverlies vlak bij de singulariteit (letterlijk, met waarschuwing).** Als ϑ_C;int;inc − ϑ_e;comb vlak onder nul ligt, wordt Δϑ_int;inc/(ϑ_C;int;inc − ϑ_e;comb) groot. Het afgifteverlies kan dan een veelvoud van de behoefte worden. De kern houdt de letterlijke uitkomst aan. Boven 3× de behoefte meldt ze de niet-blokkerende waarschuwing `cooling_emission_loss_singular` (pad `cooling.months[i]`), die het paneel toont.
+- **Voorraadvat bij een getest toestel.** Opmerking 1 van §13.6.2 (p. 566) zet het vatverlies alleen op nul als een toestel volgens 13.8.4.2/13.8.4.3 samen met het vat is getest. Met `notInApplianceTest: true` per vat is een apart vat nu toegestaan bij `measured_two_profiles`, `heat_pump_en16147` of een gastoestel met bijlage T; het verlies wordt dan berekend. Bij de tabelwaarden (13.25, forfaitair) blijft een apart vat geblokkeerd.
+- **Gemeten H_sto;ls.** Volgens p. 568 wordt H_sto;ls naar boven afgerond volgens bijlage X. Dat gebeurt nu ook bij `measured` (eerder alleen bij zonnevaten). Er is een nieuwe variant `measured_standby` voor 13.60, die H_sto;ls afleidt uit Q_stb;ls;ref, ϑ_sto;set;ref en ϑ_amb;ref. X.2 neemt letterlijk "het eerstvolgende hogere getal", ook als de waarde al in tabel X.1 staat (1,2 → 1,3).
+- **NEN-EN 16147 bij één tappatroon (13.160b).** De correcties 13.153b (SCF, smart = 1 vanaf 0,07) en 13.153c (T_max;test, T_set;design, standaard 55 °C) zijn nu optionele invoer: `smartControlFactor`, `maxTestTemperatureC` en `designSetTemperatureC`. Zonder die invoer wordt `inputKwhPerDay` ongecorrigeerd gebruikt. C_W;mixed air hoort bij combiwarmtepompen op mengluchtbronnen; die route volgt 13.8.4.2 (`measured_two_profiles.mixedAir`).
+- **Randen van tabel 13.18.**
+  - Onder 765 kWh geldt de eerste kolom: de klasse wordt niet overschreden en de tabel heeft geen lagere kolom.
+  - Boven de laatste kolom van het gemeten profiel geeft de kern `hot_water_heat_pump_class_exceeded`. P. 630 verbiedt gebruik in een hogere klasse dan de gemeten klasse, en voor profielen groter dan XL bestaan geen factoren.
+- **Circulatie met standaardwaarden.** Ontbreekt de lengte (13.31) of de diameter/Ψ (13.29/tabel 13.4), en is het jaarlijkse η_W;dis lager dan 0,2? Dan meldt de kern de niet-blokkerende waarschuwing `hot_water_circulation_defaults_low_efficiency`. De berekening zelf blijft normconform.
+- Niet nagerekend: koelmethode 1 (NEN-EN 14825, 10.53–10.64).
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 

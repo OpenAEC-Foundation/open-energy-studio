@@ -130,6 +130,15 @@ export function NtaPerformancePanel() {
         </div>
       )}
 
+      {!loading && calculated && (performance?.warnings?.length ?? 0) > 0 && (
+        <div className="nta-performance-gaps" data-testid="nta-performance-warnings">
+          <p role="status"><AlertCircle size={16} /> {t('nta.performance.warnings')}</p>
+          <ul>{(performance?.warnings ?? []).map((item, index) => (
+            <li key={`${item.code}-${index}`}><strong>{gapLabel(item.code)}</strong><code>{item.path}</code></li>
+          ))}</ul>
+        </div>
+      )}
+
       {!loading && calculated && performance && heating && <>
         <div className="nta-performance-indicators" role="group" aria-label={t('nta.performance.indicators')}>
           <div>

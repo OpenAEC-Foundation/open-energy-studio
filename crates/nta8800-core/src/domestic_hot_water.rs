@@ -322,11 +322,51 @@ pub enum StorageLoss {
         #[serde(rename = "producedFrom2018")]
         produced_from_2018: bool,
     },
-    /// 13.58 with a measured `H_sto;ls` (13.60), W/K; `f_sto;dis;ls = 1`.
+    /// 13.58 with a measured `H_sto;ls` (13.60), W/K; `f_sto;dis;ls = 1`;
+    /// rounded up per annex X (p. 568).
     Measured {
         #[serde(rename = "transmissionWPerK")]
         transmission_w_per_k: f64,
     },
+    /// 13.58 with `H_sto;ls` derived from the standby test by 13.60 and
+    /// rounded up per annex X; `f_sto;dis;ls = 1`.
+    MeasuredStandby {
+        /// `Q_stb;ls;ref`, kWh per 24 h.
+        #[serde(rename = "standbyKwhPerDay")]
+        standby_kwh_per_day: f64,
+        /// `ϑ_sto;set;ref`, °C.
+        #[serde(rename = "referenceStorageC")]
+        reference_storage_c: f64,
+        /// `ϑ_amb;ref`, °C.
+        #[serde(rename = "referenceAmbientC")]
+        reference_ambient_c: f64,
+    },
+}
+
+impl StorageLoss {
+    /// `H_sto;ls` of a measured vessel after annex X, W/K; `None` for a
+    /// label route.
+    pub fn measured_transmission_w_per_k(&self) -> Option<f64> {
+        let raw = match *self {
+            Self::Measured {
+                transmission_w_per_k,
+            } => transmission_w_per_k,
+            // 13.60.
+            Self::MeasuredStandby {
+                standby_kwh_per_day,
+                reference_storage_c,
+                reference_ambient_c,
+            } => {
+                1000.0 * standby_kwh_per_day / (24.0 * (reference_storage_c - reference_ambient_c))
+            }
+            _ => return None,
+        };
+        if !(raw.is_finite() && raw > 0.0) {
+            return Some(raw);
+        }
+        // Annex X (X.2): the next higher table X.1 value.
+        Some(crate::significant_figures::round_up(raw))
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -341,6 +381,10 @@ pub struct StorageVessel {
     pub in_heated_zone: bool,
     #[serde(default)]
     pub unheated_ambient_c: Option<f64>,
+    /// Note 1 of §13.6.2 (p. 566): the appliance of 13.8.4.2/13.8.4.3 was
+    /// tested without this vessel, so its loss is calculated.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub not_in_appliance_test: bool,
     pub source_reference: String,
 }
 
@@ -579,6 +623,29 @@ pub enum HotWaterGenerator {
         storage_without_legionella_cycle: bool,
         #[serde(default, rename = "outdoorAirFraction")]
         outdoor_air_fraction: Option<f64>,
+        /// NEN-EN 16147 `SCF`; `smart = 1` from 0,07 (13.153b).
+        #[serde(
+            default,
+            rename = "smartControlFactor",
+            skip_serializing_if = "Option::is_none"
+        )]
+        smart_control_factor: Option<f64>,
+        /// `T_max;test;i` (13.153c), °C; omitted means 55 °C (no
+        /// correction).
+        #[serde(
+            default,
+            rename = "maxTestTemperatureC",
+            skip_serializing_if = "Option::is_none"
+        )]
+        max_test_temperature_c: Option<f64>,
+        /// `T_set;design` (13.153c), default 55 °C; a lower value needs
+        /// the appliance and installation design as evidence.
+        #[serde(
+            default,
+            rename = "designSetTemperatureC",
+            skip_serializing_if = "Option::is_none"
+        )]
+        design_set_temperature_c: Option<f64>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
@@ -1742,7 +1809,30 @@ pub fn heat_pump_class_correction(class: ApplicationClass, annual_kwh: f64) -> O
     Some(interpolate(points, annual_kwh))
 }
 
+/// 13.153b with `C_W;mixed air` = 1 and 13.153c: `E_W;gen;in;test;i` of a
+/// NEN-EN 16147 test, kWh/day. Without SCF and temperatures (55 °C) the
+/// measured `Q_elec;i` is returned unchanged.
+pub fn en16147_corrected_input(
+    input_kwh_per_day: f64,
+    smart_control_factor: Option<f64>,
+    max_test_temperature_c: Option<f64>,
+    design_set_temperature_c: Option<f64>,
+) -> f64 {
+    let smart = smart_control_factor
+        .filter(|value| *value >= 0.07)
+        .unwrap_or(0.0);
+    let tested = max_test_temperature_c.unwrap_or(55.0);
+    let design = design_set_temperature_c.unwrap_or(55.0);
+    input_kwh_per_day * (1.0 - smart) * (1.0 + (55.0 - tested) * 0.02)
+        / (1.0 + (55.0 - design) * 0.02)
+}
+
 /// Table 13.18 `c_W,EU;gen`; `None` above the measured profile.
+///
+/// Edges: below 765 kWh the first column applies (the class is not
+/// exceeded and the table has no lower column); above the last column of
+/// the measured profile the heat pump would be used in a higher class than
+/// tested, which p. 630 forbids (`hot_water_heat_pump_class_exceeded`).
 pub fn european_profile_correction(profile: TappingProfile, annual_kwh: f64) -> Option<f64> {
     let points: &[(f64, f64)] = match profile {
         TappingProfile::S => &[(765.0, 1.0)],
@@ -1970,6 +2060,19 @@ pub fn validate_hot_water(
                 );
             }
         }
+        if let StorageLoss::MeasuredStandby {
+            standby_kwh_per_day,
+            reference_storage_c,
+            reference_ambient_c,
+        } = vessel.loss
+        {
+            if !positive(standby_kwh_per_day)
+                || !reference_ambient_c.is_finite()
+                || !positive(reference_storage_c - reference_ambient_c)
+            {
+                push("hot_water_storage_loss_invalid", &format!("{base}.loss"));
+            }
+        }
         if vessel.source_reference.trim().is_empty() {
             push(
                 "source_reference_required",
@@ -1995,7 +2098,26 @@ pub fn validate_hot_water(
                 | HotWaterGenerator::IndirectHeatPump { .. }
         )
     });
+    // Note 1 of §13.6.2: a vessel outside the 24-hour test of a
+    // 13.8.4.2/13.8.4.3 appliance is calculated like any other.
+    let tested = generators.iter().any(|generator| {
+        matches!(
+            generator,
+            HotWaterGenerator::MeasuredTwoProfiles(_)
+                | HotWaterGenerator::HeatPumpEn16147 { .. }
+                | HotWaterGenerator::GasAppliance {
+                    annex_t: Some(_),
+                    ..
+                }
+        )
+    });
+    let separately_tested = tested
+        && system
+            .storage
+            .iter()
+            .all(|vessel| vessel.not_in_appliance_test);
     let allows_storage = needs_storage
+        || separately_tested
         || generators
             .iter()
             .any(|generator| matches!(generator, HotWaterGenerator::ExternalHeat));
@@ -2374,11 +2496,28 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
             delivered_kwh_per_day,
             input_kwh_per_day,
             outdoor_air_fraction,
+            smart_control_factor,
+            max_test_temperature_c,
+            design_set_temperature_c,
             source_reference,
             ..
         } => {
             if !positive(*delivered_kwh_per_day) || !positive(*input_kwh_per_day) {
                 issues.push(("hot_water_test_values_invalid", prefix.to_string()));
+            }
+            if smart_control_factor.is_some_and(|value| !(0.0..1.0).contains(&value)) {
+                issues.push((
+                    "hot_water_test_values_invalid",
+                    format!("{prefix}.smartControlFactor"),
+                ));
+            }
+            for (value, field) in [
+                (max_test_temperature_c, "maxTestTemperatureC"),
+                (design_set_temperature_c, "designSetTemperatureC"),
+            ] {
+                if value.is_some_and(|value| !(30.0..=95.0).contains(&value)) {
+                    issues.push(("hot_water_test_values_invalid", format!("{prefix}.{field}")));
+                }
             }
             if outdoor_air_fraction.is_some_and(|value| !(0.0..=1.0).contains(&value)) {
                 issues.push((
@@ -2597,12 +2736,21 @@ fn generation(
             delivered_kwh_per_day,
             input_kwh_per_day,
             storage_without_legionella_cycle,
+            smart_control_factor,
+            max_test_temperature_c,
+            design_set_temperature_c,
             ..
         } => {
             let correction = european_profile_correction(*profile, annual_output_kwh)
                 .ok_or("hot_water_heat_pump_class_exceeded")?;
-            let efficiency =
-                round_down(delivered_kwh_per_day * correction / input_kwh_per_day, 0.05);
+            // 13.153b (C_W;mixed air = 1) and 13.153c.
+            let input = en16147_corrected_input(
+                *input_kwh_per_day,
+                *smart_control_factor,
+                *max_test_temperature_c,
+                *design_set_temperature_c,
+            );
+            let efficiency = round_down(delivered_kwh_per_day * correction / input, 0.05);
             let practical = if *storage_without_legionella_cycle {
                 0.9
             } else {
@@ -3801,10 +3949,11 @@ pub fn assess_hot_water_with(
         };
         let factor = f64::from(vessel.connection_factor);
         let label_c = StorageLabel::C.standing_loss_w(vessel.volume_l);
+        let measured = vessel.loss.measured_transmission_w_per_k();
         let watts = |index: usize| match vessel.loss {
-            StorageLoss::Measured {
-                transmission_w_per_k,
-            } => transmission_w_per_k * (set_temperature - ambient(index)),
+            StorageLoss::Measured { .. } | StorageLoss::MeasuredStandby { .. } => {
+                measured.unwrap_or(0.0) * (set_temperature - ambient(index))
+            }
             StorageLoss::Label { label } => {
                 let standing = label.standing_loss_w(vessel.volume_l);
                 let connection = match label {
@@ -5022,6 +5171,7 @@ mod tests {
             connection_factor: 3,
             in_heated_zone: true,
             unheated_ambient_c: None,
+            not_in_appliance_test: false,
             source_reference: "plate".into(),
         });
         assert!(validate_hot_water(&input, context(), "dhw").is_empty());
@@ -5094,6 +5244,9 @@ mod tests {
             exhaust_air_source: true,
             storage_without_legionella_cycle: true,
             outdoor_air_fraction: None,
+            smart_control_factor: None,
+            max_test_temperature_c: None,
+            design_set_temperature_c: None,
             source_reference: "EN 16147 report".into(),
         };
         let result = assess_hot_water(&input, context()).unwrap();
@@ -5102,6 +5255,32 @@ mod tests {
             european_profile_correction(TappingProfile::Xl, result.annual_generator_output_kwh)
                 .unwrap();
         let eta = round_down(11.0 * correction / 4.0, 0.05) * 0.9;
+        assert!((result.months[0].generation_efficiency - eta).abs() < 1e-12);
+        // 13.153b/13.153c: SCF 0,10 (smart = 1), T_max;test 52 °C and
+        // T_set;design 50 °C: 4,0·0,9·1,06/1,10.
+        if let HotWaterGenerator::HeatPumpEn16147 {
+            smart_control_factor,
+            max_test_temperature_c,
+            design_set_temperature_c,
+            ..
+        } = &mut input.generator
+        {
+            *smart_control_factor = Some(0.10);
+            *max_test_temperature_c = Some(52.0);
+            *design_set_temperature_c = Some(50.0);
+        }
+        let corrected = 4.0 * 0.9 * 1.06 / 1.10;
+        assert!(
+            (en16147_corrected_input(4.0, Some(0.10), Some(52.0), Some(50.0)) - corrected).abs()
+                < 1e-12
+        );
+        // SCF below 0,07: smart = 0.
+        assert_eq!(en16147_corrected_input(4.0, Some(0.05), None, None), 4.0);
+        let result = assess_hot_water(&input, context()).unwrap();
+        let correction =
+            european_profile_correction(TappingProfile::Xl, result.annual_generator_output_kwh)
+                .unwrap();
+        let eta = round_down(11.0 * correction / corrected, 0.05) * 0.9;
         assert!((result.months[0].generation_efficiency - eta).abs() < 1e-12);
     }
 
@@ -5351,6 +5530,7 @@ mod tests {
             connection_factor: 1,
             in_heated_zone: true,
             unheated_ambient_c: None,
+            not_in_appliance_test: false,
             source_reference: "label".into(),
         });
         let result = assess_hot_water(&input, context()).unwrap();
@@ -5399,11 +5579,84 @@ mod tests {
             connection_factor: 2,
             in_heated_zone: true,
             unheated_ambient_c: None,
+            not_in_appliance_test: false,
             source_reference: "label".into(),
         });
         assert!(validate_hot_water(&combined, context(), "dhw")
             .iter()
             .any(|item| item.code == "hot_water_storage_in_generator_efficiency"));
+        // Note 1 of §13.6.2: a 13.8.4.3 heat pump tested without the vessel.
+        let mut tested = system(HotWaterGenerator::HeatPumpEn16147 {
+            profile: TappingProfile::L,
+            delivered_kwh_per_day: 11.655,
+            input_kwh_per_day: 4.0,
+            exhaust_air_source: false,
+            storage_without_legionella_cycle: false,
+            outdoor_air_fraction: None,
+            smart_control_factor: None,
+            max_test_temperature_c: None,
+            design_set_temperature_c: None,
+            source_reference: "EN 16147 report".into(),
+        });
+        tested.storage = combined.storage.clone();
+        let blocked = |input: &HotWaterSystem| {
+            validate_hot_water(input, context(), "dhw")
+                .iter()
+                .any(|item| item.code == "hot_water_storage_in_generator_efficiency")
+        };
+        assert!(blocked(&tested));
+        tested.storage[0].not_in_appliance_test = true;
+        assert!(!blocked(&tested));
+        let result = assess_hot_water(&tested, context()).unwrap();
+        assert!(result.months[0].storage_loss_kwh > 0.0);
+        // The flag does not open the table 13.25 route (loss in η).
+        combined.storage[0].not_in_appliance_test = true;
+        assert!(blocked(&combined));
+    }
+
+    #[test]
+    fn measured_storage_loss_is_rounded_up_per_annex_x() {
+        // 13.60: 1 000·1,2/(24·(65 − 20)) = 1,11 W/K → 1,2 (annex X).
+        let standby = StorageLoss::MeasuredStandby {
+            standby_kwh_per_day: 1.2,
+            reference_storage_c: 65.0,
+            reference_ambient_c: 20.0,
+        };
+        assert!((standby.measured_transmission_w_per_k().unwrap() - 1.2).abs() < 1e-12);
+        // A measured 1,83 W/K becomes 1,9; X.2 takes the next higher value.
+        let direct = StorageLoss::Measured {
+            transmission_w_per_k: 1.83,
+        };
+        assert!((direct.measured_transmission_w_per_k().unwrap() - 1.9).abs() < 1e-12);
+        let mut input = system(HotWaterGenerator::ElectricBoiler);
+        input.storage.push(StorageVessel {
+            id: "v".into(),
+            volume_l: 120.0,
+            loss: standby,
+            connection_factor: 3,
+            in_heated_zone: true,
+            unheated_ambient_c: None,
+            not_in_appliance_test: false,
+            source_reference: "test report".into(),
+        });
+        assert!(validate_hot_water(&input, context(), "dhw").is_empty());
+        let from_standby = assess_hot_water(&input, context()).unwrap();
+        input.storage[0].loss = StorageLoss::Measured {
+            transmission_w_per_k: 1000.0 * 1.2 / (24.0 * 45.0),
+        };
+        let from_h = assess_hot_water(&input, context()).unwrap();
+        assert!(
+            (from_standby.months[0].storage_loss_kwh - from_h.months[0].storage_loss_kwh).abs()
+                < 1e-12
+        );
+        input.storage[0].loss = StorageLoss::MeasuredStandby {
+            standby_kwh_per_day: 1.2,
+            reference_storage_c: 20.0,
+            reference_ambient_c: 20.0,
+        };
+        assert!(validate_hot_water(&input, context(), "dhw")
+            .iter()
+            .any(|item| item.code == "hot_water_storage_loss_invalid"));
     }
 
     fn solar_heater(solar_use: crate::solar_thermal::SolarUse) -> SolarWaterHeater {
@@ -5646,6 +5899,7 @@ mod tests {
             connection_factor: 1,
             in_heated_zone: true,
             unheated_ambient_c: None,
+            not_in_appliance_test: false,
             source_reference: "label".into(),
         }];
         assert!(validate_hot_water(&input, context(), "dhw").is_empty());
@@ -5686,6 +5940,7 @@ mod tests {
             connection_factor: 1,
             in_heated_zone: true,
             unheated_ambient_c: None,
+            not_in_appliance_test: false,
             source_reference: "label".into(),
         }];
         input.additional_generators = vec![AdditionalHotWaterGenerator {
@@ -5779,6 +6034,7 @@ mod tests {
             connection_factor: 1,
             in_heated_zone: true,
             unheated_ambient_c: None,
+            not_in_appliance_test: false,
             source_reference: "label".into(),
         }];
         collective.collective = Some(CollectiveHotWater {

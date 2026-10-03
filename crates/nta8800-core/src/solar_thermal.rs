@@ -267,9 +267,9 @@ impl SolarStorage {
     /// `H_sto;ls;tot`, W/K: UA rounded up per annex X, or 13.82.
     pub fn loss_w_per_k(&self) -> f64 {
         match &self.loss {
-            StorageLoss::Measured {
-                transmission_w_per_k,
-            } => round_up(*transmission_w_per_k),
+            StorageLoss::Measured { .. } | StorageLoss::MeasuredStandby { .. } => {
+                self.loss.measured_transmission_w_per_k().unwrap_or(0.0)
+            }
             StorageLoss::Label { label } => label.standing_loss_w(self.total_volume_l) / 45.0,
             StorageLoss::UnknownLabel { produced_from_2018 } => {
                 let label = if *produced_from_2018 {
