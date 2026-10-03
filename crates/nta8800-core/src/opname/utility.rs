@@ -12,16 +12,18 @@
 //! p. 140–158), humidification (chapter 12, p. 161), utility hot water
 //! (chapter 13, p. 164–178) and lighting (chapter 14, p. 182–189).
 //!
-//! One calculation zone per building. Small functions are merged into the
-//! main function up to 25 % of A_g (p. 39–40); larger ones stay separate in
-//! a mixed calculation zone with area-weighted values (NTA §6.5.3). When
-//! afb. 6.6 (p. 53) requires separate calculation zones the survey stops
-//! (`calculation_zone_split_required`).
+//! Small functions are merged into the main function up to 25 % of A_g
+//! (p. 39–40); larger ones stay separate in a mixed calculation zone with
+//! area-weighted values (NTA §6.5.3). Without `zones` the building is one
+//! calculation zone, and when afb. 6.6 (p. 53) requires separate zones the
+//! survey stops (`calculation_zone_split_required`). With `zones` each
+//! calculation zone gets its own demand, ventilation and lighting, served by
+//! the building's systems (§6.5, p. 52–54; see [`zone_plans`]).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::envelope::{derive_envelope_with_cooling, SurveyEnvelope};
+use super::envelope::{derive_envelope_with_cooling, derive_envelope_zone, SurveyEnvelope};
 use super::general::{infiltration_year, thermal_mass, Construction, Renovation};
 use super::heating::{derive_heating, AirHeatingAnswer, SurveyHeating};
 use super::hot_water::{
@@ -53,6 +55,19 @@ pub const MERGE_LIMIT: f64 = 0.25;
 pub struct FunctionArea {
     pub function: LabelFunction,
     pub area_m2: f64,
+}
+
+/// A calculation zone of the survey (§6.5, afb. 6.6 with table 6.4,
+/// p. 52–54). The zones split the building's use functions; a function
+/// merged into the main function (p. 39–40) counts as the main function in
+/// its zone (§6.6, p. 54).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurveyCalculationZone {
+    pub id: String,
+    /// Use functions with their A_g in this zone; per function the zones add
+    /// up to the survey's `functions`.
+    pub functions: Vec<FunctionArea>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -701,6 +716,10 @@ pub struct SurveyLightingZone {
     /// At least 70 % of the power in extracted luminaires (p. 186).
     #[serde(default)]
     pub extracted_luminaires: bool,
+    /// The calculation zone of this lighting zone, required when the
+    /// survey has several calculation zones (NTA 14.3: per calculation zone).
+    #[serde(default)]
+    pub zone_id: Option<String>,
     pub source_reference: String,
 }
 
@@ -775,6 +794,10 @@ pub struct UtilitySurvey {
     /// ventilation-capacity criterion does not split the zone.
     #[serde(default)]
     pub openly_connected_residence_areas: bool,
+    /// §6.5 (p. 52–54): two or more calculation zones. Empty (or one zone):
+    /// the whole building is one calculation zone.
+    #[serde(default)]
+    pub zones: Vec<SurveyCalculationZone>,
     pub source_reference: String,
     /// Reason per applied default (path or rule) for falling back on the
     /// forfait (BRL 9500-U §4.2.2).
@@ -1004,19 +1027,30 @@ fn table_6_4(function: LabelFunction) -> Option<(f64, f64)> {
 
 /// Afb. 6.6 with table 6.4 (p. 53–54): the criteria that force a split of
 /// the climate zone into several calculation zones, on the use functions
-/// left after the merge of p. 39–40. The basic survey derives one
-/// calculation zone (the envelope is not surveyed per zone), so a required
-/// split stops the survey (`calculation_zone_split_required`). The third
+/// left after the merge of p. 39–40, for a survey without `zones`: a
+/// required split stops the survey (`calculation_zone_split_required`)
+/// until the zones are listed. The third
 /// criterion (internal heat capacity differing by more than a factor 3)
 /// cannot arise: the survey records one construction for the building.
 fn check_zone_split(groups: &FunctionGroups, survey: &UtilitySurvey, recorder: &mut Recorder) {
-    let rows: Vec<(f64, f64, f64)> = groups
-        .groups
+    if zone_split_needed(&groups.groups, groups.total_m2, survey) {
+        recorder.issue("calculation_zone_split_required", "functions");
+    }
+}
+
+/// Afb. 6.6 (p. 53) on the functions of one calculation zone: `true` when
+/// the zone must be split further.
+fn zone_split_needed(
+    functions: &[(LabelFunction, f64)],
+    total_m2: f64,
+    survey: &UtilitySurvey,
+) -> bool {
+    let rows: Vec<(f64, f64, f64)> = functions
         .iter()
         .filter_map(|(function, area)| table_6_4(*function).map(|(t, q)| (t, q, *area)))
         .collect();
-    if rows.len() < 2 || groups.total_m2 <= 0.0 {
-        return;
+    if rows.len() < 2 || total_m2 <= 0.0 {
+        return false;
     }
     let largest = rows.iter().map(|row| row.2).fold(0.0, f64::max);
     let (t_min, t_max) = rows
@@ -1026,9 +1060,8 @@ fn check_zone_split(groups: &FunctionGroups, survey: &UtilitySurvey, recorder: &
         });
     // Setpoints more than 4 K apart, unless the largest function holds at
     // least 90 % of the zone.
-    if t_max - t_min > 4.0 && largest < 0.9 * groups.total_m2 {
-        recorder.issue("calculation_zone_split_required", "functions");
-        return;
+    if t_max - t_min > 4.0 && largest < 0.9 * total_m2 {
+        return true;
     }
     // Ventilation types A, B, C and E: capacities more than a factor 4
     // apart, unless the residence areas are openly connected or more than
@@ -1036,7 +1069,7 @@ fn check_zone_split(groups: &FunctionGroups, survey: &UtilitySurvey, recorder: &
     let vent = &survey.ventilation;
     let type_d = vent.principle == VentilationPrinciple::Balanced && vent.combined.is_none();
     if type_d || survey.openly_connected_residence_areas {
-        return;
+        return false;
     }
     let (q_min, q_max) = rows
         .iter()
@@ -1052,9 +1085,7 @@ fn check_zone_split(groups: &FunctionGroups, survey: &UtilitySurvey, recorder: &
                 .sum::<f64>()
         })
         .fold(0.0, f64::max);
-    if q_max > 4.0 * q_min && same_requirement <= 0.8 * groups.total_m2 {
-        recorder.issue("calculation_zone_split_required", "functions");
-    }
+    q_max > 4.0 * q_min && same_requirement <= 0.8 * total_m2
 }
 
 /// The main function and the total area (see [`function_groups`]).
@@ -2233,6 +2264,8 @@ fn recovery_value(
 #[allow(clippy::too_many_arguments)]
 fn ventilation_value(
     survey: &UtilitySurvey,
+    zone_id: &str,
+    building_area: f64,
     ventilation_functions: &[(&'static str, f64)],
     area: f64,
     heating_c: f64,
@@ -2363,11 +2396,11 @@ fn ventilation_value(
             recorder.issue("ahu_requires_mechanical_supply", "ventilation.ahu");
         }
         let inside = match ahu.inside_thermal_zone {
-            Some(true) if area > 500.0 => {
+            Some(true) if building_area > 500.0 => {
                 recorder.record(
                     "large_installation_outside_thermal_zone",
                     "ventilation.ahu.insideThermalZone",
-                    format!("outside (A_g {area} m² > 500 m²)"),
+                    format!("outside (A_g {building_area} m² > 500 m²)"),
                     "ISSO 75.1 p. 17",
                 );
                 false
@@ -2625,7 +2658,7 @@ fn ventilation_value(
         }
     };
     let mut input = json!({
-        "zoneId": "utiliteit",
+        "zoneId": zone_id,
         "usableFloorAreaM2": area,
         "category": "utility",
         "functions": ventilation_function_values(survey, ventilation_functions, recorder),
@@ -3138,6 +3171,7 @@ fn storage_value(vessel: &SurveyStorage, electric_boiler: bool, recorder: &mut R
 
 fn lighting_value(
     survey: &UtilitySurvey,
+    zone_id: &str,
     groups: &[(LabelFunction, f64)],
     recorder: &mut Recorder,
 ) -> Value {
@@ -3303,7 +3337,7 @@ fn lighting_value(
         "ISSO 75.1 p. 189",
     );
     json!({
-        "zoneId": "utiliteit",
+        "zoneId": zone_id,
         "functions": groups
             .iter()
             .map(|(function, part)| json!({"function": label_name(*function), "areaM2": part}))
@@ -3381,6 +3415,439 @@ fn validate(survey: &UtilitySurvey, recorder: &mut Recorder) {
     }
 }
 
+/// Zone id of the single calculation zone of a survey without `zones`.
+const SINGLE_ZONE_ID: &str = "utiliteit";
+
+/// Tolerance for the zone areas against the survey's functions, m².
+const ZONE_AREA_TOLERANCE_M2: f64 = 0.05;
+
+/// One calculation zone of the derivation: the use functions left after
+/// the merge of p. 39–40, A_g, and the survey as seen from the zone (its
+/// envelope, lighting zones, swimming pool and share of the installed
+/// ventilation capacity).
+struct ZonePlan {
+    id: String,
+    groups: Vec<(LabelFunction, f64)>,
+    area: f64,
+    survey: UtilitySurvey,
+    /// The building's vertical pipes are booked in this zone.
+    pipes: bool,
+}
+
+impl ZonePlan {
+    /// The largest use function of the zone.
+    fn main(&self) -> LabelFunction {
+        self.groups
+            .iter()
+            .copied()
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(function, _)| function)
+            .unwrap_or(LabelFunction::Office)
+    }
+}
+
+/// The demand parts of one zone derived before the systems.
+struct ZoneParts {
+    envelope: super::envelope::DerivedEnvelope,
+    ventilation: Value,
+    usage: UsageFunction,
+    heating_c: f64,
+    cooling_c: f64,
+    function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
+}
+
+/// §6.5 with afb. 6.6 and table 6.4 (p. 52–54): the calculation zones.
+/// Without `zones` (or with one) the building is one zone and afb. 6.6
+/// decides whether that is allowed; with `zones` every zone must itself
+/// pass afb. 6.6 ("voor elke rekenzone ... het schema volledig doorlopen",
+/// p. 52). The functions in a zone are those left after the merge of
+/// p. 39–40 (§6.6, p. 54): a merged function counts as the main function.
+fn zone_plans(
+    survey: &UtilitySurvey,
+    groups: &FunctionGroups,
+    recorder: &mut Recorder,
+) -> Vec<ZonePlan> {
+    if survey.zones.len() < 2 {
+        if survey.zones.len() == 1 {
+            recorder.warning(
+                "single_calculation_zone_whole_building",
+                "zones",
+                "one zone listed: the whole building is the calculation zone",
+            );
+        }
+        check_zone_split(groups, survey, recorder);
+        return vec![ZonePlan {
+            id: SINGLE_ZONE_ID.into(),
+            groups: groups.groups.clone(),
+            area: groups.total_m2,
+            survey: survey.clone(),
+            pipes: true,
+        }];
+    }
+    let mut ids = std::collections::HashSet::new();
+    for (index, zone) in survey.zones.iter().enumerate() {
+        if zone.id.trim().is_empty() {
+            recorder.issue("zone_id_required", format!("zones[{index}].id"));
+        } else if !ids.insert(zone.id.as_str()) {
+            recorder.issue("zone_id_duplicate", format!("zones[{index}].id"));
+        }
+        if zone.functions.is_empty()
+            || zone
+                .functions
+                .iter()
+                .any(|item| !(item.area_m2.is_finite() && item.area_m2 > 0.0))
+        {
+            recorder.issue(
+                "zone_function_area_invalid",
+                format!("zones[{index}].functions"),
+            );
+        }
+    }
+    // Per use function the zones add up to the survey's A_g.
+    let mut functions: Vec<LabelFunction> = Vec::new();
+    for item in survey
+        .functions
+        .iter()
+        .chain(survey.zones.iter().flat_map(|zone| zone.functions.iter()))
+    {
+        if !functions.contains(&item.function) {
+            functions.push(item.function);
+        }
+    }
+    for function in functions {
+        let building: f64 = survey
+            .functions
+            .iter()
+            .filter(|item| item.function == function)
+            .map(|item| item.area_m2)
+            .sum();
+        let zoned: f64 = survey
+            .zones
+            .iter()
+            .flat_map(|zone| zone.functions.iter())
+            .filter(|item| item.function == function)
+            .map(|item| item.area_m2)
+            .sum();
+        if (building - zoned).abs() > ZONE_AREA_TOLERANCE_M2 {
+            recorder.issue("zone_function_areas_mismatch", "zones");
+            break;
+        }
+    }
+    let known = |id: &str| survey.zones.iter().any(|zone| zone.id == id);
+    for (index, surface) in survey.envelope.surfaces.iter().enumerate() {
+        if let Some(zone) = &surface.zone_id {
+            if !known(zone) {
+                recorder.issue(
+                    "surface_zone_unknown",
+                    format!("envelope.surfaces[{index}].zoneId"),
+                );
+            }
+        }
+    }
+    // NTA 14.3: the lighting zones lie within one calculation zone.
+    for (index, item) in survey.lighting.iter().enumerate() {
+        match &item.zone_id {
+            None => recorder.issue(
+                "lighting_zone_calculation_zone_required",
+                format!("lighting[{index}].zoneId"),
+            ),
+            Some(zone) if !known(zone) => recorder.issue(
+                "lighting_zone_calculation_zone_unknown",
+                format!("lighting[{index}].zoneId"),
+            ),
+            Some(_) => {}
+        }
+    }
+    if !recorder.issues.is_empty() {
+        return Vec::new();
+    }
+    let to_group = |function: LabelFunction| {
+        if groups.groups.iter().any(|(group, _)| *group == function) {
+            function
+        } else {
+            groups.main
+        }
+    };
+    // p. 65: the swimming-pool room lies in the zone with the most sport.
+    let sport_in = |zone: &SurveyCalculationZone| -> f64 {
+        zone.functions
+            .iter()
+            .filter(|item| item.function == LabelFunction::Sport)
+            .map(|item| item.area_m2)
+            .sum()
+    };
+    let pool_zone = survey
+        .swimming_pool_area_m2
+        .filter(|pool| *pool > 0.0)
+        .and_then(|_| {
+            survey
+                .zones
+                .iter()
+                .enumerate()
+                .filter(|(_, zone)| sport_in(zone) > 0.0)
+                .max_by(|a, b| sport_in(a.1).total_cmp(&sport_in(b.1)))
+                .map(|(index, _)| index)
+        });
+    let total = groups.total_m2;
+    let mut plans = Vec::new();
+    for (index, zone) in survey.zones.iter().enumerate() {
+        let mut zone_groups: Vec<(LabelFunction, f64)> = Vec::new();
+        for (group, _) in &groups.groups {
+            let part: f64 = zone
+                .functions
+                .iter()
+                .filter(|item| to_group(item.function) == *group)
+                .map(|item| item.area_m2)
+                .sum();
+            if part > 0.0 {
+                zone_groups.push((*group, part));
+            }
+        }
+        let area: f64 = zone_groups.iter().map(|(_, part)| part).sum();
+        if zone_split_needed(&zone_groups, area, survey) {
+            recorder.issue(
+                "calculation_zone_criteria_not_met",
+                format!("zones[{index}].functions"),
+            );
+        }
+        let lit: f64 = survey
+            .lighting
+            .iter()
+            .filter(|item| item.zone_id.as_deref() == Some(zone.id.as_str()))
+            .map(|item| item.area_m2)
+            .sum();
+        if (lit - area).abs() > 0.01 * area {
+            recorder.issue("zone_lighting_area_mismatch", format!("zones[{index}]"));
+        }
+        let share = area / total;
+        let mut part = survey.clone();
+        part.functions = zone.functions.clone();
+        part.envelope = zone_envelope(&survey.envelope, &zone.id, share);
+        part.lighting = survey
+            .lighting
+            .iter()
+            .filter(|item| item.zone_id.as_deref() == Some(zone.id.as_str()))
+            .cloned()
+            .collect();
+        part.swimming_pool_area_m2 = if pool_zone == Some(index) {
+            survey.swimming_pool_area_m2
+        } else {
+            None
+        };
+        // §11.4.1 (p. 146–148): the installed capacity of the building's
+        // system is split over the zones by A_g.
+        part.ventilation.installed_capacity_dm3_per_s = survey
+            .ventilation
+            .installed_capacity_dm3_per_s
+            .map(|total| total * share);
+        if let Some(passive) = part.ventilation.passive_cooling.as_mut() {
+            passive.installed_capacity_dm3_per_s = passive
+                .installed_capacity_dm3_per_s
+                .map(|total| total * share);
+        }
+        part.zones = Vec::new();
+        plans.push(ZonePlan {
+            id: zone.id.clone(),
+            groups: zone_groups,
+            area,
+            survey: part,
+            pipes: index == 0,
+        });
+    }
+    recorder.record(
+        "calculation_zones_surveyed",
+        "zones",
+        format!(
+            "{} calculation zones; one heating, cooling and ventilation system serves all",
+            plans.len()
+        ),
+        "ISSO 75.1 p. 52–54 (§6.5, afb. 6.6, §6.6)",
+    );
+    if survey
+        .envelope
+        .surfaces
+        .iter()
+        .any(|surface| surface.zone_id.is_none())
+    {
+        recorder.record(
+            "unassigned_surfaces_split_by_area",
+            "envelope.surfaces",
+            "surfaces without zoneId split over the zones by A_g".into(),
+            "basisopname: interpretation (ISSO 75.1 §6.5 gives no split rule)",
+        );
+    }
+    if survey.ventilation.installed_capacity_dm3_per_s.is_some()
+        || survey
+            .ventilation
+            .passive_cooling
+            .as_ref()
+            .is_some_and(|passive| passive.installed_capacity_dm3_per_s.is_some())
+    {
+        recorder.record(
+            "installed_capacity_split_by_area",
+            "ventilation.installedCapacityDm3PerS",
+            "split over the calculation zones by A_g".into(),
+            "basisopname: interpretation (ISSO 75.1 p. 146–148)",
+        );
+    }
+    plans
+}
+
+/// The envelope of one zone: its own surfaces, and the surfaces without a
+/// zone scaled by the zone's share of A_g (area and exposed perimeter, so
+/// B' of a ground floor is unchanged), each with its openings.
+fn zone_envelope(envelope: &SurveyEnvelope, zone: &str, share: f64) -> SurveyEnvelope {
+    let mut result = envelope.clone();
+    let mut kept: Vec<(String, f64)> = Vec::new();
+    result.surfaces = envelope
+        .surfaces
+        .iter()
+        .filter_map(|surface| match surface.zone_id.as_deref() {
+            Some(id) if id == zone => {
+                kept.push((surface.id.clone(), 1.0));
+                Some(surface.clone())
+            }
+            Some(_) => None,
+            None => {
+                kept.push((surface.id.clone(), share));
+                let mut part = surface.clone();
+                part.gross_area_m2 *= share;
+                part.exposed_perimeter_m = part.exposed_perimeter_m.map(|value| value * share);
+                Some(part)
+            }
+        })
+        .collect();
+    let factor = |surface: &str| {
+        kept.iter()
+            .find(|(id, _)| id == surface)
+            .map(|(_, factor)| *factor)
+    };
+    result.windows = envelope
+        .windows
+        .iter()
+        .filter_map(|item| {
+            factor(&item.surface_id).map(|f| {
+                let mut item = item.clone();
+                item.area_m2 *= f;
+                item
+            })
+        })
+        .collect();
+    result.doors = envelope
+        .doors
+        .iter()
+        .filter_map(|item| {
+            factor(&item.surface_id).map(|f| {
+                let mut item = item.clone();
+                item.area_m2 *= f;
+                item
+            })
+        })
+        .collect();
+    result.panels = envelope
+        .panels
+        .iter()
+        .filter_map(|item| {
+            factor(&item.surface_id).map(|f| {
+                let mut item = item.clone();
+                item.area_m2 *= f;
+                item
+            })
+        })
+        .collect();
+    result.rooflights = envelope
+        .rooflights
+        .iter()
+        .filter_map(|item| {
+            factor(&item.surface_id).map(|f| {
+                let mut item = item.clone();
+                item.area_m2 *= f;
+                item
+            })
+        })
+        .collect();
+    result
+}
+
+/// Table 8.14 (p. 96): evident solar-control glass or film, g 0,4.
+fn apply_solar_control(windows: &mut [Value], survey: &UtilitySurvey, recorder: &mut Recorder) {
+    for window in windows.iter_mut() {
+        let id = window["id"].as_str().unwrap_or_default().to_string();
+        if survey.solar_control_window_ids.contains(&id) {
+            window["gPerpendicular"] = json!(0.4);
+            recorder.record(
+                "solar_control_glass_g_0_4",
+                &format!("envelope.windows[{id}]"),
+                "0,4".into(),
+                "ISSO 75.1 p. 96 (table 8.14)",
+            );
+        }
+    }
+}
+
+/// b_U per unheated space of a derived envelope.
+fn unheated_factors(unheated: Option<&Value>) -> Vec<(String, Value)> {
+    unheated
+        .and_then(|value| value["spaces"].as_array())
+        .map(|spaces| {
+            spaces
+                .iter()
+                .map(|space| {
+                    (
+                        space["id"].as_str().unwrap_or_default().to_string(),
+                        space["reductionFactor"].clone(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// 8.53: b_U of an unheated space follows from all zones next to it, so a
+/// zone takes the factor of the whole envelope.
+fn set_unheated_factors(unheated: Option<&mut Value>, factors: &[(String, Value)]) {
+    let Some(spaces) = unheated.and_then(|value| value["spaces"].as_array_mut()) else {
+        return;
+    };
+    for space in spaces.iter_mut() {
+        let id = space["id"].as_str().unwrap_or_default().to_string();
+        if let Some((_, b)) = factors.iter().find(|(item, _)| *item == id) {
+            space["reductionFactor"] = b.clone();
+        }
+    }
+}
+
+/// Adds the records of one zone, once per rule and path.
+fn merge_zone_records(recorder: &mut Recorder, zone: Recorder) {
+    for item in zone.applied {
+        if !recorder
+            .applied
+            .iter()
+            .any(|known| known.rule == item.rule && known.path == item.path)
+        {
+            recorder.applied.push(item);
+        }
+    }
+    for item in zone.warnings {
+        if !recorder
+            .warnings
+            .iter()
+            .any(|known| known.code == item.code && known.path == item.path)
+        {
+            recorder.warnings.push(item);
+        }
+    }
+    for item in zone.issues {
+        if !recorder
+            .issues
+            .iter()
+            .any(|known| known.code == item.code && known.path == item.path)
+        {
+            recorder.issues.push(item);
+        }
+    }
+}
+
 /// Kernel input derived from the utility survey.
 pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> Option<Value> {
     let input = derive_utility_input_cited(survey, recorder);
@@ -3395,59 +3862,93 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
         return None;
     }
     let groups = function_groups(&survey.functions, recorder)?;
-    check_zone_split(&groups, survey, recorder);
+    let plans = zone_plans(survey, &groups, recorder);
     if !recorder.issues.is_empty() {
         return None;
     }
+    let multi = plans.len() > 1;
     let (main, area) = (groups.main, groups.total_m2);
-    let (usage, _, reduction_function) = kernel_names(main);
-    // §6.5.3: area-weighted values of a mixed calculation zone.
-    let function_areas: Vec<crate::monthly_demand::UsageFunctionArea> = groups
-        .groups
-        .iter()
-        .map(
-            |(function, part)| crate::monthly_demand::UsageFunctionArea {
-                function: kernel_names(*function).0,
-                area_m2: *part,
-            },
-        )
-        .collect();
-    let profile = crate::monthly_demand::FunctionProfile::weighted(&function_areas);
-    let heating_c = profile.heating_setpoint_c;
-    let cooling_c = profile.cooling_setpoint_c;
-    let ventilation_functions: Vec<(&'static str, f64)> = groups
-        .groups
-        .iter()
-        .map(|(function, part)| (kernel_names(*function).1, *part))
-        .collect();
+    let reduction_function = kernel_names(main).2;
     let year = survey.construction_year;
     let airtightness = utility_airtightness(&survey.building_type, recorder);
     let infiltration = infiltration_year(year, survey.renovation.as_ref(), recorder);
     let (floor, wall, ceiling) = thermal_mass(&survey.construction);
-    let mut envelope =
-        derive_envelope_with_cooling(&survey.envelope, year, survey.cooling.is_some(), recorder);
-    for window in envelope.windows.iter_mut() {
-        let id = window["id"].as_str().unwrap_or_default().to_string();
-        if survey.solar_control_window_ids.contains(&id) {
-            window["gPerpendicular"] = json!(0.4);
-            recorder.record(
-                "solar_control_glass_g_0_4",
-                &format!("envelope.windows[{id}]"),
-                "0,4".into(),
-                "ISSO 75.1 p. 96 (table 8.14)",
-            );
+    let cooled = survey.cooling.is_some();
+    // The whole envelope: with one zone it is the zone's; with several it
+    // records the defaults and gives ΔU_for (8.3, whole building, §8.2.1)
+    // and b_U of each unheated space over all adjacent zones (8.53).
+    let mut building_envelope =
+        derive_envelope_with_cooling(&survey.envelope, year, cooled, recorder);
+    apply_solar_control(&mut building_envelope.windows, survey, recorder);
+    let building_delta_u = building_envelope.delta_u;
+    let building_b = unheated_factors(building_envelope.unheated.as_ref());
+    let mut building_envelope = Some(building_envelope);
+    let mut parts: Vec<ZoneParts> = Vec::new();
+    for plan in &plans {
+        // §6.5.3: area-weighted values of a mixed calculation zone.
+        let function_areas: Vec<crate::monthly_demand::UsageFunctionArea> = plan
+            .groups
+            .iter()
+            .map(
+                |(function, part)| crate::monthly_demand::UsageFunctionArea {
+                    function: kernel_names(*function).0,
+                    area_m2: *part,
+                },
+            )
+            .collect();
+        let profile = crate::monthly_demand::FunctionProfile::weighted(&function_areas);
+        let ventilation_functions: Vec<(&'static str, f64)> = plan
+            .groups
+            .iter()
+            .map(|(function, part)| (kernel_names(*function).1, *part))
+            .collect();
+        let envelope = match building_envelope.take() {
+            Some(envelope) if !multi => envelope,
+            _ => {
+                // The defaults are recorded once, on the whole envelope.
+                let mut scratch = Recorder::default();
+                let mut envelope = derive_envelope_zone(
+                    &plan.survey.envelope,
+                    year,
+                    cooled,
+                    Some(building_delta_u),
+                    &mut scratch,
+                );
+                apply_solar_control(&mut envelope.windows, survey, &mut scratch);
+                set_unheated_factors(envelope.unheated.as_mut(), &building_b);
+                envelope
+            }
+        };
+        let mut zone_recorder = Recorder::default();
+        let rec: &mut Recorder = if multi {
+            &mut zone_recorder
+        } else {
+            &mut *recorder
+        };
+        let ventilation = ventilation_value(
+            &plan.survey,
+            &plan.id,
+            area,
+            &ventilation_functions,
+            plan.area,
+            profile.heating_setpoint_c,
+            envelope.floor_above_crawlspace,
+            airtightness,
+            infiltration,
+            rec,
+        );
+        if multi {
+            merge_zone_records(recorder, zone_recorder);
         }
+        parts.push(ZoneParts {
+            envelope,
+            ventilation,
+            usage: kernel_names(plan.main()).0,
+            heating_c: profile.heating_setpoint_c,
+            cooling_c: profile.cooling_setpoint_c,
+            function_areas,
+        });
     }
-    let ventilation = ventilation_value(
-        survey,
-        &ventilation_functions,
-        area,
-        heating_c,
-        envelope.floor_above_crawlspace,
-        airtightness,
-        infiltration,
-        recorder,
-    );
     let heating = derive_utility_heating(survey, reduction_function, area, recorder);
     // NTA 13.20/13.20a: each additional system serves its own areas (a
     // merged small function counts as the main function); the main system
@@ -3508,7 +4009,21 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
         survey.ventilation.principle,
         survey.ventilation.heat_recovery.is_some(),
     );
-    let lighting = lighting_value(survey, &groups.groups, recorder);
+    let mut lighting = Vec::new();
+    for plan in &plans {
+        if multi {
+            let mut zone_recorder = Recorder::default();
+            lighting.push(lighting_value(
+                &plan.survey,
+                &plan.id,
+                &plan.groups,
+                &mut zone_recorder,
+            ));
+            merge_zone_records(recorder, zone_recorder);
+        } else {
+            lighting.push(lighting_value(survey, &plan.id, &plan.groups, recorder));
+        }
+    }
     let cooling = survey.cooling.as_ref().map(|cooling| {
         cooling_value(
             cooling,
@@ -3561,70 +4076,101 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
     if !recorder.issues.is_empty() {
         return None;
     }
-    let demand = json!({
-        "zoneId": "utiliteit",
-        "usableFloorAreaM2": area,
-        "areaSourceReference": survey.area_source_reference,
-        "usageFunction": usage_name(usage),
-        "functionAreas": if function_areas.len() > 1 {
-            json!(function_areas
-                .iter()
-                .map(|part| json!({"function": usage_name(part.function), "areaM2": part.area_m2}))
-                .collect::<Vec<_>>())
-        } else {
-            json!([])
-        },
-        "setpoints": {"heatingC": heating_c, "coolingC": cooling_c, "sourceReference": "NTA 8800 table 7.13 (§6.5.3 weighted)"},
-        "transmission": {
-            "method": "components",
-            "direct": {"elements": envelope.direct_elements, "linearBridges": [], "pointBridges": []},
-            "unheated": envelope.unheated,
-            "groundFloors": envelope.ground_floors,
-            "groundInventoryConfirmed": true,
-            "verticalPipes": super::vertical_pipes(
+    let mut demands = Vec::new();
+    for (plan, part) in plans.iter().zip(parts) {
+        // Table 7.8 / NTA 7.3.3: the building's vertical pipes are booked
+        // in the first calculation zone.
+        let pipes = if plan.pipes {
+            super::vertical_pipes(
                 survey.vertical_pipes.as_deref(),
                 survey.storeys,
                 stacks,
                 &survey.source_reference,
                 recorder,
-            ),
-        },
-        "ventilationFlows": [],
-        "ventilation": ventilation,
-        "thermalMass": {
-            "floor": floor, "wall": wall, "ceiling": ceiling,
-            "sourceReference": format!("{}; ISSO 75.1 table 7.5", survey.construction.source_reference),
-        },
-        "internalGains": {
-            "method": "utility",
-            "lighting": {"method": "chapter14"},
-            "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14",
-        },
-        "windowInventoryComplete": true,
-        "windows": envelope.windows,
-        "opaqueInventoryComplete": true,
-        "opaqueElements": envelope.opaque_elements,
-    });
+            )
+        } else {
+            Vec::new()
+        };
+        let envelope = part.envelope;
+        demands.push(json!({
+            "zoneId": plan.id,
+            "usableFloorAreaM2": plan.area,
+            "areaSourceReference": survey.area_source_reference,
+            "usageFunction": usage_name(part.usage),
+            "functionAreas": if part.function_areas.len() > 1 {
+                json!(part.function_areas
+                    .iter()
+                    .map(|item| json!({"function": usage_name(item.function), "areaM2": item.area_m2}))
+                    .collect::<Vec<_>>())
+            } else {
+                json!([])
+            },
+            "setpoints": {"heatingC": part.heating_c, "coolingC": part.cooling_c, "sourceReference": "NTA 8800 table 7.13 (§6.5.3 weighted)"},
+            "transmission": {
+                "method": "components",
+                "direct": {"elements": envelope.direct_elements, "linearBridges": [], "pointBridges": []},
+                "unheated": envelope.unheated,
+                "groundFloors": envelope.ground_floors,
+                "groundInventoryConfirmed": true,
+                "verticalPipes": pipes,
+            },
+            "ventilationFlows": [],
+            "ventilation": part.ventilation,
+            "thermalMass": {
+                "floor": floor, "wall": wall, "ceiling": ceiling,
+                "sourceReference": format!("{}; ISSO 75.1 table 7.5", survey.construction.source_reference),
+            },
+            "internalGains": {
+                "method": "utility",
+                "lighting": {"method": "chapter14"},
+                "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14",
+            },
+            "windowInventoryComplete": true,
+            "windows": envelope.windows,
+            "opaqueInventoryComplete": true,
+            "opaqueElements": envelope.opaque_elements,
+        }));
+    }
+    let zone_area: f64 = plans.iter().map(|plan| plan.area).sum();
     let distribution = if heating.distribution_system.is_some() {
         json!({"method": "calculated", "sourceReference": format!("{}; basisopname forfait", survey.heating.source_reference)})
     } else {
         json!({"method": "heated_zone_only_space_heating", "sourceReference": format!("{}; basisopname: pipes in the heated zone", survey.heating.source_reference)})
     };
+    let mut demands = demands.into_iter();
+    let first = demands.next().expect("at least one calculation zone");
     let mut chain = json!({
-        "demand": demand,
+        "demand": first,
         "emission": heating.emission,
         "distribution": distribution,
         "generator": heating.generator,
     });
+    // §9.2: the heating system serves every calculation zone.
+    let further: Vec<Value> = demands
+        .map(|demand| {
+            json!({
+                "demand": demand,
+                "emission": chain["emission"].clone(),
+                "distribution": chain["distribution"].clone(),
+            })
+        })
+        .collect();
+    if !further.is_empty() {
+        chain["additionalZones"] = json!(further);
+    }
     if let Some(system) = heating.distribution_system {
         chain["distributionSystem"] = system;
     }
-    if let Some(humidifier) = humidifier_value(survey) {
-        chain["humidifiers"] = json!([humidifier]);
+    let humidifiers: Vec<Value> = plans
+        .iter()
+        .filter_map(|plan| humidifier_value(survey, &plan.id))
+        .collect();
+    if !humidifiers.is_empty() {
+        chain["humidifiers"] = json!(humidifiers);
     }
     let mut input = json!({
         "calculationScope": "utility",
-        "totalUsableFloorAreaM2": area,
+        "totalUsableFloorAreaM2": if multi { zone_area } else { area },
         "areaSourceReference": survey.area_source_reference,
         "spaceHeating": chain,
         "bacsFactor": bacs,
@@ -3646,7 +4192,7 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
         },
         "lossAreaM2": loss_area(&survey.envelope),
         "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
-        "lighting": [lighting],
+        "lighting": lighting,
         "hotWater": hot_water,
         "additionalHotWaterSystems": extra_systems,
         "demandUsesFixedC1Ventilation": false,
@@ -3685,7 +4231,7 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
 /// Chapter 12 humidifier of the survey (p. 161) for the heating chain:
 /// atomising humidifiers load the space-heating node (12.1, 9.4), steam
 /// humidifiers book their own carrier (12.3) and recoverable loss (12.4).
-fn humidifier_value(survey: &UtilitySurvey) -> Option<Value> {
+fn humidifier_value(survey: &UtilitySurvey, zone_id: &str) -> Option<Value> {
     let humidification = survey.humidification.as_ref()?;
     let humidifier = match humidification.humidifier {
         HumidifierAnswer::ElectricSteam => Humidifier::Steam {
@@ -3702,7 +4248,7 @@ fn humidifier_value(survey: &UtilitySurvey) -> Option<Value> {
         equipment_reference: humidification.source_reference.clone(),
     };
     Some(json!({
-        "zoneId": "utiliteit",
+        "zoneId": zone_id,
         "humidification": serde_json::to_value(value).expect("typed humidification serializes"),
     }))
 }
@@ -5019,6 +5565,181 @@ mod tests {
         let mut recorder = Recorder::default();
         assert!(derive_utility_input(&survey, &mut recorder).is_none());
         assert_eq!(recorder.issues[0].code, "calculation_zone_split_required");
+    }
+
+    /// A school with a sports hall: afb. 6.6 splits it (16 vs 21 °C,
+    /// capacities 3,64/0,46 under type C), so the survey lists two zones.
+    fn school_with_sports_hall() -> UtilitySurvey {
+        let mut survey = fixture("2005");
+        survey.functions = vec![
+            FunctionArea {
+                function: LabelFunction::Education,
+                area_m2: 1400.0,
+            },
+            FunctionArea {
+                function: LabelFunction::Sport,
+                area_m2: 1000.0,
+            },
+        ];
+        survey.zones = vec![
+            SurveyCalculationZone {
+                id: "school".into(),
+                functions: vec![FunctionArea {
+                    function: LabelFunction::Education,
+                    area_m2: 1400.0,
+                }],
+            },
+            SurveyCalculationZone {
+                id: "sporthal".into(),
+                functions: vec![FunctionArea {
+                    function: LabelFunction::Sport,
+                    area_m2: 1000.0,
+                }],
+            },
+        ];
+        let mut hall = survey.lighting[0].clone();
+        hall.id = "sporthal".into();
+        hall.area_m2 = 1000.0;
+        hall.zone_id = Some("sporthal".into());
+        survey.lighting[0].area_m2 = 1050.0;
+        survey.lighting[0].zone_id = Some("school".into());
+        survey.lighting[1].area_m2 = 350.0;
+        survey.lighting[1].zone_id = Some("school".into());
+        survey.lighting.push(hall);
+        for surface in survey.envelope.surfaces.iter_mut() {
+            match surface.id.as_str() {
+                "gevel-zuid" => surface.zone_id = Some("school".into()),
+                "gevel-noord" => surface.zone_id = Some("sporthal".into()),
+                _ => {}
+            }
+        }
+        survey
+    }
+
+    #[test]
+    fn calculation_zones_split_the_school_and_the_sports_hall() {
+        let survey = school_with_sports_hall();
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        assert!(!result
+            .issues
+            .iter()
+            .any(|item| item.code == "calculation_zone_split_required"));
+        let mut recorder = Recorder::default();
+        let input = derive_utility_input(&survey, &mut recorder).unwrap();
+        let chain = &input["spaceHeating"];
+        let school = &chain["demand"];
+        let hall = &chain["additionalZones"][0]["demand"];
+        assert_eq!(school["zoneId"], "school");
+        assert_eq!(hall["zoneId"], "sporthal");
+        assert_eq!(school["usableFloorAreaM2"], 1400.0);
+        assert_eq!(hall["usableFloorAreaM2"], 1000.0);
+        assert_eq!(input["totalUsableFloorAreaM2"], 2400.0);
+        // Table 7.13 setpoints per zone: the hall is not averaged with the
+        // classrooms any more.
+        let setpoint = |zone: &Value| zone["setpoints"]["heatingC"].as_f64().unwrap();
+        assert!(setpoint(hall) < setpoint(school));
+        assert_eq!(school["usageFunction"], "education");
+        assert_eq!(hall["usageFunction"], "sport");
+        // The roof without a zone is split by A_g: 2 400 × 1 400 / 2 400.
+        let roof = |zone: &Value| -> f64 {
+            zone["transmission"]["direct"]["elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|item| item["id"].as_str().unwrap().starts_with("dak"))
+                .map(|item| item["areaM2"].as_f64().unwrap())
+                .sum()
+        };
+        assert!((roof(school) - 1400.0).abs() < 1e-6, "{}", roof(school));
+        assert!((roof(hall) - 1000.0).abs() < 1e-6, "{}", roof(hall));
+        // The assigned façades stay in their zone.
+        let has = |zone: &Value, id: &str| {
+            zone["transmission"]["direct"]["elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["id"].as_str().unwrap().starts_with(id))
+        };
+        assert!(has(school, "gevel-zuid") && !has(hall, "gevel-zuid"));
+        assert!(has(hall, "gevel-noord") && !has(school, "gevel-noord"));
+        // One lighting entry per zone; the hall's ventilation is sport.
+        assert_eq!(input["lighting"].as_array().unwrap().len(), 2);
+        assert_eq!(input["lighting"][1]["zoneId"], "sporthal");
+        assert_eq!(hall["ventilation"]["zoneId"], "sporthal");
+        assert_eq!(hall["ventilation"]["functions"][0]["function"], "sport");
+        // The vertical pipes are booked once, in the first zone.
+        assert!(hall["transmission"]["verticalPipes"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let performance = result.performance.unwrap();
+        assert!(performance.status == "calculated_unverified");
+    }
+
+    #[test]
+    fn calculation_zones_are_validated() {
+        let issues = |survey: &UtilitySurvey| {
+            let mut recorder = Recorder::default();
+            derive_utility_input(survey, &mut recorder);
+            recorder
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        // Zone areas must add up to the survey's functions.
+        let mut survey = school_with_sports_hall();
+        survey.zones[1].functions[0].area_m2 = 900.0;
+        assert!(issues(&survey).contains(&"zone_function_areas_mismatch"));
+        // Unknown zone on a surface, lighting zone without a zone.
+        let mut survey = school_with_sports_hall();
+        survey.envelope.surfaces[0].zone_id = Some("kantine".into());
+        survey.lighting[2].zone_id = None;
+        let found = issues(&survey);
+        assert!(found.contains(&"surface_zone_unknown"));
+        assert!(found.contains(&"lighting_zone_calculation_zone_required"));
+        // Each zone passes afb. 6.6 itself: a zone holding both functions
+        // must be split further.
+        let mut survey = school_with_sports_hall();
+        survey.zones[0].functions.push(FunctionArea {
+            function: LabelFunction::Sport,
+            area_m2: 1000.0,
+        });
+        survey.zones[1].functions[0].function = LabelFunction::Education;
+        survey.zones[1].functions[0].area_m2 = 0.0;
+        assert!(issues(&survey).contains(&"zone_function_area_invalid"));
+        survey.zones[1].functions = vec![FunctionArea {
+            function: LabelFunction::Education,
+            area_m2: 600.0,
+        }];
+        survey.zones[0].functions[0].area_m2 = 800.0;
+        assert!(issues(&survey).contains(&"calculation_zone_criteria_not_met"));
+        // Lighting area per zone matches the zone.
+        let mut survey = school_with_sports_hall();
+        survey.lighting[2].area_m2 = 800.0;
+        survey.lighting[1].area_m2 = 550.0;
+        assert!(issues(&survey).contains(&"zone_lighting_area_mismatch"));
+    }
+
+    #[test]
+    fn dwelling_survey_rejects_zone_ids() {
+        let mut survey: super::super::ResidentialSurvey = serde_json::from_str(include_str!(
+            "../../../../training-data/nta8800-opname-1930-terraced.json"
+        ))
+        .unwrap();
+        survey.envelope.surfaces[0].zone_id = Some("a".into());
+        let result = super::super::assess_residential_survey(&survey);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "surface_zone_not_in_dwelling_survey"));
     }
 
     #[test]

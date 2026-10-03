@@ -173,7 +173,7 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 | Luchtverwarming en passieve koeling | Zoals bij woningen | p. 123, 146, 151–152 |
 | Ontvochtiging | Hoofdstuk 12 van 75.1 (p. 161) vraagt alleen naar bevochtiging. De ontvochtigingsbehoefte (NTA 12.5, tabel 12.2) volgt in de kern uit de ontwerptemperatuur van de koeling; de opname vraagt er niets extra voor | p. 161; NTA 12.5 |
 | Warmtepomp die ook koelt | Compressiekoeling (`compression`, of `room_air_conditioner` bij directe expansie in de ruimte). Voor de verwarming is het een elektrische warmtepomp (§10.3.1.1). Vrije koeling op de bron van de verwarmingswarmtepomp gaat via `closed_ground_loop`/aquifer met `heatPumpSource` (NTA 10.84) | p. 126–129 |
-| Rekenzones | Na het samenvoegen van p. 39–40 toetst de laag afb. 6.6 met tabel 6.4: setpoints meer dan 4 K uit elkaar (tenzij de grootste functie ≥ 90 % beslaat), of bij ventilatietype A, B, C of E een ventilatiecapaciteit die meer dan een factor 4 verschilt (tenzij de verblijfsgebieden in open verbinding staan, `openlyConnectedResidenceAreas`, of meer dan 80 % dezelfde eis heeft). Moet de zone worden gesplitst, dan stopt de opname met `calculation_zone_split_required` | p. 53–54 (afb. 6.6, tabel 6.4) |
+| Rekenzones | Na het samenvoegen van p. 39–40 toetst de laag afb. 6.6 met tabel 6.4: setpoints meer dan 4 K uit elkaar (tenzij de grootste functie ≥ 90 % beslaat), of bij ventilatietype A, B, C of E een ventilatiecapaciteit die meer dan een factor 4 verschilt (tenzij de verblijfsgebieden in open verbinding staan, `openlyConnectedResidenceAreas`, of meer dan 80 % dezelfde eis heeft). Zonder `zones` stopt de opname dan met `calculation_zone_split_required`. Met `zones` (twee of meer) doorloopt elke rekenzone het schema opnieuw (p. 52); een zone die zelf nog gesplitst moet worden geeft `calculation_zone_criteria_not_met` | p. 52–54 (§6.5, afb. 6.6, tabel 6.4) |
 | Fossiele brandstof op het perceel | `fossilFuelOnPlot` wordt `fossilAppliancesOutsideCalculation` (NTA §5.5.7) voor "lokaal koolstofemissievrij". Niet vastgesteld → alleen de berekende energiedragers beslissen | p. 61–62 (§7.1.7) |
 | Sport- en zwemzalen | Bij een sportfunctie en A_g ≥ 1.000 m² gaat `sportHallAreaM2` naar A_g;si;sport van de circulatie (NTA 13.32a) van het tapwatersysteem dat de sportfunctie bedient. Onbekend → 0 m² (`sport_hall_area_unknown_0`). Een ruimte met zwembad (`swimmingPoolAreaM2`) wordt van de sportfunctie afgesplitst met de factor 2 van NTA §11.2.2.5.1 | p. 65 |
 | PV | Zoals bij woningen | p. 196–197 |
@@ -181,7 +181,8 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 
 ## Niet ondersteund
 
-- Meer dan één rekenzone (een gemengde rekenzone wordt wel ondersteund). Vraagt afb. 6.6 een splitsing, dan stopt de opname met `calculation_zone_split_required`: de schil is niet per rekenzone opgenomen. Het paneel toont dan de vervolgstap: voer het gebouw in via de NTA-projectberekening met een rekenzone per groep, of neem zelfstandig gelabelde gebouwdelen elk als eigen opname op. Zie het ontwerp hieronder.
+- Ventilatie per rekenzone: één ventilatiesysteem (het gebouwsysteem) bedient alle rekenzones; een gebouw met fysiek gescheiden ventilatiesystemen is per klimatiseringszone apart op te nemen (§6.4).
+- Het criterium voor de specifieke interne warmtecapaciteit (afb. 6.6): de opname kent één constructie per gebouw.
 - Passieve koeling, warmtepompen die ook koelen, ontvochtiging en luchtverwarming (ook via de LBK) worden nu ondersteund; zie de tabel hierboven. Hetzelfde geldt voor WKK, meerdere verwarmingsopwekkers, meerdere tapwatersystemen en zonneboilers.
 - Daglichtsectoren. Een bekende daglichtregeling rekent met de forfaitaire daglichtmethode.
 
@@ -207,17 +208,21 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 18. NTA-tabel 9.31 heeft geen waarden voor een gasmotor tot en met 2 kW uit 2006 of eerder. Bij een gasmotorkoelmachine meldt de opname `gas_engine_small_old_no_table_row` in plaats van een fout in de kern.
 19. Inklapredenen van opgeslagen opnames met een hernoemd pad of een gesplitste regel blijven gekoppeld via een aliastabel (`COLLAPSE_REASON_ALIASES`): `cooling.distribution`, `cooling_fittings_unknown_uninsulated_meters_present`, `ventilation.ductsLukaAbc`, `ventilation.bypass` en de kanaal- en constant-volumeregels onder `ventilation.heatRecovery`.
 
-## Ontwerp: meerdere rekenzones in de utiliteitsopname
+## Meerdere rekenzones in de utiliteitsopname
 
-Afb. 6.6 met tabel 6.4 (p. 53–54) kan een splitsing in rekenzones vragen. De opname rekent nu met één (gemengde) rekenzone en stopt dan. Een uitbreiding binnen redelijke omvang ziet er zo uit:
+Afb. 6.6 met tabel 6.4 (p. 52–54) kan een splitsing in rekenzones vragen; ook zonder die eis mag de adviseur splitsen (p. 54). De opname neemt dan een lijst `zones` aan.
 
-1. **Zones in de opname.** Een nieuwe lijst `zones` met per zone een id, de functies met hun A_g, het setpoint dat volgt uit tabel 6.4 en, optioneel, het ventilatiesysteem. Zonder lijst blijft het huidige gedrag: één zone met alle functies.
-2. **Schil per zone.** Elk vlak in `envelope.surfaces` krijgt een optionele `zoneId`. Ontbreekt die, dan wordt het vlak naar rato van A_g over de zones verdeeld. Vlakken tussen twee zones zijn adiabatisch (§6.4: geen warmte-uitwisseling tussen rekenzones). Een `zoneId` die niet bestaat, geeft een issue.
-3. **Installaties.** Verwarming, koeling en tapwater blijven per gebouw en bedienen alle zones; de afleiding geeft per zone het bediende deel door, zoals de projectroute voor meerdere zones dat al doet. Ventilatie kan per zone verschillen. Zonder zone-antwoord geldt het gebouwsysteem.
-4. **Afleiding.** `derive_utility_input` bouwt per zone het bestaande zone-blok; de projectroute met meerdere zones rekent ze door. `check_zone_split` controleert dan of de opgegeven indeling aan afb. 6.6 voldoet, en niet langer alleen of er gesplitst moet worden.
-5. **Inklapredenen en registratie.** De paden krijgen een zoneprefix (`zones[1].envelope...`). De registratie blijft per gebouw.
+1. **Zones.** Elke zone heeft een `id` en de gebruiksfuncties met hun A_g. Per functie tellen de zones op tot `functions` van het gebouw (tolerantie 0,05 m², anders `zone_function_areas_mismatch`). Zonder `zones`, of met één zone (waarschuwing `single_calculation_zone_whole_building`), is het gebouw één rekenzone zoals voorheen.
+2. **Functies per zone (§6.6, p. 54).** Het samenvoegen van p. 39–40 gebeurt op gebouwniveau; in een zone komen alleen de functies voor die daarna over zijn. Een samengevoegde kleine functie telt in haar zone als hoofdfunctie. Setpoints en ventilatie-eisen volgen per zone met de oppervlaktegewogen waarden van §6.5.3.
+3. **Afb. 6.6 per zone.** Elke zone doorloopt het schema opnieuw (p. 52: "voor elke rekenzone ... volledig doorlopen"). Moet een zone verder gesplitst worden, dan geeft de opname `calculation_zone_criteria_not_met` op `zones[i].functions`. `calculation_zone_split_required` komt alleen nog bij een opname zonder zones.
+4. **Schil.** Een vlak in `envelope.surfaces` krijgt een optionele `zoneId`; ramen, deuren, panelen en daklichten volgen hun vlak. Een vlak zonder `zoneId` wordt naar A_g over de zones verdeeld (oppervlakte en blootgestelde omtrek, zodat B' van een vloer gelijk blijft), met zijn openingen. Vlakken tussen twee rekenzones neemt de opname niet op (geen warmte-uitwisseling tussen rekenzones). Een onbekende `zoneId` geeft `surface_zone_unknown`.
+5. **Gebouwbrede waarden.** ΔU_for (8.3) volgt uit de hele schil (§8.2.1: de forfaitaire methode geldt voor het gehele gebouw) en geldt in elke zone. b_U van een onverwarmde ruimte volgt uit alle aangrenzende zones (8.53) en is in elke zone gelijk. De toegepaste standaardwaarden van de schil staan één keer in de uitvoer, met de paden van het hele gebouw.
+6. **Installaties.** Eén verwarmingsketen bedient alle zones (§9.2): de eerste zone is de `demand`, de overige staan in `additionalZones` met dezelfde afgifte en distributie. Koeling, tapwater (13.20 per functie), BACS, PV en opslag blijven per gebouw. Het ventilatiesysteem is het gebouwsysteem en krijgt per zone de functies, A_g en het setpoint van die zone; de luchtdoorlatendheid geldt voor alle zones (p. 55: een blowerdoortest voor het hele gebouw mag voor alle rekenzones). Een opgegeven geïnstalleerde capaciteit wordt naar A_g verdeeld (`installed_capacity_split_by_area`). Een zwembadruimte hoort bij de zone met de meeste sportfunctie. Bevochtiging geldt in elke zone.
+7. **Verlichting (NTA 14.3).** Elke verlichtingszone krijgt een `zoneId` (verplicht met zones: `lighting_zone_calculation_zone_required`). Per rekenzone dekken haar verlichtingszones haar A_g (`zone_lighting_area_mismatch`). De forfaitregel van 14.3.4 geldt per rekenzone.
+8. **Leidingen.** De verticale leidingen (tabel 7.8) staan in de eerste zone.
+9. **Inklapredenen en registratie.** De paden zijn die van het gebouw (zonder zoneprefix), zodat opgeslagen inklapredenen blijven passen. De registratie blijft per gebouw.
 
-Tot die uitbreiding er is, is de vervolgstap de NTA-projectberekening, die meerdere rekenzones ondersteunt.
+Interpretaties: het verdelen van vlakken zonder zone naar A_g en het verdelen van de geïnstalleerde capaciteit naar A_g zijn keuzes van de opname; ISSO 75.1 geeft er geen regel voor. Een ΔU_for per gebouw in plaats van per zone volgt uit "voor het gehele gebouw" van §8.2.1.
 
 ## Fixtures
 

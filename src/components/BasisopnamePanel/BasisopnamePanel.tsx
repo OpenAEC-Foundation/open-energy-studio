@@ -8,7 +8,7 @@ import {
   assessResidentialSurveyWithRust, assessUtilitySurveyWithRust, type OpnameAssessment,
 } from '../../core/nta/KernelClient';
 import {
-  asResidential, asUtility, heatingGeneratorTemplate, hotWaterGeneratorTemplate, pvTemplate,
+  asResidential, asUtility, calculationZoneTemplate, heatingGeneratorTemplate, hotWaterGeneratorTemplate, pvTemplate,
   solarTemplate, surveyTemplate, windowTemplate, type StoredSurvey, type SurveyKind,
 } from '../../core/nta/SurveyTemplates';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
@@ -236,6 +236,54 @@ function GasEngineFields({ draft, base, change, t }: { draft: Draft; base: Path;
 }
 
 /** ISSO 75.1 §10.3.2–§10.4.5 (p. 131–137): further generators and the distribution answers. */
+/** Zone of a surface or lighting zone; empty: split by A_g (surfaces) or not set. */
+function ZoneSelect({ draft, change, path, label, ids, empty }: {
+  draft: Draft; change: Change; path: Path; label: string; ids: string[]; empty: string;
+}) {
+  const value = read(draft, path);
+  return <label>{label}
+    <select value={typeof value === 'string' ? value : ''}
+      onChange={(event) => change(path, event.target.value === '' ? null : event.target.value)}>
+      <option value="">{empty}</option>
+      {ids.map((id) => <option key={id} value={id}>{id}</option>)}
+    </select>
+  </label>;
+}
+
+/** ISSO 75.1 §6.5 (afb. 6.6, p. 52–54): calculation zones with their use functions, and the zone per lighting zone. */
+export function CalculationZoneFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const zones = list(draft, ['zones']);
+  const lighting = list(draft, ['lighting']);
+  const ids = zones.map((zone) => String(zone.id ?? '')).filter((id) => id !== '');
+  return <>
+    <p className="nta-form-note">{t('opname.zones.note')}</p>
+    {zones.map((_, index) => {
+      const base: Path = ['zones', index];
+      const functions = list(draft, [...base, 'functions']);
+      return <div key={index} className="opname-item">
+        <TextField {...field} path={[...base, 'id']} label={t('opname.zones.id')} />
+        {functions.map((_, functionIndex) => <div key={functionIndex} className="opname-served">
+          <SelectField {...field} path={[...base, 'functions', functionIndex, 'function']} label={t('opname.zones.function')}
+            options={opts(t, 'opname.functionKind', UTILITY_FUNCTIONS)} />
+          <NumberField {...field} path={[...base, 'functions', functionIndex, 'areaM2']} label={t('opname.zones.area')} />
+          <RemoveButton label={t('opname.remove')}
+            onRemove={() => change([...base, 'functions'], functions.filter((_, item) => item !== functionIndex))} />
+        </div>)}
+        <ListControls label={t('opname.zones.addFunction')}
+          onAdd={() => change([...base, 'functions'], [...functions, { function: 'office', areaM2: 0 }])} />
+        <RemoveButton label={t('opname.zones.remove')}
+          onRemove={() => change(['zones'], zones.filter((_, item) => item !== index))} />
+      </div>;
+    })}
+    <ListControls label={t('opname.zones.add')}
+      onAdd={() => change(['zones'], [...zones, calculationZoneTemplate(zones.length)])} />
+    {ids.length > 1 && lighting.map((item, index) =>
+      <ZoneSelect key={`l${index}`} draft={draft} change={change} path={['lighting', index, 'zoneId']}
+        label={`${t('opname.zones.lightingZone')} ${String(item.id ?? index)}`} ids={ids} empty={t('opname.zones.notSet')} />)}
+  </>;
+}
+
 export function UtilityCoolingFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
   const field = { draft, onChange: change };
   const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
@@ -478,6 +526,7 @@ export function BasisopnamePanel() {
   const pv = list(draft, ['pv']);
   const reasons = (read(draft, ['inklapRedenen']) ?? {}) as Record<string, string>;
   const verticalPipes = read(draft, ['verticalPipes']);
+  const zoneIds = list(draft, ['zones']).map((zone) => String(zone.id ?? '')).filter((id) => id !== '');
 
   const run = async () => {
     const current = ++requestId.current;
@@ -534,6 +583,10 @@ export function BasisopnamePanel() {
       </label>}
     </Section>
 
+    {kind === 'utility' && <Section title={t('opname.zones')}>
+      <CalculationZoneFields draft={draft} change={change} t={t} />
+    </Section>}
+
     <Section title={t('opname.envelope')}>
       {kind === 'residential' && <label>{t('opname.buildingKind')}
         <select value={typeof buildingKind === 'string' ? buildingKind : 'regular'}
@@ -560,6 +613,9 @@ export function BasisopnamePanel() {
             </select>
           </label>
           <NumberField {...field} path={[...base, 'grossAreaM2']} label={t('opname.surface.area')} />
+          {kind === 'utility' && zoneIds.length > 1 &&
+            <ZoneSelect draft={draft} change={change} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
+              ids={zoneIds} empty={t('opname.zones.splitByArea')} />}
           <label>{t('opname.surface.insulation')}
             <select value={typeof insulation === 'string' ? insulation : ''}
               onChange={(event) => change([...base, 'insulation'], event.target.value === 'thickness'

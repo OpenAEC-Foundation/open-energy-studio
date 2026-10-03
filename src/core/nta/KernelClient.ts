@@ -2575,6 +2575,8 @@ export interface ResidentialSurvey {
       crawlspaceBottomInsulated?: boolean | null;
       /** §8.7.2.1: insulated at a renovation or extension (with present_unknown_thickness). */
       renovation?: { year?: number | null; meetsRequirementsOfYear?: boolean } | null;
+      /** Utility survey with `zones`: the calculation zone; absent: split over the zones by A_g. */
+      zoneId?: string | null;
       sourceReference: string;
     }>;
     windows?: Array<{
@@ -2942,6 +2944,8 @@ export interface UtilitySurvey {
     daylight?: 'none' | 'switching' | 'dimming' | 'unknown';
     largeOfficeGroup?: boolean;
     extractedLuminaires?: boolean;
+    /** Calculation zone of this lighting zone; required with `zones`. */
+    zoneId?: string | null;
     sourceReference: string;
   }>;
   pv?: ResidentialSurvey['pv'];
@@ -2962,6 +2966,11 @@ export interface UtilitySurvey {
   swimmingPoolAreaM2?: number | null;
   /** Afb. 6.6: residence areas openly connected (no split on ventilation capacity). */
   openlyConnectedResidenceAreas?: boolean;
+  /**
+   * ISSO 75.1 §6.5 (p. 52–54): two or more calculation zones, each with its use
+   * functions; per function the zones add up to `functions`. Empty: one zone.
+   */
+  zones?: Array<{ id: string; functions: UtilitySurvey['functions'] }>;
   sourceReference: string;
   /** Adviser's reason per applied default (path or rule) for the forfait (BRL 9500 §4.2.2). */
   inklapRedenen?: Record<string, string>;

@@ -330,6 +330,15 @@ fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
     if !(survey.building_height_m.is_finite() && survey.building_height_m > 0.0) {
         recorder.issue("building_height_invalid", "buildingHeightM");
     }
+    // The dwelling survey derives one calculation zone.
+    for (index, surface) in survey.envelope.surfaces.iter().enumerate() {
+        if surface.zone_id.is_some() {
+            recorder.issue(
+                "surface_zone_not_in_dwelling_survey",
+                format!("envelope.surfaces[{index}].zoneId"),
+            );
+        }
+    }
     if survey.construction.closed_or_suspended_ceiling {
         // ISSO 82.1 table 7.4 (p. 62) has no closed-ceiling column: only a
         // (very) heavy floor whose top is heavier than the ceiling above

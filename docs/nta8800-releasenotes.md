@@ -2,6 +2,25 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — meerdere rekenzones in de utiliteitsopname (ISSO 75.1 §6.5)
+
+### Nieuwe invoer
+
+- **`zones`** in de utiliteitsopname: twee of meer rekenzones met hun gebruiksfuncties. Een opname die met `calculation_zone_split_required` stopte, kan nu worden afgemaakt. Vlakken (`envelope.surfaces[].zoneId`) en verlichtingszones (`lighting[].zoneId`) krijgen hun zone; vlakken zonder zone worden naar A_g verdeeld.
+- In de woningopname is `zoneId` op een vlak niet toegestaan: `surface_zone_not_in_dwelling_survey`.
+
+### Opnames die nu `incomplete` worden
+
+Alleen opnames met `zones`:
+
+- `zone_function_areas_mismatch`, `zone_function_area_invalid`, `zone_id_required`, `zone_id_duplicate`;
+- `surface_zone_unknown`, `lighting_zone_calculation_zone_required`, `lighting_zone_calculation_zone_unknown`, `zone_lighting_area_mismatch`;
+- `calculation_zone_criteria_not_met`: een zone die volgens afb. 6.6 zelf nog gesplitst moet worden.
+
+### Opnames met een andere uitkomst
+
+Geen: zonder `zones` is de afleiding ongewijzigd (gecontroleerd op de drie utiliteitsfixtures: invoer, standaardwaarden en uitkomst identiek).
+
 ## 5 oktober 2026 — micro-WKK, PV en zonneboilers na de herberekening
 
 ### Projecten die nu `invalid` worden

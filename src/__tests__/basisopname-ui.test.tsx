@@ -304,6 +304,40 @@ describe('basisopname panel', () => {
     expect(screen.getByText('ISSO 82.1 p. 113 (table 9.7)')).toBeInTheDocument();
   });
 
+  it('edits calculation zones and assigns surfaces and lighting zones (ISSO 75.1 §6.5)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
+    // No zone selector on surfaces while the building is one zone.
+    expect(screen.queryAllByRole('combobox', { name: 'Calculation zone' })).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Add calculation zone' }));
+    await user.click(screen.getByRole('button', { name: 'Add calculation zone' }));
+    expect(stored()!.survey.zones).toEqual([{ id: 'zone1', functions: [] }, { id: 'zone2', functions: [] }]);
+    const zoneNames = screen.getAllByRole('textbox', { name: 'Zone name' });
+    await user.clear(zoneNames[0]);
+    await user.type(zoneNames[0], 'kantoor');
+    await user.click(screen.getAllByRole('button', { name: 'Add function' })[0]);
+    const area = screen.getByRole('spinbutton', { name: 'A_g in this zone, m²' });
+    await user.clear(area);
+    await user.type(area, '1200');
+    expect(stored()!.survey.zones[0]).toEqual({ id: 'kantoor', functions: [{ function: 'office', areaM2: 1200 }] });
+
+    // Surfaces: a zone, or split over all zones by A_g.
+    const surfaceZones = screen.getAllByRole('combobox', { name: 'Calculation zone' });
+    expect(surfaceZones).toHaveLength(6);
+    await user.selectOptions(surfaceZones[0], 'zone2');
+    expect(stored()!.survey.envelope.surfaces[0].zoneId).toBe('zone2');
+    await user.selectOptions(surfaceZones[0], '');
+    expect(stored()!.survey.envelope.surfaces[0].zoneId).toBeNull();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Calculation zone of lighting zone kantoren' }), 'kantoor');
+    expect(stored()!.survey.lighting[0].zoneId).toBe('kantoor');
+
+    await user.click(screen.getAllByRole('button', { name: 'Remove zone' })[1]);
+    expect(stored()!.survey.zones).toHaveLength(1);
+    expect(screen.queryAllByRole('combobox', { name: 'Calculation zone' })).toHaveLength(0);
+  }, 60000);
+
   it('does not show an assessment for a survey changed during the request', async () => {
     let resolveResponse!: (value: { json: () => Promise<unknown> }) => void;
     const fetchMock = vi.fn(() => new Promise<{ json: () => Promise<unknown> }>((resolve) => {
