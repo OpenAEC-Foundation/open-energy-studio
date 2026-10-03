@@ -2970,7 +2970,16 @@ export interface UtilitySurvey {
    * ISSO 75.1 §6.5 (p. 52–54): two or more calculation zones, each with its use
    * functions; per function the zones add up to `functions`. Empty: one zone.
    */
-  zones?: Array<{ id: string; functions: UtilitySurvey['functions'] }>;
+  zones?: Array<{
+    id: string;
+    functions: UtilitySurvey['functions'];
+    /** p. 147: installed ventilation capacity of the zone, dm³/s; empty: share of the building's by A_g. */
+    installedCapacityDm3PerS?: number | null;
+    /** p. 65: swimming-pool room in this zone, m²; the zones add up to `swimmingPoolAreaM2`. */
+    swimmingPoolAreaM2?: number | null;
+    /** p. 145: system E areas of this zone; zones without it have no decentral part. */
+    combined?: { decentralAreaM2: number; totalResidenceAreaM2: number } | null;
+  }>;
   sourceReference: string;
   /** Adviser's reason per applied default (path or rule) for the forfait (BRL 9500 §4.2.2). */
   inklapRedenen?: Record<string, string>;
