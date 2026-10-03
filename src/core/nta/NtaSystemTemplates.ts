@@ -110,6 +110,9 @@ export function hotWaterGeneratorTemplate(kind: string): Block {
   if (kind === 'heat_pump') return { kind, exhaustAirSource: false, measuredClass: 'class4' };
   if (kind === 'indirect_boiler') return { kind, boiler: null, oil: false, insideBoundary: true, alsoSpaceHeating: true };
   if (kind === 'measured_two_profiles') return twoProfileTemplate();
+  if (kind === 'heat_pump_en16147') return { kind, profile: 'l', deliveredKwhPerDay: 11.655, inputKwhPerDay: null,
+    exhaustAirSource: false, storageWithoutLegionellaCycle: false, outdoorAirFraction: null, smartControlFactor: null,
+    maxTestTemperatureC: null, designSetTemperatureC: null, sourceReference: '' };
   if (kind === 'chp') return { kind, chp: chpClassTemplate(), alsoSpaceHeating: false, equipmentReference: '' };
   return { kind };
 }
@@ -128,6 +131,25 @@ export function twoProfileTemplate(): Block {
     legionellaCycleTested: false,
     sourceReference: '',
   };
+}
+
+/** §13.6 hot-water vessel; the label is unknown until stated. */
+export function hotWaterStorageTemplate(index = 0): Block {
+  return { id: `vessel-${index + 1}`, volumeL: null, loss: { method: 'unknown_label', producedFrom2018: false },
+    connectionFactor: null, inHeatedZone: true, unheatedAmbientC: null, notInApplianceTest: false, sourceReference: '' };
+}
+
+/** §13.6.2 storage loss by route (13.58–13.60). */
+export function storageLossTemplate(method: string): Block {
+  if (method === 'label') return { method, label: 'c' };
+  if (method === 'measured') return { method, transmissionWPerK: null };
+  if (method === 'measured_standby') return { method, standbyKwhPerDay: null, referenceStorageC: 65, referenceAmbientC: 20 };
+  return { method: 'unknown_label', producedFrom2018: false };
+}
+
+/** 9.6.6.2.2.8: storage outside the micro-CHP test configuration. */
+export function microChpStorageTemplate(): Block {
+  return { lossWPerK: null, setTemperatureC: null, chargingAuxiliaryW: null, sourceReference: '' };
 }
 
 /** 13.144a/13.148: exhaust-air use of a hot-water heat pump. */
