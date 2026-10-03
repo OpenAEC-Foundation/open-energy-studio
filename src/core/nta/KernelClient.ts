@@ -3617,6 +3617,8 @@ export interface NtaChapterFiveIndicators {
   meetsStandardInsulation: boolean | null;
   /** §5.3.1.3 EwePrenTot, rounded down to 0,01. */
   renewableIndicatorKwhPerM2: number;
+    /** §5.3.1.3 EwePrenTot;EMGforf with a quality declaration. */
+    renewableIndicatorForfaitKwhPerM2?: number | null;
   /** 5.3h / 5.3i. */
   finalEnergyKwhPerM2: number;
   finalEnergyEedKwhPerM2: number;

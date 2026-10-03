@@ -466,8 +466,12 @@ pub struct ChapterFiveIndicators {
     /// construction year and loss area), rounded to a whole number.
     pub standard_insulation_kwh_per_m2: Option<f64>,
     pub meets_standard_insulation: Option<bool>,
-    /// §5.3.1.3 EwePrenTot, rounded down to 0,01.
+    /// §5.3.1.3 EwePrenTot, rounded down to 0,01 (EMGverklaring when a
+    /// quality declaration is used).
     pub renewable_indicator_kwh_per_m2: f64,
+    /// §5.3.1.3 EwePrenTot;EMGforf, reported next to it with a quality
+    /// declaration.
+    pub renewable_indicator_forfait_kwh_per_m2: Option<f64>,
     /// 5.3h EweFinal, rounded up to 0,01.
     pub final_energy_kwh_per_m2: f64,
     /// 5.3i EweFinal;EED, rounded up to 0,01.
@@ -492,28 +496,58 @@ pub struct ChapterFiveIndicators {
     pub meets_renovation_standard: Option<bool>,
 }
 
+/// Σ N_woon over the zones, `None` without residential internal gains.
+fn dwelling_count(input: &BuildingPerformanceInput) -> Option<u32> {
+    let mut total = None;
+    for zone in std::iter::once(&input.space_heating.demand).chain(
+        input
+            .space_heating
+            .additional_zones
+            .iter()
+            .map(|zone| &zone.demand),
+    ) {
+        if let crate::monthly_demand::InternalGains::Residential { dwelling_count, .. } =
+            &zone.internal_gains
+        {
+            total = Some(total.unwrap_or(0) + *dwelling_count);
+        }
+    }
+    total
+}
+
 /// §5.3.2: Standaard voor woningisolatie, kWh/m² per year.
 pub fn standard_insulation(
     apartment_building: bool,
     construction_year: u32,
-    loss_area_ratio: f64,
+    loss_area_m2: f64,
+    usable_area_m2: f64,
 ) -> Option<f64> {
-    if !loss_area_ratio.is_finite() || loss_area_ratio <= 0.0 {
+    use rust_decimal::{Decimal, RoundingStrategy};
+    if !(loss_area_m2.is_finite() && usable_area_m2.is_finite())
+        || loss_area_m2 <= 0.0
+        || usable_area_m2 <= 0.0
+    {
         return None;
     }
     let (base, slope) = match (apartment_building, construction_year <= 1945) {
-        (false, true) => (60.0, 105.0),
-        (false, false) => (43.0, 40.0),
-        (true, true) => (95.0, 70.0),
-        (true, false) => (45.0, 45.0),
+        (false, true) => (60, 105),
+        (false, false) => (43, 40),
+        (true, true) => (95, 70),
+        (true, false) => (45, 45),
     };
-    let value = if loss_area_ratio < 1.0 {
-        base
+    // Decimal arithmetic so that an exact half rounds up.
+    let ratio = crate::final_energy_draft::decimal(loss_area_m2)?
+        .checked_div(crate::final_energy_draft::decimal(usable_area_m2)?)?;
+    let value = if ratio < Decimal::ONE {
+        Decimal::from(base)
     } else {
-        base + slope * (loss_area_ratio - 1.0)
+        Decimal::from(base) + Decimal::from(slope) * (ratio - Decimal::ONE)
     };
     // "Rekenkundig afronden op een geheel getal".
-    Some(value.round())
+    use rust_decimal::prelude::ToPrimitive;
+    value
+        .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero)
+        .to_f64()
 }
 
 /// Annex AB footnote g: ϑ_aflever;warmte of external heat.
@@ -2318,12 +2352,19 @@ pub fn assess_building_performance(
                 .sum();
             let heating_indicator = ceil_per_area(heating_net, area).unwrap_or(f64::NAN);
             let cooling_indicator = ceil_per_area(cooling_net, area).unwrap_or(f64::NAN);
-            let standard = match (residential, input.construction_year, input.loss_area_m2) {
+            // §5.3.2: set per dwelling (N_woon = 1).
+            let single_dwelling = dwelling_count(input) == Some(1);
+            let standard = match (
+                residential && single_dwelling,
+                input.construction_year,
+                input.loss_area_m2,
+            ) {
                 (true, Some(year), Some(loss)) => standard_insulation(
                     input.space_heating.demand.dwelling_type
                         == Some(crate::monthly_demand::DwellingType::ApartmentBuilding),
                     year,
-                    loss / area,
+                    loss,
+                    area,
                 ),
                 _ => None,
             };
@@ -2355,6 +2396,13 @@ pub fn assess_building_performance(
                 meets_standard_insulation: standard.map(|limit| heating_indicator <= limit),
                 standard_insulation_kwh_per_m2: standard,
                 renewable_indicator_kwh_per_m2: indicator.renewable_indicator_kwh_per_m2_year,
+                renewable_indicator_forfait_kwh_per_m2: indicators.as_ref().and_then(|result| {
+                    result
+                        .scenarios
+                        .iter()
+                        .find(|item| item.kind == crate::indicators_draft::ScenarioKind::EmgForfait)
+                        .map(|item| item.renewable_indicator_kwh_per_m2_year)
+                }),
                 final_energy_kwh_per_m2: ceil_per_area(final_kwh, area).unwrap_or(f64::NAN),
                 final_energy_eed_kwh_per_m2: ceil_per_area(final_kwh + solar_yield, area)
                     .unwrap_or(f64::NAN),
@@ -2365,9 +2413,15 @@ pub fn assess_building_performance(
                 delivered_other_m3_aeq: other,
                 delivered_other_m3_aeq_per_m2: other / area,
                 renewable_by_carrier: item.renewable_by,
-                locally_carbon_free: input
-                    .fossil_appliances_outside_calculation
-                    .map(|outside| !outside && !on_site_fossil_use),
+                // Gas or oil in the calculation settles it; otherwise the
+                // appliances outside the calculation decide.
+                locally_carbon_free: if on_site_fossil_use {
+                    Some(false)
+                } else {
+                    input
+                        .fossil_appliances_outside_calculation
+                        .map(|outside| !outside)
+                },
                 meets_renovation_standard: renovation.map(|limit| ep2 <= limit),
                 renovation_standard_kwh_per_m2: renovation,
             })
@@ -2610,6 +2664,8 @@ fn compute(
         // 5.39g: the renewable share counts Q_H;gen;out of external heat and
         // Q_C;gen;out of absorption chillers on it, without f_BACS.
         let mut renewable_dh_basis = row.district_heat_kwh;
+        // 5.39h: Q_C;gen;out of external cold, without f_BACS.
+        let mut renewable_dc_basis = 0.0;
         let mut used_dc = 0.0;
         let mut used_dw = 0.0;
         for item in &input.declared_uses {
@@ -2650,6 +2706,7 @@ fn compute(
             used_dh += bacs * month_row.district_heat_kwh;
             renewable_dh_basis += month_row.district_heat_cold_kwh;
             used_dc += bacs * month_row.district_cold_kwh;
+            renewable_dc_basis += month_row.district_cold_kwh;
             ambient_cold = month_row.ambient_cold_kwh;
         }
         // Chapter 14 lighting (electricity, months by t_mi/t_an).
@@ -2830,7 +2887,7 @@ fn compute(
             external_heat: renewable_dh_basis * dh.renewable_factor
                 + used_dw * dw.renewable_factor
                 + source.map_or(0.0, |item| source_heat * item.renewable_factor),
-            external_cold: used_dc * dc.renewable_factor,
+            external_cold: renewable_dc_basis * dc.renewable_factor,
         };
         renewable += month_renewable.total();
         renewable_by.add(&month_renewable);
@@ -3487,14 +3544,17 @@ mod tests {
     #[test]
     fn standard_insulation_follows_5_3_2() {
         // Ground-bound after 1945: 43 below A_ls/A_g 1,0, then 40 per unit.
-        assert_eq!(standard_insulation(false, 1975, 0.8), Some(43.0));
-        assert_eq!(standard_insulation(false, 1975, 1.5), Some(63.0));
+        assert_eq!(standard_insulation(false, 1975, 80.0, 100.0), Some(43.0));
+        assert_eq!(standard_insulation(false, 1975, 150.0, 100.0), Some(63.0));
+        // An exact half rounds up: 60 + 105·(68/56 − 1) = 82,5 → 83 (in f64
+        // the value lands just below 82,5).
+        assert_eq!(standard_insulation(false, 1930, 68.0, 56.0), Some(83.0));
         // Up to 1945: 60 + 105·(x − 1).
-        assert_eq!(standard_insulation(false, 1945, 1.2), Some(81.0));
+        assert_eq!(standard_insulation(false, 1945, 120.0, 100.0), Some(81.0));
         // Apartment building: 95/70 up to 1945, 45/45 after.
-        assert_eq!(standard_insulation(true, 1930, 2.0), Some(165.0));
-        assert_eq!(standard_insulation(true, 2000, 1.33), Some(60.0));
-        assert_eq!(standard_insulation(true, 2000, 0.0), None);
+        assert_eq!(standard_insulation(true, 1930, 200.0, 100.0), Some(165.0));
+        assert_eq!(standard_insulation(true, 2000, 133.0, 100.0), Some(60.0));
+        assert_eq!(standard_insulation(true, 2000, 0.0, 100.0), None);
     }
 
     #[test]

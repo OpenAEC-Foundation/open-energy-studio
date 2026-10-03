@@ -794,6 +794,19 @@ fn derive_input(
     // §5.5.8: a derived f_BACS replaces the declared value.
     let (bacs_factor, bacs_source_reference) = match &nta.bacs {
         None => (nta.bacs_factor, nta.bacs_source_reference.clone()),
+        Some(bacs)
+            if matches!(
+                bacs.building_use,
+                crate::bacs_draft::BuildingUse::Residential
+            ) != matches!(nta.calculation_scope, CalculationScope::Residential) =>
+        {
+            // §5.5.8: the building use follows the calculation.
+            gaps.push(gap(
+                "bacs_building_use_mismatch",
+                "ntaCalculation.bacs.buildingUse",
+            ));
+            return None;
+        }
         Some(bacs) => match crate::bacs_draft::assess_bacs_draft(bacs).factor {
             Some(factor) => (
                 factor,
@@ -886,24 +899,19 @@ mod tests {
             }],
             "bacs": {"present": false, "sourceReference": "inspection"}
         });
-        let result = assess_project_performance(&value);
-        let derived = result.derived_input.as_ref().unwrap();
-        // Above 290 kW without a BACS: f_BACS = 1,05.
-        assert_eq!(derived.bacs_factor, 1.05);
-        assert_eq!(result.bacs.as_ref().unwrap().factor, Some(1.05));
-        // Unknown power without BACS evidence leaves the factor open.
-        value["ntaCalculation"]["bacs"]["systems"][0]["generators"][0]
-            ["nominalThermalCapacityKw"] = serde_json::Value::Null;
-        value["ntaCalculation"]["bacs"]
-            .as_object_mut()
-            .unwrap()
-            .remove("bacs");
-        let open = assess_project_performance(&value);
-        assert_eq!(open.status, "incomplete");
-        assert!(open
+        // The synthetic project is a dwelling: a utility BACS block is a
+        // contradiction (§5.5.8 follows the calculation).
+        let mismatch = assess_project_performance(&value);
+        assert!(mismatch
             .gaps
             .iter()
-            .any(|gap| gap.code == "bacs_factor_undetermined"));
+            .any(|gap| gap.code == "bacs_building_use_mismatch"));
+        // As a dwelling the factor is 1,0 whatever the capacity (5.5.8).
+        value["ntaCalculation"]["bacs"]["buildingUse"] = serde_json::json!("residential");
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        assert_eq!(result.derived_input.as_ref().unwrap().bacs_factor, 1.0);
+        assert_eq!(result.bacs.as_ref().unwrap().factor, Some(1.0));
     }
 
     #[test]

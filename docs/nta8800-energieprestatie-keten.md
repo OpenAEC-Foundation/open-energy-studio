@@ -799,3 +799,13 @@ Een onbepaalde factor geeft de melding `bacs_factor_undetermined`.
 **Labelgegevens**
 
 De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indicators`.
+
+**Correcties na de review van de hoofdstuk 5-indicatoren:**
+- De Standaard voor woningisolatie wordt met decimale rekenkunde berekend. Een exacte helft rondt nu naar boven af; in f64 kwam bijvoorbeeld 82,5 net onder de helft uit.
+- De standaard wordt alleen bepaald bij één woning in de berekening (N_woon = 1).
+- De renovatiestandaard (tabel 5.7) wordt ook decimaal afgerond.
+- Hernieuwbare externe koude (5.39h) wordt niet meer met f_BACS gewogen.
+- Lokaal CO2-vrij is "nee" zodra er gas of olie in de berekening zit. Alleen anders beslist `fossilAppliancesOutsideCalculation`.
+- Bij een kwaliteitsverklaring staat EwePrenTot;EMGforf er nu naast.
+- In de projectroute moet het gebruik in het BACS-blok kloppen met de rekenscope (`bacs_building_use_mismatch`).
+- Interpretatie bij 5.19a: dw en dc worden niet nog eens als m³ aeq meegeteld. Letterlijk sluit 5.19a alleen el en dh uit, maar 5.18a telt dw en dc al.
