@@ -3021,16 +3021,13 @@ fn generate_annex_q(
         return None;
     }
     // Q.1: the rounded hours of table Q.6 keep F just below 1 even when
-    // every bin is covered; full coverage per bin counts as F = 1.
+    // every bin is covered; full coverage per bin counts as F = 1, with or
+    // without a backup (which then delivers nothing).
     let covers_all_bins = result
         .bins
         .iter()
         .all(|bin| bin.delivered_kw >= bin.demand_kw * (1.0 - 1e-9));
-    let fraction = if covers_all_bins && generator.backup.is_none() {
-        1.0
-    } else {
-        fraction
-    };
+    let fraction = if covers_all_bins { 1.0 } else { fraction };
     if fraction < 1.0 - 1e-9 && generator.backup.is_none() {
         // Q.1: without supplementary heating the fraction must be 1.
         issues.push(issue("annex_q_backup_required", "generator.backup"));
@@ -4014,6 +4011,29 @@ fn generate(
             }
         }
         Generator::HeatPumpAnnexQ(generator) => {
+            // Annex Q (Q.12A/B, Q.24A, Q.57–Q.59): an air/air heat pump heats
+            // the room air directly, so it cannot feed water emitters or pipes.
+            let water_emitter = |emission: &EmissionInput| {
+                matches!(
+                    emission.system,
+                    EmissionSystem::RadiatorsOrConvectors
+                        | EmissionSystem::FloorHeating
+                        | EmissionSystem::FanAssistedRadiatorsOrConvectors
+                )
+            };
+            if generator.heat_pump.source == AnnexQSource::AirAir
+                && (input.distribution_system.is_some()
+                    || water_emitter(&input.emission)
+                    || input
+                        .additional_zones
+                        .iter()
+                        .any(|zone| water_emitter(&zone.emission)))
+            {
+                issues.push(issue(
+                    "annex_q_air_air_hydronic_chain",
+                    "generator.heatPump.source",
+                ));
+            }
             generation_efficiency = generate_annex_q(
                 generator,
                 outputs,
@@ -5039,7 +5059,17 @@ mod tests {
             result.issues
         );
         let details = result.annex_q.as_ref().unwrap();
-        let fraction = details.annex_q.energy_fraction;
+        // Q.1: full coverage per bin counts as F = 1, also with a backup.
+        let covers_all_bins = details
+            .annex_q
+            .bins
+            .iter()
+            .all(|bin| bin.delivered_kw >= bin.demand_kw * (1.0 - 1e-9));
+        let fraction = if covers_all_bins {
+            1.0
+        } else {
+            details.annex_q.energy_fraction
+        };
         let efficiency = details.corrected_efficiency;
         assert_eq!(details.source_correction, 1.0);
         assert_eq!(result.generation_efficiency, Some(efficiency));
@@ -5060,7 +5090,53 @@ mod tests {
             .iter()
             .map(|row| row.generator_output_kwh)
             .sum();
-        assert!((details.annex_q.delivered_kwh - fraction * annual).abs() < 1e-6 * annual.max(1.0));
+        assert!(
+            (details.annex_q.delivered_kwh - details.annex_q.energy_fraction * annual).abs()
+                < 1e-6 * annual.max(1.0)
+        );
+    }
+
+    #[test]
+    fn annex_q_full_coverage_leaves_the_backup_empty() {
+        let mut input = annex_q_chain();
+        let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
+            panic!("annex Q generator expected");
+        };
+        assert!(generator.backup.is_some());
+        let power = &mut generator.heat_pump.maximum_power;
+        power.condition1.heating_power_kw *= 10.0;
+        for condition in [&mut power.condition2, &mut power.condition3]
+            .into_iter()
+            .flatten()
+        {
+            condition.heating_power_kw *= 10.0;
+        }
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let details = result.annex_q.as_ref().unwrap();
+        // Table Q.6 rounding keeps the literal F just below 1, but every bin
+        // is covered, so the backup delivers nothing.
+        assert!(details.annex_q.energy_fraction < 1.0);
+        for row in &result.monthly {
+            assert!((row.heat_pump_output_kwh - row.generator_output_kwh).abs() < 1e-9);
+            let expected = row.generator_output_kwh / details.corrected_efficiency;
+            assert!((row.generator_electricity_kwh - expected).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn annex_q_air_air_heat_pump_rejects_water_emitters() {
+        let mut input = annex_q_chain();
+        let Generator::HeatPumpAnnexQ(generator) = &mut input.generator else {
+            panic!("annex Q generator expected");
+        };
+        generator.heat_pump.source = AnnexQSource::AirAir;
+        input.emission.system = EmissionSystem::RadiatorsOrConvectors;
+        assert!(codes(&input).contains(&"annex_q_air_air_hydronic_chain"));
     }
 
     #[test]

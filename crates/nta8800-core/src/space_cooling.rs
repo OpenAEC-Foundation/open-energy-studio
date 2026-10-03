@@ -545,7 +545,8 @@ pub struct En14825Performance {
     pub nominal_eer: f64,
     /// `Φ_C;gen;gi;n`, kW.
     pub nominal_capacity_kw: f64,
-    /// `Φ_C;gen;gi;min` in continuous operation, kW.
+    /// `Φ_C;gen;gi;min` in continuous operation, kW; below the nominal
+    /// capacity (§10.5.4 applies to modulating generators only).
     pub minimum_capacity_kw: f64,
     /// Conditions A, B, C and D.
     pub test_points: Vec<En14825Point>,
@@ -1153,7 +1154,6 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                     if !positive(performance.nominal_eer)
                         || !positive(performance.nominal_capacity_kw)
                         || !positive(performance.minimum_capacity_kw)
-                        || performance.minimum_capacity_kw > performance.nominal_capacity_kw
                         || !finite(performance.condenser_inlet_limit_c)
                         || !finite(performance.required_outlet_c)
                     {
@@ -1162,6 +1162,16 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                     if !rated.room_unit && rated.rejection != HeatRejection::AirCooled {
                         // §10.5.4: direct condensation against outdoor air.
                         push("cooling_en14825_direct_condensation_only", field.clone());
+                    }
+                    if positive(performance.minimum_capacity_kw)
+                        && performance.minimum_capacity_kw >= performance.nominal_capacity_kw
+                    {
+                        // §10.5.4 (p. 401): method 1 is for a modulating
+                        // generator, i.e. Φ_C;gen;gi;min below Φ_C;gen;gi;n.
+                        push(
+                            "cooling_en14825_modulating_required",
+                            format!("{field}.minimumCapacityKw"),
+                        );
                     }
                     if performance.test_points.len() != 4 {
                         push(
@@ -1184,6 +1194,14 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                             "cooling_en14825_point_invalid",
                             format!("{field}.testPoints"),
                         );
+                    } else if let Some(code) = en14825_fifth_point_issue(performance) {
+                        // 10.63/10.64 (p. 408–409).
+                        let path = if performance.fifth_point.is_some() {
+                            format!("{field}.fifthPoint")
+                        } else {
+                            format!("{field}.testPoints")
+                        };
+                        push(code, path);
                     } else if positive(performance.nominal_eer)
                         && en14825_coefficients(performance).is_none()
                     {
@@ -1416,6 +1434,9 @@ pub const COOLING_INTERPRETATIONS: &[&str] = &[
     "10.23c: ϑ_C;mean is the mean of ϑ_in and ϑ_out of table 10.8 (both minus Δϑ_int;inc); the printed second line (ϑ_C,out = ϑ_C;dis;in;flw;req) is read as a misprint",
     "10.15: the literal result is kept near ϑ_C;int;inc = ϑ_e;comb; a loss above 3× the need is reported as cooling_emission_loss_singular",
     "10.55: months without bins in table 10.18 (January, December) use the 14 °C bin",
+    "10.56/10.58: f_C;PL above 100 % is not capped (the norm gives no limit), so the cubic of 10.63 is extrapolated; this is reported as cooling_part_load_above_full_load",
+    "10.63/10.64: the fifth point must have the part load of C and the condenser inlet of A (±0,5); without it 10.64 with Δϑ_corr = 0 needs equal evaporator outlets at A and C",
+    "§10.5.4: method 1 requires a modulating generator, read as Φ_C;gen;gi;min below Φ_C;gen;gi;n",
     "10.56/10.57: a bin with a non-positive temperature lift uses f_EER;gi;bn = 1",
     "10.68: Q_C;gen;in;req;si;mi of a generator is its share of the generator cold (10.52); method 2 counts all of it in 10.65, 10.70–10.72 only report the coverage",
     "tables 10.24/10.27 have no column for a cooling limit of 14 °C; the ≥15 column is used",
@@ -1685,6 +1706,29 @@ fn solve_linear(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
     x.iter().all(|value| value.is_finite()).then_some(x)
 }
 
+/// Tolerance for the 10.63/10.64 test-condition equalities: % for the part
+/// load, K for temperatures.
+const EN14825_CONDITION_TOLERANCE: f64 = 0.5;
+
+/// 10.63/10.64 (p. 408–409): the fifth point has the part load of C and the
+/// condenser inlet of A. Without it, 10.64 with `Δϑ_corr = 0` reduces the
+/// fifth equation to that of C only when A and C share the evaporator
+/// outlet. Points are ordered A, B, C, D.
+fn en14825_fifth_point_issue(performance: &En14825Performance) -> Option<&'static str> {
+    let [a, _, c, _] = performance.test_points.as_slice() else {
+        return None;
+    };
+    match &performance.fifth_point {
+        Some(fifth) => ((fifth.part_load_percent - c.part_load_percent).abs()
+            > EN14825_CONDITION_TOLERANCE
+            || (fifth.condenser_inlet_c - a.condenser_inlet_c).abs() > EN14825_CONDITION_TOLERANCE)
+            .then_some("cooling_en14825_fifth_point_conditions"),
+        None => ((a.evaporator_outlet_c - c.evaporator_outlet_c).abs()
+            > EN14825_CONDITION_TOLERANCE)
+            .then_some("cooling_en14825_fifth_point_required"),
+    }
+}
+
 /// 10.63: `[C1, C2, C3, C4, Δϑ_corr]` from the NEN-EN 14825 points; without
 /// a fifth point 10.64 applies with `Δϑ_corr = 0` (its equation repeats C).
 pub fn en14825_coefficients(performance: &En14825Performance) -> Option<[f64; 5]> {
@@ -1766,6 +1810,26 @@ pub fn en14825_monthly_factor(
     })
 }
 
+/// Highest `f_C;PL;gi;bn` (10.58, in %) over the bins used by 10.55 in any
+/// month. Neither 10.56 nor 10.58 caps it at 100 %; above that the fitted
+/// cubic of 10.63 is extrapolated (`cooling_part_load_above_full_load`).
+pub fn en14825_peak_part_load(
+    performance: &En14825Performance,
+    cooling_limit_c: f64,
+    annual_cold_kwh: f64,
+    building_fraction: f64,
+) -> f64 {
+    let column = (cooling_limit_c.round().clamp(14.0, 25.0) - 14.0) as usize;
+    (0..FT_BIN.len())
+        .filter(|&bin| bin == 0 || FT_BIN[bin].iter().any(|value| *value > 0.0))
+        .map(|bin| {
+            100.0 * annual_cold_kwh * FQC_BIN[bin][column]
+                / building_fraction
+                / performance.nominal_capacity_kw
+        })
+        .fold(0.0, f64::max)
+}
+
 /// 10.69 with table 10.19/10.21: `f_C;PL;k`; 1 below 5 %.
 fn part_load_step_factor(table: &[f64; 10], part_load: f64) -> f64 {
     if part_load.is_nan() || part_load < 0.05 {
@@ -1833,6 +1897,8 @@ struct RatedMonths {
     delivered: [f64; 12],
     /// Table 10.31 `p_hr;el` (10.82).
     fan_power: f64,
+    /// Method 1: a bin part load `f_C;PL` above 100 % (10.58).
+    part_load_above_full_load: bool,
 }
 
 fn rated_months(
@@ -1869,6 +1935,9 @@ fn rated_months(
                 annual,
                 building_fraction,
             );
+            let part_load_above_full_load =
+                en14825_peak_part_load(performance, cooling_limit_c, annual, building_fraction)
+                    > 100.0 + 1e-9;
             let eer = std::array::from_fn(|index| {
                 performance.nominal_eer * factors[index] * PRACTICE_FACTOR_METHOD_1
             });
@@ -1882,6 +1951,7 @@ fn rated_months(
                 delivered: *cold,
                 // Method 1 applies to direct condensation only (10.82 = 0).
                 fan_power: 0.0,
+                part_load_above_full_load,
             }
         }
         CompressionPerformance::En14511(performance) => {
@@ -1959,6 +2029,7 @@ fn rated_months(
                 } else {
                     rejection_fan_power(rated.rejection, performance.axial_fans_without_silencer)
                 },
+                part_load_above_full_load: false,
             }
         }
     }
@@ -2291,6 +2362,18 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             })
         })
         .collect();
+    for (generator_index, rated) in rated_months.iter().enumerate() {
+        if rated
+            .as_ref()
+            .is_some_and(|rated| rated.part_load_above_full_load)
+        {
+            // Literal 10.56/10.58 kept; the extrapolation is reported.
+            warnings.push(CoolingIssue {
+                code: "cooling_part_load_above_full_load",
+                path: format!("generators[{generator_index}].generator.performance"),
+            });
+        }
+    }
     for (share, rated) in shares.iter_mut().zip(&rated_months) {
         if let Some(rated) = rated {
             share.method = rated.method;
@@ -3039,6 +3122,74 @@ mod tests {
         assert!((result.generator_shares[0].monthly_eer[6] - eer).abs() < 1e-12);
         // Direct condensation: no condenser auxiliaries, control only.
         assert!((july.auxiliary_electricity_kwh - 7.44).abs() < 1e-9);
+    }
+
+    #[test]
+    fn en14825_validation_follows_10_63_10_64_and_10_5_4() {
+        let truth = [0.1, -0.2, 0.15, 0.95, 0.0];
+        let codes = |performance: En14825Performance| -> Vec<&'static str> {
+            let input = system(vec![generator(
+                rac(CompressionPerformance::En14825(performance)),
+                None,
+            )]);
+            validate_cooling(&input, "cooling")
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        assert!(codes(en14825(truth, false)).is_empty());
+        assert!(codes(en14825([0.2, -0.5, 0.3, 0.9, 3.0], true)).is_empty());
+        // Fifth point at another part load than C or condenser inlet than A.
+        let mut wrong = en14825([0.2, -0.5, 0.3, 0.9, 3.0], true);
+        wrong.fifth_point.as_mut().unwrap().part_load_percent = 50.0;
+        assert_eq!(codes(wrong), ["cooling_en14825_fifth_point_conditions"]);
+        let mut wrong = en14825([0.2, -0.5, 0.3, 0.9, 3.0], true);
+        wrong.fifth_point.as_mut().unwrap().condenser_inlet_c = 30.0;
+        assert_eq!(codes(wrong), ["cooling_en14825_fifth_point_conditions"]);
+        // 10.64 with Δϑ_corr = 0 needs the same evaporator outlet at A and C.
+        let mut wrong = en14825(truth, false);
+        wrong.test_points[2].evaporator_outlet_c = 9.0;
+        assert_eq!(codes(wrong), ["cooling_en14825_fifth_point_required"]);
+        // §10.5.4: on/off (minimum = nominal) is not method 1.
+        let mut on_off = en14825(truth, false);
+        on_off.minimum_capacity_kw = on_off.nominal_capacity_kw;
+        assert_eq!(codes(on_off), ["cooling_en14825_modulating_required"]);
+    }
+
+    #[test]
+    fn method_1_reports_part_load_above_full_load() {
+        let truth = [0.1, -0.2, 0.15, 0.95, 0.0];
+        let zones = rated_zones();
+        let quiet = system(vec![generator(
+            rac(CompressionPerformance::En14825(en14825(truth, false))),
+            None,
+        )]);
+        let result = assess_cooling(&quiet, context(&zones));
+        assert!(!result
+            .warnings
+            .iter()
+            .any(|item| item.code == "cooling_part_load_above_full_load"));
+        // An undersized unit: the literal result is kept, with a warning.
+        let mut small = en14825(truth, false);
+        small.nominal_capacity_kw = 0.05;
+        small.minimum_capacity_kw = 0.01;
+        let annual: f64 = result.months.iter().map(|row| row.generator_cold_kwh).sum();
+        assert!(en14825_peak_part_load(&small, result.cooling_limit_c, annual, 1.0) > 100.0);
+        let input = system(vec![generator(
+            rac(CompressionPerformance::En14825(small)),
+            None,
+        )]);
+        let result = assess_cooling(&input, context(&zones));
+        let warning = result
+            .warnings
+            .iter()
+            .find(|item| item.code == "cooling_part_load_above_full_load")
+            .expect("warning");
+        assert_eq!(warning.path, "generators[0].generator.performance");
+        assert!(result
+            .months
+            .iter()
+            .all(|row| row.electricity_kwh.is_finite()));
     }
 
     #[test]
