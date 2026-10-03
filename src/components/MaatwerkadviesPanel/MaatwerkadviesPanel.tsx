@@ -218,8 +218,8 @@ function MeasureEditor({ project, measure, onChange, onRemove }: {
   return (
     <fieldset className="mwa-measure">
       <legend>{measure.name || measure.id}</legend>
-      <label>{t('mwa.template.kind')}
-        <select value={kind} onChange={(e) => {
+      <label className="mwa-measure-kind">{t('mwa.template.kind')}
+        <select value={kind} title={t(kind === 'manual' ? 'mwa.template.kind.manual' : `mwa.template.kind.${kind}`)} onChange={(e) => {
           const next = e.target.value;
           onChange(next === 'manual' ? applyTemplate(project, measure, null) : templateMeasure(project, measure, next as MwaTemplateKind));
         }}>
@@ -308,9 +308,10 @@ export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: st
         <td colSpan={11}>
           <ul>{result.issues.map((item, index) => (
             <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} />
-              {item.path && <> <code>{item.path}</code></>}{item.detail && <> {item.code === 'measure_template_incomplete'
+              {item.detail && <> {item.code === 'measure_template_incomplete'
                 ? item.detail.split(', ').map((key) => t(`mwa.template.problem.${key}`)).join(' ')
-                : item.detail}</>}</li>
+                : item.detail}</>}
+              {item.path && <> <code className="kernel-code-ref" title={item.path}>{item.path}</code></>}</li>
           ))}</ul>
         </td>
       </tr>
@@ -650,7 +651,7 @@ export function MaatwerkadviesPanel() {
           )}
           {advice && (
             <div className="nta-performance-bbl">
-              <strong>{t('mwa.advice')}: {chosen?.name ?? '–'} ({advice.chosenBy === 'adviser' ? t('mwa.advised.adviser') : t('mwa.advised.automatic')})</strong>
+              <strong>{t('mwa.advice')}: {chosen?.name ?? '–'} — {advice.chosenBy === 'adviser' ? t('mwa.advised.adviser') : t('mwa.advised.automatic')}</strong>
               {advice.warnings.length > 0 && <><em>{t('mwa.warnings')}</em><ul>{advice.warnings.map((item) => <li key={item}>{adviceText(item, i18next.language || 'nl')}</li>)}</ul></>}
               {advice.specialistNotes.length > 0 && <><em>{t('mwa.specialist')}</em><ul>{advice.specialistNotes.map((item) => <li key={item}>{adviceText(item, i18next.language || 'nl')}</li>)}</ul></>}
               {chosen && chosen.systemChecks.some((check) => check.limit != null) && <><em>{t('mwa.systemChecks')}</em><ul>

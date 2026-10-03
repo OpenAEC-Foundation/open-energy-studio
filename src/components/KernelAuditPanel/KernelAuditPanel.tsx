@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, CircleHelp, ShieldCheck } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import type { IProject } from '../../core/energy/types';
 import { assessProjectWithRust, type KernelAssessment } from '../../core/nta/KernelClient';
 import './KernelAuditPanel.css';
@@ -11,7 +12,7 @@ type AuditQuery =
   | { project: IProject; kind: 'error'; error: string };
 
 export function KernelAuditPanel({ project }: { project: IProject }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState<AuditQuery | null>(null);
 
   useEffect(() => {
@@ -89,14 +90,14 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
             <tbody>
               {assessment.summary.envelopeGeometry.zones.map((zone) => <tr key={zone.zoneId}>
                 <th scope="row">{zone.zoneId}</th>
-                <td>{zone.grossSurfaceAreaM2.toFixed(2)}</td>
-                <td>{zone.windowAreaM2.toFixed(2)}</td>
-                <td>{zone.remainingOpaqueAreaM2.toFixed(2)}</td>
+                <td>{formatNumber(zone.grossSurfaceAreaM2, locale, 2)}</td>
+                <td>{formatNumber(zone.windowAreaM2, locale, 2)}</td>
+                <td>{formatNumber(zone.remainingOpaqueAreaM2, locale, 2)}</td>
               </tr>)}
               <tr className="kernel-audit-geometry-total"><th scope="row">{t('kernel.geometry.total')}</th>
-                <td>{assessment.summary.envelopeGeometry.grossSurfaceAreaM2.toFixed(2)}</td>
-                <td>{assessment.summary.envelopeGeometry.windowAreaM2.toFixed(2)}</td>
-                <td>{assessment.summary.envelopeGeometry.remainingOpaqueAreaM2.toFixed(2)}</td>
+                <td>{formatNumber(assessment.summary.envelopeGeometry.grossSurfaceAreaM2, locale, 2)}</td>
+                <td>{formatNumber(assessment.summary.envelopeGeometry.windowAreaM2, locale, 2)}</td>
+                <td>{formatNumber(assessment.summary.envelopeGeometry.remainingOpaqueAreaM2, locale, 2)}</td>
               </tr>
             </tbody>
           </table>
@@ -106,10 +107,10 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
             <summary>{t('kernel.direct.title')}</summary>
             <p>{t('kernel.direct.scope')}</p>
             <table><tbody>
-              <tr><th scope="row">{t('kernel.direct.elements')}</th><td>{assessment.summary.directOutdoorDiagnostic.elementConductanceWPerK?.toFixed(2)} W/K</td></tr>
-              <tr><th scope="row">{t('kernel.direct.linear')}</th><td>{assessment.summary.directOutdoorDiagnostic.linearBridgeConductanceWPerK?.toFixed(2)} W/K</td></tr>
-              <tr><th scope="row">{t('kernel.direct.point')}</th><td>{assessment.summary.directOutdoorDiagnostic.pointBridgeConductanceWPerK?.toFixed(2)} W/K</td></tr>
-              <tr className="kernel-audit-geometry-total"><th scope="row">{t('kernel.direct.total')}</th><td>{assessment.summary.directOutdoorDiagnostic.totalDirectConductanceWPerK.toFixed(2)} W/K</td></tr>
+              <tr><th scope="row">{t('kernel.direct.elements')}</th><td>{formatNumber(assessment.summary.directOutdoorDiagnostic.elementConductanceWPerK, locale, 2)} W/K</td></tr>
+              <tr><th scope="row">{t('kernel.direct.linear')}</th><td>{formatNumber(assessment.summary.directOutdoorDiagnostic.linearBridgeConductanceWPerK, locale, 2)} W/K</td></tr>
+              <tr><th scope="row">{t('kernel.direct.point')}</th><td>{formatNumber(assessment.summary.directOutdoorDiagnostic.pointBridgeConductanceWPerK, locale, 2)} W/K</td></tr>
+              <tr className="kernel-audit-geometry-total"><th scope="row">{t('kernel.direct.total')}</th><td>{formatNumber(assessment.summary.directOutdoorDiagnostic.totalDirectConductanceWPerK, locale, 2)} W/K</td></tr>
             </tbody></table>
           </details>}
         {assessment.summary.unheatedTransmissionDiagnostic?.totalReducedConductanceWPerK != null &&
@@ -119,10 +120,10 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
             <table><thead><tr><th scope="col">{t('kernel.unheated.space')}</th>
               <th scope="col">H (W/K)</th><th scope="col">b</th><th scope="col">b·H (W/K)</th></tr></thead>
               <tbody>{assessment.summary.unheatedTransmissionDiagnostic.spaces.map((space) => <tr key={space.id}>
-                <th scope="row">{project.unheatedSpaces?.find((item) => item.id === space.id)?.name ?? space.id}</th><td>{space.unreducedConductanceWPerK.toFixed(2)}</td>
-                <td>{space.reductionFactor.toFixed(3)}</td><td>{space.reducedConductanceWPerK.toFixed(2)}</td>
+                <th scope="row">{project.unheatedSpaces?.find((item) => item.id === space.id)?.name ?? space.id}</th><td>{formatNumber(space.unreducedConductanceWPerK, locale, 2)}</td>
+                <td>{formatNumber(space.reductionFactor, locale, 3)}</td><td>{formatNumber(space.reducedConductanceWPerK, locale, 2)}</td>
               </tr>)}<tr className="kernel-audit-geometry-total"><th scope="row">{t('kernel.direct.total')}</th>
-                <td></td><td></td><td>{assessment.summary.unheatedTransmissionDiagnostic.totalReducedConductanceWPerK.toFixed(2)}</td>
+                <td></td><td></td><td>{formatNumber(assessment.summary.unheatedTransmissionDiagnostic.totalReducedConductanceWPerK, locale, 2)}</td>
               </tr></tbody></table>
           </details>}
         {(assessment.summary.performancePointDiagnostics?.length ?? 0) > 0 &&
@@ -143,7 +144,7 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
                   <td>{point.pointId}</td>
                   <td>{t(`kernel.points.service.${point.service}`)}</td>
                   <td>{t(`kernel.points.carrier.${point.inputEnergyCarrier}`)}</td>
-                  <td>{point.instantaneousUsefulToInputRatio.toFixed(2)}</td>
+                  <td>{formatNumber(point.instantaneousUsefulToInputRatio, locale, 2)}</td>
                 </tr>)}</tbody>
             </table>
           </details>}
@@ -156,7 +157,7 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
               <th scope="col">{t('kernel.dhwTest.ratio')}</th></tr></thead><tbody>
               {assessment.summary.dhwTestDiagnostics?.map((point) => <tr key={`${point.heatPumpId}-${point.pointId}`}>
                 <th scope="row">{point.heatPumpId}</th><td>{point.tapProfile}</td>
-                <td>{point.declarationNormVersion}</td><td>{point.declaredUsefulToInputRatio.toFixed(3)}</td>
+                <td>{point.declarationNormVersion}</td><td>{formatNumber(point.declaredUsefulToInputRatio, locale, 3)}</td>
               </tr>)}
             </tbody></table>
           </details>}

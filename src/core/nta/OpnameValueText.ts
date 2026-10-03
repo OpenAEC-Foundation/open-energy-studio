@@ -81,7 +81,57 @@ export function snakeCase(value: string): string {
   return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z])([A-Z][a-z])/g, '$1_$2').toLowerCase();
 }
 
-/** The Dutch text of a fixed default value, or null when there is none. */
+/** Decimal points between digits as Dutch decimal commas ("1.47" → "1,47"). */
+export function dutchDecimals(text: string): string {
+  return text.replace(/(\d)\.(\d)/g, '$1,$2');
+}
+
+/** Use-function names in the kernel's value texts. */
+const FUNCTION_NL: Record<string, string> = {
+  office: 'kantoor', education: 'onderwijs', retail: 'winkel', sport: 'sport', lodging: 'logies', cell: 'cel',
+  residential: 'wonen', assembly_without_day_care: 'bijeenkomst zonder kinderopvang',
+  assembly_with_day_care: 'bijeenkomst met kinderopvang', healthcare_without_beds: 'gezondheidszorg zonder bed',
+  healthcare_with_beds: 'gezondheidszorg met bed',
+};
+
+/** Value texts the kernel builds from numbers, with their Dutch form. */
+const DUTCH_PATTERNS: [RegExp, (match: RegExpMatchArray) => string][] = [
+  [/^(.+) m² of other functions \(≤ 25 %\) counted as (.+)$/, (m) => `${m[1]} m² van andere functies (≤ 25 %) geteld als ${FUNCTION_NL[m[2]] ?? m[2]}`],
+  [/^(\d+) function\(s\) beyond the 25 % merge kept in a mixed calculation zone$/,
+    (m) => `${m[1]} functie(s) boven de samenvoeging van 25 % apart gehouden in een gemengde rekenzone`],
+  [/^(\d+) calculation zones; one heating, cooling and ventilation system serves all$/,
+    (m) => `${m[1]} rekenzones; één verwarmings-, koel- en ventilatiesysteem bedient ze alle`],
+  [/^outside \(A_g (.+) m² > 500 m²\)$/, (m) => `buiten de thermische zone (A_g ${m[1]} m² > 500 m²)`],
+  [/^R_c (\S+) m²K\/W \((.+)\)$/, (m) => `R_c ${m[1]} m²K/W (${dutchDefaultValue(m[2]) ?? m[2]})`],
+  [/^R_c (\S+)$/, (m) => `R_c ${m[1]}`],
+  [/^R_bw (\S+) m²K\/W, U_xw (\S+) W\/\(m²K\)$/, (m) => `R_bw ${m[1]} m²K/W, U_xw ${m[2]} W/(m²K)`],
+  [/^year class of (\d+)$/, (m) => `jaarklasse van ${m[1]}`],
+  [/^year class before (\d+), at most R_c (.+)$/, (m) => `jaarklasse vóór ${m[1]}, ten hoogste R_c ${m[2]}`],
+  [/^(.+) \(installation year (\d+)\)$/, (m) => `${m[1]} (installatiejaar ${m[2]})`],
+  [/^(.+) \(installed (.+)\)$/, (m) => `${m[1]} (geïnstalleerd ${m[2]})`],
+  [/^(.+) m² window$/, (m) => `${m[1]} m² raam`],
+  [/^(\d+) uninsulated pipe\(s\), (\d+) storey\(s\) each$/, (m) => `${m[1]} ongeïsoleerde leiding(en), elk ${m[2]} bouwla(a)g(en)`],
+  [/^(.+) mm reed \((.+) mm measured − 35 mm\)$/, (m) => `${m[1]} mm riet (${m[2]} mm gemeten − 35 mm)`],
+  [/^(.+) kW \(largest surveyed heating or cooling system\)$/, (m) => `${m[1]} kW (grootste opgenomen verwarmings- of koelsysteem)`],
+  [/^(.+) kW \(50 % of the total\)$/, (m) => `${m[1]} kW (50 % van het totaal)`],
+  [/^(.+) kW > 25 kW$/, (m) => `${m[1]} kW > 25 kW`],
+  [/^polycrystalline, installed (\d+)$/, (m) => `polykristallijn, geïnstalleerd ${m[1]}`],
+  [/^table 14\.5 \(LED from 2017: (true|false)\)$/, (m) => `tabel 14.5 (LED vanaf 2017: ${m[1] === 'true' ? 'ja' : 'nee'})`],
+  [/^the pool room lies in (.+), the only zone with sport$/, (m) => `de zwembadruimte ligt in ${m[1]}, de enige zone met sport`],
+  [/^ΔU_for (\S+) W\/\(m²K\)$/, (m) => `ΔU_for ${m[1]} W/(m²K)`],
+];
+
+/**
+ * The Dutch text of a default value: a fixed text from the table, a known
+ * number-built text, or otherwise the text with Dutch decimal commas. Null when
+ * nothing applies.
+ */
 export function dutchDefaultValue(value: string): string | null {
-  return Object.prototype.hasOwnProperty.call(DUTCH, value) ? DUTCH[value] : null;
+  if (Object.prototype.hasOwnProperty.call(DUTCH, value)) return DUTCH[value];
+  for (const [pattern, build] of DUTCH_PATTERNS) {
+    const match = value.match(pattern);
+    if (match) return dutchDecimals(build(match));
+  }
+  const decimals = dutchDecimals(value);
+  return decimals === value ? null : decimals;
 }

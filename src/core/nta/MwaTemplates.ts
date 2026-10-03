@@ -362,6 +362,8 @@ export interface TemplatePatch {
   patch: MwaPatchOperation[];
   /** i18n keys (mwa.template.problem.*) of what keeps the template from a complete patch. */
   problems: string[];
+  /** i18n keys (mwa.template.warning.*) of points to check; they do not block the measure. */
+  warnings?: string[];
 }
 
 /** Appends `items` to the list at `path`, creating it when absent. */
@@ -397,11 +399,51 @@ function hasBlank(value: unknown): boolean {
   return false;
 }
 
+/** Hot-water generators the kernel expects a separate storage vessel with (§13.6.2). */
+const STORAGE_GENERATORS = new Set(['electric_boiler', 'indirect_boiler', 'indirect_heat_pump']);
+
+/**
+ * Members that the kernel requires whenever their parent object is present: a
+ * blank (null) one there is a missing value, not an optional field. Paths are
+ * member names from the parent down; `*` matches any member or array element.
+ */
+const VENTILATION_REQUIRED: string[][] = [
+  ['heatRecovery', 'efficiency', 'value'],
+  ['heatRecovery', 'efficiency', 'exchanger'],
+  ['heatRecovery', 'bypass', 'fraction'],
+  ['heatRecovery', 'supplyDuctInsulation', 'thicknessM'],
+  ['heatRecovery', 'supplyDuctInsulation', 'conductivityWPerMK'],
+  ['*', 'heatRecovery', 'efficiency', 'value'],
+  ['*', 'heatRecovery', 'efficiency', 'exchanger'],
+  ['*', 'heatRecovery', 'bypass', 'fraction'],
+];
+const HOT_WATER_REQUIRED: string[][] = [
+  ['appliance'], ['boiler'], ['inputKwhPerDay'], ['deliveredKwhPerDay'],
+  ['low', 'inputKwhPerDay'], ['high', 'inputKwhPerDay'],
+];
+
+/** Whether a required member (see the lists above) is present but blank. */
+export function hasRequiredBlank(value: unknown, paths: string[][]): boolean {
+  const walk = (node: unknown, path: string[]): boolean => {
+    if (path.length === 0) return false;
+    const [head, ...rest] = path;
+    if (!isObject(node)) return false;
+    const children = head === '*' ? Object.values(node) : [node[head]];
+    return children.some((child) => {
+      if (head !== '*' && !(head in node)) return false;
+      if (rest.length === 0) return child === null;
+      return walk(child, rest);
+    });
+  };
+  return paths.some((path) => walk(value, path));
+}
+
 /** The patch of a template against the current project. */
 export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate | LegacyTemplate, measureId: string): TemplatePatch {
   const { template } = normalizeTemplate(project, saved);
   const block = nta(project);
   const problems: string[] = template.kind === 'lighting' && template.reviewed === false ? ['migrationReview'] : [];
+  const warnings: string[] = [];
   const patch: MwaPatchOperation[] = [];
   switch (template.kind) {
     case 'insulation': {
@@ -422,13 +464,16 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
         const surfaceValues = insulationValues(template.part, template.rcValue, template.uValue, rsi)!;
         const rc = round(surfaceValues.rc, 3);
         const u = round(surfaceValues.u, 4);
+        // The new Rc should improve on the current construction (lower U).
+        if (original && Number.isFinite(original.uValue) && original.uValue > 0 && u >= original.uValue - 1e-9) warnings.push('notImproved');
         const key = `${surface.constructionId ?? ''}${steep ? '#steep' : ''}`;
         let id = created.get(key);
         if (!id) {
           id = `${measureId}-${surface.constructionId || template.part}${steep ? '-steep' : ''}`;
           created.set(key, id);
+          const rcText = rc.toLocaleString('nl-NL', { maximumFractionDigits: 2 });
           patch.push({ op: 'add', path: '/constructions/-', value: {
-            id, name: `${original?.name ?? template.part} (${measureId})`, layers: [], rcValue: rc, uValue: u } });
+            id, name: `${original?.name ?? template.part} → Rc ${rcText} (${measureId})`, layers: [], rcValue: rc, uValue: u } });
         }
         patch.push({ op: 'replace', path: pointer('zones', option.zoneIndex, 'surfaces', option.surfaceIndex, 'constructionId'), value: id });
         // A floor on the ground or above a crawlspace/basement is
@@ -481,6 +526,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       if (!current) { problems.push('ventilationRequired'); break; }
       // A migrated snapshot without a system: never replace the system with `{}`.
       if (!isObject(template.system) || Object.keys(template.system).length === 0) { problems.push('ventilationSystemRequired'); break; }
+      if (hasRequiredBlank(template.system, VENTILATION_REQUIRED)) problems.push('valueRequired');
       // Only the system is replaced: the project's flows, controls and
       // infiltration (the airtightness measure) stay as they are.
       if (JSON.stringify(current.system) !== JSON.stringify(template.system)) {
@@ -524,8 +570,28 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       break;
     }
     case 'hot_water': {
-      if (!block?.hotWater) { problems.push('hotWaterRequired'); break; }
+      const hotWater = block?.hotWater as Block | undefined;
+      if (!hotWater) { problems.push('hotWaterRequired'); break; }
+      if (hasRequiredBlank(template.generator, HOT_WATER_REQUIRED)) problems.push('valueRequired');
       patch.push({ op: 'replace', path: pointer('ntaCalculation', 'hotWater', 'generator'), value: template.generator });
+      // §13.6.2 with the kernel's storage rule: a separate vessel goes with
+      // an electric/indirect boiler or an indirect heat pump; other
+      // generators carry their storage in the generator efficiency, so the
+      // old vessel is removed (a tested appliance keeps vessels marked as
+      // outside its test).
+      const kind = String(template.generator.kind);
+      const storage = (hotWater.storage as Block[] | undefined) ?? [];
+      const others = ((hotWater.additionalGenerators as Block[] | undefined) ?? [])
+        .map((item) => String((item.generator as Block | undefined)?.kind ?? ''));
+      const needsStorage = (value: string) => STORAGE_GENERATORS.has(value);
+      const tested = kind === 'measured_two_profiles' || kind === 'heat_pump_en16147'
+        || (kind === 'gas_appliance' && template.generator.annexT != null);
+      if (needsStorage(kind) && storage.length === 0) problems.push('storageRequired');
+      const keep = needsStorage(kind) || kind === 'external_heat' || others.some(needsStorage)
+        || (tested && storage.every((vessel) => vessel.notInApplianceTest === true));
+      if (!keep && storage.length > 0) {
+        patch.push({ op: 'replace', path: pointer('ntaCalculation', 'hotWater', 'storage'), value: [] });
+      }
       break;
     }
     case 'pv': {
@@ -578,7 +644,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       break;
     }
   }
-  return { patch, problems: [...new Set(problems)] };
+  return { patch, problems: [...new Set(problems)], warnings: [...new Set(warnings)] };
 }
 
 /**

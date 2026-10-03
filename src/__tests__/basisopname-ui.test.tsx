@@ -317,7 +317,9 @@ describe('basisopname panel', () => {
     const zoneNames = screen.getAllByRole('textbox', { name: 'Zone name' });
     await user.clear(zoneNames[0]);
     await user.type(zoneNames[0], 'kantoor');
-    await user.click(screen.getAllByRole('button', { name: 'Add function' })[0]);
+    // The building's use functions are editable in General (ISSO 75.1 §7.2.1).
+    expect(screen.getByRole('group', { name: 'Use functions of the building' })).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'Add function' })[1]);
     const area = screen.getByRole('spinbutton', { name: 'A_g in this zone, m²' });
     await user.clear(area);
     await user.type(area, '1200');

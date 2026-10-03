@@ -2,6 +2,26 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — derde UI-doorloop: utiliteitsopname, dossiercheck en maatregelsjablonen
+
+### Uitkomst die verandert
+
+- **Kleine functie in een eigen rekenzone (ISSO 75.1 p. 39–40, §6.6 p. 54).** Het samenvoegen van kleine functies met de hoofdfunctie is een toegestane vereenvoudiging. Staat een functie in een rekenzone zonder de hoofdfunctie, dan houdt die functie nu haar eigen gebruiksfunctie. Voorbeeld: een sporthal van 200 m² naast 1 400 m² onderwijs, in een eigen zone, rekent nu als sport in plaats van als onderwijs. Zonder rekenzones blijft het samenvoegen zoals het was.
+- **Maatregelsjabloon tapwater.** Bij een opwekker die zijn opslag in het opwekkingsrendement draagt (bijvoorbeeld de forfaitaire tapwaterwarmtepomp) haalt het sjabloon het bestaande voorraadvat weg. Zonder die stap weigerde de kern de maatregel (`hot_water_storage_in_generator_efficiency`). Een opwekker die een apart vat nodig heeft, terwijl er geen vat is, geeft het nieuwe probleem `storageRequired`.
+
+### Nieuwe controles in de sjablonen
+
+- Ventilatie: een leeg WTW-rendement, een leeg bypassaandeel of lege isolatiegegevens geven `valueRequired`, net als ontbrekende testwaarden van een getest tapwatertoestel.
+- Isolatie: de nieuwe constructie heet nu naar de nieuwe Rc ("Gevel Rc 4,7 → Rc 6 (m1)"). Een Rc die niet beter is dan de huidige constructie geeft de waarschuwing `notImproved`; die blokkeert de maatregel niet.
+- Verlichting: in een maatregel zijn functie, oppervlakken en verlichtingszones niet meer te wijzigen. Die horen bij het project en werden tot nu toe stil genegeerd.
+
+### Weergave
+
+- De utiliteitsopname heeft een veld voor de gebruiksfuncties van het gebouw en per verlichtingszone een veld voor de oppervlakte.
+- De dossierchecklist op het tabblad Rapport gebruikt dezelfde kernuitvoer en dezelfde labelinvoer-hash als de dossierexport.
+- Het maatwerkadviesrapport is consequent Nederlands: soort maatregel, status, getallen met duizendtallen en de reden bij niet-berekende varianten. De interpretaties van de rekenkern staan er herkenbaar in het Engels.
+- Opgenomen jaartallen staan zonder duizendtalteken; vaste en uit getallen opgebouwde waardeteksten zijn vertaald. De "Wordt"-kolom van herlabelen toont een samenvatting in plaats van JSON. De kernaudit, het projectoverzicht en de lijst "Niet meegenomen" volgen de taal.
+
 ## 3 oktober 2026 — herlabelvergelijking: getallen, anker van het origineel en dossieroordeel
 
 ### Registraties die nu een fout of ontbrekend gegeven melden

@@ -11,7 +11,7 @@
           "path": "/constructions/-",
           "value": {
             "id": "roof-c-roof",
-            "name": "Dak Rc 6,3 (roof)",
+            "name": "Dak Rc 6,3 → Rc 8 (roof)",
             "layers": [],
             "rcValue": 8,
             "uValue": 0.1229
@@ -53,7 +53,7 @@
           "path": "/constructions/-",
           "value": {
             "id": "facade-c-wall",
-            "name": "Gevel Rc 4,7 (facade)",
+            "name": "Gevel Rc 4,7 → Rc 6 (facade)",
             "layers": [],
             "rcValue": 6,
             "uValue": 0.1621
@@ -95,7 +95,7 @@
           "path": "/constructions/-",
           "value": {
             "id": "floor-c-floor",
-            "name": "Vloer Rc 3,7 (floor)",
+            "name": "Vloer Rc 3,7 → Rc 5 (floor)",
             "layers": [],
             "rcValue": 5,
             "uValue": 0.1919
@@ -592,7 +592,7 @@
           "path": "/constructions/-",
           "value": {
             "id": "roof-c-roof",
-            "name": "Plat dak Rc 6,3 (roof)",
+            "name": "Plat dak Rc 6,3 → Rc 8 (roof)",
             "layers": [],
             "rcValue": 8,
             "uValue": 0.1229
@@ -807,6 +807,139 @@
             "obstructionSourceReference": "test: foto vrij dakvlak"
           }
         ]
+      }
+    },
+    {
+      "id": "air",
+      "name": "Kierdichting",
+      "category": "airtightness",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/ventilation/infiltration",
+          "value": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.2,
+            "sourceReference": "test: streefwaarde"
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/airTightness/qv10",
+          "value": 0.2
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 20,
+      "template": {
+        "kind": "airtightness",
+        "qv10DmPerSM2": 0.2,
+        "sourceReference": "test: streefwaarde"
+      }
+    },
+    {
+      "id": "vent",
+      "name": "Balansventilatie met WTW",
+      "category": "ventilation",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/ventilation/system",
+          "value": {
+            "kind": "single",
+            "unit": {
+              "variant": "d2",
+              "ducts": "luka_a_b_c",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "declared",
+                  "value": 0.9,
+                  "standard": "en13141_7",
+                  "sourceReference": "test: productblad"
+                },
+                "bypass": {
+                  "kind": "full"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "test: WTW-unit",
+                "manufactureYear": 2026
+              },
+              "equipmentReference": "test: WTW-unit productblad"
+            }
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "ventilation",
+        "system": {
+          "kind": "single",
+          "unit": {
+            "variant": "d2",
+            "ducts": "luka_a_b_c",
+            "heatRecovery": {
+              "efficiency": {
+                "method": "declared",
+                "value": 0.9,
+                "standard": "en13141_7",
+                "sourceReference": "test: productblad"
+              },
+              "bypass": {
+                "kind": "full"
+              },
+              "layout": "central",
+              "constantVolumeControl": false,
+              "supplyDuctInsulation": {
+                "kind": "insulated"
+              },
+              "equipmentReference": "test: WTW-unit",
+              "manufactureYear": 2026
+            },
+            "equipmentReference": "test: WTW-unit productblad"
+          }
+        }
+      }
+    },
+    {
+      "id": "dhw",
+      "name": "Tapwaterwarmtepomp",
+      "category": "hot_water",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "heat_pump",
+            "exhaustAirSource": false,
+            "measuredClass": "class4"
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/hotWater/storage",
+          "value": []
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "hot_water",
+        "generator": {
+          "kind": "heat_pump",
+          "exhaustAirSource": false,
+          "measuredClass": "class4"
+        }
       }
     }
   ]

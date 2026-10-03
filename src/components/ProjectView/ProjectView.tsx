@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import { useEnergy } from '../../context/EnergyContext';
 import { Building2, Layers, Thermometer, Wind, Zap } from 'lucide-react';
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
@@ -10,7 +11,7 @@ import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainRefere
 import './ProjectView.css';
 
 export function ProjectView() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project } = state;
 
@@ -48,7 +49,7 @@ export function ProjectView() {
         <div className="summary-card">
           <div className="summary-card-icon"><Building2 size={20} /></div>
           <div className="summary-card-content">
-            <div className="summary-card-value">{totalFloorArea.toFixed(0)} m²</div>
+            <div className="summary-card-value">{formatNumber(totalFloorArea, locale, 0)} m²</div>
             <div className="summary-card-label">{t('properties.area')}</div>
           </div>
         </div>
@@ -80,7 +81,7 @@ export function ProjectView() {
         <div className="summary-card">
           <div className="summary-card-icon"><Zap size={20} /></div>
           <div className="summary-card-content">
-            <div className="summary-card-value">{project.solarPV.reduce((sum, pv) => sum + pv.peakPower, 0).toFixed(1)} kWp</div>
+            <div className="summary-card-value">{formatNumber(project.solarPV.reduce((sum, pv) => sum + pv.peakPower, 0), locale, 1)} kWp</div>
             <div className="summary-card-label">{t('browser.solarPV')}</div>
           </div>
         </div>

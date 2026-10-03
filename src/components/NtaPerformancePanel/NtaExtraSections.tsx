@@ -50,27 +50,35 @@ function nextLightingZoneId(zones: Draft[]): string {
   return `lighting-${index}`;
 }
 
-/** Chapter 14 lighting for the single-zone block. */
-export function NtaLightingSection({ draft, change, project }: SectionProps & { project: IProject }) {
+/**
+ * Chapter 14 lighting for the single-zone block. With `measureOnly` (a
+ * maatwerkadvies measure) only the changeable installation fields are open:
+ * functions, areas and the list of lighting zones belong to the building.
+ */
+export function NtaLightingSection({ draft, change, project, measureOnly = false }:
+  SectionProps & { project: IProject; measureOnly?: boolean }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
   const lighting = (read(draft, ['lighting']) as Draft[] | undefined) ?? [];
   const zones = (read(draft, ['lighting', 0, 'lightingZones']) as Draft[] | undefined) ?? [];
   return <Section title={t('nta.light.title')}>
-    <label className="nta-form-check">
+    {measureOnly && <p className="nta-form-note">{t('nta.light.measureOnlyNote')}</p>}
+    {!measureOnly && <label className="nta-form-check">
       <input type="checkbox" checked={lighting.length > 0} onChange={(event) => change(['lighting'],
         event.target.checked ? [lightingTemplate(project, read(draft, ['labelFunction']))] : [])} />
       {t('nta.light.present')}
-    </label>
+    </label>}
     {lighting.length > 0 && <>
       <SelectField {...field} path={['lighting', 0, 'functions', 0, 'function']} label={t('nta.form.usageFunction')} options={[
         ['office', t('nta.form.label.office')], ['education', t('nta.form.label.education')], ['retail', t('nta.form.label.retail')],
         ['sport', t('nta.form.label.sport')], ['lodging', t('nta.form.label.lodging')], ['cell', t('nta.form.label.cell')],
         ['assembly_without_day_care', t('nta.form.label.assembly')], ['assembly_with_day_care', t('nta.form.label.dayCare')],
-        ['healthcare_without_beds', t('nta.form.label.healthcare')], ['healthcare_with_beds', t('nta.form.label.healthcareBeds')]]} />
-      <NumberField {...field} path={['lighting', 0, 'functions', 0, 'areaM2']} label={t('nta.form.area')} />
+        ['healthcare_without_beds', t('nta.form.label.healthcare')], ['healthcare_with_beds', t('nta.form.label.healthcareBeds')]]}
+        disabled={measureOnly} />
+      <NumberField {...field} path={['lighting', 0, 'functions', 0, 'areaM2']} label={t('nta.form.area')} disabled={measureOnly} />
       {zones.map((zone, index) => <div key={String(zone.id)} className="nta-form-row">
-        <NumberField {...field} path={['lighting', 0, 'lightingZones', index, 'areaM2']} label={`${String(zone.id)} — ${t('nta.form.area')}`} />
+        <NumberField {...field} path={['lighting', 0, 'lightingZones', index, 'areaM2']} label={`${String(zone.id)} — ${t('nta.form.area')}`}
+          disabled={measureOnly} />
         <SelectField {...field} path={['lighting', 0, 'lightingZones', index, 'power', 'method']} label={t('nta.light.power')}
           options={[['forfait', t('nta.light.power.forfait')], ['installed', t('nta.light.power.installed')]]}
           onChange={(_, value) => change(['lighting', 0, 'lightingZones', index, 'power'], value === 'installed'
@@ -104,15 +112,15 @@ export function NtaLightingSection({ draft, change, project }: SectionProps & { 
         {read(draft, ['lighting', 0, 'lightingZones', index, 'daylight', 'method']) === 'sectors' &&
           <DaylightSectorsFields draft={draft} change={change} base={['lighting', 0, 'lightingZones', index, 'daylight']} />}
         <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'extractedLuminaires']} label={t('nta.light.extracted')} />
-        {zones.length > 1 && <button type="button" className="nta-form-remove"
+        {!measureOnly && zones.length > 1 && <button type="button" className="nta-form-remove"
           onClick={() => change(['lighting', 0, 'lightingZones'], zones.filter((__, other) => other !== index))}>{t('nta.form.remove')}</button>}
       </div>)}
-      <button type="button" onClick={() => change(['lighting', 0, 'lightingZones'], [...zones, {
+      {!measureOnly && <button type="button" onClick={() => change(['lighting', 0, 'lightingZones'], [...zones, {
         id: nextLightingZoneId(zones), areaM2: null, power: { method: 'forfait', ledFrom2017: false }, parasitic: { method: 'forfait' },
         occupancy: { control: 'manual_or_unknown', centralOnControl: false, largeOfficeGroup: false }, daylight: { method: 'none' },
         extractedLuminaires: false,
-      }])}>{t('nta.light.addZone')}</button>
-      <TextField {...field} path={['lighting', 0, 'sourceReference']} label={t('nta.form.source')} />
+      }])}>{t('nta.light.addZone')}</button>}
+      {!measureOnly && <TextField {...field} path={['lighting', 0, 'sourceReference']} label={t('nta.form.source')} />}
       {project.zones.length > 1 && <p className="nta-form-note">{t('nta.light.note')}</p>}
     </>}
   </Section>;

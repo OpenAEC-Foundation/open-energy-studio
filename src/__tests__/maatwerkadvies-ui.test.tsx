@@ -96,5 +96,19 @@ describe('maatwerkadvies input and report', () => {
     expect(html).toContain('Ruimteverwarming');
     expect(html).toContain('Renovatiepaspoort');
     expect(html).toContain('Hoofdverwarming aardgasvrij');
+    // Consistently Dutch: category, grouped amounts, status.
+    expect(html).toContain('<td>Isolatie</td>');
+    expect(html).toContain('8.000');
+    expect(html).toContain('berekend, niet geverifieerd');
+    expect(html).toContain('niet geattesteerd');
+    expect(html).not.toMatch(/>\s*calculated_unverified\s*</);
+    // An invalid variant shows its reason instead of dashes.
+    const failed = { ...variant('m9', 'Kapotte maatregel', 'package'), valid: false,
+      issues: [{ code: 'measure_patch_failed', path: '/zones/9', detail: 'pad bestaat niet' }] };
+    const withFailure = generateMaatwerkadviesReportHTML(project, {
+      measures: [], packages: [], tariffs: { gasEurPerM3: 1.4, electricityEurPerKwh: 0.3, sourceReference: 'x' },
+    }, { ...assessment, measures: [failed] });
+    expect(withFailure).toContain('Niet berekend:');
+    expect(withFailure).toContain('pad bestaat niet');
   });
 });
