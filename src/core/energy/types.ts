@@ -335,6 +335,8 @@ export interface IProject {
   registration?: NtaRegistration;
   /** Maatwerkadvies definition (BRL 9500-MWA); not part of the label fingerprint. */
   maatwerkadvies?: NtaMaatwerkadvies;
+  /** ISSO 82.1/75.1 basisopname (survey) kept with the project; not part of the label fingerprint. */
+  basisopname?: { kind: 'residential' | 'utility'; survey: Record<string, unknown> };
 }
 
 // ------------------------------------------------------------

@@ -376,7 +376,23 @@ pub struct UtilityHotWater {
     /// Solar water heaters (ISSO 75.1 §15.3–15.4).
     #[serde(default)]
     pub solar: Vec<super::hot_water::SurveySolarWaterHeater>,
+    /// Nominal power of the main generator, kW (NTA 13.8.2, 13.141).
+    #[serde(default)]
+    pub nominal_power_kw: Option<f64>,
+    /// Further generators of the system (NTA 13.8.2), with the utility
+    /// generator types.
+    #[serde(default)]
+    pub additional_generators: Vec<UtilityAdditionalHotWater>,
     pub source_reference: String,
+}
+
+/// A further utility hot-water generator with its nominal power.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UtilityAdditionalHotWater {
+    pub generator: UtilityHotWaterGenerator,
+    #[serde(default)]
+    pub nominal_power_kw: Option<f64>,
 }
 
 /// Connection of the hot pipes to a vessel (p. 173).
@@ -1653,30 +1669,7 @@ fn hot_water_value(
     let hot = &survey.hot_water;
     let reference = hot.source_reference.as_str();
     // Generators shared with the residential layer go through its mapping.
-    let shared = match &hot.generator {
-        UtilityHotWaterGenerator::None => Some(HotWaterGeneratorAnswer::None),
-        UtilityHotWaterGenerator::GasAppliance {
-            appliance_type,
-            gaskeur,
-            burner_load_kw,
-        } => Some(HotWaterGeneratorAnswer::GasAppliance {
-            appliance_type: *appliance_type,
-            gaskeur: *gaskeur,
-            burner_load_kw: *burner_load_kw,
-            cw_class: None,
-        }),
-        UtilityHotWaterGenerator::ElectricBoiler => Some(HotWaterGeneratorAnswer::ElectricBoiler),
-        UtilityHotWaterGenerator::ElectricInstantaneous => {
-            Some(HotWaterGeneratorAnswer::ElectricInstantaneous)
-        }
-        UtilityHotWaterGenerator::HeatPump { exhaust_air_source } => {
-            Some(HotWaterGeneratorAnswer::HeatPump {
-                exhaust_air_source: *exhaust_air_source,
-            })
-        }
-        UtilityHotWaterGenerator::DistrictHeat => Some(HotWaterGeneratorAnswer::DistrictHeat),
-        _ => None,
-    };
+    let shared = shared_hot_water_answer(&hot.generator);
     let shower_functions = matches!(
         main,
         LabelFunction::Cell
@@ -1708,43 +1701,8 @@ fn hot_water_value(
             recorder,
         ),
         None => {
-            let generator = match &hot.generator {
-                UtilityHotWaterGenerator::GasStorageHeater {
-                    volume_l,
-                    before_1985,
-                    in_heated_zone,
-                } => {
-                    let before = before_1985.unwrap_or_else(|| {
-                        recorder.record(
-                            "gas_storage_year_construction_year",
-                            "hotWater.generator.before1985",
-                            survey.construction_year.to_string(),
-                            "ISSO 75.1 p. 167",
-                        );
-                        survey.construction_year < 1985
-                    });
-                    let inside = in_heated_zone.unwrap_or_else(|| {
-                        recorder.record(
-                            "gas_storage_location_unknown_outside",
-                            "hotWater.generator.inHeatedZone",
-                            "outside the thermal zone".into(),
-                            "ISSO 75.1 p. 167",
-                        );
-                        false
-                    });
-                    json!({"kind": "gas_storage_heater", "volumeL": volume_l,
-                           "before1985": before, "inHeatedZone": inside})
-                }
-                _ => {
-                    recorder.record(
-                        "collective_hot_water_generator_unknown",
-                        "hotWater.generator",
-                        "other directly heated storage".into(),
-                        "ISSO 75.1 p. 165 (table 13.2)",
-                    );
-                    json!({"kind": "large_direct_storage", "gasFired": true})
-                }
-            };
+            let generator =
+                utility_only_generator(&hot.generator, survey, "hotWater.generator", recorder);
             json!({"generator": generator, "equipmentReference": reference})
         }
     };
@@ -1812,7 +1770,110 @@ fn hot_water_value(
         true,
         recorder,
     );
+    // NTA 13.8.2: several generators with their nominal powers.
+    if let Some(power) = hot.nominal_power_kw {
+        system["nominalPowerKw"] = json!(power);
+    }
+    if !hot.additional_generators.is_empty() {
+        let extras: Vec<Value> = hot
+            .additional_generators
+            .iter()
+            .enumerate()
+            .map(|(index, extra)| {
+                let path = format!("hotWater.additionalGenerators[{index}].generator");
+                let generator = match shared_hot_water_answer(&extra.generator) {
+                    Some(answer) => {
+                        super::hot_water::convert_generator(&answer, false, &path, recorder)
+                    }
+                    None => utility_only_generator(&extra.generator, survey, &path, recorder),
+                };
+                let mut value = json!({"generator": generator, "equipmentReference": reference});
+                if let Some(power) = extra.nominal_power_kw {
+                    value["nominalPowerKw"] = json!(power);
+                }
+                value
+            })
+            .collect();
+        system["additionalGenerators"] = json!(extras);
+    }
     system
+}
+
+/// Utility generator types shared with the residential mapping.
+fn shared_hot_water_answer(
+    generator: &UtilityHotWaterGenerator,
+) -> Option<HotWaterGeneratorAnswer> {
+    match generator {
+        UtilityHotWaterGenerator::None => Some(HotWaterGeneratorAnswer::None),
+        UtilityHotWaterGenerator::GasAppliance {
+            appliance_type,
+            gaskeur,
+            burner_load_kw,
+        } => Some(HotWaterGeneratorAnswer::GasAppliance {
+            appliance_type: *appliance_type,
+            gaskeur: *gaskeur,
+            burner_load_kw: *burner_load_kw,
+            cw_class: None,
+        }),
+        UtilityHotWaterGenerator::ElectricBoiler => Some(HotWaterGeneratorAnswer::ElectricBoiler),
+        UtilityHotWaterGenerator::ElectricInstantaneous => {
+            Some(HotWaterGeneratorAnswer::ElectricInstantaneous)
+        }
+        UtilityHotWaterGenerator::HeatPump { exhaust_air_source } => {
+            Some(HotWaterGeneratorAnswer::HeatPump {
+                exhaust_air_source: *exhaust_air_source,
+            })
+        }
+        UtilityHotWaterGenerator::DistrictHeat => Some(HotWaterGeneratorAnswer::DistrictHeat),
+        _ => None,
+    }
+}
+
+/// Kernel generator of the utility-only types (gas storage heater p. 167,
+/// unknown collective table 13.2 p. 165).
+fn utility_only_generator(
+    generator: &UtilityHotWaterGenerator,
+    survey: &UtilitySurvey,
+    path: &str,
+    recorder: &mut Recorder,
+) -> Value {
+    match generator {
+        UtilityHotWaterGenerator::GasStorageHeater {
+            volume_l,
+            before_1985,
+            in_heated_zone,
+        } => {
+            let before = before_1985.unwrap_or_else(|| {
+                recorder.record(
+                    "gas_storage_year_construction_year",
+                    &format!("{path}.before1985"),
+                    survey.construction_year.to_string(),
+                    "ISSO 75.1 p. 167",
+                );
+                survey.construction_year < 1985
+            });
+            let inside = in_heated_zone.unwrap_or_else(|| {
+                recorder.record(
+                    "gas_storage_location_unknown_outside",
+                    &format!("{path}.inHeatedZone"),
+                    "outside the thermal zone".into(),
+                    "ISSO 75.1 p. 167",
+                );
+                false
+            });
+            json!({"kind": "gas_storage_heater", "volumeL": volume_l,
+                   "before1985": before, "inHeatedZone": inside})
+        }
+        _ => {
+            recorder.record(
+                "collective_hot_water_generator_unknown",
+                path,
+                "other directly heated storage".into(),
+                "ISSO 75.1 p. 165 (table 13.2)",
+            );
+            json!({"kind": "large_direct_storage", "gasFired": true})
+        }
+    }
 }
 
 /// Table 13.10 (p. 173) and NTA 13.6.3 `f_sto;dis;ls`.
@@ -2455,6 +2516,85 @@ mod tests {
     }
 
     #[test]
+    fn chp_thermal_power_follows_the_engine_of_table_9_7() {
+        use super::super::heating::{ChpEngine, HeatingGenerator};
+        for (engine, expected) in [
+            (Some(ChpEngine::DieselEngine), 24.0),
+            (Some(ChpEngine::MicroTurbine), 50.0),
+            (None, 30.0),
+        ] {
+            let mut survey = fixture("1985");
+            survey.heating.generator = HeatingGenerator::Chp {
+                electrical_power_kw: 20.0,
+                thermal_power_kw: None,
+                engine,
+                manufacture_year: Some(2012),
+                hre_declared: false,
+                low_temperature: false,
+            };
+            survey.heating.additional_generators =
+                vec![super::super::heating::AdditionalHeatingGenerator {
+                    generator: super::super::heating::HeatingGenerator::Boiler {
+                        boiler_type: super::super::heating::BoilerType::Hr107,
+                        pilot_flame: Some(false),
+                        inside_thermal_boundary: true,
+                        manufacture_year: Some(2012),
+                        installation_year: None,
+                    },
+                    nominal_power_kw: Some(150.0),
+                }];
+            let result = assess_utility_survey(&survey);
+            let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+            let parts = input["spaceHeating"]["generator"]["generators"]
+                .as_array()
+                .unwrap()
+                .clone();
+            let chp = parts
+                .iter()
+                .find(|part| part["generator"]["kind"] == "chp")
+                .unwrap();
+            assert_eq!(chp["nominalPowerKw"], expected, "{engine:?}");
+            let unknown_recorded = result
+                .applied_defaults
+                .iter()
+                .any(|item| item.rule == "chp_engine_unknown_gas");
+            assert_eq!(unknown_recorded, engine.is_none());
+        }
+    }
+
+    #[test]
+    fn utility_hot_water_takes_several_generators_of_its_own_types() {
+        let mut survey = fixture("1985");
+        survey.hot_water.generator = UtilityHotWaterGenerator::GasStorageHeater {
+            volume_l: 200.0,
+            before_1985: Some(false),
+            in_heated_zone: Some(true),
+        };
+        survey.hot_water.storage.clear();
+        survey.hot_water.nominal_power_kw = Some(30.0);
+        survey.hot_water.additional_generators = vec![UtilityAdditionalHotWater {
+            generator: UtilityHotWaterGenerator::ElectricInstantaneous,
+            nominal_power_kw: Some(10.0),
+        }];
+        let result = assess_utility_survey(&survey);
+        let input = serde_json::to_value(result.derived_input.as_ref().unwrap()).unwrap();
+        let hot = &input["hotWater"];
+        assert_eq!(hot["generator"]["kind"], "gas_storage_heater");
+        assert_eq!(hot["nominalPowerKw"], 30.0);
+        let extras = hot["additionalGenerators"].as_array().unwrap();
+        assert_eq!(extras.len(), 1);
+        assert_eq!(extras[0]["nominalPowerKw"], 10.0);
+        assert_eq!(extras[0]["generator"]["kind"], "electric_instantaneous");
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+    }
+
+    #[test]
     fn chp_with_peak_boilers_and_a_solar_water_heater() {
         use super::super::heating::{AdditionalHeatingGenerator, BoilerType, HeatingGenerator};
         let mut survey = fixture("1985");
@@ -2463,6 +2603,7 @@ mod tests {
         survey.heating.generator = HeatingGenerator::Chp {
             electrical_power_kw: 20.0,
             thermal_power_kw: None,
+            engine: None,
             manufacture_year: Some(2012),
             hre_declared: false,
             low_temperature: false,

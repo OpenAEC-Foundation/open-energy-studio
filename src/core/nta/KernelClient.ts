@@ -375,8 +375,8 @@ export type OpnameHeatingGenerator =
   | { kind: 'district_heat' }
   | { kind: 'electric'; connectedDevices: number }
   | { kind: 'biomass'; appliance: 'freestanding_wood_stove' | 'insert_stove' | 'pellet_stove' | 'accumulating_stove' | 'central_boiler'; insideThermalBoundary: boolean; soleHeatingInServedRooms: boolean; annexRCompliant?: boolean | null }
-  /** Building CHP (NTA table 9.31); thermal power unknown → 1,5 × P_el (table 9.7). */
-  | { kind: 'chp'; electricalPowerKw: number; thermalPowerKw?: number | null; manufactureYear?: number | null; hreDeclared?: boolean; lowTemperature?: boolean }
+  /** Building CHP (NTA table 9.31); thermal power unknown → table 9.7 rule by engine (gas 1,5, diesel 1,2, micro turbine 2,5). */
+  | { kind: 'chp'; electricalPowerKw: number; thermalPowerKw?: number | null; engine?: 'gas_engine' | 'diesel_engine' | 'micro_turbine' | null; manufactureYear?: number | null; hreDeclared?: boolean; lowTemperature?: boolean }
   | { kind: 'none_present' };
 
 /** ISSO 82.1 survey hot-water generator (opname/hot_water.rs). */
@@ -2697,6 +2697,10 @@ export interface UtilitySurvey {
     }>;
     /** Solar water heaters (ISSO 75.1 §15.3–15.4). */
     solar?: OpnameSolarWaterHeater[];
+    /** 13.141 nominal power of the main generator, kW. */
+    nominalPowerKw?: number | null;
+    /** NTA 13.8.2 further generators with the utility generator types. */
+    additionalGenerators?: Array<{ generator: UtilitySurvey['hotWater']['generator']; nominalPowerKw?: number | null }>;
     sourceReference: string;
   };
   lighting: Array<{

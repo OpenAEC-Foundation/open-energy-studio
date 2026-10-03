@@ -1,0 +1,70 @@
+.opname-panel .opname-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.opname-panel .opname-item {
+  display: contents;
+}
+
+.opname-panel .opname-item > strong {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #9aa0a6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.opname-panel .opname-list-controls {
+  grid-column: 1 / -1;
+}
+
+.opname-panel .opname-remove {
+  align-self: end;
+  justify-self: start;
+}
+
+.opname-panel .opname-json textarea {
+  width: 100%;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.opname-panel .opname-error {
+  color: var(--color-error, #e57373);
+}
+
+.opname-panel .opname-defaults {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.opname-panel .opname-defaults caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 8px 0;
+}
+
+.opname-panel .opname-defaults th,
+.opname-panel .opname-defaults td {
+  border-bottom: 1px solid var(--border-color, #3a3f47);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.opname-panel .opname-defaults input {
+  width: 100%;
+}
+
+.opname-panel .opname-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+}

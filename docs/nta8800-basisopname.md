@@ -241,3 +241,22 @@ Deze routes gelden voor de woningopname (ISSO 82.1) en, waar vermeld, ook voor d
 - Een bruto-oppervlak van vacuümbuizen telt voor 60 % (p. 192).
 - Rendement, collectorkring en pomp zijn forfaitair.
 - `alsoSpaceHeating` maakt er een zonnecombi van.
+
+## WKK-vermogen naar aandrijving en meerdere tapwateropwekkers in de utiliteitsopname
+
+- **WKK zonder bekend thermisch vermogen (tabel 9.7, ISSO 82.1 p. 113).** Het nieuwe veld `engine` bepaalt de vuistregel op het elektrisch vermogen: gasmotor 1,5×, dieselmotor 1,2×, microturbine 2,5×. Is de aandrijving onbekend, dan rekent de opname met een gasmotor en legt dat vast als standaardwaarde (`chp_engine_unknown_gas`).
+- **Utiliteit, meerdere tapwateropwekkers (NTA 13.8.2).** `hotWater.nominalPowerKw` en `hotWater.additionalGenerators` gebruiken de eigen utiliteitstypen, waaronder de gasboiler (p. 167) en een onbekend collectief toestel (tabel 13.2, p. 165). Standaardwaarden worden per opwekker vastgelegd met hun eigen pad.
+
+## Basisopname in de app
+
+Het projectscherm heeft een paneel "Basisopname (ISSO 82.1 / 75.1)". Een woning- of utiliteitsopname start vanuit de synthetische voorbeeldopnamen en wordt met het project bewaard (`basisopname`, buiten de vingerafdruk van het label).
+
+Gestructureerde velden zijn er voor:
+- algemene gegevens en verticale leidingen;
+- de vlakken van de schil, met isolatie, thermoskussens en het (na-)isolatiejaar;
+- ramen, met de belemmeringssituatie uit tabel 8.24;
+- verwarming: opwekker inclusief WKK, nominaal vermogen, extra opwekkers, collectief en later bijgeplaatst;
+- tapwater: opwekker, CW-klasse, collectief, boilervat, extra opwekkers en zonneboilers;
+- PV, met de belemmeringssituatie.
+
+Al het overige staat in een JSON-weergave. "Opname doorrekenen" stuurt de opname naar de Rust-kern en toont de status, de indicatieve labelklasse, BENG 1–3, de meldingen en de toegepaste standaardwaarden met ISSO-bron. Per standaardwaarde kan de adviseur de reden voor het inklappen invullen (`inklapRedenen`, BRL 9500 §4.2.2).
