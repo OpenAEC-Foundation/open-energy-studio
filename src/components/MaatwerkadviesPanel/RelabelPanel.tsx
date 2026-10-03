@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GitCompare } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
@@ -20,16 +20,29 @@ export function RelabelPanel() {
   const [result, setResult] = useState<RelabelAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const requestId = useRef(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    requestId.current += 1;
+    setResult(null);
+    setError(null);
+    setFileName(null);
+    if (fileInput.current) fileInput.current.value = '';
+    return () => { requestId.current += 1; };
+  }, [state.project]);
 
   const compare = async (file: File) => {
+    const current = ++requestId.current;
     setError(null);
     setResult(null);
     setFileName(file.name);
     try {
       const original = deserializeProject(await file.text());
-      setResult(await assessRelabelWithRust(original, state.project));
+      const assessment = await assessRelabelWithRust(original, state.project);
+      if (requestId.current === current) setResult(assessment);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      if (requestId.current === current) setError(reason instanceof Error ? reason.message : String(reason));
     }
   };
 
@@ -38,7 +51,7 @@ export function RelabelPanel() {
       <div className="nta-performance-title"><GitCompare size={18} /><div><h3>{t('relabel.title')}</h3><p>{t('relabel.intro')}</p></div></div>
       <label className="nta-performance-actions">
         {t('relabel.choose')}{' '}
-        <input type="file" accept=".json,.oes,application/json"
+        <input ref={fileInput} type="file" accept=".json,.oes,application/json"
           onChange={(event) => { const file = event.target.files?.[0]; if (file) void compare(file); }} />
       </label>
       {error && <p role="alert">{error}</p>}
