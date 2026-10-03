@@ -34,6 +34,10 @@ interface SectionProps {
 }
 
 /** One system unit of table 11.5 at `path`. */
+export function VentilationUnitFields(props: SectionProps & { path: Path }) {
+  return <UnitFields {...props} />;
+}
+
 function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };

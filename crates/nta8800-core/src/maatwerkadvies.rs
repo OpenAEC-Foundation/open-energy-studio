@@ -201,6 +201,11 @@ pub struct Measure {
     pub phase_year: Option<u32>,
     #[serde(default)]
     pub specialist_note: Option<String>,
+    /// The editor's measure template (kind and parameters) that generated
+    /// `patch`; kept so the measure can be reopened and regenerated. The
+    /// calculation only uses `patch`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -2444,6 +2449,7 @@ mod tests {
             maintenance_eur_per_year: 0.0,
             phase_year: None,
             specialist_note: None,
+            template: None,
         };
         let economics = Economics {
             discount_rate: 0.0,
@@ -2542,6 +2548,7 @@ mod tests {
             maintenance_eur_per_year: 0.0,
             phase_year: Some(2027),
             specialist_note: None,
+            template: None,
         }];
         input.packages = vec![Package {
             id: "p1".into(),
@@ -2842,6 +2849,7 @@ mod tests {
             maintenance_eur_per_year: 0.0,
             phase_year: None,
             specialist_note: None,
+            template: None,
         };
         input.measures = vec![
             noop("isolatie", MeasureCategory::Insulation),
@@ -2906,6 +2914,7 @@ mod tests {
             maintenance_eur_per_year: 10.0,
             phase_year: Some(2030),
             specialist_note: None,
+            template: None,
         };
         let economics = Economics {
             discount_rate: 0.05,
@@ -2933,6 +2942,78 @@ mod tests {
         .unwrap()
     }
 
+    /// The editor's measure templates (src/core/nta/MwaTemplates.ts,
+    /// fixture written by src/__tests__/mwa-templates.test.ts) on the two
+    /// example projects: every patch applies, every variant calculates and
+    /// the package of all measures lowers EP2.
+    #[test]
+    fn template_measures_run_on_the_example_projects() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-mwa-template-measures.json"
+        ))
+        .unwrap();
+        let projects = [
+            (
+                "terracedDwelling",
+                include_str!("../../../training-data/nta8800-example-terraced-dwelling.json"),
+            ),
+            (
+                "office",
+                include_str!("../../../training-data/nta8800-example-office.json"),
+            ),
+        ];
+        for (key, text) in projects {
+            let mut input = mwa(json!(null));
+            input.base = MwaBase::Project {
+                project: serde_json::from_str(text).unwrap(),
+            };
+            input.measures = serde_json::from_value(fixture[key].clone()).unwrap();
+            let all: Vec<String> = input.measures.iter().map(|m| m.id.clone()).collect();
+            input.packages = vec![
+                Package {
+                    id: "all".into(),
+                    name: "Alle maatregelen".into(),
+                    measure_ids: all.clone(),
+                    partial_execution_warning: None,
+                },
+                Package {
+                    id: "first".into(),
+                    name: "Eerste maatregel".into(),
+                    measure_ids: all[..1].to_vec(),
+                    partial_execution_warning: None,
+                },
+            ];
+            let result = assess_maatwerkadvies(&input);
+            assert!(
+                result
+                    .issues
+                    .iter()
+                    .all(|issue| issue.code != "measure_patch_failed"),
+                "{key}: {:?}",
+                result.issues
+            );
+            let current = result.current.as_ref().unwrap();
+            assert!(current.valid, "{key}: {:?}", current.issues);
+            let before = current.label.primary_fossil_indicator_kwh_per_m2.unwrap();
+            for variant in result.measures.iter().chain(&result.packages) {
+                assert!(variant.valid, "{key} {}: {:?}", variant.id, variant.issues);
+                assert!(
+                    variant.label.primary_fossil_indicator_kwh_per_m2.is_some(),
+                    "{key} {}",
+                    variant.id
+                );
+            }
+            // Each template patches inputs the calculation actually uses.
+            for variant in &result.measures {
+                let ep2 = variant.label.primary_fossil_indicator_kwh_per_m2.unwrap();
+                assert!(ep2 < before, "{key} {}: EP2 {before} -> {ep2}", variant.id);
+            }
+            let package = result.packages.iter().find(|p| p.id == "all").unwrap();
+            let after = package.label.primary_fossil_indicator_kwh_per_m2.unwrap();
+            assert!(after < before - 10.0, "{key}: EP2 {before} -> {after}");
+        }
+    }
+
     #[test]
     fn project_measure_saves_energy_and_costs() {
         let mut input = mwa(json!(null));
@@ -2958,6 +3039,7 @@ mod tests {
             maintenance_eur_per_year: 0.0,
             phase_year: None,
             specialist_note: None,
+            template: None,
         };
         input.measures = vec![insulation("a", 0.15, 6.5), insulation("b", 0.12, 8.0)];
         input.packages = vec![
@@ -3104,6 +3186,7 @@ mod tests {
             maintenance_eur_per_year: 0.0,
             phase_year: None,
             specialist_note: None,
+            template: None,
         }];
         input.packages = vec![Package {
             id: "p".into(),

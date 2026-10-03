@@ -1,0 +1,863 @@
+{
+  "terracedDwelling": [
+    {
+      "id": "roof",
+      "name": "Dakisolatie Rc 8",
+      "category": "insulation",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/constructions/-",
+          "value": {
+            "id": "roof-c-roof",
+            "name": "Dak Rc 6,3 (roof)",
+            "layers": [],
+            "rcValue": 8,
+            "uValue": 0.1229
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/2/constructionId",
+          "value": "roof-c-roof"
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/3/constructionId",
+          "value": "roof-c-roof"
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 40,
+      "template": {
+        "kind": "insulation",
+        "part": "roof",
+        "surfaces": [
+          "z1/roof",
+          "z1/roof-n"
+        ],
+        "rcValue": 8,
+        "uValue": null
+      }
+    },
+    {
+      "id": "facade",
+      "name": "Gevelisolatie Rc 6",
+      "category": "insulation",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/constructions/-",
+          "value": {
+            "id": "facade-c-wall",
+            "name": "Gevel Rc 4,7 (facade)",
+            "layers": [],
+            "rcValue": 6,
+            "uValue": 0.1621
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/0/constructionId",
+          "value": "facade-c-wall"
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/1/constructionId",
+          "value": "facade-c-wall"
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 40,
+      "template": {
+        "kind": "insulation",
+        "part": "facade",
+        "surfaces": [
+          "z1/wall-N",
+          "z1/wall-S"
+        ],
+        "rcValue": 6,
+        "uValue": null
+      }
+    },
+    {
+      "id": "floor",
+      "name": "Vloerisolatie Rc 5",
+      "category": "insulation",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/constructions/-",
+          "value": {
+            "id": "floor-c-floor",
+            "name": "Vloer Rc 3,7 (floor)",
+            "layers": [],
+            "rcValue": 5,
+            "uValue": 0.1919
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/4/constructionId",
+          "value": "floor-c-floor"
+        },
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 5.17
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 40,
+      "template": {
+        "kind": "insulation",
+        "part": "floor",
+        "surfaces": [
+          "z1/floor"
+        ],
+        "rcValue": 5,
+        "uValue": null
+      }
+    },
+    {
+      "id": "glazing",
+      "name": "Triple glas",
+      "category": "glazing",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/0/windows/0/uValue",
+          "value": 0.7
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/0/windows/0/gValue",
+          "value": 0.5
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/1/windows/0/uValue",
+          "value": 0.7
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/1/windows/0/gValue",
+          "value": 0.5
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 30,
+      "template": {
+        "kind": "glazing",
+        "windows": [
+          "z1/wall-N/win-N",
+          "z1/wall-S/win-S"
+        ],
+        "uValue": 0.7,
+        "gValue": 0.5
+      }
+    },
+    {
+      "id": "air",
+      "name": "Kierdichting",
+      "category": "airtightness",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/ventilation/infiltration",
+          "value": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.25,
+            "sourceReference": "test: streefwaarde"
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/airTightness/qv10",
+          "value": 0.25
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 20,
+      "template": {
+        "kind": "airtightness",
+        "qv10DmPerSM2": 0.25,
+        "sourceReference": "test: streefwaarde"
+      }
+    },
+    {
+      "id": "vent",
+      "name": "Balansventilatie met WTW",
+      "category": "ventilation",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/ventilation/system",
+          "value": {
+            "kind": "single",
+            "unit": {
+              "variant": "d2",
+              "ducts": "luka_a_b_c",
+              "equipmentReference": "test: WTW-unit productblad",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "declared",
+                  "value": 0.9,
+                  "standard": "en13141_7",
+                  "sourceReference": "test: productblad"
+                },
+                "bypass": {
+                  "kind": "full"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "test: WTW-unit",
+                "manufactureYear": 2026
+              }
+            }
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "ventilation",
+        "ventilation": {
+          "zoneId": "z1",
+          "usableFloorAreaM2": 100,
+          "category": "residential",
+          "functions": [
+            {
+              "function": "residential",
+              "areaM2": 100,
+              "swimmingPool": false
+            }
+          ],
+          "dwellingCount": 1,
+          "apartmentBuilding": false,
+          "buildingHeightM": 9,
+          "constructionYear": 2020,
+          "floorAboveCrawlspace": false,
+          "heatingSetpointC": 20,
+          "coolingSetpointC": 24,
+          "system": {
+            "kind": "single",
+            "unit": {
+              "variant": "d2",
+              "ducts": "luka_a_b_c",
+              "equipmentReference": "test: WTW-unit productblad",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "declared",
+                  "value": 0.9,
+                  "standard": "en13141_7",
+                  "sourceReference": "test: productblad"
+                },
+                "bypass": {
+                  "kind": "full"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "test: WTW-unit",
+                "manufactureYear": 2026
+              }
+            }
+          },
+          "flowReduction": {
+            "collective": false
+          },
+          "infiltration": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.4,
+            "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+          },
+          "combustionAppliances": [],
+          "fans": {
+            "method": "forfait",
+            "current": "dc",
+            "manufactureYear": 2020
+          },
+          "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+        }
+      }
+    },
+    {
+      "id": "hp",
+      "name": "Lucht/water-warmtepomp",
+      "category": "heat_pump",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "heat-pump",
+              "classificationSourceReference": "test: offerte",
+              "scope": "residential_at_most25_kw",
+              "source": "outdoor_air",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 45,
+              "sourceCorrectionFactor": null,
+              "sourceCorrectionReference": null,
+              "thermalCapacityKw": 6,
+              "capacitySourceReference": "test: offerte",
+              "collectiveBuildingInstallation": false
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "test: individuele buitenunit"
+          }
+        },
+        {
+          "op": "add",
+          "path": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "test: buitenlucht"
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "heat_pump",
+        "generator": {
+          "kind": "heat_pump_forfait",
+          "forfait": {
+            "generatorId": "heat-pump",
+            "classificationSourceReference": "test: offerte",
+            "scope": "residential_at_most25_kw",
+            "source": "outdoor_air",
+            "sink": "hydronic",
+            "designSupplyTemperatureC": 45,
+            "sourceCorrectionFactor": null,
+            "sourceCorrectionReference": null,
+            "thermalCapacityKw": 6,
+            "capacitySourceReference": "test: offerte"
+          },
+          "sourceSystem": "individual",
+          "sourceSystemReference": "test: individuele buitenunit"
+        },
+        "renewable": {
+          "sourceBelow20C": true,
+          "exhaustAirSource": false,
+          "sourceReference": "test: buitenlucht"
+        }
+      }
+    },
+    {
+      "id": "dhw",
+      "name": "Tapwaterwarmtepomp",
+      "category": "hot_water",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "heat_pump",
+            "exhaustAirSource": false,
+            "measuredClass": "class4"
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "hot_water",
+        "generator": {
+          "kind": "heat_pump",
+          "exhaustAirSource": false,
+          "measuredClass": "class4"
+        }
+      }
+    },
+    {
+      "id": "pv",
+      "name": "PV 8 × 400 Wp",
+      "category": "pv",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/ntaCalculation/pvSystems/-",
+          "value": {
+            "id": "pv-pv-1",
+            "peakPower": {
+              "method": "panels",
+              "panelPeakPowerW": 400,
+              "panelCount": 8
+            },
+            "azimuthDeg": 180,
+            "tiltDeg": 35,
+            "mounting": "moderately_ventilated",
+            "sourceReference": "test: offerte",
+            "obstruction": {
+              "method": "minimal"
+            }
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 25,
+      "template": {
+        "kind": "pv",
+        "systems": [
+          {
+            "id": "pv-1",
+            "peakPower": {
+              "method": "panels",
+              "panelPeakPowerW": 400,
+              "panelCount": 8
+            },
+            "azimuthDeg": 180,
+            "tiltDeg": 35,
+            "mounting": "moderately_ventilated",
+            "obstruction": {
+              "method": "minimal"
+            },
+            "sourceReference": "test: offerte"
+          }
+        ]
+      }
+    },
+    {
+      "id": "solar",
+      "name": "Zonneboiler",
+      "category": "solar_thermal",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/ntaCalculation/hotWater/solar",
+          "value": [
+            {
+              "id": "solar-solar-1",
+              "solarUse": "water_heating",
+              "count": 1,
+              "method": {
+                "method": "calculated",
+                "solarType": "preheater",
+                "collectors": {
+                  "moduleAreaM2": 2.5,
+                  "moduleCount": 1,
+                  "orientation": "south",
+                  "tiltDeg": 45,
+                  "obstruction": {
+                    "method": "minimal"
+                  },
+                  "efficiency": {
+                    "method": "forfait",
+                    "collector": "glazed"
+                  },
+                  "loopPipes": {
+                    "method": "forfait"
+                  }
+                },
+                "storage": {
+                  "totalVolumeL": 150,
+                  "loss": {
+                    "method": "unknown_label",
+                    "producedFrom2018": false
+                  }
+                }
+              },
+              "pvt": null,
+              "sourceReference": "test: zonneboiler productblad"
+            }
+          ]
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 20,
+      "template": {
+        "kind": "solar_water_heater",
+        "systems": [
+          {
+            "id": "solar-1",
+            "solarUse": "water_heating",
+            "count": 1,
+            "method": {
+              "method": "calculated",
+              "solarType": "preheater",
+              "collectors": {
+                "moduleAreaM2": 2.5,
+                "moduleCount": 1,
+                "orientation": "south",
+                "tiltDeg": 45,
+                "obstruction": {
+                  "method": "minimal"
+                },
+                "efficiency": {
+                  "method": "forfait",
+                  "collector": "glazed"
+                },
+                "loopPipes": {
+                  "method": "forfait"
+                }
+              },
+              "storage": {
+                "totalVolumeL": 150,
+                "loss": {
+                  "method": "unknown_label",
+                  "producedFrom2018": false
+                }
+              }
+            },
+            "pvt": null,
+            "sourceReference": "test: zonneboiler productblad"
+          }
+        ]
+      }
+    },
+    {
+      "id": "shower",
+      "name": "Douche-WTW",
+      "category": "hot_water",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/ntaCalculation/hotWater/showerHeatRecovery",
+          "value": {
+            "showers": [
+              {
+                "unit": "vertical"
+              }
+            ],
+            "connection": "mixer_and_heater",
+            "sourceReference": "test: plattegrond"
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 20,
+      "template": {
+        "kind": "shower_heat_recovery",
+        "recovery": {
+          "showers": [
+            {
+              "unit": "vertical"
+            }
+          ],
+          "connection": "mixer_and_heater",
+          "sourceReference": "test: plattegrond"
+        }
+      }
+    }
+  ],
+  "office": [
+    {
+      "id": "glazing",
+      "name": "Triple glas",
+      "category": "glazing",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/0/windows/0/uValue",
+          "value": 0.8
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/1/windows/0/uValue",
+          "value": 0.8
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/2/windows/0/uValue",
+          "value": 0.8
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/3/windows/0/uValue",
+          "value": 0.8
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 30,
+      "template": {
+        "kind": "glazing",
+        "windows": [
+          "z1/wall-N/win-N",
+          "z1/wall-E/win-E",
+          "z1/wall-S/win-S",
+          "z1/wall-W/win-W"
+        ],
+        "uValue": 0.8,
+        "gValue": null
+      }
+    },
+    {
+      "id": "roof",
+      "name": "Dakisolatie Rc 8",
+      "category": "insulation",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/constructions/-",
+          "value": {
+            "id": "roof-c-roof",
+            "name": "Plat dak Rc 6,3 (roof)",
+            "layers": [],
+            "rcValue": 8,
+            "uValue": 0.1229
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/zones/0/surfaces/4/constructionId",
+          "value": "roof-c-roof"
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 40,
+      "template": {
+        "kind": "insulation",
+        "part": "roof",
+        "surfaces": [
+          "z1/roof"
+        ],
+        "rcValue": 8,
+        "uValue": null
+      }
+    },
+    {
+      "id": "light",
+      "name": "Aanwezigheids- en daglichtregeling",
+      "category": "lighting",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/lighting/0/lightingZones/0/power",
+          "value": {
+            "method": "installed",
+            "sourceReference": "test: lichtplan LED",
+            "luminaires": [
+              {
+                "count": 100,
+                "power": {
+                  "method": "system",
+                  "powerW": 18
+                }
+              }
+            ]
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/lighting/0/lightingZones/0/occupancy",
+          "value": {
+            "control": "auto_on_auto_off",
+            "centralOnControl": true,
+            "largeOfficeGroup": false
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/lighting/0/lightingZones/0/daylight",
+          "value": {
+            "method": "forfait",
+            "daylightControl": true
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "lighting",
+        "lighting": [
+          {
+            "zoneId": "z1",
+            "functions": [
+              {
+                "function": "office",
+                "areaM2": 400
+              }
+            ],
+            "lightingZones": [
+              {
+                "id": "kantoor",
+                "areaM2": 400,
+                "power": {
+                  "method": "installed",
+                  "sourceReference": "test: lichtplan LED",
+                  "luminaires": [
+                    {
+                      "count": 100,
+                      "power": {
+                        "method": "system",
+                        "powerW": 18
+                      }
+                    }
+                  ]
+                },
+                "parasitic": {
+                  "method": "forfait"
+                },
+                "occupancy": {
+                  "control": "auto_on_auto_off",
+                  "centralOnControl": true,
+                  "largeOfficeGroup": false
+                },
+                "daylight": {
+                  "method": "forfait",
+                  "daylightControl": true
+                },
+                "extractedLuminaires": false
+              }
+            ],
+            "sourceReference": "voorbeeld: LED-armaturen 2021"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hp",
+      "name": "Lucht/water-warmtepomp",
+      "category": "heat_pump",
+      "target": "project",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "heat-pump",
+              "classificationSourceReference": "test: offerte",
+              "scope": "utility_collective_or_over25_kw",
+              "source": "outdoor_air",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 45,
+              "sourceCorrectionFactor": null,
+              "sourceCorrectionReference": null,
+              "thermalCapacityKw": 40,
+              "capacitySourceReference": "test: offerte",
+              "collectiveBuildingInstallation": false
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "test: individuele buitenunit"
+          }
+        },
+        {
+          "op": "add",
+          "path": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "test: buitenlucht"
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 15,
+      "template": {
+        "kind": "heat_pump",
+        "generator": {
+          "kind": "heat_pump_forfait",
+          "forfait": {
+            "generatorId": "heat-pump",
+            "classificationSourceReference": "test: offerte",
+            "scope": "utility_collective_or_over25_kw",
+            "source": "outdoor_air",
+            "sink": "hydronic",
+            "designSupplyTemperatureC": 45,
+            "sourceCorrectionFactor": null,
+            "sourceCorrectionReference": null,
+            "thermalCapacityKw": 40,
+            "capacitySourceReference": "test: offerte"
+          },
+          "sourceSystem": "individual",
+          "sourceSystemReference": "test: individuele buitenunit"
+        },
+        "renewable": {
+          "sourceBelow20C": true,
+          "exhaustAirSource": false,
+          "sourceReference": "test: buitenlucht"
+        }
+      }
+    },
+    {
+      "id": "pv",
+      "name": "PV 40 × 400 Wp",
+      "category": "pv",
+      "target": "project",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/ntaCalculation/pvSystems/-",
+          "value": {
+            "id": "pv-pv-1",
+            "peakPower": {
+              "method": "panels",
+              "panelPeakPowerW": 400,
+              "panelCount": 40
+            },
+            "azimuthDeg": 180,
+            "tiltDeg": 15,
+            "mounting": "moderately_ventilated",
+            "sourceReference": "test: offerte",
+            "obstruction": {
+              "method": "minimal"
+            }
+          }
+        }
+      ],
+      "investmentEur": 1000,
+      "costSource": "test: kostenkentallen",
+      "lifetimeYears": 25,
+      "template": {
+        "kind": "pv",
+        "systems": [
+          {
+            "id": "pv-1",
+            "peakPower": {
+              "method": "panels",
+              "panelPeakPowerW": 400,
+              "panelCount": 40
+            },
+            "azimuthDeg": 180,
+            "tiltDeg": 15,
+            "mounting": "moderately_ventilated",
+            "obstruction": {
+              "method": "minimal"
+            },
+            "sourceReference": "test: offerte"
+          }
+        ]
+      }
+    }
+  ]
+}

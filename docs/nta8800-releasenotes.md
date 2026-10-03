@@ -19,6 +19,11 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
 - **BENG-rapport.** Eisen staan met dezelfde decimalen als de waarde: BENG 1 en 2 en TOjuli op 0,01, BENG 3 op 0,1. De kern toetst onafgeronde waarden; een rij als ‘74,11 | ≤ 74,1 | voldoet’ of ‘32,6 | ≥ 33 | voldoet’ kan niet meer voorkomen.
 - **Tabel 7.13 in het formulier.** De controle loopt nu, net als de kern, over de rekenzones van het project in plaats van over `zoneData`. De knop ‘Tabelwaarden gebruiken’ neemt de bronverwijzing van het blok over, anders ‘NTA 8800 tabel 7.13’, zodat de kern de setpoints niet weigert om een lege bron. De projectroute kent geen gebruiksaanpassing; die tak is uit de controle verwijderd.
 - **Tijdstempels.** Rekenrapport, invoerdossier en maatwerkadviesrapport tonen de generatietijd als `<time datetime="…">` met de exacte ISO-tijd. In het projectdossier is dat dezelfde tijd als `generatedAt` in `manifest.json`.
+## 3 oktober 2026 — maatregelsjablonen in het maatwerkadvies
+
+- **Maatregelen via sjablonen (ISSO 82.2/75.2 §4.3).** Een nieuwe maatregel start als sjabloon: isolatie van dak, gevel of vloer, beglazing, kierdichting, ventilatiesysteem, warmtepomp (forfaitair of bijlage Q), tapwatertoestel, PV, zonneboiler, douche-WTW en verlichting. Het sjabloon genereert de JSON-patch en toont die als voorbeeld; de patchregels blijven beschikbaar onder "Handmatig".
+- **Opgeslagen maatregelen.** Een maatregel krijgt het optionele veld `template`; de kern negeert het. Bestaande maatregelen zonder sjabloon openen als "Handmatig" en rekenen ongewijzigd.
+- **Patches opnieuw opgebouwd.** Bij het doorrekenen worden de patches van sjabloonmaatregelen opnieuw gegenereerd tegen het huidige project, zodat een gewijzigde volgorde van vlakken of ramen de paden niet laat verouderen.
 
 ## 3 oktober 2026 — vakantiewoning in ZEB, reservevermogens, één bouwjaar en lege enum-tag
 

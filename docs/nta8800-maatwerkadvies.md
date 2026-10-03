@@ -75,6 +75,25 @@ Voorbeelden:
 {"op": "add", "path": "/ntaCalculation/pvSystems/-", "value": {"…": "…"}}
 ```
 
+### Maatregelsjablonen
+
+In het paneel kiest de adviseur een soort maatregel. Het sjabloon zet de keuzes om in de patch; de patch blijft wat de kern rekent. De soorten volgen het overzicht van mogelijke maatregelen in ISSO 82.2 §4.3 (p. 54–62) en ISSO 75.2 §4.3 (p. 65–78; verlichting p. 78):
+
+| Sjabloon | Invoer | Patch op het project |
+|---|---|---|
+| Isolatie dak, gevel of vloer | vlakken, nieuwe Rc of U | nieuwe constructie (`/constructions/-`) met U = 1/(R_si + Rc + R_se), R_si 0,10/0,13/0,17 en R_se 0,04 (tabel C.2); `constructionId` van de vlakken; bij een vloer met grondinvoer ook `constructionResistanceM2kPerW` = Rc + 0,17 |
+| Beglazing | ramen, nieuwe U en eventueel g | `uValue`/`gValue` van de ramen |
+| Kierdichting | streefwaarde qv10 en bron | `infiltration` van de hoofdstuk 11-invoer (ook per zone) en `airTightness.qv10` |
+| Ventilatiesysteem | systeemunit (tabel 11.5) | de gewijzigde leden van `ntaCalculation.ventilation`, zonder `infiltration` |
+| Warmtepomp of andere opwekker | opwekker; bij een forfaitaire warmtepomp de tabelrij (9.27/9.29) | `ntaCalculation.generator` en `heatPumpRenewable` (5.31/5.32) |
+| Tapwatertoestel | toestel (§13.8) | `ntaCalculation.hotWater.generator` |
+| PV | systemen (hoofdstuk 16) | toegevoegd aan `pvSystems`, id voorafgegaan door de maatregel-id; zonder opgegeven factoren beschaduwing volgens situatie a (minimaal, §17.3) |
+| Zonneboiler | systemen (§13.7) | toegevoegd aan `hotWater.solar` |
+| Douche-WTW | units per douche, aansluiting, bron (§13.6, bijlage U) | `hotWater.showerHeatRecovery` |
+| Verlichting (utiliteit) | verlichtingszones (hoofdstuk 14) | de gewijzigde blokken per verlichtingszone |
+
+Het sjabloon wordt in de maatregel bewaard (`template`); de kern negeert het. Bij het doorrekenen genereert het paneel de patches opnieuw tegen het project zoals het dan is, zodat de array-indices in de paden kloppen. "Handmatig" laat het sjabloon los en houdt de patchregels bewerkbaar. De startwaarde voor de levensduur is een bewerkbare suggestie; ISSO 82.2/75.2 geven geen levensduurtabel (alleen ketels 15–20 jaar, 82.2 p. 90). De kerntest `template_measures_run_on_the_example_projects` rekent de sjablonen op beide voorbeeldprojecten door (`training-data/nta8800-mwa-template-measures.json`); elke maatregel verlaagt daar EP2.
+
 ## Energiekosten en economie
 
 **Kosten.** De jaarlijkse kosten volgen uit de tarieven van de adviseur. Die tarieven hebben een verplichte bron.

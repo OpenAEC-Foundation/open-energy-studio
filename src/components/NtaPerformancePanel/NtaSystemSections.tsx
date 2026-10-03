@@ -36,8 +36,10 @@ function RemoveButton({ label, onClick }: { label: string; onClick: () => void }
 }
 
 /** One space-heating generator at `base`; `allowMultiple` offers the 9.6.1 split. */
-export function SpaceGeneratorFields({ draft, change, base, project, allowMultiple = false }: SectionProps & {
+export function SpaceGeneratorFields({ draft, change, base, project, allowMultiple = false, heatPumpNote = true }: SectionProps & {
   base: Path; project: IProject; allowMultiple?: boolean;
+  /** The note that the forfait heat pump input lives with the heating system; off where the caller edits it. */
+  heatPumpNote?: boolean;
 }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
@@ -111,7 +113,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
     {kind === 'product_boiler' && <ProductBoilerFields draft={draft} change={change} base={base} />}
     {kind === 'local_heater' && <LocalHeaterFields draft={draft} change={change} base={base} />}
     {kind === 'forfait_heater' && <ForfaitHeaterFields draft={draft} change={change} base={base} />}
-    {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
+    {heatPumpNote && (kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
     {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
   </>;
