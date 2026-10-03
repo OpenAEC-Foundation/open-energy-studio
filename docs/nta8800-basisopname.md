@@ -264,3 +264,23 @@ Al het overige staat in een JSON-weergave. "Opname doorrekenen" stuurt de opname
 ## Meerdere tapwatersystemen (ISSO 82.1 p. 164)
 
 `additionalHotWaterSystems` in de woningopname beschrijft elk extra tapwatersysteem met dezelfde velden als `hotWater`. Een voorbeeld is een keukengeiser naast een combitoestel voor de badkamer. Per systeem leggen `connectedBathrooms` en `connectedKitchens` de aangesloten ruimten vast (NTA 13.19a). Zijn ze onbekend, dan volgen ze uit `served`: één badruimte en/of één keuken. Dat wordt vastgelegd als `hot_water_connected_*_from_served`. De utiliteitsopname kent deze lijst nog niet.
+
+## Koeling in de woningopname (ISSO 82.1 hoofdstuk 10)
+
+De woningopname kan nu een gebouwgebonden koelsysteem opnemen. Het veld `cooling` heeft dezelfde vorm als in de utiliteitsopname: opwekker, afgifte, aantal binnenunits, distributie via water, temperatuurtraject, inregeling, regeling en leidingisolatie. `coolingCollective` geeft aan of de koudeopwekker collectief is.
+
+Bij onbekende gegevens gelden dezelfde regels als in 75.1, met de paginaverwijzingen van 82.1:
+
+| Gegeven | Bij onbekend | Bron |
+|---|---|---|
+| Vermogen | forfaitair | tabel 10.3, p. 130 |
+| Ontwerptemperatuur | 6/12 °C; bij alleen oppervlaktekoeling 17/21 °C | tabel 10.4, p. 130 |
+| WKO-jaar | het vergunningsjaar, anders vóór 2013 | p. 129 |
+| Inregeling | niet ingeregeld | tabel 10.6, p. 132 |
+| Leidingisolatie | niet geïsoleerd; het isolatiejaar is het bouwjaar | tabel 10.7, p. 133 |
+| Appendages | niet geïsoleerd | tabellen 10.9–10.11, p. 134–136 |
+| Regeling | overige situaties | tabel 10.12, p. 137 |
+
+Binnenunits van split- en VRF-systemen tellen als ventilatorconvectoren, en betonkernactivering als vloerkoeling (p. 136).
+
+`coolingPresent` zonder `cooling` geeft `cooling_system_data_required`. Met koeling gebruiken de ramen de beschaduwingsrij "met koeling" (tabel 8.24/8.25). Het opnamepaneel heeft hiervoor een koelsectie.

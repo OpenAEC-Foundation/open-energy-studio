@@ -1122,10 +1122,47 @@ fn derive_utility_heating(
     derived
 }
 
-fn cooling_value(
+/// The ISSO publication whose chapter 10 rules apply (same rules, other
+/// pages).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CoolingBook {
+    /// ISSO 75.1 (utility buildings).
+    Utility,
+    /// ISSO 82.1 (dwellings).
+    Residential,
+}
+
+impl CoolingBook {
+    fn cite(self, rule: &str) -> &'static str {
+        match (self, rule) {
+            (Self::Utility, "aquifer") => "ISSO 75.1 p. 131",
+            (Self::Utility, "power") => "ISSO 75.1 p. 132 (table 10.3)",
+            (Self::Utility, "concrete") => "ISSO 75.1 p. 138",
+            (Self::Utility, "split") => "ISSO 75.1 p. 138",
+            (Self::Utility, "balancing") => "ISSO 75.1 p. 133 (table 10.6)",
+            (Self::Utility, "control") => "ISSO 75.1 p. 138 (table 10.12)",
+            (Self::Utility, "design") => "ISSO 75.1 p. 132 (table 10.4)",
+            (Self::Utility, "pipe") => "ISSO 75.1 p. 135 (table 10.7)",
+            (Self::Utility, _) => "ISSO 75.1 p. 136–137 (tables 10.8–10.11)",
+            (Self::Residential, "aquifer") => "ISSO 82.1 p. 129",
+            (Self::Residential, "power") => "ISSO 82.1 p. 130 (table 10.3)",
+            (Self::Residential, "concrete") => "ISSO 82.1 p. 136",
+            (Self::Residential, "split") => "ISSO 82.1 p. 136",
+            (Self::Residential, "balancing") => "ISSO 82.1 p. 132 (table 10.6)",
+            (Self::Residential, "control") => "ISSO 82.1 p. 137 (table 10.12)",
+            (Self::Residential, "design") => "ISSO 82.1 p. 130 (table 10.4)",
+            (Self::Residential, "pipe") => "ISSO 82.1 p. 133 (table 10.7)",
+            (Self::Residential, _) => "ISSO 82.1 p. 134–136 (tables 10.9–10.11)",
+        }
+    }
+}
+
+pub(crate) fn cooling_value(
     cooling: &SurveyCooling,
     construction_year: i32,
     storeys: u32,
+    book: CoolingBook,
+    individual_dwelling: bool,
     recorder: &mut Recorder,
 ) -> Value {
     let reference = cooling.source_reference.as_str();
@@ -1150,7 +1187,7 @@ fn cooling_value(
                 "aquifer_year_unknown",
                 "cooling.generator",
                 format!("{source} (permit year {:?})", cooling.aquifer_permit_year),
-                "ISSO 75.1 p. 131",
+                book.cite("aquifer"),
             );
             json!({"kind": "free_cooling", "source": source})
         }
@@ -1169,7 +1206,7 @@ fn cooling_value(
             "cooling_power_unknown_forfait",
             "cooling.capacityKw",
             "forfait".into(),
-            "ISSO 75.1 p. 132 (table 10.3)",
+            book.cite("power"),
         );
     }
     let (emitter, radiant) = match cooling.emitter {
@@ -1179,7 +1216,7 @@ fn cooling_value(
                 "concrete_core_activation_floor_cooling",
                 "cooling.emitter",
                 "floor_cooling".into(),
-                "ISSO 75.1 p. 138",
+                book.cite("concrete"),
             );
             ("floor_cooling", true)
         }
@@ -1192,7 +1229,7 @@ fn cooling_value(
                 "split_indoor_units_fan_coils",
                 "cooling.emitter",
                 "fan_coil_or_rac_on_outer_wall".into(),
-                "ISSO 75.1 p. 138",
+                book.cite("split"),
             );
             ("fan_coil_or_rac_on_outer_wall", false)
         }
@@ -1201,7 +1238,7 @@ fn cooling_value(
                 "split_indoor_units_fan_coils",
                 "cooling.emitter",
                 "fan_coil_or_rac_on_ceiling".into(),
-                "ISSO 75.1 p. 138",
+                book.cite("split"),
             );
             ("fan_coil_or_rac_on_ceiling", false)
         }
@@ -1218,7 +1255,7 @@ fn cooling_value(
                     "cooling_balancing_unknown_none",
                     "cooling.balanced",
                     "none_or_unknown".into(),
-                    "ISSO 75.1 p. 133 (table 10.6)",
+                    book.cite("balancing"),
                 );
                 "none_or_unknown"
             }
@@ -1233,7 +1270,7 @@ fn cooling_value(
                 "cooling_control_unknown_other",
                 "cooling.control",
                 "unknown_or_other".into(),
-                "ISSO 75.1 p. 138 (table 10.12)",
+                book.cite("control"),
             );
             "unknown_or_other"
         }
@@ -1267,7 +1304,7 @@ fn cooling_value(
                     "cooling_design_temperature_unknown",
                     "cooling.designTemperature",
                     design.into(),
-                    "ISSO 75.1 p. 132 (table 10.4)",
+                    book.cite("design"),
                 );
                 design
             }
@@ -1279,7 +1316,7 @@ fn cooling_value(
                         "cooling_pipe_insulation_year_construction_year",
                         "cooling.pipeInsulationYear",
                         construction_year.to_string(),
-                        "ISSO 75.1 p. 135 (table 10.7)",
+                        book.cite("pipe"),
                     );
                     construction_year
                 });
@@ -1297,7 +1334,7 @@ fn cooling_value(
                     "cooling_pipes_insulation_unknown_no",
                     "cooling.pipesInsulated",
                     "uninsulated".into(),
-                    "ISSO 75.1 p. 135 (table 10.7)",
+                    book.cite("pipe"),
                 );
                 "uninsulated"
             }
@@ -1306,7 +1343,7 @@ fn cooling_value(
             "cooling_fittings_unknown_uninsulated_meters_present",
             "cooling.distribution",
             "fittings uninsulated, length forfait, cold meters present".into(),
-            "ISSO 75.1 p. 136–137 (tables 10.8–10.11)",
+            book.cite("fittings"),
         );
         system["distribution"] = json!({
             "designTemperature": design,
@@ -1316,7 +1353,7 @@ fn cooling_value(
                 "hydraulicallyBalanced": balancing == "static",
                 "floorCount": storeys.max(1),
                 "heatMeter": true,
-                "individualDwellingInstallation": false,
+                "individualDwellingInstallation": individual_dwelling,
                 "sourceReference": "basisopname forfait",
             },
             "sourceReference": format!("{reference}; basisopname"),
@@ -2223,10 +2260,16 @@ pub fn derive_utility_input(survey: &UtilitySurvey, recorder: &mut Recorder) -> 
         survey.ventilation.heat_recovery.is_some(),
     );
     let lighting = lighting_value(survey, main, area, recorder);
-    let cooling = survey
-        .cooling
-        .as_ref()
-        .map(|cooling| cooling_value(cooling, year, survey.storeys, recorder));
+    let cooling = survey.cooling.as_ref().map(|cooling| {
+        cooling_value(
+            cooling,
+            year,
+            survey.storeys,
+            CoolingBook::Utility,
+            false,
+            recorder,
+        )
+    });
     let pv: Vec<Value> = survey
         .pv
         .iter()
@@ -2911,6 +2954,8 @@ mod tests {
             &cooling(CoolingEmitterAnswer::FanCoilOnCeiling),
             1990,
             3,
+            CoolingBook::Utility,
+            false,
             &mut recorder,
         );
         assert_eq!(
@@ -2935,6 +2980,8 @@ mod tests {
             &cooling(CoolingEmitterAnswer::ConcreteCoreActivation),
             1990,
             3,
+            CoolingBook::Utility,
+            false,
             &mut recorder,
         );
         assert_eq!(core["emission"]["emitter"], "floor_cooling");
@@ -2943,6 +2990,8 @@ mod tests {
             &cooling(CoolingEmitterAnswer::SplitIndoorUnitsOnWall),
             1990,
             3,
+            CoolingBook::Utility,
+            false,
             &mut recorder,
         );
         assert_eq!(
@@ -2951,7 +3000,14 @@ mod tests {
         );
         let mut insulated = cooling(CoolingEmitterAnswer::CeilingCooling);
         insulated.pipes_insulated = Some(true);
-        let value = cooling_value(&insulated, 1988, 1, &mut recorder);
+        let value = cooling_value(
+            &insulated,
+            1988,
+            1,
+            CoolingBook::Utility,
+            false,
+            &mut recorder,
+        );
         assert_eq!(
             value["distribution"]["pipe"]["kind"],
             "insulated1980_to1995"
@@ -2962,20 +3018,34 @@ mod tests {
         ));
         let mut aquifer = cooling(CoolingEmitterAnswer::CeilingCooling);
         aquifer.generator = CoolingGeneratorAnswer::AquiferYearUnknown;
-        let value = cooling_value(&aquifer, 2010, 1, &mut recorder);
+        let value = cooling_value(
+            &aquifer,
+            2010,
+            1,
+            CoolingBook::Utility,
+            false,
+            &mut recorder,
+        );
         assert_eq!(
             value["generators"][0]["generator"]["source"],
             "aquifer_utility_before2013"
         );
         aquifer.aquifer_permit_year = Some(2014);
-        let value = cooling_value(&aquifer, 2010, 1, &mut recorder);
+        let value = cooling_value(
+            &aquifer,
+            2010,
+            1,
+            CoolingBook::Utility,
+            false,
+            &mut recorder,
+        );
         assert_eq!(
             value["generators"][0]["generator"]["source"],
             "aquifer_from2013"
         );
         let mut direct = cooling(CoolingEmitterAnswer::FanCoilOnOuterWall);
         direct.water_based = false;
-        let value = cooling_value(&direct, 2010, 1, &mut recorder);
+        let value = cooling_value(&direct, 2010, 1, CoolingBook::Utility, false, &mut recorder);
         assert!(value.get("distribution").is_none());
         assert_eq!(value["emission"]["balancing"], "not_applicable");
     }

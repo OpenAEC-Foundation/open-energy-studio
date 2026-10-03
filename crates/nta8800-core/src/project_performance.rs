@@ -112,6 +112,9 @@ pub struct NtaCalculationInput {
     pub lighting: Vec<crate::lighting::ZoneLighting>,
     #[serde(default)]
     pub cooling: Option<CoolingSystem>,
+    /// §10.2: several cooling systems with the project zone ids they serve.
+    #[serde(default)]
+    pub cooling_systems: Vec<crate::building_performance::ServedCoolingSystem>,
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
     /// §5.3.1: use functions of an existing utility building with areas.
@@ -251,8 +254,8 @@ pub struct ProjectPerformanceAssessment {
     pub label_data: Option<crate::label_data::LabelData>,
 }
 
-/// §6.4/§6.5.2 for the derived calculation zones: one heating chain and at
-/// most one cooling system serve all zones in this kernel.
+/// §6.4/§6.5.2 for the derived calculation zones: one heating chain serves
+/// all zones; cooling systems serve all zones or their listed zones.
 fn schematisation_checks(input: &BuildingPerformanceInput) -> Vec<crate::zoning::ZoningIssue> {
     use crate::zoning::{check_zone, CalculationZoneLayout, VentilationShare, ZonePart};
     std::iter::once(&input.space_heating.demand)
@@ -317,7 +320,15 @@ fn schematisation_checks(input: &BuildingPerformanceInput) -> Vec<crate::zoning:
                 id: demand.zone_id.clone(),
                 parts,
                 heating_system_ids: vec!["space-heating".into()],
-                cooling_system_ids: Vec::new(),
+                cooling_system_ids: input
+                    .cooling_list()
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (_, zones))| {
+                        zones.map_or(true, |zones| zones.contains(&demand.zone_id))
+                    })
+                    .map(|(index, _)| format!("cooling-{index}"))
+                    .collect(),
                 humidification_system_ids: Vec::new(),
                 ventilation,
                 residence_areas_open: false,
@@ -876,6 +887,7 @@ fn derive_input(
         space_heating_solar: nta.space_heating_solar,
         lighting: nta.lighting,
         cooling: nta.cooling,
+        cooling_systems: nta.cooling_systems,
         label_function: nta.label_function,
         label_functions: nta.label_functions.clone(),
         construction_year: nta.construction_year.or_else(|| {

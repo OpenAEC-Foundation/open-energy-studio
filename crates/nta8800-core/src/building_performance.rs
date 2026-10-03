@@ -276,9 +276,15 @@ pub struct BuildingPerformanceInput {
     pub loss_area_m2: Option<f64>,
     #[serde(default)]
     pub loss_area_source_reference: Option<String>,
-    /// Space cooling calculated here (chapter 10, method 3).
+    /// Space cooling calculated here (chapter 10), one system serving every
+    /// calculation zone.
     #[serde(default)]
     pub cooling: Option<CoolingSystem>,
+    /// §10.2: several cooling systems, each serving the listed calculation
+    /// zones; exclusive with `cooling`. Zones that no system serves are not
+    /// cooled (no cooling energy, no active cooling for TOjuli).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cooling_systems: Vec<ServedCoolingSystem>,
     /// Utility lighting per calculation zone (chapter 14); dwellings have
     /// `W_L = 0` and leave this empty.
     #[serde(default)]
@@ -847,6 +853,55 @@ fn twelve_nonnegative(values: &[f64]) -> bool {
             .all(|value| value.is_finite() && *value >= 0.0)
 }
 
+/// A cooling system with the calculation zones it serves (§10.2).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ServedCoolingSystem {
+    /// `zoneId` of the calculation zones (monthly demand inputs).
+    pub zone_ids: Vec<String>,
+    pub system: CoolingSystem,
+}
+
+impl BuildingPerformanceInput {
+    /// The cooling systems with the zone ids they serve (`None`: every zone).
+    pub fn cooling_list(&self) -> Vec<(&CoolingSystem, Option<&[String]>)> {
+        let mut list: Vec<(&CoolingSystem, Option<&[String]>)> =
+            self.cooling.iter().map(|system| (system, None)).collect();
+        list.extend(
+            self.cooling_systems
+                .iter()
+                .map(|served| (&served.system, Some(served.zone_ids.as_slice()))),
+        );
+        list
+    }
+
+    /// Whether any cooling system is calculated.
+    pub fn has_cooling(&self) -> bool {
+        self.cooling.is_some() || !self.cooling_systems.is_empty()
+    }
+
+    /// Whether a calculated cooling system serves this zone.
+    pub fn zone_cooled(&self, zone_id: &str) -> bool {
+        self.cooling.is_some()
+            || self
+                .cooling_systems
+                .iter()
+                .any(|served| served.zone_ids.iter().any(|id| id == zone_id))
+    }
+
+    fn zone_ids(&self) -> Vec<&str> {
+        std::iter::once(&self.space_heating.demand)
+            .chain(
+                self.space_heating
+                    .additional_zones
+                    .iter()
+                    .map(|zone| &zone.demand),
+            )
+            .map(|demand| demand.zone_id.as_str())
+            .collect()
+    }
+}
+
 /// §5.7.1 system class against the calculated cooling generators.
 fn active_cooling_matches(
     system: crate::tojuli::ActiveCoolingSystem,
@@ -1116,12 +1171,15 @@ fn solar_space_heating(
     })
 }
 
-/// Chapter 10 for all zones on the one cooling system.
+/// Chapter 10: one system for every zone, or several systems each for its
+/// own zones (§10.2), combined into the building total.
 fn cooling_assessment(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
 ) -> Option<CoolingAssessment> {
-    let system = input.cooling.as_ref()?;
+    if !input.has_cooling() {
+        return None;
+    }
     let areas = std::iter::once(&input.space_heating.demand)
         .chain(
             input
@@ -1164,20 +1222,60 @@ fn cooling_assessment(
         let row = &heating.monthly[index];
         (row.heat_pump_output_kwh - row.generator_electricity_kwh).max(0.0)
     });
-    Some(assess_cooling(
-        system,
-        CoolingContext {
-            zones: &zones,
-            residential: matches!(input.calculation_scope, CalculationScope::Residential),
-            heat_pump_source_extraction_kwh: if input.space_heating.generator.heat_pump().is_some()
-                || input.space_heating.generator.annex_q().is_some()
-            {
-                extraction
-            } else {
-                [0.0; 12]
+    let extraction = if input.space_heating.generator.heat_pump().is_some()
+        || input.space_heating.generator.annex_q().is_some()
+    {
+        extraction
+    } else {
+        [0.0; 12]
+    };
+    let residential = matches!(input.calculation_scope, CalculationScope::Residential);
+    if let Some(system) = &input.cooling {
+        return Some(assess_cooling(
+            system,
+            CoolingContext {
+                zones: &zones,
+                residential,
+                heat_pump_source_extraction_kwh: extraction,
             },
-        },
-    ))
+        ));
+    }
+    // §10.2: each system for its own zones. The 10.84 source extraction of
+    // the space-heating heat pump goes to the first system only, so it is
+    // not counted twice.
+    let ids = input.zone_ids();
+    let parts: Vec<crate::space_cooling::ServedCoolingResult> = input
+        .cooling_systems
+        .iter()
+        .enumerate()
+        .map(|(system_index, served)| {
+            let zone_indexes: Vec<usize> = ids
+                .iter()
+                .enumerate()
+                .filter(|(_, id)| served.zone_ids.iter().any(|zone| zone == *id))
+                .map(|(index, _)| index)
+                .collect();
+            let own: Vec<CoolingZoneNeed> =
+                zone_indexes.iter().map(|index| zones[*index]).collect();
+            let assessment = assess_cooling(
+                &served.system,
+                CoolingContext {
+                    zones: &own,
+                    residential,
+                    heat_pump_source_extraction_kwh: if system_index == 0 {
+                        extraction
+                    } else {
+                        [0.0; 12]
+                    },
+                },
+            );
+            crate::space_cooling::ServedCoolingResult {
+                zone_indexes,
+                assessment,
+            }
+        })
+        .collect();
+    Some(crate::space_cooling::combine_cooling(parts, zones.len()))
 }
 
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
@@ -1364,12 +1462,46 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             ));
         }
     }
-    if let Some(system) = &input.cooling {
+    if input.cooling.is_some() && !input.cooling_systems.is_empty() {
+        issues.push(issue(
+            "cooling_and_cooling_systems_exclusive",
+            "coolingSystems",
+        ));
+    }
+    let zone_ids = input.zone_ids();
+    let mut served_zones: Vec<&str> = Vec::new();
+    for (index, served) in input.cooling_systems.iter().enumerate() {
+        let path = format!("coolingSystems[{index}]");
+        if served.zone_ids.is_empty() {
+            issues.push(issue("cooling_zones_required", format!("{path}.zoneIds")));
+        }
+        for (zone_index, zone) in served.zone_ids.iter().enumerate() {
+            let zone_path = format!("{path}.zoneIds[{zone_index}]");
+            if !zone_ids.contains(&zone.as_str()) {
+                issues.push(issue("cooling_zone_unknown", zone_path));
+            } else if served_zones.contains(&zone.as_str()) {
+                // §10.2: a zone belongs to one cooling system.
+                issues.push(issue("cooling_zone_served_twice", zone_path));
+            } else {
+                served_zones.push(zone.as_str());
+            }
+        }
+    }
+    let systems = input.cooling_list();
+    for (index, (system, served)) in systems.iter().enumerate() {
+        let path = if served.is_some() {
+            let offset = usize::from(input.cooling.is_some());
+            format!("coolingSystems[{}].system", index - offset)
+        } else {
+            "cooling".to_string()
+        };
         issues.extend(
-            validate_cooling(system, "cooling")
+            validate_cooling(system, &path)
                 .into_iter()
                 .map(|item| issue(item.code, item.path)),
         );
+    }
+    if !systems.is_empty() {
         if input.declared_uses.iter().any(|item| {
             matches!(
                 item.service,
@@ -1379,7 +1511,10 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             issues.push(issue("cooling_double_count", "cooling"));
         }
         if let Some(evidence) = &input.active_cooling {
-            if !active_cooling_matches(evidence.system, system) {
+            if !systems
+                .iter()
+                .any(|(system, _)| active_cooling_matches(evidence.system, system))
+            {
                 issues.push(issue(
                     "active_cooling_system_inconsistent",
                     "activeCooling.system",
@@ -1422,7 +1557,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         ));
     }
     if input.active_cooling.is_some()
-        && input.cooling.is_none()
+        && !input.has_cooling()
         && !input
             .declared_uses
             .iter()
@@ -2368,7 +2503,12 @@ pub fn assess_building_performance(
                     zone,
                     TojuliOptions {
                         residential,
-                        active_cooling: input.active_cooling.as_ref(),
+                        // §10.2: only zones a calculated system serves (or
+                        // every zone with declared cooling) are cooled.
+                        active_cooling: input
+                            .active_cooling
+                            .as_ref()
+                            .filter(|_| !input.has_cooling() || input.zone_cooled(&zone.zone_id)),
                         // 10.6 per zone, July.
                         booster_heat_pump_july_kwh: cooling
                             .as_ref()
@@ -4919,6 +5059,85 @@ mod tests {
             }],
             booster_heat_pump_extraction_kwh: Vec::new(),
             collective: None,
+        }
+    }
+
+    #[test]
+    fn several_cooling_systems_serve_their_own_zones() {
+        use crate::space_heating_chain::ChainZone;
+        let mut sample = input();
+        let mut second = sample.space_heating.demand.clone();
+        second.zone_id = "z2".into();
+        sample.space_heating.additional_zones.push(ChainZone {
+            demand: second,
+            emission: sample.space_heating.emission.clone(),
+            distribution: sample.space_heating.distribution.clone(),
+        });
+        sample.total_usable_floor_area_m2 *= 2.0;
+        let first_zone = sample.space_heating.demand.zone_id.clone();
+        let compression = || {
+            cooling_system(CoolingGeneratorKind::Compression {
+                heat_rejection: None,
+                declared: None,
+                performance: None,
+            })
+        };
+        // One system for every zone.
+        sample.cooling = Some(compression());
+        let all = assess_building_performance(&sample);
+        assert_eq!(all.status, "calculated_unverified", "{:?}", all.issues);
+        let all_cooling = cooling_assessment(&sample, &all.space_heating).unwrap();
+        let need = |assessment: &CoolingAssessment| -> f64 {
+            assessment.months.iter().map(|row| row.need_kwh).sum()
+        };
+        // §10.2: a system serving only the first zone carries only its need;
+        // the second zone is not cooled.
+        sample.cooling = None;
+        sample.cooling_systems = vec![ServedCoolingSystem {
+            zone_ids: vec![first_zone.clone()],
+            system: compression(),
+        }];
+        let one = assess_building_performance(&sample);
+        assert_eq!(one.status, "calculated_unverified", "{:?}", one.issues);
+        let one_cooling = cooling_assessment(&sample, &one.space_heating).unwrap();
+        let zone_need: f64 = one
+            .space_heating
+            .demand
+            .monthly
+            .iter()
+            .map(|row| row.cooling.need_kwh)
+            .sum();
+        assert!((need(&one_cooling) - zone_need).abs() < 1e-6);
+        assert!(need(&one_cooling) < need(&all_cooling));
+        assert_eq!(one_cooling.systems.len(), 1);
+        assert_eq!(one_cooling.zone_booster_extraction_kwh.len(), 2);
+        // Two systems: the needs add up to the one-system total.
+        sample.cooling_systems.push(ServedCoolingSystem {
+            zone_ids: vec!["z2".into()],
+            system: compression(),
+        });
+        let two = assess_building_performance(&sample);
+        assert_eq!(two.status, "calculated_unverified", "{:?}", two.issues);
+        let two_cooling = cooling_assessment(&sample, &two.space_heating).unwrap();
+        assert!((need(&two_cooling) - need(&all_cooling)).abs() < 1e-6);
+        assert!(two_cooling
+            .generator_shares
+            .iter()
+            .any(|item| item.id.starts_with("system1:")));
+        // Validation: unknown zone, a zone twice and both inputs at once.
+        sample.cooling_systems[1].zone_ids = vec![first_zone.clone(), "nope".into()];
+        sample.cooling = Some(compression());
+        let codes: Vec<&str> = assess_building_performance(&sample)
+            .issues
+            .iter()
+            .map(|item| item.code)
+            .collect();
+        for code in [
+            "cooling_zone_served_twice",
+            "cooling_zone_unknown",
+            "cooling_and_cooling_systems_exclusive",
+        ] {
+            assert!(codes.contains(&code), "{code} missing in {codes:?}");
         }
     }
 

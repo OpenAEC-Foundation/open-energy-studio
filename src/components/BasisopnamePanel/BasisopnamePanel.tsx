@@ -28,6 +28,10 @@ const HOT_WATER_KINDS: Record<SurveyKind, string[]> = {
   utility: ['gas_appliance', 'gas_storage_heater', 'electric_boiler', 'electric_instantaneous', 'heat_pump',
     'district_heat', 'collective_unknown', 'none'],
 };
+const COOLING_GENERATORS = ['room_air_conditioner', 'compression', 'gas_absorption', 'external_cold', 'unknown_collective',
+  'aquifer_before2013', 'aquifer_from2013', 'aquifer_year_unknown', 'surface_water', 'closed_ground_loop', 'dew_point_cooling'];
+const COOLING_EMITTERS = ['split_indoor_units_on_wall', 'split_indoor_units_on_ceiling', 'fan_coil_on_outer_wall',
+  'fan_coil_on_ceiling', 'floor_cooling', 'concrete_core_activation', 'wall_cooling', 'ceiling_cooling', 'other'];
 const ORIENTATIONS = ['north', 'north_east', 'east', 'south_east', 'south', 'south_west', 'west', 'north_west'];
 
 function opts(t: T, prefix: string, keys: string[]): Array<[string, string]> {
@@ -341,6 +345,33 @@ export function BasisopnamePanel() {
         </div>;
       })}
       <ListControls label={t('opname.addSolar')} onAdd={() => change(['hotWater', 'solar'], [...solar, solarTemplate(solar.length)])} />
+    </Section>
+
+    <Section title={t('opname.cooling')}>
+      <label className="nta-form-check">
+        <input type="checkbox" checked={read(draft, ['cooling']) != null}
+          onChange={(event) => {
+            const cooling = event.target.checked
+              ? { generator: 'room_air_conditioner', emitter: 'split_indoor_units_on_wall', fanCoilCount: 1, waterBased: false, sourceReference: '' }
+              : null;
+            // One write, so both fields land in the same draft.
+            const next = write(draft, ['cooling'], cooling);
+            save({ kind, survey: kind === 'residential' ? write(next, ['coolingPresent'], event.target.checked) : next });
+          }} />
+        {t('opname.cooling.present')}
+      </label>
+      {read(draft, ['cooling']) != null && <>
+        <SelectField {...field} path={['cooling', 'generator']} label={t('opname.cooling.generator')}
+          options={opts(t, 'opname.cooling.generatorKind', COOLING_GENERATORS)} />
+        <SelectField {...field} path={['cooling', 'emitter']} label={t('opname.cooling.emitter')}
+          options={opts(t, 'opname.cooling.emitterKind', COOLING_EMITTERS)} />
+        <NumberField {...field} path={['cooling', 'fanCoilCount']} label={t('opname.cooling.fanCoilCount')} step="1" />
+        <NumberField {...field} path={['cooling', 'capacityKw']} label={t('opname.cooling.capacityKw')} />
+        <CheckField {...field} path={['cooling', 'waterBased']} label={t('opname.cooling.waterBased')} />
+        {kind === 'residential' &&
+          <CheckField {...field} path={['coolingCollective']} label={t('opname.cooling.collective')} />}
+        <TextField {...field} path={['cooling', 'sourceReference']} label={t('opname.sourceReference')} />
+      </>}
     </Section>
 
     <Section title={t('opname.pv')}>
