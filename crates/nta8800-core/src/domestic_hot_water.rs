@@ -1809,8 +1809,9 @@ pub fn validate_hot_water(
                 || areas.iter().any(|item| {
                     !positive(item.area_m2) || item.function == LabelFunction::Residential
                 })
-                || (total - context.usable_floor_area_m2).abs()
-                    > 1e-6 * context.usable_floor_area_m2.max(1.0)
+                // 13.20/13.20a: a system serves part of the building when
+                // there are several; it never serves more than the building.
+                || total > context.usable_floor_area_m2 * (1.0 + 1e-6) + 1e-9
             {
                 push("hot_water_function_areas_invalid", "need.areas");
             }
