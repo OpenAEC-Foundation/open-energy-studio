@@ -1,5 +1,5 @@
 import type { IProject } from '../energy/types';
-import type { LabelData, NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment } from '../nta/KernelClient';
+import type { LabelData, NtaChapterFiveIndicators, NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
 import { summarizeExtras } from '../nta/NtaResultSummary';
 
@@ -18,6 +18,23 @@ const PURPOSE: Record<string, string> = { existing_building: 'bestaand gebouw', 
 const SURVEY: Record<string, string> = { basic: 'basisopname', detailed: 'detailopname' };
 const REPRESENTATION: Record<string, string> = { unique: 'uniek', reference: 'referentiewoning', similar: 'gelijkende woning' };
 const CATEGORY: Record<string, string> = { facade: 'Gevel', roof: 'Dak', floor: 'Vloer', glazing: 'Beglazing' };
+
+/** NTA 8800 chapter 5 label and record indicators. */
+function chapterFiveSection(indicators: NtaChapterFiveIndicators | null | undefined): string {
+  if (!indicators) return '';
+  const r = indicators.renewableByCarrier;
+  const carbonFree = indicators.locallyCarbonFree == null ? 'niet beoordeeld' : indicators.locallyCarbonFree ? 'ja' : 'nee';
+  return `<h2>Indicatoren hoofdstuk 5</h2>
+    <table><tbody>
+      <tr><th>Nettowarmtebehoefte E<sub>H;nd</sub> (5.3a)</th><td class="n">${num(indicators.heatingNeedKwhPerM2, 2)} kWh/m²·jr</td><th>Nettokoudebehoefte E<sub>C;nd</sub> (5.3d)</th><td class="n">${num(indicators.coolingNeedKwhPerM2, 2)} kWh/m²·jr</td></tr>
+      <tr><th>E<sub>H+C;nd</sub> (5.3g)</th><td class="n">${num(indicators.heatingAndCoolingNeedKwhPerM2, 2)} kWh/m²·jr</td><th>Standaard voor woningisolatie (§5.3.2)</th><td class="n">${indicators.standardInsulationKwhPerM2 == null ? '—' : `${num(indicators.standardInsulationKwhPerM2)} kWh/m²·jr — ${meets(indicators.meetsStandardInsulation)}`}</td></tr>
+      <tr><th>Hernieuwbaar EwePrenTot (§5.3.1.3)</th><td class="n">${num(indicators.renewableIndicatorKwhPerM2, 2)} kWh/m²·jr</td><th>Renovatiestandaard (tabel 5.7)</th><td class="n">${indicators.renovationStandardKwhPerM2 == null ? '—' : `${num(indicators.renovationStandardKwhPerM2, 2)} kWh/m²·jr — ${meets(indicators.meetsRenovationStandard)}`}</td></tr>
+      <tr><th>Finaal energiegebruik EweFinal (5.3h)</th><td class="n">${num(indicators.finalEnergyKwhPerM2, 2)} kWh/m²·jr</td><th>EweFinal;EED (5.3i)</th><td class="n">${num(indicators.finalEnergyEedKwhPerM2, 2)} kWh/m²·jr</td></tr>
+      <tr><th>Elektriciteit afgenomen (5.17)</th><td class="n">${num(indicators.deliveredElectricityKwh)} kWh · ${num(indicators.deliveredElectricityKwhPerM2, 1)} kWh/m²</td><th>Externe warmte/koude (5.18)</th><td class="n">${num(indicators.deliveredExternalGj, 1)} GJ · ${num(indicators.deliveredExternalGjPerM2, 3)} GJ/m²</td></tr>
+      <tr><th>Overige dragers (5.19)</th><td class="n">${num(indicators.deliveredOtherM3Aeq)} m³ aeq · ${num(indicators.deliveredOtherM3AeqPerM2, 2)} m³ aeq/m²</td><th>Lokaal koolstofemissievrij (§5.5.7)</th>${cell(carbonFree)}</tr>
+      <tr><th>Hernieuwbaar per drager (5.39a–h) [kWh]</th><td colspan="3">elektriciteit ${num(r.electricity)} · warmtepomp ${num(r.heatPumpHeat)} · zon thermisch ${num(r.solarHeat)} · koude ${num(r.cold)} · biomassa ${num(r.biomass)} · externe warmte ${num(r.externalHeat)} · externe koude ${num(r.externalCold)}</td></tr>
+    </tbody></table>`;
+}
 
 function advisor(value: NtaRegistration['surveyingAdvisor']): string {
   if (!value) return '—';
@@ -148,6 +165,7 @@ export function generateNtaCalculationReportHTML(
       <tr><th>Labelbron</th><td colspan="3">${escapeHtml(performance.labelSource)}</td></tr>
       <tr><th>Labelgegevens (Reg. art. 4)</th><td colspan="3">EP2 ${num(performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr · hernieuwbaar ${num(performance.renewableSharePercent, 1)} % · TO<sub>juli</sub> ${num(performance.tojuliMaxK, 2)} K · ${project.buildingFunction === 'residential' ? 'warmtebehoefte (BENG 1)' : 'energiebehoefte (BENG 1)'} ${num(performance.needIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td></tr>
     </tbody></table>
+    ${chapterFiveSection(performance.chapter5)}
     ${labelDataSection(assessment.labelData)}
     ${ventilationRows ? `<h2>Ventilatie (hoofdstuk 11)</h2><table><thead><tr><th>Zone</th><th>q<sub>V;ODA;req</sub> jan [m³/h]</th><th>Infiltratie jan [m³/h]</th>
       <th>H<sub>ve</sub> jan [W/K]</th><th>Ventilatoren [kWh/jr]</th><th>Vorstbeveiliging [kWh/jr]</th><th>Voorverwarming roosters [kWh/jr]</th></tr></thead>
