@@ -9,7 +9,8 @@ type Block = Record<string, unknown>;
 const OTHER_AUX = () => ({ electricallyConnectedDevices: null, nominalPowerKw: null, sourceReference: '' });
 
 /** Single space-heating generator kinds the form can create. */
-export const SPACE_GENERATOR_KINDS = ['gas_boiler', 'external_heat', 'heat_pump_forfait', 'electric_resistance', 'biomass', 'chp'] as const;
+export const SPACE_GENERATOR_KINDS = ['gas_boiler', 'external_heat', 'heat_pump_forfait', 'electric_resistance', 'biomass', 'chp',
+  'gas_heat_pump', 'heat_pump_annex_q', 'product_boiler', 'local_heater', 'forfait_heater'] as const;
 
 /** Table 9.31 class of a building CHP (method 2). */
 export function chpClassTemplate(): Block {
@@ -22,10 +23,7 @@ export function spaceGeneratorTemplate(kind: string, project?: IProject): Block 
     case 'external_heat':
       return { kind, supplierReference: '', qualityDeclarationPresent: false, auxiliary: OTHER_AUX() };
     case 'gas_boiler':
-      return { kind, boiler: {
-        generatorId: 'boiler', role: 'individual_main', location: null, kind: null, fuel: 'natural_gas',
-        averageDesignEmissionTemperatureC: null, emissionCircuit: null, equipmentReference: '',
-        locationReference: '', temperatureAndCircuitReference: '', pilotFlamePresent: false } };
+      return { kind, boiler: forfaitBoilerTemplate() };
     case 'electric_resistance':
       return { kind, equipmentReference: '', auxiliary: OTHER_AUX() };
     case 'biomass':
@@ -40,11 +38,104 @@ export function spaceGeneratorTemplate(kind: string, project?: IProject): Block 
     case 'gas_heat_pump':
       return { kind, table: 'residential_at_most25_kw', source: 'outdoor_air', designSupplyTemperatureC: null,
         sourceCorrectionFactor: null, auxiliary: OTHER_AUX(), equipmentReference: '' };
+    case 'heat_pump_annex_q':
+      return { kind, heatPump: annexQHeatPumpTemplate(), designSupplyTemperatureC: null, backup: null, regeneration: null,
+        equipmentReference: '' };
+    case 'product_boiler':
+      return { kind, boiler: productBoilerTemplate(), designTemperatureClass: null };
+    case 'local_heater':
+      return { kind, heater: localHeaterTemplate(), fuel: 'natural_gas' };
+    case 'forfait_heater':
+      return { kind, heaterKind: null, fuel: 'natural_gas', equipmentReference: '', pilotFlames: null, auxiliary: OTHER_AUX() };
     case 'multiple':
       return multipleGeneratorsTemplate(project);
     default:
       return null;
   }
+}
+
+/** One NEN-EN 14511/14825 measurement of annex Q (tables Q.11/Q.15). */
+export function annexQPointTemplate(): Block {
+  return { evaporatorInC: null, evaporatorOutC: null, condenserInC: null, condenserOutC: null, cop: null, heatingPowerKw: null };
+}
+
+/** Annex Q heat pump with product data; on/off until the part-load series are stated. */
+export function annexQHeatPumpTemplate(): Block {
+  return {
+    source: 'outdoor_air_water', outdoorAirFraction: null,
+    maximumPower: { condition1: annexQPointTemplate(), condition2: null, condition3: null, condition4: null },
+    modulation: { method: 'on_off' }, switchOff: {}, sourcePump: null, evaporatorInlet: null, testReportReference: '',
+  };
+}
+
+/** Table Q.15: the five part-load points of the low range (100/88/54/35/15 %). */
+export function annexQModulatingTemplate(): Block {
+  return { method: 'modulating', minimumPowerKw: null, lowRange: Array.from({ length: 5 }, annexQPointTemplate),
+    highRange: null, condenserPumpModulating: false, sourcePumpModulating: false };
+}
+
+/** Forfait gas boiler of table 9.25 as the annex Q backup (F_H;gen < 1). */
+export function forfaitBoilerTemplate(generatorId = 'boiler'): Block {
+  return {
+    generatorId, role: 'individual_main', location: null, kind: null, fuel: 'natural_gas',
+    averageDesignEmissionTemperatureC: null, emissionCircuit: null, equipmentReference: '',
+    locationReference: '', temperatureAndCircuitReference: '', pilotFlamePresent: false,
+  };
+}
+
+/** Annex M boiler with product values (efficiencies as fractions). */
+export function productBoilerTemplate(): Block {
+  return {
+    technology: null, fuel: 'natural_gas', placement: null, draught: null, control: null,
+    product: {
+      nominalPowerKw: null, intermediatePowerKw: null,
+      fullLoad: { method: 'single', efficiency: null, testTemperatureC: null },
+      partLoadEfficiency: null, partLoadTestTemperatureC: null,
+      standbyLossFactor: null, standbyTestTemperatureC: null,
+      auxiliaryStandbyW: null, auxiliaryIntermediateW: null, auxiliaryFullW: null, sourceReference: '',
+    },
+    equipmentReference: '',
+  };
+}
+
+/** Annex N heater; empty product values take the N.6 defaults where they exist. */
+export function localHeaterTemplate(): Block {
+  return {
+    heaterType: null, control: null, productionPeriod: null, condensing: false, pilotFlame: false,
+    ventilation: null, location: null, fan: null, envelopeInsulation: null, stoveKind: null, roomHeightM: null,
+    product: {}, sourceReference: '',
+  };
+}
+
+/** 8.3.4.2: crawlspace or unheated basement below a ground floor. */
+export function floorBelowTemplate(kind: 'crawlspace' | 'unheated_basement'): Block {
+  const common = { floorResistanceM2kPerW: null, depthClass: 'other', wallResistanceM2kPerW: null, wallUValueWPerM2k: null };
+  return kind === 'crawlspace'
+    ? { kind, ...common, ventilationOpeningM2PerM: null }
+    : { kind, ...common, volumeM3: null, airChangesPerHour: null };
+}
+
+/** Table D.1: one edge-insulation layer of a slab on ground. */
+export function edgeInsulationTemplate(): Block {
+  return { kind: 'horizontal', resistanceM2kPerW: null, thicknessM: null, sourceReference: '' };
+}
+
+/** BCRG product declaration table (interpolated by the kernel, not part of the project chain). */
+export function declaredHeatingTableTemplate(): Block {
+  return {
+    declarationId: '', declarationNormVersion: 'NTA 8800:2025+C1:2026', sourceReference: '', tableScope: '',
+    grossHeatDemandKwhPerYear: null, designSupplyTemperatureC: null, firstRowCoversLowerTemperatures: false,
+    rows: [declaredHeatingRowTemplate()],
+  };
+}
+
+export function declaredHeatingRowTemplate(): Block {
+  return { supplyTemperatureC: null, points: [declaredHeatingPointTemplate()] };
+}
+
+export function declaredHeatingPointTemplate(): Block {
+  return { grossHeatDemandKwhPerYear: null, generationEfficiency: null, preferredEnergyFraction: null,
+    auxiliaryElectricityKwhPerYear: null };
 }
 
 /** Annex V regeneration of an individual ground source (table V.1). */

@@ -9,6 +9,9 @@ import {
 import {
   CheckField, NumberField, read, SelectField, TextField, type Draft, type Path,
 } from './NtaFormFields';
+import {
+  AnnexQHeatPumpFields, BoilerForfaitFields, ForfaitHeaterFields, LocalHeaterFields, ProductBoilerFields,
+} from './NtaProductGenerators';
 
 // System inputs of the NTA form that share a base path: space-heating
 // generators (also nested in `multiple`), hot-water generators, solar water
@@ -40,7 +43,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
   const field = { draft, onChange: change };
   const at = (...rest: Path): Path => [...base, ...rest];
   const kind = read(draft, at('kind'));
-  const otherAux = ['external_heat', 'electric_resistance', 'biomass', 'chp', 'gas_heat_pump'].includes(String(kind));
+  const otherAux = ['external_heat', 'electric_resistance', 'biomass', 'chp', 'gas_heat_pump', 'forfait_heater'].includes(String(kind));
   return <>
     <label>{t('nta.form.generatorKind')}
       <select value={typeof kind === 'string' ? kind : ''} onChange={(event) => {
@@ -54,6 +57,10 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
         <option value="biomass">{t('nta.form.generator.biomass')}</option>
         <option value="chp">{t('nta.form.generator.chp')}</option>
         <option value="gas_heat_pump">{t('nta.form.generator.gasHeatPump')}</option>
+        <option value="heat_pump_annex_q">{t('nta.form.generator.annexQ')}</option>
+        <option value="product_boiler">{t('nta.form.generator.productBoiler')}</option>
+        <option value="local_heater">{t('nta.form.generator.localHeater')}</option>
+        <option value="forfait_heater">{t('nta.form.generator.forfaitHeater')}</option>
         {allowMultiple && <option value="multiple">{t('nta.form.generator.multiple')}</option>}
         {kind === 'hybrid_heat_pump' && <option value="hybrid_heat_pump">{t('nta.form.generator.hybrid')}</option>}
       </select>
@@ -95,19 +102,15 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <TextField {...field} path={at('auxiliary', 'sourceReference')} label={t('nta.form.auxSource')} />
       <p className="nta-form-note">{t('nta.form.distributionSystemNote')}</p>
     </>}
-    {kind === 'gas_boiler' && <>
-      <SelectField {...field} path={at('boiler', 'kind')} label={t('nta.form.boilerKind')} options={[
-        ['hr107', 'HR107'], ['hr104', 'HR104'], ['hr100', 'HR100'], ['vr', 'VR'], ['conventional', t('nta.form.boiler.conventional')]]} />
-      <SelectField {...field} path={at('boiler', 'location')} label={t('nta.form.boilerLocation')} options={[
-        ['inside_thermal_boundary', t('nta.form.boiler.inside')], ['outside_thermal_boundary', t('nta.form.boiler.outside')]]} />
-      <NumberField {...field} path={at('boiler', 'averageDesignEmissionTemperatureC')} label={t('nta.form.boilerTemperature')} />
-      <SelectField {...field} path={at('boiler', 'emissionCircuit')} label={t('nta.form.boilerCircuit')} options={[
-        ['direct', t('nta.form.boiler.direct')], ['mixing_with_return_limit', t('nta.form.boiler.mixingLimit')],
-        ['mixing_without_return_limit', t('nta.form.boiler.mixingNoLimit')]]} />
-      <TextField {...field} path={at('boiler', 'equipmentReference')} label={t('nta.form.boilerEquipmentSource')} />
-      <TextField {...field} path={at('boiler', 'locationReference')} label={t('nta.form.boilerLocationSource')} />
-      <TextField {...field} path={at('boiler', 'temperatureAndCircuitReference')} label={t('nta.form.boilerTemperatureSource')} />
+    {kind === 'gas_boiler' && <BoilerForfaitFields draft={draft} change={change} base={at('boiler')} />}
+    {kind === 'heat_pump_annex_q' && <>
+      <AnnexQHeatPumpFields draft={draft} change={change} base={base} />
+      {read(draft, at('heatPump', 'source')) === 'brine_water' &&
+        <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     </>}
+    {kind === 'product_boiler' && <ProductBoilerFields draft={draft} change={change} base={base} />}
+    {kind === 'local_heater' && <LocalHeaterFields draft={draft} change={change} base={base} />}
+    {kind === 'forfait_heater' && <ForfaitHeaterFields draft={draft} change={change} base={base} />}
     {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
     {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
