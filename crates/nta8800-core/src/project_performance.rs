@@ -691,6 +691,7 @@ fn derive_input(
                     obstruction: nta.window_solar.obstruction.clone(),
                     movable_shading: nta.window_solar.movable_shading.clone(),
                     dynamic: None,
+                    glazing: None,
                     source_reference: format!(
                         "project:window:{window_id}; {}",
                         nta.window_solar.source_reference
