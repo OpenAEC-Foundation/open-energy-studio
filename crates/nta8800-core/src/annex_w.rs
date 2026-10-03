@@ -60,6 +60,9 @@ impl BoosterClass {
 pub enum BoosterHeatSource {
     /// External heat supply (9.6.7, η 1,0, carrier `dh`).
     ExternalHeat,
+    /// The building's space-heating system of the chain: W.2 heat loads its
+    /// node as Q_W;BWP;si;in (9.4) and its own generator efficiency applies.
+    HeatingSystem,
     /// A collective generator in the building with its heating generation
     /// efficiency (chapter 9) and carrier.
     CollectiveGenerator {

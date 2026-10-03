@@ -1517,6 +1517,15 @@ export interface SpaceHeatingChainInput {
       testedPowerW?: number;
       sourceReference: string;
     };
+    /** 9.23 with tables 9.12/9.13: fans and controls of air heaters. */
+    airHeaters?: {
+      kind:
+        | { kind: 'direct'; radialFan?: boolean | null }
+        | { kind: 'indirect'; roomHeightAbove8M?: boolean | null; warmAirReturn?: boolean | null; ecMotor?: boolean | null };
+      /** Q_h;b per EN 12831-1, W; absent means the table 9.12 estimate. */
+      designHeatLoadW?: number | null;
+      sourceReference: string;
+    };
   };
   distribution:
     | { method: 'heated_zone_only_space_heating'; sourceReference: string }
@@ -1526,6 +1535,8 @@ export interface SpaceHeatingChainInput {
   distributionSystem?: NtaDistributionSystem | null;
   /** Part of a building on a collective installation (`f_gebouw;si;H`). */
   collectiveConnection?: { connectedUsableAreaM2: number; sourceReference: string } | null;
+  /** §9.1: number of identical physical generators modelled as one system. */
+  identicalSystems?: number | null;
   generator:
     | {
         kind: 'gas_boiler';
@@ -1539,8 +1550,20 @@ export interface SpaceHeatingChainInput {
         forfait: ForfaitHeatPumpDraftInput;
         sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
         sourceSystemReference: string;
+        /** Annex V regeneration: c_source of table 9.27 footnote a from table V.1. */
+        regeneration?: { freeCoolingFromSource?: boolean; solar?: Array<Record<string, unknown>>; sourceReference: string } | null;
         auxiliaryMeasurements?: Record<string, unknown> | null;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
+      }
+    | {
+        /** Gas-engine or gas-absorption heat pump, tables 9.27/9.29 (≤ 55 °C). */
+        kind: 'gas_heat_pump';
+        table: 'residential_at_most25_kw' | 'utility_collective_or_above25_kw';
+        source: 'ground' | 'groundwater' | 'outdoor_air' | 'exhaust_air' | 'surface_water';
+        designSupplyTemperatureC: number;
+        sourceCorrectionFactor?: number | null;
+        auxiliary?: NtaOtherGeneratorAuxiliary | null;
+        equipmentReference: string;
       }
     | {
         kind: 'hybrid_heat_pump';
@@ -1811,6 +1834,8 @@ export interface NtaBoosterHeatPump {
   coolingExtractionKwh?: number[] | null;
   heatSource:
     | { kind: 'external_heat' }
+    /** 9.4: the W.2 heat loads the node of the building's space-heating chain. */
+    | { kind: 'heating_system' }
     | { kind: 'collective_generator'; generationEfficiency: number; carrier: 'gas' | 'oil' | 'electricity'; sourceReference: string };
   testReportReference: string;
 }
@@ -1872,6 +1897,8 @@ export interface NtaDistributionSystem {
   actualPipeLengthM?: number | null;
   unheatedPipeLengthM?: number | null;
   unheatedAmbientC?: number[] | null;
+  /** b_U of the unheated space with the pipes: ϑ_ztu per 7.82 when no ϑ_ztu is entered. */
+  unheatedReductionFactor?: number | null;
   bufferVessel?: {
     volumeL: number;
     standingLossW?: number | null;
@@ -2820,6 +2847,8 @@ export type NtaAnnexPRoute =
       renewableFactor: number;
       co2KgPerKwh: number;
       declarationReference: string;
+      /** Measured values only: f_prac 1 (9.84, 13.152, 10.78); otherwise 0,95. */
+      measuredOnly?: boolean;
     }
   | {
       method: 'calculated';
@@ -3555,6 +3584,7 @@ export interface NtaCalculationInput {
   generator: SpaceHeatingChainInput['generator'];
   distributionSystem?: NtaDistributionSystem | null;
   collectiveConnection?: SpaceHeatingChainInput['collectiveConnection'];
+  identicalSystems?: number | null;
   heatPumpRenewable?: BuildingPerformanceInput['heatPumpRenewable'];
   bacsFactor: 1 | 1.05;
   bacsSourceReference: string;

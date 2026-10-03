@@ -77,6 +77,9 @@ pub struct NtaCalculationInput {
     /// §9.4 hydraulic data; see `SpaceHeatingChainInput`.
     #[serde(default)]
     pub distribution_system: Option<DistributionSystem>,
+    /// §9.1: number of identical physical generators the system models.
+    #[serde(default)]
+    pub identical_systems: Option<u32>,
     #[serde(default)]
     pub collective_connection: Option<CollectiveConnection>,
     #[serde(default)]
@@ -400,6 +403,25 @@ fn orientation(value: &str) -> Option<Option<Orientation>> {
         "horizontal" => None,
         _ => return None,
     })
+}
+
+/// 7.82: with exactly one unheated space in the project, its declared or
+/// derived `b_U` sets ϑ_ztu of the pipes and vessels there, unless the
+/// distribution system gives ϑ_ztu or `b_U` itself.
+fn with_unheated_reduction(
+    system: Option<crate::space_heating_chain::DistributionSystem>,
+    project: &ProjectInput,
+) -> Option<crate::space_heating_chain::DistributionSystem> {
+    let mut system = system?;
+    if system.unheated_ambient_c.is_none()
+        && system.unheated_reduction_factor.is_none()
+        && project.unheated_spaces.len() == 1
+    {
+        system.unheated_reduction_factor = crate::unheated_project_input(project)
+            .map(|input| crate::unheated_transmission::assess_unheated_transmission(&input))
+            .and_then(|assessed| assessed.spaces.first().map(|space| space.reduction_factor));
+    }
+    Some(system)
 }
 
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
@@ -833,8 +855,9 @@ fn derive_input(
             distribution: primary.distribution,
             additional_zones: zones,
             generator: nta.generator,
-            distribution_system: nta.distribution_system,
+            distribution_system: with_unheated_reduction(nta.distribution_system, &project),
             collective_connection: nta.collective_connection,
+            identical_systems: nta.identical_systems,
         },
         heat_pump_renewable: nta.heat_pump_renewable,
         bacs_factor,

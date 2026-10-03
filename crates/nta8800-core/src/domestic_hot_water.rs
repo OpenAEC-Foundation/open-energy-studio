@@ -1407,6 +1407,7 @@ impl HotWaterGenerator {
             HotWaterGenerator::ExternalHeat => HotWaterCarrier::DistrictHeat,
             HotWaterGenerator::BoosterHeatPump(pump) => match &pump.heat_source {
                 BoosterHeatSource::ExternalHeat => HotWaterCarrier::DistrictHeat,
+                BoosterHeatSource::HeatingSystem => HotWaterGenerator::HeatingSystem.carrier(),
                 BoosterHeatSource::CollectiveGenerator { carrier, .. } => {
                     HotWaterCarrier::Fuel(match carrier {
                         BoosterSourceCarrier::Gas => Carrier::Gas,
@@ -2718,8 +2719,9 @@ fn book_generator(
     // electricity (W.1) is auxiliary energy.
     if let HotWaterGenerator::BoosterHeatPump(pump) = generator {
         let booster = calculate_booster(pump, outputs);
+        let from_heating_system = matches!(pump.heat_source, BoosterHeatSource::HeatingSystem);
         let source_efficiency = match &pump.heat_source {
-            BoosterHeatSource::ExternalHeat => 1.0,
+            BoosterHeatSource::ExternalHeat | BoosterHeatSource::HeatingSystem => 1.0,
             BoosterHeatSource::CollectiveGenerator {
                 generation_efficiency,
                 ..
@@ -2734,7 +2736,14 @@ fn book_generator(
                 booking.recoverable[index] +=
                     crate::significant_figures::round_down(month.standing_loss_heat_kwh);
             }
-            booking.input[index] = month.heating_system_heat_kwh / source_efficiency;
+            if from_heating_system {
+                // 9.4: Q_W;BWP;si;in = E_W;gen;in;prac;BWP loads the
+                // space-heating node; the heating generator supplies it.
+                booking.input[index] = 0.0;
+                booking.heating_system[index] += month.heating_system_heat_kwh;
+            } else {
+                booking.input[index] = month.heating_system_heat_kwh / source_efficiency;
+            }
             booking.efficiency_input[index] = month.heating_system_heat_kwh + month.electricity_kwh;
             booking.auxiliary[index] += month.electricity_kwh;
             booking.ambient[index] = 0.0;
@@ -3958,6 +3967,16 @@ mod tests {
         let loss = crate::significant_figures::round_down(booster[0].standing_loss_heat_kwh);
         assert!(loss > 0.0);
         assert!(jan.recoverable_loss_kwh >= loss - 1e-9);
+        // 9.4: from the building's heating system the W.2 heat loads the
+        // space-heating node instead of a carrier.
+        let mut node = pump.clone();
+        node.heat_source = BoosterHeatSource::HeatingSystem;
+        let input = system(HotWaterGenerator::BoosterHeatPump(Box::new(node)));
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert_eq!(jan.carrier_input_kwh, 0.0);
+        assert!((jan.heating_system_load_kwh - booster[0].heating_system_heat_kwh).abs() < 1e-9);
+        assert!(jan.auxiliary_electricity_kwh >= booster[0].electricity_kwh);
     }
 
     #[test]
