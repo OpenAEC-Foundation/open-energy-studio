@@ -547,7 +547,7 @@ pub fn derive_residential_input(
     }
     // ISSO 82.1 chapter 10: the main cooling system of the zone.
     if let Some(cooling) = &survey.cooling {
-        input["cooling"] = utility::cooling_value(
+        let mut value = utility::cooling_value(
             cooling,
             year,
             storeys,
@@ -555,6 +555,14 @@ pub fn derive_residential_input(
             !survey.cooling_collective,
             recorder,
         );
+        utility::apply_cooling_heat_pump_source(
+            &mut value,
+            cooling,
+            &input["spaceHeating"]["generator"],
+            utility::CoolingBook::Residential,
+            recorder,
+        );
+        input["cooling"] = value;
     }
     Some(input)
 }
