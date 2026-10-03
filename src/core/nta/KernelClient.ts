@@ -2890,26 +2890,178 @@ export type NtaTableP5Source =
   | 'electric_surface_water' | 'electric_source15_to20_c' | 'electric_source20_to40_c'
   | 'electric_source_at_least40_c' | 'gas_ground_or_outdoor_air' | 'gas_groundwater' | 'gas_surface_water';
 
+export type NtaHeatPumpEfficiency =
+  | { method: 'declared'; value: number; sourceReference: string }
+  | { method: 'table_p5'; source: NtaTableP5Source; supplyTemperatureC: number };
+
+export type NtaTemperatureLevel = 'low' | 'high';
+
+/** Table P.6: CHP conversion numbers by electrical power and build year. */
+export interface NtaTableP6 {
+  electricalPowerKw: number;
+  installedAfter2006: boolean;
+  /** Table P.4; absent means HT. */
+  temperatureLevel?: NtaTemperatureLevel;
+}
+
+type NtaSolarCalculatedMethod = Extract<NtaSolarWaterHeater['method'], { method: 'calculated' }>;
+
 export type NtaAnnexPGenerator =
   | { kind: 'combustion'; carrier: NtaAnnexPCarrier; efficiency: number; efficiencyReference: string }
-  | {
-      kind: 'heat_pump';
-      efficiency:
-        | { method: 'declared'; value: number; sourceReference: string }
-        | { method: 'table_p5'; source: NtaTableP5Source; supplyTemperatureC: number };
-      drive: NtaAnnexPCarrier;
-    }
+  | { kind: 'heat_pump'; efficiency: NtaHeatPumpEfficiency; drive: NtaAnnexPCarrier }
   | {
       kind: 'chp_without_loss';
       carrier: NtaAnnexPCarrier;
-      thermalEfficiency: number;
-      electricalEfficiency: number;
-      efficiencyReference: string;
+      /** Declared values override table P.6. */
+      thermalEfficiency?: number;
+      electricalEfficiency?: number;
+      efficiencyReference?: string;
+      tableP6?: NtaTableP6;
     }
   | { kind: 'chp_with_loss'; carrier: NtaAnnexPCarrier; lossRatio?: number; lossRatioReference?: string }
   | { kind: 'residual_heat'; auxiliarySpecific?: number; auxiliaryReference?: string }
   | { kind: 'geothermal'; sourceTemperatureC: number; returnTemperatureC: number }
-  | { kind: 'declared'; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; sourceReference: string };
+  | { kind: 'declared'; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; sourceReference: string }
+  /** P.6.5.4.2/P.6.6.5.2 with tables P.3/P.4. */
+  | {
+      kind: 'boiler';
+      carrier: NtaAnnexPCarrier;
+      efficiency:
+        | {
+            method: 'table_p3';
+            boiler: 'conventional' | 'vr' | 'hr100' | 'hr104' | 'hr107';
+            temperatureLevel?: NtaTemperatureLevel;
+            emission?: {
+              averageDesignTemperatureC: number;
+              system: 'mixing_without_return_limit' | 'mixing_with_return_limit' | 'direct';
+            };
+          }
+        | { method: 'full_load'; value: number; outdoorInstallation?: boolean; sourceReference: string };
+    }
+  /** P.6.5.4.3: net efficiency per NEN-EN 303-5. */
+  | { kind: 'solid_biomass_boiler'; carrier: NtaAnnexPCarrier; netEfficiency: number; sourceReference: string }
+  /** P.6.5.4.10: always preferred, F = ΣQ_sol;mi / Q_in;tot. */
+  | {
+      kind: 'collective_solar';
+      contribution:
+        | { method: 'declared'; monthlyKwh?: number[]; annualKwh?: number; sourceReference: string }
+        | {
+            method: 'calculated';
+            solarType: 'preheater' | 'integrated_backup';
+            collectors: NtaSolarCalculatedMethod['collectors'];
+            storage: NtaSolarCalculatedMethod['storage'];
+            networkSupplyC: number;
+            networkReturnC: number;
+            storageAmbientC: number;
+          };
+    }
+  /** P.6.5.4.11 with tables 5.5/5.6; the thermal power is the generator's `nominalPowerKw`. */
+  | {
+      kind: 'electric_flex';
+      generator:
+        | { kind: 'electrode_boiler'; efficiency?: number; efficiencyReference?: string }
+        | { kind: 'heat_pump'; efficiency: NtaHeatPumpEfficiency };
+      flexHeatKwh?: number;
+      flexReference?: string;
+      connections: number;
+      heatBuffer: boolean;
+      registrationReference: string;
+    }
+  /** Table P.9. */
+  | {
+      kind: 'compression_chiller';
+      variant:
+        | 'unspecified' | 'high_temperature_emission' | 'wet_cooling'
+        | 'high_temperature_emission_and_wet_cooling' | 'low_temperature_source'
+        | 'high_temperature_emission_and_low_temperature_source';
+      drive: NtaAnnexPCarrier;
+      engineEfficiency?:
+        | { method: 'declared'; value: number; sourceReference: string }
+        | ({ method: 'table_p6' } & NtaTableP6);
+    }
+  | {
+      kind: 'free_cooling';
+      source:
+        | 'aquifer_storage_before2013' | 'aquifer_storage_from2013' | 'aquifer_recirculation'
+        | 'aquifer_without_heat_use' | 'other_low_temperature_source';
+      drive: NtaAnnexPCarrier;
+    }
+  /** Table P.10. */
+  | {
+      kind: 'sorption_chiller';
+      heat:
+        | { source: 'collective_heat'; primaryFactor: number; co2KgPerKwh: number; sourceReference: string }
+        | {
+            source: 'chp';
+            carrier: NtaAnnexPCarrier;
+            thermalEfficiency?: number;
+            electricalEfficiency?: number;
+            efficiencyReference?: string;
+            tableP6?: NtaTableP6;
+          };
+    };
+
+export interface NtaAnnexPSystemGenerator {
+  id: string;
+  /** Absent for all generators: derived per P.6.5.3/P.6.6.3/P.6.7.3. */
+  energyFraction?: number;
+  /** Nominal thermal (cold: cooling) power, kW. */
+  nominalPowerKw?: number;
+  /** Cold: P.53/P.55. */
+  coolingPower?:
+    | { method: 'compressor_shaft'; shaftPowerKw: number }
+    | { method: 'aquifer'; flowM3PerS: number; supplyC: number; returnC: number };
+  /** Fixed order of preference, 1 first. */
+  priority?: number;
+  auxiliary?: {
+    standbyW?: number;
+    burnerWPerKw?: number;
+    sourceWPerKw?: number;
+    solutionPumpWPerKw?: number;
+    heatRejection?: 'closed_cooling_tower' | 'open_cooling_tower' | 'dry_cooler';
+    heatRejectionWPerKw?: number;
+    sourceReference?: string;
+  };
+  kind: NtaAnnexPGenerator;
+}
+
+export interface NtaAnnexPPlotFlow {
+  annualKwh?: number;
+  monthlyKwh?: number[];
+}
+
+/** P.8: one connected plot; supplied flows override the forfait tables P.14/P.15. */
+export interface NtaAnnexPPlot {
+  id: string;
+  usableAreaM2?: number;
+  heating?: NtaAnnexPPlotFlow;
+  heatingForfait?: 'apartment' | 'terraced_or_utility' | 'corner_or_semi_detached' | 'detached';
+  sorptionCooling?: NtaAnnexPPlotFlow;
+  hotWater?: NtaAnnexPPlotFlow;
+  hotWaterForfait?:
+    | 'dwelling_low_temperature' | 'dwelling_high_temperature' | 'assembly_with_alcohol' | 'assembly'
+    | 'cell' | 'healthcare_clinical' | 'healthcare_non_clinical' | 'office' | 'lodging' | 'education'
+    | 'sport' | 'retail';
+  hotWaterViaDeliverySet?: boolean;
+  cooling?: NtaAnnexPPlotFlow;
+  dehumidification?: NtaAnnexPPlotFlow;
+  sourceReference: string;
+}
+
+export type NtaPipeAmbient = { kind: 'outdoor' } | { kind: 'crawlspace' } | { kind: 'indoor'; temperatureC: number };
+
+/** P.43/P.44 vessel or buffer. */
+export interface NtaStorageVessel {
+  volumeL?: number;
+  surfaceM2?: number;
+  diameterAtLeast50Cm?: boolean;
+  insulation?: 'none' | 'at_least10_mm' | 'at_least20_mm' | 'at_least30_mm';
+  lossFactorWPerM2k?: number;
+  standbyLossKwhPerDay?: number;
+  standbyTestDifferenceK?: number;
+  waterTemperatureC?: number;
+  ambientTemperatureC?: number;
+}
 
 export type NtaAnnexPFunction = 'heating' | 'hot_water' | 'cooling';
 
@@ -2927,7 +3079,10 @@ export type NtaAnnexPRoute =
   | {
       method: 'calculated';
       function: NtaAnnexPFunction;
-      deliveredKwh: number;
+      /** Q_XD;out;tot; overrides `areaDemand`. */
+      deliveredKwh?: number;
+      /** P.72–P.83. */
+      areaDemand?: { plots: NtaAnnexPPlot[] };
       distribution:
         | { method: 'flows'; inputKwh?: number; lossKwh?: number; sourceReference: string }
         | {
@@ -2937,14 +3092,70 @@ export type NtaAnnexPRoute =
             designTemperature?: 't90_to60' | 't90_to50' | 't70_to40' | 't50_to40' | 't35_to25';
             otherLossKwh?: number;
           }
-        | { method: 'small_cold_forfait'; supplyBelow10C: boolean };
-      generators: Array<{ id: string; energyFraction: number; kind: NtaAnnexPGenerator }>;
-      auxiliaryElectricityKwh: number;
+        | { method: 'small_cold_forfait'; supplyBelow10C: boolean }
+        /** P.13–P.18 with tables P.1 and P.16. */
+        | {
+            method: 'pipes';
+            segments: Array<{
+              lengthM: number;
+              layers?: Array<{ conductivityWPerMk: number; innerDiameterM: number; outerDiameterM: number }>;
+              placement:
+                | { kind: 'buried'; coverDepthM: number; groundConductivity?: number; ambient: NtaPipeAmbient }
+                | { kind: 'in_air'; ambient: NtaPipeAmbient; surfaceCoefficient?: number };
+              correction?:
+                | 'two_pipes_in_trench' | 'two_pipes_in_trench_rigid' | 'old_sliding_system'
+                | 'surface_or_recessed' | 'single_pipe_in_trench';
+              correctionFactor?: number;
+              resistanceKmPerW?: number;
+            }>;
+            /** Absent for hot water: 65 °C. */
+            waterTemperature?:
+              | { method: 'constant'; temperatureC: number }
+              | { method: 'monthly'; temperaturesC: Array<number | null> }
+              | { method: 'outdoor_bins'; curve: Array<{ outdoorC: number; waterC: number }>; offAboveOutdoorC?: number };
+            buffers?: NtaStorageVessel[];
+            /** Cold: required; the loss is 0 at 10 °C or more. */
+            supplyBelow10C?: boolean;
+            otherLossKwh?: number;
+            sourceReference: string;
+          };
+      generators: NtaAnnexPSystemGenerator[];
+      /** P.25 from historical peaks, kW. */
+      referencePowerKw?: number;
+      /** W_XD;aux;tot; overrides `auxiliary`. */
+      auxiliaryElectricityKwh?: number;
+      /** P.56–P.70. */
+      auxiliary?: {
+        distribution:
+          | { method: 'pumps'; pumpPowersW: number[]; operatingHours?: number; sourceReference: string }
+          | { method: 'pumps_monthly'; pumpPowersW: number[]; sourceReference: string }
+          | {
+              method: 'forfait';
+              network?: 'primary_and_secondary' | 'primary' | 'secondary' | 'small_system';
+              farthestDistanceKm?: number;
+            };
+        solarKwh?: number;
+      };
       auxiliaryRenewableShare?: number;
       /** P.34/P.35 η_WD;gen;sto; required for hot water (WD). */
       hotWaterStorage?:
         | { method: 'losses'; storageLossKwh: number; pipeLossKwh: number; sourceReference: string }
-        | { method: 'forfait'; insulation: 'at_least20_mm' | 'at_least10_mm' | 'none' };
+        | { method: 'forfait'; insulation: 'at_least20_mm' | 'at_least10_mm' | 'none' }
+        | {
+            method: 'calculated';
+            vessels?: NtaStorageVessel[];
+            pipes?: Array<{
+              lengthM: number;
+              uValueWPerMk?: number;
+              outerDiameterMm?: number;
+              insulationMm?: number;
+              ambientTemperatureC?: number;
+            }>;
+            exchanger?: { nominalPowerKw: number; insulated?: boolean; specificLossWPerKw?: number };
+            circulationTemperatureC?: number;
+            correctionFactor?: number;
+            sourceReference: string;
+          };
       sourceReference: string;
     }
   | {
@@ -2966,6 +3177,11 @@ export interface NtaExternalSupply {
     supplierReference: string;
     annexP?: NtaAnnexPRoute | null;
   } | null;
+  /** P.7/P.71: electricity produced in the area with a direct physical connection. */
+  areaElectricity?: Array<
+    | ({ kind: 'pv' } & NonNullable<BuildingPerformanceInput['pvSystems']>[number])
+    | { kind: 'declared'; id: string; annualKwh: number; sourceReference: string }
+  >;
 }
 
 export interface NtaSupplyFactors {
@@ -2986,7 +3202,29 @@ export interface NtaAnnexPSystemResult {
   distributionEfficiency: number | null;
   generationPrimaryFactor: number | null;
   storageEfficiency?: number;
-  generators: Array<{ id: string; primaryFactor: number; co2KgPerKwh: number; renewableFactor: number; heatKwh: number }>;
+  generators: Array<{
+    id: string;
+    primaryFactor: number;
+    co2KgPerKwh: number;
+    renewableFactor: number;
+    heatKwh: number;
+    energyFraction?: number;
+    efficiency?: number;
+    auxiliaryKwh?: number;
+  }>;
+  /** Intermediate values of the calculated route. */
+  calculation?: {
+    deliveredKwh: number;
+    inputKwh: number;
+    distributionLossKwh: number;
+    monthlyInputKwh: number[];
+    auxiliaryElectricityKwh: number;
+    auxiliary?: { distributionKwh: number; solarKwh: number; generatorsKwh: number; totalKwh: number };
+    beta?: number;
+    referencePowerKw?: number;
+    preferred: string[];
+    fractionsDerived: boolean;
+  };
 }
 
 export interface NtaExternalSupplyResult {
@@ -2997,6 +3235,8 @@ export interface NtaExternalSupplyResult {
   hotWater: NtaAnnexPSystemResult | null;
   cooling: NtaAnnexPSystemResult | null;
   heatPumpSource: NtaAnnexPSystemResult | null;
+  /** P.71. */
+  areaElectricity?: { totalKwh: number; generators: Array<{ id: string; annualKwh: number }> } | null;
   forfaitPrimaryFossilKwh: number | null;
   forfaitRenewablePrimaryKwh: number | null;
   forfaitCo2Kg: number | null;
