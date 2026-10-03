@@ -767,6 +767,7 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 | Manifestvingerafdruk via gebouwde API/MCP | Gebouwde API houdt projecthash gelijk en wijzigt manifesthash bij gewijzigde verwachte waarde; MCP-handshake en `audit_reference_case` tonen `manifestFingerprint` en `referenceVerified=false` | Hash maakt een case herkenbaar, maar verifieert bron, rechten, normtoepassing of verwachte waarde niet |
 | Desktop-devbuild | Linux `.deb` gebouwd; pakketomschrijving benoemt de experimentele invoeraudit | Debugpakket; geen releasecertificaat |
 | Vernieuwde desktop-devbuild `fc5a8a5` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-03-fc5a8a5.md): schone tweede bouw, 703 kerntests, 53 servicetests en 10 gerichte frontendtests groen; SHA-256 en pakketmetadata vastgelegd | Debugpakket; geen visuele acceptatie, onafhankelijke actuele EDR-toets of attest |
+| Vernieuwde desktop-devbuild `e811eb3` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-03-e811eb3.md): 747 kerntests, 53 servicetests en 380 frontendtests groen; TypeScript, Vite en Linux `.deb` gebouwd; pakketmetadata en SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
 | Visuele UI-controle | Niet uitgevoerd | Browsertoegang tot `127.0.0.1:3006` door opgeslagen gebruikersinstelling geblokkeerd; deze blokkade is niet omzeild |
 | NTA-invoereditor bij projectwissel | Het prestatiepaneel sluit zowel het formulier als de JSON-editor bij een andere project-ID en wist de oude concepttekst. Gerichte componenttest: 7/7 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole; de Rust-kern valideert de opgeslagen invoer pas bij de volgende berekening. |
 | Zijbalk met indicatief label bij projectwissel | De respons draagt de projectreferentie van de aanvraag; een oudere BENG-/labeluitkomst wordt bij een gewijzigde projectreferentie direct verborgen. Gerichte previewtests: 5/5 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of onafhankelijke toets van de energie-uitkomst. |
@@ -788,6 +789,8 @@ De voor het formele dossier benodigde tests, versiegegevens, registratie en kwal
 ## Lokaal reproduceren
 
 Op 3 oktober is de integratiecontrole gestart op `02fafc5`: 735 kerntests, 53 servicetests, beide Rust-formatcontroles en de frontend-build slaagden. Tijdens de volledige frontendtestrun werd de relabel-wijziging `b7c08b7` in dezelfde werkboom gemerged. Die run eindigde met 367/369 geslaagde tests; de twee relabel-fouten betroffen een tussentoestand van de bestanden tijdens de run. De twee betrokken testbestanden zijn daarna op `b7c08b7` opnieuw uitgevoerd en slaagden met 10/10 tests. Een volledige frontendtestrun op een stilstaande versie blijft nodig voor een nieuwe volledige integratievrijgave.
+
+Die volledige integratiecontrole is vervolgens op de stilstaande commit `e811eb3` uitgevoerd: 747 Rust-kerntests, 53 servicetests, 380 frontendtests en de TypeScript-/Vite-build slaagden; ook de Linux-debugbuild slaagde. Dit vervangt de open interne testgrens hierboven, maar niet de onafhankelijke actuele referentietoets of externe attestering.
 
 ```bash
 cargo test --manifest-path crates/nta8800-core/Cargo.toml

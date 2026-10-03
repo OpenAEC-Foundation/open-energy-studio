@@ -16,6 +16,8 @@ De Rust-invoeraudit toont op dezelfde manier alleen een beoordeling voor de proj
 
 De [debug-desktopbuild van commit `fc5a8a5`](nta8800-build-verificatie-2026-10-03-fc5a8a5.md) bundelt de Rust-kern en NTA-interface van die commit. De build en de genoemde tests zijn technisch geslaagd; de referentie- en attestkolommen hieronder worden daardoor niet automatisch vrijgegeven.
 
+De nieuwere [debug-desktopbuild van commit `e811eb3`](nta8800-build-verificatie-2026-10-03-e811eb3.md) is eveneens gebouwd en als afzonderlijk bestand met SHA-256 bewaard. Op dezelfde stilstaande commit slaagden 747 Rust-kerntests, 53 servicetests, 380 frontendtests en de TypeScript-/Vite-build. De verificatiegrenzen blijven dezelfde.
+
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
 
 Een latere controle vanaf `02fafc5` gaf 735 groene kerntests, 53 groene servicetests, geslaagde Rust-formatcontroles en een geslaagde frontend-build. De volledige frontendrun overlapte een relabel-merge en is daarom geen vrijgave voor de nieuwe stand; de twee betrokken testbestanden zijn na de merge opnieuw uitgevoerd (10/10 groen). De precieze testgrens staat in de [verificatiestatus](nta8800-verificatiestatus.md).
