@@ -976,3 +976,16 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 - Bij θ_int;set;C = θ_e;avg of Q_C;ht = 0 is H_C;ht niet gedefinieerd; de uitvoer is dan `null`.
 
 **Correctie Q.6.** Bij een modulerende warmtepomp met een modulerende bronpomp is het bronpompvermogen (P_pl/P_max)³·P_nom (gerenderde p. 1030). De code rekende lineair, met P_pl/P_max·P_nom. Bij deellast 0,5 telde de bronpompenergie daardoor 4× te hoog mee.
+
+## Warmtepompen per verwarmingssysteem (5.20/5.31, 10.84, bijlage V)
+
+Bij meerdere verwarmingssystemen (§9.2) rekent de kern de warmtepompposten per systeem, met het eigen COP van dat systeem.
+- **5.20 en 5.31:** de onttrekking Q·(1 − 1/COP) telt per systeem. Bij een collectieve bron telt ze als Q_HD;hp;in;bron (9.6.8.1.1.2.3), anders als omgevingswarmte (5.31).
+- **COP-grens:** de grens COP ≥ 1 geldt per systeem. Een systeem met warmtepompoutput maar zonder COP draagt niets bij.
+- **10.84:** de onttrekking aan de bodemopslag is Σ(Q_H;gen;out − E_H;gen;in), alleen van warmtepompen met de bodemopslag (WKO) als bron. Dat zijn bodem, grondwater, een collectieve bodembron, bijlage Q brine/water of water/water, en gasbodem.
+- **Bijlage V:** de regeneratie gebruikt alleen de output en het COP van het geregenereerde hoofdsysteem.
+- **Labelgegevens:** `heatingGenerators` noemt de opwekkers van alle systemen.
+
+**Woonboot.** Tabel I.7 geldt voor de hele uitwendige scheidingsconstructie van het drijflichaam. Daarom mogen ook de zijkanten onder de waterlijn de grens `water` krijgen; die rekenen met R_si 0,13. Een woonboot van vóór 1965 krijgt voor de romp de eerste klasse van tabel I.7 (0,17). Tabel I.4 heeft geen romprij; dit is een interpretatie.
+
+**Combiketel.** De begrenzing tot 40 % van het maximale vermogen (p. 323) mag worden toegepast, maar hoeft niet. De gebruiker geeft het nominale vermogen dus zelf op; de kern dwingt de begrenzing niet af.

@@ -38,8 +38,10 @@ pub struct EnvelopeSummary {
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallationSummary {
-    /// Kind of the space-heating generator (kernel tag).
+    /// Kind of the space-heating generator (kernel tag) of the main system.
     pub heating_generator: Option<String>,
+    /// §9.2: generator kinds of every heating system, main system first.
+    pub heating_generators: Vec<String>,
     pub hot_water_generator: Option<String>,
     /// Ventilation system variant per zone (table 11.5).
     pub ventilation_systems: Vec<String>,
@@ -234,6 +236,11 @@ pub fn installation_summary(input: &BuildingPerformanceInput) -> InstallationSum
     let demands = input.zone_inputs().into_iter();
     InstallationSummary {
         heating_generator: tag(&input.space_heating.generator),
+        heating_generators: input
+            .heating_systems()
+            .into_iter()
+            .filter_map(|system| tag(&system.generator))
+            .collect(),
         hot_water_generator: input
             .hot_water
             .as_ref()

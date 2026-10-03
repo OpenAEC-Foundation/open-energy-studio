@@ -1088,6 +1088,10 @@ pub struct SpaceHeatingChainAssessment {
     pub zone_recoverable_losses: Vec<ZoneRecoverableLoss>,
     /// Annex Q (and annex V) details of an annex Q heat pump.
     pub annex_q: Option<AnnexQOutput>,
+    /// Heat pumps per heating system (§9.2), filled by the building
+    /// performance for the per-system 5.20/5.31 split and 10.84.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heat_pump_systems: Vec<SystemHeatPump>,
     pub demand: MonthlyDemandAssessment,
     pub additional_zone_demands: Vec<MonthlyDemandAssessment>,
     pub issues: Vec<ChainIssue>,
@@ -1142,6 +1146,83 @@ impl ChainMonth {
 /// generation efficiency becomes the heat-pump weighted COP
 /// Σ Q_hp / Σ (Q_hp / COP_si), so that 5.30/5.31 ambient heat equals the sum
 /// over the systems.
+/// One heating system's heat pump for the per-system booking of 5.20/5.31
+/// (collective source or ambient heat, COP >= 1 per system) and the 10.84
+/// extraction from the ground storage.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemHeatPump {
+    pub heat_pump_output_kwh: Vec<f64>,
+    pub generator_electricity_kwh: Vec<f64>,
+    /// The system's heat-pump COP; `None` books no ambient or source heat.
+    pub generation_efficiency: Option<f64>,
+    /// 9.6.8.1.1.2.3: a collective heat-pump source (Q_HD;hp;in;bron).
+    pub collective_source: bool,
+    /// 10.84: the heat pump uses a ground storage (WKO) as source.
+    pub ground_storage_source: bool,
+}
+
+/// The heat pump of one heating system, `None` without one.
+pub fn system_heat_pump(
+    generator: &Generator,
+    assessment: &SpaceHeatingChainAssessment,
+) -> Option<SystemHeatPump> {
+    use crate::forfait_heat_pump_draft::TableSource;
+    let gas_ground = |gas: &GasHeatPumpGenerator| {
+        matches!(
+            gas.source,
+            GasHeatPumpSource::Ground | GasHeatPumpSource::Groundwater
+        )
+    };
+    let (collective_source, ground_storage_source) =
+        if let Some((forfait, system)) = generator.heat_pump() {
+            (
+                system != SourceSystem::Individual,
+                matches!(system, SourceSystem::CollectiveGround)
+                    || matches!(
+                        forfait.source,
+                        TableSource::Ground
+                            | TableSource::GroundOrGroundwaterUnknown
+                            | TableSource::GroundwaterBelow15C
+                    ),
+            )
+        } else if let Some(annex_q) = generator.annex_q() {
+            (
+                false,
+                matches!(
+                    annex_q.heat_pump.source,
+                    AnnexQSource::BrineWater | AnnexQSource::WaterWater
+                ),
+            )
+        } else if generator.has_gas_heat_pump() {
+            let ground = match generator {
+                Generator::GasHeatPump(gas) => gas_ground(gas),
+                Generator::Multiple(set) => set.generators.iter().any(|part| {
+                    matches!(&part.generator, Generator::GasHeatPump(gas) if gas_ground(gas))
+                }),
+                _ => false,
+            };
+            (false, ground)
+        } else {
+            return None;
+        };
+    Some(SystemHeatPump {
+        heat_pump_output_kwh: assessment
+            .monthly
+            .iter()
+            .map(|row| row.heat_pump_output_kwh)
+            .collect(),
+        generator_electricity_kwh: assessment
+            .monthly
+            .iter()
+            .map(|row| row.generator_electricity_kwh)
+            .collect(),
+        generation_efficiency: assessment.generation_efficiency,
+        collective_source,
+        ground_storage_source,
+    })
+}
+
 pub fn combine_heating_systems(
     mut main: SpaceHeatingChainAssessment,
     others: Vec<SpaceHeatingChainAssessment>,
@@ -2534,6 +2615,7 @@ fn assess_chain_pass(
         distribution: distribution_summary,
         zone_recoverable_losses,
         annex_q: annex_q_result.filter(|_| valid),
+        heat_pump_systems: Vec::new(),
         monthly,
         demand,
         additional_zone_demands,

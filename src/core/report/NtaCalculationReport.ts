@@ -74,7 +74,7 @@ function labelDataSection(labelData: LabelData | null | undefined): string {
   return `<h2>Labelgegevens</h2>
     <table><thead><tr><th>Element</th><th>Oppervlakte [m²]</th><th>Gemiddelde U [W/m²K]</th><th>Laagste R<sub>c</sub></th><th>Hoogste R<sub>c</sub></th></tr></thead><tbody>${envelope || '<tr><td colspan="5">Geen scheidingsconstructies met een thermische grens.</td></tr>'}</tbody></table>
     <table><tbody>
-      <tr><th>Verwarming</th>${cell(installations.heatingGenerator ?? '—')}<th>Warm tapwater</th>${cell(installations.hotWaterGenerator ?? '—')}</tr>
+      <tr><th>Verwarming</th>${cell((installations.heatingGenerators?.length ? installations.heatingGenerators.join(', ') : installations.heatingGenerator) ?? '—')}<th>Warm tapwater</th>${cell(installations.hotWaterGenerator ?? '—')}</tr>
       <tr><th>Ventilatie</th>${cell(list(installations.ventilationSystems))}<th>Koeling</th>${cell(list(installations.coolingGenerators))}</tr>
       <tr><th>PV-systemen</th>${cell(installations.pvSystemCount)}<th>Verlichtingszones</th>${cell(installations.lightingZoneCount)}</tr>
       <tr><th>Bron</th><td colspan="3">${escapeHtml(labelData.source)}</td></tr>

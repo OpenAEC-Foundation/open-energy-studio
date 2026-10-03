@@ -4249,6 +4249,8 @@ export interface LabelData {
   }>;
   installations: {
     heatingGenerator: string | null;
+    /** §9.2: generator kinds of every heating system, main first. */
+    heatingGenerators: string[];
     hotWaterGenerator: string | null;
     ventilationSystems: string[];
     coolingGenerators: string[];
