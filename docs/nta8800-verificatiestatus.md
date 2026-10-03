@@ -1,6 +1,6 @@
 # NTA 8800 verificatiestatus — 2 oktober 2026
 
-## Samenvatting stand 4 oktober 2026
+## Samenvatting stand 4 oktober 2026 (avond)
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
 - EP_Tot, EP_ren en RER;
@@ -50,13 +50,23 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
   | Bijna compleet | Hoofdstuk 6, 8 en 17; bijlagen A en W |
   | Echte gaten | Hoofdstuk 9: één verwarmingssysteem per gebouw, hybride alleen nieuwbouw. Bijlage P: berekende route compleet sinds 3 oktober 2026 (zie onder). |
 
-Wordt nu afgewerkt:
+Na audit 2 zijn de echte gaten gedicht. De kern dekt nu:
 - meerdere verwarmingssystemen;
-- hybride in bestaande bouw;
-- de letterlijke boeking van W_H;aux;hp;an bij bijlage Q;
+- hybride warmtepompen in bestaande bouw;
+- de letterlijke boeking van W_H;aux;hp;an;
 - θ_int;op;C;
-- de opname voor utiliteit: meerdere zones, meerdere tapwatersystemen, LBK-koeling en bevochtiging;
-- de opname voor woningen: aangrenzende onverwarmde serre (AOS), daklichten, woonboot en caravan.
+- de berekende route van bijlage P (P.13–P.83, tabellen P.1–P.16);
+- bijlage A stap 2 met opgegeven correctiefactoren;
+- W.4–W.7 ter indicatie;
+- in de opname:
+  - utiliteit: gemengde zones, meerdere tapwatersystemen, LBK-batterijen, bevochtiging, luchtverwarming en passieve koeling;
+  - woningen: aangrenzende onverwarmde serre (AOS), daklichten, woonboot en caravan.
+
+Wat buiten bereik blijft:
+- 17.3.8: daarvoor zijn uurdata volgens NEN 5060 nodig. De kern accepteert opgegeven factoren.
+- Spouwen dunner dan 20 mm: de waarden staan in NEN-EN-ISO 6946 tabel 8, die niet beschikbaar is. Zo'n spouw kan als opgegeven R-laag worden ingevoerd.
+- Bijlage J: dit is een productbepaling.
+- Bijlage K: dit zijn meetregels; de oppervlakken zijn invoer.
 
 Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - bijlage Q: F_H;gen = 1 bij volledige dekking; Q.48 bij L/W;
