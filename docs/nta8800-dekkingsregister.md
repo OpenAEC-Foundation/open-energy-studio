@@ -6,6 +6,8 @@ Doeluitgave: **NTA 8800:2025+C1:2026**. Dit register beschrijft implementatiedek
 
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
+De [debug-desktopbuild van commit `fc5a8a5`](nta8800-build-verificatie-2026-10-03-fc5a8a5.md) bundelt de actuele Rust-kern en NTA-interface. De build en de genoemde tests zijn technisch geslaagd; de referentie- en attestkolommen hieronder worden daardoor niet automatisch vrijgegeven.
+
 | Onderdeel | Model | Audit | Rekenroute | Referentie | Attest | Volgende verificatie |
 | --- | --- | --- | --- | --- | --- | --- |
 | Gebouw, zones, Ag en volume | bestaand `.oes` + Rust-envelope | positief/uniciteit | nee | EP-W001 (ISSO 54 v2.0, 2022): A_g = 96 m² en het omhullend oppervlak A_o = 247,2 m² exact gereproduceerd uit het `.oes`-project (p. 5, tolerantie 1 %); A_ls = 232,8 m² met f_ls 0,7 voor de grondvloer (6.7.3); energie-uitkomsten geblokkeerd op bijlage 2 | nee | begrippen en meetregels tegen normtekst |
