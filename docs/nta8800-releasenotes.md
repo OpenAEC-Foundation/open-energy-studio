@@ -6,6 +6,24 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
 
 - **Bouwjaar.** Zonder `ntaCalculation.constructionYear` neemt de projectroute het bouwjaar uit de registratie, en anders het bouwjaar van de ventilatiesectie (tabel 11.13, dezelfde grootheid). Projecten die alleen het ventilatiebouwjaar hadden, krijgen nu de standaard voor woningisolatie (§5.3.2) in plaats van de melding `standard_insulation_construction_year_missing`.
 - **Resultaten.** Met een berekende NTA-kernuitkomst tonen de BENG-kaarten, TOjuli en de energiebalans (inclusief PV-opwek uit hoofdstuk 16) de kernwaarden; de vereenvoudigde rekenmethode verschijnt alleen nog als de kern geen volledige uitkomst heeft. Rekenresultaten blijven na een projectwijziging zichtbaar als verouderd, zodat het maatwerkadvies- en herlabelpaneel niet verdwijnen.
+## 3 oktober 2026 — reviewcorrecties biomassa, Bbl-functies, labelgegevens en lege velden
+
+### Uitkomsten die veranderen
+
+- **Identieke systemen en biomassa (§9.1, p. 287; tabel 5.2/5.4, p. 94).** Identieke systemen (bijvoorbeeld één pelletkachel per woning) zijn afzonderlijke fysieke installaties. Hun vermogen wordt niet meer vermenigvuldigd met het aantal: 40 woningen met elk een kachel van 15 kW blijven bmB in plaats van bmA (f_P = 0). Alleen de opwekkers van één meervoudige set tellen op.
+- **Eén grote lokale biomassaverwarmer.** Een kachel met een eigen vollastvermogen boven 500 kW wordt nu ook als bmA gerekend; voorheen kreeg hij alleen de waarschuwing.
+- **Restset bij β₁ ≥ 1 (9.56, p. 323; opmerking 4, p. 324).** Opgegeven nominale vermogens van de overige voorkeuren worden weer gebruikt; gelijke aandelen gelden alleen als die vermogens ontbreken.
+- **Vakantiewoning (p. 136).** Bbl-functie 'andere logiesfunctie' telt als woningbouw en past nu bij een woningberekening.
+- **Registratiecontroles.** De grenslabelwaarschuwing en de andere registratiecontroles gebruiken de label-EP2 (EMGforf, Regeling art. 2 lid 3).
+- **Rapport.** De labelregel toont het hernieuwbaar aandeel van het labelscenario, zonder terug te vallen op het aandeel met verklaring.
+
+### Gaten die waarschuwingen worden
+
+- `bbl_function_areas_sum_mismatch` en `label_function_areas_sum_mismatch` blokkeren de berekening niet meer; het zijn nu waarschuwingen. Functieoppervlakten komen vaak uit vergunning of BAG (NEN 2580), A_g;tot volgt §6.6.2–6.6.4 (p. 158). Labelfuncties worden nu ook bij een woningberekening getoetst.
+
+### Lege velden
+
+- De zoektocht naar lege verplichte velden is uitgebreid getest. Proeven maken nu ook hele objecten, lijsten en lijstelementen leeg, naast losse waarden, in drie voorbeelden: tussenwoning, kantoor, en kantoor met een meervoudige opwekkerset en een berekend warmtenet (bijlage P). Getoetst wordt op 0 onterechte meldingen, 0 gemiste velden en geen restfout. De kosten worden begrensd op aantal deserialisaties in plaats van tijd.
 
 ## 3 oktober 2026 — hoofdstuk 5, label, Bbl-functies en maatwerkadvies
 

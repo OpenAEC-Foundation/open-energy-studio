@@ -295,7 +295,7 @@ export function generateNtaCalculationReportHTML(
       <tr><th>Terugwinbare systeemverliezen (7.3)</th>${cell(extras.recoverableLossesApplied ? 'verrekend' : 'niet verrekend')}<th>Q<sub>H;ls;rbl</sub></th><td class="n">${num(extras.recoverableLossKwh)} kWh</td></tr>
       ${extras.lightingKwh != null ? `<tr><th>Verlichting (hoofdstuk 14)</th><td class="n">${num(extras.lightingKwh)} kWh</td><th></th><td></td></tr>` : ''}
       <tr><th>Labelbron</th><td colspan="3">${escapeHtml(performance.labelSource)}</td></tr>
-      <tr><th>Labelgegevens (Reg. art. 4)</th><td colspan="3">EP2 ${num(performance.labelPrimaryFossilIndicatorKwhPerM2Year ?? performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr · hernieuwbaar ${num(performance.labelRenewableSharePercent ?? performance.renewableSharePercent, 1)} % · TO<sub>juli</sub> ${num(performance.tojuliMaxK, 2)} K · ${project.buildingFunction === 'residential' ? 'warmtebehoefte (BENG 1)' : 'energiebehoefte (BENG 1)'} ${num(performance.needIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td></tr>
+      <tr><th>Labelgegevens (Reg. art. 4)</th><td colspan="3">EP2 ${num(performance.labelPrimaryFossilIndicatorKwhPerM2Year ?? performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr · hernieuwbaar ${num(performance.labelPrimaryFossilIndicatorKwhPerM2Year != null ? performance.labelRenewableSharePercent : performance.renewableSharePercent, 1)} % · TO<sub>juli</sub> ${num(performance.tojuliMaxK, 2)} K · ${project.buildingFunction === 'residential' ? 'warmtebehoefte (BENG 1)' : 'energiebehoefte (BENG 1)'} ${num(performance.needIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td></tr>
     </tbody></table>
     ${chapterFiveSection(performance.chapter5)}
     ${serviceEnergySection(performance)}
