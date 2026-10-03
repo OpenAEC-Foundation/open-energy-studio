@@ -3842,6 +3842,7 @@ mod tests {
             obstruction_factors: vec![1.0],
             obstruction: None,
             collective: None,
+            pvt: None,
             source_reference: "datasheet".into(),
         });
         let result = assess_building_performance(&sample);
@@ -5224,6 +5225,7 @@ mod tests {
             obstruction_factors: vec![1.0],
             obstruction: None,
             collective: None,
+            pvt: None,
             source_reference: "datasheet".into(),
         });
         assert!(assess_building_performance(&sample)
