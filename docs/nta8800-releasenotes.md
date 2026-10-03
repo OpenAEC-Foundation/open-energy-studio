@@ -2,6 +2,24 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — herlabelvergelijking opnieuw gecontroleerd bij registratie
+
+### Registraties die nu een fout of ontbrekend gegeven melden
+
+- **Herlabelvergelijking (BRL 9500-W §4.2.3–4.2.4 p. 23–24, bijlage 3 p. 63; U p. 18–20, p. 54).** De registratiecontrole vertrouwt het bewaarde oordeel niet meer. De vergelijking bewaart nu het oorspronkelijke projectbestand (`relabelComparison.originalProjectText`); de kern controleert het tegen `originalSha256` (`relabel_original_project_hash_mismatch`), vergelijkt het opnieuw met het huidige project en gebruikt dat oordeel. Is het project na de vergelijking gewijzigd, dan meldt de kern `relabel_comparison_outdated`. De vergelijking gebeurt op een kernelhash van de labelinvoer met gesorteerde sleutels en zonder null-velden, dus een andere sleutelvolgorde maakt haar niet verouderd. Een vergelijking zonder het oorspronkelijke bestand geeft `relabel_original_project_required`: vergelijk opnieuw. Het dossier bevat het origineel als `herlabel-origineel.oes.json`.
+- **Oudere herlabelprojecten.** Bij openen krijgt een factuur zonder herlabelrol de rol gespecificeerde factuur; een eenmalige melding noemt de gegevens die nog ontbreken.
+
+### Indeling van wijzigingen die verandert
+
+- **Ruimteverwarming in het NTA-blok.** `ntaCalculation/emission`, `/distribution`, `/distributionSystem` en `zoneData/*/emission|distribution` tellen nu als verwarming: bij woningen 6a (W p. 67) in plaats van "ter beoordeling".
+- **PV en zonthermie in het NTA-blok.** Een gewijzigde helling, oriëntatie, module- of collectoroppervlakte of piekvermogen (`tiltDeg`, `azimuthDeg`, `moduleAreaM2`, `collectorAreaM2`, `peakPower`, oud `collectorArea`) is nu "ter beoordeling" in plaats van een eigenschap die mag.
+
+### Maatwerkadvies
+
+- Een verlichtingsmaatregel uit een eerdere vorm blijft geblokkeerd (`migrationReview`) tot de adviseur bevestigt; bewerken heft dat niet meer op.
+- Een oude ventilatiemaatregel zonder ventilatiesysteem geeft `ventilationSystemRequired` in plaats van een patch die het systeem leegmaakt.
+- De onderbouwing van minimale belemmering bij PV (tabel 17.3 situatie a, p. 706–707) staat nu in het maatwerkadviesrapport en in de dossierchecklist.
+
 ## 3 oktober 2026 — herlabelen volgens BRL 9500 §4.2.3 en bijlage 6a/6b
 
 ### Registraties die nu een ontbrekend gegeven melden

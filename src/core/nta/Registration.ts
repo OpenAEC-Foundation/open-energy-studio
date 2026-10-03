@@ -181,6 +181,39 @@ export async function labelInputSha256(project: object): Promise<string> {
   return sha256Hex(new TextEncoder().encode(JSON.stringify(rest)));
 }
 
+/** Relabel fields required since 3 October 2026 (BRL 9500-W §4.2.3–4.2.4, p. 23–24). */
+export type RelabelMigrationField = 'originalCertificateNumber' | 'originalEpOnlineNumber' | 'relabelComparison' | 'relabelProof';
+
+/**
+ * Brings a relabel project saved before the new relabel rules up to date:
+ * an invoice without a relabel role counts as the specified invoice of the
+ * improvement. Returns the fields still to fill in when the project shows
+ * it predates the rules (an invoice was migrated, or the comparison lacks
+ * the original project file); otherwise `missing` is empty.
+ */
+export function migrateLegacyRelabel<T extends { registration?: NtaRegistration }>(project: T): { project: T; missing: RelabelMigrationField[] } {
+  const registration = project.registration;
+  if (!registration || (registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) !== 'relabel') {
+    return { project, missing: [] };
+  }
+  let migrated = false;
+  const evidence = (registration.evidence ?? []).map((item) => {
+    if (item.kind === 'invoice' && !item.relabelProof) {
+      migrated = true;
+      return { ...item, relabelProof: 'specified_invoice' as const };
+    }
+    return item;
+  });
+  const legacyComparison = Boolean(registration.relabelComparison && !registration.relabelComparison.originalProjectText);
+  if (!migrated && !legacyComparison) return { project, missing: [] };
+  const missing: RelabelMigrationField[] = [];
+  if (!registration.originalCertificateNumber?.trim()) missing.push('originalCertificateNumber');
+  if (!registration.originalEpOnlineNumber?.trim()) missing.push('originalEpOnlineNumber');
+  if (!registration.relabelComparison?.originalProjectText) missing.push('relabelComparison');
+  if (!evidence.some((item) => item.relabelProof === 'quote_with_order' || item.relabelProof === 'specified_invoice')) missing.push('relabelProof');
+  return { project: { ...project, registration: { ...registration, evidence } }, missing };
+}
+
 /** Last day an improvement may be counted: 24 months after the survey (BRL 9500-W §4.2.3, p. 23). */
 export function relabelDeadline(surveyDate: string | undefined): string | undefined {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(surveyDate ?? '');

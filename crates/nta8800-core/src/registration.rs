@@ -35,6 +35,7 @@ use crate::label_data::{ElementCategory, EnvelopeSummary};
 use crate::KERNEL_VERSION;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 pub const REGISTRATION_SOURCE: &str = "BRL 9500-W/U (14-10-2025) §4.2.3–4.2.5; Besluit energieprestatie gebouwen art. 2.1 lid 7; Regeling energieprestatie gebouwen art. 4–5";
@@ -213,7 +214,13 @@ pub struct RelabelComparisonRecord {
     /// Moment of the comparison, ISO 8601.
     #[serde(default)]
     pub compared_at: Option<String>,
-    /// The kernel's relabel assessment as returned by `assess_relabel`.
+    /// The original project file as read, so the registration check can
+    /// verify it against `originalSha256` and compare again. Without it
+    /// the stored verdict cannot be checked.
+    #[serde(default)]
+    pub original_project_text: Option<String>,
+    /// The kernel's relabel assessment as returned by `assess_relabel`;
+    /// shown for information, the registration check compares again.
     pub assessment: Value,
 }
 
@@ -1419,14 +1426,90 @@ fn referenced_evidence(text: &str) -> impl Iterator<Item = &str> {
         .filter(|id| !id.is_empty())
 }
 
+/// Checks a stored relabel comparison against the project it belongs to
+/// and returns the registration with the verdict compared again: the
+/// stored original must match its SHA-256, the compared label input must
+/// be the current one, and the kernel's own comparison replaces the stored
+/// one (BRL 9500-W §4.2.3–4.2.4 p. 23–24, Bijlage 3 p. 63; U p. 18–20,
+/// p. 54).
+fn recheck_relabel(
+    registration: &Registration,
+    project: &Value,
+    issues: &mut Vec<RegistrationIssue>,
+) -> Option<Registration> {
+    if registration.effective_message_type() != MessageType::Relabel {
+        return None;
+    }
+    let record = registration.relabel_comparison.as_ref()?;
+    let Some(text) = record.original_project_text.as_deref() else {
+        issues.push(issue(
+            "relabel_original_project_required",
+            "relabelComparison.originalProjectText",
+            "missing",
+        ));
+        return None;
+    };
+    if let Some(expected) = record.original_sha256.as_deref() {
+        let actual = format!("{:x}", Sha256::digest(text.as_bytes()));
+        if !actual.eq_ignore_ascii_case(expected.trim()) {
+            issues.push(issue(
+                "relabel_original_project_hash_mismatch",
+                "relabelComparison.originalSha256",
+                "error",
+            ));
+        }
+    }
+    let original: Value = match serde_json::from_str::<Value>(text) {
+        // A saved project file wraps the project (`type`, `version`,
+        // `project`, optional kernel stamp).
+        Ok(mut value)
+            if value.get("type").and_then(Value::as_str) == Some("open-energy-studio")
+                && value.get("project").is_some_and(Value::is_object) =>
+        {
+            value["project"].take()
+        }
+        Ok(value) => value,
+        Err(_) => {
+            issues.push(issue(
+                "relabel_original_project_invalid",
+                "relabelComparison.originalProjectText",
+                "error",
+            ));
+            return None;
+        }
+    };
+    let rerun = crate::relabel::assess_relabel(&original, project);
+    let stored_hash = record
+        .assessment
+        .get("currentLabelInputHash")
+        .and_then(Value::as_str);
+    if stored_hash != Some(rerun.current_label_input_hash.as_str()) {
+        issues.push(issue(
+            "relabel_comparison_outdated",
+            "relabelComparison",
+            "error",
+        ));
+    }
+    let mut checked = registration.clone();
+    if let Some(comparison) = checked.relabel_comparison.as_mut() {
+        comparison.assessment =
+            serde_json::to_value(&rerun).expect("relabel assessment serializes");
+    }
+    Some(checked)
+}
+
 /// [`assess_registration`] plus the evidence cross-check against the
-/// project the block belongs to.
+/// project the block belongs to, and a fresh relabel comparison.
 pub fn assess_project_registration(
     registration: &Registration,
     project: &Value,
     context: &RegistrationContext,
 ) -> RegistrationAssessment {
+    let mut relabel_issues = Vec::new();
+    let checked = recheck_relabel(registration, project, &mut relabel_issues);
+    let registration = checked.as_ref().unwrap_or(registration);
     let mut result = assess_registration_with(registration, context);
+    result.issues.extend(relabel_issues);
     result
         .issues
         .extend(check_evidence_links(project, registration));
@@ -1479,6 +1562,7 @@ mod tests {
             original_sha256: None,
             current_sha256: None,
             compared_at: None,
+            original_project_text: None,
             assessment: serde_json::json!({"scheme": "w", "allowed": true, "needsReview": false,
                 "changes": [{"path": "/constructions/0/rcValue", "verdict": "allowed"}]}),
         });
@@ -1969,6 +2053,101 @@ mod tests {
 
         // A regular registration does not ask for any of this.
         assert!(codes(&complete()).is_empty());
+    }
+
+    /// The registration check compares the stored original with the
+    /// current project again instead of trusting the stored verdict.
+    #[test]
+    fn relabel_comparison_is_checked_again() {
+        let original = serde_json::json!({
+            "buildingFunction": "residential",
+            "zones": [{"id": "z1", "floorArea": 100.0,
+                "surfaces": [{"id": "gevel", "area": 40.0, "constructionId": "c1"}]}],
+            "constructions": [{"id": "c1", "rcValue": 0.4}]
+        });
+        let mut improved = original.clone();
+        improved["constructions"][0]["rcValue"] = serde_json::json!(3.5);
+        // Saved as a project file, the way the app reads it.
+        let text = serde_json::to_string_pretty(
+            &serde_json::json!({"type": "open-energy-studio", "version": "1.0", "project": original}),
+        )
+        .unwrap();
+        let mut relabel = complete();
+        relabel.message_type = Some(MessageType::Relabel);
+        relabel.original_kernel_version = Some(KERNEL_VERSION.into());
+        relabel.improvement_date = Some("2027-01-31".into());
+        relabel_dossier(&mut relabel);
+        let record = relabel.relabel_comparison.as_mut().unwrap();
+        record.original_sha256 = Some(format!("{:x}", Sha256::digest(text.as_bytes())));
+        record.original_project_text = Some(text.clone());
+        record.assessment =
+            serde_json::to_value(crate::relabel::assess_relabel(&original, &improved)).unwrap();
+        let check = |registration: &Registration, project: &Value| {
+            assess_project_registration(registration, project, &RegistrationContext::default())
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            check(&relabel, &improved).is_empty(),
+            "{:?}",
+            check(&relabel, &improved)
+        );
+
+        // Key order and null members do not make the comparison outdated.
+        let reordered: Value = serde_json::from_str(
+            r#"{"constructions":[{"rcValue":3.5,"id":"c1","note":null}],
+                "zones":[{"surfaces":[{"constructionId":"c1","area":40.0,"id":"gevel"}],
+                "floorArea":100.0,"id":"z1"}],"buildingFunction":"residential"}"#,
+        )
+        .unwrap();
+        assert!(
+            check(&relabel, &reordered).is_empty(),
+            "{:?}",
+            check(&relabel, &reordered)
+        );
+
+        // A Bijlage 6b change after comparing: outdated, and the fresh
+        // comparison does not allow it.
+        let mut later = improved.clone();
+        later["zones"][0]["floorArea"] = serde_json::json!(120.0);
+        let found = check(&relabel, &later);
+        assert!(found.contains(&"relabel_comparison_outdated"), "{found:?}");
+        assert!(found.contains(&"relabel_changes_not_allowed"), "{found:?}");
+
+        // A stored verdict edited to allowed does not count: the kernel
+        // compares again.
+        let mut tampered = relabel.clone();
+        let record = tampered.relabel_comparison.as_mut().unwrap();
+        record.assessment =
+            serde_json::to_value(crate::relabel::assess_relabel(&original, &later)).unwrap();
+        record.assessment["allowed"] = serde_json::json!(true);
+        assert_eq!(
+            check(&tampered, &later),
+            vec!["relabel_changes_not_allowed"]
+        );
+
+        // An original that no longer matches its SHA-256.
+        let mut edited = relabel.clone();
+        edited
+            .relabel_comparison
+            .as_mut()
+            .unwrap()
+            .original_project_text = Some(text.replace("0.4", "0.2"));
+        assert!(check(&edited, &improved).contains(&"relabel_original_project_hash_mismatch"));
+
+        // Without the original the verdict cannot be checked.
+        let mut missing = relabel.clone();
+        missing
+            .relabel_comparison
+            .as_mut()
+            .unwrap()
+            .original_project_text = None;
+        assert_eq!(
+            check(&missing, &improved),
+            vec!["relabel_original_project_required"]
+        );
     }
 
     #[test]

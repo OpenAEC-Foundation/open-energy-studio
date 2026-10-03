@@ -4422,6 +4422,12 @@ export interface NtaRelabelComparison {
   currentSha256?: string;
   /** ISO 8601. */
   comparedAt?: string;
+  /**
+   * The original project file as read; the registration check verifies it
+   * against `originalSha256` and compares it with the current project again.
+   */
+  originalProjectText?: string;
+  /** Shown for information; the registration check compares again. */
   assessment: RelabelAssessment;
 }
 
@@ -4488,6 +4494,10 @@ export interface RelabelAssessment {
   allowed: boolean;
   needsReview: boolean;
   changes: RelabelChange[];
+  /** Kernel hash of the original project's label input (sorted keys, no nulls). */
+  originalLabelInputHash?: string;
+  /** Kernel hash of the compared project's label input; differs after a later edit. */
+  currentLabelInputHash?: string;
 }
 
 export async function assessRelabelWithRust(original: unknown, current: unknown): Promise<RelabelAssessment> {

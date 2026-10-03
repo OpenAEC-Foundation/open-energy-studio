@@ -41,9 +41,10 @@ export type MwaMeasureTemplate =
    * Chapter 14 lighting of a utility building: per lighting zone
    * (`zoneId/lightingZoneId`) only the changed members (power, parasitic,
    * occupancy, daylight, extracted luminaires), applied on top of the
-   * project's current lighting.
+   * project's current lighting. `reviewed: false` marks a measure migrated
+   * from a snapshot; only the adviser's confirmation sets it to true.
    */
-  | { kind: 'lighting'; zones: Record<string, Block> };
+  | { kind: 'lighting'; zones: Record<string, Block>; reviewed?: boolean };
 
 /**
  * Template forms saved before 3 October 2026: ventilation and lighting kept
@@ -242,11 +243,14 @@ export function lightingChanges(current: Block[], edited: Block[]): Record<strin
  */
 export function normalizeTemplate(project: IProject, template: MwaMeasureTemplate | LegacyTemplate): { template: MwaMeasureTemplate; migrated: boolean } {
   if (template.kind === 'ventilation' && 'ventilation' in template && !('system' in template)) {
-    return { template: { kind: 'ventilation', system: clone((template.ventilation.system as Block | undefined) ?? {}) }, migrated: false };
+    // A snapshot without a system has no unit to apply: it stays empty and
+    // `buildTemplatePatch` reports it instead of writing `{}`.
+    const system = template.ventilation.system as Block | undefined;
+    return { template: { kind: 'ventilation', system: isObject(system) ? clone(system) : {} }, migrated: true };
   }
   if (template.kind === 'lighting' && 'lighting' in template && !('zones' in template)) {
     const current = (nta(project)?.lighting as Block[] | undefined) ?? [];
-    return { template: { kind: 'lighting', zones: lightingChanges(current, template.lighting) }, migrated: true };
+    return { template: { kind: 'lighting', zones: lightingChanges(current, template.lighting), reviewed: false }, migrated: true };
   }
   return { template: template as MwaMeasureTemplate, migrated: false };
 }
@@ -319,6 +323,21 @@ export function pvSystemTemplate(index: number): Block {
 /** Template-only member of a PV system: evidence for the minimal-obstruction situation a). */
 export const PV_OBSTRUCTION_SOURCE = 'obstructionSourceReference';
 
+/**
+ * Evidence a measure's template keeps outside its patch: the source of each
+ * PV system on minimal obstruction (table 17.3 situation a), p. 706–707),
+ * so the report and the dossier can show it.
+ */
+export function measureEvidenceNotes(measure: { template?: MwaMeasureTemplate | LegacyTemplate | null }): { id: string; source: string }[] {
+  const template = measure.template;
+  if (!template || template.kind !== 'pv' || !('systems' in template)) return [];
+  return template.systems.flatMap((system) => {
+    const obstruction = system.obstruction as Block | undefined;
+    const source = String(system[PV_OBSTRUCTION_SOURCE] ?? '').trim();
+    return obstruction?.method === 'minimal' && source ? [{ id: String(system.id ?? ''), source }] : [];
+  });
+}
+
 const isObject = (value: unknown): value is Block => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
@@ -380,9 +399,9 @@ function hasBlank(value: unknown): boolean {
 
 /** The patch of a template against the current project. */
 export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate | LegacyTemplate, measureId: string): TemplatePatch {
-  const { template, migrated } = normalizeTemplate(project, saved);
+  const { template } = normalizeTemplate(project, saved);
   const block = nta(project);
-  const problems: string[] = migrated ? ['migrationReview'] : [];
+  const problems: string[] = template.kind === 'lighting' && template.reviewed === false ? ['migrationReview'] : [];
   const patch: MwaPatchOperation[] = [];
   switch (template.kind) {
     case 'insulation': {
@@ -460,6 +479,8 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
     case 'ventilation': {
       const current = block?.ventilation as Block | undefined;
       if (!current) { problems.push('ventilationRequired'); break; }
+      // A migrated snapshot without a system: never replace the system with `{}`.
+      if (!isObject(template.system) || Object.keys(template.system).length === 0) { problems.push('ventilationSystemRequired'); break; }
       // Only the system is replaced: the project's flows, controls and
       // infiltration (the airtightness measure) stay as they are.
       if (JSON.stringify(current.system) !== JSON.stringify(template.system)) {
