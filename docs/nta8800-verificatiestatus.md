@@ -1,4 +1,35 @@
-# NTA 8800 verificatiestatus — 2 oktober 2026
+# NTA 8800 verificatiestatus — 4 oktober 2026
+
+## Stand 4 oktober 2026
+
+**Onafhankelijke herberekeningen.** Bijna elke route is opnieuw doorgerekend met eigen Python-code, rechtstreeks vanuit de normpagina's en zonder de Rust-formules te lezen. De kernuitkomsten zijn vergeleken per maand of per bin.
+- **Hoofdstukken:** 5 (indicatoren, labelklasse, Bbl, renovatiestandaard, standaard woningisolatie), 7, 8 (grond, onverwarmde ruimten, constructies), 9 met bijlagen M, N, Q en V (inclusief meerdere opwekkers, hybride en biomassa), 10 (methoden 1 en 2), 11 (utiliteit en woningen, inclusief BENG 1 en TOjuli), 12, 13, 14 en 16.
+- **Bijlagen:** P (warmte- en koudenet), AA, AB en micro-WKK.
+- **Resultaat:** de afwijkingen tussen kern en norm zijn opgelost. Een echte fout zat onder meer in 10.73 (setpoint van de koelmachine); daarnaast ging het om WKK boven vollast, bijlage Q in een meervoudige set, P.74/P.78, R_se onder de kruipruimtevloer, H_D;iu met R_si, combi-tapwater zonder f_BACS en biomassa per installatie.
+- **Interpretaties:** waar de norm onduidelijk of strijdig is, staat de gekozen lezing in de interpretatielijst hieronder én in de bijlage "Interpretaties" van het rekenrapport (`kernel_interpretations()`).
+
+**Basisopname.** De opname is gecontroleerd tegen de tabellen van ISSO 82.1 7e druk (met erratum) en ISSO 75.1 7e druk. Afwijkingen en ontbrekende opties zijn toegevoegd. De utiliteitsopname kent nu meerdere rekenzones.
+
+**BRL 9500.** De volgende onderdelen zijn tegen BRL 9500-W/U, de Regeling en het Praktijkhandboek gelegd:
+- registratie: programma-identiteit, WLC-GWP, BAG-controle, berichttypen en plausibiliteit;
+- het dwellinglabel op EMGforf;
+- herlabelen: 6a/6b, een vergelijking die bij registratie opnieuw wordt gedraaid en de verankering van het origineel.
+
+`readyForRegistration` blijft onwaar tot het programma een BRL 9501-attestnummer heeft.
+
+**Invoer en UI.**
+- Alle normatieve invoer heeft een gestructureerd formulier. Alleen de volledige JSON-weergaven bestaan nog, als expertoptie.
+- Maatwerkadviesmaatregelen hebben sjablonen.
+- Ontbrekende waarden worden per veld als gat gemeld. Dat wordt bewaakt met fuzztests op drie fixtures (0 vals-positief, 0 gemist).
+- Het rapport, de export en het paneel tonen uitsluitend kernwaarden.
+
+**Openstaand, externe gegevens of besluiten.**
+- officiële referentiegevallen (BRL 9501-toetsset);
+- het EP-Online-uitwisselschema (XSD);
+- de Bbl-tekst voor de onderwijsgrens BENG 1 (basis 190, te controleren tegen BWBR0041297);
+- het uurklimaat van 17.3.8;
+- ISO 6946 tabel 8 (spouwen kleiner dan 20 mm);
+- het attestnummer.
 
 ## Samenvatting stand 3 oktober 2026
 
