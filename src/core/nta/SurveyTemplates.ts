@@ -59,6 +59,11 @@ export function windowTemplate(index: number, surfaceId: string): Record<string,
   return { id: `raam${index + 1}`, surfaceId, areaM2: 2, glass: 'hr_plus_plus', frame: 'wood_or_plastic', sourceReference: '' };
 }
 
+/** A calculation zone of the utility survey (ISSO 75.1 §6.5); the functions are added by the adviser. */
+export function calculationZoneTemplate(index: number): Record<string, unknown> {
+  return { id: `zone${index + 1}`, functions: [] };
+}
+
 /** Typed views for the kernel calls; the kernel validates the content. */
 export function asResidential(stored: StoredSurvey): ResidentialSurvey {
   return stored.survey as unknown as ResidentialSurvey;

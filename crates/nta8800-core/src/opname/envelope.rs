@@ -129,6 +129,11 @@ pub struct SurveySurface {
     /// its own year class (§8.7.2, priority 3).
     #[serde(default)]
     pub renovation: Option<crate::forfait_envelope::Renovation>,
+    /// Utility survey with several calculation zones (ISSO 75.1 afb. 6.6):
+    /// the zone this surface bounds. `None`: split over the zones by A_g.
+    /// The dwelling survey has one zone and rejects it.
+    #[serde(default)]
+    pub zone_id: Option<String>,
     pub source_reference: String,
 }
 
@@ -452,6 +457,8 @@ pub struct DerivedEnvelope {
     pub ground_floors: Vec<Value>,
     pub unheated: Option<Value>,
     pub floor_above_crawlspace: bool,
+    /// 8.3 `ΔU_for` added to every outdoor element, W/(m²·K).
+    pub delta_u: f64,
 }
 
 struct OpaquePart {
@@ -603,6 +610,19 @@ pub fn derive_envelope_with_cooling(
     envelope: &SurveyEnvelope,
     construction_year: i32,
     cooling_in_zone: bool,
+    recorder: &mut Recorder,
+) -> DerivedEnvelope {
+    derive_envelope_zone(envelope, construction_year, cooling_in_zone, None, recorder)
+}
+
+/// [`derive_envelope_with_cooling`] for one calculation zone of a building
+/// with several: `delta_u` is the 8.3 `ΔU_for` of the whole building
+/// (§8.2.1: the forfait applies to the whole building), not of the zone.
+pub fn derive_envelope_zone(
+    envelope: &SurveyEnvelope,
+    construction_year: i32,
+    cooling_in_zone: bool,
+    delta_u: Option<f64>,
     recorder: &mut Recorder,
 ) -> DerivedEnvelope {
     let mut opaque: Vec<OpaquePart> = Vec::new();
@@ -1186,10 +1206,10 @@ pub fn derive_envelope_with_cooling(
         .fold((0.0, 0.0), |(au, a), part| {
             (au + part.area * part.u, a + part.area)
         });
-    let delta_u = if sum_a > 0.0 {
-        delta_u_forfait(sum_au / sum_a)
-    } else {
-        0.0
+    let delta_u = match delta_u {
+        Some(value) => value,
+        None if sum_a > 0.0 => delta_u_forfait(sum_au / sum_a),
+        None => 0.0,
     };
     recorder.record(
         "thermal_bridges_forfait_delta_u",
@@ -1295,6 +1315,7 @@ pub fn derive_envelope_with_cooling(
         ground_floors,
         unheated,
         floor_above_crawlspace,
+        delta_u,
     }
 }
 
@@ -1390,6 +1411,7 @@ mod tests {
             exposed_perimeter_m: Some(16.0),
             crawlspace_bottom_insulated: None,
             renovation: None,
+            zone_id: None,
             source_reference: "survey".into(),
         }
     }
