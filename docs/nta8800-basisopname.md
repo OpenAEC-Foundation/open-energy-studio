@@ -284,3 +284,9 @@ Bij onbekende gegevens gelden dezelfde regels als in 75.1, met de paginaverwijzi
 Binnenunits van split- en VRF-systemen tellen als ventilatorconvectoren, en betonkernactivering als vloerkoeling (p. 136).
 
 `coolingPresent` zonder `cooling` geeft `cooling_system_data_required`. Met koeling gebruiken de ramen de beschaduwingsrij "met koeling" (tabel 8.24/8.25). Het opnamepaneel heeft hiervoor een koelsectie.
+
+**Koeling: correcties na de review.**
+- Een aquifer van vóór 2013 krijgt bij woningen EER 14 (`aquifer_dwellings_before2013`) en bij utiliteit 16 (tabel 10.34).
+- `balanced` is nu `none`/`static`/`dynamic` (tabel 10.6); `true`/`false` van oudere opnames blijven werken.
+- `heatPumpSource` (NTA 10.84) volgt bij onbekend de verwarmingswarmtepomp van de opname op een bodem- of grondwaterbron. `groundAboveZeroDemonstrated` legt vast dat de bron aantoonbaar boven 0 °C blijft (ISSO 82.1 p. 129).
+- Bij ventilatorconvectoren en splitunits is het aantal toestellen verplicht (`cooling_fan_coil_count_required`).

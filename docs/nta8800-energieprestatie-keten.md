@@ -882,3 +882,21 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 
 
 **Correctie pompvermogen (9.49).** In de verwarmingsdistributie hoort 10⁻³ alleen bij de exponentiële term: P_ref = 1,7·P_hydr + 17·(1 − e^(−300·P_hydr))·10⁻³ (gerenderde p. 320). De code rekende eerst (1,7·P + 17·(…))·10⁻³. Daardoor viel de pompenergie zonder opgegeven elektrisch vermogen 2× tot 90× te laag uit (bij 0,01 kW respectievelijk 1 kW). De versies voor tapwater (13.41) en koeling waren al goed.
+
+## Correcties na de review van ketenpunten en koeling (4 oktober 2026)
+
+- **Identieke installaties en de pomp (§9.1).** Bij `identicalSystems` = n wordt de distributiepomp per fysiek systeem gedimensioneerd:
+  - L_max (9.37) op A/n;
+  - het ontwerpdebiet op Q/n;
+  - f_e met de ondergrens van 0,01 kW per pomp.
+
+  De pompenergie telt daarna n keer. Een opgegeven ontwerpdebiet geldt per pomp.
+- **Ketel in een verwarmde ruimte (M.12).** ϑ_brm is θ_int;op;H = θ_int;calc;H per maand (9.4.2/7.9.6), naar oppervlak gewogen. Voorheen werd het setpoint gebruikt.
+- **Regeneratietoeslag (10.84/10.85).** De 0,7-toets wordt één keer uitgevoerd, over de som van de koude die alle vrije-koeling-opwekkers op bodemopslag met `heatPumpSource` terugleveren. Dat geldt binnen één systeem en over meerdere systemen.
+  - De toeslag gaat naar die systemen, verdeeld naar hun teruggeleverde koude; levert geen enkel systeem koude terug, dan gelijk verdeeld.
+  - Voorheen ging de onttrekking alleen naar systeem 0, en binnen één systeem telde elke opwekker de toeslag apart.
+  - `regenerationReturnKwh` op het koelresultaat geeft de teruggeleverde koude.
+- **Bijlage V.** De c_source van een gaswarmtepomp moet een waarde uit tabel V.1 of V.3 zijn: 1,00, 1,02 of 1,04.
+  - Met `regenerationHotWater` op de verwarmingsketen komt het tapwater van een warmtepomp op dezelfde bodembron in de noemer van V.1, zowel bij de forfaitaire COP als bij bijlage Q.
+  - Het automatisch invullen vanuit het tapwatersysteem en het doorgeven van c_source aan de tapwaterwarmtepomp staan nog open.
+- **ϑ_ztu (7.82) met meerdere zones.** θ_int;set;H wordt per zone gewogen met F_j;ztu (7.6.4): het aandeel van de zone in de warmteoverdracht naar de onverwarmde ruimten. Zonder die gegevens wordt naar oppervlak gewogen. Voorheen werd de eerste zone gebruikt.

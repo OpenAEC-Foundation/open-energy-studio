@@ -886,6 +886,7 @@ fn derive_input(
             distribution_system: with_unheated_reduction(nta.distribution_system, &project),
             collective_connection: nta.collective_connection,
             identical_systems: nta.identical_systems,
+            regeneration_hot_water: None,
         },
         heat_pump_renewable: nta.heat_pump_renewable,
         bacs_factor,

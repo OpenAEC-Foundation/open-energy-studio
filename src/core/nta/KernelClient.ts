@@ -1537,6 +1537,8 @@ export interface SpaceHeatingChainInput {
   collectiveConnection?: { connectedUsableAreaM2: number; sourceReference: string } | null;
   /** §9.1: number of identical physical generators modelled as one system. */
   identicalSystems?: number | null;
+  /** Annex V V.1: hot water of a heat pump on the same ground source. */
+  regenerationHotWater?: { annualKwh: number; generationEfficiency: number } | null;
   generator:
     | {
         kind: 'gas_boiler';
