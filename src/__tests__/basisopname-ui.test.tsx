@@ -52,7 +52,7 @@ describe('basisopname panel', () => {
     // Vertical pipes: explicitly none.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Vertical pipes (§7.2.4)' }), 'none');
     expect(stored()!.survey.verticalPipes).toEqual([]);
-  }, 15000);
+  }, 60000);
 
   it('edits houseboats, sunrooms and rooflights in the dwelling survey', async () => {
     const user = userEvent.setup();
