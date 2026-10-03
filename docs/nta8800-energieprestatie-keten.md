@@ -52,7 +52,7 @@ Bron is het [openbare consultatieconcept van hoofdstuk 5](https://www.internetco
   - Bij een `ExternalHeat`-opwekker moet `qualityDeclarationPresent` overeenkomen met `externalSupply.heating` (`external_heat_declaration_mismatch`).
 - **Collectieve warmtepompbron** (5.20, 9.6.8.1.1.2.3):
   - Een warmtepomp met een collectieve bron vraagt `externalSupply.collectiveHeatPumpSource` met de temperatuurklasse en een factuur of ontwerpbron.
-  - De kern telt `Q_HD;hp;in;bron = Q_out·(1 − 1/COP)` per maand. Die energie telt zonder f_BACS tegen de factoren van de bron mee (drager `dh_hp_source`).
+  - De kern telt `Q_HD;hp;in;bron = Q_out·(1 − 1/COP)` per maand. Die energie telt zonder f_BACS tegen de factoren van de bron mee en wordt volgens 5.20 gerapporteerd onder drager `dh`.
   - Onder 20 °C gelden forfaitair `f_P;el/23`, `K_CO2;el/23` en `f_Pren` 0,95, of de waarden volgens bijlage P. Dezelfde waarde geldt dan ook in EMGforf.
   - Vanaf 20 °C, bij oppervlaktewater of een onbekende bron, gelden tabel 5.2–5.4.
   - De omgevingswarmte van de warmtepomp telt dan niet nog eens als `renheat`.
@@ -584,7 +584,7 @@ Generator `chp` volgt methode 2: forfaitaire omzettingsgetallen uit tabel 9.31, 
 - **Brandstof:** E = Q_H;gen;out / ε_chp;th op bovenwaarde (9.65, f_prac = 1).
 - **Hulpenergie:** volgens 9.91, als bij een overig toestel.
 - **Terugwinbaar verlies:** 0.
-- **Elektriciteit:** E_el;chp;out;H = Q_H;gen;out · ε_chp;el/ε_chp;th (16.12), gewogen met f_BACS zoals het gasverbruik. Deze stroom telt als eigen productie: eerst zelf verbruikt, het overschot wordt geëxporteerd. Ze is niet hernieuwbaar en valt buiten de opslagcorrectie 5.14a (5.14b).
+- **Elektriciteit:** E_el;chp;out;H = Q_H;gen;out · ε_chp;el/ε_chp;th (16.12), zonder f_BACS: 16.12 en 5.24 kennen die factor niet, want f_BACS is een toeslag op het gebruik (5.5.8). Dat geldt ook voor de ZEB-berekening van bijlage AB. Deze stroom telt als eigen productie: eerst zelf verbruikt, het overschot wordt geëxporteerd. Ze is niet hernieuwbaar en valt buiten de opslagcorrectie 5.14a (5.14b).
 - **Pomp:** de circulatiepomp zit niet in de hulpenergie, dus bij een watervoerend systeem is een distributiepomp verplicht.
 - **Combinatie met een piekketel:** gebruik `multiple`, met de WKK op preferentie 1.
 
@@ -704,7 +704,7 @@ Tapwatergenerator `chp` gebruikt één van twee methoden.
 - **Methode 1 (`method1`, §13.8.4.8):**
   - De micro-WKK-berekening van 9.6.6.2 met Q_W;gen;out en de bedrijfstijd t_W;op = MIN(Q_W;gen;out/(f_gebouw·P_th;chp_100+sup_100); f_func·t_mi). Dat is 13.183, met f_func 0,6 boven 500 m², anders 1.
   - Het rendement Q/E (13.182) wordt naar beneden afgerond op 0,025.
-  - Hulpenergie en terugwinbaar verlies × f_gebouw (13.8.4.8.3/4). Gemeten hulpvermogens zijn verplicht: `hot_water_chp_auxiliary_required`.
+  - Hulpenergie en terugwinbaar verlies × f_gebouw (13.8.4.8.3/4). Zonder gemeten hulpvermogens geldt 9.6.8 (9.91/9.92, volgens 9.6.6.2.2.3) met `auxiliary`. Ontbreken beide, dan geeft de kern `hot_water_chp_auxiliary_required`.
   - Elektriciteit volgens 16.16 (P_el·t_W;op).
   - Een voorraadvat volgt 13.6 en hoort daarom niet in `method1.storage` (`hot_water_chp_storage_via_13_6`).
 - **Rangorde (13.8.2.1):** de WKK valt in categorie b).
@@ -718,3 +718,19 @@ Tapwatergenerator `chp` gebruikt één van twee methoden.
 - De WKK levert dit verlies; het gebouwdeel draagt zijn aandeel f_gebouw.
 - De laadpomp telt als hulpenergie over t_H;op.
 - In de verwarmde ruimte is het verlies bij een individuele installatie terugwinbaar (9.7).
+
+
+## Correcties na de review van WKK, ZEB en 9.7 (4 oktober 2026)
+
+- **Combi-micro-WKK (§13.8.4.8, p. 650).** Bij een WKK die zowel verwarmt als tapwater maakt (`alsoSpaceHeating`), rekent de kern één 9.6.6.2-maand op Q_H + Q_W met t_H;op + t_W;op, begrensd op t_mi. E_in, de stroom en de hulpenergie worden daarna naar rato van de output verdeeld. Het tapwateraandeel gaat door 13.182, met afronding naar beneden op 0,025. Het verwarmingsaandeel (`combiChpHeating`) vervangt de eigen WKK-boeking van de keten. Daarmee tellen het standbyverlies en de standby-hulpenergie maar één keer.
+  - Interpretatie: de warmtebehoefte en het terugwinbare verlies volgens 9.7 houden de waarden van de keten.
+  - Bij verschillende waarden van f_gebouw rekent de gezamenlijke maand met f_gebouw;W.
+- **9.2.5.1 (p. 294).** Opwekkerverliezen zijn alleen terugwinbaar bij individuele toestellen in woningen, en nooit bij meer dan 500 m². Dat geldt voor bijlage M en N, voor micro-WKK en voor de WKK-opslag.
+  - "Collectief" volgt uit de installatiegegevens: een `collectiveConnection`, een collectieve distributie of een collectieve ketel, niet uit f_gebouw < 1.
+  - Interpretatie: de 500 m² wordt getoetst aan het aangesloten gebruiksoppervlak van het systeem.
+- **Omgevingstemperatuur met nivellering (13.58, 13.168).** De opslag van micro-WKK en het gasgestookte voorraadtoestel in een verwarmde zone gebruiken ϑ_int;set;H;zi,mi na nivellering (7.9.4).
+- **f_du bij gemengd gebruik (tekst onder tabel AB.1).** Gewogen naar gebruiksoppervlak. Bron is `bblFunctions` als die er is, anders de gebruiksfuncties van de zones.
+- **PFHRD (13.156a).** Het verwarmingsgas telt alleen mee als een gasketel het gebouw verwarmt, ofwel de geteste combi. Bij een andere opwekker geeft de kern `pfhrd_requires_gas_boiler_heating`.
+- **Zonne-energie alleen voor verwarming (13.68).** Q_H;sol;ls;rbl telt mee in Q_H;ls;rbl van 7.3–7.8, verdeeld naar oppervlak. Een rekenfout wordt een issue in plaats van stil te verdwijnen.
+- **Drager.** Q_HD;hp;in;bron wordt volgens 5.20 gerapporteerd onder `dh`.
+- **Meerdere opwekkers en hulpenergie (9.85).** 9.85 rekent per toestel: A·N/12 + B·E_H;ci/(C·B_nom). De B-term, met de pomp, volgt de energie van elk toestel zelf. Bij `multiple` telt de pomp dus niet dubbel; alleen de standbyterm A/12 telt per toestel, zoals de norm voorschrijft.

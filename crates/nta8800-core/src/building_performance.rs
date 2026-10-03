@@ -477,6 +477,60 @@ const ZEB_DIRECT_USE: [[f64; 12]; 3] = [
     ],
 ];
 
+/// Table AB.1 f_du;el,ren per month; for several use functions weighted by
+/// usable area (text under table AB.1). The Bbl function list decides when
+/// given, otherwise the zones' usage functions.
+fn zeb_direct_use_fraction(input: &BuildingPerformanceInput) -> [f64; 12] {
+    use crate::bbl_requirements::BblFunction as B;
+    // (dwellings, education, other) areas.
+    let mut areas = [0.0_f64; 3];
+    if !input.bbl_functions.is_empty() {
+        for part in &input.bbl_functions {
+            let column = match part.function {
+                B::ResidentialBuilding
+                | B::OtherResidential
+                | B::Caravan
+                | B::FloatingBuildingAfter2018Berth
+                | B::FloatingBuildingOtherBerth => 0,
+                B::Education => 1,
+                _ => 2,
+            };
+            areas[column] += part.area_m2.max(0.0);
+        }
+    } else if matches!(input.calculation_scope, CalculationScope::Residential) {
+        areas[0] = 1.0;
+    } else {
+        for zone in std::iter::once(&input.space_heating.demand).chain(
+            input
+                .space_heating
+                .additional_zones
+                .iter()
+                .map(|zone| &zone.demand),
+        ) {
+            let column = match zone.usage_function {
+                crate::monthly_demand::UsageFunction::Residential => 0,
+                crate::monthly_demand::UsageFunction::Education => 1,
+                _ => 2,
+            };
+            areas[column] += zone.usable_floor_area_m2.max(0.0);
+        }
+        if areas.iter().sum::<f64>() <= 0.0 {
+            let column = if input.label_function == Some(LabelFunction::Education) {
+                1
+            } else {
+                2
+            };
+            areas[column] = 1.0;
+        }
+    }
+    let total: f64 = areas.iter().sum();
+    std::array::from_fn(|month| {
+        (0..3)
+            .map(|column| areas[column] / total * ZEB_DIRECT_USE[column][month])
+            .sum()
+    })
+}
+
 /// Annex AB monthly terms: (E_P,ZEB;Tot, m_CO2;ZEB) in kWh and kg.
 #[allow(clippy::too_many_arguments)]
 fn zeb_month(
@@ -906,6 +960,21 @@ fn cooling_assessment(
 }
 
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
+    // 13.156a: E_W;gen;in;PFHRD needs the heating gas of the same combi.
+    if let Some(system) = &input.hot_water {
+        let pfhrd = std::iter::once(&system.generator)
+            .chain(system.additional_generators.iter().map(|unit| &unit.generator))
+            .any(|generator| {
+                matches!(generator, crate::domestic_hot_water::HotWaterGenerator::MeasuredTwoProfiles(test)
+                    if test.pfhrd.is_some())
+            });
+        if pfhrd && !heating_by_gas_boiler(&input.space_heating.generator) {
+            issues.push(issue(
+                "pfhrd_requires_gas_boiler_heating",
+                "hotWater.generator.pfhrd",
+            ));
+        }
+    }
     let collective_source = input
         .space_heating
         .generator
@@ -1415,7 +1484,6 @@ fn with_lighting_gains(input: &BuildingPerformanceInput) -> SpaceHeatingChainInp
     chain
 }
 
-/// Area-weighted `ϑ_int;set;H;zi,mi` (7.76) of the chain's zones.
 /// One month of 13.184.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1468,7 +1536,20 @@ fn hot_water_from_heating(heating: &SpaceHeatingChainAssessment) -> Vec<HotWater
 /// combi appliance) and the chapter 11 flows and extract temperatures for
 /// mixed-air heat pumps (13.153h/i; `ϑ_ETA;dis;out` as the zone's levelled
 /// heating setpoint, ducts inside the thermal zone).
+/// 13.156a: the heating gas belongs to the combi only when a gas boiler
+/// heats the building (the PFHRD-tested combi appliance).
+fn heating_by_gas_boiler(generator: &Generator) -> bool {
+    match generator {
+        Generator::GasBoiler(_) => true,
+        Generator::ProductBoiler(boiler) => {
+            boiler.boiler.fuel == crate::annex_m::BoilerFuel::NaturalGas
+        }
+        _ => false,
+    }
+}
+
 fn hot_water_extras(
+    input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
 ) -> crate::domestic_hot_water::HotWaterExtras {
     let zones: Vec<&crate::monthly_demand::MonthlyDemandAssessment> =
@@ -1494,8 +1575,38 @@ fn hot_water_extras(
             weighted[index] += q * zone.monthly[index].heating.setpoint_c;
         }
     }
+    // §13.8.4.8 (p. 650): a micro-CHP that heats and makes hot water.
+    let combi_chp =
+        input
+            .space_heating
+            .generator
+            .micro_chp()
+            .filter(|_| heating.monthly.len() == 12)
+            .filter(|_| {
+                input.hot_water.as_ref().is_some_and(|system| {
+                    std::iter::once(&system.generator)
+                    .chain(system.additional_generators.iter().map(|unit| &unit.generator))
+                    .any(|generator| {
+                        matches!(generator, crate::domestic_hot_water::HotWaterGenerator::Chp(chp)
+                            if chp.also_space_heating && chp.method1.is_some())
+                    })
+                })
+            })
+            .map(|product| crate::domestic_hot_water::CombiChpHeating {
+                product: product.clone(),
+                thermal_output_kwh: std::array::from_fn(|index| {
+                    heating.monthly[index].chp_thermal_output_kwh
+                }),
+                operating_hours: std::array::from_fn(|index| {
+                    heating.monthly[index].chp_operating_hours
+                }),
+            });
     crate::domestic_hot_water::HotWaterExtras {
-        combi_space_heating_gas_kwh: heating.annual_natural_gas_kwh.filter(|gas| *gas > 0.0),
+        combi_chp,
+        combi_space_heating_gas_kwh: heating
+            .annual_natural_gas_kwh
+            .filter(|gas| *gas > 0.0)
+            .filter(|_| heating_by_gas_boiler(&input.space_heating.generator)),
         mixed_air: any.then(|| crate::domestic_hot_water::MixedAirVentilation {
             required_outdoor_air_m3_per_h: flow,
             extract_air_c: std::array::from_fn(|index| {
@@ -1509,6 +1620,45 @@ fn hot_water_extras(
     }
 }
 
+/// Replaces the chain's micro-CHP input, electricity and generator auxiliary
+/// energy by the heating share of the joint combi evaluation. The heating
+/// need and its 9.7 recoverable losses keep the chain's own values.
+fn apply_combi_chp_heating(
+    heating: &mut SpaceHeatingChainAssessment,
+    shares: &[crate::domestic_hot_water::CombiChpHeatingMonth],
+    fuel: crate::micro_chp::MicroChpFuel,
+) {
+    for (row, share) in heating.monthly.iter_mut().zip(shares) {
+        if row.chp_thermal_output_kwh <= 0.0 && share.input_kwh <= 0.0 {
+            continue;
+        }
+        let delta = share.input_kwh - row.chp_input_kwh;
+        match fuel {
+            crate::micro_chp::MicroChpFuel::NaturalGas => row.natural_gas_kwh += delta,
+            crate::micro_chp::MicroChpFuel::Oil => row.oil_kwh += delta,
+        }
+        row.chp_input_kwh = share.input_kwh;
+        row.chp_electricity_kwh = share.electricity_kwh;
+        if let (Some(total), Some(auxiliary)) = (row.auxiliary_electricity_kwh, share.auxiliary_kwh)
+        {
+            row.auxiliary_electricity_kwh =
+                Some(total - row.chp_generator_auxiliary_kwh + auxiliary);
+            row.chp_generator_auxiliary_kwh = auxiliary;
+        }
+    }
+    let sum = |field: fn(&crate::space_heating_chain::ChainMonth) -> f64| {
+        heating.monthly.iter().map(field).sum::<f64>()
+    };
+    if heating.annual_natural_gas_kwh.is_some() {
+        heating.annual_natural_gas_kwh = Some(sum(|row| row.natural_gas_kwh));
+    }
+    if heating.annual_auxiliary_electricity_kwh.is_some() {
+        heating.annual_auxiliary_electricity_kwh =
+            Some(sum(|row| row.auxiliary_electricity_kwh.unwrap_or(0.0)));
+    }
+}
+
+/// Area-weighted `ϑ_int;set;H;zi,mi` (7.76) of the chain's zones.
 fn levelled_setpoint(
     input: &BuildingPerformanceInput,
     heating: &SpaceHeatingChainAssessment,
@@ -1735,6 +1885,7 @@ pub fn assess_building_performance(
         && hot_water_context.levelled_setpoint_c != levelled;
     hot_water_context.levelled_setpoint_c = levelled;
     let mut standalone_solar = None;
+    let mut standalone_solar_issue = None;
     if combi || standalone_needed || levelling_matters {
         let space_heating = solar_space_heating(input, &heating);
         if combi {
@@ -1751,19 +1902,24 @@ pub fn assess_building_performance(
             if let Some(space_heating) = space_heating {
                 let mut context = hot_water_context;
                 context.space_heating = Some(space_heating);
-                if let Ok(result) = crate::domestic_hot_water::assess_standalone_solar(
+                match crate::domestic_hot_water::assess_standalone_solar(
                     &input.space_heating_solar,
                     context,
                     "spaceHeatingSolar",
                 ) {
-                    // 9.2.3.4: the node gain adds to that of solar combis.
-                    let mut node = chain_input.solar_heating_kwh.clone();
-                    node.resize(12, 0.0);
-                    for (value, add) in node.iter_mut().zip(&result.space_heating_kwh) {
-                        *value += add;
+                    Ok(result) => {
+                        // 9.2.3.4: the node gain adds to that of solar combis.
+                        let mut node = chain_input.solar_heating_kwh.clone();
+                        node.resize(12, 0.0);
+                        for (value, add) in node.iter_mut().zip(&result.space_heating_kwh) {
+                            *value += add;
+                        }
+                        chain_input.solar_heating_kwh = node;
+                        // 13.68 Q_H;sol;ls;rbl into 7.3–7.8.
+                        chain_input.solar_recoverable_kwh = result.recoverable_kwh.clone();
+                        standalone_solar = Some(result);
                     }
-                    chain_input.solar_heating_kwh = node;
-                    standalone_solar = Some(result);
+                    Err(error) => standalone_solar_issue = Some(error),
                 }
             }
         }
@@ -1775,6 +1931,9 @@ pub fn assess_building_performance(
         .map(|item| issue(item.code, format!("spaceHeating.{}", item.path)))
         .collect();
     validate(input, &mut issues);
+    if let Some(error) = standalone_solar_issue {
+        issues.push(issue(error.code, error.path));
+    }
 
     let mut carriers = Vec::new();
     let mut balance = Vec::new();
@@ -1796,7 +1955,7 @@ pub fn assess_building_performance(
     };
     // 13.69/13.137b: the levelled setpoint of 7.76 from the chain's demand.
     hot_water_context.levelled_setpoint_c = levelled_setpoint(input, &heating);
-    let extras = hot_water_extras(&heating);
+    let extras = hot_water_extras(input, &heating);
     let hot_water_from_heating = hot_water_from_heating(&heating);
     let hot_water = match (&input.hot_water, issues.is_empty()) {
         (Some(system), true) => match crate::domestic_hot_water::assess_hot_water_with(
@@ -1817,6 +1976,13 @@ pub fn assess_building_performance(
         },
         _ => None,
     };
+    // §13.8.4.8 (p. 650): the combi micro-CHP's joint input replaces the
+    // chain's own heating booking with its heating share.
+    if let (Some(result), Some(product)) = (&hot_water, input.space_heating.generator.micro_chp()) {
+        if let Some(shares) = &result.combi_chp_heating {
+            apply_combi_chp_heating(&mut heating, shares, product.fuel);
+        }
+    }
     let mut external = resolve_external(input, &mut issues);
     let mut forfait_totals = None;
     if issues.is_empty() {
@@ -2175,11 +2341,7 @@ fn compute(
             .storage
             .as_ref()
             .is_some_and(|storage| storage.building_bound_electrical_kwh >= 5.0);
-    let zeb_direct_use = match (input.calculation_scope, input.label_function) {
-        (CalculationScope::Residential, _) => ZEB_DIRECT_USE[0],
-        (_, Some(LabelFunction::Education)) => ZEB_DIRECT_USE[1],
-        _ => ZEB_DIRECT_USE[2],
-    };
+    let zeb_direct_use = zeb_direct_use_fraction(input);
     let heat_pump_renewable = (input.space_heating.generator.heat_pump().is_some()
         || input.space_heating.generator.annex_q().is_some())
         && input
@@ -2300,7 +2462,8 @@ fn compute(
             + pv_yields.iter().map(|yields| yields[index]).sum::<f64>();
         // 16.11–16.13/16.16: heating and hot-water CHP electricity is own
         // production, not renewable and outside 5.14a (5.14b).
-        let chp_electricity = bacs * row.chp_electricity_kwh + hot_water_chp;
+        // 16.12/5.24 carry no f_BACS (a penalty on use only, 5.5.8).
+        let chp_electricity = row.chp_electricity_kwh + hot_water_chp;
         let produced = produced_renewable + chp_electricity;
         let self_used = produced.min(used_el);
         // 5.26 summed over producers.
@@ -2335,15 +2498,9 @@ fn compute(
         if let Some(source) = source {
             fossil += source_heat * source.primary_factor;
             co2 += source_heat * source.co2_kg_per_kwh;
-            if source_heat > 0.0 {
-                carriers.push(CarrierMonth {
-                    carrier: "dh_hp_source",
-                    month,
-                    used_kwh: source_heat,
-                    delivered_kwh: source_heat,
-                });
-            }
         }
+        // 5.20 books Q_HD;hp;in;bron as carrier dh (its own factors above).
+        let reported_dh = used_dh + if source.is_some() { source_heat } else { 0.0 };
         let used_bm = bacs * row.biomass_kwh;
         fossil += used_bm * F_P_BIOMASS_B;
         co2 += used_bm * K_CO2_BIOMASS_B;
@@ -2355,12 +2512,12 @@ fn compute(
                 delivered_kwh: used_bm,
             });
         }
-        if used_dh > 0.0 {
+        if reported_dh > 0.0 {
             carriers.push(CarrierMonth {
                 carrier: "dh",
                 month,
-                used_kwh: used_dh,
-                delivered_kwh: used_dh,
+                used_kwh: reported_dh,
+                delivered_kwh: reported_dh,
             });
         }
         if used_dw > 0.0 {
@@ -2828,10 +2985,11 @@ mod tests {
             .map(|row| row.heat_pump_output_kwh * (1.0 - 1.0 / cop))
             .sum();
         assert!(source > 0.0);
+        // 5.20: reported under carrier dh (no other external heat here).
         let listed: f64 = result
             .carriers
             .iter()
-            .filter(|item| item.carrier == "dh_hp_source")
+            .filter(|item| item.carrier == "dh")
             .map(|item| item.used_kwh)
             .sum();
         assert!((listed - source).abs() < 1e-6);
@@ -2988,7 +3146,7 @@ mod tests {
             .space_heating
             .monthly
             .iter()
-            .map(|row| sample.bacs_factor * row.chp_electricity_kwh)
+            .map(|row| row.chp_electricity_kwh)
             .sum();
         assert!(expected > 0.0);
         assert!((produced - expected).abs() < 1e-6);
@@ -3002,6 +3160,53 @@ mod tests {
             chp.annual_renewable_primary_kwh.unwrap()
                 <= base.annual_renewable_primary_kwh.unwrap() + 1e-9
         );
+    }
+
+    #[test]
+    fn zeb_direct_use_is_area_weighted_for_mixed_use() {
+        use crate::bbl_requirements::{BblFunction, BblFunctionArea};
+        let mut sample = input();
+        sample.bbl_functions = vec![
+            BblFunctionArea {
+                function: BblFunction::ResidentialBuilding,
+                area_m2: 50.0,
+            },
+            BblFunctionArea {
+                function: BblFunction::Education,
+                area_m2: 50.0,
+            },
+        ];
+        // Text under table AB.1: July 0,5·0,15 + 0,5·0,01; January 0,65.
+        let f = zeb_direct_use_fraction(&sample);
+        assert!((f[6] - 0.08).abs() < 1e-12);
+        assert!((f[0] - 0.65).abs() < 1e-12);
+    }
+
+    #[test]
+    fn pfhrd_needs_a_gas_boiler_heating_the_building() {
+        // 13.156a: the heating gas belongs to the combi only for a gas
+        // boiler; other heating gives no PFHRD gas.
+        let sample = input();
+        assert!(matches!(
+            sample.space_heating.generator,
+            Generator::GasBoiler(_)
+        ));
+        assert!(heating_by_gas_boiler(&sample.space_heating.generator));
+        let gas = assess_building_performance(&sample);
+        assert!(hot_water_extras(&sample, &gas.space_heating)
+            .combi_space_heating_gas_kwh
+            .is_some());
+        let mut electric = sample.clone();
+        electric.space_heating.generator = Generator::ElectricResistance(
+            crate::space_heating_chain::ElectricResistanceGenerator {
+                equipment_reference: "panel heaters".into(),
+                auxiliary: None,
+            },
+        );
+        assert!(!heating_by_gas_boiler(&electric.space_heating.generator));
+        assert!(hot_water_extras(&electric, &gas.space_heating)
+            .combi_space_heating_gas_kwh
+            .is_none());
     }
 
     #[test]
@@ -3114,6 +3319,122 @@ mod tests {
     }
 
     #[test]
+    fn combi_micro_chp_is_evaluated_once_and_split_by_output() {
+        use crate::domestic_hot_water::{
+            HotWaterChp, HotWaterEmission, HotWaterGenerator, HotWaterNeed, ServedTaps,
+        };
+        use crate::micro_chp::{
+            hot_water_operating_hours, micro_chp_month, ChpTestPoint, MicroChp, MicroChpFuel,
+            MicroChpLocation, MicroChpType,
+        };
+        let product = MicroChp {
+            kind: MicroChpType::StirlingEngine,
+            fuel: MicroChpFuel::NaturalGas,
+            location: MicroChpLocation::InstallationRoom,
+            hydraulics: None,
+            full_load: ChpTestPoint {
+                thermal_power_kw: 20.0,
+                electric_power_kw: None,
+                thermal_efficiency: None,
+                electric_efficiency: None,
+                auxiliary_power_kw: Some(0.10),
+            },
+            chp_only: ChpTestPoint {
+                thermal_power_kw: 6.0,
+                electric_power_kw: Some(1.0),
+                thermal_efficiency: Some(0.80),
+                electric_efficiency: None,
+                auxiliary_power_kw: Some(0.06),
+            },
+            standby_loss_kw: None,
+            pilot_kw: None,
+            standby_electric_kw: None,
+            standby_auxiliary_kw: Some(0.01),
+            net_production_measured: false,
+            storage: None,
+            test_report_reference: "EN 50465 report".into(),
+        };
+        let mut sample = input();
+        sample.on_site_production.clear();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        sample.space_heating.generator = Generator::Chp(crate::space_heating_chain::ChpGenerator {
+            chp: None,
+            method1: Some(product.clone()),
+            auxiliary: None,
+            equipment_reference: "micro-CHP".into(),
+        });
+        // Air heating: no hydronic pump input needed for this booking test.
+        sample.space_heating.emission.system = crate::heating_emission::EmissionSystem::AirHeating;
+        sample.space_heating.emission.balancing =
+            crate::heating_emission::HydronicBalancing::NotApplicable;
+        sample.hot_water = Some(HotWaterSystem {
+            declared_share: None,
+            need: HotWaterNeed::Residential {
+                dwelling_count: 1,
+                source_reference: "one dwelling".into(),
+            },
+            emission: HotWaterEmission::Residential {
+                served: ServedTaps::KitchenAndBathroom,
+                kitchen_length_m: Some(1.0),
+                bathroom_length_m: Some(1.0),
+                source_reference: "drawing".into(),
+            },
+            shower_heat_recovery: None,
+            circulation: None,
+            storage: Vec::new(),
+            delivery_sets: None,
+            boiling_water_tap: false,
+            generator: HotWaterGenerator::Chp(Box::new(HotWaterChp {
+                chp: None,
+                method1: Some(product.clone()),
+                also_space_heating: true,
+                auxiliary: None,
+                equipment_reference: "micro-CHP".into(),
+            })),
+            nominal_power_kw: None,
+            exhaust_air: None,
+            additional_generators: Vec::new(),
+            series: None,
+            solar: Vec::new(),
+            collective: None,
+            equipment_reference: "plate".into(),
+        });
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let hot_water = result.hot_water.as_ref().unwrap();
+        assert!(hot_water.combi_chp_heating.is_some());
+        // January: one 9.6.6.2 month on Q_H + Q_W with t_H;op + t_W;op.
+        let row = &result.space_heating.monthly[0];
+        let q_h = row.chp_thermal_output_kwh;
+        let q_w = hot_water.months[0].generator_output_kwh;
+        let t_w = hot_water_operating_hours(&product, q_w, 1.0, 1.0, 744.0);
+        let joint = micro_chp_month(
+            &product,
+            q_h + q_w,
+            (row.chp_operating_hours + t_w).min(744.0),
+            744.0,
+            1.0,
+            false,
+        )
+        .unwrap();
+        let heating_share = q_h / (q_h + q_w);
+        assert!((row.chp_input_kwh - joint.input_kwh * heating_share).abs() < 1e-6);
+        assert!((row.natural_gas_kwh - joint.input_kwh * heating_share).abs() < 1e-6);
+        assert!((row.chp_electricity_kwh - joint.electricity_kwh * heating_share).abs() < 1e-6);
+        // The stand-by loss is booked once: less than two separate months.
+        let alone_h =
+            micro_chp_month(&product, q_h, row.chp_operating_hours, 744.0, 1.0, false).unwrap();
+        let alone_w = micro_chp_month(&product, q_w, t_w, 744.0, 1.0, false).unwrap();
+        assert!(joint.input_kwh < alone_h.input_kwh + alone_w.input_kwh);
+    }
+
+    #[test]
     fn hot_water_chp_electricity_is_own_production() {
         use crate::domestic_hot_water::{
             HotWaterChp, HotWaterEmission, HotWaterGenerator, HotWaterNeed, ServedTaps,
@@ -3149,6 +3470,7 @@ mod tests {
                 }),
                 method1: None,
                 also_space_heating: false,
+                auxiliary: None,
                 equipment_reference: "CHP plate".into(),
             })),
             nominal_power_kw: None,
@@ -3170,7 +3492,7 @@ mod tests {
             .space_heating
             .monthly
             .iter()
-            .map(|row| sample.bacs_factor * row.chp_electricity_kwh)
+            .map(|row| row.chp_electricity_kwh)
             .sum::<f64>()
             + hot_water
                 .months
@@ -3443,6 +3765,12 @@ mod tests {
         assert!(march.generator_output_kwh < plain.space_heating.monthly[2].generator_output_kwh);
         // 13.67: the pump energy is electricity.
         assert!(solar.auxiliary_kwh.iter().sum::<f64>() > 0.0);
+        // 13.68: Q_H;sol;ls;rbl joins Q_H;ls;rbl (7.3) and lowers the need.
+        assert!(solar.recoverable_kwh[0] > 0.0);
+        assert!(
+            result.space_heating.monthly[0].heating_need_kwh
+                < plain.space_heating.monthly[0].heating_need_kwh
+        );
         // Only space-heating systems may stand alone.
         let mut water = heater;
         water.solar_use = crate::solar_thermal::SolarUse::WaterHeating;

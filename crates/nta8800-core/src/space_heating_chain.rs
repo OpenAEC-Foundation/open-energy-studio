@@ -101,6 +101,10 @@ pub struct SpaceHeatingChainInput {
     /// kWh; the node gain is capped at the node output plus losses.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub solar_heating_kwh: Vec<f64>,
+    /// 13.68 `Q_H;sol;ls;rbl` of solar systems for space heating only, per
+    /// month, kWh; added to Q_H;ls;rbl of 7.3–7.8 (split by area).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub solar_recoverable_kwh: Vec<f64>,
     /// 13.185 `E_W;gen;in;conv;hj` per month: hot water made with heat from
     /// this system (§13.8.4.9.3), kWh; it loads the node like space heating.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -778,6 +782,13 @@ pub struct ChainMonth {
     pub ahu_heating_load_kwh: f64,
     /// 16.12 E_el;chp;out;H: electricity of a heating CHP, kWh.
     pub chp_electricity_kwh: f64,
+    /// Micro-CHP method 1: heat delivered by the CHP (incl. its storage
+    /// share), kWh; with t_H;op and the booked input and generator auxiliary
+    /// energy, for the combi split of §13.8.4.8 (p. 650).
+    pub chp_thermal_output_kwh: f64,
+    pub chp_operating_hours: f64,
+    pub chp_input_kwh: f64,
+    pub chp_generator_auxiliary_kwh: f64,
     /// 13.185 hot-water load from §13.8.4.9.3, kWh.
     pub hot_water_load_kwh: f64,
 }
@@ -1842,7 +1853,33 @@ fn assess_chain_pass(
             &input.generator,
             &mut issues,
         );
-        let conditions = generator_conditions(input, &valid_zones, &distribution);
+        let mut conditions = generator_conditions(input, &valid_zones, &distribution);
+        {
+            let zones: Vec<(&MonthlyDemandAssessment, f64)> = std::iter::once(&demand)
+                .chain(&additional_zone_demands)
+                .zip(
+                    std::iter::once(&input.demand)
+                        .chain(input.additional_zones.iter().map(|zone| &zone.demand))
+                        .map(|zone| zone.usable_floor_area_m2),
+                )
+                .filter(|(zone, _)| zone.monthly.len() == 12)
+                .collect();
+            let area: f64 = zones.iter().map(|(_, area)| area).sum();
+            if area > 0.0 {
+                conditions.levelled_c = Some(std::array::from_fn(|index| {
+                    zones
+                        .iter()
+                        .map(|(zone, area)| zone.monthly[index].heating.setpoint_c * area)
+                        .sum::<f64>()
+                        / area
+                }));
+            }
+            let residential = std::iter::once(&input.demand)
+                .chain(input.additional_zones.iter().map(|zone| &zone.demand))
+                .all(|zone| zone.usage_function.is_residential());
+            conditions.generator_losses_recoverable =
+                residential && !conditions.collective && connected_area <= 500.0;
+        }
         // 7.3/7.7: the recoverable losses (9.2.5) reduce the heating need and
         // add to the cooling need; the heating limit (9.28) and the
         // distribution itself use the need without them.
@@ -1904,6 +1941,12 @@ fn assess_chain_pass(
                             recoverable.get(index).copied().unwrap_or(0.0)
                                 + humidifier[index]
                                 + generator_recoverable.map_or(0.0, |losses| losses[index] * share)
+                                + input
+                                    .solar_recoverable_kwh
+                                    .get(index)
+                                    .copied()
+                                    .unwrap_or(0.0)
+                                    * share
                         })
                         .collect();
                     apply_recoverable_losses(assessed, &total, &[])
@@ -2002,6 +2045,10 @@ fn assess_chain_pass(
                 humidification_load_kwh: humidification[index][0],
                 ahu_heating_load_kwh: ahu_heating[index],
                 chp_electricity_kwh: 0.0,
+                chp_thermal_output_kwh: 0.0,
+                chp_operating_hours: 0.0,
+                chp_input_kwh: 0.0,
+                chp_generator_auxiliary_kwh: 0.0,
                 hot_water_load_kwh: hot_water_load,
                 humidification_electricity_kwh: humidification[index][1],
                 humidification_fuel_kwh: humidification[index][2],
@@ -2038,6 +2085,13 @@ fn assess_chain_pass(
                 &mut annex_q_result,
                 &mut issues,
             );
+            // 9.2.5.1: generator losses are recoverable only for individual
+            // appliances in dwellings, never above 500 m².
+            if !conditions.generator_losses_recoverable {
+                for row in monthly.iter_mut() {
+                    row.generator_recoverable_loss_kwh = 0.0;
+                }
+            }
         }
         // 9.22 with t_H;op;si;mi (9.32a): the longest operating time of the
         // zones on the system, t_H·f_H;red·f_H;red;pmp;op as for the pump.
@@ -2217,6 +2271,40 @@ struct GeneratorConditions {
     /// `t_H;op;si;mi` per 9.32a (with f_H;red and f_H;red;pmp;op), longest
     /// over the zones.
     operating_hours: Option<[f64; 12]>,
+    /// Area-weighted `ϑ_int;set;H;zi,mi` after levelling (7.9.4), °C.
+    levelled_c: Option<[f64; 12]>,
+    /// A collective building installation (installation data, not
+    /// `f_gebouw`).
+    collective: bool,
+    /// 9.2.5.1: generator losses are recoverable only for individual
+    /// appliances in dwellings and never above 500 m².
+    generator_losses_recoverable: bool,
+}
+
+impl Generator {
+    /// The micro-CHP (method 1) of this generator, directly or inside
+    /// `multiple`.
+    pub fn micro_chp(&self) -> Option<&crate::micro_chp::MicroChp> {
+        match self {
+            Self::Chp(generator) => generator.method1.as_ref(),
+            Self::Multiple(set) => set
+                .generators
+                .iter()
+                .find_map(|part| part.generator.micro_chp()),
+            _ => None,
+        }
+    }
+}
+
+/// A collective building installation for space heating.
+fn collective_installation(input: &SpaceHeatingChainInput) -> bool {
+    input.collective_connection.is_some()
+        || input
+            .distribution_system
+            .as_ref()
+            .is_some_and(|system| system.installation == Installation::Collective)
+        || matches!(&input.generator, Generator::GasBoiler(generator)
+            if generator.boiler.role == BoilerRole::Collective)
 }
 
 fn generator_conditions(
@@ -2317,6 +2405,9 @@ fn generator_conditions(
         return_c,
         indoor_c,
         operating_hours,
+        levelled_c: None,
+        collective: collective_installation(input),
+        generator_losses_recoverable: false,
     }
 }
 
@@ -2754,6 +2845,10 @@ fn generate_multiple(
             row.generator_electricity_kwh += sub.generator_electricity_kwh;
             row.collective_source_heat_kwh += sub.collective_source_heat_kwh;
             row.chp_electricity_kwh += sub.chp_electricity_kwh;
+            row.chp_thermal_output_kwh += sub.chp_thermal_output_kwh;
+            row.chp_operating_hours = row.chp_operating_hours.max(sub.chp_operating_hours);
+            row.chp_input_kwh += sub.chp_input_kwh;
+            row.chp_generator_auxiliary_kwh += sub.chp_generator_auxiliary_kwh;
             match (row.auxiliary_electricity_kwh, sub.auxiliary_electricity_kwh) {
                 (Some(total), Some(value)) => row.auxiliary_electricity_kwh = Some(total + value),
                 _ => auxiliary_known = false,
@@ -2859,7 +2954,7 @@ fn generate(
                     if !issues.is_empty() {
                         return None;
                     }
-                    let collective = building_fraction < 1.0;
+                    let collective = conditions.collective;
                     let mut output = 0.0;
                     let mut input_total = 0.0;
                     for (index, row) in monthly.iter_mut().enumerate() {
@@ -2870,7 +2965,12 @@ fn generate(
                                 product,
                                 index,
                                 hours[index],
-                                input.demand.setpoints.heating_c,
+                                // 13.58: the levelled setpoint (7.9.4).
+                                conditions
+                                    .levelled_c
+                                    .map_or(input.demand.setpoints.heating_c, |values| {
+                                        values[index]
+                                    }),
                                 collective,
                             );
                         let month = crate::micro_chp::micro_chp_month(
@@ -2890,6 +2990,10 @@ fn generate(
                         }
                         // 16.15.
                         row.chp_electricity_kwh = month.electricity_kwh;
+                        row.chp_thermal_output_kwh =
+                            row.generator_output_kwh + storage_loss * building_fraction;
+                        row.chp_operating_hours = hours[index];
+                        row.chp_input_kwh = month.input_kwh;
                         row.generator_recoverable_loss_kwh = month.recoverable_kwh + storage_rbl;
                         let auxiliary = match month.auxiliary_kwh {
                             Some(value) => value,
@@ -2901,6 +3005,7 @@ fn generate(
                                 building_fraction,
                             ),
                         };
+                        row.chp_generator_auxiliary_kwh = auxiliary;
                         row.auxiliary_electricity_kwh =
                             Some(auxiliary + storage_aux * building_fraction);
                         output += row.generator_output_kwh;
@@ -3527,6 +3632,7 @@ mod tests {
         SpaceHeatingChainInput {
             humidifiers: Vec::new(),
             solar_heating_kwh: Vec::new(),
+            solar_recoverable_kwh: Vec::new(),
             hot_water_load_kwh: Vec::new(),
             demand: demand(),
             emission: emission(),
@@ -3632,13 +3738,25 @@ mod tests {
             auxiliary: None,
             equipment_reference: "micro-CHP".into(),
         });
-        input.distribution_system = Some(system(calculated_pump()));
+        // An individual installation in a dwelling ≤ 500 m² (9.2.5.1).
+        let mut individual = system(calculated_pump());
+        individual.installation = Installation::Individual;
+        input.distribution_system = Some(individual);
         let result = assess_space_heating_chain(&input);
         assert_eq!(
             result.status, "calculated_unverified",
             "{:?}",
             result.issues
         );
+        // 9.2.5.1: a collective installation has no recoverable generator
+        // loss.
+        let mut collective = input.clone();
+        collective.distribution_system = Some(system(calculated_pump()));
+        let collective = assess_space_heating_chain(&collective);
+        assert!(collective
+            .monthly
+            .iter()
+            .all(|row| row.generator_recoverable_loss_kwh == 0.0));
         // The chain uses t_H;op of 9.32a from the distribution summary.
         let hours = result.distribution.as_ref().unwrap().zones[0].operating_hours[0];
         let jan = &result.monthly[0];
@@ -3686,6 +3804,53 @@ mod tests {
             generator.method1 = None;
         }
         assert!(codes(&input).contains(&"chp_method_required"));
+    }
+
+    #[test]
+    fn multiple_boilers_count_the_9_85_pump_term_once() {
+        // 9.85 per appliance: A·N/12 + B·E_H;ci/(C·B_nom). The B term (with
+        // the pump) follows each boiler's own energy, so two identical
+        // boilers sharing the load add only the stand-by term A/12.
+        let single = boiler_chain();
+        let boiler = single.generator.clone();
+        let mut double = single.clone();
+        double.generator = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 24.0,
+                    generator: boiler.clone(),
+                },
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 24.0,
+                    generator: boiler,
+                },
+            ],
+            added_preferred_generator: false,
+            source_reference: "survey".into(),
+        }));
+        // Two generators at preference 1 only are also a valid split.
+        let one = assess_space_heating_chain(&single);
+        let two = assess_space_heating_chain(&double);
+        assert_eq!(two.status, "calculated_unverified", "{:?}", two.issues);
+        let differences: Vec<f64> = one
+            .monthly
+            .iter()
+            .zip(&two.monthly)
+            .map(|(a, b)| {
+                b.auxiliary_electricity_kwh.unwrap() - a.auxiliary_electricity_kwh.unwrap()
+            })
+            .collect();
+        for difference in &differences {
+            assert!((difference - differences[0]).abs() < 1e-9);
+        }
+        // A = 87,6 or 43,8 kWh per year.
+        assert!(
+            (differences[0] - 87.6 / 12.0).abs() < 1e-9
+                || (differences[0] - 43.8 / 12.0).abs() < 1e-9,
+            "{differences:?}"
+        );
     }
 
     #[test]
@@ -4309,6 +4474,18 @@ mod tests {
             .monthly
             .iter()
             .any(|row| row.generator_recoverable_loss_kwh > 0.0));
+        // 9.2.5.1: not in a building above 500 m² (here a collective
+        // connection of 800 m²).
+        let mut large = input.clone();
+        large.collective_connection = Some(CollectiveConnection {
+            connected_usable_area_m2: 800.0,
+            source_reference: "drawing".into(),
+        });
+        let large = assess_space_heating_chain(&large);
+        assert!(large
+            .monthly
+            .iter()
+            .all(|row| row.generator_recoverable_loss_kwh == 0.0));
     }
 
     #[test]
