@@ -175,12 +175,15 @@
   color: inherit;
   text-align: center;
   line-height: 1.15;
-  max-width: 58px;
+  /* Wide enough for one long Dutch compound ("Projectgegevens") without breaking it mid-word. */
+  max-width: 84px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: auto;
 }
 
 /* Small buttons (stacked) */

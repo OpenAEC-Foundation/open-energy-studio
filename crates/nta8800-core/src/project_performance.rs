@@ -2496,11 +2496,20 @@ fn derive_input(
         cooling_systems: nta.cooling_systems,
         label_function: nta.label_function,
         label_functions: nta.label_functions.clone(),
+        // One building construction year: the NTA block, else the registration, else the
+        // chapter 11 bouwjaar of table 11.13 (the same quantity).
         construction_year: nta.construction_year.or_else(|| {
-            project_value
-                .pointer("/registration/constructionYear")
-                .and_then(Value::as_u64)
-                .and_then(|year| u32::try_from(year).ok())
+            [
+                "/registration/constructionYear",
+                "/ntaCalculation/ventilation/constructionYear",
+            ]
+            .iter()
+            .find_map(|pointer| {
+                project_value
+                    .pointer(pointer)
+                    .and_then(Value::as_u64)
+                    .and_then(|year| u32::try_from(year).ok())
+            })
         }),
         fossil_appliances_outside_calculation: nta.fossil_appliances_outside_calculation,
         bbl_function: nta.bbl_function,
@@ -2874,6 +2883,27 @@ mod tests {
             let label = performance.indicative_label_class.unwrap();
             assert!(label.starts_with('A'), "{function}: label {label}");
         }
+    }
+
+    /// One building construction year: without one in the NTA block the
+    /// registration, else the chapter 11 bouwjaar (table 11.13), is used.
+    #[test]
+    fn construction_year_falls_back_to_registration_then_ventilation() {
+        let base: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        let year = |value: &Value| {
+            let mut gaps = Vec::new();
+            derive_input(value, &mut gaps).and_then(|input| input.construction_year)
+        };
+        assert!(base["ntaCalculation"].get("constructionYear").is_none());
+        assert_eq!(year(&base), Some(2020));
+        let mut registered = base.clone();
+        registered["registration"] = serde_json::json!({"constructionYear": 1975});
+        assert_eq!(year(&registered), Some(1975));
+        registered["ntaCalculation"]["constructionYear"] = serde_json::json!(1990);
+        assert_eq!(year(&registered), Some(1990));
     }
 
     /// The WLC-GWP area is per building: a terraced dwelling (party walls

@@ -11,6 +11,7 @@ import {
   asResidential, asUtility, calculationZoneTemplate, heatingGeneratorTemplate, hotWaterGeneratorTemplate, pvTemplate,
   solarTemplate, surveyTemplate, windowTemplate, type StoredSurvey, type SurveyKind,
 } from '../../core/nta/SurveyTemplates';
+import { KernelCode } from '../KernelCode/KernelCode';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
 
@@ -19,7 +20,7 @@ import './BasisopnamePanel.css';
 // that derives the NTA 8800 input with the applied defaults (ISSO pages).
 
 type Change = (path: Path, value: unknown) => void;
-type T = (key: string) => string;
+type T = (key: string, options?: Record<string, unknown>) => string;
 
 const HEATING_KINDS = ['boiler', 'heat_pump', 'local_fired', 'gas_air_heater', 'district_heat', 'electric', 'biomass',
   'chp', 'none_present'];
@@ -276,6 +277,15 @@ export function renameZone(draft: Draft, index: number, id: string): Draft {
 }
 
 /** Removes zone `index` and clears the references to it (unless another zone has the same name). */
+/** A recorded default value: a translated enum id with the id as reference, otherwise the value itself. */
+export function defaultValueLabel(t: T, value: string) {
+  if (!/^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(value)) return value;
+  const key = `opname.value.${value}`;
+  const text = t(key);
+  const label = text === key ? value.replace(/_/g, ' ') : text;
+  return <>{label} <code className="kernel-code-ref">{value}</code></>;
+}
+
 export function removeZone(draft: Draft, index: number): Draft {
   const zones = list(draft, ['zones']);
   const old = String(zones[index]?.id ?? '');
@@ -299,7 +309,11 @@ export function CalculationZoneFields({ draft, change, replace, t }: {
       const base: Path = ['zones', index];
       const functions = list(draft, [...base, 'functions']);
       const combined = read(draft, [...base, 'combined']) != null;
-      return <div key={index} className="opname-item">
+      return <div key={index} className="opname-zone" role="group"
+        aria-label={t('opname.zones.heading', { n: index + 1, id: String(read(draft, [...base, 'id']) ?? '') })}>
+        <strong className="opname-zone-heading">
+          {t('opname.zones.heading', { n: index + 1, id: String(read(draft, [...base, 'id']) ?? '') })}
+        </strong>
         <TextField draft={draft} path={[...base, 'id']} label={t('opname.zones.id')}
           onChange={(_, value) => replace(renameZone(draft, index, String(value ?? '')))} />
         {functions.map((_, functionIndex) => <div key={functionIndex} className="opname-served">
@@ -956,7 +970,9 @@ export function BasisopnamePanel() {
     {error && <p className="opname-error" role="alert">{error}</p>}
 
     {result && <div className="opname-result" aria-label={t('opname.result')}>
-      <p><strong>{t('opname.status')}:</strong> {result.status}</p>
+      <h4 className="opname-result-heading">{t('opname.resultHeading')}</h4>
+      <p className="nta-form-note">{t('opname.resultNote')}</p>
+      <p><strong>{t('opname.status')}:</strong> {t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
       {performance && <ul className="opname-indicators">
         <li>{t('opname.label')}: <strong>{performance.indicativeLabelClass ?? '—'}</strong></li>
         <li>BENG 1: {performance.needIndicatorKwhPerM2Year ?? '—'} kWh/m²</li>
@@ -966,11 +982,13 @@ export function BasisopnamePanel() {
       {result.issues.length > 0 && <ul className="opname-issues">
         {result.issues.map((item, index) => {
           const hint = t(`opname.issueHint.${item.code}`, { defaultValue: '' });
-          return <li key={index}><code>{item.code}</code> {item.path}{hint && <small> {hint}</small>}</li>;
+          return <li key={index}><KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} />
+            {' '}<code>{item.path}</code>{hint && <small> {hint}</small>}</li>;
         })}
       </ul>}
       {result.warnings.length > 0 && <ul className="opname-warnings">
-        {result.warnings.map((item, index) => <li key={index}><code>{item.code}</code> {item.note}</li>)}
+        {result.warnings.map((item, index) => <li key={index}>
+          <KernelCode code={item.code} prefixes={['opname.warning.', 'nta.warning.', 'nta.gap.']} /> {item.note}</li>)}
       </ul>}
       {result.appliedDefaults.length > 0 && <table className="opname-defaults">
         <caption>{t('opname.defaults')}</caption>
@@ -978,8 +996,8 @@ export function BasisopnamePanel() {
           <th>{t('opname.defaults.source')}</th><th>{t('opname.defaults.reason')}</th></tr></thead>
         <tbody>
           {result.appliedDefaults.map((item, index) => <tr key={index}>
-            <td><code>{item.path}</code></td><td>{item.value}</td><td>{item.source}</td>
-            <td><input aria-label={`${t('opname.defaults.reason')} ${item.path}`} value={reasons[item.path] ?? ''}
+            <td><code>{item.path}</code></td><td>{defaultValueLabel(t, item.value)}</td><td>{item.source}</td>
+            <td><input className="opname-reason" aria-label={`${t('opname.defaults.reason')} ${item.path}`} value={reasons[item.path] ?? ''}
               onChange={(event) => {
                 const next = { ...reasons };
                 if (event.target.value === '') delete next[item.path]; else next[item.path] = event.target.value;

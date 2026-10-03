@@ -39,7 +39,7 @@
 .nta-form { display: grid; gap: 12px; margin-top: 12px; }
 .nta-form-section { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .nta-form-section legend { font-weight: 700; padding: 0 4px; }
-.nta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; }
+.nta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; align-items: start; }
 .nta-form-row { display: contents; }
 .nta-form label { display: grid; gap: 3px; }
 .nta-form input:not([type="checkbox"]), .nta-form select { padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-width: 0; }
@@ -48,3 +48,102 @@
 .nta-form-actions { display: flex; gap: 8px; }
 .nta-performance-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .nta-form-error { color: #b42318; font-size: 12px; }
+
+/* Sub-blocks (generators, annex P routes, vessels, dynamic windows): full width, own grid. */
+.nta-form-subsection,
+.nta-form-group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  min-width: 0;
+}
+.nta-form-subsection .nta-form-subsection,
+.nta-form-subsection .nta-form-group,
+.nta-form-group .nta-form-subsection { background: var(--bg-primary); }
+.nta-form-subsection > strong,
+.nta-form-subsection > p,
+.nta-form-group > legend,
+.nta-form-group > p { grid-column: 1 / -1; }
+.nta-form-group > legend { font-weight: 700; padding: 0 4px; }
+/* Repeated entries (points, segments, vessels, windows) take a full row with their own grid. */
+.nta-form-grid > div:not([class]),
+.nta-form-subsection > div:not([class]),
+.nta-form-group > div:not([class]) {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-size: 12px; padding: 4px 0 0; }
+.nta-form-months {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px 8px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.nta-form-months > legend { font-weight: 600; font-size: 12px; padding: 0 4px; }
+
+/* Native buttons inside the form get the secondary button look. */
+.nta-form button:not(.btn),
+.nta-form-remove {
+  justify-self: start;
+  align-self: end;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nta-form button:not(.btn):hover,
+.nta-form-remove:hover { border-color: var(--accent); color: var(--accent); }
+.nta-form-remove { color: var(--energy-red, #b42318); }
+.nta-form-remove:hover { border-color: var(--energy-red, #b42318); color: var(--energy-red, #b42318); }
+.nta-form button:focus-visible,
+.nta-form-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Save / cancel stay reachable at the bottom of long forms. */
+.nta-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 0 -2px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Totals: long values (fingerprints, ventilation details) wrap inside their cell. */
+.nta-performance-totals > div { min-width: 0; }
+.nta-performance-totals dd { min-width: 0; overflow-wrap: anywhere; }
+.nta-performance-fingerprint {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.nta-performance-totals .nta-performance-wide { grid-column: 1 / -1; flex-direction: column; justify-content: flex-start; }
+.nta-performance-totals .nta-performance-wide dd { font-weight: 400; }

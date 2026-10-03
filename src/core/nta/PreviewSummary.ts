@@ -11,6 +11,8 @@ export interface PreviewSummary {
   beng3Limit: number | null;
   tojuliMaxK: number | null;
   tojuliMeetsLimit: boolean | null;
+  /** TOjuli has a Bbl limit for dwellings only (§5.7); the preview hides it for utility. */
+  tojuliApplies: boolean;
   labelClass: string | null;
   zebIndicator: number | null;
   finalEnergyKwh: number | null;
@@ -40,6 +42,7 @@ export function summarizeForPreview(assessment: ProjectPerformanceAssessment): P
     beng3Limit: limits?.renewableShareMinPercent ?? null,
     tojuliMaxK: performance?.tojuliMaxK ?? null,
     tojuliMeetsLimit: performance?.tojuliMeetsBblLimit ?? null,
+    tojuliApplies: assessment.derivedInput?.calculationScope !== 'utility',
     labelClass: performance?.indicativeLabelClass ?? null,
     zebIndicator: performance?.zebPrimaryTotalIndicatorKwhPerM2 ?? null,
     finalEnergyKwh: performance?.annualFinalEnergyKwh ?? null,

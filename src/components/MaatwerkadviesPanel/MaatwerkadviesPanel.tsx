@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
+import { KernelCode } from '../KernelCode/KernelCode';
+import { formatNumber } from '../../i18n/format';
 import { ClipboardList } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
-import { useI18n } from '../../i18n/i18n';
+import i18next, { useI18n } from '../../i18n/i18n';
 import {
   assessMaatwerkadviesWithRust,
   type MaatwerkadviesAssessment,
@@ -35,10 +37,9 @@ export function emptyMaatwerkadvies(): NtaMaatwerkadvies {
   };
 }
 
+/** Number in the active UI language. */
 function format(value: number | null | undefined, digits = 0): string {
-  return value == null || !Number.isFinite(value)
-    ? '–'
-    : value.toLocaleString('nl-NL', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return formatNumber(value, i18next.language || 'nl', digits);
 }
 
 /** Monthly values separated by `;` or new lines (decimal comma allowed); `-` or empty is `null`. */
@@ -182,13 +183,13 @@ export function MeasurePatchFields({ patch, onChange }: {
           </label>
           {operation.op !== 'remove' && <PatchValueField value={operation.value} fresh={rows.fresh.has(rows.ids[index])}
             onChange={(value) => update(index, { ...operation, value })} />}
-          <button type="button" onClick={() => {
+          <button type="button" className="btn" onClick={() => {
             rows.ids.splice(index, 1);
             onChange(patch.filter((_, other) => other !== index));
           }}>{t('mwa.remove')}</button>
         </div>
       ))}
-      <button type="button" onClick={() => {
+      <button type="button" className="btn" onClick={() => {
         const id = rows.next++;
         rows.ids.push(id);
         rows.fresh.add(id);
@@ -243,7 +244,7 @@ function MeasureEditor({ measure, onChange, onRemove }: {
         <input value={measure.specialistNote ?? ''} onChange={(e) => onChange({ ...measure, specialistNote: e.target.value || undefined })} />
       </label>
       <MeasurePatchFields patch={measure.patch} onChange={(patch) => onChange({ ...measure, patch })} />
-      <button type="button" onClick={onRemove}>{t('mwa.remove')}</button>
+      <button type="button" className="btn" onClick={onRemove}>{t('mwa.remove')}</button>
     </fieldset>
   );
 }
@@ -303,7 +304,7 @@ export function MaatwerkadviesPanel() {
       <section className="nta-performance mwa-panel" aria-label={t('mwa.title')}>
         <div className="nta-performance-title"><ClipboardList size={18} /><div><h3>{t('mwa.title')}</h3><p>{t('mwa.intro')}</p></div></div>
         <div className="nta-performance-actions">
-          <button type="button" onClick={() => update(emptyMaatwerkadvies())}>{t('mwa.start')}</button>
+          <button type="button" className="btn btn-primary" onClick={() => update(emptyMaatwerkadvies())}>{t('mwa.start')}</button>
         </div>
       </section>
     );
@@ -469,7 +470,7 @@ export function MaatwerkadviesPanel() {
           <MeasureEditor key={measure.id} measure={measure}
             onChange={(value) => setMeasure(index, value)} onRemove={() => removeMeasure(index)} />
         ))}
-        <button type="button" onClick={addMeasure}>{t('mwa.addMeasure')}</button>
+        <button type="button" className="btn" onClick={addMeasure}>{t('mwa.addMeasure')}</button>
       </details>
 
       <details open>
@@ -498,10 +499,10 @@ export function MaatwerkadviesPanel() {
               <input value={item.partialExecutionWarning ?? ''}
                 onChange={(e) => setPackage(index, { ...item, partialExecutionWarning: e.target.value || undefined })} />
             </label>
-            <button type="button" onClick={() => update({ ...definition, packages: definition.packages.filter((_, i) => i !== index) })}>{t('mwa.remove')}</button>
+            <button type="button" className="btn" onClick={() => update({ ...definition, packages: definition.packages.filter((_, i) => i !== index) })}>{t('mwa.remove')}</button>
           </fieldset>
         ))}
-        <button type="button" onClick={addPackage}>{t('mwa.addPackage')}</button>
+        <button type="button" className="btn" onClick={addPackage}>{t('mwa.addPackage')}</button>
         <label className="mwa-advised">{t('mwa.advised')}
           <select value={definition.advisedPackageId ?? ''}
             onChange={(e) => update({ ...definition, advisedPackageId: e.target.value || undefined })}>
@@ -568,8 +569,8 @@ export function MaatwerkadviesPanel() {
       </details>
 
       <div className="nta-performance-actions mwa-actions">
-        <button type="button" onClick={calculate} disabled={busy}>{busy ? t('mwa.calculating') : t('mwa.calculate')}</button>
-        <button type="button" onClick={() => { void downloadMaatwerkadviesReportHTML(project).catch((reason: unknown) => setError(String(reason))); }}>
+        <button type="button" className="btn btn-primary" onClick={calculate} disabled={busy}>{busy ? t('mwa.calculating') : t('mwa.calculate')}</button>
+        <button type="button" className="btn" onClick={() => { void downloadMaatwerkadviesReportHTML(project).catch((reason: unknown) => setError(String(reason))); }}>
           {t('mwa.report')}
         </button>
       </div>
@@ -579,7 +580,7 @@ export function MaatwerkadviesPanel() {
         <div className="mwa-results">
           {assessment.issues.length > 0 && (
             <ul className="nta-performance-gaps">
-              {assessment.issues.map((item, index) => <li key={index}><strong>{item.code}</strong><code>{item.path}</code>{item.detail}</li>)}
+              {assessment.issues.map((item, index) => <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} /> <code>{item.path}</code> {item.detail}</li>)}
             </ul>
           )}
           {assessment.current && (

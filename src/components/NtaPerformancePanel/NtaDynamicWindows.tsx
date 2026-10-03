@@ -99,7 +99,7 @@ function DynamicWindowFields({ draft, change, base, windowName }: SectionProps &
       </div>)}
       <button type="button" onClick={() => resize([...states, newState(states.length)], (row) => [...row, null])}>
         {t('nta.form.dynamic.addState')}</button>
-      <p>{t('nta.form.dynamic.weightsHelp')}</p>
+      <p className="nta-form-note">{t('nta.form.dynamic.weightsHelp')}</p>
       <WeightGrid draft={draft} change={change} path={[...dynamic, 'solarWeights']} states={states} label={t('nta.form.dynamic.solarWeights')} />
       <WeightGrid draft={draft} change={change} path={[...dynamic, 'temperatureWeights']} states={states} label={t('nta.form.dynamic.temperatureWeights')} />
     </>}
@@ -131,7 +131,7 @@ export function DynamicWindowsFields({ draft, change, project }: SectionProps & 
   const name = (id: unknown) => windows.find((window) => window.id === id)?.name || String(id);
   const free = windows.filter((window) => !entries.some((entry) => entry.windowId === window.id));
   return <>
-    <p>{t('nta.form.dynamic.help')}</p>
+    <p className="nta-form-note">{t('nta.form.dynamic.help')}</p>
     {entries.map((entry, index) => <div key={String(entry.windowId)}>
       <DynamicWindowFields draft={draft} change={change} base={['dynamicWindows', index]} windowName={name(entry.windowId)} />
       <button type="button" onClick={() => change(['dynamicWindows'], entries.filter((_, other) => other !== index))}>
