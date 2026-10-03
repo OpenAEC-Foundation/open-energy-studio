@@ -28,11 +28,18 @@ use serde::{Deserialize, Serialize};
 /// 9.74–9.77 practice factor.
 pub const PRACTICE_FACTOR: f64 = 0.95;
 
+/// Table 9.33: validity interval of the total efficiency η_chp.
+const MAX_TOTAL_EFFICIENCY: f64 = 1.2;
+
+/// Relative tolerance between a test point's P_el and P_th·η_el/η_th.
+const ELECTRIC_TOLERANCE: f64 = 0.02;
+
 pub const INTERPRETATIONS: &[&str] = &[
     "9.6.6.2: P_th;sb of figures 9.1–9.3 is taken as 0 kW (no heat output in the stand-by state)",
     "9.6.6.2: NEN-EN 50465 efficiencies refer to the net calorific value (table 9.37 totals above 1); the input is converted to the gross value with f_Hs/Hi of table M.3 (gas 1,11, oil 1,06)",
-    "9.66: heat above P_th;chp_100+sup_100·t is booked at the CHP_100 %+Sup_100 % efficiency (η_th, η_el) instead of being rejected",
-    "16.15: the electricity of a collective CHP is scaled with f_gebouw;si;H like the input energy",
+    "9.66: P_th;gen;out is capped at P_th;chp_100+sup_100 and 16.15 credits only P_el·t at that capped output; heat above P_th;chp_100+sup_100·t (also when the f_func cap of 13.183 binds) earns no electricity. The norm assigns that excess to no generator (read literally it would cost no fuel at all), so its input is booked as supplementary heat at f_prac·η_th;chp_100+sup_100 and reported with the warning micro_chp_capacity_exceeded",
+    "16.15: the electricity of a collective CHP is scaled with f_gebouw;si;H like the input energy. The printed 16.15 has no f_gebouw, but 9.66 works with the output of the whole installation (Q_H;gen;j;out / f_gebouw), so P_el·t is the whole installation's production; without f_gebouw one building part would be credited with all of it",
+    "§9.6.6 vs §16.4: chapter 9 numbers the forfait route method 2 (9.6.6.1) and the NEN-EN 50465 route method 1 (9.6.6.2); §16.4.2/§16.4.3 number them the other way round. The kernel follows chapter 9. §13.8.4.8.3/13.8.4.8.4 cite 9.6.5.2 for the CHP, read as 9.6.6.2",
 ];
 
 /// Table 9.36 CGN_TYPE.
@@ -285,9 +292,32 @@ pub fn validate_micro_chp(chp: &MicroChp, path: &str) -> Vec<MicroChpIssue> {
                 &format!("{name}.auxiliaryPowerKw"),
             );
         }
-        if resolve(point, default).is_none() {
+        match resolve(point, default) {
             // ORC (no table 9.37 column) needs measured efficiencies.
-            push("micro_chp_efficiency_required", name);
+            None => push("micro_chp_efficiency_required", name),
+            Some(resolved) => {
+                // Table 9.33: η_chp = η_th + η_el in [0:1,2]; above it the
+                // 9.74–9.77 loss turns negative.
+                if resolved.thermal_eff + resolved.electric_eff > MAX_TOTAL_EFFICIENCY + 1e-9 {
+                    push(
+                        "micro_chp_total_efficiency_invalid",
+                        &format!("{name}.thermalEfficiency"),
+                    );
+                }
+                // P_el and η_el both given must agree with P_th·η_el/η_th,
+                // otherwise the 9.82 balance mixes two products.
+                if let (Some(power), Some(eta_el)) =
+                    (point.electric_power_kw, point.electric_efficiency)
+                {
+                    let implied = point.thermal_power_kw * eta_el / resolved.thermal_eff;
+                    if (power - implied).abs() > ELECTRIC_TOLERANCE * implied.max(0.01) {
+                        push(
+                            "micro_chp_electric_values_inconsistent",
+                            &format!("{name}.electricPowerKw"),
+                        );
+                    }
+                }
+            }
         }
     }
     if chp.full_load.thermal_power_kw < chp.chp_only.thermal_power_kw {
@@ -424,6 +454,9 @@ pub struct MicroChpMonth {
     pub auxiliary_kwh: Option<f64>,
     /// 9.80/9.81, kWh.
     pub recoverable_kwh: f64,
+    /// Heat of the building part above P_th;chp_100+sup_100·t (9.66), kWh;
+    /// included in `input_kwh` without electricity.
+    pub excess_kwh: f64,
 }
 
 /// Interpolation between stand-by (P_th = 0), CHP_100+Sup_0 and
@@ -482,13 +515,13 @@ pub fn micro_chp_month(
     let p_el = interpolate(p_th, p0, p100, el_sb, only.electric_kw, full.electric_kw);
     // 9.78/9.79.
     let p_ls = interpolate(p_th, p0, p100, loss_sb, only.loss_kw(), full.loss_kw());
-    // 9.82/9.83, net calorific value; the excess above full load at the
-    // CHP_100+Sup_100 efficiency (interpretation).
+    // 9.82/9.83, net calorific value; the excess above full load as
+    // supplementary heat at the CHP_100+Sup_100 thermal efficiency
+    // (interpretation), without electricity (16.15: P_el·t only).
     let mut input_net = (p_th + p_el + p_ls) * t + loss_sb * t_sb;
-    let mut electricity = p_el * t;
+    let electricity = p_el * t;
     if excess_kwh > 0.0 {
         input_net += excess_kwh / (PRACTICE_FACTOR * full.thermal_eff);
-        electricity += excess_kwh * full.electric_eff / full.thermal_eff;
     }
     // 9.69–9.72.
     let auxiliary = if chp.net_production_measured {
@@ -518,6 +551,7 @@ pub fn micro_chp_month(
         electricity_kwh: electricity * fraction,
         auxiliary_kwh: auxiliary,
         recoverable_kwh: recoverable,
+        excess_kwh: excess_kwh * fraction,
     })
 }
 
@@ -639,11 +673,53 @@ mod tests {
         // 9.72: P_aux;sb · t_sb · f_gebouw.
         close(month.auxiliary_kwh.unwrap(), 0.01 * 644.0 * 0.25);
         assert_eq!(month.recoverable_kwh, 0.0);
-        // Above the 20 kW full-load point the excess uses Sup_100 values.
+        // Above the 20 kW full-load point: 9.66 caps P_th, 16.15 credits
+        // only P_el·t; the excess carries input but no electricity.
         let high = micro_chp_month(&stirling(), 30.0 * 100.0, 100.0, 744.0, 1.0, false).unwrap();
         close(high.thermal_power_kw, 20.0);
         let el100 = 20.0 * 0.04 / 0.92;
-        close(high.electricity_kwh, el100 * 100.0 + 1000.0 * 0.04 / 0.92);
+        close(high.electricity_kwh, el100 * 100.0);
+        close(high.excess_kwh, 1000.0);
+    }
+
+    #[test]
+    fn heat_above_full_load_earns_no_electricity() {
+        // Stirling with a 24 kW CHP_100+Sup_100 point and the table 9.37
+        // defaults (η_th 0,92, η_el 0,04): 9 000 kWh in 300 h asks 30 kW.
+        let mut chp = stirling();
+        chp.full_load.thermal_power_kw = 24.0;
+        let month = micro_chp_month(&chp, 9000.0, 300.0, 744.0, 1.0, false).unwrap();
+        close(month.thermal_power_kw, 24.0);
+        // 16.15: P_el(24 kW) · 300 h = 24 · 0,04/0,92 · 300 = 313,04 kWh.
+        close(month.electricity_kwh, 24.0 * 0.04 / 0.92 * 300.0);
+        assert!((month.electricity_kwh - 313.0).abs() < 0.05);
+        close(month.excess_kwh, 1800.0);
+        // Input: 9.82/9.83 at 24 kW plus 1 800 kWh at 0,95·0,92, gross.
+        let loss100 = (1.0 - 0.95 * 0.92 - 0.95 * 0.04) * 24.0 / (0.95 * 0.92);
+        let chp_part = (24.0 + 24.0 * 0.04 / 0.92 + loss100) * 300.0 + 0.4 * 444.0;
+        close(month.input_kwh, (chp_part + 1800.0 / (0.95 * 0.92)) * 1.11);
+    }
+
+    #[test]
+    fn total_efficiency_and_electric_values_are_checked() {
+        let codes = |chp: &MicroChp| -> Vec<&'static str> {
+            validate_micro_chp(chp, "chp")
+                .into_iter()
+                .map(|issue| issue.code)
+                .collect()
+        };
+        // Table 9.33: η_th 0,95 + η_el 0,30 = 1,25 > 1,2.
+        let mut chp = stirling();
+        chp.full_load.thermal_efficiency = Some(0.95);
+        chp.full_load.electric_efficiency = Some(0.30);
+        assert!(codes(&chp).contains(&"micro_chp_total_efficiency_invalid"));
+        // 1,0 kW stated with η_el 0,20 at 6 kW and η_th 0,80 implies 1,5 kW.
+        let mut chp = stirling();
+        chp.chp_only.electric_efficiency = Some(0.20);
+        assert!(codes(&chp).contains(&"micro_chp_electric_values_inconsistent"));
+        // Consistent values (1,0 kW ↔ η_el 0,80/6) pass.
+        chp.chp_only.electric_efficiency = Some(0.80 / 6.0);
+        assert!(codes(&chp).is_empty());
     }
 
     #[test]

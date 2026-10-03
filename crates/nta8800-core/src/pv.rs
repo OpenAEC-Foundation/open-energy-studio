@@ -228,6 +228,30 @@ fn nearest_orientation(azimuth_deg: f64) -> crate::climate::Orientation {
     ][sector]
 }
 
+/// 17.3.7 (p. 749): the obstruction table value of the nearest orientation;
+/// exactly midway between two the higher neighbouring value may be used,
+/// and the kernel takes it (as 17.2 does for I_sol, p. 694).
+fn collector_obstruction(
+    situation: &crate::solar_shading::CollectorObstruction,
+    azimuth_deg: f64,
+    tilt_deg: f64,
+    month: u8,
+) -> Option<f64> {
+    let first = nearest_orientation(azimuth_deg);
+    let value =
+        crate::solar_shading::collector_obstruction_factor(situation, first, tilt_deg, month)?;
+    let sector = azimuth_deg.rem_euclid(360.0) / 45.0;
+    if (sector - sector.floor() - 0.5).abs() > 1e-9 {
+        return Some(value);
+    }
+    // Exactly midway: `round` took the clockwise neighbour; compare with
+    // the other one.
+    let other = nearest_orientation(azimuth_deg - 22.5 - 1e-6);
+    let alternative =
+        crate::solar_shading::collector_obstruction_factor(situation, other, tilt_deg, month)?;
+    Some(value.max(alternative))
+}
+
 fn unknown_mounting() -> PvMounting {
     PvMounting::Unknown
 }
@@ -235,9 +259,9 @@ fn unknown_mounting() -> PvMounting {
 impl PvSystem {
     fn obstruction(&self, index: usize) -> f64 {
         if let Some(situation) = &self.obstruction {
-            return crate::solar_shading::collector_obstruction_factor(
+            return collector_obstruction(
                 situation,
-                nearest_orientation(self.azimuth_deg),
+                self.azimuth_deg,
                 self.tilt_deg,
                 index as u8 + 1,
             )
@@ -250,6 +274,12 @@ impl PvSystem {
         }
     }
 }
+
+/// Readings of chapter 16 and 17.3.7 where the norm leaves a choice.
+pub const INTERPRETATIONS: &[&str] = &[
+    "Table 16.3 (p. 681) lists c_sh;PV from F_sh;obst 0,80 to 1,00 and gives no rule outside that range; below 0,80 the kernel holds the last value 0,75 (as other tables are held at their ends). The yield of 16.2/16.3 still falls with F_sh;obst itself, so only the extra mismatch correction stops at 0,75",
+    "17.3.7 (p. 749): an azimuth exactly midway between two table orientations may take the higher neighbouring obstruction value; the kernel does so per month, consistent with I_sol in 17.2 (p. 694), where the higher value is required",
+];
 
 /// Table 16.3 with linear interpolation; `F_sh;obst ≤ 0,80` gives 0,75.
 pub fn shading_correction(obstruction_factor: f64) -> f64 {
@@ -332,15 +362,9 @@ pub fn validate_pv(system: &PvSystem, path: &str) -> Vec<PvIssue> {
             if !factors.is_empty() {
                 push("pv_obstruction_declared_twice", "obstruction");
             }
-            let orientation = nearest_orientation(system.azimuth_deg);
             if (1..=12).any(|month| {
-                crate::solar_shading::collector_obstruction_factor(
-                    situation,
-                    orientation,
-                    system.tilt_deg,
-                    month,
-                )
-                .is_none()
+                collector_obstruction(situation, system.azimuth_deg, system.tilt_deg, month)
+                    .is_none()
             }) {
                 push("pv_obstruction_invalid", "obstruction");
             }
@@ -493,6 +517,36 @@ mod tests {
         assert_eq!(
             nearest_orientation(350.0),
             crate::climate::Orientation::North
+        );
+    }
+
+    #[test]
+    fn midway_orientation_takes_the_higher_obstruction_value() {
+        use crate::climate::Orientation::{North, NorthEast, NorthWest, West};
+        use crate::solar_shading::collector_obstruction_factor as table;
+        let edge = crate::solar_shading::CollectorObstruction::RoofEdge {
+            height_m: 2.0,
+            distance_m: 1.0,
+        };
+        // 17.3.7 (p. 749): exactly midway the higher neighbouring value.
+        for (azimuth, tilt, a, b) in [
+            (22.5, 45.0, North, NorthEast),
+            (292.5, 90.0, West, NorthWest),
+        ] {
+            for month in 1..=12 {
+                let expected = table(&edge, a, tilt, month)
+                    .unwrap()
+                    .max(table(&edge, b, tilt, month).unwrap());
+                assert_eq!(
+                    collector_obstruction(&edge, azimuth, tilt, month),
+                    Some(expected)
+                );
+            }
+        }
+        // Off the midpoint the nearest orientation alone.
+        assert_eq!(
+            collector_obstruction(&edge, 20.0, 45.0, 6),
+            table(&edge, North, 45.0, 6)
         );
     }
 

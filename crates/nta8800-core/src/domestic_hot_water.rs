@@ -1591,6 +1591,7 @@ pub fn merge_hot_water(results: Vec<HotWaterAssessment>) -> Option<HotWaterAsses
             month.extra_electric_output_kwh += other.extra_electric_output_kwh;
             month.heating_system_load_kwh += other.heating_system_load_kwh;
             month.chp_electricity_kwh += other.chp_electricity_kwh;
+            month.chp_excess_kwh += other.chp_excess_kwh;
         }
         merged.annual_net_need_kwh += result.annual_net_need_kwh;
         merged.annual_generator_output_kwh += result.annual_generator_output_kwh;
@@ -1756,6 +1757,9 @@ pub struct HotWaterMonth {
     pub heating_system_load_kwh: f64,
     /// 16.13/16.16 `E_el;chp;out;W`: electricity of a hot-water CHP, kWh.
     pub chp_electricity_kwh: f64,
+    /// 9.66 with 13.183: hot-water heat above P_th;chp_100+sup_100·t_W;op,
+    /// booked without electricity (`micro_chp_capacity_exceeded`), kWh.
+    pub chp_excess_kwh: f64,
 }
 
 fn round_down(value: f64, step: f64) -> f64 {
@@ -2954,6 +2958,8 @@ struct Booking {
     heating_system: [f64; 12],
     /// 16.13/16.16: CHP electricity.
     chp_electricity: [f64; 12],
+    /// 9.66: CHP heat above full load (no electricity).
+    chp_excess: [f64; 12],
     /// Q_W;gen;out of a table 13.22 biomass appliance.
     biomass_output: [f64; 12],
     /// §13.8.4.8: the heating share of a combi micro-CHP.
@@ -3258,8 +3264,10 @@ fn book_generator(
                         electricity_kwh: month.electricity_kwh * water_share,
                         auxiliary_kwh: month.auxiliary_kwh.map(|value| value * water_share),
                         recoverable_kwh: month.recoverable_kwh * water_share,
+                        excess_kwh: month.excess_kwh * water_share,
                         ..month
                     };
+                    booking.chp_excess[index] = month.excess_kwh;
                     // 13.182 rounded down to 0,025.
                     let efficiency = round_down(output / month.input_kwh, 0.025);
                     booking.input[index] = output / efficiency;
@@ -4112,6 +4120,7 @@ pub fn assess_hot_water_with(
             row.ambient_heat_kwh += booking.ambient[index];
             row.heating_system_load_kwh += booking.heating_system[index];
             row.chp_electricity_kwh += booking.chp_electricity[index];
+            row.chp_excess_kwh += booking.chp_excess[index];
             generator_recoverable[index] += booking.recoverable[index];
             weighted_input[index] += booking.efficiency_input[index];
         }

@@ -937,6 +937,9 @@ pub struct ChainMonth {
     pub chp_operating_hours: f64,
     pub chp_input_kwh: f64,
     pub chp_generator_auxiliary_kwh: f64,
+    /// 9.66: heat above P_th;chp_100+sup_100·t, booked without electricity
+    /// (`micro_chp_capacity_exceeded`), kWh.
+    pub chp_excess_kwh: f64,
     /// 13.185 hot-water load from §13.8.4.9.3, kWh.
     pub hot_water_load_kwh: f64,
 }
@@ -1141,6 +1144,7 @@ impl ChainMonth {
         self.humidification_fuel_kwh += other.humidification_fuel_kwh;
         self.ahu_heating_load_kwh += other.ahu_heating_load_kwh;
         self.chp_electricity_kwh += other.chp_electricity_kwh;
+        self.chp_excess_kwh += other.chp_excess_kwh;
         self.hot_water_load_kwh += other.hot_water_load_kwh;
     }
 }
@@ -2483,6 +2487,7 @@ fn assess_chain_pass(
                 chp_operating_hours: 0.0,
                 chp_input_kwh: 0.0,
                 chp_generator_auxiliary_kwh: 0.0,
+                chp_excess_kwh: 0.0,
                 hot_water_load_kwh: hot_water_load,
                 humidification_electricity_kwh: humidification[index][1],
                 humidification_fuel_kwh: humidification[index][2],
@@ -3441,6 +3446,7 @@ fn generate_multiple(
             row.generator_electricity_kwh += sub.generator_electricity_kwh;
             row.collective_source_heat_kwh += sub.collective_source_heat_kwh;
             row.chp_electricity_kwh += sub.chp_electricity_kwh;
+            row.chp_excess_kwh += sub.chp_excess_kwh;
             row.chp_thermal_output_kwh += sub.chp_thermal_output_kwh;
             row.chp_operating_hours = row.chp_operating_hours.max(sub.chp_operating_hours);
             row.chp_input_kwh += sub.chp_input_kwh;
@@ -3549,6 +3555,7 @@ fn generate_identical(
         row.generator_electricity_kwh = n * one.generator_electricity_kwh;
         row.collective_source_heat_kwh = n * one.collective_source_heat_kwh;
         row.chp_electricity_kwh = n * one.chp_electricity_kwh;
+        row.chp_excess_kwh = n * one.chp_excess_kwh;
         row.auxiliary_electricity_kwh = one.auxiliary_electricity_kwh.map(|value| n * value);
     }
     efficiency
@@ -3726,6 +3733,7 @@ fn generate(
                         }
                         // 16.15.
                         row.chp_electricity_kwh = month.electricity_kwh;
+                        row.chp_excess_kwh = month.excess_kwh;
                         row.chp_thermal_output_kwh =
                             row.generator_output_kwh + storage_loss * building_fraction;
                         row.chp_operating_hours = hours[index];
