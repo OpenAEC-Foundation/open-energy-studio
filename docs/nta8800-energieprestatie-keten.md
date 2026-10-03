@@ -875,3 +875,5 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 **Absorptiekoeling op externe warmte (tabel 10.30).** Hiervoor geldt ζ = 0,70 × η_H;gen;equiv;dh. Volgens 9.6.7.2 heeft η_H;gen;equiv;dh de vaste waarde 1,0; de kern rekent dus al conform. Bijlage P verandert de primaire factor van de warmte, niet dit rendement.
 
 **Niet gekoppeld.** De koude-onttrekking van een boosterwarmtepomp (W.3) wordt niet automatisch als Q_C;HP (10.6) aan de koeling doorgegeven. Beide blijven invoer: `cooling.boosterHeatPumpExtractionKwh` en `coolingExtractionKwh` van bijlage W.
+
+**ϑ_ztu voor tapwater in de projectroute.** Heeft het project precies één onverwarmde ruimte, dan krijgen ook de tapwatersystemen die b_U mee (7.82, voor 13.26, 13.58 en 13.168). Dat gebeurt alleen als het systeem zelf geen b_U opgeeft, en gaat op dezelfde manier als bij het verwarmingsdistributiesysteem.

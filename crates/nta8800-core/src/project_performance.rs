@@ -427,15 +427,29 @@ fn with_unheated_reduction(
     project: &ProjectInput,
 ) -> Option<crate::space_heating_chain::DistributionSystem> {
     let mut system = system?;
-    if system.unheated_ambient_c.is_none()
-        && system.unheated_reduction_factor.is_none()
-        && project.unheated_spaces.len() == 1
-    {
-        system.unheated_reduction_factor = crate::unheated_project_input(project)
-            .map(|input| crate::unheated_transmission::assess_unheated_transmission(&input))
-            .and_then(|assessed| assessed.spaces.first().map(|space| space.reduction_factor));
+    if system.unheated_ambient_c.is_none() && system.unheated_reduction_factor.is_none() {
+        system.unheated_reduction_factor = single_unheated_reduction(project);
     }
     Some(system)
+}
+
+/// `b_U` of the only unheated space of the project, if there is exactly one.
+fn single_unheated_reduction(project: &ProjectInput) -> Option<f64> {
+    if project.unheated_spaces.len() != 1 {
+        return None;
+    }
+    crate::unheated_project_input(project)
+        .map(|input| crate::unheated_transmission::assess_unheated_transmission(&input))
+        .and_then(|assessed| assessed.spaces.first().map(|space| space.reduction_factor))
+}
+
+/// 7.82 for hot-water pipes and vessels in that unheated space (13.26,
+/// 13.58, 13.168), unless the system gives `b_U` itself.
+fn with_hot_water_reduction(mut system: HotWaterSystem, project: &ProjectInput) -> HotWaterSystem {
+    if system.unheated_reduction_factor.is_none() {
+        system.unheated_reduction_factor = single_unheated_reduction(project);
+    }
+    system
 }
 
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
@@ -882,8 +896,14 @@ fn derive_input(
         production_inventory_complete: nta.production_inventory_complete,
         on_site_production: nta.on_site_production,
         pv_systems: nta.pv_systems,
-        hot_water: nta.hot_water,
-        additional_hot_water_systems: nta.additional_hot_water_systems,
+        hot_water: nta
+            .hot_water
+            .map(|system| with_hot_water_reduction(system, &project)),
+        additional_hot_water_systems: nta
+            .additional_hot_water_systems
+            .into_iter()
+            .map(|system| with_hot_water_reduction(system, &project))
+            .collect(),
         space_heating_solar: nta.space_heating_solar,
         lighting: nta.lighting,
         cooling: nta.cooling,
