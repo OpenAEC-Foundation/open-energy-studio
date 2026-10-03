@@ -16,6 +16,8 @@ De Rust-invoeraudit toont op dezelfde manier alleen een beoordeling voor de proj
 
 De [debug-desktopbuild van commit `fc5a8a5`](nta8800-build-verificatie-2026-10-03-fc5a8a5.md) bundelt de Rust-kern en NTA-interface van die commit. De build en de genoemde tests zijn technisch geslaagd; de referentie- en attestkolommen hieronder worden daardoor niet automatisch vrijgegeven.
 
+Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
+
 | Onderdeel | Model | Audit | Rekenroute | Referentie | Attest | Volgende verificatie |
 | --- | --- | --- | --- | --- | --- | --- |
 | Gebouw, zones, Ag en volume | bestaand `.oes` + Rust-envelope; NTA-rekeninvoer per rekenzone (`zoneData`) | positief/uniciteit; zone-indeling §6.4/6.5.2 en gemengde rekenzones §6.5.3 in de kern | ja, onverifieerd: A_g;tot, A_ls met f_ls (6.3, 6.7.3), zone-indeling §6.4–6.5 | EP-W001 (ISSO 54 v2.0, 2022): A_g = 96 m² en A_o = 247,2 m² exact gereproduceerd (p. 5, tolerantie 1 %); A_ls = 232,8 m² met f_ls 0,7 (6.7.3); onafhankelijke Python-herberekening (3 oktober 2026, zie verificatiestatus); geen EDR | nee | meetregels (bijlage K) blijven invoer; actuele referentiegevallen |
