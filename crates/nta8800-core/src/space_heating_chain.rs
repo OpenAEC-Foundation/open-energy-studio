@@ -3385,7 +3385,9 @@ fn generate(
         }
         Generator::GasBoiler(generator) => {
             let collective = generator.boiler.role == BoilerRole::Collective;
-            if collective {
+            // 9.6.8.2.2: W_H;aux;gen = 0 for an unknown collective generator.
+            let unknown = generator.boiler.kind == crate::boiler_forfait_draft::BoilerKind::Unknown;
+            if collective && !unknown {
                 validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
             } else if generator.auxiliary.is_some() {
                 issues.push(issue(
@@ -3407,7 +3409,12 @@ fn generate(
             generation_efficiency = result.generation_efficiency;
             for (row, boiler) in monthly.iter_mut().zip(&result.monthly) {
                 row.natural_gas_kwh = boiler.input_natural_gas_kwh;
-                row.auxiliary_electricity_kwh = boiler.auxiliary_electricity_kwh;
+                row.oil_kwh = boiler.input_oil_kwh;
+                row.auxiliary_electricity_kwh = if unknown {
+                    Some(0.0)
+                } else {
+                    boiler.auxiliary_electricity_kwh
+                };
             }
             if let Some(measurements) = &generator.auxiliary_measurements {
                 if collective {
@@ -3438,7 +3445,7 @@ fn generate(
             if result.monthly.len() != 12 && issues.is_empty() {
                 issues.push(issue("generator_result_incomplete", "generator"));
             }
-            if let (true, Some(auxiliary)) = (collective, &generator.auxiliary) {
+            if let (true, false, Some(auxiliary)) = (collective, unknown, &generator.auxiliary) {
                 if issues.is_empty() {
                     for (index, row) in monthly.iter_mut().enumerate() {
                         row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
@@ -4337,6 +4344,27 @@ mod tests {
         assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.49).abs() < 1e-9);
         assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.30 / 0.49).abs() < 1e-9);
         assert_eq!(result.generation_efficiency, Some(0.49));
+    }
+
+    #[test]
+    fn unknown_collective_generator_has_no_auxiliary_energy() {
+        // 9.6.8.2.2: W_H;aux;gen = 0; table 9.25 a) 0,70.
+        let mut input = boiler_chain();
+        if let Generator::GasBoiler(generator) = &mut input.generator {
+            generator.boiler.role = BoilerRole::Collective;
+            generator.boiler.kind = crate::boiler_forfait_draft::BoilerKind::Unknown;
+            generator.auxiliary = None;
+        }
+        input.distribution_system = Some(system(calculated_pump()));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.issues);
+        assert_eq!(result.generation_efficiency, Some(0.70));
+        let jan = &result.monthly[0];
+        assert!(
+            (jan.auxiliary_electricity_kwh.unwrap() - jan.distribution_auxiliary_electricity_kwh)
+                .abs()
+                < 1e-9
+        );
     }
 
     #[test]

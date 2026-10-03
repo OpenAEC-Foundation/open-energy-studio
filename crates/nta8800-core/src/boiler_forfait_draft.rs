@@ -26,17 +26,21 @@ pub enum BoilerLocation {
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum BoilerKind {
+    /// A gas boiler without further designation, or any oil boiler.
     Conventional,
     Vr,
     Hr100,
     Hr104,
     Hr107,
+    /// Table 9.25 a): unknown generator of a collective installation
+    /// (0,70; W_H;aux;gen = 0 per 9.6.8.2.2, note 1 of table 9.25).
+    Unknown,
 }
 
 impl BoilerKind {
     fn index(self) -> usize {
         match self {
-            Self::Conventional => 0,
+            Self::Conventional | Self::Unknown => 0,
             Self::Vr => 1,
             Self::Hr100 => 2,
             Self::Hr104 => 3,
@@ -159,8 +163,22 @@ pub fn assess_boiler_forfait_draft(
     if input.generator_id.trim().is_empty() {
         issues.push(issue("generator_id_required", "generatorId"));
     }
-    if input.fuel != "natural_gas" {
-        issues.push(issue("fuel_unsupported", "fuel"));
+    // Table 9.25: oil boilers count as conventional (definition below the
+    // table); VR and HR classes are gas appliances.
+    match input.fuel.as_str() {
+        "natural_gas" => {}
+        "oil" => {
+            if input.kind != BoilerKind::Conventional {
+                issues.push(issue("oil_boiler_must_be_conventional", "kind"));
+            }
+            if input.pilot_flame_present {
+                issues.push(issue("pilot_flame_gas_only", "pilotFlamePresent"));
+            }
+        }
+        _ => issues.push(issue("fuel_unsupported", "fuel")),
+    }
+    if input.kind == BoilerKind::Unknown && input.role != BoilerRole::Collective {
+        issues.push(issue("unknown_boiler_collective_only", "kind"));
     }
     if !input.average_design_emission_temperature_c.is_finite()
         || !(-30.0..=120.0).contains(&input.average_design_emission_temperature_c)
@@ -258,6 +276,9 @@ pub struct BoilerMonth {
     pub month: u8,
     pub generator_output_kwh: f64,
     pub input_natural_gas_kwh: f64,
+    /// Oil input of a conventional oil boiler (gross value), kWh.
+    #[serde(default)]
+    pub input_oil_kwh: f64,
     pub auxiliary_electricity_kwh: Option<f64>,
     /// §9.6.2.1: 695 kWh gas per year for a pilot flame, by month length,
     /// for the whole device (not in `input_natural_gas_kwh`; a collective
@@ -360,10 +381,12 @@ pub fn assess_boiler_forfait_monthly_draft(
                     break;
                 }
             }
+            let oil = input.boiler.fuel == "oil";
             monthly.push(BoilerMonth {
                 month: (index + 1) as u8,
                 generator_output_kwh: thermal,
-                input_natural_gas_kwh: fuel,
+                input_natural_gas_kwh: if oil { 0.0 } else { fuel },
+                input_oil_kwh: if oil { fuel } else { 0.0 },
                 auxiliary_electricity_kwh: auxiliary,
                 pilot_flame_natural_gas_kwh: if input.boiler.pilot_flame_present {
                     PILOT_FLAME_ANNUAL_KWH * crate::climate::MONTH_HOURS[index]
@@ -424,6 +447,47 @@ mod tests {
             "temperatureAndCircuitReference":"system design", "pilotFlamePresent":false
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn oil_boilers_are_conventional_and_unknown_is_collective() {
+        // Table 9.25: an oil boiler is conventional (0,75 inside, main).
+        let mut input = sample();
+        input.role = BoilerRole::IndividualMain;
+        input.fuel = "oil".into();
+        assert!(assess_boiler_forfait_draft(&input)
+            .issues
+            .iter()
+            .any(|item| item.code == "oil_boiler_must_be_conventional"));
+        input.kind = BoilerKind::Conventional;
+        assert_eq!(
+            assess_boiler_forfait_draft(&input).generation_efficiency,
+            Some(0.75)
+        );
+        let monthly = assess_boiler_forfait_monthly_draft(&BoilerForfaitMonthlyDraftInput {
+            boiler: input.clone(),
+            generator_output_kwh: (1..=12)
+                .map(|month| MonthlyEnergy {
+                    month,
+                    energy_kwh: 300.0,
+                })
+                .collect(),
+            generator_output_reference: "dispatch heat".into(),
+        });
+        assert_eq!(monthly.monthly[0].input_natural_gas_kwh, 0.0);
+        assert!((monthly.monthly[0].input_oil_kwh - 400.0).abs() < 1e-9);
+        // Table 9.25 a): unknown collective generator 0,70.
+        let mut unknown = sample();
+        unknown.kind = BoilerKind::Unknown;
+        assert!(assess_boiler_forfait_draft(&unknown)
+            .issues
+            .iter()
+            .any(|item| item.code == "unknown_boiler_collective_only"));
+        unknown.role = BoilerRole::Collective;
+        assert_eq!(
+            assess_boiler_forfait_draft(&unknown).generation_efficiency,
+            Some(0.70)
+        );
     }
 
     #[test]
