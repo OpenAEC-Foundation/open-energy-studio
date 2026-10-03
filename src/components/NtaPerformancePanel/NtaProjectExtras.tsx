@@ -88,6 +88,7 @@ export function HumidifiersFields({ draft, change, project }: SectionProps & { p
         {kind === 'steam' && <SelectField {...field} path={at('humidification', 'humidifier', 'carrier')}
           label={t('nta.form.humidifier.carrier')} options={[
             ['electricity', t('nta.form.humidifier.electricity')], ['gas_or_oil', t('nta.form.humidifier.gasOrOil')]]} />}
+        {kind === 'steam' && <NumberField {...field} path={at('servedAreaM2')} label={t('nta.form.humidifier.servedArea')} />}
         <CheckField {...field} path={at('humidification', 'rotaryWheel')} label={t('nta.form.humidifier.rotaryWheel')} />
         <TextField {...field} path={at('humidification', 'equipmentReference')} label={t('nta.form.boilerEquipmentSource')} />
         <RemoveButton label={t('nta.form.remove')} onClick={() => change(['humidifiers'], rows.filter((__, other) => other !== index))} />

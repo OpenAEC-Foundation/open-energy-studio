@@ -949,6 +949,11 @@ pub struct ChainMonth {
 pub struct ZoneHumidifier {
     pub zone_id: String,
     pub humidification: crate::humidification::Humidification,
+    /// A_g served by the humidification generator for the "grote opwekkers
+    /// (A_g > 500 m²)" rule of 12.2.1 (p. 521). Absent: the area connected
+    /// to the space-heating system (as 9.2.5.1), the earlier reading.
+    #[serde(default)]
+    pub served_area_m2: Option<f64>,
 }
 
 fn humidity_function(function: crate::monthly_demand::UsageFunction) -> HumidityFunction {
@@ -2334,6 +2339,21 @@ fn assess_chain_pass(
         let mut humidifier_recoverable = vec![[0.0_f64; 12]; zone_sources.len()];
         for (h_index, humidifier) in input.humidifiers.iter().enumerate() {
             let path = format!("humidifiers[{h_index}]");
+            // §12.1 (p. 520): one humidification system per calculation zone.
+            if input.humidifiers[..h_index]
+                .iter()
+                .any(|other| other.zone_id == humidifier.zone_id)
+            {
+                issues.push(issue("humidifier_zone_duplicate", format!("{path}.zoneId")));
+                continue;
+            }
+            if humidifier
+                .served_area_m2
+                .is_some_and(|area| !(area.is_finite() && area > 0.0))
+            {
+                issues.push(issue("value_invalid", format!("{path}.servedAreaM2")));
+                continue;
+            }
             let found = zone_sources
                 .iter()
                 .zip(std::iter::once(&demand).chain(&additional_zone_demands))
@@ -2347,7 +2367,7 @@ fn assess_chain_pass(
                 humidifier,
                 zone_input,
                 zone_demand,
-                connected_area,
+                humidifier.served_area_m2.unwrap_or(connected_area),
                 &path,
                 &mut issues,
             ) {
@@ -4447,6 +4467,7 @@ mod tests {
                 rotary_wheel: false,
                 equipment_reference: "steam unit".into(),
             },
+            served_area_m2: None,
         }];
         let steam = assess_space_heating_chain(&input);
         assert_eq!(steam.status, "calculated_unverified", "{:?}", steam.issues);
@@ -4467,6 +4488,25 @@ mod tests {
         assert!(
             (jan.generator_output_kwh - base.monthly[0].generator_output_kwh - need).abs() < 1e-6
         );
+        // 12.2.1: a steam generator serving more than 500 m² has no
+        // recoverable loss; its own served area decides when given.
+        input.humidifiers[0].humidification.humidifier = Humidifier::Steam {
+            carrier: SteamCarrier::Electricity,
+        };
+        input.humidifiers[0].served_area_m2 = Some(600.0);
+        let large = assess_space_heating_chain(&input);
+        assert_eq!(large.status, "calculated_unverified", "{:?}", large.issues);
+        assert!(
+            (large.monthly[0].heating_need_kwh - base.monthly[0].heating_need_kwh).abs() < 1e-9
+        );
+        // §12.1: one humidification system per calculation zone.
+        input.humidifiers.push(input.humidifiers[0].clone());
+        let duplicate = assess_space_heating_chain(&input);
+        assert!(duplicate
+            .issues
+            .iter()
+            .any(|item| item.code == "humidifier_zone_duplicate"
+                && item.path == "humidifiers[1].zoneId"));
     }
 
     fn boiler_chain() -> SpaceHeatingChainInput {

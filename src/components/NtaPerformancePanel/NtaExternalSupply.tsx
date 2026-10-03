@@ -87,6 +87,7 @@ function HeatPumpEfficiencyFields({ draft, change, base }: SectionProps & { base
         : { method: 'table_p5', source: null, supplyTemperatureC: null })} />
     {method === 'declared' ? <>
       <NumberField {...field} path={[...base, 'value']} label={t('nta.annexP.efficiency')} />
+      <CheckField {...field} path={[...base, 'sourcePumpIncluded']} label={t('nta.annexP.sourcePumpIncluded')} />
       <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
     </> : <>
       <SelectField {...field} path={[...base, 'source']} label={t('nta.annexP.p5Source')} options={options(t, 'nta.annexP.p5', TABLE_P5_SOURCES)} />

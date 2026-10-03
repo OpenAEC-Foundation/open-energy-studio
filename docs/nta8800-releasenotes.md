@@ -2,6 +2,22 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — hoofdstuk 12 en bijlage P na de herberekening
+
+### Uitkomsten die veranderen
+
+- **Koudenet met ontvochtiging als jaarwaarde (P.77/P.78, p. 1022).** Het maandprofiel blijft nu bestaan; ontvochtiging telt alleen in de jaarwaarde. Pompenergie per maand (P.68) is daardoor mogelijk, en de standby van P.69 loopt alleen in de maanden met koudelevering.
+- **Warmtenet met een deel zonder maandwaarden (P.73/P.74, p. 1020).** Alleen dat deel volgt P.74; de opgegeven maandwaarden van de andere percelen blijven. Dit verandert vooral de looptijden van P.60.
+- **f_Pren;dc (5.49, p. 129)** wordt niet meer naar beneden afgerond.
+- **Een tweede bevochtiger in dezelfde rekenzone** geeft nu het gat `humidifier_zone_duplicate` (§12.1, p. 520).
+
+### Nieuw
+
+- `sourcePumpIncluded` bij een opgegeven warmtepomprendement in bijlage P: de bronpomp of -ventilator zit in het rendement, dus 0 W/kW in plaats van 10 W/kW (P.6.8.4.3, p. 1009).
+- `servedAreaM2` bij een stoombevochtiger: de bediende oppervlakte voor de 500 m²-grens van 12.2.1 (p. 521). Zonder waarde blijft de oppervlakte aan het verwarmingssysteem gelden.
+- Waarschuwingen `chp_co2_factor_negative` (P.27) en `cold_network_gain_outside_cooling_months` (P.13–P.18 voor koude).
+- Een primaire factor 0 heet in de uitvoer nu `0` in plaats van `-0`.
+
 ## 3 oktober 2026 — formulieren zonder JSON-editors (bijlage P, hoofdstuk 14, randdelen, maatwerkadvies)
 
 Rekenuitkomsten en opgeslagen projecten veranderen niet; dezelfde invoer is nu met gewone velden te maken:
