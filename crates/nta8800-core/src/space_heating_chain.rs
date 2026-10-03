@@ -68,7 +68,7 @@ use serde::{Deserialize, Serialize};
 pub const OMITTED_TERMS: &[&str] = &[
     "9.2.3 node gains from solar thermal systems, booster heat pumps and delivery sets",
     "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
-    "θ_int;op;H of 7.9.6 is taken equal to the heating setpoint for the in-zone pipe ambient",
+    "7.82: ϑ_ztu of the unheated space follows from distributionSystem.unheatedReductionFactor (b_U); without it and without entered values 13 °C is used",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
     "annex Q: W_H;aux;hp;an is not booked again as 9.6.3.2 auxiliary energy, because Q.4 already includes it in η_H;gen;hp (COP of 9.63)",
     "annex Q: F_H;gen = 1 (Q.1) is taken as met when every bin of table Q.6 is fully covered; the rounded table hours sum to 277,757 instead of 277,778",
@@ -207,9 +207,14 @@ pub struct DistributionSystem {
     /// `L_si;j` in unheated spaces; absent means 15 % of `L_si`.
     #[serde(default)]
     pub unheated_pipe_length_m: Option<f64>,
-    /// `ϑ_ztu` per month of the unheated space (7.82); absent means 13 °C.
+    /// `ϑ_ztu` per month of the unheated space (7.82); absent means 7.82
+    /// from `unheatedReductionFactor`, or 13 °C without it.
     #[serde(default)]
     pub unheated_ambient_c: Option<Vec<f64>>,
+    /// `b_U` of the unheated space with the pipes and vessels, for
+    /// ϑ_ztu = ϑ_int;set;H − b_U·(ϑ_int;set;H − ϑ_e;avg) (7.82).
+    #[serde(default)]
+    pub unheated_reduction_factor: Option<f64>,
     /// Collective buffer vessel (9.2.3.3/9.2.3.5); only with calculated Ψ.
     #[serde(default)]
     pub buffer_vessel: Option<BufferVessel>,
@@ -982,6 +987,8 @@ struct ZoneTerms {
     heating_limit_extra: [f64; 12],
     /// Σ P_fan·n_fan of 9.22, W.
     fan_power_w: f64,
+    /// θ_int;op;H = θ_int;calc;H (7.9.6) per month, °C.
+    operative_c: [f64; 12],
 }
 
 /// Validates one zone; `None` when invalid.
@@ -1123,6 +1130,12 @@ fn zone_terms(
         zone_id: demand_input.zone_id.clone(),
         area_m2: demand_input.usable_floor_area_m2,
         setpoint_c: setpoint,
+        operative_c: std::array::from_fn(|month| {
+            demand
+                .monthly
+                .get(month)
+                .map_or(setpoint, |row| row.heating.calculation_temperature_c)
+        }),
         increment_k: increment,
         hydronic: !matches!(
             emission.system,
@@ -1182,6 +1195,15 @@ fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<Ch
         if value.is_some_and(|length| !length.is_finite() || length < 0.0) {
             issues.push(issue("pipe_length_invalid", format!("{path}.{field}")));
         }
+    }
+    if system
+        .unheated_reduction_factor
+        .is_some_and(|b| !b.is_finite() || !(0.0..=1.0).contains(&b))
+    {
+        issues.push(issue(
+            "unheated_reduction_factor_invalid",
+            "distributionSystem.unheatedReductionFactor",
+        ));
     }
     if let Some(values) = &system.unheated_ambient_c {
         if !twelve_finite(values) {
@@ -1380,12 +1402,8 @@ fn calculate_distribution(
         in_zone_total + equivalent_length_m(in_zone_total, psi_zone, system.valves_insulated);
     let unheated_with_fittings = unheated_length
         + equivalent_length_m(unheated_length, psi_unheated, system.valves_insulated);
-    let unheated_ambient = |month: usize| {
-        system
-            .unheated_ambient_c
-            .as_ref()
-            .map_or(DEFAULT_UNHEATED_AMBIENT_C, |values| values[month])
-    };
+    let unheated_ambient =
+        |month: usize| system.unheated_ambient(month, zones.first().map_or(20.0, |z| z.setpoint_c));
 
     // 9.26 and 9.38 for zones on the calculated route.
     for (index, zone) in zones.iter().enumerate() {
@@ -1401,7 +1419,8 @@ fn calculate_distribution(
         };
         for (month, t) in hours[index].iter().copied().enumerate() {
             let theta = mean(index, month);
-            let in_zone = psi_zone * (theta - zone.setpoint_c) * zone_length * t / 1000.0;
+            // 9.4.2 with θ_int;op;H = θ_int;calc;H (7.9.6).
+            let in_zone = psi_zone * (theta - zone.operative_c[month]) * zone_length * t / 1000.0;
             let unheated =
                 psi_unheated * (theta - unheated_ambient(month)) * unheated_with_fittings * t
                     / 1000.0
@@ -1516,7 +1535,7 @@ fn calculate_distribution(
                     .fold(f64::NEG_INFINITY, f64::max)
             };
             let ambient = if buffer.in_heated_space {
-                zones[0].setpoint_c
+                zones[0].operative_c[month]
             } else {
                 unheated_ambient(month)
             };
@@ -2642,6 +2661,20 @@ fn generate_annex_q(
     Some(corrected)
 }
 
+impl DistributionSystem {
+    /// ϑ_ztu of the unheated space with pipes and vessels: the entered
+    /// values, else 7.82 with `b_U`, else 13 °C.
+    pub fn unheated_ambient(&self, month: usize, setpoint_c: f64) -> f64 {
+        if let Some(values) = &self.unheated_ambient_c {
+            return values[month];
+        }
+        match self.unheated_reduction_factor {
+            Some(b) => setpoint_c - b * (setpoint_c - crate::climate::OUTDOOR_TEMPERATURE_C[month]),
+            None => DEFAULT_UNHEATED_AMBIENT_C,
+        }
+    }
+}
+
 /// M.12 ϑ_brm as ϑ_H,amb of 9.4.2: the heating setpoint (taken for
 /// θ_int;op;H, 7.9.6) in a heated space, ϑ_ztu of the distribution system
 /// (7.82) in an installation room when entered; otherwise table M.6.
@@ -2653,11 +2686,12 @@ fn boiler_ambient_c(
 ) -> Option<f64> {
     match placement {
         BoilerPlacement::HeatedSpace => Some(indoor_c),
-        BoilerPlacement::InstallationRoom => input
-            .distribution_system
-            .as_ref()
-            .and_then(|system| system.unheated_ambient_c.as_ref())
-            .and_then(|values| values.get(month).copied()),
+        BoilerPlacement::InstallationRoom => {
+            input.distribution_system.as_ref().and_then(|system| {
+                (system.unheated_ambient_c.is_some() || system.unheated_reduction_factor.is_some())
+                    .then(|| system.unheated_ambient(month, input.demand.setpoints.heating_c))
+            })
+        }
         BoilerPlacement::Outdoors | BoilerPlacement::UnderRoof => None,
     }
 }
@@ -4761,6 +4795,7 @@ mod tests {
             actual_pipe_length_m: None,
             unheated_pipe_length_m: None,
             unheated_ambient_c: None,
+            unheated_reduction_factor: None,
             buffer_vessel: None,
             pump,
             source_reference: "installation survey".into(),
@@ -4973,6 +5008,43 @@ mod tests {
         };
         input.distribution_system = Some(system(calculated_pump()));
         input
+    }
+
+    #[test]
+    fn unheated_pipe_ambient_follows_7_82() {
+        let with_b = DistributionSystem {
+            unheated_reduction_factor: Some(0.6),
+            ..system(calculated_pump())
+        };
+        // ϑ_ztu = 20 − 0,6·(20 − ϑ_e;jan).
+        let jan = crate::climate::OUTDOOR_TEMPERATURE_C[0];
+        assert!((with_b.unheated_ambient(0, 20.0) - (20.0 - 0.6 * (20.0 - jan))).abs() < 1e-12);
+        // Entered values win; without both the default is 13 °C.
+        let entered = DistributionSystem {
+            unheated_ambient_c: Some(vec![9.0; 12]),
+            ..with_b.clone()
+        };
+        assert_eq!(entered.unheated_ambient(0, 20.0), 9.0);
+        let plain = DistributionSystem {
+            unheated_reduction_factor: None,
+            ..with_b.clone()
+        };
+        assert_eq!(plain.unheated_ambient(0, 20.0), DEFAULT_UNHEATED_AMBIENT_C);
+        // The chain uses it: a higher ϑ_ztu lowers the unheated pipe loss.
+        let mut input = collective_boiler_chain();
+        input.distribution_system = Some(DistributionSystem {
+            unheated_pipe_length_m: Some(40.0),
+            ..system(calculated_pump())
+        });
+        let cold = assess_space_heating_chain(&input);
+        input
+            .distribution_system
+            .as_mut()
+            .unwrap()
+            .unheated_reduction_factor = Some(0.2);
+        let warm = assess_space_heating_chain(&input);
+        assert_eq!(warm.status, "calculated_unverified", "{:?}", warm.issues);
+        assert!(warm.monthly[0].distribution_loss_kwh < cold.monthly[0].distribution_loss_kwh);
     }
 
     #[test]
