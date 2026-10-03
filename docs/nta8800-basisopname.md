@@ -260,3 +260,7 @@ Gestructureerde velden zijn er voor:
 - PV, met de belemmeringssituatie.
 
 Al het overige staat in een JSON-weergave. "Opname doorrekenen" stuurt de opname naar de Rust-kern en toont de status, de indicatieve labelklasse, BENG 1–3, de meldingen en de toegepaste standaardwaarden met ISSO-bron. Per standaardwaarde kan de adviseur de reden voor het inklappen invullen (`inklapRedenen`, BRL 9500 §4.2.2).
+
+## Meerdere tapwatersystemen (ISSO 82.1 p. 164)
+
+`additionalHotWaterSystems` in de woningopname beschrijft elk extra tapwatersysteem met dezelfde velden als `hotWater`. Een voorbeeld is een keukengeiser naast een combitoestel voor de badkamer. Per systeem leggen `connectedBathrooms` en `connectedKitchens` de aangesloten ruimten vast (NTA 13.19a). Zijn ze onbekend, dan volgen ze uit `served`: één badruimte en/of één keuken. Dat wordt vastgelegd als `hot_water_connected_*_from_served`. De utiliteitsopname kent deze lijst nog niet.

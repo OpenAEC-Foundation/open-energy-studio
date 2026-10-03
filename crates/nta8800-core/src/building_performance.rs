@@ -24,8 +24,7 @@ use crate::bbl_requirements::{
     a0_check, check_mixed as bbl_check_mixed, A0Check, BblCheck, BblFunction, BblFunctionArea,
 };
 use crate::domestic_hot_water::{
-    assess_hot_water, validate_hot_water, HotWaterAssessment, HotWaterContext, HotWaterSystem,
-    SolarSpaceHeating,
+    validate_hot_water, HotWaterAssessment, HotWaterContext, HotWaterSystem, SolarSpaceHeating,
 };
 use crate::final_energy_draft::DRAFT_SOURCE;
 use crate::forfait_heat_pump_draft::TableSource;
@@ -284,9 +283,14 @@ pub struct BuildingPerformanceInput {
     /// `W_L = 0` and leave this empty.
     #[serde(default)]
     pub lighting: Vec<ZoneLighting>,
-    /// Domestic hot water calculated here (chapter 13, one generator).
+    /// Domestic hot water calculated here (chapter 13).
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
+    /// §13.2.4: further hot-water systems of the building. Dwellings split
+    /// the need by their connected taps (13.19a); utility systems by the
+    /// areas of their own `need` (13.20).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_hot_water_systems: Vec<HotWaterSystem>,
     /// §13.7 solar systems for space heating only (SHS) that are not part
     /// of the hot-water system.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -905,6 +909,80 @@ pub fn usage_fit_applied(input: &BuildingPerformanceInput) -> bool {
             .any(|zone| zone.demand.usage_fit.is_some())
 }
 
+/// The hot-water systems of the building with their input path.
+fn hot_water_system_list(input: &BuildingPerformanceInput) -> Vec<(&HotWaterSystem, String)> {
+    input
+        .hot_water
+        .iter()
+        .map(|system| (system, "hotWater".to_string()))
+        .chain(
+            input
+                .additional_hot_water_systems
+                .iter()
+                .enumerate()
+                .map(|(index, system)| (system, format!("additionalHotWaterSystems[{index}]"))),
+        )
+        .collect()
+}
+
+/// §13.2.4 `F_W;si` per system: 13.19a for dwellings, `None` (the system's
+/// own need areas, 13.20) for utility buildings. `Err` when a dwelling with
+/// several systems lacks the connected taps.
+fn hot_water_need_fractions(input: &BuildingPerformanceInput) -> Result<Vec<Option<f64>>, ()> {
+    let systems = hot_water_system_list(input);
+    if systems.len() <= 1 || !matches!(input.calculation_scope, CalculationScope::Residential) {
+        return Ok(vec![None; systems.len()]);
+    }
+    let taps: Vec<_> = systems
+        .iter()
+        .map(|(system, _)| system.connected_taps)
+        .collect();
+    crate::domestic_hot_water::residential_need_fractions(&taps)
+        .map(|fractions| fractions.into_iter().map(Some).collect())
+        .ok_or(())
+}
+
+/// All hot-water systems of the building, each with its share of the need,
+/// summed for the energy performance; `Ok(None)` without hot water.
+pub(crate) fn assess_hot_water_systems(
+    input: &BuildingPerformanceInput,
+    context: HotWaterContext,
+    extras: &crate::domestic_hot_water::HotWaterExtras,
+) -> Result<Option<HotWaterAssessment>, crate::domestic_hot_water::HotWaterIssue> {
+    let systems = hot_water_system_list(input);
+    let fractions =
+        hot_water_need_fractions(input).map_err(|_| crate::domestic_hot_water::HotWaterIssue {
+            code: "hot_water_connected_taps_required",
+            path: "additionalHotWaterSystems".into(),
+        })?;
+    let mut results = Vec::with_capacity(systems.len());
+    for ((system, path), fraction) in systems.into_iter().zip(fractions) {
+        let mut context = context;
+        context.need_fraction = fraction;
+        let result = crate::domestic_hot_water::assess_hot_water_with(system, context, extras)
+            .map_err(|mut error| {
+                if path != "hotWater" {
+                    error.path = error.path.replacen("hotWater", &path, 1);
+                }
+                error
+            })?;
+        results.push(result);
+    }
+    Ok(crate::domestic_hot_water::merge_hot_water(results))
+}
+
+/// Annual net hot-water need of all systems (13.15/13.19 with §13.2.4).
+pub fn hot_water_annual_need_kwh(input: &BuildingPerformanceInput) -> Option<f64> {
+    assess_hot_water_systems(
+        input,
+        hot_water_context(input),
+        &crate::domestic_hot_water::HotWaterExtras::default(),
+    )
+    .ok()
+    .flatten()
+    .map(|result| result.annual_net_need_kwh)
+}
+
 fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
     let zones = std::iter::once(&input.space_heating.demand).chain(
         input
@@ -929,6 +1007,7 @@ fn hot_water_context(input: &BuildingPerformanceInput) -> HotWaterContext {
         // 13.69a/13.137a: table 7.13.
         standard_setpoint_c: (area > 0.0).then(|| standard / area),
         levelled_setpoint_c: None,
+        need_fraction: None,
     }
 }
 
@@ -1044,7 +1123,7 @@ fn cooling_assessment(
 
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
     // 13.156a: E_W;gen;in;PFHRD needs the heating gas of the same combi.
-    if let Some(system) = &input.hot_water {
+    for (system, path) in hot_water_system_list(input) {
         let pfhrd = std::iter::once(&system.generator)
             .chain(system.additional_generators.iter().map(|unit| &unit.generator))
             .any(|generator| {
@@ -1054,7 +1133,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         if pfhrd && !heating_by_gas_boiler(&input.space_heating.generator) {
             issues.push(issue(
                 "pfhrd_requires_gas_boiler_heating",
-                "hotWater.generator.pfhrd",
+                format!("{path}.generator.pfhrd"),
             ));
         }
     }
@@ -1276,7 +1355,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         // One route for solar electricity, so the same array cannot count twice.
         issues.push(issue("pv_route_mixed", "onSiteProduction"));
     }
-    if input.hot_water.is_some() && !input.declared_renewable_heat.is_empty() {
+    if !hot_water_system_list(input).is_empty() && !input.declared_renewable_heat.is_empty() {
         // Ambient heat of a calculated hot-water heat pump is derived here.
         issues.push(issue(
             "hot_water_renewable_double_count",
@@ -1333,6 +1412,24 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         if seen.len() != zones.len() {
             issues.push(issue("lighting_zone_missing", "lighting"));
         }
+    }
+    if !input.additional_hot_water_systems.is_empty() && input.hot_water.is_none() {
+        // Further systems need the main `hotWater` system.
+        issues.push(issue("hot_water_main_system_required", "hotWater"));
+    }
+    if hot_water_need_fractions(input).is_err() {
+        // 13.19a needs n_b;si and n_k;si of every system.
+        issues.push(issue(
+            "hot_water_connected_taps_required",
+            "additionalHotWaterSystems",
+        ));
+    }
+    for (system, path) in hot_water_system_list(input).into_iter().skip(1) {
+        issues.extend(
+            validate_hot_water(system, hot_water_context(input), &path)
+                .into_iter()
+                .map(|item| issue(item.code, item.path)),
+        );
     }
     if let Some(system) = &input.hot_water {
         issues.extend(
@@ -1666,7 +1763,7 @@ fn hot_water_extras(
             .micro_chp()
             .filter(|_| heating.monthly.len() == 12)
             .filter(|_| {
-                input.hot_water.as_ref().is_some_and(|system| {
+                hot_water_system_list(input).into_iter().any(|(system, _)| {
                     std::iter::once(&system.generator)
                     .chain(system.additional_generators.iter().map(|unit| &unit.generator))
                     .any(|generator| {
@@ -1875,13 +1972,19 @@ fn with_hot_water_gains(
     context: HotWaterContext,
     mut chain: SpaceHeatingChainInput,
 ) -> SpaceHeatingChainInput {
-    let Some(system) = &input.hot_water else {
-        return chain;
-    };
-    if !validate_hot_water(system, context, "hotWater").is_empty() {
+    let systems = hot_water_system_list(input);
+    if systems.is_empty()
+        || systems
+            .iter()
+            .any(|(system, path)| !validate_hot_water(system, context, path).is_empty())
+    {
         return chain;
     }
-    let Ok(result) = assess_hot_water(system, context) else {
+    let Ok(Some(result)) = assess_hot_water_systems(
+        input,
+        context,
+        &crate::domestic_hot_water::HotWaterExtras::default(),
+    ) else {
         return chain;
     };
     let total_area: f64 = std::iter::once(&chain.demand)
@@ -1952,7 +2055,7 @@ pub fn assess_building_performance(
     let mut heating = assess_space_heating_chain(&chain_input);
     // 13.7.2.2.3: solar combi systems need the node output of a run without
     // solar gains; the second run takes their node gain (9.2.3.4).
-    let combi = input.hot_water.as_ref().is_some_and(|system| {
+    let combi = hot_water_system_list(input).into_iter().any(|(system, _)| {
         system
             .solar
             .iter()
@@ -1963,7 +2066,7 @@ pub fn assess_building_performance(
     // gains) use the levelled ϑ_int;set;H;zi,mi of 7.9.4, which does not
     // depend on the internal gains; the first run supplies it.
     let levelled = levelled_setpoint(input, &heating);
-    let levelling_matters = input.hot_water.is_some()
+    let levelling_matters = !hot_water_system_list(input).is_empty()
         && levelled.is_some()
         && hot_water_context.levelled_setpoint_c != levelled;
     hot_water_context.levelled_setpoint_c = levelled;
@@ -2040,24 +2143,22 @@ pub fn assess_building_performance(
     hot_water_context.levelled_setpoint_c = levelled_setpoint(input, &heating);
     let extras = hot_water_extras(input, &heating);
     let hot_water_from_heating = hot_water_from_heating(&heating);
-    let hot_water = match (&input.hot_water, issues.is_empty()) {
-        (Some(system), true) => match crate::domestic_hot_water::assess_hot_water_with(
-            system,
-            hot_water_context,
-            &extras,
-        ) {
-            Ok(mut result) => {
+    let hot_water = if issues.is_empty() {
+        match assess_hot_water_systems(input, hot_water_context, &extras) {
+            Ok(Some(mut result)) => {
                 if let Some(fit) = &input.hot_water_need_fit {
                     fit_hot_water_need(&mut result, fit.annual_need_kwh);
                 }
                 Some(result)
             }
+            Ok(None) => None,
             Err(error) => {
                 issues.push(issue(error.code, error.path));
                 None
             }
-        },
-        _ => None,
+        }
+    } else {
+        None
     };
     // §13.8.4.8 (p. 650): the combi micro-CHP's joint input replaces the
     // chain's own heating booking with its heating share.
@@ -3677,6 +3778,7 @@ mod tests {
             crate::heating_emission::HydronicBalancing::NotApplicable;
         sample.hot_water = Some(HotWaterSystem {
             declared_share: None,
+            connected_taps: None,
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
@@ -3752,6 +3854,7 @@ mod tests {
             .retain(|item| item.service != Service::DomesticHotWater);
         sample.hot_water = Some(HotWaterSystem {
             declared_share: None,
+            connected_taps: None,
             need: HotWaterNeed::Residential {
                 dwelling_count: 1,
                 source_reference: "one dwelling".into(),
@@ -3852,6 +3955,7 @@ mod tests {
             solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
+            connected_taps: None,
         };
         sample.hot_water = Some(system.clone());
         let doubled = assess_building_performance(&sample);
@@ -3920,6 +4024,7 @@ mod tests {
             solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
+            connected_taps: None,
         };
         sample.hot_water = Some(system.clone());
         let plain = assess_building_performance(&sample);
@@ -3992,7 +4097,120 @@ mod tests {
             solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
+            connected_taps: None,
         }
+    }
+
+    #[test]
+    fn several_hot_water_systems_split_the_need_by_13_19a() {
+        use crate::domestic_hot_water::{
+            residential_need_fractions, ConnectedTaps, GasAppliance, HotWaterEmission,
+            HotWaterGenerator, ServedTaps,
+        };
+        // 13.19a: one bathroom on the combi, one kitchen on the geyser.
+        let fractions = residential_need_fractions(&[
+            Some(ConnectedTaps {
+                bathrooms: 1,
+                kitchens: 0,
+            }),
+            Some(ConnectedTaps {
+                bathrooms: 0,
+                kitchens: 1,
+            }),
+        ])
+        .unwrap();
+        assert!((fractions[0] - 0.8).abs() < 1e-12);
+        assert!((fractions[1] - 0.2).abs() < 1e-12);
+        // Two bathrooms over two systems, one kitchen on the first.
+        let fractions = residential_need_fractions(&[
+            Some(ConnectedTaps {
+                bathrooms: 1,
+                kitchens: 1,
+            }),
+            Some(ConnectedTaps {
+                bathrooms: 1,
+                kitchens: 0,
+            }),
+        ])
+        .unwrap();
+        assert!((fractions[0] - 0.6).abs() < 1e-12);
+        assert!((fractions[1] - 0.4).abs() < 1e-12);
+        assert!(residential_need_fractions(&[None, None]).is_none());
+
+        let mut sample = input();
+        sample
+            .declared_uses
+            .retain(|item| item.service != Service::DomesticHotWater);
+        let combi = hot_water_system(HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::CombiGaskeurHrCw,
+            measured_class: Some(crate::domestic_hot_water::ApplicationClass::Class1),
+            kitchen_only: false,
+            declared: None,
+            annex_t: None,
+            annex_t_conditions: None,
+        });
+        sample.hot_water = Some(combi.clone());
+        let single = assess_building_performance(&sample);
+        assert_eq!(
+            single.status, "calculated_unverified",
+            "{:?}",
+            single.issues
+        );
+        let total_need = single.hot_water.as_ref().unwrap().annual_net_need_kwh;
+
+        let mut bathroom = combi;
+        bathroom.emission = HotWaterEmission::Residential {
+            served: ServedTaps::BathroomOnly,
+            kitchen_length_m: None,
+            bathroom_length_m: Some(1.0),
+            source_reference: "drawing".into(),
+        };
+        let mut kitchen = hot_water_system(HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::KitchenGeyser,
+            measured_class: None,
+            kitchen_only: true,
+            declared: None,
+            annex_t: None,
+            annex_t_conditions: None,
+        });
+        kitchen.emission = HotWaterEmission::Residential {
+            served: ServedTaps::KitchenOnly,
+            kitchen_length_m: Some(1.0),
+            bathroom_length_m: None,
+            source_reference: "drawing".into(),
+        };
+        sample.hot_water = Some(bathroom.clone());
+        sample.additional_hot_water_systems = vec![kitchen.clone()];
+        // 13.19a needs the connected taps of every system.
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| item.code == "hot_water_connected_taps_required"));
+        bathroom.connected_taps = Some(ConnectedTaps {
+            bathrooms: 1,
+            kitchens: 0,
+        });
+        kitchen.connected_taps = Some(ConnectedTaps {
+            bathrooms: 0,
+            kitchens: 1,
+        });
+        sample.hot_water = Some(bathroom);
+        sample.additional_hot_water_systems = vec![kitchen];
+        let split = assess_building_performance(&sample);
+        assert_eq!(split.status, "calculated_unverified", "{:?}", split.issues);
+        let merged = split.hot_water.as_ref().unwrap();
+        // The systems together deliver the building's net need once.
+        assert!((merged.annual_net_need_kwh - total_need).abs() < 1e-6);
+        // The kitchen geyser's lower efficiency raises the gas use.
+        let gas = |result: &BuildingPerformanceAssessment| -> f64 {
+            result
+                .carriers
+                .iter()
+                .filter(|row| row.carrier == "gas")
+                .map(|row| row.used_kwh)
+                .sum()
+        };
+        assert!(gas(&split) > gas(&single));
     }
 
     #[test]
@@ -4398,6 +4616,7 @@ mod tests {
             solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
+            connected_taps: None,
         });
         let result = assess_building_performance(&sample);
         assert_eq!(

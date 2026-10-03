@@ -228,6 +228,10 @@ pub struct ResidentialSurvey {
     pub envelope: SurveyEnvelope,
     pub heating: SurveyHeating,
     pub hot_water: SurveyHotWater,
+    /// Further hot-water systems of the dwelling, for example a kitchen
+    /// geyser next to the bathroom appliance (ISSO 82.1 p. 164, NTA §13.2.4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_hot_water_systems: Vec<SurveyHotWater>,
     pub ventilation: SurveyVentilation,
     #[serde(default)]
     pub pv: Vec<SurveyPv>,
@@ -290,20 +294,28 @@ fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
             );
         }
     }
-    let hot = &survey.hot_water;
-    let kitchen = matches!(
-        hot.served,
-        hot_water::TapsServed::KitchenAndBathroom | hot_water::TapsServed::KitchenOnly
+    let systems = std::iter::once((&survey.hot_water, "hotWater".to_string())).chain(
+        survey
+            .additional_hot_water_systems
+            .iter()
+            .enumerate()
+            .map(|(index, hot)| (hot, format!("additionalHotWaterSystems[{index}]"))),
     );
-    let bathroom = matches!(
-        hot.served,
-        hot_water::TapsServed::KitchenAndBathroom | hot_water::TapsServed::BathroomOnly
-    );
-    if kitchen && hot.kitchen_length_m.is_none() {
-        recorder.issue("tap_length_required", "hotWater.kitchenLengthM");
-    }
-    if bathroom && hot.bathroom_length_m.is_none() {
-        recorder.issue("tap_length_required", "hotWater.bathroomLengthM");
+    for (hot, path) in systems {
+        let kitchen = matches!(
+            hot.served,
+            hot_water::TapsServed::KitchenAndBathroom | hot_water::TapsServed::KitchenOnly
+        );
+        let bathroom = matches!(
+            hot.served,
+            hot_water::TapsServed::KitchenAndBathroom | hot_water::TapsServed::BathroomOnly
+        );
+        if kitchen && hot.kitchen_length_m.is_none() {
+            recorder.issue("tap_length_required", format!("{path}.kitchenLengthM"));
+        }
+        if bathroom && hot.bathroom_length_m.is_none() {
+            recorder.issue("tap_length_required", format!("{path}.bathroomLengthM"));
+        }
     }
 }
 
@@ -325,6 +337,49 @@ pub(crate) fn loss_area(envelope: &SurveyEnvelope) -> f64 {
             weight * surface.gross_area_m2
         })
         .sum()
+}
+
+/// One hot-water system of the residential survey as kernel input.
+fn survey_hot_water(
+    survey: &ResidentialSurvey,
+    hot: &SurveyHotWater,
+    path: &str,
+    recorder: &mut Recorder,
+) -> Value {
+    let year = survey.construction_year;
+    let mut system = hot_water::derive_hot_water(hot, recorder);
+    hot_water::apply_extensions(
+        &mut system,
+        hot,
+        year,
+        survey.usable_floor_area_m2,
+        false,
+        recorder,
+    );
+    hot_water::apply_exhaust_air_use(
+        &mut system,
+        survey.ventilation.principle,
+        survey.ventilation.heat_recovery.is_some(),
+    );
+    if matches!(
+        hot.generator,
+        hot_water::HotWaterGeneratorAnswer::ElectricBoiler
+    ) {
+        if let Some(vessel) = hot_water::boiler_storage(
+            hot.boiler_vessel.as_ref(),
+            year,
+            &hot.source_reference,
+            recorder,
+        ) {
+            system["storage"] = json!([vessel]);
+        }
+    } else if hot.boiler_vessel.is_some() {
+        recorder.issue(
+            "boiler_vessel_not_applicable",
+            format!("{path}.boilerVessel"),
+        );
+    }
+    system
 }
 
 /// Kernel input derived from the survey.
@@ -372,34 +427,18 @@ pub fn derive_residential_input(
     });
     let calculated_distribution =
         heating::apply_unheated_pipes(&survey.heating, &mut heating, unheated_spaces, recorder);
-    let mut hot_water = hot_water::derive_hot_water(&survey.hot_water, recorder);
-    hot_water::apply_extensions(
-        &mut hot_water,
-        &survey.hot_water,
-        year,
-        survey.usable_floor_area_m2,
-        false,
-        recorder,
-    );
-    hot_water::apply_exhaust_air_use(
-        &mut hot_water,
-        survey.ventilation.principle,
-        survey.ventilation.heat_recovery.is_some(),
-    );
-    if matches!(
-        survey.hot_water.generator,
-        hot_water::HotWaterGeneratorAnswer::ElectricBoiler
-    ) {
-        if let Some(vessel) = hot_water::boiler_storage(
-            survey.hot_water.boiler_vessel.as_ref(),
-            year,
-            &survey.hot_water.source_reference,
-            recorder,
-        ) {
-            hot_water["storage"] = json!([vessel]);
+    let mut hot_water = survey_hot_water(survey, &survey.hot_water, "hotWater", recorder);
+    let mut additional_hot_water = Vec::new();
+    if !survey.additional_hot_water_systems.is_empty() {
+        // NTA 13.19a: the share of each system follows its taps.
+        hot_water["connectedTaps"] =
+            hot_water::connected_taps(&survey.hot_water, "hotWater", recorder);
+        for (index, hot) in survey.additional_hot_water_systems.iter().enumerate() {
+            let path = format!("additionalHotWaterSystems[{index}]");
+            let mut system = survey_hot_water(survey, hot, &path, recorder);
+            system["connectedTaps"] = hot_water::connected_taps(hot, &path, recorder);
+            additional_hot_water.push(system);
         }
-    } else if survey.hot_water.boiler_vessel.is_some() {
-        recorder.issue("boiler_vessel_not_applicable", "hotWater.boilerVessel");
     }
     let pv: Vec<Value> = survey
         .pv
@@ -481,6 +520,7 @@ pub fn derive_residential_input(
         "onSiteProduction": [],
         "pvSystems": pv,
         "hotWater": hot_water,
+        "additionalHotWaterSystems": additional_hot_water,
         "lossAreaM2": loss_area(&survey.envelope),
         "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
         "demandUsesFixedC1Ventilation": false,
@@ -653,6 +693,44 @@ mod tests {
         let input = derive_residential_input(&survey, &mut recorder).unwrap();
         let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
         assert!(pipes.as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn kitchen_geyser_next_to_bathroom_appliance_splits_the_need() {
+        let mut survey = fixture("1930");
+        survey.hot_water.served = hot_water::TapsServed::BathroomOnly;
+        survey.hot_water.kitchen_length_m = None;
+        survey.additional_hot_water_systems = vec![serde_json::from_value(json!({
+            "generator": {"kind": "gas_appliance", "applianceType": "kitchen_geyser", "gaskeur": "none"},
+            "served": "kitchen_only",
+            "kitchenLengthM": 3.0,
+            "showers": 0,
+            "showerHeatRecovery": "none",
+            "sourceReference": "survey"
+        }))
+        .unwrap()];
+        let mut recorder = Recorder::default();
+        let input = derive_residential_input(&survey, &mut recorder).expect("derived input");
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        // p. 164 / NTA 13.19a: the connected taps follow the served taps.
+        assert_eq!(
+            input["hotWater"]["connectedTaps"],
+            json!({"bathrooms": 1, "kitchens": 0})
+        );
+        assert_eq!(
+            input["additionalHotWaterSystems"][0]["connectedTaps"],
+            json!({"bathrooms": 0, "kitchens": 1})
+        );
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "hot_water_connected_kitchens_from_served"));
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
     }
 
     #[test]

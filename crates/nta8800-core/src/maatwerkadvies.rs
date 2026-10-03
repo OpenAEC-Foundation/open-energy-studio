@@ -1361,6 +1361,10 @@ fn run_variant(
 
 /// NTA annual net hot-water need of a building input, kWh.
 fn hot_water_need_kwh(input: &BuildingPerformanceInput) -> Option<f64> {
+    if !input.additional_hot_water_systems.is_empty() {
+        // §13.2.4: all systems together.
+        return crate::building_performance::hot_water_annual_need_kwh(input);
+    }
     let system = input.hot_water.as_ref()?;
     let context = crate::domestic_hot_water::HotWaterContext {
         residential: matches!(input.calculation_scope, CalculationScope::Residential),
@@ -1369,6 +1373,7 @@ fn hot_water_need_kwh(input: &BuildingPerformanceInput) -> Option<f64> {
         space_heating: None,
         standard_setpoint_c: None,
         levelled_setpoint_c: None,
+        need_fraction: None,
     };
     crate::domestic_hot_water::assess_hot_water(system, context)
         .ok()

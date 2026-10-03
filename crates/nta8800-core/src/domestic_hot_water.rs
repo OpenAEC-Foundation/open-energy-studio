@@ -1382,7 +1382,124 @@ pub struct HotWaterSystem {
     pub solar: Vec<SolarWaterHeater>,
     #[serde(default)]
     pub collective: Option<CollectiveHotWater>,
+    /// §13.2.4.1 (13.19a): bathrooms and kitchens connected to this system
+    /// when a dwelling has several hot-water systems.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connected_taps: Option<ConnectedTaps>,
     pub equipment_reference: String,
+}
+
+/// 13.19a `n_b;si` and `n_k;si`.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConnectedTaps {
+    pub bathrooms: u32,
+    pub kitchens: u32,
+}
+
+/// 13.19a: `F_W;si = n_b;si·C_W;nd;b/Σn_b + n_k;si·C_W;nd;k/Σn_k` for the
+/// hot-water systems of a dwelling (category woningbouw); `None` when a
+/// system lacks its connected taps or no tap is connected at all.
+pub fn residential_need_fractions(taps: &[Option<ConnectedTaps>]) -> Option<Vec<f64>> {
+    if taps.len() == 1 {
+        return Some(vec![1.0]);
+    }
+    let taps: Vec<ConnectedTaps> = taps.iter().copied().collect::<Option<_>>()?;
+    let bathrooms: u32 = taps.iter().map(|item| item.bathrooms).sum();
+    let kitchens: u32 = taps.iter().map(|item| item.kitchens).sum();
+    if bathrooms + kitchens == 0 {
+        return None;
+    }
+    Some(
+        taps.iter()
+            .map(|item| {
+                let bathroom = if bathrooms > 0 {
+                    f64::from(item.bathrooms) * BATHROOM_SHARE / f64::from(bathrooms)
+                } else {
+                    0.0
+                };
+                let kitchen = if kitchens > 0 {
+                    f64::from(item.kitchens) * KITCHEN_SHARE / f64::from(kitchens)
+                } else {
+                    0.0
+                };
+                bathroom + kitchen
+            })
+            .collect(),
+    )
+}
+
+/// Sums the results of several hot-water systems of one building (§13.2.4)
+/// for the energy performance; ratios are recombined from their sums.
+pub fn merge_hot_water(results: Vec<HotWaterAssessment>) -> Option<HotWaterAssessment> {
+    let mut iter = results.into_iter();
+    let mut merged = iter.next()?;
+    for result in iter {
+        let need_ratio = |a: f64, eta_a: f64, b: f64, eta_b: f64| {
+            let denominator = if eta_a > 0.0 { a / eta_a } else { 0.0 }
+                + if eta_b > 0.0 { b / eta_b } else { 0.0 };
+            if denominator > 0.0 {
+                (a + b) / denominator
+            } else {
+                eta_a
+            }
+        };
+        merged.emission_efficiency = need_ratio(
+            merged.annual_net_need_kwh,
+            merged.emission_efficiency,
+            result.annual_net_need_kwh,
+            result.emission_efficiency,
+        );
+        for (month, other) in merged.months.iter_mut().zip(&result.months) {
+            month.distribution_efficiency = need_ratio(
+                month.emission_input_kwh,
+                month.distribution_efficiency,
+                other.emission_input_kwh,
+                other.distribution_efficiency,
+            );
+            month.generation_efficiency = need_ratio(
+                month.generator_output_kwh,
+                month.generation_efficiency,
+                other.generator_output_kwh,
+                other.generation_efficiency,
+            );
+            month.net_need_kwh += other.net_need_kwh;
+            month.recovered_kwh += other.recovered_kwh;
+            month.emission_input_kwh += other.emission_input_kwh;
+            month.circulation_loss_kwh += other.circulation_loss_kwh;
+            month.storage_loss_kwh += other.storage_loss_kwh;
+            month.conversion_loss_kwh += other.conversion_loss_kwh;
+            month.generator_output_kwh += other.generator_output_kwh;
+            month.carrier_input_kwh += other.carrier_input_kwh;
+            month.auxiliary_electricity_kwh += other.auxiliary_electricity_kwh;
+            month.ambient_heat_kwh += other.ambient_heat_kwh;
+            month.recoverable_loss_kwh += other.recoverable_loss_kwh;
+            month.electricity_kwh += other.electricity_kwh;
+            month.natural_gas_kwh += other.natural_gas_kwh;
+            month.oil_kwh += other.oil_kwh;
+            month.district_heat_kwh += other.district_heat_kwh;
+            month.solar_renewable_kwh += other.solar_renewable_kwh;
+            month.solar_space_heating_kwh += other.solar_space_heating_kwh;
+            month.solar_auxiliary_kwh += other.solar_auxiliary_kwh;
+            month.solar_backup_storage_loss_kwh += other.solar_backup_storage_loss_kwh;
+            month.solar_recoverable_kwh += other.solar_recoverable_kwh;
+            month.extra_electric_output_kwh += other.extra_electric_output_kwh;
+            month.heating_system_load_kwh += other.heating_system_load_kwh;
+            month.chp_electricity_kwh += other.chp_electricity_kwh;
+        }
+        merged.annual_net_need_kwh += result.annual_net_need_kwh;
+        merged.annual_generator_output_kwh += result.annual_generator_output_kwh;
+        merged.annual_solar_renewable_kwh += result.annual_solar_renewable_kwh;
+        merged.annual_solar_space_heating_kwh += result.annual_solar_space_heating_kwh;
+        merged.generators.extend(result.generators);
+        if merged.exhaust_air.is_none() {
+            merged.exhaust_air = result.exhaust_air;
+        }
+        if merged.combi_chp_heating.is_none() {
+            merged.combi_chp_heating = result.combi_chp_heating;
+        }
+    }
+    Some(merged)
 }
 
 impl HotWaterSystem {
@@ -1464,6 +1581,9 @@ pub struct HotWaterContext {
     pub standard_setpoint_c: Option<f64>,
     /// `ϑ_int;set;H;zi,mi` after levelling (7.76, 13.69/13.137b), °C.
     pub levelled_setpoint_c: Option<[f64; 12]>,
+    /// §13.2.4 `F_W;si`: the share of the building's net need delivered by
+    /// this system; `None` means 1.
+    pub need_fraction: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3364,6 +3484,8 @@ pub fn assess_hot_water_with(
         1.0
     };
     let (annual, shower) = annual_need(system, area);
+    // §13.2.4: the share delivered by this system.
+    let annual = annual * context.need_fraction.unwrap_or(1.0);
     let year_hours: f64 = MONTH_HOURS.iter().sum();
     let eta_em = emission_efficiency(system);
     // 13.51/13.52 with 13.53.
@@ -3753,6 +3875,7 @@ mod tests {
     fn context() -> HotWaterContext {
         HotWaterContext {
             levelled_setpoint_c: None,
+            need_fraction: None,
             standard_setpoint_c: None,
             residential: true,
             usable_floor_area_m2: 100.0,
@@ -3787,6 +3910,7 @@ mod tests {
             solar: Vec::new(),
             collective: None,
             equipment_reference: "plate".into(),
+            connected_taps: None,
         }
     }
 
@@ -4590,6 +4714,7 @@ mod tests {
     fn utility_need_storage_label_and_delivery_sets() {
         let ctx = HotWaterContext {
             levelled_setpoint_c: None,
+            need_fraction: None,
             standard_setpoint_c: None,
             residential: false,
             usable_floor_area_m2: 1000.0,

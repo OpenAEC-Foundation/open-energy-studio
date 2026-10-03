@@ -2539,8 +2539,13 @@ export interface ResidentialSurvey {
     collective?: { buildingUsableAreaM2?: number | null; connectedDwellings?: number | null } | null;
     /** Solar water heaters (§15.3–15.4). */
     solar?: OpnameSolarWaterHeater[];
+    /** p. 164 / NTA 13.19a; unknown follows `served`. */
+    connectedBathrooms?: number | null;
+    connectedKitchens?: number | null;
     sourceReference: string;
   };
+  /** Further hot-water systems, e.g. a kitchen geyser (ISSO 82.1 p. 164). */
+  additionalHotWaterSystems?: Array<ResidentialSurvey['hotWater']>;
   ventilation: {
     principle: 'natural' | 'mechanical_supply' | 'mechanical_extract' | 'balanced';
     declaredVariant?: VentilationSystemVariant | null;
@@ -2942,6 +2947,8 @@ export interface BuildingPerformanceInput {
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
+  /** §13.2.4: further hot-water systems (dwellings: with `connectedTaps`, 13.19a). */
+  additionalHotWaterSystems?: NtaHotWaterSystem[];
   /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
   spaceHeatingSolar?: NtaSolarWaterHeater[];
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
@@ -3356,6 +3363,8 @@ export type NtaHotWaterGenerator =
 
 /** Chapter 13 hot-water system (several generators, solar systems). */
 export interface NtaHotWaterSystem {
+  /** 13.19a: bathrooms and kitchens on this system when a dwelling has several systems. */
+  connectedTaps?: { bathrooms: number; kitchens: number } | null;
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
     | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
@@ -3565,6 +3574,8 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  /** §13.2.4: further hot-water systems (dwellings: with `connectedTaps`, 13.19a). */
+  additionalHotWaterSystems?: NtaHotWaterSystem[];
   /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
   spaceHeatingSolar?: NtaSolarWaterHeater[];
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */

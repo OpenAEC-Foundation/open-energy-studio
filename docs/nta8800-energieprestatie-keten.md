@@ -799,3 +799,13 @@ Een onbepaalde factor geeft de melding `bacs_factor_undetermined`.
 **Labelgegevens**
 
 De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indicators`.
+
+## Meerdere tapwatersystemen per gebouw (§13.2.4)
+
+`additionalHotWaterSystems` bevat de tapwatersystemen naast `hotWater`. Elk systeem rekent met zijn eigen aandeel van de netto warmtebehoefte. Daarna worden de maandwaarden opgeteld: energiedragers, hulpenergie, terugwinbare verliezen (7.29), zonne-energie, WKK-stroom en de knooppuntbelasting.
+
+- **Woningen (13.19a).** F_W;si = n_b;si·C_W;nd;b/Σn_b + n_k;si·C_W;nd;k/Σn_k, met C_W;nd;b = 0,8 en C_W;nd;k = 0,2 (13.2.3.1). Elk systeem geeft daarvoor `connectedTaps` (badruimten, keukens) op. Ontbreekt dat bij meer dan één systeem, dan volgt `hot_water_connected_taps_required`.
+- **Utiliteit (13.20).** Elk systeem geeft in `need.areas` alleen het gebruiksoppervlak op dat het bedient. De verdeling volgt dan uit de behoefte zelf.
+- **Samenvoegen.** Rendementen in het samengevoegde resultaat zijn naar energie gewogen. De maatwerkadviesfit schaalt de opgetelde behoefte.
+
+De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijvoorbeeld een keukengeiser naast het badkamertoestel. Onbekende aangesloten badruimten en keukens worden afgeleid uit `served`; dat wordt als standaardwaarde vastgelegd.
