@@ -81,6 +81,32 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 
 Ze staan per module in `INTERPRETATIONS` en in de docs.
 
+**Onafhankelijke herberekeningen (4 oktober 2026).** Bij gebrek aan officiële referentiegevallen zijn beide voorbeeldprojecten opnieuw doorgerekend. De agent schreef daarvoor een eigen Python-implementatie, rechtstreeks vanuit de normtekst en de gerenderde pagina's, zonder de Rust-formules te lezen.
+
+| Voorbeeld | Vergeleken | Grootste verschil met de kern | BENG 2 | RER | Label |
+|---|---|---|---|---|---|
+| Tussenwoning | 29 maandtermen | 5·10⁻¹³ | 17,13 | 57,5 % | A+++ |
+| Kantoor | 23 maandtermen | 0 | 39,49 | 54,7 % | A++++ |
+
+De vergeleken termen beslaan:
+- hoofdstuk 7: winsten, setpoint-nivellering, tijdconstante, de grond volgens bijlage D, benuttingsfactoren, warmte- en koudebehoefte;
+- hoofdstuk 9: afgifte en opwekking;
+- hoofdstuk 14: verlichting;
+- hoofdstuk 16: PV en export;
+- hoofdstuk 5: indicatoren en label.
+
+Elke afwijking die tijdens het opzetten werd gevonden, bleek een fout in de Python-versie te zijn; de kern volgde de norm.
+
+De herberekeningen brachten wel invoer- en validatiepunten aan het licht:
+- mengen van forfaitaire en gedetailleerde koudebruggen;
+- verticale leidingen met de waarde "onbekend";
+- f_BACS 1,0 zonder onderbouwing;
+- een open plafond bij utiliteit;
+- TOjuli bij utiliteit;
+- onrealistische opgegeven gebruiken in de voorbeelden.
+
+Deze punten worden afgewerkt.
+
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
 - tabel 11.19 een kolom verschoven;
