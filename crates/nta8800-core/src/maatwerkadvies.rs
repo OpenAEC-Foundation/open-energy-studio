@@ -881,24 +881,14 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
     let resolved = resolve_use(profile, input);
     let nta_hot_water_need = hot_water_need_kwh(input);
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
-    let total_area: f64 = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let total_area: f64 = input
+        .zone_inputs()
+        .into_iter()
         .map(|demand| demand.usable_floor_area_m2)
         .sum();
-    let nta_occupants: f64 = std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    let nta_occupants: f64 = input
+        .zone_inputs()
+        .into_iter()
         .filter_map(zone_occupants)
         .sum();
     let fit_zone = |demand: &mut MonthlyDemandInput| {
@@ -968,6 +958,13 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
     fit_zone(&mut input.space_heating.demand);
     for zone in input.space_heating.additional_zones.iter_mut() {
         fit_zone(&mut zone.demand);
+    }
+    // §9.2: the zones of further heating systems take the same fit.
+    for system in input.additional_heating_systems.iter_mut() {
+        fit_zone(&mut system.demand);
+        for zone in system.additional_zones.iter_mut() {
+            fit_zone(&mut zone.demand);
+        }
     }
     // ISSO 75.2 table 2.7: burning hours of chapter 14.
     if let Some(factor) = resolved.lighting_hours_factor.filter(|_| !residential) {

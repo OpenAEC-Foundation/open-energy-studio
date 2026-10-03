@@ -51,10 +51,19 @@ pub struct Generator {
 pub struct GeneratorDispatchDraftInput {
     pub node_input_kwh: Vec<MonthlyEnergy>,
     pub node_input_reference: String,
-    /// The published installed-power beta route for new buildings only.
+    /// `new_build` or `existing`: β by installed power (9.56/9.57);
+    /// `existing_added_preferred`: renovation or a changed installation with
+    /// an added preferred generator, β = Σ Φ·f_gebouw;si;H / Φ_H;tot with
+    /// Φ_H;tot = Σ Q_H;node;in / 1139 (9.58/9.59).
     pub design_context: String,
     pub generators: Vec<Generator>,
+    /// f_gebouw;si;H for 9.58; 1 when absent.
+    #[serde(default)]
+    pub building_fraction: Option<f64>,
 }
+
+/// 9.59: 0,13 × the year length, rounded.
+const FULL_LOAD_HOURS_9_59: f64 = 1139.0;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,8 +136,17 @@ pub fn assess_generator_dispatch_draft(
     if input.node_input_reference.trim().is_empty() {
         issues.push(issue("source_required", "nodeInputReference"));
     }
-    if input.design_context != "new_build" {
-        issues.push(issue("design_context_unsupported", "designContext"));
+    let added_preferred = match input.design_context.as_str() {
+        "new_build" | "existing" => false,
+        "existing_added_preferred" => true,
+        _ => {
+            issues.push(issue("design_context_unsupported", "designContext"));
+            false
+        }
+    };
+    let building_fraction = input.building_fraction.unwrap_or(1.0);
+    if !(building_fraction.is_finite() && building_fraction > 0.0 && building_fraction <= 1.0) {
+        issues.push(issue("building_fraction_invalid", "buildingFraction"));
     }
     let mut months = [None; 12];
     for (index, value) in input.node_input_kwh.iter().enumerate() {
@@ -214,6 +232,17 @@ pub fn assess_generator_dispatch_draft(
             break;
         }
     }
+    // 9.57 or 9.59 as the β reference.
+    let reference = if added_preferred {
+        months.iter().map(|value| value.unwrap_or(0.0)).sum::<f64>() / FULL_LOAD_HOURS_9_59
+    } else {
+        total_power
+    };
+    let scale = if added_preferred {
+        building_fraction
+    } else {
+        1.0
+    };
     let mut monthly = Vec::new();
     if issues.is_empty() {
         for (index, node) in months.into_iter().enumerate() {
@@ -225,10 +254,12 @@ pub fn assess_generator_dispatch_draft(
             let mut outputs = Vec::new();
             for (position, generator) in sorted.iter().enumerate() {
                 cumulative_power += generator.nominal_thermal_power_kw;
-                let beta = if position + 1 == sorted.len() {
+                // The lowest preference takes the remainder (9.6.1 note 4:
+                // a fictitious identical generator covers missing power).
+                let beta = if position + 1 == sorted.len() || reference <= 0.0 {
                     1.0
                 } else {
-                    cumulative_power / total_power
+                    (cumulative_power * scale / reference).min(1.0)
                 };
                 let current_fraction = fraction(beta, month);
                 let energy_fraction = current_fraction - previous_fraction;
@@ -283,7 +314,7 @@ pub fn assess_generator_dispatch_draft(
         } else {
             "invalid"
         },
-        scope: "public_chapter_9_draft_new_build_installed_power_dispatch_only",
+        scope: "nta8800_9_6_1_installed_power_dispatch",
         consultation_source: DRAFT_SOURCE,
         target_norm_version: TARGET_NORM_VERSION,
         kernel_version: KERNEL_VERSION,
@@ -310,6 +341,7 @@ mod tests {
                 .collect(),
             node_input_reference: "9.2.3.5 hand case".into(),
             design_context: "new_build".into(),
+            building_fraction: None,
             generators: vec![
                 Generator {
                     id: "hp".into(),
@@ -351,6 +383,36 @@ mod tests {
                     < 1e-9
             );
         }
+    }
+
+    #[test]
+    fn existing_building_routes_follow_9_56_and_9_58() {
+        // Existing as installed: the same 9.56 β as new build.
+        let mut existing = case();
+        existing.design_context = "existing".into();
+        let result = assess_generator_dispatch_draft(&existing);
+        assert_eq!(result.status, "diagnostic_valid");
+        assert!((result.monthly[0].generators[0].delivered_heat_kwh - 810.0).abs() < 1e-9);
+        // 9.58/9.59: Φ_H;tot = 12 000 / 1139 = 10,5356 kW; β_hp = 4,5/10,5356
+        // = 0,42713 → f = 0,75 + 0,2713·(0,87 − 0,75) = 0,78256 in January.
+        let mut added = case();
+        added.design_context = "existing_added_preferred".into();
+        let result = assess_generator_dispatch_draft(&added);
+        assert_eq!(result.status, "diagnostic_valid");
+        let beta = 4.5 / (12_000.0 / 1139.0);
+        let expected = 0.75 + (beta * 10.0 - 4.0) * (0.87 - 0.75);
+        assert!(
+            (result.monthly[0].generators[0].delivered_heat_kwh - 1000.0 * expected).abs() < 1e-6
+        );
+        // The boiler takes the remainder.
+        let total: f64 = result.monthly[0]
+            .generators
+            .iter()
+            .map(|item| item.delivered_heat_kwh)
+            .sum();
+        assert!((total - 1000.0).abs() < 1e-9);
+        added.design_context = "renovation".into();
+        assert_eq!(assess_generator_dispatch_draft(&added).status, "invalid");
     }
 
     #[test]

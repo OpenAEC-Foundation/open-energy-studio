@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { IProject } from '../core/energy/types';
 import {
-  CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields, SpaceGeneratorFields,
+  AdditionalHeatingSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, SolarWaterHeaterFields, SpaceGeneratorFields,
   WindowObstructionFields,
 } from '../components/NtaPerformancePanel/NtaSystemSections';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
@@ -225,5 +225,20 @@ describe('NTA system sections', () => {
     await user.type(screen.getByLabelText('Heating balance per month 1'), '0.9');
     expect(current().windowSolar.obstruction.heating[0]).toBe(0.9);
     expect(current().windowSolar.obstruction.cooling).toHaveLength(12);
+  });
+
+  it('assigns zones to a further heating system (§9.2)', async () => {
+    const user = userEvent.setup();
+    const zoned = { ...project, zones: [{ id: 'z1', name: 'Begane grond' }, { id: 'z2', name: 'Verdieping' }] } as unknown as IProject;
+    renderWithProviders(<Harness initial={{ generator: { kind: 'gas_boiler' } }}
+      body={(draft, change) => <AdditionalHeatingSystemsFields draft={draft} change={change} project={zoned} />} />);
+    await user.click(screen.getByRole('button', { name: 'Add heating system' }));
+    await user.click(screen.getByLabelText('Verdieping'));
+    expect(current().additionalHeatingSystems).toMatchObject([{ zoneIds: ['z2'], generator: { kind: 'gas_boiler' } }]);
+    // A zone already served by another further system cannot be ticked twice.
+    await user.click(screen.getByRole('button', { name: 'Add heating system' }));
+    expect(screen.getAllByLabelText('Verdieping')[1]).toBeDisabled();
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    expect(current().additionalHeatingSystems).toHaveLength(1);
   });
 });

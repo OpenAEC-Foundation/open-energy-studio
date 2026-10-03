@@ -655,6 +655,8 @@ export interface MonthlyDemandBalanceTerms {
   gamma: number | null;
   utilization: number;
   needKwh: number;
+  /** θ_int;op;H/C (7.9.6): θ_int;calc;H for heating, 7.80/7.81 for cooling; null when H_C;ht is undefined. */
+  operativeTemperatureC: number | null;
 }
 
 export interface MonthlyDemandAssessment {
@@ -1309,10 +1311,15 @@ export async function diagnoseForfaitHeatPumpMonthlyDraftWithRust(
   throw new Error('Rust draft monthly heat-pump diagnostics are available in the desktop app and local development server.');
 }
 
+export type NtaDispatchDesignContext = 'new_build' | 'existing' | 'existing_added_preferred';
+
 export interface GeneratorDispatchDraftInput {
   nodeInputKwh: Array<{ month: number; energyKwh: number }>;
   nodeInputReference: string;
-  designContext: 'new_build';
+  /** new_build/existing: 9.56/9.57; existing_added_preferred: 9.58/9.59. */
+  designContext: NtaDispatchDesignContext;
+  /** f_gebouw;si;H for 9.58 (default 1). */
+  buildingFraction?: number | null;
   generators: Array<{
     id: string;
     class: 'exhaust_air_heat_pump_without_overventilation' | 'heat_pump' | 'biomass_boiler' | 'combined_heat_power' | 'other_boiler';
@@ -1592,7 +1599,7 @@ export interface SpaceHeatingChainInput {
       }
     | {
         kind: 'hybrid_heat_pump';
-        designContext: 'new_build';
+        designContext: NtaDispatchDesignContext;
         generators: Array<{
           id: string;
           class: 'heat_pump' | 'exhaust_air_heat_pump_without_overventilation' | 'other_boiler';
@@ -2980,6 +2987,8 @@ export interface BuildingPerformanceInput {
   totalUsableFloorAreaM2: number;
   areaSourceReference: string;
   spaceHeating: SpaceHeatingChainInput;
+  /** §9.2: further heating systems, each with its own zones (zone ids unique across systems). */
+  additionalHeatingSystems?: SpaceHeatingChainInput[];
   heatPumpRenewable?: {
     sourceBelow20C: boolean;
     exhaustAirSource: boolean;
@@ -3605,6 +3614,15 @@ export async function calculateBuildingPerformanceWithRust(input: BuildingPerfor
   throw new Error('Rust performance calculation is available in the desktop app and local development server.');
 }
 
+export interface NtaProjectHeatingSystem {
+  zoneIds: string[];
+  generator: SpaceHeatingChainInput['generator'];
+  distributionSystem?: NtaDistributionSystem | null;
+  collectiveConnection?: SpaceHeatingChainInput['collectiveConnection'];
+  identicalSystems?: number | null;
+  humidifiers?: NtaZoneHumidifier[];
+}
+
 export interface NtaCalculationInput {
   calculationScope: 'residential' | 'utility';
   areaSourceReference: string;
@@ -3654,6 +3672,8 @@ export interface NtaCalculationInput {
   distributionSystem?: NtaDistributionSystem | null;
   collectiveConnection?: SpaceHeatingChainInput['collectiveConnection'];
   identicalSystems?: number | null;
+  /** §9.2: further heating systems; the main system serves the zones not listed here. */
+  additionalHeatingSystems?: NtaProjectHeatingSystem[];
   heatPumpRenewable?: BuildingPerformanceInput['heatPumpRenewable'];
   bacsFactor: 1 | 1.05;
   bacsSourceReference: string;

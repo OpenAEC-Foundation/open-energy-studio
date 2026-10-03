@@ -115,6 +115,10 @@ pub struct NtaCalculationInput {
     /// §10.2: several cooling systems with the project zone ids they serve.
     #[serde(default)]
     pub cooling_systems: Vec<crate::building_performance::ServedCoolingSystem>,
+    /// §9.2/5.20: further heating systems with the project zone ids they
+    /// serve; the other zones stay on the main heating system.
+    #[serde(default)]
+    pub additional_heating_systems: Vec<ProjectHeatingSystem>,
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
     /// §5.3.1: use functions of an existing utility building with areas.
@@ -254,18 +258,29 @@ pub struct ProjectPerformanceAssessment {
     pub label_data: Option<crate::label_data::LabelData>,
 }
 
+/// A further heating system of the project (§9.2) with the zones it serves.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectHeatingSystem {
+    pub zone_ids: Vec<String>,
+    pub generator: crate::space_heating_chain::Generator,
+    #[serde(default)]
+    pub distribution_system: Option<crate::space_heating_chain::DistributionSystem>,
+    #[serde(default)]
+    pub collective_connection: Option<crate::space_heating_chain::CollectiveConnection>,
+    #[serde(default)]
+    pub identical_systems: Option<u32>,
+    #[serde(default)]
+    pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
+}
+
 /// §6.4/§6.5.2 for the derived calculation zones: one heating chain serves
 /// all zones; cooling systems serve all zones or their listed zones.
 fn schematisation_checks(input: &BuildingPerformanceInput) -> Vec<crate::zoning::ZoningIssue> {
     use crate::zoning::{check_zone, CalculationZoneLayout, VentilationShare, ZonePart};
-    std::iter::once(&input.space_heating.demand)
-        .chain(
-            input
-                .space_heating
-                .additional_zones
-                .iter()
-                .map(|zone| &zone.demand),
-        )
+    input
+        .zone_inputs()
+        .into_iter()
         .flat_map(|demand| {
             let capacity = demand
                 .thermal_mass
@@ -841,6 +856,66 @@ fn derive_input(
     if !gaps.is_empty() || zones.is_empty() {
         return None;
     }
+    // §9.2: zones of the further heating systems leave the main chain.
+    let mut assigned: HashSet<String> = HashSet::new();
+    let mut extra_chains = Vec::new();
+    for (index, system) in nta.additional_heating_systems.iter().enumerate() {
+        let path = format!("ntaCalculation.additionalHeatingSystems[{index}]");
+        let mut served: Vec<ChainZone> = Vec::new();
+        if system.zone_ids.is_empty() {
+            gaps.push(gap(
+                "heating_system_zones_required",
+                format!("{path}.zoneIds"),
+            ));
+        }
+        for zone_id in &system.zone_ids {
+            if !assigned.insert(zone_id.clone()) {
+                gaps.push(gap("heating_system_zone_twice", format!("{path}.zoneIds")));
+                continue;
+            }
+            match zones
+                .iter()
+                .position(|zone| &zone.demand.zone_id == zone_id)
+            {
+                Some(position) => served.push(zones.remove(position)),
+                None => gaps.push(gap(
+                    "heating_system_zone_unknown",
+                    format!("{path}.zoneIds"),
+                )),
+            }
+        }
+        if served.is_empty() {
+            continue;
+        }
+        let first = served.remove(0);
+        extra_chains.push(SpaceHeatingChainInput {
+            humidifiers: system.humidifiers.clone(),
+            solar_heating_kwh: Vec::new(),
+            solar_recoverable_kwh: Vec::new(),
+            hot_water_load_kwh: Vec::new(),
+            demand: first.demand,
+            emission: first.emission,
+            distribution: first.distribution,
+            additional_zones: served,
+            generator: system.generator.clone(),
+            distribution_system: with_unheated_reduction(
+                system.distribution_system.clone(),
+                &project,
+            ),
+            collective_connection: system.collective_connection.clone(),
+            identical_systems: system.identical_systems,
+            regeneration_hot_water: None,
+        });
+    }
+    if zones.is_empty() && !nta.additional_heating_systems.is_empty() {
+        gaps.push(gap(
+            "main_heating_system_without_zones",
+            "ntaCalculation.additionalHeatingSystems",
+        ));
+    }
+    if !gaps.is_empty() || zones.is_empty() {
+        return None;
+    }
     let primary = zones.remove(0);
     // §5.5.8: a derived f_BACS replaces the declared value.
     let (bacs_factor, bacs_source_reference) = match &nta.bacs {
@@ -889,6 +964,7 @@ fn derive_input(
             identical_systems: nta.identical_systems,
             regeneration_hot_water: None,
         },
+        additional_heating_systems: extra_chains,
         heat_pump_renewable: nta.heat_pump_renewable,
         bacs_factor,
         bacs_source_reference,
@@ -1204,6 +1280,59 @@ mod tests {
             .unwrap();
         let second = zone_two.transmission.as_ref().unwrap();
         assert!((first.conductance_w_per_k - second.conductance_w_per_k).abs() < 1e-9);
+        let need = |performance: &BuildingPerformanceAssessment| -> f64 {
+            performance
+                .space_heating
+                .monthly
+                .iter()
+                .map(|row| row.heating_need_kwh)
+                .sum()
+        };
+        let one_system = need(performance);
+
+        // §9.2: zone z2 gets its own heating system; z1 stays on the main one.
+        let generator = value["ntaCalculation"]["generator"].clone();
+        value["ntaCalculation"]["additionalHeatingSystems"] =
+            serde_json::json!([{"zoneIds": ["z2"], "generator": generator}]);
+        let split = assess_project_performance(&value);
+        assert_eq!(split.status, "calculated_unverified", "{:?}", split.gaps);
+        let derived = split.derived_input.as_ref().unwrap();
+        assert!(derived.space_heating.additional_zones.is_empty());
+        assert_eq!(derived.additional_heating_systems.len(), 1);
+        assert_eq!(derived.additional_heating_systems[0].demand.zone_id, "z2");
+        let performance = split.performance.as_ref().unwrap();
+        assert_eq!(performance.tojuli.len(), 2);
+        assert!((need(performance) - one_system).abs() < 1e-6 * one_system);
+
+        // Gaps: an unknown zone, a zone in two systems, no zone left for
+        // the main system, and a system without zones.
+        let codes = |systems: Value| -> Vec<&'static str> {
+            let mut copy = value.clone();
+            copy["ntaCalculation"]["additionalHeatingSystems"] = systems;
+            assess_project_performance(&copy)
+                .gaps
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        let generator = &value["ntaCalculation"]["generator"];
+        let found = codes(serde_json::json!([{"zoneIds": ["nope"], "generator": generator}]));
+        assert!(found.contains(&"heating_system_zone_unknown"), "{found:?}");
+        let found = codes(serde_json::json!([
+            {"zoneIds": ["z2"], "generator": generator},
+            {"zoneIds": ["z2"], "generator": generator}
+        ]));
+        assert!(found.contains(&"heating_system_zone_twice"), "{found:?}");
+        let found = codes(serde_json::json!([{"zoneIds": ["z1", "z2"], "generator": generator}]));
+        assert!(
+            found.contains(&"main_heating_system_without_zones"),
+            "{found:?}"
+        );
+        let found = codes(serde_json::json!([{"zoneIds": [], "generator": generator}]));
+        assert!(
+            found.contains(&"heating_system_zones_required"),
+            "{found:?}"
+        );
     }
 
     /// ISSO 54 v2.0 (2022), EP-W001, p. 5: A_g = 96 m² and A_o = 247,2 m²

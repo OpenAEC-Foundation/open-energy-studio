@@ -717,6 +717,33 @@ pub struct BalanceTerms {
     pub gamma: Option<f64>,
     pub utilization: f64,
     pub need_kwh: f64,
+    /// `θ_int;op;H/C` (7.9.6), °C: for heating `θ_int;calc;H`; for cooling
+    /// 7.80/7.81 as printed (with `+ Q_C;nd`). `None` when `H_C;ht` is
+    /// undefined (setpoint equal to the outdoor temperature or no transfer).
+    pub operative_temperature_c: Option<f64>,
+}
+
+/// 7.80 with 7.81: θ_int;op;C = θ_e;avg + (Q_C;nd + Q_C;gn)/(H_C;ht·0,001·t),
+/// H_C;ht = Q_C;ht/((θ_int;set;C;stc − θ_e;avg)·0,001·t). The sign of Q_C;nd
+/// follows the printed formula (p. 221).
+pub fn cooling_operative_temperature(
+    outdoor_c: f64,
+    setpoint_c: f64,
+    hours: f64,
+    need_kwh: f64,
+    gains_kwh: f64,
+    heat_transfer_kwh: f64,
+) -> Option<f64> {
+    let delta = setpoint_c - outdoor_c;
+    if hours <= 0.0 || delta.abs() < 1e-9 {
+        return None;
+    }
+    let conductance = heat_transfer_kwh / (delta * 0.001 * hours);
+    if !conductance.is_finite() || conductance.abs() < 1e-12 {
+        return None;
+    }
+    let value = outdoor_c + (need_kwh + gains_kwh) / (conductance * 0.001 * hours);
+    value.is_finite().then_some(value)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2518,6 +2545,7 @@ fn compute(
                 gamma: gamma_heating,
                 utilization: eta_heating,
                 need_kwh: need_heating,
+                operative_temperature_c: Some(theta_heating),
             },
             cooling: BalanceTerms {
                 setpoint_c: cooling_setpoint,
@@ -2533,6 +2561,14 @@ fn compute(
                 gamma: gamma_cooling,
                 utilization: eta_cooling,
                 need_kwh: need_cooling,
+                operative_temperature_c: cooling_operative_temperature(
+                    outdoor,
+                    cooling_setpoint,
+                    hours,
+                    need_cooling,
+                    gains_cooling,
+                    heat_transfer_cooling,
+                ),
             },
         };
         let values = [
@@ -2553,6 +2589,21 @@ fn compute(
         results.push(row);
     }
     results
+}
+
+#[cfg(test)]
+mod operative_temperature_tests {
+    use super::cooling_operative_temperature;
+
+    #[test]
+    fn cooling_operative_temperature_follows_7_80_and_7_81() {
+        // H_C;ht = 1488/((24 − 4)·0,001·744) = 100 W/K;
+        // θ = 4 + (50 + 2000)/(100·0,744) = 31,5538 °C.
+        let value = cooling_operative_temperature(4.0, 24.0, 744.0, 50.0, 2000.0, 1488.0).unwrap();
+        assert!((value - (4.0 + 2050.0 / 74.4)).abs() < 1e-9);
+        assert!(cooling_operative_temperature(24.0, 24.0, 744.0, 0.0, 10.0, 10.0).is_none());
+        assert!(cooling_operative_temperature(4.0, 24.0, 744.0, 0.0, 10.0, 0.0).is_none());
+    }
 }
 
 #[cfg(test)]

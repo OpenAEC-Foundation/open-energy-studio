@@ -231,13 +231,7 @@ fn tag<T: Serialize>(value: &T) -> Option<String> {
 }
 
 pub fn installation_summary(input: &BuildingPerformanceInput) -> InstallationSummary {
-    let demands = std::iter::once(&input.space_heating.demand).chain(
-        input
-            .space_heating
-            .additional_zones
-            .iter()
-            .map(|zone| &zone.demand),
-    );
+    let demands = input.zone_inputs().into_iter();
     InstallationSummary {
         heating_generator: tag(&input.space_heating.generator),
         hot_water_generator: input
