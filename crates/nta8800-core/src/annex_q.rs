@@ -1076,7 +1076,8 @@ pub fn calculate_annex_q(pump: &AnnexQHeatPump, context: AnnexQContext) -> Annex
                 }
             );
             let power = if modulating_pump && maximum > 0.0 {
-                operating_power / maximum * nominal
+                // Q.6: cubic in the part-load ratio (rendered p. 1030).
+                (operating_power / maximum).powi(3) * nominal
             } else {
                 nominal
             };
@@ -1321,6 +1322,22 @@ mod tests {
             source_pump_modulating: false,
         };
         assert!(validate_annex_q(&pump, 35.0, "p").is_empty());
+        // Q.6: a modulating source pump runs at (P_pl/P_max)³·P_nom, well
+        // below the constant P_nom of Q.7.
+        let constant = calculate_annex_q(&pump, context()).source_pump_kwh;
+        let mut cubic = pump.clone();
+        if let Modulation::Modulating {
+            source_pump_modulating,
+            ..
+        } = &mut cubic.modulation
+        {
+            *source_pump_modulating = true;
+        }
+        let modulated = calculate_annex_q(&cubic, context()).source_pump_kwh;
+        assert!(
+            modulated > 0.0 && modulated < 0.75 * constant,
+            "{modulated} vs {constant}"
+        );
         let cop_max = plane(&pump, |item| item.cop).unwrap();
         let Modulation::Modulating {
             low_range,

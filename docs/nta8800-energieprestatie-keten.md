@@ -974,3 +974,5 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
 - **Verwarming:** θ_int;op;H = θ_int;calc;H.
 - **Koeling, 7.80/7.81:** θ_int;op;C = θ_e;avg + (Q_C;nd + Q_C;gn)/(H_C;ht·0,001·t), met H_C;ht = Q_C;ht/((θ_int;set;C;stc − θ_e;avg)·0,001·t). De kern neemt het plusteken over zoals gedrukt (p. 221). Fysisch zou je eerder Q_C;gn − Q_C;nd verwachten; dit is een open normvraag.
 - Bij θ_int;set;C = θ_e;avg of Q_C;ht = 0 is H_C;ht niet gedefinieerd; de uitvoer is dan `null`.
+
+**Correctie Q.6.** Bij een modulerende warmtepomp met een modulerende bronpomp is het bronpompvermogen (P_pl/P_max)³·P_nom (gerenderde p. 1030). De code rekende lineair, met P_pl/P_max·P_nom. Bij deellast 0,5 telde de bronpompenergie daardoor 4× te hoog mee.
