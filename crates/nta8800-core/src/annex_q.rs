@@ -210,6 +210,8 @@ pub const INTERPRETATIONS: &[&str] = &[
     "interval int = 5 (B < 0,15) uses the 15 % part-load point (plj = 4); the formula refers to plj = 5, which is not measured",
     "the annual energy fraction F_H;gen is applied to every month",
     "switch-off criteria that are not given are not applied (note 1 of tables Q.1/Q.3)",
+    "Q.4.4 (p. 1065): the forfait water/water source pump uses the evaporator power at condition 1, P·(1 − 1/COP); the norm does not name the condition",
+    "Q.1: when every bin of table Q.6 is covered, F_H;gen = 1 with or without a backup; the rounded hours would otherwise leave F just below 1",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

@@ -3544,9 +3544,11 @@ export type NtaCompressionPerformance =
       method: 'en14825';
       nominalEer: number;
       nominalCapacityKw: number;
+      /** Below `nominalCapacityKw`: method 1 applies to modulating units only (§10.5.4). */
       minimumCapacityKw: number;
-      /** Conditions A, B, C and D. */
+      /** Conditions A, B, C and D, in that order. */
       testPoints: NtaEn14825Point[];
+      /** Part load of C at the condenser inlet of A (10.63); omitted: 10.64, which needs equal evaporator outlets at A and C. */
       fifthPoint?: NtaEn14825Point | null;
       condenserInletLimitC?: number | null;
       requiredOutletC?: number | null;

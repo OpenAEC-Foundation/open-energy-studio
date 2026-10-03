@@ -69,7 +69,8 @@ Wat buiten bereik blijft:
 - Bijlage K: dit zijn meetregels; de oppervlakken zijn invoer.
 
 Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
-- bijlage Q: F_H;gen = 1 bij volledige dekking; Q.48 bij L/W;
+- bijlage Q: F_H;gen = 1 bij volledige dekking (ook met bijverwarming); Q.48 bij L/W; bronpomp dubbel geteld (Q.4 en 9.6.3.2); Q.4.4 met het verdampervermogen bij conditie 1;
+- koelmethode 1: f_C;PL boven 100 % niet begrensd (10.56/10.58), met waarschuwing;
 - de teken-keuze van Δθ_fan in 9.29 tegenover 10.20;
 - 10.15 en tabel 10.16;
 - 10.23c: het gemiddelde van ϑ_in en ϑ_out van tabel 10.8, in plaats van tweemaal de aanvoertemperatuur;
@@ -146,7 +147,16 @@ Hoofdstuk 13 kwam op elke maandterm overeen. In hoofdstuk 10 bleek één echte f
   - Onder 765 kWh geldt de eerste kolom: de klasse wordt niet overschreden en de tabel heeft geen lagere kolom.
   - Boven de laatste kolom van het gemeten profiel geeft de kern `hot_water_heat_pump_class_exceeded`. P. 630 verbiedt gebruik in een hogere klasse dan de gemeten klasse, en voor profielen groter dan XL bestaan geen factoren.
 - **Circulatie met standaardwaarden.** Ontbreekt de lengte (13.31) of de diameter/Ψ (13.29/tabel 13.4), en is het jaarlijkse η_W;dis lager dan 0,2? Dan meldt de kern de niet-blokkerende waarschuwing `hot_water_circulation_defaults_low_efficiency`. De berekening zelf blijft normconform.
-- Niet nagerekend: koelmethode 1 (NEN-EN 14825, 10.53–10.64).
+- Niet nagerekend: koelmethode 1 (NEN-EN 14825, 10.53–10.64); zie de volgende alinea.
+
+**Herberekening van bijlage Q (verwarming) en koelmethode 1 (H10), 4 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's (p. 340, 1028–1065 en 402–409). Getest zijn negen warmtepompscenario's: lucht/water modulerend en aan/uit, brine/water forfaitair en modulerend, lucht/lucht en bivalente gevallen. Voor koeling zijn een kamerairco zonder en een koelmachine met vijfde meetpunt getest. Alle bin- en maandtermen kwamen overeen (≈ 1e-12). Vastgelegd of aangepast:
+- **Bronpomp dubbel geteld (normpunt).** Q.4 (p. 1029) rekent W_H;aux;hp;an mee in η_H;gen;hp, en 9.6.3.2 (p. 340) boekt hem nogmaals als hulpenergie. De kern volgt beide letterlijk. Effect: ongeveer 5 % van het warmtepompverbruik bij brine/water aan/uit, 0,3 % bij een modulerende bronpomp.
+- **Q.4.4 (p. 1065).** Het forfaitaire bronpompvermogen van water/water rekent met het verdampervermogen bij conditie 1, P·(1 − 1/COP). De norm noemt de conditie niet.
+- **Q.1 bij volledige dekking.** Dekt de warmtepomp elke bin, dan geldt F_H;gen = 1, met of zonder bijverwarming. De afronding van tabel Q.6 zou anders een restaandeel van 0,007 % aan de bijverwarming geven.
+- **Lucht/luchtwarmtepomp in een waterketen** wordt afgewezen (`annex_q_air_air_hydronic_chain`).
+- **Deellast boven 100 % (10.56/10.58, p. 403, normpunt).** De norm begrenst f_C;PL niet. Bij een te klein toestel extrapoleert de kubische functie van 10.63 (in het testgeval f_EER 18,9 bij 324 % deellast). De kern houdt de letterlijke uitkomst aan en meldt `cooling_part_load_above_full_load`.
+- **10.63/10.64 (p. 408–409).** Het vijfde meetpunt moet de deellast van C en de condensorintrede van A hebben. Zonder vijfde punt moet de verdamperuittrede bij A en C gelijk zijn, anders is 10.64 met Δϑ_corr = 0 niet consistent. Beide worden nu gecontroleerd (tolerantie 0,5).
+- **§10.5.4 (p. 401).** Methode 1 is voor modulerende opwekkers; de kern eist een minimumvermogen onder het nominale vermogen.
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
