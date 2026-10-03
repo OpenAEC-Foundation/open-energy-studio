@@ -2,8 +2,11 @@ import { useState } from 'react';
 import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
 import {
-  CheckField, NumberField, read, Section, SelectField, TextField, write, type Draft, type Path,
+  CheckField, NumberField, read, Section, SelectField, TextField, TriStateField, write, type Draft, type Path,
 } from './NtaFormFields';
+import {
+  AirHeatersFields, BacsAndSupplyFields, BBL_FUNCTIONS, FunctionAreasFields, LABEL_FUNCTIONS,
+} from './NtaAdvancedSections';
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import {
@@ -90,6 +93,13 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         <TextField {...field} path={['activeCooling', 'sourceReference']} label={t('nta.form.source')} />
       </>}
       <CheckField {...field} path={['permitApplicationAfter20260529']} label={t('nta.form.permitAfter')} />
+      <NumberField {...field} path={['constructionYear']} label={t('nta.form.constructionYear')} step="1" />
+      <TriStateField {...field} path={['fossilAppliancesOutsideCalculation']} label={t('nta.form.fossilOutside')}
+        yes={t('nta.form.yes')} no={t('nta.form.no')} />
+    </Section>
+    <Section title={t('nta.form.functions')}>
+      <FunctionAreasFields draft={draft} change={change} base="labelFunctions" functions={LABEL_FUNCTIONS} prefix="nta.form.labelFn" />
+      <FunctionAreasFields draft={draft} change={change} base="bblFunctions" functions={BBL_FUNCTIONS} prefix="nta.form.bblFn" />
     </Section>
     <Section title={t('nta.form.setpoints')}>
       <NumberField {...field} path={['setpoints', 'heatingC']} label={t('nta.form.heatingSetpoint')} />
@@ -215,12 +225,15 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
       <SelectField {...field} path={['emission', 'control']} label={t('nta.form.control')} options={[
         ['main_room_thermostat', t('nta.form.control.main')], ['central_with_room_valves', t('nta.form.control.central')],
         ['individual_room_thermostats', t('nta.form.control.individual')], ['other_or_unknown', t('nta.form.unknown')]]} />
+      {(read(draft, ['emission', 'system']) === 'air_heating' || read(draft, ['emission', 'airHeaters']) != null) &&
+        <AirHeatersFields draft={draft} change={change} />}
       <TextField {...field} path={['emission', 'sourceReference']} label={t('nta.form.source')} />
       <TextField {...field} path={['distribution', 'sourceReference']} label={t('nta.form.distributionSource')} />
       <NtaDistributionFields draft={draft} change={change} />
     </Section>
     <Section title={t('nta.form.generator')}>
       <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} allowMultiple />
+      <NumberField {...field} path={['identicalSystems']} label={t('nta.form.identicalSystems')} step="1" />
     </Section>
     {project.zones.length > 1 && <Section title={t('nta.form.heatingSystems.title')}>
       <AdditionalHeatingSystemsFields draft={draft} change={change} project={project} />
@@ -348,6 +361,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.inventory')}>
       <NumberField {...field} path={['bacsFactor']} label={t('nta.form.bacs')} />
       <TextField {...field} path={['bacsSourceReference']} label={t('nta.form.source')} />
+      <BacsAndSupplyFields draft={draft} change={change} residential={residential} />
       <CheckField {...field} path={['useInventoryComplete']} label={t('nta.form.useInventory')} />
       <CheckField {...field} path={['productionInventoryComplete']} label={t('nta.form.productionInventory')} />
       {chapter11

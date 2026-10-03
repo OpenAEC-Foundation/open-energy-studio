@@ -2,11 +2,12 @@ import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import {
   additionalHotWaterGeneratorTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
-  declaredShareTemplate, en14825PointTemplate, exhaustAirUseTemplate, hotWaterGeneratorTemplate, preferredGeneratorTemplate,
-  solarWaterHeaterTemplate, spaceGeneratorTemplate, testedSolarMethod, windowObstructionTemplate,
+  chpClassTemplate, declaredShareTemplate, en14825PointTemplate, exhaustAirUseTemplate, hotWaterGeneratorTemplate,
+  microChpTemplate, preferredGeneratorTemplate, regenerationTemplate, solarRegenerationTemplate, solarWaterHeaterTemplate,
+  spaceGeneratorTemplate, testedSolarMethod, windowObstructionTemplate,
 } from '../../core/nta/NtaSystemTemplates';
 import {
-  CheckField, NumberField, read, SelectField, TextField, type Draft, type Path,
+  CheckField, JsonField, NumberField, read, SelectField, TextField, type Draft, type Path,
 } from './NtaFormFields';
 
 // System inputs of the NTA form that share a base path: space-heating
@@ -39,7 +40,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
   const field = { draft, onChange: change };
   const at = (...rest: Path): Path => [...base, ...rest];
   const kind = read(draft, at('kind'));
-  const otherAux = ['external_heat', 'electric_resistance', 'biomass', 'chp'].includes(String(kind));
+  const otherAux = ['external_heat', 'electric_resistance', 'biomass', 'chp', 'gas_heat_pump'].includes(String(kind));
   return <>
     <label>{t('nta.form.generatorKind')}
       <select value={typeof kind === 'string' ? kind : ''} onChange={(event) => {
@@ -52,6 +53,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
         <option value="electric_resistance">{t('nta.form.generator.electric')}</option>
         <option value="biomass">{t('nta.form.generator.biomass')}</option>
         <option value="chp">{t('nta.form.generator.chp')}</option>
+        <option value="gas_heat_pump">{t('nta.form.generator.gasHeatPump')}</option>
         {allowMultiple && <option value="multiple">{t('nta.form.generator.multiple')}</option>}
         {kind === 'hybrid_heat_pump' && <option value="hybrid_heat_pump">{t('nta.form.generator.hybrid')}</option>}
       </select>
@@ -62,6 +64,18 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
     </>}
     {kind === 'electric_resistance' && <TextField {...field} path={at('equipmentReference')} label={t('nta.form.source')} />}
     {kind === 'chp' && <ChpClassFields draft={draft} change={change} base={base} lowTemperature />}
+    {kind === 'gas_heat_pump' && <>
+      <SelectField {...field} path={at('table')} label={t('nta.form.gasHp.table')} options={[
+        ['residential_at_most25_kw', t('nta.form.gasHp.table.residential')],
+        ['utility_collective_or_above25_kw', t('nta.form.gasHp.table.utility')]]} />
+      <SelectField {...field} path={at('source')} label={t('nta.form.gasHp.source')} options={[
+        ['outdoor_air', t('nta.form.gasHp.source.outdoorAir')], ['exhaust_air', t('nta.form.gasHp.source.exhaustAir')],
+        ['ground', t('nta.form.gasHp.source.ground')], ['groundwater', t('nta.form.gasHp.source.groundwater')],
+        ['surface_water', t('nta.form.gasHp.source.surfaceWater')]]} />
+      <NumberField {...field} path={at('designSupplyTemperatureC')} label={t('nta.form.gasHp.supplyTemperature')} />
+      <NumberField {...field} path={at('sourceCorrectionFactor')} label={t('nta.form.gasHp.sourceCorrection')} step="0.01" />
+      <TextField {...field} path={at('equipmentReference')} label={t('nta.form.boilerEquipmentSource')} />
+    </>}
     {kind === 'biomass' && <>
       <SelectField {...field} path={at('appliance')} label={t('nta.form.biomassAppliance')} options={[
         ['freestanding_wood_stove', t('nta.form.biomass.stove')], ['insert_stove', t('nta.form.biomass.insert')],
@@ -95,12 +109,69 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <TextField {...field} path={at('boiler', 'temperatureAndCircuitReference')} label={t('nta.form.boilerTemperatureSource')} />
     </>}
     {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
+    {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
   </>;
 }
 
-/** Building CHP with the table 9.31 class (method 2). */
+/** Annex V regeneration of an individual ground source (free cooling, solar collectors). */
+function RegenerationFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const present = read(draft, base) != null;
+  const solar = list(draft, [...base, 'solar']);
+  return <>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present}
+        onChange={(event) => change(base, event.target.checked ? regenerationTemplate() : undefined)} />
+      {t('nta.form.regeneration')}
+    </label>
+    {present && <>
+      <CheckField {...field} path={[...base, 'freeCoolingFromSource']} label={t('nta.form.regeneration.freeCooling')} />
+      <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
+      {solar.map((_, index) => <div key={index} className="nta-form-row">
+        <strong>{t('nta.form.regeneration.solar')} {index + 1}</strong>
+        <NumberField {...field} path={[...base, 'solar', index, 'collectorAreaM2']} label={t('nta.form.regeneration.area')} />
+        <NumberField {...field} path={[...base, 'solar', index, 'azimuthDeg']} label={t('nta.form.regeneration.azimuth')} />
+        <NumberField {...field} path={[...base, 'solar', index, 'tiltDeg']} label={t('nta.form.regeneration.tilt')} />
+        <NumberField {...field} path={[...base, 'solar', index, 'declaredEfficiency']} label={t('nta.form.regeneration.efficiency')} />
+        <TextField {...field} path={[...base, 'solar', index, 'sourceReference']} label={t('nta.form.source')} />
+        <RemoveButton label={t('nta.form.remove')} onClick={() => change([...base, 'solar'], solar.filter((_, item) => item !== index))} />
+      </div>)}
+      <button type="button" className="btn" onClick={() => change([...base, 'solar'], [...solar, solarRegenerationTemplate()])}>
+        {t('nta.form.regeneration.addSolar')}
+      </button>
+    </>}
+  </>;
+}
+
+/** Building CHP: table 9.31 class (method 2) or measured micro-CHP (method 1, 9.6.6.2). */
 function ChpClassFields({ draft, change, base, lowTemperature = false }: SectionProps & { base: Path; lowTemperature?: boolean }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const method1 = read(draft, [...base, 'method1']) != null;
+  const setMethod = (measured: boolean) => change(base, {
+    ...(read(draft, base) as Draft),
+    chp: measured ? null : chpClassTemplate(),
+    method1: measured ? microChpTemplate() : null,
+  });
+  return <>
+    <label>{t('nta.form.chp.method')}
+      <select value={method1 ? 'method1' : 'method2'} onChange={(event) => setMethod(event.target.value === 'method1')}>
+        <option value="method2">{t('nta.form.chp.method2')}</option>
+        <option value="method1">{t('nta.form.chp.method1')}</option>
+      </select>
+    </label>
+    {method1
+      ? <JsonField key={JSON.stringify(base)} {...field} path={[...base, 'method1']} label={t('nta.form.chp.method1Json')}
+        invalid={t('nta.form.jsonInvalid')} />
+      : <ChpTableFields draft={draft} change={change} base={base} lowTemperature={lowTemperature} />}
+    <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+    <p className="nta-form-note">{t('nta.form.chp.note')}</p>
+  </>;
+}
+
+function ChpTableFields({ draft, change, base, lowTemperature }: SectionProps & { base: Path; lowTemperature: boolean }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
   return <>
@@ -108,8 +179,6 @@ function ChpClassFields({ draft, change, base, lowTemperature = false }: Section
     <CheckField {...field} path={[...base, 'chp', 'builtAfter2006']} label={t('nta.form.chp.after2006')} />
     <CheckField {...field} path={[...base, 'chp', 'hreDeclared']} label={t('nta.form.chp.hre')} />
     {lowTemperature && <CheckField {...field} path={[...base, 'chp', 'lowTemperature']} label={t('nta.form.chp.lowTemperature')} />}
-    <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
-    <p className="nta-form-note">{t('nta.form.chp.note')}</p>
   </>;
 }
 
@@ -269,6 +338,7 @@ export function HotWaterGeneratorFields({ draft, change, base }: SectionProps & 
     {kind === 'heat_pump' && <>
       <CheckField {...field} path={[...base, 'exhaustAirSource']} label={t('nta.form.dhwExhaustAir')} />
       <SelectField {...field} path={[...base, 'measuredClass']} label={t('nta.form.dhwClass')} options={classes} />
+      <CheckField {...field} path={[...base, 'sameGroundSource']} label={t('nta.form.dhwSameGroundSource')} />
     </>}
     {kind === 'indirect_boiler' && <SelectField {...field} path={[...base, 'boiler']} label={t('nta.form.dhwBoiler')} options={[
       ['hr107', 'HR 107'], ['hr100_or104', 'HR 100/104'], ['vr', 'VR'], ['conventional_or_unknown', t('nta.form.dhwGas.unknown')]]} />}
