@@ -36,6 +36,7 @@ Voor warmtepompen ontbreken hierdoor nog de normatieve prestatie- en hulpenergie
 - Omgevingsregeling, art. 5.11–5.13 en bijlagen IX en X, geconsolideerde tekst geldig vanaf 1 januari 2026: https://wetten.overheid.nl/BWBR0045528/2026-01-01. De grenswaarden zijn letterlijk overgenomen in `crates/nta8800-core/src/label_class.rs`.
 - Wijzigingsregeling van 24 april 2026 (EPBD IV, eerste tranche), met onder meer bijlagen IXa/Xa (A0) en art. 5.13a: https://zoek.officielebekendmakingen.nl/stcrt-2026-18123.html. Nog niet verwerkt.
 - Besluit bouwwerken leefomgeving, art. 4.149–4.149b en tabel 4.148A, geconsolideerde tekst geldig vanaf 1 januari 2026: https://wetten.overheid.nl/BWBR0041297/2026-01-01. De grenswaarden zijn overgenomen in `crates/nta8800-core/src/bbl_requirements.rs`.
+- De onderwijsrij van tabel 4.148A is daarnaast rechtstreeks gecontroleerd tegen de [IPLO-werkversie van het Bbl, p. 150](https://iplo.nl/publish/pages/245245/besluit-bouwwerken-leefomgeving-werkversie_1.pdf) en [Stb. 2021, 147](https://zoek.officielebekendmakingen.nl/stb-2021-147.pdf): BENG 1 is 190 kWh/m² bij A_ls/A_g ≤ 1,8 en 190 + 30 × (A_ls/A_g − 1,8) daarboven; BENG 2 is 70 en BENG 3 is 40. De werkversie vervangt de formele geconsolideerde wetstekst niet.
 - Omgevingsregeling art. 5.31a/5.31b (BRL 9500-detailopname en BRL 9501-attest voor BENG-bepaling bij nieuwbouw) en art. 5.50 (restwarmte; Rekentool Koelbehoefte in plaats van bijlage AA).
 
 ## Transcriptiebronnen van de rekenkern (1 oktober 2026)

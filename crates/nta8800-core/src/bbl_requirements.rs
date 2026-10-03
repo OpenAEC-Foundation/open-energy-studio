@@ -408,6 +408,23 @@ mod tests {
     }
 
     #[test]
+    fn education_limits_follow_table_4_148a_at_shape_boundary() {
+        // Bbl table 4.148A, education row: 190 through A_ls/A_g = 1.8;
+        // above that, 190 + 30 × (A_ls/A_g − 1.8). The same row gives
+        // BENG 2 = 70 and BENG 3 = 40 (IPLO 2026 working text, p. 150).
+        let at_boundary = bbl_limits(BblFunction::Education, 1.8, 250.0).unwrap();
+        assert_eq!(at_boundary.energy_need_max_kwh_per_m2, 190.0);
+        assert_eq!(at_boundary.primary_fossil_max_kwh_per_m2, 70.0);
+        assert_eq!(at_boundary.renewable_share_min_percent, 40.0);
+        assert_eq!(
+            bbl_limits(BblFunction::Education, 2.0, 250.0)
+                .unwrap()
+                .energy_need_max_kwh_per_m2,
+            196.0
+        );
+    }
+
+    #[test]
     fn check_reports_only_available_indicators() {
         let result = check(
             BblFunction::OtherResidential,

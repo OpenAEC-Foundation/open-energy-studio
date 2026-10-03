@@ -26,10 +26,12 @@
 **Openstaand, externe gegevens of besluiten.**
 - officiële referentiegevallen (BRL 9501-toetsset);
 - het EP-Online-uitwisselschema (XSD);
-- de Bbl-tekst voor de onderwijsgrens BENG 1 (basis 190, te controleren tegen BWBR0041297);
+- de formele controle van tabel 4.148A tegen de geconsolideerde Bbl-tekst (BWBR0041297); de onderwijsgrens is al bevestigd in de officiële IPLO-werkversie en het Staatsblad (zie hieronder);
 - het uurklimaat van 17.3.8;
 - ISO 6946 tabel 8 (spouwen kleiner dan 20 mm);
 - het attestnummer.
+
+**Interne controle op `aace329` (4 oktober).** De volledige Rust-kern (751 tests), HTTP/MCP-service (53 tests), frontend (385 tests in 61 bestanden) en TypeScript-/Vite-build zijn geslaagd. Daarna is een extra regressietest toegevoegd voor de onderwijsgrens van Bbl-tabel 4.148A; deze gerichte test en `cargo fmt --check` slaagden. Deze controles leveren geen externe normtoets of attest op.
 
 ## Samenvatting stand 3 oktober 2026
 
@@ -141,7 +143,7 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - §5.3.1 (p. 70): woon- en utiliteitsfuncties worden nooit samen naar oppervlakte gewogen; een gemengde `bblFunctions`-lijst wordt geweigerd. Functielijsten moeten binnen 0,5 % (of 0,5 m²) optellen tot A_g;tot;
 - bijlage Z (p. 1133): ook de brandurenfactor van tabel 14.1 in het maatwerkadvies telt als gebruiksaanpassing, dus zonder label;
 - TOjuli-grens: de kern toetst "niet groter dan 1,20" (Bbl art. 4.149b, geconsolideerde tekst 2026-01-01); NTA §5.7.1 (p. 114) verwijst naar de Omgevingsregeling, en de "< 1,2" bij bijlage AA (p. 1145–1146) is alleen de grondslag van de AA-aftrek;
-- Bbl-grenswaarden: tabel 4.148A staat niet in de gelicentieerde bronnen; de waarden komen uit de geconsolideerde Bbl-tekst (BWBR0041297, 2026-01-01). Nog te verifiëren tegen die tekst: de basiswaarde 190 kWh/m² voor BENG 1 bij onderwijs;
+- Bbl-grenswaarden: tabel 4.148A staat niet in de gelicentieerde norm. De onderwijsrij met BENG 1 = 190 kWh/m² bij A_ls/A_g ≤ 1,8, daarboven 190 + 30 × (A_ls/A_g − 1,8), BENG 2 = 70 en BENG 3 = 40 is gecontroleerd tegen de [IPLO-werkversie van het Bbl, p. 150](https://iplo.nl/publish/pages/245245/besluit-bouwwerken-leefomgeving-werkversie_1.pdf) en [Stb. 2021, 147](https://zoek.officielebekendmakingen.nl/stb-2021-147.pdf). De IPLO-tekst is een werkversie; formele controle van de volledige tabel tegen de geconsolideerde BWBR0041297-tekst blijft open;
 - maatwerkadvies: ISSO 82.2 §6.2.4 (p. 82) schrijft geen rangorde voor; de terugverdientijd moet in het rapport, NCW en levensduur mogen. Zonder keuze van de adviseur stelt de kern het pakket met de hoogste NCW voor; het paneel sorteert ook op terugverdientijd;
 - fitcriteria (ISSO 82.2 bijlage C.1, p. 105): de 5 % geldt ten opzichte van de meting, zoals de tekst zegt; het rekenvoorbeeld op p. 110 (60 en 63, 4,7 %) past daarbij met een gemeten helling van 63;
 - de lichtgrens voor systeemeisen volgt het Bbl (75 kWh_prim/m²); ISSO 82.2 tabel 5.1 (p. 79) noemt 17.
