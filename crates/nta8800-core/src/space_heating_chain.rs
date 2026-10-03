@@ -81,6 +81,8 @@ pub const OMITTED_TERMS: &[&str] = &[
     "annex M: β above 1 (M.24/M.25) is refused as a capacity shortfall, as annex N does; the plausibility bounds P_int ≥ 0,05·P_n and f_gen;ls;P0 ≤ 0,1 are program choices",
     "annex M: stand-by losses (M.4/M.6) burn fuel in every hour of the month even when the 9.7 feedback of recoverable losses brings the generator output to 0 (a grossly oversized boiler in a small zone); the norm is followed literally",
     "tables 5.2/5.4 (biomass classes): a type-plate power above 500 kW classes the boiler as bmA regardless of the entered 500 kW flag",
+    "tables 5.2/5.4 (p. 94, 'per installatie'): the biomass class follows how the stoves or boilers are modelled. The generators of one multiple set add up; identical systems (§9.1, p. 287, for example one stove per dwelling) and separate heating systems (for example local heaters in different zones) are separate installations and are classed one by one",
+    "9.56 (p. 323) with remark 4 (p. 324): when preference 1 of an annex Q set is estimated at β ≥ 1, the remaining preferences are weighted by their entered nominal powers; only when those are missing does each count with the same power (program choice)",
     "annex V, V.1 (p. 1115): η_H;gen is referred to 14.6, which in this edition is the lighting daylight factor; the kernel uses the delivered COP with η_el = 1/f_P;del;el, so extraction is Q·(1 − η_el/COP). Reading η_H;gen as COP·η_el gives Q·(1 − 1/COP) and a higher R; the kernel's reading is the conservative one",
 ];
 
@@ -2969,17 +2971,28 @@ fn is_biomass(generator: &Generator) -> bool {
 }
 
 /// Thermal biomass power of the installation the input describes (tables
-/// 5.2/5.4: "per installatie"), kW.
+/// 5.2/5.4: "per installatie"), kW. Identical systems (§9.1, p. 287) are
+/// separate physical installations (for example one per dwelling), so the
+/// power is that of one system; only the generators of one multiple set add
+/// up.
 fn biomass_installation_kw(input: &SpaceHeatingChainInput) -> f64 {
-    let single = match &input.generator {
+    match &input.generator {
         Generator::Multiple(set) => set
             .generators
             .iter()
             .map(|part| biomass_power_kw(&part.generator, part.nominal_power_kw))
             .sum(),
         generator => biomass_power_kw(generator, 0.0),
-    };
-    single * f64::from(input.identical_systems.unwrap_or(1).max(1))
+    }
+}
+
+/// Whether a local biomass heater's own full-load output exceeds 500 kW.
+fn local_heater_above_500_kw(generator: &LocalHeaterGenerator) -> bool {
+    generator
+        .heater
+        .product
+        .output_full_kw
+        .is_some_and(|power| power.is_finite() && power > BIOMASS_CLASS_LIMIT_KW)
 }
 
 /// Marks a biomass generator as part of an installation above 500 kW.
@@ -3010,7 +3023,7 @@ fn biomass_class_warnings(input: &SpaceHeatingChainInput) -> Vec<ChainIssue> {
             )),
             Generator::LocalHeater(item) if item.fuel == LocalHeaterFuel::Biomass => Some((
                 item.annex_r_compliant_at_most_500_kw == Some(true),
-                item.biomass_above_500_kw,
+                item.biomass_above_500_kw || local_heater_above_500_kw(item),
             )),
             _ => None,
         }
@@ -3569,11 +3582,16 @@ fn generate_multiple_with_annex_q(
         // β of the remaining preferences: estimated values rebased on the
         // share left by preference 1 (interpretation), else nominal powers.
         // When preference 1 was estimated to cover everything (β ≥ 1) there
-        // is nothing to rebase on: every remaining generator then counts with
-        // the same power (an equal share by 9.56–9.60), so the nominal powers
-        // the estimate stood in for are not demanded after all.
+        // is nothing to rebase on. Entered nominal powers then weight the
+        // remaining preferences as 9.56 (p. 323) does; only when they are
+        // missing (the estimate stood in for them) does every remaining
+        // generator count with the same power (interpretation).
         let first = set.estimated_beta.first().copied().unwrap_or(0.0);
-        let equal_shares = !set.estimated_beta.is_empty() && first >= 1.0;
+        let rest_powers_known = rest_indices.iter().all(|other| {
+            let power = set.generators[*other].nominal_power_kw;
+            power.is_finite() && power > 0.0
+        });
+        let equal_shares = !set.estimated_beta.is_empty() && first >= 1.0 && !rest_powers_known;
         let estimated_beta = if set.estimated_beta.len() > 1 && first < 1.0 {
             set.estimated_beta[1..]
                 .iter()
@@ -4711,7 +4729,7 @@ fn generate(
             let biomass_class = (generator.fuel == LocalHeaterFuel::Biomass).then(|| {
                 validate_biomass_evidence(
                     generator.annex_r_compliant_at_most_500_kw,
-                    generator.biomass_above_500_kw,
+                    generator.biomass_above_500_kw || local_heater_above_500_kw(generator),
                     generator.annex_r_reference.as_ref(),
                     issues,
                 )
@@ -5794,6 +5812,43 @@ mod tests {
             result.issues
         );
         assert!(!codes(&estimated).contains(&"generator_nominal_power_invalid"));
+
+        // The same β = 1 estimate with entered powers for the rest: 9.56
+        // weights the rest by those powers, so swapping them changes the
+        // split between the gas boiler and the electric heater.
+        let weighted = |boiler_kw: f64, electric_kw: f64| {
+            let mut input = partial.clone();
+            input.distribution_system = Some(system(calculated_pump()));
+            if let Generator::Multiple(set) = &mut input.generator {
+                set.generators[1].nominal_power_kw = boiler_kw;
+                set.generators.push(PreferredGenerator {
+                    preference: 3,
+                    nominal_power_kw: electric_kw,
+                    generator: Generator::ElectricResistance(ElectricResistanceGenerator {
+                        equipment_reference: "panel heaters".into(),
+                        auxiliary: other_aux(1, None),
+                    }),
+                });
+                set.estimated_beta = vec![1.0, 1.0];
+            }
+            let result = assess_space_heating_chain(&input);
+            assert_eq!(
+                result.status, "calculated_unverified",
+                "{:?}",
+                result.issues
+            );
+            result
+                .monthly
+                .iter()
+                .map(|row| row.natural_gas_kwh)
+                .sum::<f64>()
+        };
+        let small_boiler = weighted(10.0, 30.0);
+        let large_boiler = weighted(30.0, 10.0);
+        assert!(
+            large_boiler > small_boiler + 1.0,
+            "{small_boiler} vs {large_boiler}"
+        );
     }
 
     #[test]
@@ -6306,23 +6361,22 @@ mod tests {
             .iter()
             .all(|row| row.biomass_class_a_kwh == 0.0));
         assert!(small.warnings.is_empty());
-        // Identical appliances (§9.1) are one installation too.
+        // Identical systems (§9.1, p. 287) are separate physical
+        // installations: two 300 kW boilers modelled as identical systems
+        // stay 300 kW per installation, bmB.
         let mut identical = boiler_chain();
         identical.distribution_system = cascade(200.0).distribution_system;
         identical.generator = wood(300.0);
         identical.identical_systems = Some(2);
-        assert_eq!(biomass_installation_kw(&identical), 600.0);
+        assert_eq!(biomass_installation_kw(&identical), 300.0);
         let result = assess_space_heating_chain(&identical);
         assert_eq!(
             result.status, "calculated_unverified",
             "{:?}",
             result.issues
         );
-        assert!(result.monthly.iter().all(|row| row.biomass_kwh == 0.0));
-        assert!(result
-            .warnings
-            .iter()
-            .any(|item| item.code == "biomass_class_conflict"));
+        assert!(result.monthly.iter().any(|row| row.biomass_kwh > 0.0));
+        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
     }
 
     #[test]
@@ -6357,6 +6411,65 @@ mod tests {
             .monthly
             .iter()
             .all(|row| row.generator_recoverable_loss_kwh == 0.0));
+    }
+
+    #[test]
+    fn biomass_stove_class_follows_one_physical_installation() {
+        let stove = |output_kw: f64| {
+            let mut input = boiler_chain();
+            input.emission = serde_json::from_value(json!({
+                "system": "local_heater", "balancing": "not_applicable",
+                "control": "main_room_thermostat", "sourceReference": "survey"
+            }))
+            .unwrap();
+            input.generator = serde_json::from_value(json!({
+                "kind": "local_heater",
+                "fuel": "biomass",
+                "annexRCompliantAtMost500Kw": true,
+                "annexRReference": "annex R declaration",
+                "soleHeatingInServedRooms": true,
+                "heater": {
+                    "heaterType": "stove", "control": "on_off",
+                    "productionPeriod": "after2005", "condensing": false, "pilotFlame": false,
+                    "ventilation": "none", "location": "heated_space_free",
+                    "stoveKind": "pellet",
+                    "product": {"outputFullKw": output_kw},
+                    "sourceReference": "Ecodesign sheet"
+                }
+            }))
+            .unwrap();
+            input
+        };
+        // §9.1 (p. 287): 40 dwellings each with a 15 kW pellet stove are 40
+        // physical installations of 15 kW, not one of 600 kW: bmB stays.
+        let mut dwellings = stove(15.0);
+        dwellings.identical_systems = Some(40);
+        assert_eq!(biomass_installation_kw(&dwellings), 15.0);
+        let result = assess_space_heating_chain(&dwellings);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(result.monthly.iter().any(|row| row.biomass_kwh > 0.0));
+        assert!(result
+            .monthly
+            .iter()
+            .all(|row| row.biomass_class_a_kwh == 0.0));
+        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+        // One 600 kW stove with the annex R box ticked: tables 5.2/5.4 class
+        // it bmA by its own output, and the declaration is reported.
+        let large = assess_space_heating_chain(&stove(600.0));
+        assert_eq!(large.status, "calculated_unverified", "{:?}", large.issues);
+        assert!(large.monthly.iter().all(|row| row.biomass_kwh == 0.0));
+        assert!(large
+            .monthly
+            .iter()
+            .any(|row| row.biomass_class_a_kwh > 0.0));
+        assert!(large
+            .warnings
+            .iter()
+            .any(|item| item.code == "biomass_class_conflict"));
     }
 
     #[test]

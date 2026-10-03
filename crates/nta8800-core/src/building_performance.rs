@@ -1954,6 +1954,8 @@ fn residential_bbl_function(function: BblFunction) -> bool {
         function,
         BblFunction::ResidentialBuilding
             | BblFunction::OtherResidential
+            // p. 136: 'andere logiesfunctie' (vakantiewoning) is woningbouw.
+            | BblFunction::OtherLodging
             | BblFunction::Caravan
             | BblFunction::FloatingBuildingAfter2018Berth
             | BblFunction::FloatingBuildingOtherBerth
@@ -1970,7 +1972,6 @@ fn function_area_sum_matches(sum: f64, total: f64) -> bool {
 /// describe the whole A_g;tot of the calculation.
 fn validate_function_lists(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
     let residential_scope = matches!(input.calculation_scope, CalculationScope::Residential);
-    let total = input.total_usable_floor_area_m2;
     if !input.bbl_functions.is_empty() {
         let dwelling = input
             .bbl_functions
@@ -1984,10 +1985,6 @@ fn validate_function_lists(input: &BuildingPerformanceInput, issues: &mut Vec<Pe
             ));
         } else if (dwelling > 0) != residential_scope {
             issues.push(issue("bbl_functions_scope_mismatch", "bblFunctions"));
-        }
-        let sum: f64 = input.bbl_functions.iter().map(|part| part.area_m2).sum();
-        if total.is_finite() && total > 0.0 && !function_area_sum_matches(sum, total) {
-            issues.push(issue("bbl_function_areas_sum_mismatch", "bblFunctions"));
         }
     } else if let Some(function) = input.bbl_function {
         if residential_bbl_function(function) != residential_scope {
@@ -2010,13 +2007,31 @@ fn validate_function_lists(input: &BuildingPerformanceInput, issues: &mut Vec<Pe
                 "labelFunctions",
             ));
         }
-        if !input.label_functions.is_empty() {
-            let sum: f64 = input.label_functions.iter().map(|part| part.area_m2).sum();
-            if total.is_finite() && total > 0.0 && !function_area_sum_matches(sum, total) {
-                issues.push(issue("label_function_areas_sum_mismatch", "labelFunctions"));
-            }
+    }
+}
+
+/// Function areas are typed in, often from permit or BAG data (NEN 2580),
+/// while A_g;tot follows §6.6.2–6.6.4 (p. 158): a sum that differs from
+/// A_g;tot is reported but does not stop the calculation.
+fn function_area_warnings(input: &BuildingPerformanceInput) -> Vec<PerformanceIssue> {
+    let total = input.total_usable_floor_area_m2;
+    let mut warnings = Vec::new();
+    if !total.is_finite() || total <= 0.0 {
+        return warnings;
+    }
+    if !input.bbl_functions.is_empty() {
+        let sum: f64 = input.bbl_functions.iter().map(|part| part.area_m2).sum();
+        if !function_area_sum_matches(sum, total) {
+            warnings.push(issue("bbl_function_areas_sum_mismatch", "bblFunctions"));
         }
     }
+    if !input.label_functions.is_empty() {
+        let sum: f64 = input.label_functions.iter().map(|part| part.area_m2).sum();
+        if !function_area_sum_matches(sum, total) {
+            warnings.push(issue("label_function_areas_sum_mismatch", "labelFunctions"));
+        }
+    }
+    warnings
 }
 
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
@@ -3213,6 +3228,7 @@ pub fn assess_building_performance(
     // 13.184 per system: only the main system carries the hot-water load.
     let hot_water_from_heating = hot_water_from_heating(&main_heating);
     let mut warnings = result_warnings(input, &heating, cooling.as_ref(), hot_water.as_ref());
+    warnings.extend(function_area_warnings(input));
     let mut external = resolve_external(input, &mut issues);
     // Annex P warnings (P.27 with a renewable fuel, cold-network gains).
     warnings.extend(
@@ -4741,6 +4757,13 @@ mod tests {
                 .map(|item| item.code)
                 .collect()
         };
+        let warning_codes = |sample: &BuildingPerformanceInput| -> Vec<&'static str> {
+            assess_building_performance(sample)
+                .warnings
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
         let mut sample = input();
         // p. 70: a dwelling part and an office part are never weighted.
         sample.bbl_functions = vec![
@@ -4760,16 +4783,34 @@ mod tests {
             area_m2: 100.0,
         }];
         assert!(codes(&sample).contains(&"bbl_functions_scope_mismatch"));
-        // Areas must describe A_g;tot.
+        // p. 136: a holiday home ('andere logiesfunctie') is woningbouw, so
+        // it fits a residential calculation.
+        sample.bbl_functions = vec![BblFunctionArea {
+            function: BblFunction::OtherLodging,
+            area_m2: 100.0,
+        }];
+        assert!(!codes(&sample)
+            .iter()
+            .any(|code| code.starts_with("bbl_function")));
+        // Areas that do not describe A_g;tot are reported, not refused.
         sample.bbl_functions = vec![BblFunctionArea {
             function: BblFunction::OtherResidential,
             area_m2: 80.0,
         }];
-        assert!(codes(&sample).contains(&"bbl_function_areas_sum_mismatch"));
+        assert!(!codes(&sample).contains(&"bbl_function_areas_sum_mismatch"));
+        assert!(warning_codes(&sample).contains(&"bbl_function_areas_sum_mismatch"));
         sample.bbl_functions[0].area_m2 = 100.0;
         assert!(!codes(&sample)
             .iter()
             .any(|code| code.starts_with("bbl_function")));
+        assert!(!warning_codes(&sample).contains(&"bbl_function_areas_sum_mismatch"));
+        // Label functions are checked on a residential calculation too.
+        sample.label_functions = vec![LabelFunctionArea {
+            function: LabelFunction::Residential,
+            area_m2: 70.0,
+        }];
+        assert!(warning_codes(&sample).contains(&"label_function_areas_sum_mismatch"));
+        sample.label_functions.clear();
         // Utility label functions: no woonfunctie, areas sum to A_g;tot.
         let mut utility = input();
         utility.calculation_scope = CalculationScope::Utility;
@@ -4788,11 +4829,13 @@ mod tests {
             function: LabelFunction::Office,
             area_m2: 87.5,
         }];
-        assert!(codes(&utility).contains(&"label_function_areas_sum_mismatch"));
+        assert!(!codes(&utility).contains(&"label_function_areas_sum_mismatch"));
+        assert!(warning_codes(&utility).contains(&"label_function_areas_sum_mismatch"));
         utility.label_functions[0].area_m2 = 99.6;
         assert!(!codes(&utility)
             .iter()
             .any(|code| code.starts_with("label_function")));
+        assert!(!warning_codes(&utility).contains(&"label_function_areas_sum_mismatch"));
     }
 
     #[test]

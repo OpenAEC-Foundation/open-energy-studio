@@ -456,8 +456,13 @@ fn registration_context(
             )
         }),
         label_function: derived.and_then(|input| input.label_function),
-        primary_fossil_kwh_per_m2: performance
-            .and_then(|result| result.primary_fossil_indicator_kwh_per_m2_year),
+        // Regeling art. 2 lid 3 (p. 4): the dwelling label, and so its
+        // registration checks, follow the EMGforf scenario.
+        primary_fossil_kwh_per_m2: performance.and_then(|result| {
+            result
+                .label_primary_fossil_indicator_kwh_per_m2_year
+                .or(result.primary_fossil_indicator_kwh_per_m2_year)
+        }),
         label_class: performance.and_then(|result| result.indicative_label_class),
         envelope: label_data
             .map(|data| data.envelope.clone())
@@ -1186,13 +1191,19 @@ impl Slot {
         Slot {
             path,
             steps,
+            // Text first: a blank enum tag then names its variants (an
+            // integer would pick a variant by index, blind to the members
+            // next to it).
             candidates: vec![
+                Value::from(""),
                 Value::from(0),
                 Value::from(1),
-                Value::from(""),
                 Value::from(false),
-                Value::Array(Vec::new()),
+                // A map before a list: internally tagged enums and structs
+                // also accept a sequence, which leaves no place to put the
+                // tag or members the repair has to fill next.
                 Value::Object(serde_json::Map::new()),
+                Value::Array(Vec::new()),
             ],
             next: 0,
             siblings: Vec::new(),
@@ -1212,6 +1223,29 @@ enum Verdict {
 
 type FirstError = Option<(String, String)>;
 
+trait ErrorMove {
+    /// The error is gone, or moved and is not a refusal of `field` itself.
+    fn is_none_or_moved(&self, before: &FirstError, field: &str) -> bool;
+}
+
+impl ErrorMove for FirstError {
+    fn is_none_or_moved(&self, before: &FirstError, field: &str) -> bool {
+        match self {
+            None => true,
+            Some((_, message)) => {
+                self != before && !message.starts_with(&format!("unknown field `{field}`"))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    // Deserializations `blank_paths` made on this thread (tests bound the
+    // cost by this count instead of by wall-clock time).
+    static BLANK_SEARCH_DESERIALIZATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// The null leaves of the block that the kernel does not accept.
 ///
 /// Design: serde gives no type information at runtime, and inside internally
@@ -1227,9 +1261,13 @@ type FirstError = Option<(String, String)>;
 ///    under it in turn. Values are tried in a fixed order (numbers, text,
 ///    boolean, list, object, then the variants an enum names) and the first
 ///    one the kernel does not refuse is kept. Whether a null was allowed is
-///    not decided here; a wrong guess only costs another round. A required
-///    member that was never in the block (absent, not null) is filled too,
-///    so the search can go on, but makes the result `residual`.
+///    not decided here; a wrong guess only costs another round. Where the
+///    path stops at a buffered enum, the object a missing member belongs
+///    to is found with a probe value (an object that knows the member
+///    refuses the probe, one that does not reports it as unknown), and a
+///    blank tag takes the variant that knows the blank members next to it.
+///    A required member that was never in the block (absent, not null) is
+///    filled too, so the search can go on, but makes the result `residual`.
 /// 2. Classify: with a copy that deserializes, every null leaf is put back
 ///    as null. A set of put-back nulls fails exactly when it contains one the
 ///    kernel rejects, so the leaves are tested in halving groups: all allowed
@@ -1246,6 +1284,8 @@ type FirstError = Option<(String, String)>;
 /// for k blanks among n nulls.
 fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
     let first_error = |candidate: &Value| -> FirstError {
+        #[cfg(test)]
+        BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.set(count.get() + 1));
         serde_path_to_error::deserialize::<_, T>(candidate.clone())
             .err()
             .map(|error| {
@@ -1296,13 +1336,21 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
             // hid it), or a variant that does not fit its fields: try the
             // next value at the latest filled location at or around the
             // error.
-            let near: Vec<usize> = (0..slots.len())
+            let mut near: Vec<usize> = (0..slots.len())
                 .rev()
                 .filter(|&index| {
                     let slot = &slots[index];
                     slot.path == at || is_under(&slot.path, &at) || is_under(&at, &slot.path)
                 })
                 .collect();
+            // "invalid type: sequence" and the like name the refused kind:
+            // slots holding a value of that kind go first (a stable sort, so
+            // the latest one stays first among them).
+            if let Some(kind) = refused_kind(&message) {
+                near.sort_by_key(|&index| {
+                    walk(&work, &slots[index].steps).map_or(true, |value| json_kind(value) != kind)
+                });
+            }
             retry(
                 &mut work,
                 &mut slots,
@@ -1404,41 +1452,81 @@ where
     }
     // Under a tagged enum the path stops early: a removed member with this
     // name deeper under it, when giving it a value clears this error.
-    for leaf in leaves.iter().filter(|leaf| {
-        leaf.removed
-            && is_under(&leaf.path, at)
-            && matches!(leaf.steps.last(), Some(PathStep::Key(key)) if key == field)
-            && !filled(slots, &leaf.path)
-    }) {
-        let mut trial = work.clone();
-        let mut trial_slots = Vec::new();
-        if place(
-            &mut trial,
-            &mut trial_slots,
-            leaves,
-            &leaf.path,
-            &leaf.steps,
-            first_error,
-            current,
-        ) && first_error(&trial) != *current
-        {
-            *work = trial;
-            slots.extend(trial_slots);
+    let deeper: Vec<Vec<PathStep>> = leaves
+        .iter()
+        .filter(|leaf| {
+            leaf.removed
+                && is_under(&leaf.path, at)
+                && matches!(leaf.steps.last(), Some(PathStep::Key(key)) if key == field)
+                && !filled(slots, &leaf.path)
+        })
+        .map(|leaf| leaf.steps.clone())
+        .collect();
+    for steps in deeper {
+        if place_member(work, slots, leaves, &steps, field, first_error, current) {
             return true;
+        }
+    }
+    // Inside a buffered enum the path stops at the enum: the member may
+    // belong to a placeholder object the repair put under it (a blank struct
+    // or tagged enum). Try the latest such placeholder first.
+    let placeholders: Vec<Vec<PathStep>> = slots
+        .iter()
+        .rev()
+        .filter(|slot| is_under(&slot.path, at))
+        .filter(|slot| {
+            walk(work, &slot.steps).is_some_and(|value| {
+                value
+                    .as_object()
+                    .is_some_and(|map| !map.contains_key(field))
+            })
+        })
+        .map(|slot| slot.steps.clone())
+        .collect();
+    for steps in placeholders {
+        let mut member = steps.clone();
+        member.push(PathStep::Key(field.to_string()));
+        if filled(slots, &render_path(&member)) {
+            continue;
+        }
+        if place_member(work, slots, leaves, &member, field, first_error, current) {
+            return true;
+        }
+    }
+    // Still ambiguous inside a buffered enum: find the object under the
+    // error path that knows the member, by giving it a probe value no kernel
+    // type accepts. An object that knows the member refuses the probe; one
+    // that does not reports it as unknown (or ignores it).
+    if let Some(owner) = member_owner(work, at, field, first_error, current) {
+        let mut member = owner.clone();
+        member.push(PathStep::Key(field.to_string()));
+        let path = render_path(&member);
+        if !filled(slots, &path) {
+            let removed = leaves.iter().any(|leaf| leaf.removed && leaf.path == path);
+            let inside_placeholder = slots.iter().any(|slot| {
+                let owner_path = render_path(&owner);
+                slot.path == owner_path || is_under(&owner_path, &slot.path)
+            });
+            if place_member(work, slots, leaves, &member, field, first_error, current) {
+                if !removed && !inside_placeholder {
+                    if let Some(slot) = slots.iter_mut().rev().find(|slot| slot.path == path) {
+                        slot.absent = true;
+                    }
+                }
+                return true;
+            }
         }
     }
     // A variant chosen for a blank tag next to it may be the wrong one: one
     // that needs members the input never had. Try the next variant first.
-    let tags: Vec<usize> = (0..slots.len())
-        .rev()
-        .filter(|&index| {
-            let slot = &slots[index];
-            render_path(&slot.steps[..slot.steps.len().saturating_sub(1)]) == at
-                && walk(work, &slot.steps)
-                    .is_some_and(|value| value.is_string() || value.is_number())
-        })
-        .collect();
+    let tags = tag_slots(slots, work, at, false);
     if retry(work, slots, leaves, &tags, first_error, current) {
+        return true;
+    }
+    // Inside a buffered enum the error stops above a nested tagged enum:
+    // its variant may be the one that needs the member.
+    let deeper_tags = tag_slots(slots, work, at, true);
+    if retry(work, slots, leaves, &deeper_tags, first_error, current) {
         return true;
     }
     // A member that was never in the block. Inside a value the repair put
@@ -1460,6 +1548,160 @@ where
         }
     }
     placed
+}
+
+/// Places a value at `steps`; when that is an object and the error still
+/// asks for `field` (a tagged enum whose own tag has the same name, such as
+/// a `kind` member that is itself a `kind`-tagged enum), the member is
+/// placed inside it too, a few levels deep. Returns whether the error moved.
+#[allow(clippy::too_many_arguments)]
+fn place_member<F>(
+    work: &mut Value,
+    slots: &mut Vec<Slot>,
+    leaves: &[NullLeaf],
+    steps: &[PathStep],
+    field: &str,
+    first_error: &F,
+    current: &FirstError,
+) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let mut trial = work.clone();
+    let mut trial_slots = Vec::new();
+    let mut at = steps.to_vec();
+    for _ in 0..4 {
+        let path = render_path(&at);
+        if !place(
+            &mut trial,
+            &mut trial_slots,
+            leaves,
+            &path,
+            &at,
+            first_error,
+            current,
+        ) {
+            return false;
+        }
+        let error = first_error(&trial);
+        // The same error can come from another object asking for a member
+        // of the same name (nested `kind`-tagged enums under one buffered
+        // path): the member placed here still counts when this object knows
+        // it, which a probe value there shows.
+        let same_name_elsewhere = error == *current
+            && error
+                .as_ref()
+                .and_then(|(_, message)| missing_field(message))
+                == Some(field)
+            && at
+                .last()
+                .is_some_and(|step| matches!(step, PathStep::Key(key) if key == field))
+            && {
+                let mut probe = trial.clone();
+                set_at(&mut probe, &at, serde_json::json!({ "\u{1}probe": [] }));
+                let probed = first_error(&probe);
+                probed != error
+                    && probed.is_some_and(|(_, text)| {
+                        !text.starts_with(&format!("unknown field `{field}`"))
+                    })
+            };
+        if error.is_none_or_moved(current, field) || same_name_elsewhere {
+            *work = trial;
+            slots.extend(trial_slots);
+            return true;
+        }
+        let nested = walk(&trial, &at)
+            .and_then(Value::as_object)
+            .is_some_and(|map| !map.contains_key(field));
+        if !nested
+            || error
+                .as_ref()
+                .and_then(|(_, message)| missing_field(message))
+                != Some(field)
+        {
+            return false;
+        }
+        at.push(PathStep::Key(field.to_string()));
+    }
+    false
+}
+
+/// The object at or under `at` that lacks `field` and knows it: putting a
+/// probe value there changes the error to a refusal of the probe rather than
+/// an unknown field. Deepest objects first.
+fn member_owner<F>(
+    work: &Value,
+    at: &str,
+    field: &str,
+    first_error: &F,
+    current: &FirstError,
+) -> Option<Vec<PathStep>>
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let root = parse_path(at, "x")?;
+    let root = &root[..root.len() - 1];
+    let start = walk(work, root)?;
+    let mut objects = Vec::new();
+    collect_objects(start, root.to_vec(), &mut objects);
+    objects.sort_by_key(|steps| std::cmp::Reverse(steps.len()));
+    objects.into_iter().find(|steps| {
+        let lacks = walk(work, steps)
+            .and_then(Value::as_object)
+            .is_some_and(|map| !map.contains_key(field));
+        if !lacks {
+            return false;
+        }
+        let mut trial = work.clone();
+        let mut member = steps.clone();
+        member.push(PathStep::Key(field.to_string()));
+        set_at(&mut trial, &member, serde_json::json!({ "\u{1}probe": [] }));
+        let error = first_error(&trial);
+        error != *current
+            && error.as_ref().is_some_and(|(_, message)| {
+                !message.starts_with(&format!("unknown field `{field}`"))
+                    && missing_field(message) != Some(field)
+            })
+    })
+}
+
+fn collect_objects(value: &Value, steps: Vec<PathStep>, out: &mut Vec<Vec<PathStep>>) {
+    match value {
+        Value::Object(map) => {
+            for (key, item) in map {
+                let mut more = steps.clone();
+                more.push(PathStep::Key(key.clone()));
+                collect_objects(item, more, out);
+            }
+            out.push(steps);
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                let mut more = steps.clone();
+                more.push(PathStep::Index(index));
+                collect_objects(item, more, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Slots holding a variant name (latest first) whose enum sits at `at`, or
+/// under it when `deeper`.
+fn tag_slots(slots: &[Slot], work: &Value, at: &str, deeper: bool) -> Vec<usize> {
+    (0..slots.len())
+        .rev()
+        .filter(|&index| {
+            let slot = &slots[index];
+            let parent = render_path(&slot.steps[..slot.steps.len().saturating_sub(1)]);
+            (if deeper {
+                is_under(&parent, at)
+            } else {
+                parent == at
+            }) && walk(work, &slot.steps)
+                .is_some_and(|value| value.is_string() || value.is_number())
+        })
+        .collect()
 }
 
 /// Moves the given slots (in order) to their next accepted value until the
@@ -1615,7 +1857,7 @@ where
         let tried = slot.candidates[index].clone();
         set_at(work, &slot.steps, tried.clone());
         let error = first_error(work);
-        let mut verdict = judge(&error, &tried, &slot.path, before);
+        let mut verdict = judge(&error, &tried, &slot.path, before, work, first_error);
         if verdict != Verdict::Refuse && !knows_siblings(work, slot, first_error) {
             verdict = Verdict::Poor;
         }
@@ -1657,16 +1899,26 @@ where
 {
     let parent_steps = &slot.steps[..slot.steps.len().saturating_sub(1)];
     let parent = render_path(parent_steps);
+    if slot.siblings.is_empty() {
+        return true;
+    }
+    // Without the probe: a probe that leaves this error as it is was ignored
+    // (a unit variant) or never reached, so it shows no knowledge.
+    let baseline = first_error(work);
     slot.siblings.iter().all(|key| {
         let mut trial = work.clone();
         let mut steps = parent_steps.to_vec();
         steps.push(PathStep::Key(key.clone()));
         set_at(&mut trial, &steps, serde_json::json!({ "\u{1}probe": [] }));
-        first_error(&trial).is_some_and(|(at, message)| {
-            // Inside a buffered enum the path stops at the enum, above it.
-            (at == parent || is_under(&at, &parent) || (!at.is_empty() && is_under(&parent, &at)))
-                && !message.starts_with(&format!("unknown field `{key}`"))
-        })
+        let error = first_error(&trial);
+        error != baseline
+            && error.is_some_and(|(at, message)| {
+                // Inside a buffered enum the path stops at the enum, above it.
+                (at == parent
+                    || is_under(&at, &parent)
+                    || (!at.is_empty() && is_under(&parent, &at)))
+                    && !message.starts_with(&format!("unknown field `{key}`"))
+            })
     })
 }
 
@@ -1676,6 +1928,15 @@ fn learn(message: &str, slot: &mut Slot) {
     let mut suggested = Vec::new();
     if message.starts_with("unknown variant") {
         suggested.extend(variants(message).into_iter().map(Value::from));
+        // An enum: its variants by name, not by index.
+        let next = slot.next;
+        let mut index = 0;
+        slot.candidates.retain(|value| {
+            let keep = index < next || !value.is_number();
+            index += 1;
+            keep
+        });
+        slot.next = slot.next.min(slot.candidates.len());
     }
     if let Some(rest) = message.split("expected an array of length ").nth(1) {
         if let Some(length) = rest
@@ -1694,7 +1955,17 @@ fn learn(message: &str, slot: &mut Slot) {
 }
 
 /// Whether the error after putting `tried` at `path` refuses that value.
-fn judge(error: &FirstError, tried: &Value, path: &str, before: &FirstError) -> Verdict {
+fn judge<F>(
+    error: &FirstError,
+    tried: &Value,
+    path: &str,
+    before: &FirstError,
+    work: &Value,
+    first_error: &F,
+) -> Verdict
+where
+    F: Fn(&Value) -> FirstError,
+{
     let Some((at, message)) = error else {
         return Verdict::Accept;
     };
@@ -1728,15 +1999,79 @@ fn judge(error: &FirstError, tried: &Value, path: &str, before: &FirstError) -> 
     if refused {
         return Verdict::Refuse;
     }
-    if tried.is_string() && missing_field(message).is_some() && error != before {
-        return Verdict::Weak;
+    if let Some(field) = missing_field(message).filter(|_| tried.is_string() && error != before) {
+        // A member the object the error points at lacks and knows (it
+        // refuses a probe there) is a later error at that level, after the
+        // enum deserialized: the variant is fine. Otherwise the variant
+        // needs a member the input lacks.
+        let later = parse_path(at, field).is_some_and(|steps| {
+            let lacks = walk(work, &steps[..steps.len() - 1])
+                .and_then(Value::as_object)
+                .is_some_and(|map| !map.contains_key(field));
+            if !lacks {
+                return false;
+            }
+            let mut trial = work.clone();
+            set_at(&mut trial, &steps, serde_json::json!({ "\u{1}probe": [] }));
+            let probed = first_error(&trial);
+            probed != *error
+                && probed.is_some_and(|(_, text)| {
+                    !text.starts_with(&format!("unknown field `{field}`"))
+                        && missing_field(&text) != Some(field)
+                })
+        });
+        let enum_level = path
+            .rsplit_once(['.', '['])
+            .map_or("", |(parent, _)| parent);
+        if !(later && *at != enum_level) {
+            return Verdict::Weak;
+        }
     }
-    if error == before && !tried.is_object() {
+    if error == before {
         // Nothing moved: under a buffered enum the value may be refused with
-        // the same wording as the blank it replaced.
+        // the same wording as the blank it replaced, or the error comes from
+        // another member of the same name. Text and numbers first, so a
+        // scalar member keeps a scalar placeholder.
         return Verdict::Weak;
     }
     Verdict::Accept
+}
+
+/// The JSON kind an ``invalid type: <kind>`` or ``invalid value: <kind>``
+/// error refuses, in serde's wording.
+fn refused_kind(message: &str) -> Option<&'static str> {
+    let rest = message
+        .strip_prefix("invalid type: ")
+        .or_else(|| message.strip_prefix("invalid value: "))?;
+    [
+        "integer",
+        "floating point",
+        "string",
+        "boolean",
+        "sequence",
+        "map",
+    ]
+    .into_iter()
+    .find(|kind| rest.starts_with(kind))
+    .map(|kind| {
+        if kind == "floating point" {
+            "integer"
+        } else {
+            kind
+        }
+    })
+}
+
+/// The kind of a JSON value in serde's wording (numbers as "integer").
+fn json_kind(value: &Value) -> &'static str {
+    match value {
+        Value::Number(_) => "integer",
+        Value::String(_) => "string",
+        Value::Bool(_) => "boolean",
+        Value::Array(_) => "sequence",
+        Value::Object(_) => "map",
+        Value::Null => "null",
+    }
 }
 
 /// The field named by a ``missing field `X` `` error.
@@ -3347,14 +3682,14 @@ mod tests {
             .collect();
         let mut block = serde_json::json!({ "segments": rows });
         block["segments"][150]["lengthM"] = Value::Null;
-        let started = std::time::Instant::now();
+        let before = BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.get());
         let search = blank_paths::<BlankProbe>(&block);
+        let used = BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.get()) - before;
         assert_eq!(search.paths, ["segments[150].lengthM"]);
-        assert!(
-            started.elapsed() < std::time::Duration::from_secs(1),
-            "{:?}",
-            started.elapsed()
-        );
+        assert!(!search.residual);
+        // 2 401 nulls: linear in the nulls, not quadratic (a per-null retry
+        // of every allowed null would need millions).
+        assert!(used < 12 * 2401 + 200, "{used} deserializations");
     }
 
     #[test]
@@ -3913,16 +4248,14 @@ mod blank_fuzz {
         }
     }
 
-    /// Scalar leaves as (rendered path, JSON pointer).
-    fn scalar_leaves(
-        value: &Value,
-        path: String,
-        pointer: String,
-        out: &mut Vec<(String, String)>,
-    ) {
-        match value {
-            Value::Object(map) => {
-                for (key, item) in map {
+    /// Nodes below the root as (rendered path, JSON pointer, scalar):
+    /// scalar leaves, and the objects and arrays (array elements included)
+    /// that a user can blank as a whole.
+    fn nodes(value: &Value, path: String, pointer: String, out: &mut Vec<(String, String, bool)>) {
+        let children: Vec<(String, String, &Value)> = match value {
+            Value::Object(map) => map
+                .iter()
+                .map(|(key, item)| {
                     let next = if path.is_empty() {
                         key.clone()
                     } else {
@@ -3930,21 +4263,31 @@ mod blank_fuzz {
                     };
                     let next_pointer =
                         format!("{pointer}/{}", key.replace('~', "~0").replace('/', "~1"));
-                    scalar_leaves(item, next, next_pointer, out);
-                }
-            }
-            Value::Array(items) => {
-                for (index, item) in items.iter().enumerate() {
-                    scalar_leaves(
-                        item,
+                    (next, next_pointer, item)
+                })
+                .collect(),
+            Value::Array(items) => items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    (
                         format!("{path}[{index}]"),
                         format!("{pointer}/{index}"),
-                        out,
-                    );
+                        item,
+                    )
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        for (next, next_pointer, item) in children {
+            match item {
+                Value::Null => {}
+                Value::Object(_) | Value::Array(_) => {
+                    out.push((next.clone(), next_pointer.clone(), false));
+                    nodes(item, next, next_pointer, out);
                 }
+                _ => out.push((next, next_pointer, true)),
             }
-            Value::Null => {}
-            _ => out.push((path, pointer)),
         }
     }
 
@@ -3952,20 +4295,84 @@ mod blank_fuzz {
         serde_json::from_value::<NtaCalculationInput>(value.clone()).is_ok()
     }
 
-    fn block(file: &str) -> Value {
+    fn training(file: &str) -> Value {
         let text = std::fs::read_to_string(format!(
             "{}/../../training-data/{file}",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap();
-        let project: Value = serde_json::from_str(&text).unwrap();
-        let block = project["ntaCalculation"].clone();
+        serde_json::from_str(&text).unwrap()
+    }
+
+    fn block(file: &str) -> Value {
+        let block = training(file)["ntaCalculation"].clone();
         assert!(deserializes(&block), "{file} must deserialize");
         block
     }
 
+    /// The office block with a multiple-generator set (two preferences of
+    /// its own generator) and the calculated annex P heat network of the
+    /// annex P fixture: tagged enums inside arrays inside tagged enums.
+    fn multiple_and_annex_p_block() -> Value {
+        use crate::space_heating_chain::{MultipleGenerators, PreferredGenerator};
+        let mut block = block("nta8800-example-office.json");
+        let own: Generator = serde_json::from_value(block["generator"].clone()).unwrap();
+        let set = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 40.0,
+                    generator: own.clone(),
+                },
+                PreferredGenerator {
+                    preference: 2,
+                    nominal_power_kw: 20.0,
+                    generator: own,
+                },
+            ],
+            added_preferred_generator: false,
+            estimated_beta: Vec::new(),
+            source_reference: "design".into(),
+        }));
+        block["generator"] = without_nulls(serde_json::to_value(set).unwrap());
+        let annex_p = training("nta8800-annex-p-synthetic.json");
+        block["externalSupply"] = serde_json::json!({ "heating": annex_p["heating"].clone() });
+        assert!(
+            deserializes(&block),
+            "multiple + annex P block must deserialize"
+        );
+        block
+    }
+
+    /// Serialized defaults (`None`) as absent members, as the app sends them.
+    fn without_nulls(value: Value) -> Value {
+        match value {
+            Value::Object(map) => Value::Object(
+                map.into_iter()
+                    .filter(|(_, item)| !item.is_null())
+                    .map(|(key, item)| (key, without_nulls(item)))
+                    .collect(),
+            ),
+            Value::Array(items) => Value::Array(items.into_iter().map(without_nulls).collect()),
+            other => other,
+        }
+    }
+
+    fn under(path: &str, ancestor: &str) -> bool {
+        path.len() > ancestor.len()
+            && path.starts_with(ancestor)
+            && matches!(path.as_bytes()[ancestor.len()], b'.' | b'[')
+    }
+
+    fn counted<F: FnOnce() -> BlankSearch>(search: F) -> (BlankSearch, usize) {
+        let before = BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.get());
+        let result = search();
+        let used = BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.get()) - before;
+        (result, used)
+    }
+
     /// `BLANK_FUZZ_TRIALS` and `BLANK_FUZZ_SEED` widen a local run.
-    fn check(file: &str, seed: u64, trials: usize) {
+    fn check(name: &str, block: Value, seed: u64, trials: usize) {
         let trials = std::env::var("BLANK_FUZZ_TRIALS")
             .ok()
             .and_then(|value| value.parse().ok())
@@ -3976,82 +4383,109 @@ mod blank_fuzz {
             .map_or(seed, |extra| {
                 seed ^ extra.wrapping_mul(0x9E37_79B9_7F4A_7C15)
             });
-        let block = block(file);
-        let mut leaves = Vec::new();
-        scalar_leaves(&block, String::new(), String::new(), &mut leaves);
-        let required: HashMap<String, bool> = leaves
+        let mut all_nodes = Vec::new();
+        nodes(&block, String::new(), String::new(), &mut all_nodes);
+        // Ground truth from serde alone: a node is required when the
+        // otherwise valid block fails with only that node blank.
+        let required: HashMap<String, bool> = all_nodes
             .iter()
-            .map(|(path, pointer)| {
+            .map(|(path, pointer, _)| {
                 let mut trial = block.clone();
                 *trial.pointer_mut(pointer).unwrap() = Value::Null;
                 (path.clone(), !deserializes(&trial))
             })
             .collect();
         let mut rng = Rng(seed);
-        let (mut false_positive, mut missed) = (Vec::new(), Vec::new());
-        for _ in 0..trials {
+        let (mut false_positive, mut missed, mut residual) = (Vec::new(), Vec::new(), Vec::new());
+        let mut worst = 0usize;
+        for trial_index in 0..trials {
             let count = 1 + rng.below(2);
-            let mut picked: Vec<&(String, String)> = Vec::new();
+            let mut picked: Vec<&(String, String, bool)> = Vec::new();
             while picked.len() < count {
-                let leaf = &leaves[rng.below(leaves.len())];
-                if !picked.iter().any(|other| other.0 == leaf.0) {
-                    picked.push(leaf);
+                let node = &all_nodes[rng.below(all_nodes.len())];
+                // A node inside (or around) one already blanked disappears
+                // with it.
+                if !picked.iter().any(|other| {
+                    other.0 == node.0 || under(&node.0, &other.0) || under(&other.0, &node.0)
+                }) {
+                    picked.push(node);
                 }
             }
             let mut trial = block.clone();
-            for (_, pointer) in &picked {
+            for (_, pointer, _) in &picked {
                 *trial.pointer_mut(pointer).unwrap() = Value::Null;
             }
-            let found: BTreeSet<String> = blank_paths::<NtaCalculationInput>(&trial)
-                .paths
-                .into_iter()
-                .collect();
+            let (search, used) = counted(|| blank_paths::<NtaCalculationInput>(&trial));
+            worst = worst.max(used);
+            let found: BTreeSet<String> = search.paths.into_iter().collect();
             let expected: BTreeSet<String> = picked
                 .iter()
-                .filter(|(path, _)| required[path])
-                .map(|(path, _)| path.clone())
+                .filter(|(path, _, _)| required[path])
+                .map(|(path, _, _)| path.clone())
                 .collect();
             false_positive.extend(found.difference(&expected).cloned());
             missed.extend(expected.difference(&found).cloned());
+            // Only blanks were introduced: once they are filled the block
+            // has no other fault.
+            if search.residual {
+                residual.push((
+                    trial_index,
+                    picked.iter().map(|node| node.0.clone()).collect::<Vec<_>>(),
+                ));
+            }
         }
         assert!(
             false_positive.is_empty() && missed.is_empty(),
-            "{file}: false positives {false_positive:?}, missed {missed:?}"
+            "{name}: false positives {false_positive:?}, missed {missed:?}"
         );
+        assert!(residual.is_empty(), "{name}: residual after {residual:?}");
 
         // Every scalar leaf blank at once.
         let mut all = block.clone();
-        for (_, pointer) in &leaves {
+        let scalars: Vec<&(String, String, bool)> =
+            all_nodes.iter().filter(|node| node.2).collect();
+        for (_, pointer, _) in &scalars {
             *all.pointer_mut(pointer).unwrap() = Value::Null;
         }
-        let started = std::time::Instant::now();
-        let found: BTreeSet<String> = blank_paths::<NtaCalculationInput>(&all)
-            .paths
-            .into_iter()
-            .collect();
-        let elapsed = started.elapsed();
-        let expected: BTreeSet<String> = leaves
+        let (search, used) = counted(|| blank_paths::<NtaCalculationInput>(&all));
+        let found: BTreeSet<String> = search.paths.into_iter().collect();
+        let expected: BTreeSet<String> = scalars
             .iter()
-            .filter(|(path, _)| required[path])
-            .map(|(path, _)| path.clone())
+            .filter(|(path, _, _)| required[path])
+            .map(|(path, _, _)| path.clone())
             .collect();
         let wrong: Vec<_> = found.difference(&expected).collect();
         let missed: Vec<_> = expected.difference(&found).collect();
         assert!(
             wrong.is_empty(),
-            "{file}: all blank, false positives {wrong:?}"
+            "{name}: all blank, false positives {wrong:?}"
         );
-        assert!(missed.is_empty(), "{file}: all blank, missed {missed:?}");
+        assert!(missed.is_empty(), "{name}: all blank, missed {missed:?}");
+        assert!(!search.residual, "{name}: all blank left a residual");
+        // Cost bound instead of wall-clock time: phase 1 is guarded at
+        // 12·n + 200 rounds of a few deserializations, phase 2 at about
+        // 2·k·log2(n) for k blanks among n nulls.
+        let n = scalars.len();
         assert!(
-            elapsed < std::time::Duration::from_secs(2),
-            "{file}: all blank took {elapsed:?}"
+            used < 40 * n + 1000,
+            "{name}: all blank took {used} deserializations for {n} nulls"
+        );
+        assert!(
+            worst < 2000,
+            "{name}: a random trial took {worst} deserializations"
+        );
+        eprintln!(
+            "{name}: {trials} trials over {} nodes ({} scalar), worst {worst} deserializations; all {n} blank: {used}",
+            all_nodes.len(),
+            n
         );
     }
 
     #[test]
     fn random_blanks_in_the_terraced_dwelling() {
         check(
-            "nta8800-example-terraced-dwelling.json",
+            "terraced dwelling",
+            block("nta8800-example-terraced-dwelling.json"),
             0x9E37_79B9_7F4A_7C15,
             300,
         );
@@ -4059,6 +4493,21 @@ mod blank_fuzz {
 
     #[test]
     fn random_blanks_in_the_office() {
-        check("nta8800-example-office.json", 0xD1B5_4A32_D192_ED03, 300);
+        check(
+            "office",
+            block("nta8800-example-office.json"),
+            0xD1B5_4A32_D192_ED03,
+            300,
+        );
+    }
+
+    #[test]
+    fn random_blanks_in_a_multiple_set_with_an_annex_p_network() {
+        check(
+            "multiple + annex P",
+            multiple_and_annex_p_block(),
+            0x2545_F491_4F6C_DD1D,
+            300,
+        );
     }
 }

@@ -60,6 +60,18 @@ describe('NTA calculation report', () => {
     expect(html).not.toContain('Ventilatie (hoofdstuk 11)');
   });
 
+  it('shows the EMGforf label RER without falling back to the declaration RER', () => {
+    const assessment = calculated();
+    const performance = assessment.performance as unknown as Record<string, unknown>;
+    performance.labelPrimaryFossilIndicatorKwhPerM2Year = 14.5;
+    performance.labelRenewableSharePercent = null;
+    const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
+    const row = html.match(/<tr><th>Labelgegevens \(Reg\. art\. 4\)<\/th>.*?<\/tr>/)?.[0] ?? '';
+    expect(row).toContain('EP2 14.50');
+    expect(row).toContain('hernieuwbaar — %');
+    expect(row).not.toContain('77.7');
+  });
+
   it('reports chapter 11 ventilation and the fixed C1 basis of BENG 1', () => {
     const assessment = calculated();
     const performance = assessment.performance as unknown as Record<string, unknown> & { spaceHeating: { demand: Record<string, unknown> } };
