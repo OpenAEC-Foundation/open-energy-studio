@@ -30,8 +30,13 @@ describe('gas chain reference comparison UI', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Submitted values within tolerance');
     expect(screen.getByRole('status')).toHaveTextContent('Reference not independently verified');
     expect(screen.getByRole('status')).toHaveTextContent('625.000');
+    const provenance = screen.getByLabelText('Reference case provenance');
+    expect(provenance).toHaveTextContent('Open Energy Studio internal arithmetic');
+    expect(provenance).toHaveTextContent('synthetic gas heat-pump hand calculation; not ISSO 54');
+    expect(provenance).toHaveTextContent('none; external verification pending');
     fireEvent.change(screen.getByLabelText('Case JSON'), { target: { value: '{invalid' } });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Reference case provenance')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Compare draft values' }));
     expect(screen.getByRole('alert')).toHaveTextContent('SyntaxError');
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -52,6 +57,7 @@ describe('gas chain reference comparison UI', () => {
     await user.click(screen.getByRole('button', { name: 'Compare draft values' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Case incomplete or invalid'));
     expect(screen.getByRole('status')).toHaveTextContent('metric_required');
+    expect(screen.queryByLabelText('Reference case provenance')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 

@@ -5,9 +5,10 @@ import { useI18n } from '../../i18n/i18n';
 import './GasChainReferencePanel.css';
 
 export function GasChainReferencePanel() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [text, setText] = useState('');
   const [result, setResult] = useState<GasChainDiagnosticComparison | null>(null);
+  const [comparedSource, setComparedSource] = useState<GasChainDiagnosticCase['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
@@ -17,6 +18,7 @@ export function GasChainReferencePanel() {
     sequence.current += 1;
     setText(value);
     setResult(null);
+    setComparedSource(null);
     setError(null);
     setLoading(false);
   };
@@ -25,6 +27,7 @@ export function GasChainReferencePanel() {
     if (!file) return;
     const current = ++sequence.current;
     setResult(null);
+    setComparedSource(null);
     setError(null);
     setLoading(true);
     try {
@@ -50,16 +53,23 @@ export function GasChainReferencePanel() {
     } catch (reason) {
       setError(String(reason));
       setResult(null);
+      setComparedSource(null);
       return;
     }
     const current = ++sequence.current;
     setLoading(true);
     setError(null);
     setResult(null);
+    setComparedSource(null);
     try {
       const assessment = await compareGasHeatPumpChainDiagnosticWithRust(caseInput);
       if (sequence.current === current) {
         setResult(assessment);
+        const source = caseInput.source;
+        setComparedSource(assessment.status !== 'invalid_case' && source
+          && typeof source.publisher === 'string' && typeof source.documentId === 'string'
+          && typeof source.edition === 'string' && typeof source.independentReviewer === 'string'
+          ? source : null);
         setLoading(false);
       }
     } catch (reason) {
@@ -92,6 +102,12 @@ export function GasChainReferencePanel() {
       {result && <div role="status" className="gas-chain-reference-result" data-status={result.status}>
         <p><strong>{t(`kernel.gasReference.status.${result.status}`)}</strong> · {result.caseId}</p>
         <p>{t('kernel.gasReference.unverified')}</p>
+        {comparedSource && <dl className="gas-chain-reference-source" aria-label={locale === 'nl' ? 'Herkomst referentiecase' : 'Reference case provenance'}>
+          <div><dt>{locale === 'nl' ? 'Uitgever' : 'Publisher'}</dt><dd>{comparedSource.publisher}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Document' : 'Document'}</dt><dd>{comparedSource.documentId}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Editie' : 'Edition'}</dt><dd>{comparedSource.edition}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Onafhankelijke controleur' : 'Independent reviewer'}</dt><dd>{comparedSource.independentReviewer}</dd></div>
+        </dl>}
         {result.issues.length > 0 && <ul>{result.issues.map((item, index) =>
           <li key={`${item.path}-${item.code}-${index}`}><code>{item.path}</code>: {item.code}</li>)}</ul>}
         {result.metrics.length > 0 && <div className="gas-chain-reference-table-wrap"><table>

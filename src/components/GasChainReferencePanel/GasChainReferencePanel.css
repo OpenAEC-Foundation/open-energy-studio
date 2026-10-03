@@ -19,6 +19,10 @@
 .gas-chain-reference button:disabled { opacity: 0.55; cursor: default; }
 .gas-chain-reference-error, .gas-chain-reference .outside-tolerance { color: var(--danger); }
 .gas-chain-reference-result { display: grid; gap: 0.7rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
+.gas-chain-reference-source { display: grid; gap: 0.3rem; margin: 0; font-size: 11px; }
+.gas-chain-reference-source div { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr); gap: 0.6rem; }
+.gas-chain-reference-source dt { color: var(--text-secondary); }
+.gas-chain-reference-source dd { margin: 0; overflow-wrap: anywhere; }
 .gas-chain-reference-result[data-status="compared_fail"] > p:first-child, .gas-chain-reference-result[data-status="invalid_case"] > p:first-child { color: var(--danger); }
 .gas-chain-reference-result[data-status="compared_pass"] > p:first-child { color: var(--accent); }
 .gas-chain-reference-table-wrap { overflow-x: auto; }
