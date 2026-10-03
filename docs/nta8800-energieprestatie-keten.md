@@ -929,3 +929,17 @@ In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de
   - Met `regenerationHotWater` op de verwarmingsketen komt het tapwater van een warmtepomp op dezelfde bodembron in de noemer van V.1, zowel bij de forfaitaire COP als bij bijlage Q.
   - Het automatisch invullen vanuit het tapwatersysteem en het doorgeven van c_source aan de tapwaterwarmtepomp staan nog open.
 - **ϑ_ztu (7.82) met meerdere zones.** θ_int;set;H wordt per zone gewogen met F_j;ztu (7.6.4): het aandeel van de zone in de warmteoverdracht naar de onverwarmde ruimten. Zonder die gegevens wordt naar oppervlak gewogen. Voorheen werd de eerste zone gebruikt.
+
+
+## Koppelingen van tapwater met verwarming en koeling (13.51, 13.20a, bijlage V, W.3)
+
+- **Douche-WTW bij meerdere systemen (13.51, p. 563).**
+  - Q_W;nd;d is de nettowarmtebehoefte van de woning volgens 13.1.
+  - Bij een splitsing volgens 13.19a rekent de terugwinning daarom met de ongesplitste behoefte. Het systeem met de douche-WTW krijgt de hele terugwinning, begrensd tot zijn eigen afgiftebehoefte.
+- **Circulatie bij utiliteit (13.20a, p. 541).** De lengte (13.31) en L_max (13.32) van een niet-collectief utiliteitssysteem gaan uit van A_g;si;W. Dat is het oppervlak dat het systeem bedient (Σ `need.areas`), en niet het hele gebouw.
+- **Bijlage V voor tapwater.** Een tapwaterwarmtepomp met `sameGroundSource` gebruikt dezelfde geregenereerde bodembron als de verwarmingswarmtepomp.
+  - Zijn tapwater, met c_source = 1 berekend, telt mee in de noemer van V.1 (`regenerationHotWater` van de keten). Dit wordt automatisch ingevuld als de keten zelf geen waarde opgeeft.
+  - Hij neemt de c_source van tabel V.1 over: bij bijlage Q uit de gerapporteerde R, en bij de forfaitaire route op dezelfde manier berekend als in de keten.
+  - Een opgegeven `sourceCorrection` gaat voor.
+  - c_source moet 1,00, 1,02 of 1,04 zijn (tabel V.1/V.3). Eerder werd alles boven 1,0 afgewezen.
+- **W.3.** Q_C;HP;si;mi van de koelketen (10.6/10.9) vult `coolingExtractionKwh` in van boosterwarmtepompen die zelf geen waarde opgeven. Bij meer boosters wordt het gelijk verdeeld (W.3, opmerking 3).

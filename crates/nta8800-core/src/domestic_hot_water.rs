@@ -558,6 +558,11 @@ pub enum HotWaterGenerator {
         /// 5.37: outdoor-air share of a partly exhaust-air source.
         #[serde(default, rename = "outdoorAirFraction")]
         outdoor_air_fraction: Option<f64>,
+        /// Annex V (V.1, table V.1): on the same regenerated ground source
+        /// as the space-heating heat pump. Its hot water joins the V.1
+        /// denominator and it takes that c_source.
+        #[serde(default, rename = "sameGroundSource", skip_serializing_if = "is_false")]
+        same_ground_source: bool,
     },
     /// 13.160b: EN 16147 test at one European tapping profile.
     HeatPumpEn16147 {
@@ -2336,12 +2341,25 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
         HotWaterGenerator::HeatPump {
             source_correction,
             outdoor_air_fraction,
+            exhaust_air_source,
+            same_ground_source,
             ..
         } => {
-            if source_correction.is_some_and(|value| !positive(value) || value > 1.0) {
+            // Tables V.1/V.3: c_source is 1,00, 1,02 or 1,04.
+            if source_correction.is_some_and(|value| {
+                ![1.00, 1.02, 1.04]
+                    .iter()
+                    .any(|allowed| (value - allowed).abs() < 1e-9)
+            }) {
                 issues.push((
                     "hot_water_source_correction_invalid",
                     format!("{prefix}.sourceCorrection"),
+                ));
+            }
+            if *same_ground_source && *exhaust_air_source {
+                issues.push((
+                    "hot_water_same_ground_source_exhaust_air",
+                    format!("{prefix}.sameGroundSource"),
                 ));
             }
             if outdoor_air_fraction.is_some_and(|value| !(0.0..=1.0).contains(&value)) {
@@ -3602,6 +3620,10 @@ fn storage_and_generator_losses_recoverable(
     served < 500.0
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Monthly chain; call only after [`validate_hot_water`] returned no issues.
 pub fn assess_hot_water(
     system: &HotWaterSystem,
@@ -3636,7 +3658,11 @@ pub fn assess_hot_water_with(
     };
     let (annual, shower) = annual_need(system, area);
     // §13.2.4: the share delivered by this system.
-    let annual = annual * context.need_fraction.unwrap_or(1.0);
+    let fraction = context.need_fraction.unwrap_or(1.0);
+    let annual = annual * fraction;
+    // 13.51: Q_W;nd;d is the dwelling need of 13.1, not the 13.19a share;
+    // the system with the shower units books the whole recovery.
+    let unsplit = if fraction > 0.0 { 1.0 / fraction } else { 0.0 };
     let year_hours: f64 = MONTH_HOURS.iter().sum();
     let eta_em = emission_efficiency(system);
     // 13.51/13.52 with 13.53.
@@ -3649,13 +3675,26 @@ pub fn assess_hot_water_with(
             * item.connection.factor()
     });
     let need: [f64; 12] = std::array::from_fn(|index| annual * MONTH_HOURS[index] / year_hours);
-    let emission_input: [f64; 12] =
-        std::array::from_fn(|index| need[index] / eta_em - recovery_factor * need[index]);
+    let emission_input: [f64; 12] = std::array::from_fn(|index| {
+        need[index] / eta_em - (recovery_factor * need[index] * unsplit).min(need[index] / eta_em)
+    });
 
     // Circulation (13.26–13.44).
     let mut circulation_loss = [0.0; 12];
     let mut pump = [0.0; 12];
     if let Some(circulation) = &system.circulation {
+        // 13.20a: A_g;si;W of a utility system is the area it serves.
+        let building_area = match (&system.collective, &system.need) {
+            (None, HotWaterNeed::Utility { areas, .. }) => {
+                let served: f64 = areas.iter().map(|item| item.area_m2).sum();
+                if served > 0.0 {
+                    served.min(building_area)
+                } else {
+                    building_area
+                }
+            }
+            _ => building_area,
+        };
         let reduced = (building_area
             - if building_area < 1000.0 {
                 0.0
@@ -3819,7 +3858,7 @@ pub fn assess_hot_water_with(
         months.push(HotWaterMonth {
             month: index as u8 + 1,
             net_need_kwh: need[index],
-            recovered_kwh: recovery_factor * need[index],
+            recovered_kwh: (recovery_factor * need[index] * unsplit).min(need[index] / eta_em),
             emission_input_kwh: emission,
             circulation_loss_kwh: circulation_loss[index],
             storage_loss_kwh: storage_loss[index],
@@ -4262,6 +4301,7 @@ mod tests {
     #[test]
     fn single_exhaust_air_heat_pump_follows_13_144a() {
         let mut input = system(HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
             measured_class: None,
@@ -4654,6 +4694,7 @@ mod tests {
         ctx.levelled_setpoint_c = Some([17.0; 12]);
         let base = system(HotWaterGenerator::ElectricBoiler);
         let mut exhaust = system(HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
             measured_class: None,
@@ -4856,6 +4897,94 @@ mod tests {
     }
 
     #[test]
+    fn shower_recovery_uses_the_dwelling_need_under_a_13_19a_split() {
+        let mut input = system(combi());
+        input.shower_heat_recovery = Some(ShowerHeatRecovery {
+            assignment_unknown: false,
+            showers: vec![ShowerUnit::Vertical],
+            connection: ShowerConnection::MixerAndHeater,
+            source_reference: "plan".into(),
+        });
+        let whole = assess_hot_water(&input, context()).unwrap();
+        let mut split = context();
+        split.need_fraction = Some(0.8);
+        let bathroom = assess_hot_water(&input, split).unwrap();
+        // 13.51: the recovery follows Q_W;nd;d of the dwelling (13.1), not
+        // the bathroom system's 13.19a share.
+        assert!((bathroom.months[0].recovered_kwh - whole.months[0].recovered_kwh).abs() < 1e-9);
+        assert!(
+            (bathroom.months[0].net_need_kwh - 0.8 * whole.months[0].net_need_kwh).abs() < 1e-9
+        );
+    }
+
+    #[test]
+    fn utility_circulation_uses_the_served_area_of_13_20a() {
+        let mut input = system(HotWaterGenerator::ExternalHeat);
+        input.need = HotWaterNeed::Utility {
+            areas: vec![UtilityArea {
+                function: LabelFunction::Office,
+                area_m2: 1000.0,
+            }],
+            source_reference: "plan".into(),
+        };
+        input.emission = HotWaterEmission::Utility {
+            mean_length_m: 5.0,
+            source_reference: "plan".into(),
+        };
+        input.circulation = Some(Circulation {
+            outer_diameter_mm: Some(28.0),
+            insulation: PipeInsulation::Mm15,
+            declared_psi_w_per_mk: None,
+            fittings_insulated: true,
+            length_m: None,
+            unheated_length_m: Some(0.0),
+            unheated_ambient_c: None,
+            floor_count: 1,
+            sport_hall_area_m2: 0.0,
+            connected_dwellings: None,
+            pump: CirculationPump {
+                control: PumpControl::UncontrolledOrUnknown,
+                label_power_kw: None,
+                energy_efficiency_index: None,
+            },
+            source_reference: "design".into(),
+        });
+        let mut own = context();
+        own.residential = false;
+        own.usable_floor_area_m2 = 1000.0;
+        let mut building = own;
+        building.usable_floor_area_m2 = 2000.0;
+        let a = assess_hot_water(&input, own).unwrap();
+        let b = assess_hot_water(&input, building).unwrap();
+        // 13.31 with A_g;si;W = Σ A_g;zi,si (13.20a): the same pipe length.
+        assert!(a.months[0].circulation_loss_kwh > 0.0);
+        assert!((a.months[0].circulation_loss_kwh - b.months[0].circulation_loss_kwh).abs() < 1e-9);
+    }
+
+    #[test]
+    fn source_correction_takes_table_v1_values() {
+        for (value, valid) in [
+            (1.0, true),
+            (1.02, true),
+            (1.04, true),
+            (1.1, false),
+            (0.9, false),
+        ] {
+            let input = system(HotWaterGenerator::HeatPump {
+                exhaust_air_source: false,
+                source_correction: Some(value),
+                measured_class: None,
+                outdoor_air_fraction: None,
+                same_ground_source: false,
+            });
+            let found = validate_hot_water(&input, context(), "hotWater")
+                .iter()
+                .any(|item| item.code == "hot_water_source_correction_invalid");
+            assert_eq!(found, !valid, "{value}");
+        }
+    }
+
+    #[test]
     fn circulation_storage_and_pump_follow_13_25_to_13_59() {
         let mut input = system(HotWaterGenerator::IndirectBoiler {
             boiler: IndirectBoiler::Hr107,
@@ -4925,6 +5054,7 @@ mod tests {
     #[test]
     fn heat_pump_classes_and_ambient_heat() {
         let mut input = system(HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: false,
             source_correction: None,
             measured_class: Some(ApplicationClass::Class3),
@@ -4942,6 +5072,7 @@ mod tests {
         }
         // A class-1 measurement cannot serve a larger demand.
         input.generator = HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: false,
             source_correction: None,
             measured_class: Some(ApplicationClass::Class1),
@@ -5448,6 +5579,7 @@ mod tests {
         // An individual exhaust-air heat pump (category a, 1,0 kW default)
         // first, then the gas combi for the rest.
         let mut input = system(HotWaterGenerator::HeatPump {
+            same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
             measured_class: None,

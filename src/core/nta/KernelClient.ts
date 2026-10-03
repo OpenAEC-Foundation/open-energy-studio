@@ -3419,7 +3419,9 @@ export type NtaHotWaterGenerator =
         /** §13.8.4.3 conditions; required with annexT. */
         annexTConditions?: { typeSuppliedBefore2021: boolean; applianceIndoors: boolean } | null }
     | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
-        outdoorAirFraction?: number | null }
+        outdoorAirFraction?: number | null;
+        /** Annex V: on the same regenerated ground source as the space-heating heat pump (V.1, table V.1). */
+        sameGroundSource?: boolean }
     | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
         exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null; sourceReference: string }
     | { kind: 'electric_instantaneous' }
