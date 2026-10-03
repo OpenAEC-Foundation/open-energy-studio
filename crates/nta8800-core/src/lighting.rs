@@ -308,6 +308,122 @@ pub enum DaylightSector {
         luminaire_height_m: f64,
         control: DaylightControl,
     },
+    /// Annex Y: a tilted window (tilt γ from the horizontal) projected to a
+    /// vertical window (75° ≤ γ ≤ 105°) or a rooflight (γ < 75°); above
+    /// 105° its daylight is neglected.
+    #[serde(rename_all = "camelCase")]
+    TiltedWindow {
+        tilt_deg: f64,
+        /// `h_w`, window length along the slope, m.
+        window_length_m: f64,
+        /// `c_w`, distance along the slope from its start to the window, m.
+        slope_offset_m: f64,
+        /// Height of the start of the slope above the floor, m.
+        slope_start_height_m: f64,
+        /// Ceiling (plafond) height for the vertical projection, m.
+        ceiling_height_m: f64,
+        window_width_m: f64,
+        /// Vertical projection data (14.27–14.30).
+        #[serde(default)]
+        vertical: Option<TiltedVertical>,
+        /// Rooflight projection data (14.31–14.35).
+        #[serde(default)]
+        rooflight: Option<TiltedRooflight>,
+        control: DaylightControl,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TiltedVertical {
+    pub sector_width_m: f64,
+    pub actual_depth_m: f64,
+    #[serde(default)]
+    pub use_actual_depth_alternative: bool,
+    pub heavily_shaded: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TiltedRooflight {
+    pub wall_distances_m: [f64; 4],
+    pub room_length_m: f64,
+    pub room_width_m: f64,
+    pub luminaire_height_m: f64,
+}
+
+/// Outcome of the annex Y projection.
+#[derive(Debug, Clone)]
+pub enum AnnexYProjection {
+    Sector(DaylightSector),
+    /// γ > 105°: the daylight of the window is neglected.
+    Neglected,
+    /// Missing projection data or invalid geometry.
+    Invalid,
+}
+
+/// Annex Y projection of a tilted window to a vertical window or a
+/// rooflight sector of 14.6.
+#[allow(clippy::too_many_arguments)]
+pub fn annex_y_projection(
+    tilt_deg: f64,
+    window_length_m: f64,
+    slope_offset_m: f64,
+    slope_start_height_m: f64,
+    ceiling_height_m: f64,
+    window_width_m: f64,
+    vertical: Option<&TiltedVertical>,
+    rooflight: Option<&TiltedRooflight>,
+    control: DaylightControl,
+) -> AnnexYProjection {
+    if !(tilt_deg.is_finite() && positive(window_length_m) && positive(window_width_m))
+        || !(slope_offset_m.is_finite() && slope_offset_m >= 0.0)
+        || !(slope_start_height_m.is_finite() && slope_start_height_m >= 0.0)
+    {
+        return AnnexYProjection::Invalid;
+    }
+    if tilt_deg > 105.0 {
+        return AnnexYProjection::Neglected;
+    }
+    if tilt_deg >= 75.0 {
+        // Figure Y.1: the slope turned vertical in line with the facade;
+        // A1 keeps c_w, A2 lowers the window until it is under the ceiling.
+        let Some(vertical) = vertical else {
+            return AnnexYProjection::Invalid;
+        };
+        let top = (slope_start_height_m + slope_offset_m + window_length_m).min(ceiling_height_m);
+        let bottom = (top - window_length_m).max(slope_start_height_m);
+        let above_task = (top - bottom.max(0.75)).max(0.0);
+        return AnnexYProjection::Sector(DaylightSector::VerticalWindows {
+            sector_width_m: vertical.sector_width_m,
+            lintel_height_m: top,
+            actual_depth_m: vertical.actual_depth_m,
+            use_actual_depth_alternative: vertical.use_actual_depth_alternative,
+            opening_area_m2: window_width_m * above_task,
+            heavily_shaded: vertical.heavily_shaded,
+            control,
+        });
+    }
+    // Figure Y.2: projection on the ceiling, h_p = h_w·cos γ; h_R,a at the
+    // middle of the window's inner surface.
+    let Some(rooflight) = rooflight else {
+        return AnnexYProjection::Invalid;
+    };
+    let radians = tilt_deg.to_radians();
+    let projected = window_length_m * radians.cos();
+    let clear_height =
+        slope_start_height_m + (slope_offset_m + window_length_m / 2.0) * radians.sin();
+    AnnexYProjection::Sector(DaylightSector::Rooflights {
+        rooflight_depth_m: projected,
+        rooflight_width_m: window_width_m,
+        clear_height_m: clear_height,
+        wall_distances_m: rooflight.wall_distances_m,
+        opening_area_m2: projected * window_width_m,
+        room_length_m: rooflight.room_length_m,
+        room_width_m: rooflight.room_width_m,
+        luminaire_height_m: rooflight.luminaire_height_m,
+        control,
+    })
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -637,6 +753,32 @@ pub fn rooflight_supply(daylight_factor_percent: f64) -> f64 {
 /// Sector area `A_D;i` and `F_D;dayl;i`; `None` for invalid geometry.
 fn sector_geometry(sector: &DaylightSector) -> Option<(f64, f64)> {
     match sector {
+        DaylightSector::TiltedWindow {
+            tilt_deg,
+            window_length_m,
+            slope_offset_m,
+            slope_start_height_m,
+            ceiling_height_m,
+            window_width_m,
+            vertical,
+            rooflight,
+            control,
+        } => match annex_y_projection(
+            *tilt_deg,
+            *window_length_m,
+            *slope_offset_m,
+            *slope_start_height_m,
+            *ceiling_height_m,
+            *window_width_m,
+            vertical.as_ref(),
+            rooflight.as_ref(),
+            *control,
+        ) {
+            AnnexYProjection::Sector(projected) => sector_geometry(&projected),
+            // Forward-tilted windows above 105° are neglected.
+            AnnexYProjection::Neglected => Some((0.0, 1.0)),
+            AnnexYProjection::Invalid => None,
+        },
         DaylightSector::VerticalWindows {
             sector_width_m,
             lintel_height_m,
@@ -1020,6 +1162,77 @@ mod tests {
         assert!((occupancy_factor(0.1, 0.8) - 0.9).abs() < 1e-12);
         assert_eq!(burning_hours(LabelFunction::Education), (1600.0, 300.0));
         assert_eq!(specific_power(LabelFunction::Retail, true), 30.0);
+    }
+
+    #[test]
+    fn annex_y_projects_tilted_windows() {
+        let vertical = TiltedVertical {
+            sector_width_m: 4.0,
+            actual_depth_m: 5.0,
+            use_actual_depth_alternative: false,
+            heavily_shaded: false,
+        };
+        let rooflight = TiltedRooflight {
+            wall_distances_m: [1.0, 1.0, 1.0, 1.0],
+            room_length_m: 6.0,
+            room_width_m: 4.0,
+            luminaire_height_m: 2.0,
+        };
+        let control = DaylightControl::AutomaticDimming;
+        // 80°: slope starts at 2 m, window 0,5 m up the slope, 1,2 m long;
+        // turned vertical the top would be 3,7 m, so c_w shrinks until it
+        // fits under the 3,5 m ceiling (A2): lintel 3,5, window 2,3–3,5.
+        let AnnexYProjection::Sector(DaylightSector::VerticalWindows {
+            lintel_height_m,
+            opening_area_m2,
+            ..
+        }) = annex_y_projection(80.0, 1.2, 0.5, 2.0, 3.5, 1.0, Some(&vertical), None, control)
+        else {
+            panic!("vertical projection expected");
+        };
+        assert!((lintel_height_m - 3.5).abs() < 1e-12);
+        assert!((opening_area_m2 - 1.2).abs() < 1e-12);
+        // A1 under a 4 m ceiling keeps c_w: lintel 3,7.
+        let AnnexYProjection::Sector(DaylightSector::VerticalWindows { lintel_height_m, .. }) =
+            annex_y_projection(80.0, 1.2, 0.5, 2.0, 4.0, 1.0, Some(&vertical), None, control)
+        else {
+            panic!("vertical projection expected");
+        };
+        assert!((lintel_height_m - 3.7).abs() < 1e-12);
+        // 30°: h_p = 1,2·cos 30°, h_R,a = 2 + (0,5 + 0,6)·sin 30° = 2,55.
+        let AnnexYProjection::Sector(DaylightSector::Rooflights {
+            rooflight_depth_m,
+            clear_height_m,
+            opening_area_m2,
+            ..
+        }) = annex_y_projection(30.0, 1.2, 0.5, 2.0, 3.0, 1.0, None, Some(&rooflight), control)
+        else {
+            panic!("rooflight projection expected");
+        };
+        assert!((rooflight_depth_m - 1.2 * 30f64.to_radians().cos()).abs() < 1e-12);
+        assert!((clear_height_m - 2.55).abs() < 1e-12);
+        assert!((opening_area_m2 - rooflight_depth_m).abs() < 1e-12);
+        // Above 105° neglected; missing projection data is invalid.
+        assert!(matches!(
+            annex_y_projection(110.0, 1.2, 0.5, 2.0, 3.0, 1.0, None, None, control),
+            AnnexYProjection::Neglected
+        ));
+        assert!(matches!(
+            annex_y_projection(90.0, 1.2, 0.5, 2.0, 3.0, 1.0, None, None, control),
+            AnnexYProjection::Invalid
+        ));
+        let tilted = DaylightSector::TiltedWindow {
+            tilt_deg: 110.0,
+            window_length_m: 1.2,
+            slope_offset_m: 0.5,
+            slope_start_height_m: 2.0,
+            ceiling_height_m: 3.0,
+            window_width_m: 1.0,
+            vertical: None,
+            rooflight: None,
+            control,
+        };
+        assert_eq!(sector_geometry(&tilted), Some((0.0, 1.0)));
     }
 
     #[test]
