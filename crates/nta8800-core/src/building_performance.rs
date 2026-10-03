@@ -1819,6 +1819,22 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
         // Further systems need the main `hotWater` system.
         issues.push(issue("hot_water_main_system_required", "hotWater"));
     }
+    // 13.20: utility systems serve distinct areas; together at most A_g.
+    let served: f64 = hot_water_system_list(input)
+        .into_iter()
+        .filter_map(|(system, _)| match &system.need {
+            crate::domestic_hot_water::HotWaterNeed::Utility { areas, .. } => {
+                Some(areas.iter().map(|item| item.area_m2).sum::<f64>())
+            }
+            _ => None,
+        })
+        .sum();
+    if served > input.total_usable_floor_area_m2 * (1.0 + 1e-9) + 1e-6 {
+        issues.push(issue(
+            "hot_water_served_area_exceeds_building",
+            "additionalHotWaterSystems",
+        ));
+    }
     if hot_water_need_fractions(input).is_err() {
         // 13.19a needs n_b;si and n_k;si of every system.
         issues.push(issue(
