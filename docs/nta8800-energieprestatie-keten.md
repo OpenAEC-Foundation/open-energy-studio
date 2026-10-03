@@ -800,6 +800,16 @@ Een onbepaalde factor geeft de melding `bacs_factor_undetermined`.
 
 De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indicators`.
 
+## Meerdere tapwatersystemen per gebouw (§13.2.4)
+
+`additionalHotWaterSystems` bevat de tapwatersystemen naast `hotWater`. Elk systeem rekent met zijn eigen aandeel van de netto warmtebehoefte. Daarna worden de maandwaarden opgeteld: energiedragers, hulpenergie, terugwinbare verliezen (7.29), zonne-energie, WKK-stroom en de knooppuntbelasting.
+
+- **Woningen (13.19a).** F_W;si = n_b;si·C_W;nd;b/Σn_b + n_k;si·C_W;nd;k/Σn_k, met C_W;nd;b = 0,8 en C_W;nd;k = 0,2 (13.2.3.1). Elk systeem geeft daarvoor `connectedTaps` (badruimten, keukens) op. Ontbreekt dat bij meer dan één systeem, dan volgt `hot_water_connected_taps_required`.
+- **Utiliteit (13.20).** Elk systeem geeft in `need.areas` alleen het gebruiksoppervlak op dat het bedient. De verdeling volgt dan uit de behoefte zelf.
+- **Samenvoegen.** Rendementen in het samengevoegde resultaat zijn naar energie gewogen. De maatwerkadviesfit schaalt de opgetelde behoefte.
+
+De basisopname (ISSO 82.1, p. 164) ondersteunt `additionalHotWaterSystems`, bijvoorbeeld een keukengeiser naast het badkamertoestel. Onbekende aangesloten badruimten en keukens worden afgeleid uit `served`; dat wordt als standaardwaarde vastgelegd.
+
 **Correcties na de review van de hoofdstuk 5-indicatoren:**
 - De Standaard voor woningisolatie wordt met decimale rekenkunde berekend. Een exacte helft rondt nu naar boven af; in f64 kwam bijvoorbeeld 82,5 net onder de helft uit.
 - De standaard wordt alleen bepaald bij één woning in de berekening (N_woon = 1).
@@ -840,3 +850,7 @@ De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indic
 - Factor: direct gestookt axiaal 0,014, radiaal 0,022; indirect 0,004–0,013. Bij een onbekende eigenschap geldt de hoogste waarde.
 - Q_h;b komt uit NEN-EN 12831-1, of anders uit de schatting van tabel 9.12: Q_H;ht van januari van 21 °C naar −10 °C, plus (√A_g·4·3 + A_g)·5 W.
 - Het resultaat telt bij de afgiftehulpenergie (`emissionFanElectricityKwh`).
+
+**ϑ_ztu voor tapwaterleidingen en -vaten (7.82).** Met `unheatedReductionFactor` (b_U) op het tapwatersysteem rekenen circulatieleidingen (13.26) en voorraadvaten (13.58) in een onverwarmde ruimte met ϑ_ztu = ϑ_int;set;H − b_U·(ϑ_int;set;H − ϑ_e;avg). Dat geldt ook voor de gasboiler buiten de verwarmde zone (13.168). Een opgegeven `unheatedAmbientC` gaat voor; zonder beide geldt 13 °C.
+
+**Douche-WTW met meerdere douches (13.53–13.57, p. 563–564).** Het rendement is het gemiddelde over alle douches van het systeem, met 0 voor een douche zonder unit. In de utiliteitsbouw kan bekend zijn dat meer dan 80 % van de douches op een unit is aangesloten, terwijl niet bekend is welke douche op welke unit zit (`assignmentUnknown`). Dan geldt het laagste rendement van de aangesloten units.

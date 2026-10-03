@@ -317,6 +317,72 @@ export function HotWaterGeneratorsFields({ draft, change }: SectionProps) {
   </div>;
 }
 
+/** A further hot-water system (§13.2.4), started from the main system. */
+function additionalHotWaterSystem(main: Draft | null, residential: boolean): Draft {
+  const need = (main?.need as Draft | undefined) ?? (residential
+    ? { method: 'residential', dwellingCount: 1, sourceReference: '' }
+    : { method: 'utility', areas: [{ function: 'office', areaM2: null }], sourceReference: '' });
+  return {
+    need: residential ? need : { method: 'utility', areas: [{ function: 'office', areaM2: null }], sourceReference: '' },
+    emission: residential
+      ? { method: 'residential', served: 'kitchen_only', kitchenLengthM: null, bathroomLengthM: null, sourceReference: '' }
+      : { method: 'utility', meanLengthM: null, sourceReference: '' },
+    connectedTaps: residential ? { bathrooms: 0, kitchens: 1 } : null,
+    storage: [],
+    boilingWaterTap: false,
+    generator: hotWaterGeneratorTemplate('electric_instantaneous'),
+    equipmentReference: '',
+  };
+}
+
+/**
+ * §13.2.4: further hot-water systems. Dwellings split the need by the
+ * connected bathrooms and kitchens (13.19a); utility systems by the areas
+ * of their own need (13.20).
+ */
+export function AdditionalHotWaterSystemsFields({ draft, change, residential }: SectionProps & { residential: boolean }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const systems = list(draft, ['additionalHotWaterSystems']);
+  return <div className="nta-form-subsection">
+    {systems.length > 0 && residential && <fieldset className="nta-form-row">
+      <legend>{t('nta.form.dhwSystems.mainTaps')}</legend>
+      <NumberField {...field} path={['hotWater', 'connectedTaps', 'bathrooms']} label={t('nta.form.dhwSystems.bathrooms')} step="1" />
+      <NumberField {...field} path={['hotWater', 'connectedTaps', 'kitchens']} label={t('nta.form.dhwSystems.kitchens')} step="1" />
+    </fieldset>}
+    {systems.map((_, index) => {
+      const base: Path = ['additionalHotWaterSystems', index];
+      return <fieldset key={index} className="nta-form-row">
+        <legend>{t('nta.form.dhwSystems.system')} {index + 2}</legend>
+        {residential ? <>
+          <SelectField {...field} path={[...base, 'emission', 'served']} label={t('nta.form.hotWaterTaps')} options={[
+            ['kitchen_and_bathroom', t('nta.form.dhwTaps.both')], ['bathroom_only', t('nta.form.dhwTaps.bathroom')],
+            ['kitchen_only', t('nta.form.dhwTaps.kitchen')]]} />
+          <NumberField {...field} path={[...base, 'emission', 'kitchenLengthM']} label={t('nta.form.hotWaterKitchenLength')} />
+          <NumberField {...field} path={[...base, 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
+          <NumberField {...field} path={[...base, 'connectedTaps', 'bathrooms']} label={t('nta.form.dhwSystems.bathrooms')} step="1" />
+          <NumberField {...field} path={[...base, 'connectedTaps', 'kitchens']} label={t('nta.form.dhwSystems.kitchens')} step="1" />
+        </> : <>
+          <NumberField {...field} path={[...base, 'need', 'areas', 0, 'areaM2']} label={t('nta.form.dhwSystems.servedArea')} />
+          <NumberField {...field} path={[...base, 'emission', 'meanLengthM']} label={t('nta.form.hotWaterMeanLength')} />
+        </>}
+        <TextField {...field} path={[...base, 'emission', 'sourceReference']} label={t('nta.form.source')} />
+        <HotWaterGeneratorFields draft={draft} change={change} base={[...base, 'generator']} />
+        <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+        <RemoveButton label={t('nta.form.remove')}
+          onClick={() => change(['additionalHotWaterSystems'], systems.filter((__, other) => other !== index))} />
+      </fieldset>;
+    })}
+    <button type="button" className="btn" onClick={() => {
+      if (systems.length === 0 && residential && read(draft, ['hotWater', 'connectedTaps']) == null) {
+        change(['hotWater', 'connectedTaps'], { bathrooms: 1, kitchens: 0 });
+      }
+      change(['additionalHotWaterSystems'],
+        [...systems, additionalHotWaterSystem(read(draft, ['hotWater']) as Draft | null, residential)]);
+    }}>{t('nta.form.dhwSystems.add')}</button>
+  </div>;
+}
+
 /** Twelve monthly numbers in one row. */
 function MonthlyValues({ draft, change, path, label }: SectionProps & { path: Path; label: string }) {
   const values = list(draft, path) as unknown as Array<number | null>;

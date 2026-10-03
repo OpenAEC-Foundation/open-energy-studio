@@ -225,7 +225,45 @@ pub struct SurveyHotWater {
     /// Solar water heaters on this system (§15.3).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub solar: Vec<SurveySolarWaterHeater>,
+    /// Bathrooms and kitchens connected to this system when the dwelling
+    /// has several systems (p. 164, NTA 13.19a); unknown follows `served`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connected_bathrooms: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connected_kitchens: Option<u32>,
     pub source_reference: String,
+}
+
+/// NTA 13.19a `connectedTaps` of a survey system; unknown counts follow the
+/// served taps of the system (one bathroom and/or one kitchen).
+pub fn connected_taps(hot: &SurveyHotWater, path: &str, recorder: &mut Recorder) -> Value {
+    let bathroom = matches!(
+        hot.served,
+        TapsServed::KitchenAndBathroom | TapsServed::BathroomOnly
+    );
+    let kitchen = matches!(
+        hot.served,
+        TapsServed::KitchenAndBathroom | TapsServed::KitchenOnly
+    );
+    let bathrooms = hot.connected_bathrooms.unwrap_or_else(|| {
+        recorder.record(
+            "hot_water_connected_bathrooms_from_served",
+            &format!("{path}.connectedBathrooms"),
+            u32::from(bathroom).to_string(),
+            "ISSO 82.1 p. 164",
+        );
+        u32::from(bathroom)
+    });
+    let kitchens = hot.connected_kitchens.unwrap_or_else(|| {
+        recorder.record(
+            "hot_water_connected_kitchens_from_served",
+            &format!("{path}.connectedKitchens"),
+            u32::from(kitchen).to_string(),
+            "ISSO 82.1 p. 164",
+        );
+        u32::from(kitchen)
+    });
+    json!({ "bathrooms": bathrooms, "kitchens": kitchens })
 }
 
 fn one() -> u32 {
@@ -736,6 +774,8 @@ mod tests {
             collective: None,
             solar: Vec::new(),
             source_reference: "survey".into(),
+            connected_bathrooms: None,
+            connected_kitchens: None,
         }
     }
 

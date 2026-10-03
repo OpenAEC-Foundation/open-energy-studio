@@ -102,6 +102,9 @@ pub struct NtaCalculationInput {
     pub pv_systems: Vec<PvSystem>,
     #[serde(default)]
     pub hot_water: Option<HotWaterSystem>,
+    /// §13.2.4: further hot-water systems of the building.
+    #[serde(default)]
+    pub additional_hot_water_systems: Vec<HotWaterSystem>,
     /// §13.7 solar systems for space heating only (SHS).
     #[serde(default)]
     pub space_heating_solar: Vec<crate::solar_thermal::SolarWaterHeater>,
@@ -869,6 +872,7 @@ fn derive_input(
         on_site_production: nta.on_site_production,
         pv_systems: nta.pv_systems,
         hot_water: nta.hot_water,
+        additional_hot_water_systems: nta.additional_hot_water_systems,
         space_heating_solar: nta.space_heating_solar,
         lighting: nta.lighting,
         cooling: nta.cooling,

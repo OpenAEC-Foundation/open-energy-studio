@@ -1697,6 +1697,8 @@ fn hot_water_value(
                 collective: None,
                 solar: Vec::new(),
                 source_reference: reference.to_string(),
+                connected_bathrooms: None,
+                connected_kitchens: None,
             },
             recorder,
         ),

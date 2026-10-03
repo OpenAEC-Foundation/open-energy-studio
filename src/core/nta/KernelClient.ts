@@ -2566,8 +2566,13 @@ export interface ResidentialSurvey {
     collective?: { buildingUsableAreaM2?: number | null; connectedDwellings?: number | null } | null;
     /** Solar water heaters (§15.3–15.4). */
     solar?: OpnameSolarWaterHeater[];
+    /** p. 164 / NTA 13.19a; unknown follows `served`. */
+    connectedBathrooms?: number | null;
+    connectedKitchens?: number | null;
     sourceReference: string;
   };
+  /** Further hot-water systems, e.g. a kitchen geyser (ISSO 82.1 p. 164). */
+  additionalHotWaterSystems?: Array<ResidentialSurvey['hotWater']>;
   ventilation: {
     principle: 'natural' | 'mechanical_supply' | 'mechanical_extract' | 'balanced';
     declaredVariant?: VentilationSystemVariant | null;
@@ -2971,6 +2976,8 @@ export interface BuildingPerformanceInput {
     sourceReference: string;
   }>;
   hotWater?: NtaHotWaterSystem | null;
+  /** §13.2.4: further hot-water systems (dwellings: with `connectedTaps`, 13.19a). */
+  additionalHotWaterSystems?: NtaHotWaterSystem[];
   /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
   spaceHeatingSolar?: NtaSolarWaterHeater[];
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
@@ -3385,6 +3392,10 @@ export type NtaHotWaterGenerator =
 
 /** Chapter 13 hot-water system (several generators, solar systems). */
 export interface NtaHotWaterSystem {
+  /** 13.19a: bathrooms and kitchens on this system when a dwelling has several systems. */
+  connectedTaps?: { bathrooms: number; kitchens: number } | null;
+  /** 7.82: b_U of the unheated space with pipes or vessels; ϑ_ztu = ϑ_set − b_U·(ϑ_set − ϑ_e). */
+  unheatedReductionFactor?: number | null;
   need:
     | { method: 'residential'; dwellingCount: number; sourceReference: string }
     | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
@@ -3398,6 +3409,8 @@ export interface NtaHotWaterSystem {
       | { unit: 'declared'; efficiency: number; testClass?: 'class2' | 'class3' | 'class4'; sourceReference: string }
       | { unit: 'annex_u'; test: NtaAnnexUTest }
     >;
+    /** Utility (p. 564): assignment of showers to units unknown; above 80 % connected the minimum applies. */
+    assignmentUnknown?: boolean;
     connection: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
     sourceReference: string;
   } | null;
@@ -3595,6 +3608,8 @@ export interface NtaCalculationInput {
   onSiteProduction?: BuildingPerformanceInput['onSiteProduction'];
   pvSystems?: BuildingPerformanceInput['pvSystems'];
   hotWater?: NtaHotWaterSystem | null;
+  /** §13.2.4: further hot-water systems (dwellings: with `connectedTaps`, 13.19a). */
+  additionalHotWaterSystems?: NtaHotWaterSystem[];
   /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
   spaceHeatingSolar?: NtaSolarWaterHeater[];
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
