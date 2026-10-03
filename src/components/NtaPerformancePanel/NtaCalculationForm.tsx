@@ -9,6 +9,7 @@ import {
 } from './NtaAdvancedSections';
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { DynamicWindowsFields } from './NtaDynamicWindows';
+import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import {
   AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
@@ -223,6 +224,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
             <option value="detailed">{t('nta.form.edgeBridges.detailed')}</option>
           </select>
         </label>
+        <GroundFloorDetailFields draft={draft} change={change} base={['groundFloors', index]} />
         <TextField {...field} path={['groundFloors', index, 'sourceReference']} label={t('nta.form.source')} />
       </div>)}
       {ground.some((item) => read(item, ['edgeThermalBridges', 'method']) === 'forfait') &&
@@ -296,6 +298,9 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     <Section title={t('nta.form.generator')}>
       <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} allowMultiple />
       <NumberField {...field} path={['identicalSystems']} label={t('nta.form.identicalSystems')} step="1" />
+    </Section>
+    <Section title={t('nta.form.bcrg.title')}>
+      <DeclaredHeatingTableTool />
     </Section>
     {project.zones.length > 1 && <Section title={t('nta.form.heatingSystems.title')}>
       <AdditionalHeatingSystemsFields draft={draft} change={change} project={project} />

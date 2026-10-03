@@ -2,6 +2,26 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — invoerformulieren voor toestellen met productgegevens en de grondvloer
+
+Alleen de invoer verandert; opgeslagen projecten rekenen hetzelfde.
+
+- **Warmtepomp met productgegevens (bijlage Q):**
+  - bron;
+  - maximaal vermogen bij condities 1–4;
+  - aan/uit of modulerend met de deellastreeksen van tabel Q.15;
+  - uitschakelcriteria van tabellen Q.1/Q.3;
+  - bronpomp (Q.4.4);
+  - verdamperintrede (Q.2.14.2);
+  - bijverwarming (elektrisch of forfaitaire gasketel);
+  - regeneratie bij een bodembron (bijlage V).
+- **Ketel met productgegevens (bijlage M), lokale, lucht- en stralingsverwarmers (bijlage N) en overige verwarmers volgens tabel 9.25:** nu als formulier in plaats van alleen via de API.
+- **Grondvloer (§8.3, bijlage D):**
+  - kruipruimte of onverwarmde kelder eronder (8.3.4.2);
+  - verwarmde ruimte onder maaiveld (8.3.3.2);
+  - randisolatie (tabel D.1).
+- **BCRG-verklaringstabel:** invoer met de BCRG-code. De kern interpoleert η, F en W_aux binnen de tabel. De uitkomst is informatief en wordt niet in het project opgeslagen.
+
 ## 5 oktober 2026 — R_se en R_si bij grenzen met een onverwarmde ruimte (8.4.2.1)
 
 Volgens 8.4.2.1 (p. 266) wordt bij een grens met een onverwarmde ruimte R_se vervangen door de R_si van tabel C.2 (p. 778). Een projectconstructie draagt R_se = 0,04 (C.10, p. 777). Deze release regelt de gevallen waarin dat niet zo is.
