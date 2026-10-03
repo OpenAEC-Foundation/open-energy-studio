@@ -2310,7 +2310,7 @@ export interface VentilationInput {
       };
   maximumCapacityForCooling?: string;
   installedCapacity?: { totalDm3PerS: number; naturalSupplyDm3PerS?: number; sourceReference: string };
-  flowReduction?: { collective?: boolean; recirculationPercent?: number; flowControlPercent?: number };
+  flowReduction?: { collective?: boolean; recirculationPercent?: number; flowControlPercent?: number; evidenceReference?: string };
   infiltration:
     | { method: 'measured'; qv10DmPerSM2: number; sourceReference: string }
     | { method: 'reference'; buildingType: string; renovationYear?: number };

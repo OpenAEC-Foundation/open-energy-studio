@@ -1632,6 +1632,7 @@ export const en: Record<string, string> = {
   'nta.vent.collective': "Collective ventilation system",
   'nta.vent.recirculation': "Recirculation x, % (multiple of 10)",
   'nta.vent.flowControl': "Flow control down to x %, % (multiple of 10)",
+  'nta.vent.flowReductionEvidence': "Evidence for recirculation above 20 % or flow control below 80 % (11.60/11.61)",
   'nta.vent.infiltration': "Infiltration (11.2.5)",
   'nta.vent.infiltrationMethod': "Determination",
   'nta.vent.measured': "measured q_v10 (NEN 2686)",

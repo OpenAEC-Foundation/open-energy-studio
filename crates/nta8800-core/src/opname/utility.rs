@@ -1854,6 +1854,17 @@ fn ventilation_value(
             "ISSO 75.1 p. 149 (table 11.8)",
         ),
     }
+    // Notes 1 and 2 under 11.60/11.61: a surveyed, proven percentage is
+    // backed by the ventilation evidence of the survey.
+    let favourable = flow_reduction["recirculationPercent"]
+        .as_u64()
+        .is_some_and(|x| x > 20)
+        || flow_reduction["flowControlPercent"]
+            .as_u64()
+            .is_some_and(|x| x < 80);
+    if favourable {
+        flow_reduction["evidenceReference"] = json!(vent.source_reference);
+    }
     // Table 11.15: fan manufacture year unknown → construction year. This
     // specific rule takes precedence over the general installation-year
     // fallback (and is the conservative one).
@@ -3509,6 +3520,10 @@ mod tests {
         // Recirculation rounds down, the minimum flow up, both to tens.
         assert_eq!(reduction["recirculationPercent"], 30);
         assert_eq!(reduction["flowControlPercent"], 50);
+        assert_eq!(
+            reduction["evidenceReference"],
+            json!(survey.ventilation.source_reference)
+        );
         // 11.60/11.61: only proven higher x (recirculation) or lower x
         // (flow control) than the defaults 20 and 80 count.
         survey.ventilation.recirculation_percent = Some(15);
@@ -3520,6 +3535,7 @@ mod tests {
         let reduction = &input["spaceHeating"]["demand"]["ventilation"]["flowReduction"];
         assert_eq!(reduction["recirculationPercent"], 20);
         assert_eq!(reduction["flowControlPercent"], 80);
+        assert!(reduction.get("evidenceReference").is_none());
     }
 
     #[test]

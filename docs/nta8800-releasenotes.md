@@ -17,6 +17,10 @@ Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten ver
   - De kern vult ΔU_for voor de kelderwanden nu zelf in met de waarde van 8.3.
   - Een opgegeven waarde die daarvan afwijkt geeft `basement_forfait_delta_u_conflict`.
 
+- **Ventilatie (11.60/11.61, p. 468).** Een terugregel-x gunstiger dan de standaard (recirculatie boven 20 %, debietregeling onder 80 %) zonder `flowReduction.evidenceReference` geeft `flow_reduction_evidence_required`.
+- **Gemeten luchtdoorlatendheid.** Een q_v10 van 0 of lager geeft `infiltration_invalid`.
+- **Verlichting (§14.5.1, p. 664).** `largeOfficeGroup` in een zone zonder kantoorfunctie geeft `lighting_large_office_group_without_office`.
+
 ### Projecten met een andere uitkomst
 
 - **Forfaitaire koudebruggen.**
