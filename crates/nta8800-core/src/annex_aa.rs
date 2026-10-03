@@ -587,8 +587,11 @@ mod tests {
                 id: "tinted".into(),
                 g_perpendicular: 0.3,
                 u_value_w_per_m2k: 1.0,
+                tau_solar: None,
+                tau_visual: None,
             },
             source_reference: "product sheet".into(),
+            correction: None,
         });
         let result = assess_annex_aa(&rooms(2.0), &input, &demand, "aa").unwrap();
         // AA.6b with g_gl;C;juli = 0,3 instead of the nominal 0,6.
