@@ -90,6 +90,11 @@ pub struct SoftwareIdentity {
     pub version: String,
     #[serde(default)]
     pub attest_number: Option<String>,
+    /// Version of the calculation core that made the calculation. A
+    /// relabel must be calculated with the original core (BRL 9500-W
+    /// §4.2.4, p. 24).
+    #[serde(default)]
+    pub kernel_version: Option<String>,
 }
 
 /// Outcome of the WLC-GWP calculation that the EP adviser enters (BRL
@@ -337,6 +342,10 @@ pub struct RegistrationAssessment {
     /// art. 2/3, p. 4–5). Reported apart from `issues`: it is a property of
     /// the program, not of the dossier.
     pub software_attested: bool,
+    /// The dossier holds everything the registration needs (no `issues`).
+    pub dossier_complete: bool,
+    /// The dossier is complete and the program carries a BRL 9501 attest:
+    /// Regeling art. 2/3 (p. 4–5) only allow an attested program.
     pub ready_for_registration: bool,
     pub issues: Vec<RegistrationIssue>,
     /// Plausibility findings (severity `warning`); they never block
@@ -362,6 +371,10 @@ pub struct RegistrationContext {
     pub primary_fossil_kwh_per_m2: Option<f64>,
     pub label_class: Option<&'static str>,
     pub envelope: Vec<EnvelopeSummary>,
+    /// The calculation covers the whole building (a single detached
+    /// dwelling or a whole utility building), so its A_g is the building
+    /// A_g for the WLC-GWP threshold.
+    pub whole_building: bool,
 }
 
 /// Name of this program in the registration (Regeling art. 5 lid 1 onder b).
@@ -505,9 +518,13 @@ fn check_bag_object_id(id: &str, residential: bool, issues: &mut Vec<Registratio
 
 /// The program of the registration (Regeling art. 5 lid 1 onder b, p. 6).
 /// Projects saved before the identity was recorded get this program with
-/// the kernel version; blank fields are filled the same way.
-fn effective_software(software: &Option<SoftwareIdentity>) -> SoftwareIdentity {
+/// the kernel version; blank fields are filled the same way. A relabel
+/// keeps the stored calculation core, so a missing one stays unknown.
+fn effective_software(software: &Option<SoftwareIdentity>, relabel: bool) -> SoftwareIdentity {
     let stored = software.clone().unwrap_or_default();
+    let kernel_version = stored
+        .kernel_version
+        .filter(|version| !version.trim().is_empty());
     SoftwareIdentity {
         name: if stored.name.trim().is_empty() {
             SOFTWARE_NAME.to_owned()
@@ -522,6 +539,11 @@ fn effective_software(software: &Option<SoftwareIdentity>) -> SoftwareIdentity {
         attest_number: stored
             .attest_number
             .filter(|number| !number.trim().is_empty()),
+        kernel_version: if relabel {
+            kernel_version
+        } else {
+            kernel_version.or_else(|| Some(KERNEL_VERSION.to_owned()))
+        },
     }
 }
 
@@ -562,12 +584,14 @@ fn check_wlc_gwp(
                     .or(registration.survey_date.as_deref())
                     .and_then(Date::parse)
                     .is_some_and(|date| date >= WLC_GWP_FROM);
-                if late {
-                    warnings.push(warning(
-                        "wlc_gwp_bbl_check_date_unknown",
-                        "registration.bblCheckDate",
-                    ));
+                // Before 2028 no delivery can follow a check that needs it.
+                if !late {
+                    return Some(false);
                 }
+                warnings.push(warning(
+                    "wlc_gwp_bbl_check_date_unknown",
+                    "registration.bblCheckDate",
+                ));
                 return None;
             }
         },
@@ -583,7 +607,7 @@ fn check_wlc_gwp(
         Some(area) => area,
         None => {
             let area = context.usable_floor_area_m2?;
-            if context.residential && area <= WLC_GWP_AREA_M2 {
+            if context.residential && !context.whole_building && area <= WLC_GWP_AREA_M2 {
                 warnings.push(warning(
                     "wlc_gwp_building_area_unknown",
                     "registration.buildingUsableFloorAreaM2",
@@ -898,6 +922,21 @@ pub fn assess_registration_with(
                 )),
                 _ => {}
             }
+            // §4.2.4 (p. 24): only an interim release with the same
+            // calculation core may relabel; the kept program identity must
+            // name the core that calculates now.
+            if registration
+                .software
+                .as_ref()
+                .and_then(|software| software.kernel_version.as_deref())
+                .is_some_and(|version| !version.trim().is_empty() && version != KERNEL_VERSION)
+            {
+                issues.push(issue(
+                    "relabel_software_kernel_differs",
+                    "software.kernelVersion",
+                    "error",
+                ));
+            }
         } else {
             // §4.2.5: three months, six for serial projects.
             let deadline = survey.add_months(if registration.serial_project { 6 } else { 3 });
@@ -938,7 +977,7 @@ pub fn assess_registration_with(
     }
     check_detail_survey(registration, &mut issues);
     check_evidence(&registration.evidence, &mut issues);
-    let software = effective_software(&registration.software);
+    let software = effective_software(&registration.software, message_type == MessageType::Relabel);
     let mut plausibility = plausibility_warnings(registration, context);
     let wlc_gwp_required = check_wlc_gwp(registration, context, &mut issues, &mut plausibility);
     // Only used for the class-jump warning, so an unknown class warns.
@@ -964,8 +1003,9 @@ pub fn assess_registration_with(
         replacement_deadline: replacement_deadline.map(|date| date.to_string()),
         wlc_gwp_required,
         software_attested: software.attest_number.is_some(),
+        dossier_complete: issues.is_empty(),
+        ready_for_registration: issues.is_empty() && software.attest_number.is_some(),
         software,
-        ready_for_registration: issues.is_empty(),
         issues,
         plausibility,
     }
@@ -1167,7 +1207,8 @@ pub fn assess_project_registration(
     result
         .issues
         .extend(check_evidence_links(project, registration));
-    result.ready_for_registration = result.issues.is_empty();
+    result.dossier_complete = result.issues.is_empty();
+    result.ready_for_registration = result.dossier_complete && result.software_attested;
     result
 }
 
@@ -1199,6 +1240,7 @@ mod tests {
                 name: SOFTWARE_NAME.into(),
                 version: "0.1.6-alpha".into(),
                 attest_number: Some("TEST-ATTEST".into()),
+                kernel_version: None,
             }),
             ..Registration::default()
         }
@@ -1298,9 +1340,17 @@ mod tests {
         let mut unattested = complete();
         unattested.software.as_mut().unwrap().attest_number = None;
         let result = assess_registration(&unattested);
-        assert!(result.ready_for_registration, "{:?}", result.issues);
+        assert!(result.dossier_complete, "{:?}", result.issues);
         assert!(!result.software_attested);
-        assert!(assess_registration(&complete()).software_attested);
+        // Regeling art. 2/3 (p. 4–5): only an attested program registers.
+        assert!(!result.ready_for_registration);
+        let attested = assess_registration(&complete());
+        assert!(attested.software_attested);
+        assert!(attested.ready_for_registration);
+        assert_eq!(
+            attested.software.kernel_version.as_deref(),
+            Some(KERNEL_VERSION)
+        );
         // Saved before the identity was recorded: this program, kernel version.
         unattested.software = None;
         let result = assess_registration(&unattested);
@@ -1346,6 +1396,15 @@ mod tests {
         let result = assess_registration(&relabel);
         assert_eq!(result.message_type, MessageType::Relabel);
         assert!(result.relabel_deadline.is_some());
+        // §4.2.4 (p. 24): the kept identity must name the calculation core
+        // that calculates now.
+        relabel.software.as_mut().unwrap().kernel_version = Some("0.0.1-old".into());
+        assert!(codes(&relabel).contains(&"relabel_software_kernel_differs"));
+        relabel.software.as_mut().unwrap().kernel_version = Some(KERNEL_VERSION.into());
+        assert!(!codes(&relabel).contains(&"relabel_software_kernel_differs"));
+        // A relabel keeps an unknown core unknown instead of claiming this one.
+        relabel.software.as_mut().unwrap().kernel_version = None;
+        assert_eq!(assess_registration(&relabel).software.kernel_version, None);
         let mut conflict = complete();
         conflict.relabel = true;
         conflict.message_type = Some(MessageType::Regular);
@@ -1433,6 +1492,13 @@ mod tests {
             assess_registration_with(&delivery, &large).wlc_gwp_required,
             Some(true)
         );
+        // A delivery before 2028 cannot follow a check that needs it.
+        delivery.bbl_check_date = None;
+        delivery.survey_date = Some("2027-10-01".into());
+        delivery.registration_date = Some("2027-10-01".into());
+        let result = assess_registration_with(&delivery, &large);
+        assert_eq!(result.wlc_gwp_required, Some(false));
+        assert!(result.plausibility.is_empty(), "{:?}", result.plausibility);
         // The threshold is per building: one dwelling of 90 m² does not
         // decide it, the building's A_g does.
         let dwelling = RegistrationContext {
@@ -1454,6 +1520,19 @@ mod tests {
             assess_registration_with(&apartment, &dwelling).wlc_gwp_required,
             Some(true)
         );
+        // A single detached dwelling is the whole building: its own A_g
+        // decides, without a warning.
+        let detached = RegistrationContext {
+            whole_building: true,
+            ..dwelling.clone()
+        };
+        apartment.building_usable_floor_area_m2 = None;
+        let result = assess_registration_with(&apartment, &detached);
+        assert_eq!(result.wlc_gwp_required, Some(false));
+        assert!(!result
+            .plausibility
+            .iter()
+            .any(|item| item.code == "wlc_gwp_building_area_unknown"));
         // Undecidable without A_g.
         bbl.survey_date = Some("2028-03-01".into());
         bbl.registration_date = Some("2028-03-01".into());
@@ -1484,6 +1563,7 @@ mod tests {
                 min_rc_m2k_per_w: None,
                 max_rc_m2k_per_w: None,
             }],
+            whole_building: false,
         };
         let result = assess_registration_with(&registration, &context);
         assert!(result.ready_for_registration, "{:?}", result.issues);
@@ -1512,6 +1592,7 @@ mod tests {
             primary_fossil_kwh_per_m2: Some(150.0),
             label_class: Some("A"),
             envelope: Vec::new(),
+            whole_building: false,
         };
         registration.previous_label_class = Some("B".into());
         assert!(assess_registration_with(&registration, &calm)

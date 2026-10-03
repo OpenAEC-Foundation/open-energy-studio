@@ -5,7 +5,7 @@ import {
 import {
   CheckField, NumberField, read, SelectField, TextField, type Draft, type Path,
 } from './NtaFormFields';
-import { CalculatedHotWaterStorageFields, PipeDistributionFields } from './NtaAnnexPDetails';
+import { CalculatedHotWaterStorageFields, PipeDistributionFields, storageVesselTemplate } from './NtaAnnexPDetails';
 import { PvSystemFields, peakPowerTemplate } from './NtaPvFields';
 import { MonthlyValues, SolarCalculatedFields } from './NtaSystemSections';
 import { calculatedSolarMethod } from '../../core/nta/NtaSystemTemplates';
@@ -386,7 +386,7 @@ function DistributionFields({ draft, change, base }: SectionProps & { base: Path
         ['ground_bound', t('nta.annexP.connectionType.ground')], ['within_building', t('nta.annexP.connectionType.building')]]} />
       <SelectField {...field} path={[...base, 'designTemperature']} label={t('nta.annexP.designTemperature')} options={[
         ['t90_to60', '90/60'], ['t90_to50', '90/50'], ['t70_to40', '70/40'], ['t50_to40', '50/40'], ['t35_to25', '35/25']]} />
-      <NumberField {...field} path={[...base, 'otherLossKwh']} label={t('nta.annexP.otherLoss')} />
+      <NumberField {...field} path={[...base, 'otherLossKwh']} label={t('nta.annexP.otherLoss')} optional />
     </>}
     {method === 'small_cold_forfait' &&
       <CheckField {...field} path={[...base, 'supplyBelow10C']} label={t('nta.annexP.supplyBelow10')} />}
@@ -444,7 +444,7 @@ function HotWaterStorageFields({ draft, change, base }: SectionProps & { base: P
       options={options(t, 'nta.annexP.hwStorage', ['forfait', 'losses', 'calculated'])}
       onChange={(_, value) => change(base, value === 'losses'
         ? { method: value, storageLossKwh: null, pipeLossKwh: null, sourceReference: '' }
-        : value === 'calculated' ? { method: value, vessels: [], sourceReference: '' }
+        : value === 'calculated' ? { method: value, vessels: [storageVesselTemplate()], sourceReference: '' }
           : { method: 'forfait', insulation: null })} />
     {method === 'forfait' && <SelectField {...field} path={[...base, 'insulation']} label={t('nta.annexP.insulation')} options={[
       ['at_least20_mm', '≥ 20 mm'], ['at_least10_mm', '≥ 10 mm'], ['none', t('nta.annexP.insulation.none')]]} />}
@@ -559,7 +559,7 @@ export function ExternalSupplyFields({ draft, change }: SectionProps) {
     <button type="button" onClick={() => change([...base, 'areaElectricity'],
       [...area, {
         kind: 'pv', id: `gebied-pv-${area.length + 1}`, peakPower: peakPowerTemplate('panels'), azimuthDeg: null, tiltDeg: null,
-        mounting: 'unknown', obstructionFactors: [null], sourceReference: '',
+        mounting: 'unknown', obstructionFactors: [], sourceReference: '',
       }])}>
       {t('nta.annexP.addAreaPv')}
     </button>

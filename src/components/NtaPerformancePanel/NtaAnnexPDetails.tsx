@@ -190,7 +190,7 @@ export function PipeDistributionFields({ draft, change, base }: SectionProps & {
         <option value="false">{t('nta.annexP.pipe.coldSupply.atLeast10')}</option>
       </select>
     </label>
-    <NumberField {...field} path={[...base, 'otherLossKwh']} label={t('nta.annexP.otherLoss')} />
+    <NumberField {...field} path={[...base, 'otherLossKwh']} label={t('nta.annexP.otherLoss')} optional />
     <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
   </>;
 }

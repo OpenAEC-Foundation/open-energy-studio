@@ -46,7 +46,9 @@ export function PvSystemFields({ draft, change, base, label }: {
     <NumberField {...field} path={at('tiltDeg')} label={t('nta.form.tilt')} />
     <SelectField {...field} path={at('mounting')} label={t('nta.form.pvPerformance')}
       options={[['unknown', t('nta.form.pvMount.unknown')], ['not_ventilated', '0,76'], ['moderately_ventilated', '0,80'], ['strongly_ventilated', '0,82']]} />
-    <NumberField {...field} path={at('obstructionFactors', 0)} label={t('nta.form.obstruction')} />
+    {/* Optional (16.2): clearing drops the factor instead of leaving a blank. */}
+    <NumberField {...field} path={at('obstructionFactors', 0)} label={t('nta.form.obstruction')}
+      onChange={(path, value) => change(value == null ? at('obstructionFactors') : path, value == null ? [] : value)} />
     <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
   </>;
 }

@@ -61,14 +61,21 @@ describe('annex P details without JSON editors', () => {
       waterTemperature: { method: 'constant', temperatureC: 70 },
       buffers: [{ volumeL: 500, insulation: 'at_least20_mm' }],
     });
+    // Other losses are optional: clearing drops the member (kernel default 0).
+    const other = screen.getByRole('spinbutton', { name: 'Other losses, kWh/year' });
+    await user.type(other, '50');
+    expect(current().externalSupply.hotWater.distribution.otherLossKwh).toBe(50);
+    await user.clear(other);
+    expect('otherLossKwh' in current().externalSupply.hotWater.distribution
+      && current().externalSupply.hotWater.distribution.otherLossKwh !== undefined).toBe(false);
 
     // Switching the placement drops the buried-only fields.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Placement' }), 'in_air');
     expect(current().externalSupply.hotWater.distribution.segments[0].placement)
       .toEqual({ kind: 'in_air', ambient: { kind: 'indoor', temperatureC: null } });
 
+    // The calculated route starts with one vessel: without components η would be 1 (P.35).
     await user.selectOptions(screen.getByRole('combobox', { name: 'Hot-water storage η_WD;gen;sto (P.34/P.35)' }), 'calculated');
-    await user.click(screen.getByRole('button', { name: 'Add vessel' }));
     await user.type(screen.getAllByRole('spinbutton', { name: 'Volume, l' })[1], '300');
     await user.click(screen.getByRole('button', { name: 'Add charging pipe' }));
     await user.type(screen.getAllByRole('spinbutton', { name: 'Length, m' })[1], '10');
@@ -136,8 +143,14 @@ describe('annex P details without JSON editors', () => {
     await user.type(screen.getByRole('spinbutton', { name: 'azimuth ° (0 = north)' }), '180');
     expect(withoutNulls(current().externalSupply.areaElectricity[0])).toEqual({
       kind: 'pv', id: 'gebied-pv-1', peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 10 }, azimuthDeg: 180,
-      mounting: 'unknown', obstructionFactors: [null], sourceReference: '',
+      mounting: 'unknown', obstructionFactors: [], sourceReference: '',
     });
+    // The obstruction factor is optional: clearing it leaves no blank.
+    const obstruction = screen.getByRole('spinbutton', { name: /obstruction/i });
+    await user.type(obstruction, '0.9');
+    expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([0.9]);
+    await user.clear(obstruction);
+    expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([]);
     await user.selectOptions(screen.getByRole('combobox', { name: 'gebied-pv-1 — peak power P_pk' }), 'table16_1');
     expect(current().externalSupply.areaElectricity[0].peakPower).toEqual({ method: 'table16_1', moduleType: null, panelAreaM2: null });
   }, 60000);
@@ -210,9 +223,21 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     renderWithProviders(<PatchHarness />);
     await user.click(screen.getByRole('button', { name: 'Add change' }));
     await user.type(screen.getByRole('textbox', { name: 'Path (JSON pointer)' }), '/constructions/0/uValue');
-    await user.clear(screen.getByRole('textbox', { name: 'New value (number, text, true/false or JSON)' }));
-    await user.type(screen.getByRole('textbox', { name: 'New value (number, text, true/false or JSON)' }), '0.15');
+    await user.type(screen.getByRole('textbox', { name: 'New value' }), '0.15');
     expect(current().patch).toEqual([{ op: 'replace', path: '/constructions/0/uValue', value: 0.15 }]);
+    // The type is explicit: text "2" stays a string, true a boolean.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'text');
+    await user.clear(screen.getByRole('textbox', { name: 'New value' }));
+    await user.type(screen.getByRole('textbox', { name: 'New value' }), '2');
+    expect(current().patch[0].value).toBe('2');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'boolean');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'New value' }), 'true');
+    expect(current().patch[0].value).toBe(true);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'json');
+    expect(current().patch[0].value).toEqual({});
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'number');
+    await user.type(screen.getByRole('textbox', { name: 'New value' }), '7');
+    expect(current().patch[0].value).toBe(7);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Operation' }), 'remove');
     expect(current().patch).toEqual([{ op: 'remove', path: '/constructions/0/uValue' }]);
   }, 60000);

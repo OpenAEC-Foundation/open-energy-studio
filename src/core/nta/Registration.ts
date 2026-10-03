@@ -25,6 +25,11 @@ function cleanObject(value: object): Record<string, unknown> | undefined {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
+/** Only a relabel keeps the stored program identity (BRL 9500-W §4.2.4, p. 24). */
+export function keepsSoftwareIdentity(registration: NtaRegistration): boolean {
+  return (registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) === 'relabel';
+}
+
 /** Drops empty values so an untouched registration block is not saved. */
 export function cleanRegistration(registration: NtaRegistration): NtaRegistration | undefined {
   const result: Record<string, unknown> = {};
@@ -49,10 +54,10 @@ export function cleanRegistration(registration: NtaRegistration): NtaRegistratio
   }
   if (!Object.keys(result).length) return undefined;
   // Regeling art. 5 lid 1 onder b: the registration records the program used.
-  // A relabel or a replacement keeps the program of the original
-  // calculation (BRL 9500-W §4.2.4, p. 23–24).
-  const messageType = registration.messageType ?? (registration.relabel ? 'relabel' : 'regular');
-  result.software = messageType !== 'regular' && registration.software
+  // A relabel keeps the program of the original calculation (BRL 9500-W
+  // §4.2.4, p. 24); a replacement is a new calculation with the current
+  // attested version (p. 23), so it records this program.
+  result.software = keepsSoftwareIdentity(registration) && registration.software
     ? registration.software
     : softwareIdentity();
   return result as NtaRegistration;
