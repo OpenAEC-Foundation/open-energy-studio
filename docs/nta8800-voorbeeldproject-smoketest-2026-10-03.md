@@ -11,11 +11,11 @@ De API-proef bevestigt dat de voorbeelden technisch door de projectroute lopen. 
 
 ## Herhaling na de validatieregels — 4 oktober 2026
 
-Na de merge van de validatieregels zijn beide voorbeelden aangepast (`3eec124`): één koudebrugmethode, opgegeven verticale leidingen, ventilatie volgens hoofdstuk 11 en berekend warm tapwater in plaats van een opgegeven gebruik. Daarna zijn ze opnieuw ingediend via `POST /v1/nta8800/project/performance`.
+Na de merge van de validatieregels zijn beide voorbeelden aangepast (`3eec124`): één koudebrugmethode, opgegeven verticale leidingen, ventilatie volgens hoofdstuk 11 en berekend warm tapwater in plaats van een opgegeven gebruik. Ze zijn opnieuw ingediend, ook na de correctie dat ΔU_for alleen in H_D telt (merge van de reviewfixes), via `POST /v1/nta8800/project/performance`.
 
 | Project | Kernelstatus | Gaten | Waarschuwingen | Indicatieve labelklasse | BENG 2 (kWh/m²·jr) | Aandeel hernieuwbare energie |
 | --- | --- | ---: | ---: | --- | ---: | ---: |
-| `nta8800-example-terraced-dwelling.json` | `calculated_unverified` | 0 | 0 | A+ | 76,15 | 23,3 % |
-| `nta8800-example-office.json` | `calculated_unverified` | 0 | 0 | A+++ | 48,29 | 49,7 % |
+| `nta8800-example-terraced-dwelling.json` | `calculated_unverified` | 0 | 0 | A+ | 76,56 | 23,2 % |
+| `nta8800-example-office.json` | `calculated_unverified` | 0 | 0 | A+++ | 48,33 | 49,6 % |
 
 De tussenwoning stijgt vooral doordat het tapwater nu wordt berekend met het tabelrendement van de HR-combiketel. Dat is realistisch voor een woning met een gasketel. De vorige waarde van 17,13 berustte op een opgegeven tapwatergebruik dat fysiek niet kon (η > 1).
