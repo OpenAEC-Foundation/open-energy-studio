@@ -19,3 +19,14 @@ Na de merge van de validatieregels zijn beide voorbeelden aangepast (`3eec124`):
 | `nta8800-example-office.json` | `calculated_unverified` | 0 | 0 | A+++ | 48,33 | 49,6 % |
 
 De tussenwoning stijgt vooral doordat het tapwater nu wordt berekend met het tabelrendement van de HR-combiketel. Dat is realistisch voor een woning met een gasketel. De vorige waarde van 17,13 berustte op een opgegeven tapwatergebruik dat fysiek niet kon (η > 1).
+
+## Herhaling na de herberekening van hoofdstuk 8 — 5 oktober 2026
+
+Het dak van de tussenwoning was 52 m² bij 45° op een plattegrond van 5 × 10 m; dat moet 70,7 m² zijn. Het dak bestaat nu uit twee schilden van 35,36 m² (noord en zuid, beide 45°). De uitkomsten via `assess_project_performance`:
+
+| Project | Kernelstatus | Gaten | Waarschuwingen | Indicatieve labelklasse | BENG 2 (kWh/m²·jr) | Aandeel hernieuwbare energie |
+| --- | --- | ---: | ---: | --- | ---: | ---: |
+| `nta8800-example-terraced-dwelling.json` | `calculated_unverified` | 0 | 0 | A+ | 80,56 | 22,3 % |
+| `nta8800-example-office.json` | `calculated_unverified` | 0 | 0 | A+++ | 48,33 | 49,6 % |
+
+Het kantoor verandert niet: het heeft geen kruipruimte en geen onverwarmde ruimte.

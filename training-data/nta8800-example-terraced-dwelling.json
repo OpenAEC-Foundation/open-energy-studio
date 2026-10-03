@@ -57,11 +57,22 @@
         },
         {
           "id": "roof",
-          "name": "Dak",
+          "name": "Dak zuid",
           "type": "roof",
           "thermalBoundary": "outdoor",
-          "area": 52.0,
+          "area": 35.36,
           "orientation": "S",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "roof-n",
+          "name": "Dak noord",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 35.36,
+          "orientation": "N",
           "constructionId": "c-roof",
           "zoneId": "z1",
           "windows": []
@@ -156,6 +167,11 @@
     "surfaceTilts": [
       {
         "surfaceId": "roof",
+        "tiltDeg": 45.0,
+        "sourceReference": "synthetic section drawing"
+      },
+      {
+        "surfaceId": "roof-n",
         "tiltDeg": 45.0,
         "sourceReference": "synthetic section drawing"
       }

@@ -176,8 +176,7 @@ pub enum FloorBelow {
     },
 }
 
-/// R_si (downward) and R_se of the floor construction towards the space
-/// below (C.2), m²K/W.
+/// R_si (downward) on the floor of the space below (8.33, table C.2), m²K/W.
 const R_SI_DOWN: f64 = 0.17;
 const R_SI_HORIZONTAL: f64 = 0.13;
 /// 8.47: h above ground level.
@@ -239,11 +238,12 @@ fn below_terms(slab: &SlabOnGround, below: &FloorBelow) -> Option<BelowTerms> {
     let area = slab.area_m2;
     let perimeter = slab.exposed_perimeter_m;
     let b_prime = area / (0.5 * perimeter);
-    // 8.2.2.2.1: R_si + R_c of the floor plus R_si towards the space below.
-    // Table C.2 gives R_se 0,04 for surfaces to outside air; like 8.4.2.1
-    // for unheated spaces and 7.2 of NEN-EN-ISO 13370 (U_f between the
-    // interior and the underfloor space), the still air below takes R_si.
-    let u_f = 1.0 / (slab.construction_resistance_m2k_per_w + R_SI_DOWN);
+    // 8.43 (p. 258) takes U_f per 8.2.2.2.1: R_T of C.1.2 with R_si and
+    // R_se of table C.2 (p. 778), so R_se = 0,04 on the crawlspace side.
+    // §8.3 gives no exception; the R_se → R_si swap of 8.4.2.1 is for
+    // H_D;zi,j;ztu only. NEN-EN-ISO 13370 7.2 would take R_si (0,17) there;
+    // the norm text governs (about +0,2 % Q_H;nd for a typical dwelling).
+    let u_f = 1.0 / (slab.construction_resistance_m2k_per_w + R_SE_GROUND);
     // 8.33/8.34.
     let d_bf = WALL_THICKNESS_M + LAMBDA_GROUND * (R_SI_DOWN + r_bf + R_SE_GROUND);
     let d_bw = LAMBDA_GROUND * (R_SI_HORIZONTAL + r_bw + R_SE_GROUND);
@@ -482,6 +482,21 @@ fn edge_insulated_external(perimeter: f64, d_f: f64, insulation: &EdgeInsulation
 }
 
 /// Steady and periodic coefficients, or `None` for non-physical input.
+/// Input combinations §8.3 and annex D do not cover, as an issue code:
+/// a heated basement under a floor with a crawlspace or unheated basement
+/// (8.3.3.2 against 8.3.4.2), and edge insulation (D.7/D.8, table D.1) on
+/// anything but a slab on ground.
+pub fn combination_issue(slab: &SlabOnGround) -> Option<&'static str> {
+    if slab.below.is_some() && slab.heated_basement.is_some() {
+        return Some("ground_floor_below_and_heated_basement");
+    }
+    if (slab.below.is_some() || slab.heated_basement.is_some()) && !slab.edge_insulation.is_empty()
+    {
+        return Some("ground_floor_edge_insulation_slab_only");
+    }
+    None
+}
+
 pub fn slab_coefficients(slab: &SlabOnGround) -> Option<SlabCoefficients> {
     let steady = slab_on_ground_conductance(slab)?;
     for insulation in &slab.edge_insulation {
@@ -694,9 +709,9 @@ mod tests {
             wall_u_value_w_per_m2k: 1.9,
             ventilation_opening_m2_per_m: None,
         });
-        // Hand calculation: B' = 7,5; U_f = 1/(0,32 + 0,17).
+        // Hand calculation: B' = 7,5; U_f = 1/(0,32 + 0,04) (8.43, C.2 R_se).
         let b = 7.5;
-        let u_f = 1.0 / 0.49;
+        let u_f = 1.0 / 0.36;
         let d_bf: f64 = 0.5 + 2.0 * (0.17 + 0.0 + 0.04);
         let d_bw: f64 = 2.0 * (0.13 + 0.35 + 0.04);
         let z = 0.5;
@@ -735,7 +750,7 @@ mod tests {
         });
         let coefficients = slab_coefficients(&floor).unwrap();
         assert_eq!(coefficients.beta, 1.0);
-        let u_f = 1.0 / (2.67 + 0.17);
+        let u_f = 1.0 / (2.67 + 0.04);
         let air = 0.125 * 16.0 * 1.9 + 0.33 * 0.3 * 120.0;
         let below = (60.0 + 0.5 * 16.0) * 2.0 / 3.0 + air;
         let internal = 1.0 / (1.0 / (60.0 * u_f) + 1.0 / below);

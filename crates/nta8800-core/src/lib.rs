@@ -1739,6 +1739,17 @@ fn bridge_sides(bridge: &Value) -> Option<Vec<direct_transmission::EnvelopeSide>
         .collect()
 }
 
+/// Table C.2 R_si on the unheated side of a separation (8.4.2.1): heat
+/// flows up through a ceiling or roof (0,10), down through a floor (0,17)
+/// and horizontally through a wall or a surface without a type (0,13).
+pub(crate) fn unheated_side_surface_resistance(surface_type: &str) -> f64 {
+    match surface_type {
+        "roof" | "ceiling" => 0.10,
+        "floor" => 0.17,
+        _ => 0.13,
+    }
+}
+
 pub(crate) fn direct_boundary_input(
     project: &ProjectInput,
     target: ThermalBoundary,
@@ -1778,6 +1789,23 @@ pub(crate) fn direct_boundary_input_zone(
             let surface_id = surface.get("id")?.as_str()?;
             let gross_area = surface.get("area")?.as_f64()?;
             let windows = surface.get("windows")?.as_array()?;
+            // 8.4.2.1 (p. 266): H_D;zi,j;ztu follows 8.2.1 with R_se replaced
+            // by the R_si of table C.2 that applies on the unheated side.
+            // Project U-values carry R_se = 0,04 (C.1.2 with table C.2).
+            let unheated_side = (target == ThermalBoundary::UnheatedSpace).then(|| {
+                unheated_side_surface_resistance(
+                    surface.get("type").and_then(Value::as_str).unwrap_or(""),
+                )
+            });
+            let boundary_u = |u_value: f64| match unheated_side {
+                Some(r_si) => 1.0 / (1.0 / u_value - constructions::R_SE + r_si),
+                None => u_value,
+            };
+            let note = if unheated_side.is_some() {
+                " (8.4.2.1: R_se → R_si)"
+            } else {
+                ""
+            };
             let mut window_area = 0.0;
             for window in windows {
                 let window_id = window.get("id")?.as_str()?;
@@ -1790,8 +1818,8 @@ pub(crate) fn direct_boundary_input_zone(
                 elements.push(DirectElement {
                     id: format!("window:{window_id}"),
                     area_m2: area,
-                    u_value_w_per_m2k: u_value,
-                    source_reference: format!("project:window:{window_id}.uValue"),
+                    u_value_w_per_m2k: boundary_u(u_value),
+                    source_reference: format!("project:window:{window_id}.uValue{note}"),
                 });
             }
             let opaque_area = gross_area - window_area;
@@ -1808,8 +1836,10 @@ pub(crate) fn direct_boundary_input_zone(
                 elements.push(DirectElement {
                     id: format!("surface:{surface_id}:opaque"),
                     area_m2: opaque_area,
-                    u_value_w_per_m2k: u_value,
-                    source_reference: format!("project:construction:{construction_id}.uValue"),
+                    u_value_w_per_m2k: boundary_u(u_value),
+                    source_reference: format!(
+                        "project:construction:{construction_id}.uValue{note}"
+                    ),
                 });
             }
         }
@@ -2267,7 +2297,10 @@ mod tests {
         let result = assess_json(value.clone()).unwrap();
         assert_eq!(result.status, "structurally_valid");
         let diagnosis = result.summary.unheated_transmission_diagnostic.unwrap();
-        assert!((diagnosis.total_reduced_conductance_w_per_k.unwrap() - 2.1).abs() < 1e-12);
+        // 8.4.2.1: U 0,4 with R_se 0,04 replaced by the wall R_si 0,13.
+        let u_iu = 1.0 / (1.0 / 0.4 - 0.04 + 0.13);
+        let expected = 0.5 * (10.0 * u_iu + 2.0 * 0.1);
+        assert!((diagnosis.total_reduced_conductance_w_per_k.unwrap() - expected).abs() < 1e-12);
         assert!(!diagnosis.reference_verified);
         assert!(!diagnosis.beng_calculation_available);
 
@@ -2315,8 +2348,10 @@ mod tests {
         let result = assess_json(value.clone()).unwrap();
         assert_eq!(result.status, "structurally_valid", "{:?}", result.issues);
         let diagnosis = result.summary.unheated_transmission_diagnostic.unwrap();
-        // H_zi;ztu = 10·0,4 + 2·0,1 = 4,2; H_ue = 20 + 10 (8.58).
-        let b = 30.0 / (30.0 + 4.2);
+        // H_zi;ztu = 10·U_iu + 2·0,1 with U_iu from U 0,4 and R_si 0,13 in
+        // place of R_se (8.4.2.1); H_ue = 20 + 10 (8.58).
+        let h_iu = 10.0 / (1.0 / 0.4 - 0.04 + 0.13) + 0.2;
+        let b = 30.0 / (30.0 + h_iu);
         assert!((diagnosis.spaces[0].reduction_factor - b).abs() < 1e-12);
 
         // A second project zone on the same space enters Σ_j (8.53).
@@ -2329,9 +2364,15 @@ mod tests {
         let project: ProjectInput = serde_json::from_value(value).unwrap();
         let input = unheated_zone_input(&project, Some("z1")).unwrap();
         let outside = input.spaces[0].outside.as_ref().unwrap();
-        assert!((outside.other_zones_conductance_w_per_k - 4.0).abs() < 1e-12);
+        let other = h_iu - 0.2;
+        assert!((outside.other_zones_conductance_w_per_k - other).abs() < 1e-12);
         let assessed = unheated_transmission::assess_unheated_transmission(&input);
-        assert!((assessed.spaces[0].reduction_factor - 30.0 / (30.0 + 4.2 + 4.0)).abs() < 1e-12);
+        assert!((assessed.spaces[0].reduction_factor - 30.0 / (30.0 + h_iu + other)).abs() < 1e-12);
+
+        // A floor above the space uses R_si 0,17 and a ceiling below it 0,10.
+        assert_eq!(unheated_side_surface_resistance("floor"), 0.17);
+        assert_eq!(unheated_side_surface_resistance("roof"), 0.10);
+        assert_eq!(unheated_side_surface_resistance("wall"), 0.13);
     }
 
     #[test]

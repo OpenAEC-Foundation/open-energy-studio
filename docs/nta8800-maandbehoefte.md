@@ -95,8 +95,8 @@ Invoer voor de zontoetreding per raam:
 ## Interpretatiepunten voor de normreview
 
 1. `θ_e;avg;an` in 7.14/7.15 en D.1–D.3 is het ongewogen gemiddelde van tabel 17.1 (10,6725 °C); D.4 gebruikt de vaste 10,67 °C.
-2. D.7/D.8 staan in de NTA met exponenten in `d_f;equi/δ`; NEN-EN-ISO 13370 gebruikt daar de breedte of diepte van de randisolatie. De module volgt de NTA zoals gedrukt.
-3. Tabel D.1: verticale randisolatie geeft altijd β = 2; horizontale randisolatie alleen vanaf R_c ≥ 2,0 m²K/W.
+2. D.7/D.8 (p. 793) staan in de NTA met exponenten in `d_f;equi/δ`; NEN-EN-ISO 13370 (H.5.2) gebruikt daar de breedte D of diepte van de randisolatie. De gewichten (1 − e^(−d_f/δ)) en e^(−2·d_f/δ) tellen niet op tot 1, en de breedte van de randisolatie komt in de formule niet voor. Dat lezen we als normfout. De module volgt de NTA zoals gedrukt.
+3. Tabel D.1 (p. 792): verticale randisolatie geeft altijd β = 2; horizontale randisolatie alleen vanaf R_n ≥ 2,0 m²K/W. De tekst kan ook zo gelezen worden dat de grens van 2,0 voor beide soorten geldt. Dat is dubbelzinnig; de kern houdt de grens alleen bij horizontale randisolatie aan.
 4. 7.66–7.68: als `dθ_set − dθ_float ≤ 0` geldt `f_low = 1` vóór de regel `dθ_float = 1 → f_low = 0`. De norm noemt beide voorwaarden zonder rangorde, en bij `dθ_float = 1` gelden ze allebei (dubbelzinnig). De kern kiest `f_H;red;low = 1`. Dat is de enige fysische lezing: bij `dθ_float = 1` dekken de winsten het hele verlies, de temperatuur zakt in de verlaagde periode niet onder het verlaagde setpoint, en 7.64 geeft dan `a_H;red = 1` (geen verlaging). Met `f = 0` zou 7.65 een verlaging opleveren voor een periode waarin de zone niet afkoelt. Omdat `dθ_set` volgens 7.70–7.72 hooguit 1 is, valt elk geval met `dθ_float = 1` onder de eerste voorwaarde; de regel van 7.68 heeft in de kern dus geen eigen effect.
 5. `b_v` (7.20) is ongedefinieerd als `θ_set;stc = θ_e`; de module neemt dan 1. Met tabel 17.1 en tabel 7.13 komt dat niet voor.
 6. Een maand met `H_tr + H_g;adj + H_ve ≤ 0` (bijvoorbeeld door warme toevoerlucht met negatieve `b_v`) wordt geweigerd; de tijdconstante is dan niet gedefinieerd.
@@ -126,7 +126,7 @@ Invoer per vloer:
 - R_bf van de kruipruimte- of keldervloer (0 als ongeïsoleerd);
 - R_bw en U_xw: de gevel erboven (8.34, 8.47 opmerking 3).
 
-De vloerconstructie zelf krijgt aan de onderzijde R_si = 0,17 (C.2). Randisolatie volgens D.7/D.8 hoort alleen bij een vloer direct op de grond. Een verwarmde kelder krijgt `heatedBasement` met de werkelijke diepte z en de R_c van de kelderwanden:
+De vloerconstructie zelf krijgt aan de onderzijde R_se = 0,04 (8.43 via 8.2.2.2.1 en tabel C.2; zie de interpretatie hieronder). Randisolatie volgens D.7/D.8 hoort alleen bij een vloer direct op de grond. Een verwarmde kelder krijgt `heatedBasement` met de werkelijke diepte z en de R_c van de kelderwanden:
 
 - H_g volgens 8.39, met U_fl uit 8.40/8.41 bij diepte z en U_bw uit 8.45;
 - forfaitair volgens 8.38: 0,5·P plus ΔU_for over de wandoppervlakte z·P (ΔU_for opgeven);
@@ -159,6 +159,10 @@ De toetsen op setpointverschil, ventilatiecapaciteit en warmtecapaciteit staan i
 
 De winst is (1 − b_U)·F·f_gn;max·Q_sol;ztu. Q_sol;ztu volgt uit 7.34/7.35 met F_sh;obst = 1. De begrenzing f_gn;max (7.37) geldt alleen in de verwarmingsstand. Het warmteverlies via de serre loopt via de onverwarmde ruimte van §8.4. De vereenvoudigde route uit de norm (de serre negeren) blijft mogelijk door geen `sunrooms` op te geven.
 
+## H_D naar een onverwarmde ruimte (8.4.2.1)
+
+H_D;zi,j;ztu (p. 266) wordt berekend als H_D van 8.2.1, met R_se vervangen door de R_si van de onverwarmde ruimte (tabel C.2). De U-waarden van het project zijn bepaald met R_se = 0,04 (C.1.2). De projectroute rekent ze daarom om: U_iu = 1/(1/U − 0,04 + R_si). Daarbij is R_si 0,13 bij een wand of een vlak zonder type, 0,10 bij een dak of plafond (warmtestroom omhoog) en 0,17 bij een vloer boven de onverwarmde ruimte. Dit geldt voor opake delen en ramen; ψ- en χ-waarden blijven ongewijzigd. Bij een binnenwand met U 0,4 wordt dat 0,386 W/(m²K).
+
 ## Reductiefactor b_U in de projectroute
 
 Een onverwarmde ruimte in het project (`unheatedSpaces`) heeft óf een opgegeven `reductionFactor` met bron, óf `outside` met de verliezen van de ruimte naar buiten. Met `outside` leidt de kern b_U af volgens 8.53–8.59:
@@ -190,18 +194,18 @@ Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De ke
   - Infiltratie komt nog bij de ondergrens.
 - `bacs_factor_without_capacity_evidence`: een utiliteitsgebouw met f_BACS < 1,05 zonder `bacs`-blok. Volgens §5.5.8 is f_BACS 1,05 tenzij alle verwarmings- en koelsystemen aantoonbaar ten hoogste 290 kW zijn, of de gebouwautomatisering voldoet.
 - `utility_open_ceiling_requires_evidence`: tabel 7.10 voetnoot a. Utiliteitsbouw rekent met de kolom "gesloten of verlaagd plafond", tenzij een vrijhangend plafond ten minste 15 % open is.
+- `ground_floor_resistance_below_surface_resistance`: `constructionResistanceM2kPerW` is R_si + R_c (8.32, 8.43). Een waarde onder R_si = 0,17 betekent een negatieve R_c.
+- `ground_floor_perimeter_implausible`: de blootgestelde omtrek P is groter dan 2·A/w + 2·w met w = 1 m. Een vloer met een gemiddelde breedte van minstens 1 m kan zo'n omtrek niet hebben.
+- `detailed_thermal_bridges_none_entered`: de gedetailleerde route (geen forfaitaire vloerrand, 8.2.1) zonder één lineaire thermische brug naar buitenlucht. H_D krijgt dan geen ψ·ℓ. Voer de bruggen in of kies de forfaitaire ΔU_for (8.3).
+- `sunroom_values_differ_from_unheated_space`: een serre (`sunrooms`) met dezelfde id als een onverwarmde ruimte van het project, waarvan de opgegeven b_U of H_zi;ztu meer dan 10 % afwijkt van de afgeleide waarde (8.4.1, 8.53–8.59).
 
 BENG 1 (`needIndicatorKwhPerM2Year`, ook in `indicators`) staat alleen ingevuld als de behoefte uit de vaste C1-ventilatierun van §5.4 komt. E_H+C;nd met de opgegeven ventilatie staat in het hoofdstuk 5-blok (`chapter5.heatingAndCoolingNeedKwhPerM2`). `tojuliMeetsBblLimit` geldt alleen voor woonfuncties (Bbl art. 4.149b) en is bij utiliteit leeg.
 
-## Interpretatie: R_si onder een vloer boven een kruipruimte of kelder
+## Overgangsweerstand onder een vloer boven een kruipruimte of kelder (5 oktober 2026 herzien)
 
-U_f in 8.43 verwijst via 8.2.2.2.1 en C.1.2 naar tabel C.2. Letterlijk gelezen geeft dat R_se = 0,04 aan de onderzijde. De kern gebruikt toch R_si 0,17 (omlaag), om vier redenen:
-- 8.4.2.1 vervangt R_se door de R_si van de onverwarmde ruimte;
-- 8.33 gebruikt aan de kruipruimtezijde ook R_si;
-- 7.2 van NEN-EN-ISO 13370 definieert U_f tussen het binnenmilieu en de ruimte onder de vloer;
-- U_g en U_x behandelen de kruipruimtelucht als een apart knooppunt.
+U_f in 8.43 (p. 258) verwijst via 8.2.2.2.1 en C.1.2 (8.6, p. 229) naar tabel C.2 (p. 778). Die geeft R_se = 0,04, "tenzij bij desbetreffende formules anders is aangegeven". Bij 8.43 staat geen afwijking. De vervanging van R_se door R_si in 8.4.2.1 geldt alleen voor H_D;zi,j;ztu naar een onverwarmde ruimte, en een kruipruimte valt onder §8.3. De kern rekende eerder met R_si 0,17 (naar analogie met 7.2 van NEN-EN-ISO 13370). Ze volgt nu de normtekst: U_f = 1/(R_si + R_c + 0,04).
 
-Ten opzichte van 0,04 geeft dit een lagere U_fl: −2,7 % bij R_c 3,5, en −11 % bij een ongeïsoleerde vloer. Referentiesoftware die letterlijk rekent, kan hierop afwijken.
+Effect: H_g van een geventileerde kruipruimte 13,40 → 13,59 W/K in de herberekening, ongeveer +0,2 % Q_H;nd voor een tussenwoning.
 
 ## Belemmeringssituaties (§17.3.2, tabel 17.3)
 

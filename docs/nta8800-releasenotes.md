@@ -2,6 +2,27 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — hoofdstuk 8 na de herberekening
+
+### Projecten die nu `incomplete` worden
+
+- **Kruipruimte of onverwarmde kelder met randisolatie.** Randisolatie (D.7/D.8, tabel D.1) hoort alleen bij een vloer op de grond: `ground_floor_edge_insulation_slab_only` op `ntaCalculation.groundFloors[i]`. Dit gaf eerder alleen de status `invalid`.
+- **Kruipruimte én verwarmde kelder onder dezelfde vloer:** `ground_floor_below_and_heated_basement`. Ook dit gaf eerder alleen `invalid`.
+
+### Projecten met een andere uitkomst
+
+- **Vloer boven een kruipruimte of onverwarmde kelder.** U_f rekent nu met R_se = 0,04 (8.43 → 8.2.2.2.1 → tabel C.2) in plaats van 0,17. H_g stijgt iets; Q_H;nd ongeveer +0,2 %.
+- **Transmissie naar een onverwarmde ruimte.** H_D;zi,j;ztu gebruikt nu R_si aan de kant van de onverwarmde ruimte in plaats van R_se (8.4.2.1). U wordt omgerekend met 0,13 (wand), 0,10 (dak of plafond) of 0,17 (vloer). H_D;iu daalt iets; b_U en H_U veranderen mee.
+- **Samengestelde constructie met een sterk geventileerde spouw.** Werd geweigerd en wordt nu berekend (C.3.3 in C.5 en C.6).
+- **Voorbeeld tussenwoning:** het dak is nu 2 × 35,36 m² in plaats van 52 m². BENG 2 80,56 kWh/m²·jr, aandeel hernieuwbaar 22,3 %, label A+.
+
+### Nieuwe waarschuwingen (niet-blokkerend)
+
+- `ground_floor_resistance_below_surface_resistance`: R_si + R_c van de vloer onder 0,17.
+- `ground_floor_perimeter_implausible`: P groter dan 2·A/1 m + 2 m.
+- `detailed_thermal_bridges_none_entered`: gedetailleerde methode zonder ψ-waarden naar buitenlucht.
+- `sunroom_values_differ_from_unheated_space`: b_U of H_zi;ztu van een serre wijkt meer dan 10 % af van de onverwarmde ruimte met dezelfde id.
+
 ## 5 oktober 2026 — micro-WKK, PV en zonneboilers na de herberekening
 
 ### Projecten die nu `invalid` worden

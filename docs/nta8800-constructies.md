@@ -86,6 +86,9 @@ Deze keuzes staan ook in de uitvoer (`interpretations`):
 15. Zoldervloeren (`attic_floor`) gebruiken de vloerrijen van tabel I.4/I.5 met R_si = 0,10 (warmtestroom omhoog). Vloeren boven kruipruimte of op de grond blijven op 0,17.
 16. Forfaitaire constructies naar een onverwarmde ruimte (`towardsUnheatedSpace`): in I.1 wordt R_se vervangen door de R_si van die ruimte bij dezelfde warmtestroomrichting (8.4.2.1).
 17. `renovation` bij "aanwezig, dikte onbekend" volgt ISSO 82.1/75.1 §8.7.2.1 (afb. 8.14) over de jaarklassen van tabel I.5/I.6. Drijvende gebouwen worden afgewezen (`renovation_year_classes_unavailable`). Het renovatiejaar ligt niet vóór het bouwjaar (`renovation_year_invalid`).
+18. C.12 (p. 780): R_cav;sv van een sterk geventileerde luchtlaag staat niet in de tabellen C.3/C.4. De kern leidt hem af uit de kolom "zwak geventileerd" (de tabelwaarde bij A_V = 1 000): R_sv = 2·R_zv − R_nv. Dat is de enige waarde waarmee C.12 bij A_V = 1 000 de tabelwaarde teruggeeft.
+19. Tabel C.4 (warmtestroom omlaag): voor een spouwdikte tussen twee rijen neemt de kern de lagere rij. De norm geeft voor deze tabel geen interpolatieregel; de lagere rij is de veilige kant.
+20. Samengestelde constructie met een sterk geventileerde spouw (C.3.3, C.5–C.7): elke sectie moet de spouw op dezelfde laagpositie hebben (`composite_strong_cavity_mismatch`). In de bovengrens (C.5) kapt elke sectie af bij de spouw. In de ondergrens (C.6) tellen alleen de lagen binnen de spouw mee, met de stilstaande-lucht-R_se van C.3.3 in plaats van R_se.
 
 ## Open punten
 

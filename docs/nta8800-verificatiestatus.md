@@ -163,6 +163,9 @@ Hoofdstuk 13 kwam op elke maandterm overeen. In hoofdstuk 10 bleek één echte f
 - **Deellast boven 100 % (10.56/10.58, p. 403, normpunt).** De norm begrenst f_C;PL niet. Bij een te klein toestel extrapoleert de kubische functie van 10.63 (in het testgeval f_EER 18,9 bij 324 % deellast). De kern houdt de letterlijke uitkomst aan en meldt `cooling_part_load_above_full_load`.
 - **10.63/10.64 (p. 408–409).** Het vijfde meetpunt moet de deellast van C en de condensorintrede van A hebben. Zonder vijfde punt moet de verdamperuittrede bij A en C gelijk zijn, anders is 10.64 met Δϑ_corr = 0 niet consistent. Beide worden nu gecontroleerd (tolerantie 0,5).
 - **§10.5.4 (p. 401).** Methode 1 is voor modulerende opwekkers; de kern eist een minimumvermogen onder het nominale vermogen.
+- D.7 (p. 793) zoals gedrukt: de gewichten tellen niet op tot 1 en de breedte van de randisolatie ontbreekt (normfout, letterlijk gevolgd);
+- tabel D.1 (p. 792): de grens R_n ≥ 2,0 alleen bij horizontale randisolatie;
+- C.12: R_cav;sv = 2·R_zv − R_nv; tabel C.4 omlaag zonder interpolatie (lagere rij).
 
 **Herberekening van PV (H16), zonneboilers en micro-WKK, 5 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's. De tabellen 17.2, 17.12 en 17.15 zijn zelf uit de pdf gelezen. Getest zijn:
 - PV: 16.2–16.4b, PVT (16.10) en de collectieve verdeling;
@@ -183,6 +186,21 @@ Alle maandtermen kwamen overeen. Vastgelegd of aangepast:
   - η_th + η_el ≤ 1,2 per meetpunt (tabel 9.33, `micro_chp_total_efficiency_invalid`);
   - P_el en η_el van één meetpunt moeten op 2 % na overeenkomen (`micro_chp_electric_values_inconsistent`);
   - een PVT-paneel en een PVT-zonneboiler moeten elkaar in het gebouw hebben, met een passende afdekking (`pvt_without_thermal_part`, `pvt_without_electric_part`, `pvt_cover_inconsistent`; niet-blokkerend, omdat de invoer geen koppeling heeft).
+
+**Herberekening van hoofdstuk 8 (transmissie, grond, onverwarmde ruimten), 5 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's, vergeleken via `assess_project_performance`. Getest zijn:
+- grond: vloer op staal, kruipruimte (geventileerd en niet), onverwarmde en verwarmde kelder, randisolatie verticaal en horizontaal, gedetailleerde ψ (8.30–8.49, D.1–D.16);
+- onverwarmde ruimten: b_U (8.53, 8.57–8.59), forfait H_ue (I.8), serre plus trappenhuis;
+- thermische bruggen en constructies: ΔU_for (8.3), spouwmuren (C.3, tabel C.3), zolder (C.5), geventileerd trappenhuis (C.15), afschotdaken (C.17–C.20), samengestelde bovengrens (C.5);
+- H_tr en de maandbehoefte van de tussenwoning.
+
+Alles kwam op ongeveer 1e-6 overeen, op één punt na. Vastgelegd of aangepast:
+- **U_f boven een kruipruimte of onverwarmde kelder (gecorrigeerd).** 8.43 (p. 258) neemt U_f volgens 8.2.2.2.1 (8.6, p. 229), dus met R_se = 0,04 uit tabel C.2 (p. 778). §8.3 geeft geen afwijking; de R_si-regel van 8.4.2.1 hoort bij H_D;zi,j;ztu. De kern gebruikte 0,17 en volgt nu de tekst. Geventileerde kruipruimte: H_g 13,40 → 13,59 W/K, Q_H;nd ongeveer +0,2 %.
+- **H_D;zi,j;ztu met R_si (gecorrigeerd).** 8.4.2.1 (p. 266) vervangt R_se door de R_si van de onverwarmde ruimte. De projectroute gebruikte de U voor buitenlucht ongewijzigd. Ze rekent die nu om met R_si 0,13 (wand), 0,10 (dak/plafond) of 0,17 (vloer).
+- **Samengestelde constructie met een sterk geventileerde spouw.** Werd geweigerd (`composite_layer_requires_thickness`). Nu toegestaan, met de afkapping van C.3.3 in beide grenzen.
+- **Ongeldige grondcombinaties.** Een kruipruimte met randisolatie, of een kruipruimte met een verwarmde kelder, gaf alleen de status `invalid`. Nu staan ze als gat in `gaps`: `ground_floor_edge_insulation_slab_only` en `ground_floor_below_and_heated_basement`.
+- **Nieuwe waarschuwingen:** `ground_floor_resistance_below_surface_resistance`, `ground_floor_perimeter_implausible`, `detailed_thermal_bridges_none_entered` en `sunroom_values_differ_from_unheated_space`.
+- **D.7, tabel D.1, C.12 en tabel C.4:** vastgelegd als interpretatie (zie de lijst bovenaan, en `nta8800-maandbehoefte.md` en `nta8800-constructies.md`).
+- **Voorbeeld tussenwoning:** het dak was 52 m² bij 45° op een plattegrond van 5 × 10 m. Dat moet 70,7 m² zijn. Het dak bestaat nu uit twee schilden van 35,36 m² (noord en zuid).
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
@@ -241,7 +259,7 @@ Vier leesreviews hebben de kern opnieuw tegen de normtekst gelegd, zonder de cod
 
   Daarnaast ontbreken nog boekregels, zoals leidingdoorvoeren H_p, leidingen in onverwarmde ruimten en het naïsolatiejaar.
 
-De vraag welke R_se onder een vloer boven een kruipruimte of kelder geldt, is beslist op 0,17 (R_si omlaag). Tabel C.2 geeft 0,04 voor buitenlucht. 8.4.2.1 vervangt R_se door de R_si van de onverwarmde ruimte, en 7.2 van NEN-EN-ISO 13370, waar 8.43 op is gebaseerd, definieert U_f tussen het binnenmilieu en de ruimte onder de vloer.
+De vraag welke R_se onder een vloer boven een kruipruimte of kelder geldt, was beslist op 0,17 (R_si omlaag). Op 5 oktober 2026 is dat herzien naar de normtekst: 8.43 verwijst via 8.2.2.2.1 naar tabel C.2, en die geeft R_se = 0,04 zonder afwijking voor dit geval. Zie de herberekening van hoofdstuk 8 hierboven.
 
 Het interpretatiedocument NTA 8800:2024/INT-V1:2024 is nagelopen. De correcties staan al in de doeleditie 2025+C1:2026:
 - buffervat zonder terugwinbare verliezen bij 9.5;

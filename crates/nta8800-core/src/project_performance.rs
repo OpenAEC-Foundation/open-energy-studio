@@ -698,7 +698,141 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
             }
         }
     }
+
+    chapter8_warnings(&project, &nta, &mut warnings);
     warnings
+}
+
+/// Smallest mean floor width the perimeter check accepts, m: a floor of
+/// area A and width w ≥ 1 m has a perimeter of at most 2·A/w + 2·w.
+const MIN_FLOOR_WIDTH_M: f64 = 1.0;
+/// Relative deviation of a declared sunroom b_U or H_zi;ztu from the value
+/// derived from the matching unheated space before a warning.
+const SUNROOM_DEVIATION: f64 = 0.10;
+
+/// Chapter 8 plausibility: floor input, the detailed thermal-bridge route
+/// without ψ-values and sunroom values that differ from their unheated
+/// space.
+fn chapter8_warnings(
+    project: &ProjectInput,
+    nta: &NtaCalculationInput,
+    warnings: &mut Vec<InputGap>,
+) {
+    for (index, floor) in nta.ground_floors.iter().enumerate() {
+        let path = format!("ntaCalculation.groundFloors[{index}]");
+        // The input is R_si + R_c (8.32/8.43); below R_si the construction
+        // has a negative R_c.
+        if floor.construction_resistance_m2k_per_w < crate::constructions::R_SI_DOWNWARD {
+            warnings.push(InputGap {
+                detail: Some(format!(
+                    "{:.2} m²K/W is below R_si = 0,17: the input is R_si + R_c of the floor",
+                    floor.construction_resistance_m2k_per_w
+                )),
+                ..gap(
+                    "ground_floor_resistance_below_surface_resistance",
+                    format!("{path}.constructionResistanceM2kPerW"),
+                )
+            });
+        }
+        let area = project
+            .zones
+            .iter()
+            .flat_map(|zone| &zone.surfaces)
+            .find(|surface| {
+                surface.get("id").and_then(Value::as_str) == Some(floor.surface_id.as_str())
+            })
+            .and_then(|surface| surface.get("area").and_then(Value::as_f64));
+        if let Some(area) = area.filter(|area| *area > 0.0) {
+            let limit = 2.0 * area / MIN_FLOOR_WIDTH_M + 2.0 * MIN_FLOOR_WIDTH_M;
+            if floor.exposed_perimeter_m > limit {
+                warnings.push(InputGap {
+                    detail: Some(format!(
+                        "P = {:.1} m on A = {area:.1} m² implies a mean floor width below {MIN_FLOOR_WIDTH_M} m (B' = {:.2} m)",
+                        floor.exposed_perimeter_m,
+                        area / (0.5 * floor.exposed_perimeter_m)
+                    )),
+                    ..gap("ground_floor_perimeter_implausible", format!("{path}.exposedPerimeterM"))
+                });
+            }
+        }
+    }
+
+    // 8.2.1: the detailed route sums ψ·ℓ over the linear thermal bridges of
+    // H_D; with none entered H_D carries no bridges at all.
+    let forfait = nta
+        .ground_floors
+        .iter()
+        .any(|floor| matches!(floor.edge_thermal_bridges, EdgeThermalBridges::Forfait));
+    let outdoor = |item: &Value| {
+        item.get("thermalBoundary")
+            .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
+            == Some(ThermalBoundary::Outdoor)
+    };
+    let outdoor_surfaces = project
+        .zones
+        .iter()
+        .flat_map(|zone| &zone.surfaces)
+        .any(&outdoor);
+    let outdoor_bridges = project
+        .zones
+        .iter()
+        .flat_map(|zone| zone.thermal_bridges.as_deref().unwrap_or(&[]))
+        .any(outdoor);
+    if !forfait && outdoor_surfaces && !outdoor_bridges {
+        warnings.push(InputGap {
+            detail: Some(
+                "Detailed thermal-bridge route (8.2.1) without linear thermal bridges to outside air: H_D has no ψ·ℓ; enter the bridges or use the forfait ΔU_for (8.3)".into(),
+            ),
+            ..gap("detailed_thermal_bridges_none_entered", "zones")
+        });
+    }
+
+    // 7.30b/8.4.1: a sunroom that is also an unheated space of the project
+    // should carry the b_U and H_zi;ztu derived for that space.
+    let sunroom_sets = std::iter::once((None, "ntaCalculation.sunrooms".to_owned(), &nta.sunrooms))
+        .chain(nta.zone_data.iter().enumerate().map(|(index, item)| {
+            (
+                Some(item.zone_id.as_str()),
+                format!("ntaCalculation.zoneData[{index}].sunrooms"),
+                &item.sunrooms,
+            )
+        }));
+    for (zone_id, base, sunrooms) in sunroom_sets {
+        if sunrooms.is_empty() {
+            continue;
+        }
+        let Some(assessment) = unheated_zone_input(project, zone_id)
+            .map(|input| crate::unheated_transmission::assess_unheated_transmission(&input))
+        else {
+            continue;
+        };
+        for (index, room) in sunrooms.iter().enumerate() {
+            let Some(space) = assessment.spaces.iter().find(|space| space.id == room.id) else {
+                continue;
+            };
+            let differs = |declared: f64, derived: f64| {
+                (declared - derived).abs() > SUNROOM_DEVIATION * derived.abs().max(0.1)
+            };
+            if differs(room.reduction_factor, space.reduction_factor)
+                || differs(
+                    room.zone_conductance_w_per_k,
+                    space.unreduced_conductance_w_per_k,
+                )
+            {
+                warnings.push(InputGap {
+                    detail: Some(format!(
+                        "declared b_U {:.3} and H_zi;ztu {:.2} W/K; unheated space {} gives b_U {:.3} and H_zi;ztu {:.2} W/K (8.4.1)",
+                        room.reduction_factor,
+                        room.zone_conductance_w_per_k,
+                        space.id,
+                        space.reduction_factor,
+                        space.unreduced_conductance_w_per_k
+                    )),
+                    ..gap("sunroom_values_differ_from_unheated_space", format!("{base}[{index}]"))
+                });
+            }
+        }
+    }
 }
 
 /// Lowest residential f_ctrl·f_sys of table 11.5 (p. 460) for system B and
@@ -1020,6 +1154,20 @@ fn derive_input(
                                 ),
                                 source_reference: data.source_reference.clone(),
                             });
+                            if let Some(code) = ground_floors
+                                .last()
+                                .and_then(crate::ground::combination_issue)
+                            {
+                                let index = nta
+                                    .ground_floors
+                                    .iter()
+                                    .position(|item| item.surface_id == id)
+                                    .unwrap_or_default();
+                                gaps.push(gap(
+                                    code,
+                                    format!("ntaCalculation.groundFloors[{index}]"),
+                                ));
+                            }
                         }
                         None => gaps.push(gap("ground_floor_data_missing", format!("{path}.id"))),
                     }
@@ -2007,6 +2155,125 @@ mod tests {
             .gaps
             .iter()
             .any(|gap| gap.code == "forfait_thermal_bridges_unheated_space_unsupported"));
+    }
+
+    #[test]
+    fn chapter8_plausibility_and_ground_combinations() {
+        let example = || -> Value {
+            serde_json::from_str(include_str!(
+                "../../../training-data/nta8800-example-terraced-dwelling.json"
+            ))
+            .unwrap()
+        };
+        let codes = |value: &Value| -> Vec<&'static str> {
+            plausibility_warnings(value)
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        assert!(codes(&example()).is_empty());
+
+        // R_si + R_c below R_si, and P = 120 m on 50 m² (limit 2·50/1 + 2).
+        let mut floor = example();
+        floor["ntaCalculation"]["groundFloors"][0]["constructionResistanceM2kPerW"] =
+            Value::from(0.05);
+        floor["ntaCalculation"]["groundFloors"][0]["exposedPerimeterM"] = Value::from(120.0);
+        assert_eq!(
+            codes(&floor),
+            [
+                "ground_floor_resistance_below_surface_resistance",
+                "ground_floor_perimeter_implausible"
+            ]
+        );
+
+        // Detailed floor edge without any ψ to outside air.
+        let mut detailed = example();
+        detailed["ntaCalculation"]["groundFloors"][0]["edgeThermalBridges"] = serde_json::json!({
+            "method": "detailed",
+            "bridges": [{"lengthM": 10.0, "psiWPerMk": 0.1, "sourceReference": "x"}]
+        });
+        assert_eq!(codes(&detailed), ["detailed_thermal_bridges_none_entered"]);
+
+        // A crawlspace with edge insulation is a top-level gap.
+        let mut crawl = example();
+        crawl["ntaCalculation"]["groundFloors"][0]["below"] = serde_json::json!({
+            "kind": "crawlspace",
+            "floorResistanceM2kPerW": 0.0,
+            "depthClass": "other",
+            "wallResistanceM2kPerW": 0.35,
+            "wallUValueWPerM2k": 1.9
+        });
+        let fine = assess_project_performance(&crawl);
+        assert_eq!(fine.status, "calculated_unverified", "{:?}", fine.gaps);
+        crawl["ntaCalculation"]["groundFloors"][0]["edgeInsulation"] = serde_json::json!([{
+            "kind": "vertical", "resistanceM2kPerW": 2.0, "thicknessM": 0.1,
+            "sourceReference": "x"
+        }]);
+        let result = assess_project_performance(&crawl);
+        assert_eq!(result.status, "incomplete");
+        assert!(result
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "ground_floor_edge_insulation_slab_only"
+                && gap.path == "ntaCalculation.groundFloors[0]"));
+    }
+
+    #[test]
+    fn sunroom_values_are_checked_against_the_unheated_space() {
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        value["constructions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "c-inner", "name": "Binnenwand", "layers": [], "rcValue": 0.5, "uValue": 1.4
+            }));
+        value["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "wall-serre", "name": "Wand serre", "type": "wall",
+                "thermalBoundary": "unheated_space", "unheatedSpaceId": "serre",
+                "area": 10.0, "orientation": "S", "constructionId": "c-inner",
+                "zoneId": "z1", "windows": []
+            }));
+        value["unheatedSpaces"] = serde_json::json!([{
+            "id": "serre", "name": "Serre",
+            "outside": {
+                "transmission": {"elements": [{
+                    "id": "glass", "areaM2": 20.0, "uValueWPerM2k": 2.8,
+                    "sourceReference": "survey"
+                }]},
+                "ventilation": {"method": "half_of_transmission"},
+                "otherZonesConductanceWPerK": 0.0
+            }
+        }]);
+        let project: ProjectInput = serde_json::from_value(value.clone()).unwrap();
+        let derived = crate::unheated_transmission::assess_unheated_transmission(
+            &unheated_zone_input(&project, None).unwrap(),
+        );
+        let space = &derived.spaces[0];
+        let sunroom = |b: f64, h: f64| {
+            serde_json::json!([{
+                "id": "serre", "glazingGHeating": 0.6, "glazingGCooling": 0.6,
+                "exteriorFrameFraction": 0.2, "reductionFactor": b,
+                "zoneConductanceWPerK": h, "surfaces": [], "sourceReference": "x"
+            }])
+        };
+        value["ntaCalculation"]["sunrooms"] =
+            sunroom(space.reduction_factor, space.unreduced_conductance_w_per_k);
+        assert!(!plausibility_warnings(&value)
+            .iter()
+            .any(|item| item.code == "sunroom_values_differ_from_unheated_space"));
+        value["ntaCalculation"]["sunrooms"] = sunroom(0.3, 99.0);
+        let warnings = plausibility_warnings(&value);
+        let warning = warnings
+            .iter()
+            .find(|item| item.code == "sunroom_values_differ_from_unheated_space")
+            .unwrap();
+        assert_eq!(warning.path, "ntaCalculation.sunrooms[0]");
     }
 
     #[test]
