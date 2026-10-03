@@ -18,8 +18,9 @@
 //! required for the indicators (5.27).
 
 use crate::annex_p::{
-    assess_route, source_factors, AnnexPRoute, CollectiveHeatPumpSource, ScenarioFactors,
-    SupplyFactors, SystemFunction, SystemResult, COLD_FORFAIT, HEAT_FORFAIT,
+    area_electricity, assess_route, source_factors, AnnexPRoute, AreaElectricityGenerator,
+    AreaElectricityResult, CollectiveHeatPumpSource, ScenarioFactors, SupplyFactors,
+    SystemFunction, SystemResult, COLD_FORFAIT, HEAT_FORFAIT,
 };
 use crate::annex_q::AnnexQSource;
 use crate::bbl_requirements::{
@@ -344,6 +345,10 @@ pub struct ExternalSupply {
     /// Collective heat-pump source (9.6.8.1.1.2.3).
     #[serde(default)]
     pub collective_heat_pump_source: Option<CollectiveHeatPumpSource>,
+    /// P.7: electricity produced in the area with a direct physical
+    /// connection to the users (reported as P.71).
+    #[serde(default)]
+    pub area_electricity: Vec<AreaElectricityGenerator>,
 }
 
 /// Factors per external carrier for one scenario.
@@ -396,6 +401,8 @@ pub struct ExternalSupplyResult {
     pub hot_water: Option<SystemResult>,
     pub cooling: Option<SystemResult>,
     pub heat_pump_source: Option<SystemResult>,
+    /// P.71 for the area electricity, when given.
+    pub area_electricity: Option<AreaElectricityResult>,
     /// EP_Tot and EP_ren of the EMGforf calculation, kWh.
     pub forfait_primary_fossil_kwh: Option<f64>,
     pub forfait_renewable_primary_kwh: Option<f64>,
@@ -465,6 +472,17 @@ fn resolve_external(
         heat_pump_source: source.map(|item| item.forfait),
         ..FORFAIT_FACTORS
     };
+    let area = if supply.area_electricity.is_empty() {
+        None
+    } else {
+        match area_electricity(&supply.area_electricity, "externalSupply.areaElectricity") {
+            Ok(result) => Some(result),
+            Err(found) => {
+                issues.extend(found.into_iter().map(|item| issue(item.code, item.path)));
+                None
+            }
+        }
+    };
     ExternalSupplyResult {
         declared,
         forfait,
@@ -479,6 +497,7 @@ fn resolve_external(
         hot_water,
         cooling,
         heat_pump_source: source_result,
+        area_electricity: area,
         forfait_primary_fossil_kwh: None,
         forfait_renewable_primary_kwh: None,
         forfait_co2_kg: None,

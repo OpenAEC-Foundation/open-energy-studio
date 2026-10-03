@@ -48,7 +48,7 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
   |---|---|
   | Compleet | Hoofdstuk 5, 7 en 10–16; bijlagen B–I, L–O, Q, R, T–V, X, Y, AA, AB |
   | Bijna compleet | Hoofdstuk 6, 8 en 17; bijlagen A en W |
-  | Echte gaten | Hoofdstuk 9: één verwarmingssysteem per gebouw, hybride alleen nieuwbouw. Bijlage P: berekende route. |
+  | Echte gaten | Hoofdstuk 9: één verwarmingssysteem per gebouw, hybride alleen nieuwbouw. Bijlage P: berekende route compleet sinds 3 oktober 2026 (zie onder). |
 
 Wordt nu afgewerkt:
 - meerdere verwarmingssystemen;
@@ -158,7 +158,31 @@ Interpretatievragen:
 5. EMGforf voor een collectieve bron vanaf 20 °C met verklaring gebruikt tabel 5.2–5.4. De uitzondering in §5.3.1 geldt alleen onder 20 °C.
 6. P.6 noemt geen `f_Pren`. Bij de gemeten route wordt `f_Pren;dX` opgegeven, volgens 5.42/5.49/5.50 zoals vastgelegd voor het systeem.
 
-Niet getranscribeerd: energiefracties met β-factor (P.6.5.3, P.6.7.3; fracties worden opgegeven), leidingverliezen P.13–P.18, de forfaitaire ketel- en koelrendementen van P.6.5.4.2/P.6.7.4, collectieve zonnecollectoren, flexmodus en de behoefte van het gebied (P.8). Deze onderdelen kunnen worden opgegeven als `declared`-opwekker.
+De onderdelen die hier nog ontbraken, zijn op 3 oktober 2026 toegevoegd (zie hieronder).
+
+## Stand 3 oktober 2026: berekende route van bijlage P compleet
+
+De berekende route rekent nu vanuit gebiedsgegevens (p. 957–1026). Opgegeven waarden gaan voor:
+
+- behoefte van het gebied P.72–P.83 met tabellen P.14/P.15 en de maandverdeling P.74;
+- leidingverliezen P.13–P.18 met tabellen P.1 en P.16, buffervaten P.43/P.44;
+- het opslagrendement voor tapwater uit P.43–P.46 met tabel P.7;
+- energiefracties: β met tabel P.2 en de cascade (P.23–P.25), tapwater P.40–P.42, koude P.51–P.55 met tabel P.8, en de collectieve zonnecollector P.32/P.33;
+- forfaitaire rendementen: tabellen P.3/P.4 (ketels), P.6 (WKK), P.9/P.10 (koude), vaste biomassa P.6.5.4.3 en de flexmodus P.6.5.4.11 met tabellen 5.5/5.6;
+- hulpenergie P.56–P.70 met tabellen P.11–P.13;
+- P.71 als rapportage van de elektriciteitsproductie in het gebied.
+
+Interpretatievragen:
+
+7. P.62 (`t_on × ΣP` in W) en P.65 (`1 000 × P` in de noemer) zijn in de gedrukte norm dimensioneel anders dan P.57 en P.60. De kern rekent ze zoals P.57/P.60: kWh = h·W/1 000, en uren = kWh/kW.
+8. P.74 geeft negatieve maandwaarden als `θ_e;avg;mi` boven 18 °C ligt (juli en augustus in tabel 17.1). De kern gebruikt `max(0, 18 − θ_e)` in teller en noemer, zodat het jaartotaal klopt.
+9. P.53 noemt het rendement "van de preferente koelmachine". De kern neemt per compressiekoelmachine haar eigen rendement.
+10. De voorkeursregels a)–e) staan alleen bij warmte (P.6.5.3.2). De kern past ze ook toe op tapwater. Zonder rendement om op te rangschikken vraagt hij `priority`.
+11. Zonder maandwaarden verdeelt de kern de levering van tapwater naar maandlengte, net als P.82. Voor koude is er dan geen maandverdeling, en staat `f_on;mi` in elke maand op 1.
+12. Bij de hulpenergie per opwekker krijgen restwarmte, geothermie, voorgeschakelde systemen, STEG en AVI geen eigen term. Hun hulpenergie zit al in de factor (P.6.5.4.7, P.6.8.4.1, P.6.9.4.1). Een warmtepomp met tabel P.5 heeft 0 W/kW voor de bronpomp; met een opgegeven rendement is dat 10 W/kW.
+13. Bij de collectieve zonnecollector (13.7.2.2 op `Q_in;mi`) gelden `θ_X;low` als de omgevingstemperatuur van de opslag, `θ_X;high` als de retourtemperatuur en de bijstookset als de aanvoertemperatuur van het net. Hiervoor zijn de instellingen voor ruimteverwarming als voorbeeld genomen.
+14. Een ketel met vollastrendement wordt bij tapwater alleen als niet-preferent toestel met 5 punten verlaagd (P.6.6.5.2). Een ketel buiten wordt bij warmte en tapwater eenmalig met 5 punten verlaagd.
+15. P.71 staat los van P.4.5. De productie wordt gerapporteerd; het direct hernieuwbare aandeel van de aandrijving blijft een opgave.
 
 ## Stand 2 oktober 2026: bijlagen AA, A en B, en TO-juli stap B
 
