@@ -105,6 +105,18 @@ describe('NTA calculation report', () => {
     expect(html).toContain('<td>nee</td>');
   });
 
+  it('reports the kernel warnings next to the project plausibility warnings', () => {
+    const assessment = calculated();
+    assessment.warnings = [{ code: 'declared_hot_water_efficiency_above_one', path: 'ntaCalculation.declaredUses[0].monthlyKwh' }];
+    (assessment.performance as unknown as Record<string, unknown>).warnings = [
+      { code: 'cooling_emission_loss_singular', path: 'spaceCooling.months[9]' },
+    ];
+    const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
+    expect(html).toContain('Plausibiliteit');
+    expect(html).toContain('declared_hot_water_efficiency_above_one');
+    expect(html).toContain('cooling_emission_loss_singular');
+  });
+
   it('lists gaps instead of numbers when the kernel has no result', () => {
     const html = generateNtaCalculationReportHTML(createDefaultProject(), {
       status: 'incomplete', targetNormVersion: 'NTA 8800:2025+C1:2026', kernelVersion: '0.1.0',

@@ -1173,6 +1173,8 @@ export const en: Record<string, string> = {
   'nta.gap.unheated_transmission_unresolved': 'Transmission via unheated space cannot be derived',
   'nta.gap.project_shape_invalid': 'Project structure invalid',
   'nta.gap.vertical_pipes_unknown': 'Vertical pipes unknown: list them, or none (7.3.3)',
+  'nta.gap.vertical_pipes_conflicting': 'Zone "no vertical pipes" conflicts with the project pipes (7.3.3)',
+  'nta.gap.basement_forfait_delta_u_conflict': 'Basement ΔU_for differs from the derived ΔU_for (8.38, 8.3)',
   'nta.gap.thermal_bridge_methods_mixed': 'Forfait and detailed thermal bridges mixed (8.2.1)',
   'nta.gap.forfait_thermal_bridges_unheated_space_unsupported': 'Forfait thermal bridges with an unheated space: H_U;for not derived (8.4, C.1.3)',
   'nta.performance.warnings': 'Plausibility (the calculation continues):',

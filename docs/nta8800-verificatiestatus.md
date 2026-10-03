@@ -685,3 +685,5 @@ SHA-256 van de bij deze verificatiestatus geleverde bestanden:
 | `open-energy-studio_0.1.6-alpha_debug_amd64.deb` | `92a22694a87dc4fadfb3e0345fe28c089b441dab5c50fb83c306d166d51d70cf` |
 | `oes-nta8800-api-linux-amd64` | `631f6e33fa6d7596f1bb56e93657bc047e18e281ba4a39716cc0194c009d393f` |
 | `oes-nta8800-mcp-linux-amd64` | `1ccb4587376e441e32fb13bbe45c1da3a99932cfa6f6333233f666530e89ea9f` |
+
+Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, staan in de [releasenotes](nta8800-releasenotes.md).

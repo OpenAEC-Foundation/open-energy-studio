@@ -625,6 +625,8 @@ export interface MonthlyDemandInput {
     glazing?: NtaGlazingSolar | null;
     frameFraction: number;
     uValueWPerM2k: number;
+    /** ΔU_for (8.3) carried by H_D only; the solar terms keep U_c. */
+    forfaitDeltaUWPerM2k?: number | null;
     obstruction: NtaObstruction;
     movableShading?: NtaMovableShading | null;
     /** Annex A: dynamic g and U per month. */
@@ -638,6 +640,8 @@ export interface MonthlyDemandInput {
     orientation: NtaOrientation;
     tiltDeg: number;
     uValueWPerM2k: number;
+    /** ΔU_for (8.3) carried by H_D only; the solar terms keep U_c. */
+    forfaitDeltaUWPerM2k?: number | null;
     sourceReference: string;
   }>;
 }
@@ -3970,10 +3974,10 @@ export interface NtaCalculationInput {
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
   ventilation?: VentilationInput | null;
   /** 7.3.3 vertical pipes (single-zone projects; per zone in `zoneData`); `[]` is none, absent is unknown (a gap). */
-  verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }>;
+  verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }> | null;
   zoneData?: Array<{
     zoneId: string;
-    verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }>;
+    verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }> | null;
     functionAreas?: Array<{ function: NtaUsageFunction; areaM2: number }>;
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
     ventilation?: VentilationInput | null;

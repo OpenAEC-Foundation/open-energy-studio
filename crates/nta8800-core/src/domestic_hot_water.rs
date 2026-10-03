@@ -362,7 +362,8 @@ impl StorageLoss {
             _ => return None,
         };
         if !(raw.is_finite() && raw > 0.0) {
-            return Some(raw);
+            // Rejected by validation; never a silent infinite or negative loss.
+            return None;
         }
         // Annex X (X.2): the next higher table X.1 value.
         Some(crate::significant_figures::round_up(raw))

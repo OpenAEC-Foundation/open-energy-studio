@@ -565,18 +565,31 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
     }
 
     // Chapter 11: a mechanical system without heat recovery moves at least
-    // q_V;ODA;req; a declared conductance below that flow is implausible.
-    let recovery_free_mechanical = project.ventilation_systems.iter().any(|system| {
-        matches!(
-            system.get("type").and_then(Value::as_str),
-            Some("type_b" | "type_c" | "type_d")
-        ) && system
-            .get("heatRecoveryEfficiency")
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0)
-            <= 0.0
-    });
-    if recovery_free_mechanical {
+    // q_V;ODA;req (11.22); a declared conductance below that flow is
+    // implausible. Only dwellings: their design flow is continuous, while a
+    // utility design flow is time-averaged over the operating hours, which
+    // this indicative check does not model. f_ctrl·f_sys takes the lowest
+    // residential value of table 11.5 for the system type, so demand
+    // control never raises a false warning.
+    let lowest_control_factor = project
+        .ventilation_systems
+        .iter()
+        .filter(|system| {
+            system
+                .get("heatRecoveryEfficiency")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+                <= 0.0
+        })
+        .filter_map(|system| match system.get("type").and_then(Value::as_str) {
+            Some("type_b") => Some(RESIDENTIAL_MIN_CONTROL_FACTOR_B),
+            Some("type_c" | "type_d") => Some(RESIDENTIAL_MIN_CONTROL_FACTOR_CD),
+            _ => None,
+        })
+        .fold(None, |lowest: Option<f64>, factor| {
+            Some(lowest.map_or(factor, |value| value.min(factor)))
+        });
+    if let Some(control_factor) = lowest_control_factor.filter(|_| residential) {
         for zone in &project.zones {
             let data = nta.zone_data.iter().find(|item| item.zone_id == zone.id);
             let (flows, chapter11, path) = match data {
@@ -608,6 +621,7 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
                 zone.floor_area,
                 zone.floor_area / dwellings,
             );
+            let required = control_factor * required;
             let floor = crate::ventilation::VOLUMETRIC_HEAT_CAPACITY / 3600.0 * required;
             let lowest = (1..=12u8)
                 .map(|month| {
@@ -622,7 +636,7 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
             if lowest < floor {
                 warnings.push(InputGap {
                     detail: Some(format!(
-                        "H_ve {lowest:.1} W/K is below ρc·q_V;ODA;req ≈ {floor:.1} W/K ({required:.1} m³/h, 11.22) of the mechanical system without heat recovery"
+                        "H_ve {lowest:.1} W/K is below ρc·q_V;ODA;req ≈ {floor:.1} W/K ({required:.1} m³/h, 11.22 with the lowest table 11.5 f_ctrl·f_sys {control_factor:.2}) of the mechanical system without heat recovery"
                     )),
                     ..gap("declared_ventilation_below_required_flow", path)
                 });
@@ -671,6 +685,11 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
     }
     warnings
 }
+
+/// Lowest residential f_ctrl·f_sys of table 11.5 (p. 460) for system B and
+/// for systems C and D, so the plausibility floor holds for every control.
+const RESIDENTIAL_MIN_CONTROL_FACTOR_B: f64 = 0.57;
+const RESIDENTIAL_MIN_CONTROL_FACTOR_CD: f64 = 0.52;
 
 const VERTICAL_PIPES_UNKNOWN_DETAIL: &str = "7.3.3: state the pipes, [] for none; when unknown enter one fictitious uninsulated pipe per storey of the zone (dwelling outside a residential building), one per dwelling (residential building) or one per toilet group with N = H/3 shared by usable area over the zones (utility building)";
 
@@ -935,7 +954,36 @@ fn derive_input(
                                 edge_thermal_bridges: data.edge_thermal_bridges.clone(),
                                 edge_insulation: data.edge_insulation.clone(),
                                 below: data.below.clone(),
-                                heated_basement: data.heated_basement.clone(),
+                                heated_basement: data.heated_basement.clone().map(
+                                    |mut basement| {
+                                        // 8.38: the walls take ΔU_for of 8.2.1, the
+                                        // same surcharge as H_D.
+                                        if let (
+                                            EdgeThermalBridges::Forfait,
+                                            Some(derived),
+                                        ) = (&data.edge_thermal_bridges, delta_u_forfait)
+                                        {
+                                            if basement.forfait_delta_u_w_per_m2k.is_some_and(
+                                                |declared| (declared - derived).abs() > 5e-4,
+                                            ) {
+                                                let index = nta
+                                                    .ground_floors
+                                                    .iter()
+                                                    .position(|item| item.surface_id == id)
+                                                    .unwrap_or_default();
+                                                gaps.push(InputGap {
+                                                    code: "basement_forfait_delta_u_conflict",
+                                                    path: format!("ntaCalculation.groundFloors[{index}].heatedBasement.forfaitDeltaUWPerM2k"),
+                                                    detail: Some(format!(
+                                                        "8.38 takes ΔU_for of 8.2.1 (8.3): {derived:.3} W/(m²K)"
+                                                    )),
+                                                });
+                                            }
+                                            basement.forfait_delta_u_w_per_m2k = Some(derived);
+                                        }
+                                        basement
+                                    },
+                                ),
                                 source_reference: data.source_reference.clone(),
                             });
                         }
@@ -997,7 +1045,8 @@ fn derive_input(
                     tilt_deg: tilt,
                     g_perpendicular: g_value,
                     frame_fraction: nta.window_solar.frame_fraction,
-                    u_value_w_per_m2k: u_value + delta_u_forfait.unwrap_or(0.0),
+                    u_value_w_per_m2k: u_value,
+                    forfait_delta_u_w_per_m2k: delta_u_forfait,
                     obstruction: nta.window_solar.obstruction.clone(),
                     movable_shading: nta.window_solar.movable_shading.clone(),
                     dynamic: None,
@@ -1025,7 +1074,8 @@ fn derive_input(
                         area_m2: opaque_area,
                         orientation: azimuth_orientation,
                         tilt_deg: tilt,
-                        u_value_w_per_m2k: u_value + delta_u_forfait.unwrap_or(0.0),
+                        u_value_w_per_m2k: u_value,
+                        forfait_delta_u_w_per_m2k: delta_u_forfait,
                         source_reference: format!("project:construction:{construction_id}.uValue"),
                     }),
                     None => gaps.push(gap(
@@ -1092,6 +1142,31 @@ fn derive_input(
                 // The project list serves a single zone only; a multi-zone
                 // project gives the pipes per zone (no double counting).
                 vertical_pipes: Some(match data.and_then(|item| item.vertical_pipes.as_ref()) {
+                    // A zone "none" next to listed project pipes would drop
+                    // those pipes silently; the input has to say which holds.
+                    Some(pipes)
+                        if pipes.is_empty()
+                            && nta
+                                .vertical_pipes
+                                .as_ref()
+                                .is_some_and(|list| !list.is_empty()) =>
+                    {
+                        let index = nta
+                            .zone_data
+                            .iter()
+                            .position(|item| item.zone_id == zone.id)
+                            .unwrap_or_default();
+                        gaps.push(InputGap {
+                            detail: Some(
+                                "7.3.3: zone list [] (none) conflicts with the project-level pipes; remove one of the two".into(),
+                            ),
+                            ..gap(
+                                "vertical_pipes_conflicting",
+                                format!("ntaCalculation.zoneData[{index}].verticalPipes"),
+                            )
+                        });
+                        Vec::new()
+                    }
                     Some(pipes) => pipes.clone(),
                     None if !multi_zone && nta.vertical_pipes.is_some() => {
                         nta.vertical_pipes.clone().unwrap_or_default()
@@ -1592,6 +1667,22 @@ mod tests {
         }]);
         // Table 7.1: 1,8 W/K per storey (7.17).
         assert!((conductance(&value) - base - 3.6).abs() < 1e-9);
+        // A zone "none" next to listed project pipes is a conflict, not a
+        // silent drop of the project pipes.
+        let mut conflicting = value.clone();
+        conflicting["ntaCalculation"]["zoneData"] = serde_json::json!([{
+            "zoneId": "z1",
+            "verticalPipes": [],
+            "ventilationFlows": value["ntaCalculation"]["ventilationFlows"].clone(),
+            "internalGains": value["ntaCalculation"]["internalGains"].clone()
+        }]);
+        let result = assess_project_performance(&conflicting);
+        assert_eq!(result.status, "incomplete");
+        assert!(result
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "vertical_pipes_conflicting"
+                && gap.path == "ntaCalculation.zoneData[0].verticalPipes"));
         // 7.3.3: an absent list is "unknown", not "none".
         value["ntaCalculation"]
             .as_object_mut()
@@ -1639,6 +1730,71 @@ mod tests {
             .clone()
             .unwrap();
         assert!((summary.direct_conductance_w_per_k.unwrap() - expected).abs() < 1e-9);
+        // 7.33/7.39 take U_c of 8.2.2: ΔU_for stays out of the solar terms
+        // and is carried separately for the TOjuli split of H_D.
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let roof = demand
+            .opaque_elements
+            .iter()
+            .find(|item| item.id == "surface:roof:opaque")
+            .unwrap();
+        assert_eq!(roof.u_value_w_per_m2k, 0.16);
+        assert!((roof.forfait_delta_u_w_per_m2k.unwrap() - delta).abs() < 1e-12);
+        let mut without = roof.clone();
+        without.forfait_delta_u_w_per_m2k = None;
+        for month in 1..=12 {
+            assert_eq!(
+                crate::monthly_demand::opaque_solar_kwh(roof, month),
+                crate::monthly_demand::opaque_solar_kwh(&without, month)
+            );
+        }
+        assert!(demand
+            .windows
+            .iter()
+            .all(|window| window.u_value_w_per_m2k == 1.1
+                && window.forfait_delta_u_w_per_m2k
+                    == Some(roof.forfait_delta_u_w_per_m2k.unwrap())));
+        // The TOjuli split still covers H_D including ΔU_for.
+        let performance = result.performance.as_ref().unwrap();
+        assert!(!performance.tojuli.is_empty());
+        assert!(performance
+            .tojuli
+            .iter()
+            .all(|item| item.status != "invalid"));
+        assert!(performance.tojuli_max_k.is_some());
+
+        // 8.38: a heated basement takes the derived ΔU_for of 8.2.1; a
+        // conflicting declared value is a gap, an absent one is filled in.
+        let mut basement = value.clone();
+        basement["ntaCalculation"]["groundFloors"][0]["heatedBasement"] = serde_json::json!({
+            "depthM": 1.5, "wallResistanceM2kPerW": 2.5
+        });
+        let derived = assess_project_performance(&basement);
+        assert_eq!(
+            derived.status, "calculated_unverified",
+            "{:?}",
+            derived.gaps
+        );
+        let slab = &derived.derived_input.as_ref().unwrap().space_heating.demand;
+        let crate::monthly_demand::Transmission::Components(components) = &slab.transmission else {
+            panic!("component transmission");
+        };
+        let filled = components.ground_floors[0]
+            .heated_basement
+            .as_ref()
+            .unwrap()
+            .forfait_delta_u_w_per_m2k
+            .unwrap();
+        assert!((filled - delta).abs() < 1e-12);
+        basement["ntaCalculation"]["groundFloors"][0]["heatedBasement"]["forfaitDeltaUWPerM2k"] =
+            Value::from(delta + 0.05);
+        let conflict = assess_project_performance(&basement);
+        assert!(conflict
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "basement_forfait_delta_u_conflict"
+                && gap.path
+                    == "ntaCalculation.groundFloors[0].heatedBasement.forfaitDeltaUWPerM2k"));
 
         // H_U;for = 0 with U_iu;equi (C.1.3) is not derived here.
         value["zones"][0]["surfaces"]
@@ -1659,10 +1815,25 @@ mod tests {
     #[test]
     fn plausibility_warnings_leave_the_calculation_running() {
         // The synthetic dwelling declares 1 800 kWh gas for 1 952 kWh need
-        // and 35 W/K for a C system that moves about 152 m³/h.
-        let result = assess_project_performance(&project());
+        // and 35 W/K for a C system: about 152 m³/h (51 W/K) at f_ctrl 1,
+        // but demand control (table 11.5, lowest 0,52) may bring it to
+        // 26,5 W/K, so 35 W/K is plausible.
+        let mut value = project();
+        let result = assess_project_performance(&value);
         assert_eq!(result.status, "calculated_unverified");
         let codes: Vec<_> = result.warnings.iter().map(|item| item.code).collect();
+        assert_eq!(codes, ["declared_hot_water_efficiency_above_one"]);
+        // 20 W/K is below even the demand-controlled flow.
+        for flow in value["ntaCalculation"]["ventilationFlows"]
+            .as_array_mut()
+            .unwrap()
+        {
+            for month in flow["months"].as_array_mut().unwrap() {
+                month["conductanceWPerK"] = Value::from(20.0);
+            }
+        }
+        let low = assess_project_performance(&value);
+        let codes: Vec<_> = low.warnings.iter().map(|item| item.code).collect();
         assert_eq!(
             codes,
             [
@@ -1670,11 +1841,11 @@ mod tests {
                 "declared_ventilation_below_required_flow"
             ]
         );
-        assert!(result.warnings[1]
+        assert!(low.warnings[1]
             .detail
             .as_ref()
             .unwrap()
-            .contains("51.0 W/K"));
+            .contains("26.5 W/K"));
 
         // Utility: f_BACS 1,0 without the bacs block and an open ceiling.
         let mut office: Value = serde_json::from_str(include_str!(

@@ -91,6 +91,11 @@ export function generateNtaCalculationReportHTML(
   assessment: ProjectPerformanceAssessment,
 ): string {
   const performance = assessment.performance;
+  // Project plausibility and the kernel's own warnings (e.g. 10.15, 13.25).
+  const warnings: Array<{ code: string; path: string; detail?: string | null }> = [
+    ...(assessment.warnings ?? []),
+    ...(performance?.warnings ?? []),
+  ];
   const generatedAt = new Date().toISOString();
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>NTA 8800-rekenrapport — ${escapeHtml(project.name)}</title>
@@ -111,8 +116,8 @@ export function generateNtaCalculationReportHTML(
         <th>A<sub>ls</sub>/A<sub>g</sub></th><td>${num(assessment.geometry.lossAreaRatio, 3)}</td></tr>` : ''}
     </tbody></table>
     ${registrationSection(project.registration, assessment.registration)}
-    ${(assessment.warnings?.length ?? 0) > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen, maar de invoer botst met de norm of met andere invoer.</p>
-      <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${assessment.warnings!
+    ${warnings.length > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen. De invoer of de uitkomst botst met de norm of met andere invoer, of is extreem volgens de letter van de norm.</p>
+      <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${warnings
         .map((warning) => `<tr>${cell(warning.code)}${cell(warning.path)}${cell(warning.detail ?? '')}</tr>`).join('')}</tbody></table>` : ''}`;
   if (!performance || assessment.status !== 'calculated_unverified') {
     const gaps = assessment.gaps.map((gap) => `<tr>${cell(gap.code)}${cell(gap.path)}${cell(gap.detail ?? '')}</tr>`).join('');
