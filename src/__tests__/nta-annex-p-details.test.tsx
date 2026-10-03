@@ -241,4 +241,28 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Operation' }), 'remove');
     expect(current().patch).toEqual([{ op: 'remove', path: '/constructions/0/uValue' }]);
   }, 60000);
+
+  it('keeps each patch row its own value after a removal and reopens a saved null as null', async () => {
+    const user = userEvent.setup();
+    function PatchHarness() {
+      const [patch, setPatch] = useState<MwaPatchOperation[]>([
+        { op: 'replace', path: '/a', value: 'first' },
+        { op: 'replace', path: '/b', value: 'second' },
+        { op: 'replace', path: '/c', value: null },
+      ]);
+      return <>
+        <MeasurePatchFields patch={patch} onChange={setPatch} />
+        <output data-testid="draft">{JSON.stringify({ patch })}</output>
+      </>;
+    }
+    renderWithProviders(<PatchHarness />);
+    // The saved null row shows the null type, not "number".
+    const types = () => screen.getAllByRole('combobox', { name: 'Value type' }) as HTMLSelectElement[];
+    expect(types().map((select) => select.value)).toEqual(['text', 'text', 'null']);
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    expect(current().patch.map((row: MwaPatchOperation) => row.path)).toEqual(['/b', '/c']);
+    // The remaining rows keep their own values and types.
+    expect((screen.getByRole('textbox', { name: 'New value' }) as HTMLInputElement).value).toBe('second');
+    expect(types().map((select) => select.value)).toEqual(['text', 'null']);
+  }, 60000);
 });

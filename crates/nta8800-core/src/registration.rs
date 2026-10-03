@@ -519,12 +519,24 @@ fn check_bag_object_id(id: &str, residential: bool, issues: &mut Vec<Registratio
 /// The program of the registration (Regeling art. 5 lid 1 onder b, p. 6).
 /// Projects saved before the identity was recorded get this program with
 /// the kernel version; blank fields are filled the same way. A relabel
-/// keeps the stored calculation core, so a missing one stays unknown.
-fn effective_software(software: &Option<SoftwareIdentity>, relabel: bool) -> SoftwareIdentity {
+/// keeps the stored calculation core (BRL 9500-W §4.2.4, p. 24), falling
+/// back to `originalKernelVersion`; when neither is known it stays unknown.
+fn effective_software(
+    software: &Option<SoftwareIdentity>,
+    relabel: bool,
+    original_kernel_version: Option<&str>,
+) -> SoftwareIdentity {
     let stored = software.clone().unwrap_or_default();
     let kernel_version = stored
         .kernel_version
-        .filter(|version| !version.trim().is_empty());
+        .filter(|version| !version.trim().is_empty())
+        .or_else(|| {
+            relabel
+                .then(|| original_kernel_version.map(str::trim))
+                .flatten()
+                .filter(|version| !version.is_empty())
+                .map(str::to_owned)
+        });
     SoftwareIdentity {
         name: if stored.name.trim().is_empty() {
             SOFTWARE_NAME.to_owned()
@@ -922,15 +934,26 @@ pub fn assess_registration_with(
                 )),
                 _ => {}
             }
-            // §4.2.4 (p. 24): only an interim release with the same
-            // calculation core may relabel; the kept program identity must
-            // name the core that calculates now.
-            if registration
+            // §4.2.4 (p. 24): the kept program identity and the stated
+            // original core must name the same calculation core; the core
+            // itself is compared with this one above.
+            let kept_core = registration
                 .software
                 .as_ref()
                 .and_then(|software| software.kernel_version.as_deref())
-                .is_some_and(|version| !version.trim().is_empty() && version != KERNEL_VERSION)
+                .map(str::trim)
+                .filter(|version| !version.is_empty());
+            if let (Some(kept), Some(original)) =
+                (kept_core, registration.original_kernel_version.as_deref())
             {
+                if kept != original.trim() {
+                    issues.push(issue(
+                        "relabel_software_kernel_differs",
+                        "software.kernelVersion",
+                        "error",
+                    ));
+                }
+            } else if kept_core.is_some_and(|kept| kept != KERNEL_VERSION) {
                 issues.push(issue(
                     "relabel_software_kernel_differs",
                     "software.kernelVersion",
@@ -977,7 +1000,11 @@ pub fn assess_registration_with(
     }
     check_detail_survey(registration, &mut issues);
     check_evidence(&registration.evidence, &mut issues);
-    let software = effective_software(&registration.software, message_type == MessageType::Relabel);
+    let software = effective_software(
+        &registration.software,
+        message_type == MessageType::Relabel,
+        registration.original_kernel_version.as_deref(),
+    );
     let mut plausibility = plausibility_warnings(registration, context);
     let wlc_gwp_required = check_wlc_gwp(registration, context, &mut issues, &mut plausibility);
     // Only used for the class-jump warning, so an unknown class warns.
@@ -1402,9 +1429,19 @@ mod tests {
         assert!(codes(&relabel).contains(&"relabel_software_kernel_differs"));
         relabel.software.as_mut().unwrap().kernel_version = Some(KERNEL_VERSION.into());
         assert!(!codes(&relabel).contains(&"relabel_software_kernel_differs"));
-        // A relabel keeps an unknown core unknown instead of claiming this one.
+        // A relabel keeps an unknown core unknown instead of claiming this one,
+        // unless the original core is stated.
         relabel.software.as_mut().unwrap().kernel_version = None;
+        relabel.original_kernel_version = None;
         assert_eq!(assess_registration(&relabel).software.kernel_version, None);
+        relabel.original_kernel_version = Some("0.0.1-old".into());
+        let result = assess_registration(&relabel);
+        assert_eq!(result.software.kernel_version.as_deref(), Some("0.0.1-old"));
+        assert!(codes(&relabel).contains(&"relabel_kernel_version_differs"));
+        // A kept core that contradicts the stated original core.
+        relabel.software.as_mut().unwrap().kernel_version = Some(KERNEL_VERSION.into());
+        assert!(codes(&relabel).contains(&"relabel_software_kernel_differs"));
+        relabel.original_kernel_version = None;
         let mut conflict = complete();
         conflict.relabel = true;
         conflict.message_type = Some(MessageType::Regular);

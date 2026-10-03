@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultProject } from '../context/EnergyContext';
 import { compareKernelStamp, deserializeProject, deserializeProjectFile, serializeProject } from '../core/io/ProjectSerializer';
-import { generateNtaCalculationReportHTML } from '../core/report/NtaCalculationReport';
+import { generateNtaCalculationReportHTML, readinessText } from '../core/report/NtaCalculationReport';
 import {
   bagConflicts, cleanRegistration, readBagLedger, recordBagRegistration, SOFTWARE_NAME, softwareIdentity,
 } from '../core/nta/Registration';
@@ -85,6 +85,24 @@ describe('registration block', () => {
     expect(cleanRegistration({ messageType: 'replacement', client: 'X', software: original })?.software).toEqual(softwareIdentity());
   });
 
+  it('stamps the calculation core and keeps the original core on a relabel (BRL 9500-W §4.2.4)', () => {
+    // A regular registration records the kernel that calculates now.
+    expect(cleanRegistration({ client: 'X' }, '0.2.0')?.software)
+      .toEqual({ name: SOFTWARE_NAME, version, kernelVersion: '0.2.0' });
+    // A relabel keeps the stored identity, including its core ...
+    const original = { name: SOFTWARE_NAME, version: '0.1.0-alpha', kernelVersion: '0.1.0' };
+    expect(cleanRegistration({ messageType: 'relabel', client: 'X', software: original }, '0.2.0')?.software)
+      .toEqual(original);
+    // ... and names the stated original core when the stored identity has none.
+    const older = { name: SOFTWARE_NAME, version: '0.1.0-alpha' };
+    expect(cleanRegistration({
+      messageType: 'relabel', client: 'X', software: older, originalKernelVersion: '0.1.0',
+    }, '0.2.0')?.software).toEqual({ ...older, kernelVersion: '0.1.0' });
+    // A replacement is a new calculation with the current core (p. 23).
+    expect(cleanRegistration({ messageType: 'replacement', client: 'X', software: original }, '0.2.0')?.software)
+      .toEqual({ name: SOFTWARE_NAME, version, kernelVersion: '0.2.0' });
+  });
+
   it('prints advisers, dates, validity and label data in the report', () => {
     const project = {
       ...createDefaultProject(),
@@ -130,6 +148,13 @@ describe('registration block', () => {
     const ready = generateNtaCalculationReportHTML(project, attestMissing);
     expect(ready).toContain('<th>Dossier compleet</th><td>ja</td>');
     expect(ready).toContain('nee, rekenprogramma nog niet geattesteerd (BRL 9501)');
+    // Both reasons when the dossier is incomplete too.
+    const both = generateNtaCalculationReportHTML(project, {
+      ...assessment, registration: { ...assessment.registration!, softwareAttested: false },
+    } as ProjectPerformanceAssessment);
+    expect(both).toContain('nee, dossier onvolledig; rekenprogramma nog niet geattesteerd (BRL 9501)');
+    expect(readinessText({ ...assessment.registration!, issues: [], dossierComplete: false, softwareAttested: true, readyForRegistration: false }))
+      .toBe('nee, dossier onvolledig');
   });
 
   it('notes missing registration data', () => {

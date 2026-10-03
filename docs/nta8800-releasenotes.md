@@ -2,6 +2,23 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — reviewcorrecties lege velden, herlabeling en WLC-GWP
+
+### Status die verandert
+
+- **Lege velden.** De zoektocht naar lege waarden (`nta_value_missing`) is herschreven. Ook een leeg veld met `#[serde(default)]` dat geen keuze toelaat, een leeg keuzeveld (enum) naast een ander leeg veld in hetzelfde blok en een lege waarde in een samengevoegde (flatten) structuur geven nu een eigen gat op hun pad. Toegestane lege waarden (maanden buiten bedrijf, optionele velden) worden niet gemeld. Een echt ontbrekend verplicht veld wordt niet meer verward met een lege waarde met dezelfde naam elders; het blok krijgt dan naast de gaten ook `nta_calculation_block_invalid`.
+- **Hele gebouw (WLC-GWP).** Een woning telt alleen als het hele gebouw als die vrijstaand is vastgelegd: met de vrijstaande typen van tabel 11.14 in de infiltratie-invoer, of met een woningtype dat "vrijstaand" noemt (niet half vrijstaand of twee-onder-een-kap), en niet in een woongebouw. Een tussenwoning zonder ingevoerde woningscheidende wanden telde eerder als hele gebouw; nu geldt weer `buildingUsableFloorAreaM2` of de waarschuwing `wlc_gwp_building_area_unknown`.
+- **Herlabeling (BRL 9500-W §4.2.4, p. 24).** Bij het opslaan legt de app nu de rekenkern van de kernelstempel vast (`software.kernelVersion`). Een herlabeling houdt de opgeslagen identiteit en neemt, als die geen kern noemt, de opgegeven `originalKernelVersion` over. `relabel_software_kernel_differs` meldt nu een bewaarde kern die afwijkt van de opgegeven oorspronkelijke kern (of, zonder die opgave, van de huidige).
+
+### Uitkomsten die veranderen
+
+- **P.78 met alleen ontvochtiging.** Een perceel met alleen een jaarwaarde voor ontvochtiging gaf een maandprofiel van nullen dat als bekend gold, waardoor P.68/P.69 nul werden. Dan gelden de maanden nu als onbekend. De maandwaarden van de koude-invoer (`monthlyInputKwh`) kunnen volgens P.78 lager optellen dan het jaartotaal; dat staat nu bij het veld.
+
+### Rapport en invoer
+
+- "Gereed voor registratie" noemt alle redenen: dossier onvolledig en/of rekenprogramma nog niet geattesteerd.
+- Maatwerkadvies: elke wijzigingsregel houdt na het verwijderen van een andere regel zijn eigen waarde en type, en een opgeslagen `null` opent weer als type null.
+
 ## 3 oktober 2026 — hoofdstuk 12 en bijlage P na de herberekening
 
 ### Uitkomsten die veranderen

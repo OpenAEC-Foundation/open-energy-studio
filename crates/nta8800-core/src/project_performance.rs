@@ -462,22 +462,28 @@ fn registration_context(
         envelope: label_data
             .map(|data| data.envelope.clone())
             .unwrap_or_default(),
-        whole_building: single_detached_dwelling(project, derived),
+        whole_building: single_detached_dwelling(project, project_value, derived),
     }
 }
 
-/// One dwelling (Σ N_woon = 1) without surfaces against an adjacent
-/// conditioned building: the calculation covers the whole building.
+/// The calculation covers the whole building (BRL 9500-W p. 18, 21: the
+/// WLC-GWP threshold is per building): one dwelling (Σ N_woon = 1), not in an
+/// apartment building, without surfaces against an adjacent conditioned
+/// building, and recorded as detached. Party walls of terraced houses are
+/// usually not entered as surfaces, so the absence of such surfaces alone is
+/// not enough: the table 11.14 detached airtightness types, or a registration
+/// building type that says detached, are required.
 fn single_detached_dwelling(
     project: Option<&ProjectInput>,
+    project_value: &Value,
     derived: Option<&BuildingPerformanceInput>,
 ) -> bool {
     let Some(derived) = derived else {
         return false;
     };
-    let dwellings: u32 = derived
-        .zone_inputs()
-        .into_iter()
+    let zones = derived.zone_inputs();
+    let dwellings: u32 = zones
+        .iter()
         .filter_map(|zone| match &zone.internal_gains {
             crate::monthly_demand::InternalGains::Residential { dwelling_count, .. } => {
                 Some(*dwelling_count)
@@ -485,6 +491,13 @@ fn single_detached_dwelling(
             _ => None,
         })
         .sum();
+    let apartment = zones.iter().any(|zone| {
+        zone.dwelling_type == Some(crate::monthly_demand::DwellingType::ApartmentBuilding)
+            || zone
+                .ventilation
+                .as_ref()
+                .is_some_and(|ventilation| ventilation.apartment_building)
+    });
     let attached = project.is_some_and(|project| {
         project.zones.iter().any(|zone| {
             zone.surfaces.iter().any(|surface| {
@@ -497,7 +510,48 @@ fn single_detached_dwelling(
             })
         })
     });
-    dwellings == 1 && !attached
+    dwellings == 1 && !apartment && !attached && recorded_detached(project_value)
+}
+
+/// Table 11.14 airtightness types of the infiltration inputs all detached, or
+/// the registration building type names a detached dwelling.
+fn recorded_detached(project_value: &Value) -> bool {
+    let mut types = Vec::new();
+    collect_airtightness_types(project_value, &mut types);
+    if !types.is_empty() {
+        return types.iter().all(|kind| kind.contains("detached"));
+    }
+    project_value
+        .pointer("/registration/buildingType")
+        .and_then(Value::as_str)
+        .map(str::to_lowercase)
+        .is_some_and(|text| {
+            (text.contains("vrijstaand") || text.contains("detached"))
+                && !["half", "semi", "twee-onder", "2-onder", "onder-een-kap"]
+                    .iter()
+                    .any(|part| text.contains(part))
+        })
+}
+
+fn collect_airtightness_types(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            if map.get("method").and_then(Value::as_str) == Some("reference") {
+                if let Some(kind) = map.get("buildingType").and_then(Value::as_str) {
+                    out.push(kind.to_string());
+                }
+            }
+            for item in map.values() {
+                collect_airtightness_types(item, out);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_airtightness_types(item, out);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// 8.2.1 and 8.3.3.1: a forfait floor edge (0,5·P of 8.37/8.38) selects
@@ -1091,123 +1145,369 @@ fn is_blank_error(message: &str) -> bool {
     message.starts_with("invalid type: null") || message.starts_with("invalid type: unit value")
 }
 
-/// The null leaves of the block that make it fail.
+/// Result of [`blank_paths`]: the blank (null) leaves the kernel cannot
+/// accept, and whether the block still fails for another reason once those
+/// blanks are filled (a truly absent field, an unknown field, a shape the
+/// search cannot fill).
+#[derive(Debug, Default, PartialEq)]
+struct BlankSearch {
+    paths: Vec<String>,
+    residual: bool,
+}
+
+/// One null leaf of the block.
+struct NullLeaf {
+    path: String,
+    parent: String,
+    steps: Vec<PathStep>,
+    state: LeafState,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum LeafState {
+    Open,
+    Blank,
+    Allowed,
+}
+
+/// The null leaves of the block that the kernel does not accept.
 ///
-/// Every null object member is removed first: an optional member then
-/// deserializes as absent, while a required one gives `missing field X`,
-/// which names the culprit even inside internally tagged enums (whose
-/// error path stops at the enum). That culprit gets a placeholder so the
-/// next blank can surface, and so on. A null array element cannot be
-/// removed without shifting its siblings; the erroring one is the element
-/// whose replacement changes the error, so allowed nulls in
-/// `Vec<Option<_>>` rows are not reported.
-fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> Vec<String> {
-    const PLACEHOLDERS: [fn() -> Value; 5] = [
-        || Value::from(0),
-        || Value::from(""),
-        || Value::from(false),
-        || Value::Array(Vec::new()),
-        || Value::Object(serde_json::Map::new()),
-    ];
+/// Design: serde gives no type information at runtime, and inside internally
+/// tagged enums and flattened structs it buffers the input, so a null there
+/// is reported as a unit value with the error path stopped at the enum. The
+/// search therefore works in two phases on a working copy:
+///
+/// 1. Reach a copy that deserializes. Every null object member is removed
+///    (optional members then default, required ones give `missing field X`
+///    naming the culprit at its parent path); a null array element that
+///    errors is located at its exact path, or, under a tagged enum, as the
+///    first element in visit order whose replacement changes the error
+///    (elements before it in that order leave the error unchanged, so they
+///    accept null and are marked allowed). Each culprit is filled with a
+///    placeholder the kernel accepts (number, text, boolean, list, object, or
+///    the first variant an enum names), so the next blank can surface. A
+///    missing field that matches no removed null is a truly absent field: it
+///    is not reported as blank, only filled to continue, and makes the result
+///    `residual`.
+/// 2. Classify the leaves not yet classified by putting them back as null in
+///    the copy from phase 1. When that copy deserializes, an error can only
+///    come from a null put back, so `#[serde(default)]` members that are not
+///    `Option` (which phase 1 silently defaulted) are found too, while
+///    allowed nulls never are. The leaves are tested in halving groups, so
+///    any number of allowed nulls costs one deserialization. When the copy
+///    still fails elsewhere (`residual`), each leaf is tested once on its own.
+///
+/// Cost: a few deserializations per culprit (placeholder tries) plus, in
+/// phase 2, about 2·k·log2(n) for k blanks among n remaining nulls.
+fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
     let first_error = |candidate: &Value| -> Option<(String, String)> {
         serde_path_to_error::deserialize::<_, T>(candidate.clone())
             .err()
-            .map(|error| (error.path().to_string(), error.inner().to_string()))
+            .map(|error| {
+                (
+                    normal_path(&error.path().to_string()),
+                    error.inner().to_string(),
+                )
+            })
     };
-    let placeholder_rejected = |message: &str| {
-        [
-            "invalid type: integer `0`",
-            "invalid type: string \"\"",
-            "invalid type: boolean `false`",
-            "invalid type: sequence",
-            "invalid type: map",
-        ]
-        .iter()
-        .any(|prefix| message.starts_with(prefix))
-    };
-    let mut leaves = Vec::new();
-    collect_nulls(block, String::new(), Vec::new(), &mut leaves);
+    let mut raw = Vec::new();
+    collect_nulls(block, String::new(), Vec::new(), &mut raw);
+    let mut leaves: Vec<NullLeaf> = raw
+        .into_iter()
+        .map(|(path, steps)| NullLeaf {
+            parent: render_path(&steps[..steps.len().saturating_sub(1)]),
+            path,
+            steps,
+            state: LeafState::Open,
+        })
+        .collect();
     let mut work = block.clone();
-    let mut removed: Vec<(String, Vec<PathStep>, bool)> = Vec::new();
-    let mut elements: Vec<(String, Vec<PathStep>, bool)> = Vec::new();
-    for (path, steps) in leaves {
-        match steps.last() {
-            Some(PathStep::Key(_)) => {
-                remove_member(&mut work, &steps);
-                removed.push((path, steps, false));
-            }
-            Some(PathStep::Index(_)) => elements.push((path, steps, false)),
-            None => {}
+    for leaf in &leaves {
+        if matches!(leaf.steps.last(), Some(PathStep::Key(_))) {
+            remove_member(&mut work, &leaf.steps);
         }
     }
-    let under = |path: &str, prefix: &str| {
-        prefix == "."
-            || prefix.is_empty()
-            || path == prefix
-            || path.starts_with(&format!("{prefix}."))
-            || path.starts_with(&format!("{prefix}["))
-    };
-    let mut culprits = Vec::new();
-    // Puts a placeholder at `steps` that the kernel accepts, so the search
-    // can move past this blank.
-    let fill = |work: &mut Value, steps: &[PathStep]| {
-        for make in PLACEHOLDERS {
-            set_at(work, steps, make());
-            match first_error(work) {
-                Some((_, message)) if placeholder_rejected(&message) => continue,
-                _ => return,
-            }
+    let mut residual = false;
+    let mut guard = 0;
+    // Phase 1: reach a copy that deserializes.
+    let settled = loop {
+        guard += 1;
+        if guard > 4 * leaves.len() + 64 {
+            break false;
         }
-    };
-    for _ in 0..256 {
-        let Some((prefix, message)) = first_error(&work) else {
-            break;
+        let Some((at, message)) = first_error(&work) else {
+            break true;
         };
-        if let Some(field) = message
-            .strip_prefix("missing field `")
-            .and_then(|rest| rest.split('`').next())
-        {
-            let found = removed.iter_mut().find(|(path, steps, done)| {
-                !*done
-                    && under(path, &prefix)
-                    && matches!(steps.last(), Some(PathStep::Key(key)) if key == field)
+        if let Some(field) = missing_field(&message) {
+            let is_key = |leaf: &NullLeaf| matches!(leaf.steps.last(), Some(PathStep::Key(key)) if key == field);
+            // A removed null member at exactly this parent, or (under a
+            // tagged enum whose path stops early) one deeper under it.
+            let exact = leaves.iter().position(|leaf| {
+                leaf.state == LeafState::Open && leaf.parent == at && is_key(leaf)
             });
-            let Some((path, steps, done)) = found else {
-                break;
-            };
-            *done = true;
-            culprits.push(path.clone());
-            let steps = steps.clone();
-            fill(&mut work, &steps);
-        } else if is_blank_error(&message) {
-            let mut hit = None;
-            for (index, (path, steps, done)) in elements.iter().enumerate() {
-                if *done || !under(path, &prefix) {
-                    continue;
+            let found = exact.or_else(|| {
+                leaves.iter().position(|leaf| {
+                    leaf.state == LeafState::Open && is_under(&leaf.path, &at) && is_key(leaf) && {
+                        let mut trial = work.clone();
+                        fill(&mut trial, &leaf.steps, &leaf.path, &first_error)
+                            && first_error(&trial) != Some((at.clone(), message.clone()))
+                    }
+                })
+            });
+            match found {
+                Some(index) => {
+                    leaves[index].state = LeafState::Blank;
+                    let (steps, path) = (leaves[index].steps.clone(), leaves[index].path.clone());
+                    if !fill(&mut work, &steps, &path, &first_error) {
+                        residual = true;
+                        break false;
+                    }
                 }
-                let mut trial = work.clone();
-                set_at(&mut trial, steps, Value::from(0));
-                if first_error(&trial) != Some((prefix.clone(), message.clone())) {
-                    hit = Some(index);
-                    break;
+                None => {
+                    // A truly absent required field: not a blank.
+                    residual = true;
+                    let Some(steps) = parse_path(&at, field) else {
+                        break false;
+                    };
+                    let path = render_path(&steps);
+                    if walk_mut(&mut work, &steps[..steps.len() - 1]).is_none()
+                        || !fill(&mut work, &steps, &path, &first_error)
+                    {
+                        break false;
+                    }
                 }
             }
-            let Some(index) = hit else {
-                break;
+        } else if is_blank_error(&message) {
+            let is_element =
+                |leaf: &NullLeaf| matches!(leaf.steps.last(), Some(PathStep::Index(_)));
+            let exact = leaves.iter().position(|leaf| {
+                leaf.state == LeafState::Open && leaf.path == at && is_element(leaf)
+            });
+            let found = exact.or_else(|| {
+                // Under a tagged enum: the first element in visit order
+                // whose replacement changes the error.
+                let mut hit = None;
+                for (index, leaf) in leaves.iter_mut().enumerate() {
+                    if leaf.state != LeafState::Open
+                        || !is_under(&leaf.path, &at)
+                        || !is_element(leaf)
+                    {
+                        continue;
+                    }
+                    let unchanged = PLACEHOLDERS.iter().any(|make| {
+                        let mut trial = work.clone();
+                        set_at(&mut trial, &leaf.steps, make());
+                        first_error(&trial) == Some((at.clone(), message.clone()))
+                    });
+                    if unchanged {
+                        leaf.state = LeafState::Allowed;
+                    } else {
+                        hit = Some(index);
+                        break;
+                    }
+                }
+                hit
+            });
+            let Some(index) = found else {
+                residual = true;
+                break false;
             };
-            elements[index].2 = true;
-            culprits.push(elements[index].0.clone());
-            let steps = elements[index].1.clone();
-            fill(&mut work, &steps);
+            leaves[index].state = LeafState::Blank;
+            let (steps, path) = (leaves[index].steps.clone(), leaves[index].path.clone());
+            if !fill(&mut work, &steps, &path, &first_error) {
+                residual = true;
+                break false;
+            }
         } else {
-            break;
+            residual = true;
+            break false;
+        }
+    };
+    // Phase 2: classify the remaining leaves against the copy. Once the copy
+    // deserializes, a set of nulls put back fails exactly when it contains
+    // one the kernel rejects, so the leaves are tested in halving groups:
+    // all allowed nulls together cost one deserialization.
+    let open: Vec<usize> = (0..leaves.len())
+        .filter(|&index| leaves[index].state == LeafState::Open)
+        .collect();
+    if settled {
+        let mut groups = vec![open];
+        while let Some(group) = groups.pop() {
+            if group.is_empty() {
+                continue;
+            }
+            let mut trial = work.clone();
+            for &index in &group {
+                set_at(&mut trial, &leaves[index].steps, Value::Null);
+            }
+            if first_error(&trial).is_none() {
+                for &index in &group {
+                    leaves[index].state = LeafState::Allowed;
+                }
+            } else if group.len() == 1 {
+                leaves[group[0]].state = LeafState::Blank;
+            } else {
+                let (left, right) = group.split_at(group.len() / 2);
+                groups.push(right.to_vec());
+                groups.push(left.to_vec());
+            }
+        }
+    } else {
+        // The copy still fails elsewhere: a null counts only when it moves
+        // the first error to a blank at (or above) its own path.
+        let baseline = first_error(&work);
+        for index in open {
+            let leaf = &leaves[index];
+            let mut trial = work.clone();
+            set_at(&mut trial, &leaf.steps, Value::Null);
+            let error = first_error(&trial);
+            let caused = match &error {
+                None => false,
+                Some((at, message)) => {
+                    error != baseline
+                        && is_blank_error(message)
+                        && (*at == leaf.path || is_under(&leaf.path, at))
+                }
+            };
+            leaves[index].state = if caused {
+                LeafState::Blank
+            } else {
+                LeafState::Allowed
+            };
         }
     }
-    culprits.sort_by_key(|path| {
-        // Report in document order.
-        block_order(block, path)
-    });
-    culprits
+    BlankSearch {
+        paths: leaves
+            .into_iter()
+            .filter(|leaf| leaf.state == LeafState::Blank)
+            .map(|leaf| leaf.path)
+            .collect(),
+        residual,
+    }
+}
+
+const PLACEHOLDERS: [fn() -> Value; 5] = [
+    || Value::from(0),
+    || Value::from(""),
+    || Value::from(false),
+    || Value::Array(Vec::new()),
+    || Value::Object(serde_json::Map::new()),
+];
+
+/// Puts a value at `steps` that the kernel accepts there, so the search can
+/// move past this blank. An error that still points at (or into) the filled
+/// path, or that rejects the placeholder's own type, means the placeholder
+/// was refused; an enum's refusal names its variants, and the first is
+/// tried. Returns whether a placeholder was accepted.
+fn fill<F>(work: &mut Value, steps: &[PathStep], path: &str, first_error: &F) -> bool
+where
+    F: Fn(&Value) -> Option<(String, String)>,
+{
+    let refused = |error: &Option<(String, String)>, tried: &Value| -> bool {
+        let Some((at, message)) = error else {
+            return false;
+        };
+        if at == path || is_under(at, path) {
+            return true;
+        }
+        // Under a tagged enum the path stops at the enum.
+        if !is_under(path, at) {
+            return false;
+        }
+        // A type or value refusal there concerns the placeholder; a blank
+        // error is the next blank surfacing.
+        (!is_blank_error(message)
+            && (message.starts_with("invalid type")
+                || message.starts_with("invalid value")
+                || message.starts_with("invalid length")
+                || message.starts_with("unknown variant")))
+            || (tried.is_object() && missing_field(message).is_some())
+    };
+    let mut variant = None;
+    for make in PLACEHOLDERS {
+        let tried = make();
+        set_at(work, steps, tried.clone());
+        let error = first_error(work);
+        if !refused(&error, &tried) {
+            return true;
+        }
+        if let Some((_, message)) = &error {
+            if variant.is_none() {
+                variant = first_variant(message);
+            }
+        }
+    }
+    if let Some(name) = variant {
+        let tried = Value::from(name);
+        set_at(work, steps, tried.clone());
+        if !refused(&first_error(work), &tried) {
+            return true;
+        }
+    }
+    false
+}
+
+/// The field named by a ``missing field `X` `` error.
+fn missing_field(message: &str) -> Option<&str> {
+    message
+        .strip_prefix("missing field `")
+        .and_then(|rest| rest.split('`').next())
+}
+
+/// The first variant an `unknown variant` error lists as expected.
+fn first_variant(message: &str) -> Option<String> {
+    if !message.starts_with("unknown variant") {
+        return None;
+    }
+    let expected = message.split("expected").nth(1)?;
+    expected.split('`').nth(1).map(str::to_string)
+}
+
+/// serde_path_to_error renders the root as `.`; leaves use an empty parent.
+fn normal_path(path: &str) -> String {
+    if path == "." {
+        String::new()
+    } else {
+        path.to_string()
+    }
+}
+
+fn is_under(path: &str, prefix: &str) -> bool {
+    prefix.is_empty()
+        || path.starts_with(&format!("{prefix}."))
+        || path.starts_with(&format!("{prefix}["))
+}
+
+fn render_path(steps: &[PathStep]) -> String {
+    let mut out = String::new();
+    for step in steps {
+        match step {
+            PathStep::Key(key) => {
+                if !out.is_empty() {
+                    out.push('.');
+                }
+                out.push_str(key);
+            }
+            PathStep::Index(index) => out.push_str(&format!("[{index}]")),
+        }
+    }
+    out
+}
+
+/// Steps of `parent` (as rendered by serde_path_to_error) plus `field`.
+fn parse_path(parent: &str, field: &str) -> Option<Vec<PathStep>> {
+    let mut steps = Vec::new();
+    for part in parent.split('.').filter(|part| !part.is_empty()) {
+        let (key, rest) = part.split_once('[').unwrap_or((part, ""));
+        if !key.is_empty() {
+            steps.push(PathStep::Key(key.to_string()));
+        }
+        for index in rest.split('[').filter(|piece| !piece.is_empty()) {
+            steps.push(PathStep::Index(index.trim_end_matches(']').parse().ok()?));
+        }
+    }
+    steps.push(PathStep::Key(field.to_string()));
+    Some(steps)
 }
 
 fn collect_nulls(
@@ -1239,16 +1539,6 @@ fn collect_nulls(
         }
         _ => {}
     }
-}
-
-/// Position of a null leaf in document order.
-fn block_order(block: &Value, path: &str) -> usize {
-    let mut leaves = Vec::new();
-    collect_nulls(block, String::new(), Vec::new(), &mut leaves);
-    leaves
-        .iter()
-        .position(|(item, _)| item == path)
-        .unwrap_or(usize::MAX)
 }
 
 #[derive(Clone)]
@@ -1325,19 +1615,17 @@ fn derive_input(
                     // a missing input at its own path, not a malformed block.
                     // Inside internally tagged enums serde reports the null as
                     // a unit value and stops the path at the enum, so the
-                    // blank leaves are located in the JSON itself.
-                    let blanks = if is_blank_error(&error.inner().to_string()) {
-                        blank_paths::<NtaCalculationInput>(value)
-                    } else {
-                        Vec::new()
-                    };
-                    if blanks.is_empty() {
+                    // blank leaves are located in the JSON itself. Whatever
+                    // still fails once the blanks are filled is reported as
+                    // an invalid block.
+                    let search = blank_paths::<NtaCalculationInput>(value);
+                    if search.paths.is_empty() || search.residual {
                         gaps.push(InputGap {
                             detail: Some(error.to_string()),
                             ..gap("nta_calculation_block_invalid", "ntaCalculation")
                         });
                     }
-                    for path in blanks {
+                    for path in search.paths {
                         gaps.push(InputGap {
                             detail: Some(error.to_string()),
                             ..gap("nta_value_missing", format!("ntaCalculation.{path}"))
@@ -2273,6 +2561,42 @@ mod tests {
         }
     }
 
+    /// The WLC-GWP area is per building: a terraced dwelling (party walls
+    /// not entered as surfaces) is not the whole building; a dwelling
+    /// recorded as detached is.
+    #[test]
+    fn whole_building_needs_a_detached_dwelling() {
+        let base: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        let whole = |value: &Value| {
+            let mut gaps = Vec::new();
+            let derived = derive_input(value, &mut gaps);
+            let project: ProjectInput = serde_json::from_value(value.clone()).unwrap();
+            single_detached_dwelling(Some(&project), value, derived.as_ref())
+        };
+        assert!(!whole(&base));
+        let mut terraced = base.clone();
+        terraced["registration"] = serde_json::json!({"buildingType": "tussenwoning"});
+        assert!(!whole(&terraced));
+        let mut semi = base.clone();
+        semi["registration"] = serde_json::json!({"buildingType": "half vrijstaande woning"});
+        assert!(!whole(&semi));
+        let mut detached = base.clone();
+        detached["registration"] = serde_json::json!({"buildingType": "vrijstaande woning"});
+        assert!(whole(&detached));
+        // Table 11.14 types take precedence over the free-text type.
+        let mut typed = detached.clone();
+        typed["ntaCalculation"]["ventilation"]["infiltration"] = serde_json::json!({
+            "method": "reference", "buildingType": "pitched_roof_terraced"
+        });
+        assert!(!whole(&typed));
+        typed["ntaCalculation"]["ventilation"]["infiltration"]["buildingType"] =
+            serde_json::json!("pitched_roof_detached");
+        assert!(whole(&typed));
+    }
+
     /// §5.5.3: the per-function breakdown adds up to the carriers (5.20),
     /// to EPTot (with the export and storage terms) and to EPrenTot.
     #[test]
@@ -2539,7 +2863,7 @@ mod tests {
             "note": null
         });
         assert_eq!(
-            blank_paths::<BlankProbe>(&block),
+            blank_paths::<BlankProbe>(&block).paths,
             [
                 "segments[0].coverDepthM",
                 "segments[0].lengthM",
@@ -2553,7 +2877,7 @@ mod tests {
              "temperaturesC": months()}
         ]});
         assert_eq!(
-            blank_paths::<BlankProbe>(&block),
+            blank_paths::<BlankProbe>(&block).paths,
             ["segments[0].coverDepthM"]
         );
         // Nested arrays of enums: a blank inside a group's part.
@@ -2566,7 +2890,7 @@ mod tests {
             ]}
         ]});
         assert_eq!(
-            blank_paths::<BlankProbe>(&block),
+            blank_paths::<BlankProbe>(&block).paths,
             ["segments[0].parts[1].lengthM"]
         );
         // A null element in a required f64 row is reported, the allowed
@@ -2578,13 +2902,144 @@ mod tests {
             allowed: Vec<Option<f64>>,
         }
         let block = serde_json::json!({"required": [1.0, null, 3.0], "allowed": [null, 2.0]});
-        assert_eq!(blank_paths::<Rows>(&block), ["required[1]"]);
+        assert_eq!(blank_paths::<Rows>(&block).paths, ["required[1]"]);
         // A complete block has no blanks.
         let block = serde_json::json!({"segments": [
             {"kind": "pipe", "lengthM": 1.0, "coverDepthM": 0.6,
              "temperaturesC": months()}
         ]});
-        assert!(blank_paths::<BlankProbe>(&block).is_empty());
+        assert_eq!(blank_paths::<BlankProbe>(&block), BlankSearch::default());
+    }
+
+    #[test]
+    fn blank_search_covers_enums_defaults_absent_fields_and_flatten() {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        #[allow(dead_code)]
+        enum Fuel {
+            Gas,
+            Oil,
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(
+            tag = "kind",
+            rename_all = "snake_case",
+            rename_all_fields = "camelCase"
+        )]
+        #[allow(dead_code)]
+        enum Generator {
+            Boiler { fuel: Fuel, power_kw: f64 },
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Holder {
+            generator: Generator,
+        }
+        // An enum field and a power field, both blank, inside a tagged enum.
+        let block =
+            serde_json::json!({"generator": {"kind": "boiler", "fuel": null, "powerKw": null}});
+        assert_eq!(
+            blank_paths::<Holder>(&block),
+            BlankSearch {
+                paths: vec!["generator.fuel".into(), "generator.powerKw".into()],
+                residual: false
+            }
+        );
+
+        // A blank `#[serde(default)]` member that is not an Option.
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        #[allow(dead_code)]
+        struct Defaults {
+            #[serde(default)]
+            other_loss_kwh: f64,
+            #[serde(default)]
+            note: Option<String>,
+        }
+        let block = serde_json::json!({"otherLossKwh": null, "note": null});
+        assert_eq!(blank_paths::<Defaults>(&block).paths, ["otherLossKwh"]);
+
+        // A truly absent required field next to an optional null with the
+        // same name elsewhere: the absent field is not a blank, the other
+        // blank is still found, and the block stays invalid (residual).
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Sub {
+            #[serde(default)]
+            x: Option<f64>,
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Top {
+            sub: Sub,
+            x: f64,
+            y: f64,
+        }
+        let block = serde_json::json!({"sub": {"x": null}, "y": null});
+        assert_eq!(
+            blank_paths::<Top>(&block),
+            BlankSearch {
+                paths: vec!["y".into()],
+                residual: true
+            }
+        );
+
+        // Flattened structs buffer like tagged enums.
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Inner {
+            v: f64,
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Outer {
+            #[serde(flatten)]
+            inner: Inner,
+            w: Option<f64>,
+        }
+        let block = serde_json::json!({"v": null, "w": null});
+        assert_eq!(blank_paths::<Outer>(&block).paths, ["v"]);
+
+        // Untagged enums report no position; the search degrades to an
+        // invalid block instead of a wrong path.
+        #[derive(serde::Deserialize)]
+        #[serde(untagged)]
+        #[allow(dead_code)]
+        enum Either {
+            Number { a: f64 },
+            Text { b: String },
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Wrapper {
+            either: Either,
+        }
+        let search = blank_paths::<Wrapper>(&serde_json::json!({"either": {"a": null}}));
+        assert!(
+            search.residual || search.paths == ["either.a"],
+            "{search:?}"
+        );
+    }
+
+    #[test]
+    fn blank_search_tests_each_allowed_null_once() {
+        // 200 rows of allowed nulls inside a tagged enum plus one blank.
+        let rows: Vec<Value> = (0..200)
+            .map(|_| {
+                serde_json::json!({"kind": "pipe", "lengthM": 1.0, "coverDepthM": 0.6,
+                    "temperaturesC": vec![Value::Null; 12]})
+            })
+            .collect();
+        let mut block = serde_json::json!({ "segments": rows });
+        block["segments"][150]["lengthM"] = Value::Null;
+        let started = std::time::Instant::now();
+        let search = blank_paths::<BlankProbe>(&block);
+        assert_eq!(search.paths, ["segments[150].lengthM"]);
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(1),
+            "{:?}",
+            started.elapsed()
+        );
     }
 
     #[test]

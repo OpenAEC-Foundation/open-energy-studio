@@ -51,6 +51,8 @@
 //! - P.78 (p. 1022) sums only `E_C;dc;mi`: dehumidification counts in the
 //!   annual cold delivery (P.77) but not in the monthly profile used for
 //!   `f_on;mi` and P.68, so the monthly values may sum below the annual;
+//!   when that leaves a zero profile next to a positive annual total (only
+//!   dehumidification) the months count as unknown;
 //! - P.70 (p. 1016) writes `Q_CD;dis;tot;an` in the formula while its
 //!   legend defines the network input `Q_XD;in;tot`; the legend is followed
 //!   (the cold the chillers produce, distribution loss included);
@@ -1683,7 +1685,8 @@ pub struct CalculationDetails {
     pub input_kwh: f64,
     /// `Q_XD;dis;ls`, kWh.
     pub distribution_loss_kwh: f64,
-    /// `Q_XD;in;mi` (P.33), kWh.
+    /// `Q_XD;in;mi` (P.33), kWh. For cold the months follow P.78, which
+    /// leaves dehumidification out, so they can sum below `input_kwh`.
     pub monthly_input_kwh: Months,
     /// `W_XD;aux;tot` used, kWh.
     pub auxiliary_electricity_kwh: f64,
@@ -2787,9 +2790,13 @@ fn area_demand(
             }
         }
     }
+    // Parts left out of the monthly sum (dehumidification, P.78) can leave a
+    // zero profile next to a positive annual total; those months are not
+    // known, so the annual profile applies as for parts without months.
+    let known = all_monthly && !(monthly.iter().sum::<f64>() <= 0.0 && annual > 0.0);
     ok.then(|| Demand {
         annual,
-        monthly: if all_monthly {
+        monthly: if known {
             Some(monthly)
         } else {
             annual_profile(function, annual)
@@ -5313,6 +5320,21 @@ mod tests {
         near(cold.annual, 600.0 + 120.0, 1e-9);
         assert_eq!(cold.monthly.unwrap(), cold_months);
         assert!(issues.is_empty(), "{issues:?}");
+        // A plot with only dehumidification: no zero profile marked as
+        // known; the months are unknown and the annual profile applies.
+        let plot = AreaPlot {
+            heating_forfait: None,
+            cooling: None,
+            dehumidification: Some(PlotFlow {
+                annual_kwh: Some(120.0),
+                monthly_kwh: Vec::new(),
+            }),
+            ..area_plot()
+        };
+        let area = AreaDemand { plots: vec![plot] };
+        let cold = area_demand(&area, SystemFunction::Cooling, "a", &mut issues).unwrap();
+        near(cold.annual, 120.0, 1e-9);
+        assert_eq!(cold.monthly, None);
     }
 
     #[test]
