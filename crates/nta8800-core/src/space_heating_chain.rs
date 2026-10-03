@@ -124,6 +124,12 @@ pub struct SpaceHeatingChainInput {
     /// zone area / `A_g;gebouw;H`. Absent means the whole building (1,0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collective_connection: Option<CollectiveConnection>,
+    /// §9.1 (p. 287): the system models this many identical physical
+    /// generators (same make, type, power and carrier), e.g. one per
+    /// dwelling. Efficiency, power and auxiliary energy follow the demand
+    /// per appliance; the 500 m² limits use the area per appliance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identical_systems: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1901,8 +1907,10 @@ fn assess_chain_pass(
             let residential = std::iter::once(&input.demand)
                 .chain(input.additional_zones.iter().map(|zone| &zone.demand))
                 .all(|zone| zone.usage_function.is_residential());
+            // §9.1: the area per identical appliance decides the 500 m² limit.
+            let appliances = f64::from(input.identical_systems.unwrap_or(1).max(1));
             conditions.generator_losses_recoverable =
-                residential && !conditions.collective && connected_area <= 500.0;
+                residential && !conditions.collective && connected_area / appliances <= 500.0;
         }
         // 7.3/7.7: the recoverable losses (9.2.5) reduce the heating need and
         // add to the cooling need; the heating limit (9.28) and the
@@ -2099,7 +2107,7 @@ fn assess_chain_pass(
                     .sum(),
                 usable_floor_area_m2: zone_area,
             };
-            generation_efficiency = generate(
+            generation_efficiency = generate_identical(
                 input,
                 &outputs,
                 building_fraction,
@@ -2931,6 +2939,85 @@ fn generate_multiple(
     hp_efficiency.or((total_input > 0.0).then(|| output / total_input))
 }
 
+/// §9.1 (p. 287): with N identical physical generators each appliance
+/// delivers 1/N of the output and need; carriers, auxiliary energy and
+/// losses of one appliance are multiplied by N.
+#[allow(clippy::too_many_arguments)]
+fn generate_identical(
+    input: &SpaceHeatingChainInput,
+    outputs: &[MonthlyEnergy],
+    building_fraction: f64,
+    conditions: &GeneratorConditions,
+    building: HeatPumpBuildingContext,
+    monthly: &mut [ChainMonth],
+    annex_q_result: &mut Option<AnnexQOutput>,
+    issues: &mut Vec<ChainIssue>,
+) -> Option<f64> {
+    let count = input.identical_systems.unwrap_or(1);
+    if count == 0 {
+        issues.push(issue("identical_systems_invalid", "identicalSystems"));
+        return None;
+    }
+    if count == 1 {
+        return generate(
+            input,
+            outputs,
+            building_fraction,
+            conditions,
+            building,
+            monthly,
+            annex_q_result,
+            issues,
+        );
+    }
+    let n = f64::from(count);
+    let per_outputs: Vec<MonthlyEnergy> = outputs
+        .iter()
+        .map(|item| MonthlyEnergy {
+            month: item.month,
+            energy_kwh: item.energy_kwh / n,
+        })
+        .collect();
+    let mut rows: Vec<ChainMonth> = monthly
+        .iter()
+        .zip(&per_outputs)
+        .map(|(row, output)| ChainMonth {
+            month: row.month,
+            generator_output_kwh: output.energy_kwh,
+            ..ChainMonth::default()
+        })
+        .collect();
+    let per_building = HeatPumpBuildingContext {
+        heating_need_kwh: building.heating_need_kwh / n,
+        cooling_need_kwh: building.cooling_need_kwh / n,
+        usable_floor_area_m2: building.usable_floor_area_m2 / n,
+        ..building
+    };
+    let efficiency = generate(
+        input,
+        &per_outputs,
+        building_fraction,
+        conditions,
+        per_building,
+        &mut rows,
+        annex_q_result,
+        issues,
+    );
+    for (row, one) in monthly.iter_mut().zip(&rows) {
+        row.heat_pump_output_kwh = n * one.heat_pump_output_kwh;
+        row.natural_gas_kwh = n * one.natural_gas_kwh;
+        row.district_heat_kwh = n * one.district_heat_kwh;
+        row.biomass_kwh = n * one.biomass_kwh;
+        row.oil_kwh = n * one.oil_kwh;
+        row.generator_recoverable_loss_kwh = n * one.generator_recoverable_loss_kwh;
+        row.generator_electricity_kwh = n * one.generator_electricity_kwh;
+        row.collective_source_heat_kwh = n * one.collective_source_heat_kwh;
+        row.chp_electricity_kwh = n * one.chp_electricity_kwh;
+        row.auxiliary_electricity_kwh = one.auxiliary_electricity_kwh.map(|value| n * value);
+    }
+    efficiency
+}
+
 #[allow(clippy::too_many_arguments)]
 fn generate(
     input: &SpaceHeatingChainInput,
@@ -3730,6 +3817,7 @@ mod tests {
             additional_zones: Vec::new(),
             distribution_system: None,
             collective_connection: None,
+            identical_systems: None,
             generator: serde_json::from_value(json!({
                 "kind": "gas_boiler",
                 "boiler": {
@@ -5008,6 +5096,24 @@ mod tests {
         };
         input.distribution_system = Some(system(calculated_pump()));
         input
+    }
+
+    #[test]
+    fn identical_systems_count_auxiliary_per_appliance() {
+        let single = assess_space_heating_chain(&boiler_chain());
+        let mut input = boiler_chain();
+        input.identical_systems = Some(10);
+        let many = assess_space_heating_chain(&input);
+        assert_eq!(many.status, "calculated_unverified", "{:?}", many.issues);
+        // Forfait boiler efficiency: the same gas in total.
+        assert!((many.monthly[0].natural_gas_kwh - single.monthly[0].natural_gas_kwh).abs() < 1e-6);
+        // 9.85: the stand-by constant is booked per appliance.
+        assert!(
+            many.monthly[0].auxiliary_electricity_kwh.unwrap()
+                > single.monthly[0].auxiliary_electricity_kwh.unwrap()
+        );
+        input.identical_systems = Some(0);
+        assert!(codes(&input).contains(&"identical_systems_invalid"));
     }
 
     #[test]
