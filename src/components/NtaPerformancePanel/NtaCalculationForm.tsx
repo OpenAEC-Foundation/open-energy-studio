@@ -8,6 +8,7 @@ import {
   AirHeatersFields, BacsAndSupplyFields, BBL_FUNCTIONS, FunctionAreasFields, LABEL_FUNCTIONS,
 } from './NtaAdvancedSections';
 import { NtaVentilationSection } from './NtaVentilationSection';
+import { DynamicWindowsFields } from './NtaDynamicWindows';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import {
   AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, CoolingPerformanceFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
@@ -198,6 +199,9 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         <TextField {...field} path={['windowSolar', 'movableShading', 'sourceReference']} label={t('nta.form.source')} />
       </>}
       <TextField {...field} path={['windowSolar', 'sourceReference']} label={t('nta.form.source')} />
+    </Section>
+    <Section title={t('nta.form.dynamic.title')}>
+      <DynamicWindowsFields draft={draft} change={change} project={project} />
     </Section>
     {tilts.length > 0 && <Section title={t('nta.form.roofTilts')}>
       {tilts.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">

@@ -3961,6 +3961,8 @@ export interface NtaCalculationInput {
     movableShading?: NtaMovableShading | null;
     sourceReference: string;
   };
+  /** Annex A dynamic transparent elements per project window id. */
+  dynamicWindows?: Array<{ windowId: string; dynamic: NtaDynamicTransparent }>;
   groundFloors: Array<{
     surfaceId: string;
     exposedPerimeterM: number;

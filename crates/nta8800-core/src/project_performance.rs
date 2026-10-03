@@ -51,6 +51,11 @@ pub struct NtaCalculationInput {
     #[serde(default)]
     pub surface_tilts: Vec<SurfaceTilt>,
     pub window_solar: WindowSolarDefaults,
+    /// Annex A: dynamic transparent elements (switchable glazing, movable
+    /// shutters) linked to project windows by id, with the method A/B
+    /// weighting and optional step-2 correction factors.
+    #[serde(default)]
+    pub dynamic_windows: Vec<ProjectDynamicWindow>,
     /// Humidifiers per zone (chapter 12).
     #[serde(default)]
     pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
@@ -195,6 +200,16 @@ pub struct SurfaceTilt {
     pub surface_id: String,
     pub tilt_deg: f64,
     pub source_reference: String,
+}
+
+/// Annex A input for one project window. The project `uValue` and `gValue`
+/// stay the nominal values; the kernel replaces them per month by
+/// `U_mi;mn` (A.1) and `g_mi;mn` (A.2), times the step-2 factors (p. 770).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectDynamicWindow {
+    pub window_id: String,
+    pub dynamic: crate::annex_a::DynamicTransparent,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -909,6 +924,20 @@ fn derive_input(
         .collect();
     let delta_u_forfait = forfait_bridge_route(&project, &nta, &constructions, gaps);
     let mut used_ground = HashSet::new();
+    let mut dynamic_windows: HashMap<&str, &crate::annex_a::DynamicTransparent> = HashMap::new();
+    for (index, item) in nta.dynamic_windows.iter().enumerate() {
+        let path = format!("ntaCalculation.dynamicWindows[{index}]");
+        if dynamic_windows
+            .insert(item.window_id.as_str(), &item.dynamic)
+            .is_some()
+        {
+            gaps.push(gap("dynamic_window_duplicate", format!("{path}.windowId")));
+        }
+        for issue in item.dynamic.validate(&format!("{path}.dynamic")) {
+            gaps.push(gap(issue.code, issue.path));
+        }
+    }
+    let mut used_dynamic = HashSet::new();
     let mut loss_area = 0.0;
     let mut total_area = 0.0;
     let mut zones = Vec::new();
@@ -1038,6 +1067,10 @@ fn derive_input(
                     continue;
                 };
                 window_area += area;
+                let dynamic = dynamic_windows.get(window_id).map(|item| (*item).clone());
+                if dynamic.is_some() {
+                    used_dynamic.insert(window_id.to_owned());
+                }
                 windows.push(Window {
                     id: format!("window:{window_id}"),
                     area_m2: area,
@@ -1049,7 +1082,7 @@ fn derive_input(
                     forfait_delta_u_w_per_m2k: delta_u_forfait,
                     obstruction: nta.window_solar.obstruction.clone(),
                     movable_shading: nta.window_solar.movable_shading.clone(),
-                    dynamic: None,
+                    dynamic,
                     glazing: None,
                     source_reference: format!(
                         "project:window:{window_id}; {}",
@@ -1219,6 +1252,14 @@ fn derive_input(
                 .and_then(|item| item.distribution.clone())
                 .unwrap_or_else(|| nta.distribution.clone()),
         });
+    }
+    for (index, item) in nta.dynamic_windows.iter().enumerate() {
+        if !used_dynamic.contains(&item.window_id) {
+            gaps.push(gap(
+                "dynamic_window_without_window",
+                format!("ntaCalculation.dynamicWindows[{index}].windowId"),
+            ));
+        }
     }
     for (index, item) in nta.ground_floors.iter().enumerate() {
         if !used_ground.contains(&item.surface_id) {
@@ -1478,6 +1519,118 @@ mod tests {
         assert_eq!(performance.tojuli[0].status, "calculated_unverified");
         assert!(performance.tojuli_max_k.is_some());
         assert_eq!(result.attest_status, "unattested");
+    }
+
+    /// Annex A on a project window: method A weights with step-2 factors.
+    /// States open (g 0,60, U 1,10) and shutter closed (g 0,10, U 0,70),
+    /// solar weights 0,75/0,25 and temperature weights 0,5/0,5:
+    /// g = 0,60·0,75 + 0,10·0,25 = 0,475 and U = 0,90 (A.1/A.2); step 2
+    /// with g factor 0,9 and a January U factor 1,1 gives g 0,4275 and
+    /// U 0,99 in January, U 0,90 in February.
+    #[test]
+    fn dynamic_window_carries_annex_a_into_the_demand() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        let mut u_factors = vec![1.0; 12];
+        u_factors[0] = 1.1;
+        value["ntaCalculation"]["dynamicWindows"] = serde_json::json!([{
+            "windowId": "win-S",
+            "dynamic": {
+                "method": "weighted_states",
+                "states": [
+                    {"id": "open", "gPerpendicular": 0.6, "uValueWPerM2k": 1.1},
+                    {"id": "closed", "gPerpendicular": 0.1, "uValueWPerM2k": 0.7}
+                ],
+                "solarWeights": vec![vec![0.75, 0.25]; 12],
+                "temperatureWeights": vec![vec![0.5, 0.5]; 12],
+                "sourceReference": "hourly simulation report",
+                "correction": {
+                    "uFactors": u_factors,
+                    "gFactors": vec![0.9; 12],
+                    "sourceReference": "step-2 comparison"
+                }
+            }
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let window = demand
+            .windows
+            .iter()
+            .find(|item| item.id == "window:win-S")
+            .unwrap();
+        assert!(window.dynamic.is_some());
+        assert!((window.g_for_month(0) - 0.4275).abs() < 1e-12);
+        assert!((window.u_for_month(0) - 0.99).abs() < 1e-12);
+        assert!((window.u_for_month(1) - 0.90).abs() < 1e-12);
+        // The nominal U stays in H_D; the month adds 8 m²·(U_mi;mn − 1,10).
+        assert!(
+            (crate::monthly_demand::dynamic_window_correction_w_per_k(demand, 0) + 0.88).abs()
+                < 1e-12
+        );
+        assert!(
+            (crate::monthly_demand::dynamic_window_correction_w_per_k(demand, 1) + 1.6).abs()
+                < 1e-12
+        );
+        let other = demand
+            .windows
+            .iter()
+            .find(|item| item.id == "window:win-N")
+            .unwrap();
+        assert!(other.dynamic.is_none());
+        let transmission = |item: &ProjectPerformanceAssessment, month: usize| {
+            item.performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly[month]
+                .heating
+                .transmission_kwh
+        };
+        // H_D drops by 0,88 W/K in January (U 0,99 instead of 1,10).
+        assert!(transmission(&result, 0) < transmission(&base, 0));
+    }
+
+    #[test]
+    fn dynamic_window_input_errors_are_gaps() {
+        let mut value = project();
+        let dynamic = serde_json::json!({
+            "method": "single_state",
+            "state": {"id": "closed", "gPerpendicular": 0.1, "uValueWPerM2k": 0.7},
+            "sourceReference": "product sheet"
+        });
+        value["ntaCalculation"]["dynamicWindows"] = serde_json::json!([
+            {"windowId": "win-S", "dynamic": dynamic},
+            {"windowId": "win-S", "dynamic": dynamic},
+            {"windowId": "missing", "dynamic": dynamic},
+            {"windowId": "win-N", "dynamic": {
+                "method": "weighted_states",
+                "states": [{"id": "a", "gPerpendicular": 0.5, "uValueWPerM2k": 1.0}],
+                "solarWeights": vec![vec![0.5]; 12],
+                "temperatureWeights": vec![vec![1.0]; 12],
+                "sourceReference": "x"
+            }}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        assert!(codes.contains(&(
+            "dynamic_window_duplicate",
+            "ntaCalculation.dynamicWindows[1].windowId"
+        )));
+        assert!(codes.contains(&(
+            "dynamic_window_without_window",
+            "ntaCalculation.dynamicWindows[2].windowId"
+        )));
+        assert!(codes.contains(&(
+            "dynamic_weights_invalid",
+            "ntaCalculation.dynamicWindows[3].dynamic.solarWeights"
+        )));
+        assert_eq!(result.status, "incomplete");
     }
 
     /// The example projects of the start screen (src/core/nta/ExampleProjects.ts)
