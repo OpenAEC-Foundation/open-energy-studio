@@ -53,7 +53,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "the hot-water fit rescales the chapter 13 result linearly in the net need (circulation and storage losses fixed)",
     "ISSO 75.2 table 2.4 gives NTA −20 % reduction hours for both energy-conscious and not energy-conscious users; read as +20 % (energy-conscious) and −20 % (not energy-conscious), in line with the weekend column; weekend hours are capped at 48",
     "gas costs use 35,17 MJ/m³ (Groningen equivalent, gross calorific value)",
-    "heat from a collective heat-pump source (dh_hp_source) is priced at the district-heat tariff",
+    "heat from a collective heat-pump source (reported as carrier dh, 5.20) is priced at the district-heat tariff",
     "the best-fit package is the adviser's choice; without one, the package with the highest net present value is proposed and marked as automatic",
     "ISSO 82.2 §2.5.3: the NTA option carries the MWA practice correction for hot water; taken as the average-profile 545 kWh per occupant",
     "ventilation practice factors (82.2 table 2.7, 75.2 table 2.8) apply to the standard profiles or when entered, not to the NTA option (table 2.2 '–'); system B takes the system C value",
@@ -1018,7 +1018,7 @@ fn energy_use(result: &BuildingPerformanceAssessment, tariffs: &Tariffs) -> Ener
             }
             "oil" => usage.oil_kwh += row.used_kwh,
             "bm" => usage.biomass_kwh += row.used_kwh,
-            "dh" | "dw" | "dh_hp_source" => {
+            "dh" | "dw" => {
                 usage.district_heat_kwh += row.used_kwh;
                 let month = usize::from(row.month.saturating_sub(1)).min(11);
                 usage.monthly_heat_kwh[month] += row.used_kwh;
@@ -3004,6 +3004,7 @@ mod tests {
         };
         let mut result = HotWaterAssessment {
             exhaust_air: None,
+            combi_chp_heating: None,
             annual_net_need_kwh: 100.0,
             emission_efficiency: 100.0 / 120.0,
             annual_generator_output_kwh: 150.0,

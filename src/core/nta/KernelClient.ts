@@ -1498,6 +1498,8 @@ export interface SpaceHeatingChainInput {
   humidifiers?: NtaZoneHumidifier[];
   /** 9.2.3.4 Q_H;ren;prac of solar combi systems per month, kWh. */
   solarHeatingKwh?: number[];
+  /** 13.68 Q_H;sol;ls;rbl of solar systems for space heating only, kWh per month (into 7.3). */
+  solarRecoverableKwh?: number[];
   /** 13.185 hot water made with heat from this system (§13.8.4.9.3), kWh per month. */
   hotWaterLoadKwh?: number[];
   demand: MonthlyDemandInput;
@@ -3344,7 +3346,9 @@ export type NtaHotWaterGenerator =
     | ({ kind: 'measured_two_profiles' } & NtaTwoProfileTest)
     | { kind: 'heating_system' }
     /** §13.8.4.7.4/§13.8.4.8 building CHP: method 2 (`chp`) or method 1 (`method1`), exclusive. */
-    | { kind: 'chp'; chp?: NtaChpClass | null; method1?: NtaMicroChp | null; alsoSpaceHeating?: boolean; equipmentReference: string };
+    | { kind: 'chp'; chp?: NtaChpClass | null; method1?: NtaMicroChp | null; alsoSpaceHeating?: boolean;
+        /** Method 1 without NEN-EN 50465 auxiliary powers: 9.6.8 (9.91/9.92), per 9.6.6.2.2.3. */
+        auxiliary?: NtaOtherGeneratorAuxiliary | null; equipmentReference: string };
 
 /** Chapter 13 hot-water system (several generators, solar systems). */
 export interface NtaHotWaterSystem {
@@ -3425,7 +3429,7 @@ export interface BuildingPerformanceAssessment {
   attestStatus: 'unattested';
   labelAvailable: false;
   carriers: Array<{
-    carrier: 'el' | 'gas' | 'oil' | 'dh' | 'dw' | 'dc' | 'dh_hp_source' | 'bm';
+    carrier: 'el' | 'gas' | 'oil' | 'dh' | 'dw' | 'dc' | 'bm';
     month: number;
     usedKwh: number;
     deliveredKwh: number;
@@ -4077,6 +4081,8 @@ export interface NtaHotWaterAssessment {
   generators: Array<{ index: number; order: number; monthlyOutputKwh: number[]; monthlyShare: number[] }>;
   /** 13.148/13.149 data of an exhaust-air heat pump. */
   exhaustAir?: { timeFraction: number[]; hotWaterOnly: boolean; declaredFlowM3PerH: number | null };
+  /** §13.8.4.8 (p. 650): the heating share of a combi micro-CHP after one joint 9.6.6.2 evaluation. */
+  combiChpHeating?: Array<{ month: number; inputKwh: number; electricityKwh: number; auxiliaryKwh: number | null }>;
 }
 
 /** 9.6.6.2 test point (table 9.33); omitted efficiencies take table 9.37. */

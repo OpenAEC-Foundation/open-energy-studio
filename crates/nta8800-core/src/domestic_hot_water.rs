@@ -643,6 +643,10 @@ pub struct HotWaterChp {
     /// The CHP also heats the building (13.181: no stand-by electronics).
     #[serde(default)]
     pub also_space_heating: bool,
+    /// Method 1 without NEN-EN 50465 auxiliary powers: the 9.6.8 route
+    /// (9.91/9.92) per 9.6.6.2.2.3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auxiliary: Option<crate::space_heating_chain::OtherGeneratorAuxiliary>,
     pub equipment_reference: String,
 }
 
@@ -805,13 +809,35 @@ pub struct PfhrdTest {
 }
 
 /// Data from outside chapter 13 for the final hot-water run.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct HotWaterExtras {
+    /// §13.8.4.8 (p. 650): the space-heating side of a combi micro-CHP.
+    pub combi_chp: Option<CombiChpHeating>,
     /// 13.156a: `Σ E_H;gen;gi;in` of the combi appliance for space heating,
     /// gross calorific value, kWh per year.
     pub combi_space_heating_gas_kwh: Option<f64>,
     /// 13.153h/i per month.
     pub mixed_air: Option<MixedAirVentilation>,
+}
+
+/// The heating side of a combi micro-CHP (method 1) from the chain: its
+/// product, its heat output (incl. storage share) and `t_H;op` per month.
+#[derive(Debug, Clone)]
+pub struct CombiChpHeating {
+    pub product: crate::micro_chp::MicroChp,
+    pub thermal_output_kwh: [f64; 12],
+    pub operating_hours: [f64; 12],
+}
+
+/// The space-heating share of a combi micro-CHP month after the joint
+/// 9.6.6.2 evaluation, kWh.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CombiChpHeatingMonth {
+    pub month: u8,
+    pub input_kwh: f64,
+    pub electricity_kwh: f64,
+    pub auxiliary_kwh: Option<f64>,
 }
 
 /// 13.153h/i inputs: `Σ q_V;ODA;req;zi,mi` of the zones whose return air
@@ -2026,11 +2052,30 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
                     || (product.standby_auxiliary_kw.is_some()
                         && product.chp_only.auxiliary_power_kw.is_some()
                         && product.full_load.auxiliary_power_kw.is_some());
-                if !measured_aux {
-                    issues.push((
+                // 9.6.6.2.2.3: without measured auxiliary powers 9.6.8.
+                match (&chp.auxiliary, measured_aux) {
+                    (None, false) => issues.push((
                         "hot_water_chp_auxiliary_required",
-                        format!("{prefix}.method1"),
-                    ));
+                        format!("{prefix}.auxiliary"),
+                    )),
+                    (Some(auxiliary), _) => {
+                        if auxiliary.source_reference.trim().is_empty() {
+                            issues.push((
+                                "source_reference_required",
+                                format!("{prefix}.auxiliary.sourceReference"),
+                            ));
+                        }
+                        if !auxiliary
+                            .nominal_power_kw
+                            .is_some_and(|power| power.is_finite() && power > 0.0)
+                        {
+                            issues.push((
+                                "generator_nominal_power_required",
+                                format!("{prefix}.auxiliary.nominalPowerKw"),
+                            ));
+                        }
+                    }
+                    (None, true) => {}
                 }
                 if product.storage.is_some() {
                     // §13.8.4.8.1: hot-water vessels follow 13.6.
@@ -2406,6 +2451,10 @@ pub struct HotWaterAssessment {
     /// 13.148/13.149 data of an exhaust-air heat pump for chapter 11.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exhaust_air: Option<ExhaustAirHotWater>,
+    /// §13.8.4.8 (p. 650): the space-heating share of a combi micro-CHP;
+    /// it replaces the chain's own CHP booking.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub combi_chp_heating: Option<Vec<CombiChpHeatingMonth>>,
 }
 
 /// 13.149 `f_W;t;hp-on;mi` and the 13.148/13.148a flow data of the
@@ -2499,6 +2548,8 @@ struct Booking {
     heating_system: [f64; 12],
     /// 16.13/16.16: CHP electricity.
     chp_electricity: [f64; 12],
+    /// §13.8.4.8: the heating share of a combi micro-CHP.
+    combi_heating: Option<[CombiChpHeatingMonth; 12]>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2568,8 +2619,12 @@ fn book_generator(
             } else {
                 55.0
             };
+            // 13.168: ϑ_int;set;H;zi,mi after levelling (7.9.4) in a heated
+            // zone, 13 °C otherwise.
             let ambient = if *in_heated_zone {
-                context.heated_ambient_c
+                context
+                    .levelled_setpoint_c
+                    .map_or(context.heated_ambient_c, |values| values[index])
             } else {
                 UNHEATED_AMBIENT_C
             };
@@ -2712,23 +2767,79 @@ fn book_generator(
                         functioning,
                         MONTH_HOURS[index],
                     );
-                    let month = crate::micro_chp::micro_chp_month(
-                        product,
-                        *output,
-                        hours,
-                        MONTH_HOURS[index],
-                        f_building,
-                        collective,
-                    )
-                    .ok_or("micro_chp_efficiency_required")?;
+                    // p. 650: a combi appliance has one E_H;gen;in, split
+                    // over heating and hot water by output; one 9.6.6.2
+                    // month on Q_H + Q_W with t_H;op + t_W;op.
+                    let combi = extras.combi_chp.as_ref().filter(|_| chp.also_space_heating);
+                    let (month, water_share) = match combi {
+                        Some(heating) => {
+                            let q_h = heating.thermal_output_kwh[index].max(0.0);
+                            let total = q_h + output;
+                            let joint = crate::micro_chp::micro_chp_month(
+                                &heating.product,
+                                total,
+                                (heating.operating_hours[index] + hours).min(MONTH_HOURS[index]),
+                                MONTH_HOURS[index],
+                                f_building,
+                                collective,
+                            )
+                            .ok_or("micro_chp_efficiency_required")?;
+                            let share = output / total;
+                            let combi_heating = booking.combi_heating.get_or_insert_with(|| {
+                                std::array::from_fn(|month| CombiChpHeatingMonth {
+                                    month: month as u8 + 1,
+                                    ..CombiChpHeatingMonth::default()
+                                })
+                            });
+                            combi_heating[index] = CombiChpHeatingMonth {
+                                month: index as u8 + 1,
+                                input_kwh: joint.input_kwh * (1.0 - share),
+                                electricity_kwh: joint.electricity_kwh * (1.0 - share),
+                                auxiliary_kwh: joint
+                                    .auxiliary_kwh
+                                    .map(|value| value * (1.0 - share)),
+                            };
+                            (joint, share)
+                        }
+                        None => (
+                            crate::micro_chp::micro_chp_month(
+                                product,
+                                *output,
+                                hours,
+                                MONTH_HOURS[index],
+                                f_building,
+                                collective,
+                            )
+                            .ok_or("micro_chp_efficiency_required")?,
+                            1.0,
+                        ),
+                    };
+                    let month = crate::micro_chp::MicroChpMonth {
+                        input_kwh: month.input_kwh * water_share,
+                        electricity_kwh: month.electricity_kwh * water_share,
+                        auxiliary_kwh: month.auxiliary_kwh.map(|value| value * water_share),
+                        recoverable_kwh: month.recoverable_kwh * water_share,
+                        ..month
+                    };
                     // 13.182 rounded down to 0,025.
                     let efficiency = round_down(output / month.input_kwh, 0.025);
                     booking.input[index] = output / efficiency;
                     booking.efficiency_input[index] = booking.input[index];
                     // 13.8.4.8.3: W_H;gen;aux × f_gebouw (in the month result).
-                    booking.auxiliary[index] += month
-                        .auxiliary_kwh
-                        .ok_or("hot_water_chp_auxiliary_required")?;
+                    booking.auxiliary[index] += match (month.auxiliary_kwh, &chp.auxiliary) {
+                        (Some(value), _) => value,
+                        // 9.6.6.2.2.3 → 9.6.8 (9.91/9.92).
+                        (None, Some(auxiliary)) => {
+                            crate::space_heating_chain::other_generator_auxiliary_kwh(
+                                auxiliary,
+                                crate::space_heating_chain::OTHER_AUX_GAS_OIL_W_PER_KW,
+                                *output,
+                                MONTH_HOURS[index],
+                                f_building,
+                            )
+                        }
+                        (None, None) => return Err("hot_water_chp_auxiliary_required"),
+                    };
                     // 13.8.4.8.4, subject to the 500 m² rule of 13.13.
                     if recoverable_counts {
                         booking.recoverable[index] += month.recoverable_kwh * f_building;
@@ -3483,6 +3594,7 @@ pub fn assess_hot_water_with(
     );
     let mut generator_recoverable = [0.0; 12];
     let mut weighted_input = [0.0; 12];
+    let mut combi_chp_heating: Option<Vec<CombiChpHeatingMonth>> = None;
     for (unit, unit_outputs) in units.iter().zip(&shares) {
         let path = if unit.index == 0 {
             "hotWater.generator".to_string()
@@ -3507,6 +3619,9 @@ pub fn assess_hot_water_with(
             code,
             path: path.clone(),
         })?;
+        if let Some(heating) = booking.combi_heating {
+            combi_chp_heating = Some(heating.to_vec());
+        }
         let carrier = unit.generator.carrier();
         for (index, row) in months.iter_mut().enumerate() {
             let input = booking.input[index];
@@ -3627,6 +3742,7 @@ pub fn assess_hot_water_with(
         months,
         generators,
         exhaust_air,
+        combi_chp_heating,
     })
 }
 
@@ -3690,6 +3806,7 @@ mod tests {
             chp: Some(dhw_chp_class()),
             method1: None,
             also_space_heating: true,
+            auxiliary: None,
             equipment_reference: "CHP plate".into(),
         })));
         assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
@@ -3705,6 +3822,7 @@ mod tests {
             chp: None,
             method1: None,
             also_space_heating: false,
+            auxiliary: None,
             equipment_reference: "CHP plate".into(),
         })));
         assert!(validate_hot_water(&neither, context(), "hotWater")
@@ -3749,6 +3867,7 @@ mod tests {
             chp: None,
             method1: Some(product.clone()),
             also_space_heating: false,
+            auxiliary: None,
             equipment_reference: "micro-CHP".into(),
         })));
         assert!(
@@ -3771,18 +3890,34 @@ mod tests {
         assert!(jan.chp_electricity_kwh > 0.0);
         // 13.8.4.8.3: the measured auxiliary energy.
         assert!(jan.auxiliary_electricity_kwh >= month.auxiliary_kwh.unwrap() - 1e-9);
-        // Without measured auxiliary power the method is rejected.
+        // Without measured auxiliary power and without 9.6.8 input the
+        // method is rejected; with 9.91/9.92 input it falls back (9.6.6.2.2.3).
         let mut unmeasured = product;
         unmeasured.full_load.auxiliary_power_kw = None;
-        let input = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+        let mut fallback = HotWaterChp {
             chp: None,
             method1: Some(unmeasured),
             also_space_heating: false,
+            auxiliary: None,
             equipment_reference: "micro-CHP".into(),
-        })));
+        };
+        let input = system(HotWaterGenerator::Chp(Box::new(fallback.clone())));
         assert!(validate_hot_water(&input, context(), "hotWater")
             .iter()
             .any(|item| item.code == "hot_water_chp_auxiliary_required"));
+        fallback.auxiliary = Some(crate::space_heating_chain::OtherGeneratorAuxiliary {
+            electrically_connected_devices: 1,
+            nominal_power_kw: Some(25.0),
+            source_reference: "plate".into(),
+        });
+        let input = system(HotWaterGenerator::Chp(Box::new(fallback)));
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        let result = assess_hot_water(&input, context()).unwrap();
+        // 9.91: 10 W stand-by × 744 h plus 1 W/kW × 25 kW over the burner time.
+        let jan = &result.months[0];
+        let on = (jan.generator_output_kwh * 1.1 / 25.0).min(744.0);
+        let expected = (10.0 * 744.0 + 25.0 * on) / 1000.0;
+        assert!(jan.auxiliary_electricity_kwh >= expected - 1e-6);
     }
 
     #[test]
@@ -4060,6 +4195,7 @@ mod tests {
         });
         assert!(gas.issues("g").is_empty(), "{:?}", gas.issues("g"));
         let extras = HotWaterExtras {
+            combi_chp: None,
             combi_space_heating_gas_kwh: Some(3650.0),
             mixed_air: None,
         };
@@ -4438,6 +4574,16 @@ mod tests {
         assert!((jan.generation_efficiency - eta).abs() < 1e-12);
         let aux = (10.0 * 744.0 + output * 1.1) / 1000.0;
         assert!((jan.auxiliary_electricity_kwh - aux).abs() < 1e-9);
+        // 13.168: ϑ_W;amb is the levelled ϑ_int;set;H;zi,mi (7.9.4).
+        let mut levelled = context();
+        levelled.levelled_setpoint_c = Some([17.0; 12]);
+        let result = assess_hot_water(&input, levelled).unwrap();
+        let jan = &result.months[0];
+        let output = jan.generator_output_kwh;
+        let standing = (55.0 - 17.0) / 45.0 * 744.0 / 24.0 * standby;
+        let loss = 0.27 / 0.84 * output;
+        let eta = round_down(output / (output + loss + standing), 0.025);
+        assert!((jan.generation_efficiency - eta).abs() < 1e-12);
     }
 
     #[test]
