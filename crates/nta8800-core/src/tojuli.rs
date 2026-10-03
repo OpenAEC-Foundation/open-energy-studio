@@ -416,7 +416,8 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             window.tilt_deg,
             window.area_m2,
             // Annex A: U_jul of a dynamic window (A.1).
-            window.area_m2 * window.u_for_month(usize::from(JULY) - 1),
+            // ΔU_for (8.2) is part of H_D, so of the split, not of the gains.
+            window.area_m2 * window.transmission_u_for_month(usize::from(JULY) - 1),
             window_solar_kwh(window, JULY, Balance::Cooling),
         );
     }
@@ -425,7 +426,8 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             element.orientation,
             element.tilt_deg,
             element.area_m2,
-            element.area_m2 * element.u_value_w_per_m2k,
+            element.area_m2
+                * (element.u_value_w_per_m2k + element.forfait_delta_u_w_per_m2k.unwrap_or(0.0)),
             opaque_solar_kwh(element, JULY),
         );
     }

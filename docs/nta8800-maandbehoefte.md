@@ -182,7 +182,11 @@ Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De ke
 `warnings` in de projectbeoordeling houdt de berekening niet tegen, maar meldt opgegeven waarden die met de norm of andere invoer botsen:
 
 - `declared_hot_water_efficiency_above_one`: een opgegeven brandstofgebruik voor warm tapwater is lager dan Q_W;nd (13.15 voor woningen, tabel 13.1 voor utiliteit). Dat impliceert een opwekkingsrendement boven 1 op bovenwaarde.
-- `declared_ventilation_below_required_flow`: bij een mechanisch systeem zonder warmteterugwinning ligt de opgegeven H_ve onder ρc·q_V;ODA;req (11.22 met f_ctrl = 1, zonder ondergrens 11.63). Dat is een indicatieve ondergrens; infiltratie komt er nog bij.
+- `declared_ventilation_below_required_flow`: alleen bij woningen. Het gaat om een mechanisch systeem zonder warmteterugwinning waarvan de opgegeven H_ve onder ρc·q_V;ODA;req ligt.
+  - De ondergrens volgt 11.22 met de laagste f_ctrl·f_sys van tabel 11.5 voor het systeemtype (B 0,57; C en D 0,52), zonder de ondergrens van 11.63.
+  - Een vraaggestuurde regeling geeft daardoor geen valse melding.
+  - Bij utiliteit is het ontwerpdebiet tijdgemiddeld over de bedrijfstijd. Die weging maakt deze indicatieve toets niet, dus daar geeft de toets geen melding.
+  - Infiltratie komt nog bij de ondergrens.
 - `bacs_factor_without_capacity_evidence`: een utiliteitsgebouw met f_BACS < 1,05 zonder `bacs`-blok. Volgens §5.5.8 is f_BACS 1,05 tenzij alle verwarmings- en koelsystemen aantoonbaar ten hoogste 290 kW zijn, of de gebouwautomatisering voldoet.
 - `utility_open_ceiling_requires_evidence`: tabel 7.10 voetnoot a. Utiliteitsbouw rekent met de kolom "gesloten of verlaagd plafond", tenzij een vrijhangend plafond ten minste 15 % open is.
 

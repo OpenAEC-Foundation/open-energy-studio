@@ -576,6 +576,20 @@ pub fn validate_solar(heater: &SolarWaterHeater, path: &str) -> Vec<SolarIssue> 
                     );
                 }
             }
+            // 13.60 needs a positive standby loss and ϑ_sto;set;ref > ϑ_amb;ref.
+            if let StorageLoss::MeasuredStandby {
+                standby_kwh_per_day,
+                reference_storage_c,
+                reference_ambient_c,
+            } = storage.loss
+            {
+                if !positive(standby_kwh_per_day)
+                    || !reference_ambient_c.is_finite()
+                    || !positive(reference_storage_c - reference_ambient_c)
+                {
+                    push("hot_water_storage_loss_invalid", "method.storage.loss");
+                }
+            }
         }
         SolarMethod::Tested {
             solar_type,
@@ -1013,6 +1027,38 @@ mod tests {
         // Pump: 15 W over 1500 h distributed by irradiance.
         let total: f64 = months.iter().map(|month| month.auxiliary_kwh).sum();
         assert!((total - 15.0 * 1500.0 / 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn measured_standby_loss_is_validated_for_solar_storage() {
+        // 13.60 with ϑ_sto;set;ref ≤ ϑ_amb;ref has no finite positive H_sto;ls.
+        let loss = StorageLoss::MeasuredStandby {
+            standby_kwh_per_day: 1.0,
+            reference_storage_c: 20.0,
+            reference_ambient_c: 20.0,
+        };
+        assert_eq!(loss.measured_transmission_w_per_k(), None);
+        let heater = SolarWaterHeater {
+            id: "sol".into(),
+            solar_use: SolarUse::WaterHeating,
+            count: 1,
+            method: SolarMethod::Calculated {
+                collectors: field(),
+                storage: SolarStorage {
+                    total_volume_l: 200.0,
+                    backup_volume_l: None,
+                    loss,
+                    backup_loss_in_generator_efficiency: false,
+                },
+                solar_type: SolarType::Preheater,
+            },
+            pvt: None,
+            source_reference: "test".into(),
+        };
+        assert!(validate_solar(&heater, "solar")
+            .iter()
+            .any(|issue| issue.code == "hot_water_storage_loss_invalid"
+                && issue.path == "solar.method.storage.loss"));
     }
 
     #[test]

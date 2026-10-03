@@ -560,6 +560,11 @@ pub struct Window {
     pub g_perpendicular: f64,
     pub frame_fraction: f64,
     pub u_value_w_per_m2k: f64,
+    /// Forfait thermal-bridge surcharge ΔU_for (8.3) that `H_D` carries on
+    /// this element. It belongs in `H_D` (8.2) only, so the solar terms
+    /// 7.33/7.39 keep `U_c` and only the TOjuli orientation split adds it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forfait_delta_u_w_per_m2k: Option<f64>,
     /// External obstruction `F_sh;obst` per balance (§17.3).
     pub obstruction: Obstruction,
     /// Movable solar shading (7.42/7.43); see [`ShadingControl`] for the
@@ -625,6 +630,11 @@ impl Window {
         }
     }
 
+    /// U of `H_D` in the month: U_c (annex A.1 when dynamic) plus ΔU_for.
+    pub fn transmission_u_for_month(&self, month_index: usize) -> f64 {
+        self.u_for_month(month_index) + self.forfait_delta_u_w_per_m2k.unwrap_or(0.0)
+    }
+
     /// U of the month (annex A.1 when dynamic).
     pub fn u_for_month(&self, month_index: usize) -> f64 {
         self.dynamic
@@ -652,6 +662,11 @@ pub struct OpaqueElement {
     pub orientation: Orientation,
     pub tilt_deg: f64,
     pub u_value_w_per_m2k: f64,
+    /// Forfait thermal-bridge surcharge ΔU_for (8.3) that `H_D` carries on
+    /// this element. It belongs in `H_D` (8.2) only, so the solar terms
+    /// 7.33/7.39 keep `U_c` and only the TOjuli orientation split adds it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forfait_delta_u_w_per_m2k: Option<f64>,
     pub source_reference: String,
 }
 
@@ -1250,6 +1265,15 @@ pub(crate) fn opaque_solar_kwh(element: &OpaqueElement, month: u8) -> f64 {
         )
 }
 
+fn check_forfait_delta_u(value: Option<f64>, path: &str, issues: &mut Vec<DemandIssue>) {
+    if value.is_some_and(|delta| !finite_nonneg(delta)) {
+        issues.push(issue(
+            "element_forfait_delta_u_invalid",
+            format!("{path}.forfaitDeltaUWPerM2k"),
+        ));
+    }
+}
+
 fn finite_nonneg(value: f64) -> bool {
     value.is_finite() && value >= 0.0
 }
@@ -1649,6 +1673,7 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 format!("{path}.uValueWPerM2k"),
             ));
         }
+        check_forfait_delta_u(window.forfait_delta_u_w_per_m2k, &path, issues);
         for (code, suffix) in validate_obstruction(&window.obstruction, window.tilt_deg) {
             issues.push(issue(code, format!("{path}.obstruction{suffix}")));
         }
@@ -1708,6 +1733,7 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 format!("{path}.uValueWPerM2k"),
             ));
         }
+        check_forfait_delta_u(element.forfait_delta_u_w_per_m2k, &path, issues);
         check_reference(
             &element.source_reference,
             format!("{path}.sourceReference"),

@@ -1412,7 +1412,7 @@ const PRACTICE_FACTOR_OTHER: f64 = 0.9;
 pub const COOLING_INTERPRETATIONS: &[&str] = &[
     "10.66 with an absorption chiller on building CHP: the table 10.30 factor 1,00 is replaced by PLV·ζ_n·f_prpr, so the CHP fuel is Q_C/(PLV·ζ_n·f_prpr·ε_chp;th)",
     "absorption method 2: f_prpr 0,60 only for an air-cooled absorber (direct condensation, principle 2), 0,9 otherwise or when the heat rejection is not given",
-    "10.61/10.73: ϑ_C;gen;req;out is ϑ_C;dis;flw;set of table 10.8 (design supply − Δϑ_int;inc, the 6/12 column without distribution) for chillers and ϑ_C;int;inc of 10.10 for evaporation in the room (§10.3.4), unless declared",
+    "10.61/10.73: ϑ_C;gen;req;out is ϑ_C;dis;flw;set of table 10.8 (design supply − Δϑ_int;inc, the 6/12 column without distribution) for chillers and ϑ_C;int;inc of 10.10 for evaporation in the room (closing part of §10.3.4, p. 379), unless declared",
     "10.23c: ϑ_C;mean is the mean of ϑ_in and ϑ_out of table 10.8 (both minus Δϑ_int;inc); the printed second line (ϑ_C,out = ϑ_C;dis;in;flw;req) is read as a misprint",
     "10.15: the literal result is kept near ϑ_C;int;inc = ϑ_e;comb; a loss above 3× the need is reported as cooling_emission_loss_singular",
     "10.55: months without bins in table 10.18 (January, December) use the 14 °C bin",
@@ -1847,7 +1847,7 @@ fn rated_months(
     let air_cooled = rated.room_unit || rated.rejection == HeatRejection::AirCooled;
     // Table 10.22.
     let delta_evaporator = if rated.room_unit { 20.0 } else { 6.0 };
-    // §10.3.4: ϑ_C;int;inc (10.10) for evaporation in the room, otherwise
+    // §10.3.4 (p. 379): ϑ_C;int;inc (10.10) for evaporation in the room, otherwise
     // ϑ_C;gen;out;set = ϑ_C;dis;flw;set of table 10.8.
     let default_outlet = if rated.room_unit {
         internal_c
@@ -3021,7 +3021,7 @@ mod tests {
         assert_eq!(result.generator_shares[0].method, 1);
         let coefficients = en14825_coefficients(&performance).unwrap();
         let annual: f64 = result.months.iter().map(|row| row.generator_cold_kwh).sum();
-        // 10.61: ϑ_C;int;inc = 24 + Δϑ_int;inc (10.10, §10.3.4) in the
+        // 10.61: ϑ_C;int;inc = 24 + Δϑ_int;inc (10.10, §10.3.4 p. 379) in the
         // room minus Δϑ_evap 20 K.
         let delta = result.internal_temperature_shift_k;
         assert!((delta + 1.75).abs() < 1e-12);
@@ -3063,7 +3063,7 @@ mod tests {
         let july = &result.months[6];
         let column = limit_column_from_15(result.cooling_limit_c);
         let reference = THETA_E_KG[6][column];
-        // 10.73 with ϑ_req;out = ϑ_C;int;inc = 24 + Δϑ_int;inc (§10.3.4),
+        // 10.73 with ϑ_req;out = ϑ_C;int;inc = 24 + Δϑ_int;inc (§10.3.4 p. 379),
         // Δϑ_evap 20 K, Δϑ_cond 10 K against the 24/35 rating.
         let outlet = 24.0 + result.internal_temperature_shift_k;
         let carnot =

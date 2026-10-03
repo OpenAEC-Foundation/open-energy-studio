@@ -1173,6 +1173,8 @@ export const nl: Record<string, string> = {
   'nta.gap.unheated_transmission_unresolved': 'Transmissie via onverwarmde ruimte niet af te leiden',
   'nta.gap.project_shape_invalid': 'Projectstructuur ongeldig',
   'nta.gap.vertical_pipes_unknown': 'Verticale leidingen onbekend: geef ze op, of geen (7.3.3)',
+  'nta.gap.vertical_pipes_conflicting': 'Zone "geen verticale leidingen" botst met de projectleidingen (7.3.3)',
+  'nta.gap.basement_forfait_delta_u_conflict': 'ΔU_for van de kelder wijkt af van de afgeleide ΔU_for (8.38, 8.3)',
   'nta.gap.thermal_bridge_methods_mixed': 'Forfaitaire en gedetailleerde koudebruggen gemengd (8.2.1)',
   'nta.gap.forfait_thermal_bridges_unheated_space_unsupported': 'Forfaitaire koudebruggen met onverwarmde ruimte: H_U;for niet afgeleid (8.4, C.1.3)',
   'nta.performance.warnings': 'Plausibiliteit (de berekening loopt door):',
