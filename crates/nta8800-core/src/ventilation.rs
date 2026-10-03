@@ -24,9 +24,9 @@
 //! The effective flows and their temperatures are returned as chapter 7
 //! ventilation flows (`H_ve;k = ρ_a·c_a·q_V;k/3600`, 7.19).
 //!
-//! Air-handling units that heat or cool the supply air (table 11.15,
-//! 11.100/11.101, 11.114–11.121) and specific gas appliances with a
-//! variable flue (table 11.11 footnote a) are rejected as unsupported.
+//! Air-handling units with reheating or cooling coils follow table 11.15
+//! and 11.100/11.101, 11.114–11.121. Specific gas appliances with a variable
+//! flue (table 11.11 footnote a) are rejected: the norm gives no values.
 //!
 //! Transcribed from the licensed NTA 8800:2025+C1:2026, pp. 436–520.
 //! Interpretation choices are listed in [`INTERPRETATIONS`].

@@ -10,7 +10,9 @@
 //!   phase shifts from table D.1 and `δ = 3 m`; D.1 `H_g;an;mi`; D.2/D.3 the
 //!   seasonal `H_H;g;adj` and `H_C;g;adj` for the time constant.
 //!
-//! Suspended floors, basements and crawlspaces are not covered.
+//! Floors above a crawlspace or unheated basement (8.43–8.49, D.13–D.16)
+//! and heated basements (8.38/8.39, D.10/D.11) are covered by
+//! [`FloorBelow`] and [`HeatedBasement`].
 
 use crate::climate::{ANNUAL_MEAN_OUTDOOR_TEMPERATURE_C, OUTDOOR_TEMPERATURE_C};
 use serde::{Deserialize, Serialize};

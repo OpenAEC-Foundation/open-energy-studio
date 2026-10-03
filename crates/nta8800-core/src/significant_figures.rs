@@ -1,5 +1,5 @@
 //! Class rounding to two significant figures, NTA 8800:2025+C1:2026
-//! annex X (p. 1117).
+//! annex X (p. 1129).
 //!
 //! Rounding up takes the next higher value of table X.1 for the first two
 //! significant digits, also when the digits already equal a table value

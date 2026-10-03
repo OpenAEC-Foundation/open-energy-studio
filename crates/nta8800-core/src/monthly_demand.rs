@@ -52,11 +52,10 @@ pub const F_MOD_T: f64 = 0.8;
 pub const H_INT_SPEC: f64 = 2.0;
 
 pub const OMITTED_CORRECTIONS: &[&str] = &[
-    "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl of chapter 10 is still 0",
-    "8.5 adjacent heated spaces H_A",
+    "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl = 0 is prescribed by 10.4/10.43",
+    "8.5: H_A = 0 for adjacent heated spaces is prescribed by the norm",
     "§17.3.8 extended obstruction method (hourly NEN 5060) enters as declared factors",
     "table 7.10 footnote c is the caller's column choice",
-    "annex D for floors other than slab on ground (crawlspace, basement)",
 ];
 
 const SCOPE: &str = "nta8800_chapter_7_monthly_need_single_zone_unverified";

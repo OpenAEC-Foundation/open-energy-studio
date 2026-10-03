@@ -10,7 +10,8 @@
 //! energy (M.21–M.23), the auxiliary energy recovered by the medium
 //! (M.18, f_aux;rvd 0,75) and the input energy (M.1) with the control factor
 //! of table M.7 (M.24). Recoverable losses to the space (M.16, M.19) are
-//! reported, not fed back into the need.
+//! fed back into the need through 9.7 by the heating chain (individual
+//! dwelling installations up to 500 m², 9.2.5.1).
 
 use serde::{Deserialize, Serialize};
 

@@ -29,7 +29,28 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
 | Bijlage X (afronding) | geïmplementeerd |
 | §5.9 finaal energiegebruik (5.57–5.60), 16.17 wind = 0 | geïmplementeerd |
 | Bijlage AB ZEB-indicator (informatief) met operationele CO2 | geïmplementeerd |
-| WKK voor tapwater (13.8.4.8), basisopname voor collectieve en meervoudige installaties | in uitvoering |
+| WKK voor tapwater (13.8.4.8), basisopname voor collectieve, meervoudige en hybride installaties, WKK en zonneboilers, opname-UI | geïmplementeerd |
+
+**Dekkingsaudit 4 oktober 2026.** Een systematische audit heeft hoofdstuk 5 t/m 17 en alle bijlagen naast de code gelegd. De formules zijn grotendeels gedekt.
+
+Open punten, in volgorde van belang voor de attestering:
+1. Uitvoerindicatoren van hoofdstuk 5:
+   - E_H;nd en E_C;nd;
+   - EH;Standaard;
+   - EwePrenTot;
+   - gebruik en hernieuwbaar per energiedrager (5.17–5.19, 5.39a–h);
+   - lokaal CO2-vrij (5.5.7).
+2. Meerdere tapwatersystemen per gebouw (13.19a–13.20a).
+3. Identieke individuele installaties in woongebouwen (§9.1).
+4. f_prac 0,95 bij externe warmte en koude (9.84, 10.78).
+5. Renovatiestandaard utiliteit (tabel 5.7).
+6. Koppeling van f_BACS (5.5.8).
+7. θ_ztu (7.82) en θ_int;op (7.9.6).
+8. Kleinere punten bij warmtepompen.
+9. Meerdere koelsystemen.
+10. Gaswarmtepompen.
+
+Deze punten worden in rondes afgewerkt.
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
@@ -46,7 +67,6 @@ Alle onderdelen zijn getranscribeerd uit de gelicentieerde normtekst, met pagina
 3. **Niet ondersteund (met expliciete foutcode).**
    - het specifieke gastoestel uit tabel 11.11, voetnoot a (de norm geeft geen rekenwaarden);
    - een wisselstroomventilator van na 2006 in de forfaitaire methode (tabel 11.23 geeft geen waarde);
-   - absorptiekoeling op gebouw-WKK;
    - de onderdelen met de status "in uitvoering" in de tabel hierboven.
    - Registratie in EP-Online vereist de uitwisselspecificatie van RVO.
 4. **Visuele acceptatie** van de desktop-UI en de attestprocedure (BRL 9501:2026, ISSO 54 actuele editie).
