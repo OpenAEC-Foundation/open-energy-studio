@@ -608,6 +608,18 @@ pub enum HotWaterGenerator {
         also_space_heating: bool,
         #[serde(default)]
         declared: Option<DeclaredEfficiency>,
+        /// §13.8.4.7.4: a gas pilot flame (695 kWh/year, 9.6.2.1), counted
+        /// only when the boiler does not also heat the building.
+        #[serde(default, rename = "pilotFlame")]
+        pilot_flame: bool,
+    },
+    /// §13.8.4.6 table 13.22: solid-biomass combi appliance with a vessel
+    /// meeting annex R; the efficiency includes the vessel losses, W_aux 0
+    /// and no recoverable loss.
+    BiomassCombi {
+        insulation: BiomassStoreInsulation,
+        #[serde(rename = "insideBoundary")]
+        inside_boundary: bool,
     },
     /// §13.8.4.7.4 heat pump with an indirectly heated vessel, 1,4.
     IndirectHeatPump {
@@ -1489,6 +1501,8 @@ pub fn merge_hot_water(results: Vec<HotWaterAssessment>) -> Option<HotWaterAsses
             month.natural_gas_kwh += other.natural_gas_kwh;
             month.oil_kwh += other.oil_kwh;
             month.district_heat_kwh += other.district_heat_kwh;
+            month.biomass_kwh += other.biomass_kwh;
+            month.biomass_output_kwh += other.biomass_output_kwh;
             month.solar_renewable_kwh += other.solar_renewable_kwh;
             month.solar_space_heating_kwh += other.solar_space_heating_kwh;
             month.solar_auxiliary_kwh += other.solar_auxiliary_kwh;
@@ -1529,6 +1543,7 @@ impl HotWaterGenerator {
             HotWaterGenerator::LargeDirectStorage { gas_fired: true } => {
                 HotWaterCarrier::Fuel(Carrier::Gas)
             }
+            HotWaterGenerator::BiomassCombi { .. } => HotWaterCarrier::Biomass,
             HotWaterGenerator::IndirectBoiler { oil, .. } => {
                 HotWaterCarrier::Fuel(if *oil { Carrier::Oil } else { Carrier::Gas })
             }
@@ -1558,10 +1573,21 @@ impl HotWaterGenerator {
     }
 }
 
+/// Table 13.22 insulation of the store and pipework.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BiomassStoreInsulation {
+    AtLeast20Mm,
+    AtLeast10Mm,
+    None,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotWaterCarrier {
     Fuel(Carrier),
     DistrictHeat,
+    /// Solid biomass (bmB: table 13.22 appliances meet annex R).
+    Biomass,
 }
 
 /// Space-heating data for the heating part of solar combi systems
@@ -1628,6 +1654,10 @@ pub struct HotWaterMonth {
     pub natural_gas_kwh: f64,
     pub oil_kwh: f64,
     pub district_heat_kwh: f64,
+    /// Solid biomass of a table 13.22 appliance (bmB), kWh.
+    pub biomass_kwh: f64,
+    /// Q_W;gen;out of that appliance, for 5.39 (f_Pren;bmB), kWh.
+    pub biomass_output_kwh: f64,
     /// 13.4a `Q_W;ren;sol,prac`, kWh.
     pub solar_renewable_kwh: f64,
     /// 13.66a `Q_H;ren;prac` of solar combi systems for the space-heating
@@ -2480,6 +2510,21 @@ fn generation(
     annual_output_kwh: f64,
 ) -> Result<(f64, f64), &'static str> {
     match generator {
+        // Table 13.22, including the vessel losses.
+        HotWaterGenerator::BiomassCombi {
+            insulation,
+            inside_boundary,
+        } => Ok((
+            match (insulation, inside_boundary) {
+                (BiomassStoreInsulation::AtLeast20Mm, true) => 0.65,
+                (BiomassStoreInsulation::AtLeast20Mm, false) => 0.60,
+                (BiomassStoreInsulation::AtLeast10Mm, true) => 0.575,
+                (BiomassStoreInsulation::AtLeast10Mm, false) => 0.525,
+                (BiomassStoreInsulation::None, true) => 0.35,
+                (BiomassStoreInsulation::None, false) => 0.325,
+            },
+            1.0,
+        )),
         HotWaterGenerator::GasAppliance {
             appliance,
             measured_class,
@@ -2728,6 +2773,8 @@ struct Booking {
     heating_system: [f64; 12],
     /// 16.13/16.16: CHP electricity.
     chp_electricity: [f64; 12],
+    /// Q_W;gen;out of a table 13.22 biomass appliance.
+    biomass_output: [f64; 12],
     /// §13.8.4.8: the heating share of a combi micro-CHP.
     combi_heating: Option<[CombiChpHeatingMonth; 12]>,
 }
@@ -2820,6 +2867,22 @@ fn book_generator(
         let practical_efficiency = practical * efficiency;
         booking.input[index] = output / practical_efficiency;
         booking.efficiency_input[index] = booking.input[index];
+        if matches!(generator, HotWaterGenerator::BiomassCombi { .. }) {
+            booking.biomass_output[index] = output;
+        }
+        // §13.8.4.7.4 with 9.6.2.1: pilot gas of a hot-water-only gas boiler.
+        if let HotWaterGenerator::IndirectBoiler {
+            pilot_flame: true,
+            oil: false,
+            also_space_heating: false,
+            ..
+        } = generator
+        {
+            booking.input[index] += crate::boiler_forfait_draft::PILOT_FLAME_ANNUAL_KWH
+                * MONTH_HOURS[index]
+                / crate::climate::YEAR_HOURS
+                * f_building;
+        }
         // 13.181 for generators whose auxiliaries are not in the efficiency.
         let (electronics, burner) = match generator {
             HotWaterGenerator::ElectricInstantaneous => (STANDBY_ELECTRONICS_W, 0.0),
@@ -3830,6 +3893,10 @@ pub fn assess_hot_water_with(
                 HotWaterCarrier::Fuel(Carrier::Gas) => row.natural_gas_kwh += input,
                 HotWaterCarrier::Fuel(Carrier::Oil) => row.oil_kwh += input,
                 HotWaterCarrier::DistrictHeat => row.district_heat_kwh += input,
+                HotWaterCarrier::Biomass => {
+                    row.biomass_kwh += input;
+                    row.biomass_output_kwh += booking.biomass_output[index];
+                }
             }
             row.auxiliary_electricity_kwh += booking.auxiliary[index];
             row.ambient_heat_kwh += booking.ambient[index];
@@ -4585,6 +4652,37 @@ mod tests {
         assert_eq!(solar_storage_ambient(&base, context()), [20.0; 12]);
     }
 
+    #[test]
+    fn biomass_combi_and_indirect_pilot_flame() {
+        // §13.8.4.6 table 13.22: 20 mm inside 0,65, no aux.
+        let input = system(HotWaterGenerator::BiomassCombi {
+            insulation: BiomassStoreInsulation::AtLeast20Mm,
+            inside_boundary: true,
+        });
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        assert_eq!(input.carrier(), HotWaterCarrier::Biomass);
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert!((jan.biomass_kwh - jan.generator_output_kwh / 0.65).abs() < 1e-9);
+        assert!((jan.biomass_output_kwh - jan.generator_output_kwh).abs() < 1e-9);
+        assert_eq!(jan.auxiliary_electricity_kwh, 0.0);
+        // §13.8.4.7.4: pilot gas only for a hot-water-only gas boiler.
+        let pilot = |also_space_heating: bool, pilot_flame: bool| {
+            let input = system(HotWaterGenerator::IndirectBoiler {
+                boiler: IndirectBoiler::Hr107,
+                oil: false,
+                inside_boundary: true,
+                also_space_heating,
+                declared: None,
+                pilot_flame,
+            });
+            assess_hot_water(&input, context()).unwrap().months[0].natural_gas_kwh
+        };
+        let extra = 695.0 * 744.0 / crate::climate::YEAR_HOURS;
+        assert!((pilot(false, true) - pilot(false, false) - extra).abs() < 1e-9);
+        assert!((pilot(true, true) - pilot(true, false)).abs() < 1e-12);
+    }
+
     fn combi() -> HotWaterGenerator {
         HotWaterGenerator::GasAppliance {
             appliance: GasAppliance::CombiGaskeurHrCw,
@@ -4671,6 +4769,7 @@ mod tests {
             inside_boundary: true,
             also_space_heating: true,
             declared: None,
+            pilot_flame: false,
         });
         input.circulation = Some(Circulation {
             outer_diameter_mm: Some(15.0),
@@ -4731,6 +4830,7 @@ mod tests {
             inside_boundary: true,
             also_space_heating: true,
             declared: None,
+            pilot_flame: false,
         });
         input.circulation = Some(Circulation {
             outer_diameter_mm: Some(15.0),
@@ -5405,6 +5505,7 @@ mod tests {
             inside_boundary: true,
             also_space_heating: true,
             declared: None,
+            pilot_flame: false,
         });
         input.collective = Some(CollectiveHotWater {
             building_usable_floor_area_m2: 400.0,

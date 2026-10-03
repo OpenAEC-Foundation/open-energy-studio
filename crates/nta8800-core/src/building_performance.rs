@@ -2868,6 +2868,9 @@ fn compute(
         if let Some(solar) = standalone_solar {
             used_el += solar.auxiliary_kwh.get(index).copied().unwrap_or(0.0);
         }
+        // §13.8.4.6: table 13.22 biomass appliances (bmB).
+        let mut hot_water_biomass = 0.0;
+        let mut hot_water_biomass_heat = 0.0;
         if let Some(months) = &hot_water {
             let row = &months[index];
             // 13.1/13.3 per generator carrier; table 5.2 or annex P for
@@ -2881,6 +2884,8 @@ fn compute(
             hot_water_ambient = row.ambient_heat_kwh;
             hot_water_chp = row.chp_electricity_kwh;
             solar_heat += row.solar_renewable_kwh;
+            hot_water_biomass = row.biomass_kwh;
+            hot_water_biomass_heat = row.biomass_output_kwh;
         }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
         let produced_renewable: f64 = input
@@ -2931,7 +2936,7 @@ fn compute(
         // 5.20 books Q_HD;hp;in;bron as carrier dh (its own factors above).
         let reported_dh = used_dh + if source.is_some() { source_heat } else { 0.0 };
         // Tables 5.2/5.3: bmA f_P 0,0, bmB 0,5, bmC 1,0 (× 0,104 for CO2).
-        let used_bm_b = bacs * row.biomass_kwh;
+        let used_bm_b = bacs * row.biomass_kwh + hot_water_biomass;
         let used_bm_a = bacs * row.biomass_class_a_kwh;
         let used_bm_c = bacs * row.biomass_class_c_kwh;
         let used_bm = used_bm_a + used_bm_b + used_bm_c;
@@ -3031,7 +3036,7 @@ fn compute(
                 / biomass_fuel
         } else {
             0.0
-        };
+        } + hot_water_biomass_heat;
         // 5.39: external supply at f_Pren;dX and the collective source.
         // 5.39a–h per carrier ri; their sum is EPrenTot (5.28).
         let month_renewable = RenewableByCarrier {
