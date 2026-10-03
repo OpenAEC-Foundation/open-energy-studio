@@ -13,3 +13,6 @@
 .relabel-allowed { color: var(--energy-green, #16a34a); }
 .relabel-not_allowed { color: var(--energy-red, #ef4444); }
 .relabel-review { color: var(--energy-orange, #f59e0b); }
+.mwa-patch { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
+.mwa-patch-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.mwa-patch-row label { display: flex; flex-direction: column; flex: 1 1 140px; }

@@ -47,6 +47,4 @@
 .nta-form-note { grid-column: 1 / -1; margin: 0; }
 .nta-form-actions { display: flex; gap: 8px; }
 .nta-performance-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.nta-form-json { grid-column: 1 / -1; }
-.nta-form-json textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; box-sizing: border-box; }
 .nta-form-error { color: #b42318; font-size: 12px; }

@@ -8,6 +8,7 @@ import {
   type MwaMeasure,
   type MwaMeasureCategory,
   type MwaMeasuredUse,
+  type MwaPatchOperation,
   type MwaRenovationPassportInput,
   type MwaPackage,
   type MwaUserProfile,
@@ -61,14 +62,67 @@ function nextId(prefix: string, taken: string[]): string {
   return `${prefix}${index}`;
 }
 
+/** A patch value as typed: a number, true/false/null or JSON when it parses, else plain text. */
+export function parsePatchValue(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function patchValueText(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value ?? null);
+}
+
+/** The RFC 6902 operations of a measure, one row per operation: op, path and value. */
+export function MeasurePatchFields({ patch, onChange }: {
+  patch: MwaPatchOperation[];
+  onChange: (patch: MwaPatchOperation[]) => void;
+}) {
+  const { t } = useI18n();
+  const update = (index: number, operation: MwaPatchOperation) =>
+    onChange(patch.map((item, other) => (other === index ? operation : item)));
+  return (
+    <fieldset className="mwa-wide mwa-patch">
+      <legend>{t('mwa.measure.patch')}</legend>
+      {patch.map((operation, index) => (
+        <div key={index} className="mwa-patch-row">
+          <label>{t('mwa.patch.op')}
+            <select value={operation.op} onChange={(e) => {
+              const op = e.target.value as MwaPatchOperation['op'];
+              update(index, op === 'remove' ? { op, path: operation.path }
+                : { op, path: operation.path, value: 'value' in operation ? operation.value : null });
+            }}>
+              <option value="replace">{t('mwa.patch.replace')}</option>
+              <option value="add">{t('mwa.patch.add')}</option>
+              <option value="remove">{t('mwa.patch.remove')}</option>
+            </select>
+          </label>
+          <label>{t('mwa.patch.path')}
+            <input value={operation.path} placeholder="/ntaCalculation/…"
+              onChange={(e) => update(index, { ...operation, path: e.target.value })} />
+          </label>
+          {operation.op !== 'remove' && <label>{t('mwa.patch.value')}
+            <input value={patchValueText(operation.value)}
+              onChange={(e) => update(index, { ...operation, value: parsePatchValue(e.target.value) })} />
+          </label>}
+          <button type="button" onClick={() => onChange(patch.filter((_, other) => other !== index))}>{t('mwa.remove')}</button>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...patch, { op: 'replace', path: '', value: null }])}>
+        {t('mwa.patch.addOperation')}
+      </button>
+    </fieldset>
+  );
+}
+
 function MeasureEditor({ measure, onChange, onRemove }: {
   measure: MwaMeasure;
   onChange: (measure: MwaMeasure) => void;
   onRemove: () => void;
 }) {
   const { t } = useI18n();
-  const [patchText, setPatchText] = useState(JSON.stringify(measure.patch, null, 2));
-  const [patchError, setPatchError] = useState(false);
   const num = (value: string) => (value.trim() === '' ? undefined : Number(value));
   return (
     <fieldset className="mwa-measure">
@@ -105,21 +159,7 @@ function MeasureEditor({ measure, onChange, onRemove }: {
       <label className="mwa-wide">{t('mwa.measure.specialist')}
         <input value={measure.specialistNote ?? ''} onChange={(e) => onChange({ ...measure, specialistNote: e.target.value || undefined })} />
       </label>
-      <label className="mwa-wide">{t('mwa.measure.patch')}
-        <textarea rows={4} value={patchText} spellCheck={false}
-          onChange={(e) => {
-            setPatchText(e.target.value);
-            try {
-              const parsed = JSON.parse(e.target.value) as unknown;
-              if (!Array.isArray(parsed)) throw new Error('array');
-              setPatchError(false);
-              onChange({ ...measure, patch: parsed as MwaMeasure['patch'] });
-            } catch {
-              setPatchError(true);
-            }
-          }} />
-        {patchError && <span role="alert">{t('mwa.measure.patchInvalid')}</span>}
-      </label>
+      <MeasurePatchFields patch={measure.patch} onChange={(patch) => onChange({ ...measure, patch })} />
       <button type="button" onClick={onRemove}>{t('mwa.remove')}</button>
     </fieldset>
   );

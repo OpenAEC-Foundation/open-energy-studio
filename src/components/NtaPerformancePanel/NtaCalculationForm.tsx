@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/i18n';
 import {
   CheckField, NumberField, read, Section, SelectField, TextField, TriStateField, write, type Draft, type Path,
 } from './NtaFormFields';
+import { PvSystemFields } from './NtaPvFields';
 import {
   AirHeatersFields, BacsAndSupplyFields, BBL_FUNCTIONS, FunctionAreasFields, LABEL_FUNCTIONS,
 } from './NtaAdvancedSections';
@@ -74,6 +75,28 @@ function VerticalPipesFields({ draft, change, residential, path, label }: {
     </div>)}
     {list != null && list.length > 0 &&
       <button type="button" onClick={() => change(path, [...list, newPipe(list.length)])}>{t('nta.form.verticalPipes.add')}</button>}
+  </>;
+}
+
+/** 8.36: the ψ_gr;j and ℓ_j of the floor-edge bridges (§8.3.6). */
+export function GroundEdgeBridgesFields({ draft, change, base }: {
+  draft: Draft; change: (path: Path, value: unknown) => void; base: Path;
+}) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const bridges = (read(draft, base) as Draft[] | undefined) ?? [];
+  return <>
+    {bridges.map((_, bridge) => <div key={bridge} className="nta-form-row">
+      <NumberField {...field} path={[...base, bridge, 'lengthM']} label={`${t('nta.form.edgeBridges.length')} ${bridge + 1}`} />
+      <NumberField {...field} path={[...base, bridge, 'psiWPerMk']} label={t('nta.form.edgeBridges.psi')} />
+      <TextField {...field} path={[...base, bridge, 'sourceReference']} label={t('nta.form.source')} />
+      <button type="button" className="nta-form-remove" onClick={() => change(base, bridges.filter((__, other) => other !== bridge))}>
+        {t('nta.form.remove')}
+      </button>
+    </div>)}
+    <button type="button" onClick={() => change(base, [...bridges, { lengthM: null, psiWPerMk: null, sourceReference: '' }])}>
+      {t('nta.form.edgeBridges.add')}
+    </button>
   </>;
 }
 
@@ -243,6 +266,8 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
             <option value="detailed">{t('nta.form.edgeBridges.detailed')}</option>
           </select>
         </label>
+        {read(draft, ['groundFloors', index, 'edgeThermalBridges', 'method']) === 'detailed' &&
+          <GroundEdgeBridgesFields draft={draft} change={change} base={['groundFloors', index, 'edgeThermalBridges', 'bridges']} />}
         <GroundFloorDetailFields draft={draft} change={change} base={['groundFloors', index]} />
         <TextField {...field} path={['groundFloors', index, 'sourceReference']} label={t('nta.form.source')} />
       </div>)}
@@ -367,29 +392,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
     {!residential && <NtaLightingSection draft={draft} change={change} project={project} />}
     {pv.length > 0 && <Section title={t('nta.form.pv')}>
       {pv.map((item, index) => <div key={String(item.id)} className="nta-form-row">
-        <SelectField {...field} path={['pvSystems', index, 'peakPower', 'method']} label={`${String(item.id)} — ${t('nta.form.pvPeak')}`}
-          options={[['panels', t('nta.form.pvPeak.panels')], ['declared_specific', t('nta.form.pvPeak.declared')], ['table16_1', t('nta.form.pvPeak.table')]]} />
-        {read(draft, ['pvSystems', index, 'peakPower', 'method']) === 'panels' ? <>
-          <NumberField {...field} path={['pvSystems', index, 'peakPower', 'panelPeakPowerW']} label={t('nta.form.pvPanelPower')} />
-          <NumberField {...field} path={['pvSystems', index, 'peakPower', 'panelCount']} label={t('nta.form.pvPanelCount')} />
-        </> : <>
-          {read(draft, ['pvSystems', index, 'peakPower', 'method']) === 'table16_1'
-            ? <SelectField {...field} path={['pvSystems', index, 'peakPower', 'moduleType']} label={t('nta.form.pvModuleType')} options={[
-              ['monocrystalline_from2018', 'mono ≥ 2018'], ['monocrystalline2015_to2017', 'mono 2015–2017'],
-              ['monocrystalline2011_to2014', 'mono 2011–2014'], ['monocrystalline2001_to2010', 'mono 2001–2010'],
-              ['monocrystalline_before2001', 'mono < 2001'], ['multicrystalline_from2018', 'multi ≥ 2018'],
-              ['multicrystalline2015_to2017', 'multi 2015–2017'], ['multicrystalline2011_to2014', 'multi 2011–2014'],
-              ['multicrystalline2001_to2010', 'multi 2001–2010'], ['multicrystalline_before2001', 'multi < 2001'],
-              ['amorphous_single_junction', 'a-Si'], ['amorphous_multi_junction', 'a-Si multi'], ['cigs', 'CIGS'], ['cd_te', 'CdTe']]} />
-            : <NumberField {...field} path={['pvSystems', index, 'peakPower', 'peakPowerWPerM2']} label={t('nta.form.pvSpecificPeak')} />}
-          <NumberField {...field} path={['pvSystems', index, 'peakPower', 'panelAreaM2']} label={t('nta.form.pvArea')} />
-        </>}
-        <NumberField {...field} path={['pvSystems', index, 'azimuthDeg']} label={t('nta.form.pvAzimuth')} />
-        <NumberField {...field} path={['pvSystems', index, 'tiltDeg']} label={t('nta.form.tilt')} />
-        <SelectField {...field} path={['pvSystems', index, 'mounting']} label={t('nta.form.pvPerformance')}
-          options={[['unknown', t('nta.form.pvMount.unknown')], ['not_ventilated', '0,76'], ['moderately_ventilated', '0,80'], ['strongly_ventilated', '0,82']]} />
-        <NumberField {...field} path={['pvSystems', index, 'obstructionFactors', 0]} label={t('nta.form.obstruction')} />
-        <TextField {...field} path={['pvSystems', index, 'sourceReference']} label={t('nta.form.source')} />
+        <PvSystemFields draft={draft} change={change} base={['pvSystems', index]} label={String(item.id)} />
       </div>)}
     </Section>}
     <Section title={t('nta.form.inventory')}>

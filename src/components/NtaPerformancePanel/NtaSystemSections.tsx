@@ -655,6 +655,52 @@ function CollectorObstructionFields({ draft, change, base }: SectionProps & { ba
 }
 
 /**
+ * §13.7.2.2 collector field and solar store of a calculated solar system at
+ * `base` (the `method` block, or an annex P collective contribution).
+ */
+export function SolarCalculatedFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const orientations: Array<[string, string]> = ORIENTATIONS.map((key) => [key, t(`nta.form.orientation.${key}`)]);
+  const at = (...rest: Path): Path => [...base, ...rest];
+  return <>
+    <NumberField {...field} path={at('collectors', 'moduleAreaM2')} label={t('nta.form.solar.moduleArea')} />
+    <NumberField {...field} path={at('collectors', 'moduleCount')} label={t('nta.form.solar.moduleCount')} step="1" />
+    <SelectField {...field} path={at('collectors', 'orientation')} label={t('nta.form.solar.orientation')} options={orientations} />
+    <NumberField {...field} path={at('collectors', 'tiltDeg')} label={t('nta.form.tilt')} />
+    <CollectorObstructionFields draft={draft} change={change} base={at('collectors', 'obstruction')} />
+    <SelectField {...field} path={at('collectors', 'efficiency', 'method')} label={t('nta.form.solar.efficiency')} options={[
+      ['forfait', t('nta.form.solar.efficiency.forfait')], ['declared', t('nta.form.solar.efficiency.declared')]]}
+      onChange={(_, value) => change(at('collectors', 'efficiency'), value === 'declared'
+        ? { method: 'declared', eta0: null, a1WPerM2K: null, a2WPerM2K2: null, incidenceAngleModifier: null, sourceReference: '' }
+        : { method: 'forfait', collector: 'glazed' })} />
+    {read(draft, at('collectors', 'efficiency', 'method')) === 'declared' ? <>
+      <NumberField {...field} path={at('collectors', 'efficiency', 'eta0')} label="η0" />
+      <NumberField {...field} path={at('collectors', 'efficiency', 'a1WPerM2K')} label="a1 W/(m²K)" />
+      <NumberField {...field} path={at('collectors', 'efficiency', 'a2WPerM2K2')} label="a2 W/(m²K²)" />
+      <NumberField {...field} path={at('collectors', 'efficiency', 'incidenceAngleModifier')} label="IAM" />
+      <TextField {...field} path={at('collectors', 'efficiency', 'sourceReference')} label={t('nta.form.source')} />
+    </> : <SelectField {...field} path={at('collectors', 'efficiency', 'collector')} label={t('nta.form.solar.collector')} options={[
+      ['unglazed_or_unknown', t('nta.form.solar.collector.unglazed')], ['glazed', t('nta.form.solar.collector.glazed')],
+      ['evacuated_tube', t('nta.form.solar.collector.tube')]]} />}
+    <NumberField {...field} path={at('collectors', 'heatExchangerWPerK')} label={t('nta.form.solar.heatExchanger')} />
+    <SelectField {...field} path={at('collectors', 'loopPipes', 'method')} label={t('nta.form.solar.loop')} options={[
+      ['forfait', t('nta.form.solar.loop.forfait')], ['declared', t('nta.form.solar.loop.declared')]]}
+      onChange={(_, value) => change(at('collectors', 'loopPipes'), value === 'declared'
+        ? { method: 'declared', heatLossWPerK: null, sourceReference: '' } : { method: 'forfait' })} />
+    {read(draft, at('collectors', 'loopPipes', 'method')) === 'declared' && <>
+      <NumberField {...field} path={at('collectors', 'loopPipes', 'heatLossWPerK')} label={t('nta.form.solar.loopLoss')} />
+      <TextField {...field} path={at('collectors', 'loopPipes', 'sourceReference')} label={t('nta.form.source')} />
+    </>}
+    <NumberField {...field} path={at('collectors', 'pumpPowerW')} label={t('nta.form.solar.pump')} />
+    <NumberField {...field} path={at('storage', 'totalVolumeL')} label={t('nta.form.solar.volume')} />
+    <NumberField {...field} path={at('storage', 'backupVolumeL')} label={t('nta.form.solar.backupVolume')} />
+    <StorageLossFields draft={draft} change={change} base={at('storage', 'loss')} />
+    <CheckField {...field} path={at('storage', 'backupLossInGeneratorEfficiency')} label={t('nta.form.solar.backupInGenerator')} />
+  </>;
+}
+
+/**
  * §13.7 solar water heaters and solar combi systems (`hotWater.solar`), or
  * solar space heating without a hot-water system (`spaceHeatingSolar`).
  */
@@ -682,41 +728,7 @@ export function SolarWaterHeaterFields({ draft, change, base = ['hotWater', 'sol
           onChange={(_, value) => change(at('method'), value === 'tested' ? testedSolarMethod() : calculatedSolarMethod())} />
         <SelectField {...field} path={at('method', 'solarType')} label={t('nta.form.solar.type')} options={[
           ['preheater', t('nta.form.solar.type.preheater')], ['integrated_backup', t('nta.form.solar.type.integrated')]]} />
-        {method === 'calculated' && <>
-          <NumberField {...field} path={at('method', 'collectors', 'moduleAreaM2')} label={t('nta.form.solar.moduleArea')} />
-          <NumberField {...field} path={at('method', 'collectors', 'moduleCount')} label={t('nta.form.solar.moduleCount')} step="1" />
-          <SelectField {...field} path={at('method', 'collectors', 'orientation')} label={t('nta.form.solar.orientation')} options={orientations} />
-          <NumberField {...field} path={at('method', 'collectors', 'tiltDeg')} label={t('nta.form.tilt')} />
-          <CollectorObstructionFields draft={draft} change={change} base={at('method', 'collectors', 'obstruction')} />
-          <SelectField {...field} path={at('method', 'collectors', 'efficiency', 'method')} label={t('nta.form.solar.efficiency')} options={[
-            ['forfait', t('nta.form.solar.efficiency.forfait')], ['declared', t('nta.form.solar.efficiency.declared')]]}
-            onChange={(_, value) => change(at('method', 'collectors', 'efficiency'), value === 'declared'
-              ? { method: 'declared', eta0: null, a1WPerM2K: null, a2WPerM2K2: null, incidenceAngleModifier: null, sourceReference: '' }
-              : { method: 'forfait', collector: 'glazed' })} />
-          {read(draft, at('method', 'collectors', 'efficiency', 'method')) === 'declared' ? <>
-            <NumberField {...field} path={at('method', 'collectors', 'efficiency', 'eta0')} label="η0" />
-            <NumberField {...field} path={at('method', 'collectors', 'efficiency', 'a1WPerM2K')} label="a1 W/(m²K)" />
-            <NumberField {...field} path={at('method', 'collectors', 'efficiency', 'a2WPerM2K2')} label="a2 W/(m²K²)" />
-            <NumberField {...field} path={at('method', 'collectors', 'efficiency', 'incidenceAngleModifier')} label="IAM" />
-            <TextField {...field} path={at('method', 'collectors', 'efficiency', 'sourceReference')} label={t('nta.form.source')} />
-          </> : <SelectField {...field} path={at('method', 'collectors', 'efficiency', 'collector')} label={t('nta.form.solar.collector')} options={[
-            ['unglazed_or_unknown', t('nta.form.solar.collector.unglazed')], ['glazed', t('nta.form.solar.collector.glazed')],
-            ['evacuated_tube', t('nta.form.solar.collector.tube')]]} />}
-          <NumberField {...field} path={at('method', 'collectors', 'heatExchangerWPerK')} label={t('nta.form.solar.heatExchanger')} />
-          <SelectField {...field} path={at('method', 'collectors', 'loopPipes', 'method')} label={t('nta.form.solar.loop')} options={[
-            ['forfait', t('nta.form.solar.loop.forfait')], ['declared', t('nta.form.solar.loop.declared')]]}
-            onChange={(_, value) => change(at('method', 'collectors', 'loopPipes'), value === 'declared'
-              ? { method: 'declared', heatLossWPerK: null, sourceReference: '' } : { method: 'forfait' })} />
-          {read(draft, at('method', 'collectors', 'loopPipes', 'method')) === 'declared' && <>
-            <NumberField {...field} path={at('method', 'collectors', 'loopPipes', 'heatLossWPerK')} label={t('nta.form.solar.loopLoss')} />
-            <TextField {...field} path={at('method', 'collectors', 'loopPipes', 'sourceReference')} label={t('nta.form.source')} />
-          </>}
-          <NumberField {...field} path={at('method', 'collectors', 'pumpPowerW')} label={t('nta.form.solar.pump')} />
-          <NumberField {...field} path={at('method', 'storage', 'totalVolumeL')} label={t('nta.form.solar.volume')} />
-          <NumberField {...field} path={at('method', 'storage', 'backupVolumeL')} label={t('nta.form.solar.backupVolume')} />
-          <StorageLossFields draft={draft} change={change} base={at('method', 'storage', 'loss')} />
-          <CheckField {...field} path={at('method', 'storage', 'backupLossInGeneratorEfficiency')} label={t('nta.form.solar.backupInGenerator')} />
-        </>}
+        {method === 'calculated' && <SolarCalculatedFields draft={draft} change={change} base={at('method')} />}
         {method === 'tested' && <>
           <SelectField {...field} path={at('method', 'orientation')} label={t('nta.form.solar.orientation')} options={orientations} />
           <NumberField {...field} path={at('method', 'tiltDeg')} label={t('nta.form.tilt')} />

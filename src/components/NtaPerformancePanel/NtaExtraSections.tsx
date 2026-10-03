@@ -2,6 +2,9 @@ import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import { distributionSystemTemplate, lightingTemplate } from '../../core/nta/NtaFormModels';
 import {
+  DaylightSectorsFields, daylightSectorTemplate, LuminaireGroupsFields, luminaireGroupTemplate, ParasiticPowerFields,
+} from './NtaLightingDetails';
+import {
   CheckField, NumberField, read, Section, SelectField, TextField, type Draft, type Path,
 } from './NtaFormFields';
 
@@ -39,6 +42,14 @@ export function NtaUtilityGainsFields({ draft, change }: SectionProps) {
   </>;
 }
 
+/** A free `lighting-N` id for a new lighting zone. */
+function nextLightingZoneId(zones: Draft[]): string {
+  const taken = new Set(zones.map((zone) => String(zone.id)));
+  let index = zones.length + 1;
+  while (taken.has(`lighting-${index}`)) index += 1;
+  return `lighting-${index}`;
+}
+
 /** Chapter 14 lighting for the single-zone block. */
 export function NtaLightingSection({ draft, change, project }: SectionProps & { project: IProject }) {
   const { t } = useI18n();
@@ -63,28 +74,40 @@ export function NtaLightingSection({ draft, change, project }: SectionProps & { 
         <SelectField {...field} path={['lighting', 0, 'lightingZones', index, 'power', 'method']} label={t('nta.light.power')}
           options={[['forfait', t('nta.light.power.forfait')], ['installed', t('nta.light.power.installed')]]}
           onChange={(_, value) => change(['lighting', 0, 'lightingZones', index, 'power'], value === 'installed'
-            ? { method: 'installed', sourceReference: '', luminaires: [{ count: null, power: { method: 'system', powerW: null } }] }
+            ? { method: 'installed', sourceReference: '', luminaires: [luminaireGroupTemplate()] }
             : { method: 'forfait', ledFrom2017: false })} />
         {read(draft, ['lighting', 0, 'lightingZones', index, 'power', 'method']) === 'installed' ? <>
-          <NumberField {...field} path={['lighting', 0, 'lightingZones', index, 'power', 'luminaires', 0, 'count']} label={t('nta.light.count')} step="1" />
-          <NumberField {...field} path={['lighting', 0, 'lightingZones', index, 'power', 'luminaires', 0, 'power', 'powerW']} label={t('nta.light.systemPower')} />
+          <LuminaireGroupsFields draft={draft} change={change} base={['lighting', 0, 'lightingZones', index, 'power']} />
           <TextField {...field} path={['lighting', 0, 'lightingZones', index, 'power', 'sourceReference']} label={t('nta.form.source')} />
         </> : <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'power', 'ledFrom2017']} label={t('nta.light.led')} />}
+        <ParasiticPowerFields draft={draft} change={change} base={['lighting', 0, 'lightingZones', index, 'parasitic']} />
         <SelectField {...field} path={['lighting', 0, 'lightingZones', index, 'occupancy', 'control']} label={t('nta.light.control')} options={[
           ['manual_or_unknown', t('nta.light.control.manual')], ['manual_with_sweep', t('nta.light.control.sweep')],
           ['auto_on_dimmed', t('nta.light.control.autoDimmed')], ['auto_on_auto_off', t('nta.light.control.autoOff')],
           ['manual_on_dimmed', t('nta.light.control.manualDimmed')], ['manual_on_auto_off', t('nta.light.control.manualAutoOff')]]} />
         <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'occupancy', 'centralOnControl']} label={t('nta.light.central')} />
         <SelectField {...field} path={['lighting', 0, 'lightingZones', index, 'daylight', 'method']} label={t('nta.light.daylight')}
-          options={[['none', t('nta.light.daylight.none')], ['forfait', t('nta.light.daylight.forfait')]]}
+          options={[['none', t('nta.light.daylight.none')], ['forfait', t('nta.light.daylight.forfait')],
+            ['sectors', t('nta.light.daylight.sectors')]]}
           onChange={(_, value) => change(['lighting', 0, 'lightingZones', index, 'daylight'], value === 'forfait'
-            ? { method: 'forfait', daylightControl: false } : { method: 'none' })} />
+            ? { method: 'forfait', daylightControl: false }
+            : value === 'sectors' ? { method: 'sectors', sectors: [daylightSectorTemplate('vertical_windows')], sourceReference: '' }
+              : { method: 'none' })} />
         {read(draft, ['lighting', 0, 'lightingZones', index, 'daylight', 'method']) === 'forfait' &&
           <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'daylight', 'daylightControl']} label={t('nta.light.daylightControl')} />}
+        {read(draft, ['lighting', 0, 'lightingZones', index, 'daylight', 'method']) === 'sectors' &&
+          <DaylightSectorsFields draft={draft} change={change} base={['lighting', 0, 'lightingZones', index, 'daylight']} />}
         <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'extractedLuminaires']} label={t('nta.light.extracted')} />
+        {zones.length > 1 && <button type="button" className="nta-form-remove"
+          onClick={() => change(['lighting', 0, 'lightingZones'], zones.filter((__, other) => other !== index))}>{t('nta.form.remove')}</button>}
       </div>)}
+      <button type="button" onClick={() => change(['lighting', 0, 'lightingZones'], [...zones, {
+        id: nextLightingZoneId(zones), areaM2: null, power: { method: 'forfait', ledFrom2017: false }, parasitic: { method: 'forfait' },
+        occupancy: { control: 'manual_or_unknown', centralOnControl: false, largeOfficeGroup: false }, daylight: { method: 'none' },
+        extractedLuminaires: false,
+      }])}>{t('nta.light.addZone')}</button>
       <TextField {...field} path={['lighting', 0, 'sourceReference']} label={t('nta.form.source')} />
-      <p className="nta-form-note">{t('nta.light.note')}</p>
+      {project.zones.length > 1 && <p className="nta-form-note">{t('nta.light.note')}</p>}
     </>}
   </Section>;
 }
