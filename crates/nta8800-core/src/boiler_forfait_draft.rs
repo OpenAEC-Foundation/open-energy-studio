@@ -1,4 +1,6 @@
-//! Public chapter-9 consultation table 9.25 and equation 9.61 for gas-fired water boilers.
+//! NTA 8800:2025+C1:2026 table 9.25 (p. 327–328) and equation 9.61 (p. 326)
+//! for gas-fired water boilers, first taken from the consultation draft and
+//! checked against the final edition.
 //! Generator heat remains supplied by the caller or a separate dispatch step.
 
 use crate::final_energy_draft::MonthlyEnergy;
@@ -6,7 +8,8 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-const DRAFT_SOURCE: &str = "https://www.internetconsultatie.nl/epg2026/document/14150";
+const DRAFT_SOURCE: &str =
+    "NTA 8800:2025+C1:2026, tabel 9.25 (p. 327–328) en formule 9.61 (p. 326)";
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

@@ -259,10 +259,10 @@ export function additionalHotWaterGeneratorTemplate(): Block {
 }
 
 /** §13.7 calculated solar water heater with forfait collector values. */
-export function solarWaterHeaterTemplate(index = 0): Block {
+export function solarWaterHeaterTemplate(index = 0, solarUse = 'water_heating'): Block {
   return {
     id: `solar-${index + 1}`,
-    solarUse: 'water_heating',
+    solarUse,
     count: 1,
     method: calculatedSolarMethod(),
     pvt: null,
@@ -347,4 +347,123 @@ export function coolingPerformanceTemplate(method: string, roomUnit: boolean): B
 
 export function en14825PointTemplate(partLoadPercent = 47): Block {
   return EN14825_POINT(partLoadPercent);
+}
+
+/** 7.30b adjacent unheated sunroom; F_zi;ztu defaults to 1. */
+export function sunroomTemplate(index = 0): Block {
+  return {
+    id: `serre-${index + 1}`, glazingGHeating: null, glazingGCooling: null, exteriorFrameFraction: null,
+    reductionFactor: null, zoneConductanceWPerK: null, distributionFactor: 1, surfaces: [sunroomSurfaceTemplate()],
+    sourceReference: '',
+  };
+}
+
+/** One surface of a sunroom with its solar absorptance (7.6.6.3). */
+export function sunroomSurfaceTemplate(): Block {
+  return { areaM2: null, absorptance: null, azimuthDeg: null, tiltDeg: null };
+}
+
+/** Chapter 12 humidifier of one calculation zone. */
+export function humidifierTemplate(zoneId: string): Block {
+  return { zoneId, humidification: { humidifier: { kind: 'atomising' }, rotaryWheel: false, equipmentReference: '' } };
+}
+
+/** A cooling system with one generator of `kind`; without a kind the generator list is empty. */
+export function coolingSystemTemplate(kind?: string): Block {
+  return {
+    emission: { emitter: null, balancing: null, control: null, fanCoilCount: 0, sourceReference: '' },
+    distribution: null,
+    generators: kind ? [{ id: 'cold-1', generator: { kind }, capacityKw: null, equipmentReference: '' }] : [],
+    boosterHeatPumpExtractionKwh: [],
+  };
+}
+
+/** 9.6.1 `A_g;gebouw;H` of the collective installation. */
+export function collectiveConnectionTemplate(): Block {
+  return { connectedUsableAreaM2: null, sourceReference: '' };
+}
+
+/** 5.31/5.32 evidence for the renewable share of a heat pump. */
+export function heatPumpRenewableTemplate(): Block {
+  return { sourceBelow20C: false, exhaustAirSource: false, combinedOutdoorAndExhaustAir: false, sourceReference: '' };
+}
+
+/** §5.5 use determined outside the calculation, per month. */
+export function declaredUseTemplate(index = 0): Block {
+  return { id: `gebruik-${index + 1}`, service: null, carrier: 'el', monthlyKwh: [], sourceReference: '' };
+}
+
+/** 5.35/5.36 ambient heat of a hot-water heat pump determined elsewhere. */
+export function declaredRenewableHeatTemplate(index = 0): Block {
+  return { id: `warmte-${index + 1}`, monthlyKwh: [], sourceReference: '' };
+}
+
+/** Chapter 16 electricity produced on site per month. */
+export function onSiteProductionTemplate(index = 0): Block {
+  return { id: `opwekking-${index + 1}`, kind: 'pv', monthlyKwh: [], sourceReference: '' };
+}
+
+/** An annex P route (§5.8) of `method` for `fn` (heating, hot_water or cooling). */
+export function annexPRouteTemplate(method: string, fn: string): Block {
+  switch (method) {
+    case 'declared':
+      return { method, primaryFactor: null, renewableFactor: null, co2KgPerKwh: null, declarationReference: '', measuredOnly: false };
+    case 'measured':
+      return { method, function: fn, deliveredKwh: null, inputs: [{ carrier: { kind: 'natural_gas' }, kwh: null }],
+        exportedElectricityKwh: 0, renewableFactor: null, sourceReference: '' };
+    default:
+      return {
+        method: 'calculated', function: fn, deliveredKwh: null,
+        distribution: { method: 'flows', inputKwh: null, lossKwh: null, sourceReference: '' },
+        generators: [annexPGeneratorTemplate(0, fn === 'cooling' ? 'compression_chiller' : 'boiler')],
+        ...(fn === 'hot_water' ? { hotWaterStorage: { method: 'forfait', insulation: null } } : {}),
+        sourceReference: '',
+      };
+  }
+}
+
+/** One annex P generator with the kind-specific inputs of `kind`. */
+export function annexPGeneratorTemplate(index = 0, kind = 'combustion'): Block {
+  return { id: `opwekker-${index + 1}`, kind: annexPGeneratorKindTemplate(kind) };
+}
+
+/** The `kind` block of an annex P generator (P.6.5.4, P.6.7.4, tables P.3–P.10). */
+export function annexPGeneratorKindTemplate(kind: string): Block {
+  const gas = { kind: 'natural_gas' };
+  const electricity = { kind: 'electricity' };
+  switch (kind) {
+    case 'boiler':
+      return { kind, carrier: gas, efficiency: { method: 'table_p3', boiler: null } };
+    case 'heat_pump':
+      return { kind, efficiency: { method: 'table_p5', source: null, supplyTemperatureC: null }, drive: electricity };
+    case 'chp_without_loss':
+      return { kind, carrier: gas, tableP6: { electricalPowerKw: null, installedAfter2006: true } };
+    case 'chp_with_loss':
+      return { kind, carrier: gas };
+    case 'residual_heat':
+      return { kind };
+    case 'geothermal':
+      return { kind, sourceTemperatureC: null, returnTemperatureC: null };
+    case 'solid_biomass_boiler':
+      return { kind, carrier: { kind: 'biomass_above500_kw' }, netEfficiency: null, sourceReference: '' };
+    case 'declared':
+      return { kind, primaryFactor: null, co2KgPerKwh: null, renewableFactor: null, sourceReference: '' };
+    case 'compression_chiller':
+      return { kind, variant: 'unspecified', drive: electricity };
+    case 'free_cooling':
+      return { kind, source: null, drive: electricity };
+    case 'collective_solar':
+      return { kind, contribution: { method: 'declared', annualKwh: null, sourceReference: '' } };
+    case 'electric_flex':
+      return { kind, generator: { kind: 'electrode_boiler' }, connections: null, heatBuffer: false, registrationReference: '' };
+    case 'sorption_chiller':
+      return { kind, heat: { source: 'collective_heat', primaryFactor: null, co2KgPerKwh: null, sourceReference: '' } };
+    default:
+      return { kind: 'combustion', carrier: gas, efficiency: null, efficiencyReference: '' };
+  }
+}
+
+/** P.8 connected plot; without supplied flows the forfait tables P.14/P.15 apply. */
+export function annexPPlotTemplate(index = 0): Block {
+  return { id: `perceel-${index + 1}`, usableAreaM2: null, sourceReference: '' };
 }

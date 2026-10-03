@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import type { IProject } from '../core/energy/types';
 import { HotWaterGeneratorFields, SpaceGeneratorFields } from '../components/NtaPerformancePanel/NtaSystemSections';
 import {
@@ -198,14 +198,13 @@ describe('advanced NTA calculation fields', () => {
     });
     await user.click(screen.getAllByRole('button', { name: 'Remove system' })[1]);
     expect(current().bacs.systems).toHaveLength(1);
-    const supply = screen.getByRole('textbox', { name: 'External supply, annex P (JSON)' });
-    const value = { heating: { method: 'forfait' }, areaElectricity: [] };
-    fireEvent.change(supply, { target: { value: JSON.stringify(value) } });
-    fireEvent.blur(supply);
-    expect(current().externalSupply).toEqual(value);
-    fireEvent.change(supply, { target: { value: '' } });
-    fireEvent.blur(supply);
-    expect(current()).not.toHaveProperty('externalSupply');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'External heat for space heating (dh)' }), 'declared');
+    await user.type(screen.getByRole('spinbutton', { name: 'Primary fossil factor f_P;del' }), '0.5');
+    expect(current().externalSupply.heating).toEqual({
+      method: 'declared', primaryFactor: 0.5, renewableFactor: null, co2KgPerKwh: null, declarationReference: '', measuredOnly: false,
+    });
+    await user.selectOptions(screen.getByRole('combobox', { name: 'External heat for space heating (dh)' }), '');
+    expect(current().externalSupply.heating).toBeNull();
     await user.click(screen.getByRole('checkbox', { name: /Systems and BACS evidence/ }));
     expect(current()).not.toHaveProperty('bacs');
   });
