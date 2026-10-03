@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import {
-  CheckField, NumberField, read, Section, SelectField, TextField, write, type Draft, type Path,
+  CheckField, NumberField, read, Section, SelectField, TextField, TriStateField, write, type Draft, type Path,
 } from '../NtaPerformancePanel/NtaFormFields';
 import {
   assessResidentialSurveyWithRust, assessUtilitySurveyWithRust, type OpnameAssessment,
@@ -34,6 +34,9 @@ const COOLING_EMITTERS = ['split_indoor_units_on_wall', 'split_indoor_units_on_c
   'fan_coil_on_ceiling', 'floor_cooling', 'concrete_core_activation', 'wall_cooling', 'ceiling_cooling', 'other'];
 const UTILITY_FUNCTIONS = ['office', 'assembly_without_day_care', 'assembly_with_day_care', 'education',
   'healthcare_without_beds', 'healthcare_with_beds', 'retail', 'sport', 'lodging', 'cell'];
+const EMITTERS = ['radiators', 'low_temperature_radiators', 'floor_heating', 'floor_heating_and_radiators', 'air_heating',
+  'local_heaters'];
+const AIR_HEATING_KINDS = ['direct', 'indirect', 'via_air_handling_unit'];
 const ORIENTATIONS = ['north', 'north_east', 'east', 'south_east', 'south', 'south_west', 'west', 'north_west'];
 
 function opts(t: T, prefix: string, keys: string[]): Array<[string, string]> {
@@ -50,6 +53,58 @@ function KindSelect({ draft, path, label, kinds, prefix, template, change, t }: 
       {kinds.map((kind) => <option key={kind} value={kind}>{t(`${prefix}.${kind}`)}</option>)}
     </select>
   </label>;
+}
+
+/** ISSO table 9.16: emitters, and with air heating the air-heater type (unknown: null). */
+export function EmitterFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const emitters = read(draft, ['heating', 'emitters']);
+  const air = read(draft, ['heating', 'airHeating', 'kind']);
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
+  return <>
+    <label>{t('opname.heating.emitters')}
+      <select value={typeof emitters === 'string' ? emitters : ''} onChange={(event) => change(['heating'], {
+        ...(read(draft, ['heating']) as Draft), emitters: event.target.value,
+        airHeating: event.target.value === 'air_heating' ? read(draft, ['heating', 'airHeating']) ?? null : undefined,
+      })}>
+        {EMITTERS.map((key) => <option key={key} value={key}>{t(`opname.heating.emitters.${key}`)}</option>)}
+      </select>
+    </label>
+    {emitters === 'air_heating' && <>
+      <SelectField {...field} path={['heating', 'airHeating', 'kind']} label={t('opname.airHeating')}
+        options={opts(t, 'opname.airHeating.kind', AIR_HEATING_KINDS)}
+        onChange={(_, value) => change(['heating', 'airHeating'], value == null ? null
+          : value === 'direct' ? { kind: value, radialFan: null, count: null }
+            : value === 'indirect' ? { kind: value, roomHeightAbove8M: null, warmAirReturn: null, ecMotor: null, count: null }
+              : { kind: value })} />
+      {air === 'direct' && <TriStateField {...field} {...yesNo} path={['heating', 'airHeating', 'radialFan']} label={t('opname.airHeating.radialFan')} />}
+      {air === 'indirect' && <>
+        <TriStateField {...field} {...yesNo} path={['heating', 'airHeating', 'roomHeightAbove8M']} label={t('opname.airHeating.above8m')} />
+        <TriStateField {...field} {...yesNo} path={['heating', 'airHeating', 'warmAirReturn']} label={t('opname.airHeating.warmAirReturn')} />
+        <TriStateField {...field} {...yesNo} path={['heating', 'airHeating', 'ecMotor']} label={t('opname.airHeating.ecMotor')} />
+      </>}
+      {(air === 'direct' || air === 'indirect') &&
+        <NumberField {...field} path={['heating', 'airHeating', 'count']} label={t('opname.airHeating.count')} step="1" />}
+    </>}
+  </>;
+}
+
+/** ISSO §11.4.1/§11.5.6: passive cooling proven by a supplier project document. */
+export function PassiveCoolingFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const field = { draft, onChange: change };
+  const present = read(draft, ['ventilation', 'passiveCooling']) != null;
+  return <>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present} onChange={(event) => change(['ventilation', 'passiveCooling'],
+        event.target.checked ? { evidenceReference: '', installedCapacityDm3PerS: null } : null)} />
+      {t('opname.passiveCooling.present')}
+    </label>
+    {present && <>
+      <TextField {...field} path={['ventilation', 'passiveCooling', 'evidenceReference']} label={t('opname.passiveCooling.evidence')} />
+      <NumberField {...field} path={['ventilation', 'passiveCooling', 'installedCapacityDm3PerS']} label={t('opname.passiveCooling.installed')} />
+    </>}
+    <p className="nta-form-note">{t('opname.passiveCooling.note')}</p>
+  </>;
 }
 
 function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path: Path; change: Change; t: T }) {
@@ -326,6 +381,7 @@ export function BasisopnamePanel() {
     <Section title={t('opname.heating')}>
       <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} />
       <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
+      <EmitterFields draft={draft} change={change} t={t} />
       <CheckField {...field} path={['heating', 'addedPreferredGenerator']} label={t('opname.heating.addedPreferred')} />
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, ['heating', 'collective']) != null}
@@ -422,6 +478,10 @@ export function BasisopnamePanel() {
       <CheckField {...field} path={['ventilation', 'ahu', 'heatingConnected']} label={t('opname.ahu.heatingConnected')} />
       <CheckField {...field} path={['ventilation', 'ahu', 'coolingConnected']} label={t('opname.ahu.coolingConnected')} />
     </Section>}
+
+    <Section title={t('opname.passiveCooling')}>
+      <PassiveCoolingFields draft={draft} change={change} t={t} />
+    </Section>
 
     <Section title={t('opname.cooling')}>
       <label className="nta-form-check">

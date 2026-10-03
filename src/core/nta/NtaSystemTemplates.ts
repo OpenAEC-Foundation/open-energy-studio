@@ -36,11 +36,52 @@ export function spaceGeneratorTemplate(kind: string, project?: IProject): Block 
         sourceSystem: 'individual', sourceSystemReference: '' };
     case 'chp':
       return { kind, chp: chpClassTemplate(), method1: null, auxiliary: OTHER_AUX(), equipmentReference: '' };
+    case 'gas_heat_pump':
+      return { kind, table: 'residential_at_most25_kw', source: 'outdoor_air', designSupplyTemperatureC: null,
+        sourceCorrectionFactor: null, auxiliary: OTHER_AUX(), equipmentReference: '' };
     case 'multiple':
       return multipleGeneratorsTemplate(project);
     default:
       return null;
   }
+}
+
+/** Annex V regeneration of an individual ground source (table V.1). */
+export function regenerationTemplate(): Block {
+  return { freeCoolingFromSource: false, solar: [], sourceReference: '' };
+}
+
+/** Annex V: one solar collector field that regenerates the ground source. */
+export function solarRegenerationTemplate(): Block {
+  return { collectorAreaM2: null, azimuthDeg: 180, tiltDeg: 45, declaredEfficiency: null, sourceReference: '' };
+}
+
+/** §9.6.6.2 micro-CHP (method 1) measured at full load and CHP only. */
+export function microChpTemplate(): Block {
+  const point = () => ({ thermalPowerKw: null, electricPowerKw: null, thermalEfficiency: null, electricEfficiency: null,
+    auxiliaryPowerKw: null });
+  return { kind: 'stirling_engine', fuel: 'natural_gas', location: 'heated_space', hydraulics: null,
+    fullLoad: point(), chpOnly: point(), testReportReference: '' };
+}
+
+/** 9.23 with tables 9.12/9.13: fans and controls of air heaters. */
+export function airHeatersTemplate(kind: 'direct' | 'indirect' = 'direct'): Block {
+  return {
+    kind: kind === 'direct' ? { kind, radialFan: null } : { kind, roomHeightAbove8M: null, warmAirReturn: null, ecMotor: null },
+    designHeatLoadW: null,
+    sourceReference: '',
+  };
+}
+
+/** §5.5.8: systems and BACS evidence that derive f_BACS. */
+export function bacsTemplate(residential: boolean): Block {
+  return {
+    buildingUse: residential ? 'residential' : 'utility',
+    systemInventoryComplete: false,
+    systems: [{ id: 'heating-1', service: 'heating', sourceReference: '',
+      generators: [{ id: 'generator-1', nominalThermalCapacityKw: null, sourceReference: '' }] }],
+    bacs: { present: false, sourceReference: '' },
+  };
 }
 
 /** 9.6.1: a preferred heat pump and a boiler as the starting split. */
