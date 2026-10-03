@@ -145,8 +145,10 @@ describe('project dossier', () => {
       evidence: [evidence('ev-1', 'invoice', 'A')],
     });
     const { labelInputSha256 } = await import('../core/nta/Registration');
+    const originalText = '{"type":"open-energy-studio","project":{"name":"Woning"}}';
     base.registration!.relabelComparison = {
       originalFileName: 'origineel.oes.json', currentSha256: await labelInputSha256(base), assessment: assessmentW,
+      originalProjectText: originalText,
     };
     const status = (items: ReturnType<typeof checkDossierCompleteness>, id: string) =>
       items.find((item) => item.id === id);
@@ -182,11 +184,20 @@ describe('project dossier', () => {
     items = checkDossierCompleteness({ project: edited, labelInputSha256: await labelInputSha256(edited) });
     expect(status(items, 'relabel_changes')?.status).toBe('check');
 
-    // The dossier export writes the kept comparison.
+    // The dossier export writes the kept comparison and the original file
+    // on its own, so the manifest's SHA-256 is the one of the original.
     const bundle = await buildProjectDossier({ project: base });
     const record = JSON.parse(strFromU8(bundle.files['herlabel-vergelijking.json']));
     expect(record.originalFileName).toBe('origineel.oes.json');
     expect(record.assessment.changes).toHaveLength(1);
+    expect(record.originalProjectText).toBeUndefined();
+    expect(strFromU8(bundle.files['herlabel-origineel.oes.json'])).toBe(originalText);
+
+    // A comparison kept without the original file cannot be checked again.
+    const legacy = { ...base, registration: { ...base.registration!, originalCertificateNumber: 'K1',
+      relabelComparison: { ...base.registration!.relabelComparison!, originalProjectText: undefined } } } as IProject;
+    items = checkDossierCompleteness({ project: legacy, labelInputSha256: await labelInputSha256(legacy) });
+    expect(status(items, 'relabel_changes')?.status).toBe('check');
   });
 
   it('keeps the relabel comparison and stated answers when cleaning the registration', () => {

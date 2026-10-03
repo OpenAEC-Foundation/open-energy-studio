@@ -55,7 +55,8 @@ export function RelabelPanel() {
         sha256Hex(new TextEncoder().encode(text)), labelInputSha256(state.project),
       ]);
       if (requestId.current === current) {
-        store({ originalFileName: file.name, originalSha256, currentSha256, comparedAt: new Date().toISOString(), assessment });
+        store({ originalFileName: file.name, originalSha256, currentSha256, comparedAt: new Date().toISOString(),
+          originalProjectText: text, assessment });
       }
     } catch (reason) {
       if (requestId.current === current) setError(reason instanceof Error ? reason.message : String(reason));

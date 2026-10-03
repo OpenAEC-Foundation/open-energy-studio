@@ -34,6 +34,19 @@ import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
+import { migrateLegacyRelabel } from './core/nta/Registration';
+
+/** Shows the relabel migration notice once per project (per browser profile). */
+function relabelNoticeShown(projectId: string | undefined): boolean {
+  const key = `oes-relabel-migration-notice:${projectId ?? 'unknown'}`;
+  try {
+    if (localStorage.getItem(key)) return true;
+    localStorage.setItem(key, '1');
+  } catch {
+    // Storage unavailable: show the notice each time.
+  }
+  return false;
+}
 import { stampProject } from './core/io/KernelStampClient';
 import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
 import { AppMenu } from './components/AppMenu/AppMenu';
@@ -366,8 +379,12 @@ function AppContent() {
       });
       if (!filePath) return;
       const json = await readTextFile(filePath as string);
-      const { project: loaded, kernel: saved } = deserializeProjectFile(json);
+      const { project: opened, kernel: saved } = deserializeProjectFile(json);
+      const { project: loaded, missing } = migrateLegacyRelabel(opened);
       docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath: filePath as string } });
+      if (missing.length > 0 && !relabelNoticeShown(loaded.id)) {
+        alert(t('relabel.migrationNotice', { fields: missing.map((field) => t(`relabel.migrationField.${field}`)).join(', ') }));
+      }
       const current = await stampProject(loaded);
       const [difference] = compareKernelStamp(saved, current);
       if (difference === 'version' && saved && current) {

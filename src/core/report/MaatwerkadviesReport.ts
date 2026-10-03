@@ -2,6 +2,7 @@ import type { IProject } from '../energy/types';
 import type { MaatwerkadviesAssessment, MwaVariantResult, NtaMaatwerkadvies } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
 import { dutchCodeCell, dutchNumber, dutchTimeHtml } from './DutchReportText';
+import { measureEvidenceNotes } from '../nta/MwaTemplates';
 
 function cell(value: unknown): string { return `<td>${escapeHtml(value)}</td>`; }
 function num(value: number | null | undefined, digits = 0): string {
@@ -78,7 +79,9 @@ export function generateMaatwerkadviesReportHTML(
   const tariffs = definition.tariffs;
   const fit = assessment.fitCheck;
   const advice = assessment.advice;
-  const measureRows = definition.measures.map((measure) => `<tr>${cell(measure.name)}${cell(measure.category)}${n(measure.investmentEur)}${cell(measure.costSource)}
+  const evidenceNote = (measure: (typeof definition.measures)[number]) => measureEvidenceNotes(measure)
+    .map((note) => `<br><small>PV ${escapeHtml(note.id)}: belemmeringssituatie a) (minimaal, NTA 8800 tabel 17.3) — onderbouwing: ${escapeHtml(note.source)}</small>`).join('');
+  const measureRows = definition.measures.map((measure) => `<tr><td>${escapeHtml(measure.name)}${evidenceNote(measure)}</td>${cell(measure.category)}${n(measure.investmentEur)}${cell(measure.costSource)}
     ${n(measure.lifetimeYears)}${n(measure.maintenanceEurPerYear ?? 0)}${cell(measure.phaseYear ?? '—')}</tr>`).join('');
   const packageRows = definition.packages.map((item) => {
     const names = item.measureIds.map((id) => definition.measures.find((m) => m.id === id)?.name ?? id).join(', ');

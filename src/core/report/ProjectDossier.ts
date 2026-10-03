@@ -7,6 +7,7 @@ import { evidenceArchiveName, loadEvidenceBytes, sha256Hex } from '../nta/Eviden
 import { serializeProject, type KernelStamp } from '../io/ProjectSerializer';
 import { labelInputSha256, relabelDeadline } from '../nta/Registration';
 import { isProductionPath } from '../nta/RelabelText';
+import { measureEvidenceNotes } from '../nta/MwaTemplates';
 
 /**
  * Project dossier of an EP adviser (BRL 9500-W Bijlage 3, p. 61–63;
@@ -166,12 +167,22 @@ export function checkDossierCompleteness({ project, assessment, opname, relabel:
   if (bbl) {
     attention('forfait_justification', 'evidence', 'Onderbouwing van gebruikte forfaitaire waarden', 'alleen bij toets Bbl');
   }
+  // Maatwerkadvies: PV on minimal obstruction needs its evidence (table 17.3 situation a), p. 706–707).
+  const pvNotes = (project.maatwerkadvies?.measures ?? []).flatMap((measure) =>
+    measureEvidenceNotes(measure).map((note) => `${measure.name} / PV ${note.id}: ${note.source}`));
+  if (pvNotes.length > 0) {
+    attention('mwa_pv_minimal_obstruction', 'evidence', 'Onderbouwing minimale belemmering van PV in het maatwerkadvies (NTA 8800 tabel 17.3 situatie a)',
+      pvNotes.join('; '));
+  }
 
   // Herlabelen (BRL 9500-W §4.2.3 p. 23 en Bijlage 3 p. 63; 9500-U p. 18–19 en p. 54)
   if ((registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) === 'relabel') {
     const stored = registration.relabelComparison;
     const outdated = Boolean(!given && stored?.currentSha256 && currentSha && stored.currentSha256 !== currentSha);
-    if (outdated) {
+    if (!given && stored && !stored.originalProjectText) {
+      attention('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
+        'de vergelijking bevat het oorspronkelijke projectbestand niet; vergelijk opnieuw zodat de registratiecontrole het kan nagaan');
+    } else if (outdated) {
       attention('relabel_changes', 'relabel', 'Overzicht later aangebrachte wijzigingen (Bijlage 6a)',
         'het project is na de herlabelvergelijking gewijzigd; vergelijk opnieuw');
     } else {
@@ -249,8 +260,12 @@ export async function buildProjectDossier(
   if (context.opname) files['basisopname-output.json'] = strToU8(JSON.stringify(context.opname, null, 2));
   if (relabel) {
     const stored = project.registration?.relabelComparison;
-    const record = context.relabel ? { assessment: context.relabel } : stored;
+    // The original project goes in as its own file, so the manifest's
+    // SHA-256 of it equals the comparison's `originalSha256`.
+    const { originalProjectText, ...rest } = stored ?? { originalProjectText: undefined };
+    const record = context.relabel ? { assessment: context.relabel } : stored ? rest : undefined;
     files['herlabel-vergelijking.json'] = strToU8(JSON.stringify(record, null, 2));
+    if (!context.relabel && originalProjectText) files['herlabel-origineel.oes.json'] = strToU8(originalProjectText);
   }
   const missingEvidence: DossierManifest['missingEvidence'] = [];
   for (const item of project.registration?.evidence ?? []) {

@@ -28,7 +28,8 @@
 //! insulation changes carry a confirmation note.
 
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 pub const RELABEL_SOURCE_W: &str =
     "BRL 9500-W (14-10-2025) §4.2.3–4.2.4 (p. 23–24), Bijlage 6a (p. 67) and 6b (p. 68)";
@@ -79,6 +80,11 @@ pub struct RelabelAssessment {
     pub allowed: bool,
     pub needs_review: bool,
     pub changes: Vec<RelabelChange>,
+    /// [`label_input_hash`] of the original project.
+    pub original_label_input_hash: String,
+    /// [`label_input_hash`] of the compared project; a registration whose
+    /// project hashes differently has an out-of-date comparison.
+    pub current_label_input_hash: String,
 }
 
 /// Keys whose change says nothing about the building.
@@ -194,6 +200,17 @@ const PRODUCTION_ARRAYS: &[&str] = &[
     "solarWaterHeaters",
 ];
 
+/// Size, tilt and orientation of building-bound production in the NTA
+/// input (`pvSystems`, solar collectors) and the legacy `solarThermal`.
+const PRODUCTION_GEOMETRY_KEYS: &[&str] = &[
+    "tiltDeg",
+    "azimuthDeg",
+    "moduleAreaM2",
+    "collectorAreaM2",
+    "collectorArea",
+    "peakPower",
+];
+
 /// Project blocks that are not label input: the maatwerkadvies and the
 /// basic survey kept with the project, and the registration (compared only
 /// for the survey date).
@@ -230,7 +247,22 @@ enum Service {
 
 fn service_of(path: &str) -> Option<Service> {
     let lower = path.to_ascii_lowercase();
-    if lower.contains("ventilation") {
+    let parts = segments(path);
+    // Space heating's own subsystems sit directly in the NTA block
+    // (`emission`, `distribution`, `distributionSystem`) and per zone in
+    // `zoneData[i]`, without "heating" in their path.
+    let nta_heating = parts.first().map(String::as_str) == Some("ntaCalculation")
+        && match parts.get(1).map(String::as_str) {
+            Some("emission" | "distribution" | "distributionSystem") => true,
+            Some("zoneData") => matches!(
+                parts.get(3).map(String::as_str),
+                Some("emission" | "distribution")
+            ),
+            _ => false,
+        };
+    if nta_heating {
+        Some(Service::Heating)
+    } else if lower.contains("ventilation") {
         Some(Service::Ventilation)
     } else if lower.contains("hotwater") || lower.contains("tapwater") || lower.contains("dhw") {
         Some(Service::HotWater)
@@ -320,7 +352,12 @@ fn classify(
     // PV or solar thermal resized, tilted or turned: building-bound
     // production, 6a for a one-to-one replacement and 6b for a system
     // change (W p. 67–68, U p. 58–59); not an area of the building.
-    if is_production_path(path) && GEOMETRY_KEYS.contains(&key.as_str()) {
+    if is_production_path(path)
+        && parts.iter().any(|segment| {
+            GEOMETRY_KEYS.contains(&segment.as_str())
+                || PRODUCTION_GEOMETRY_KEYS.contains(&segment.as_str())
+        })
+    {
         return change(
             RelabelVerdict::Review,
             "building-bound production: size, tilt or orientation changed",
@@ -519,6 +556,10 @@ fn review_shares_next_to_added_generators(changes: &mut [RelabelChange]) {
 /// project per Bijlage 6a/6b. The registration block is compared only for
 /// the survey date, which must stay the original one (§4.2.4).
 pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
+    // The app leaves null members out of the NTA block before a kernel
+    // call; a null and an absent member are the same input here.
+    let original = &without_null_members(original);
+    let current = &without_null_members(current);
     let scheme = match current
         .get("buildingFunction")
         .or_else(|| original.get("buildingFunction"))
@@ -555,13 +596,166 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
             .iter()
             .any(|change| change.verdict == RelabelVerdict::Review),
         changes,
+        original_label_input_hash: label_input_hash(original),
+        current_label_input_hash: label_input_hash(current),
     }
+}
+
+/// Copy of `value` without null object members, at any depth; null array
+/// elements stay, as in the app's `withoutNulls`.
+fn without_null_members(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .filter(|(_, item)| !item.is_null())
+                .map(|(key, item)| (key.clone(), without_null_members(item)))
+                .collect::<Map<String, Value>>(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(without_null_members).collect()),
+        other => other.clone(),
+    }
+}
+
+/// Writes `value` as JSON with object keys sorted, independent of how the
+/// map was built.
+fn write_canonical(value: &Value, out: &mut String) {
+    match value {
+        Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            out.push('{');
+            for (index, key) in keys.into_iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                out.push_str(&Value::String(key.clone()).to_string());
+                out.push(':');
+                write_canonical(&map[key], out);
+            }
+            out.push('}');
+        }
+        Value::Array(items) => {
+            out.push('[');
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                write_canonical(item, out);
+            }
+            out.push(']');
+        }
+        other => out.push_str(&other.to_string()),
+    }
+}
+
+/// SHA-256 (lowercase hex) of a project's label input: the project without
+/// the registration, maatwerkadvies and basic survey, null members left
+/// out and object keys sorted, so key order and nulls do not change it.
+pub fn label_input_hash(project: &Value) -> String {
+    let mut input = without_null_members(project);
+    if let Value::Object(map) = &mut input {
+        for block in NON_LABEL_BLOCKS {
+            map.remove(*block);
+        }
+    }
+    let mut text = String::new();
+    write_canonical(&input, &mut text);
+    format!("{:x}", Sha256::digest(text.as_bytes()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn nta_heating_subsystems_follow_bijlage_6a() {
+        // W p. 67: heating distribution, emission and control are 6a; the
+        // NTA block keeps them without "heating" in the path.
+        let original: Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../training-data/nta8800-example-terraced-dwelling.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut current = original.clone();
+        let nta = &mut current["ntaCalculation"];
+        nta["emission"]["sourceReference"] = json!("offerte");
+        nta["emission"]["edited"] = json!(true);
+        nta["distribution"]["edited"] = json!(true);
+        nta["hotWater"]["emission"]["edited"] = json!(true);
+        nta["hotWater"]["generator"]["edited"] = json!(true);
+        nta["ventilation"]["fans"] = json!("changed");
+        let result = assess_relabel(&original, &current);
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/emission/edited"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/distribution/edited"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/hotWater/emission/edited"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            service_of("/ntaCalculation/zoneData/0/emission/kind"),
+            Some(Service::Heating)
+        );
+        assert_eq!(
+            service_of("/ntaCalculation/distributionSystem/pump"),
+            Some(Service::Heating)
+        );
+        assert_eq!(
+            service_of("/ntaCalculation/ventilation/system/unit"),
+            Some(Service::Ventilation)
+        );
+        assert_eq!(
+            service_of("/ntaCalculation/hotWater/distribution/loop"),
+            Some(Service::HotWater)
+        );
+        assert_eq!(
+            service_of("/ntaCalculation/coolingSystems/0/emission"),
+            Some(Service::Cooling)
+        );
+        assert_eq!(
+            service_of("/ntaCalculation/additionalHeatingSystems/0/emission"),
+            Some(Service::Heating)
+        );
+    }
+
+    #[test]
+    fn nta_production_geometry_needs_review() {
+        let original = json!({"ntaCalculation": {"pvSystems": [{"id": "pv", "tiltDeg": 30.0,
+            "azimuthDeg": 180.0, "peakPower": {"method": "panels", "panelPeakPowerW": 400.0}}]},
+            "solarThermal": [{"collectorArea": 4.0}]});
+        let mut current = original.clone();
+        current["ntaCalculation"]["pvSystems"][0]["tiltDeg"] = json!(40.0);
+        current["ntaCalculation"]["pvSystems"][0]["azimuthDeg"] = json!(200.0);
+        current["ntaCalculation"]["pvSystems"][0]["peakPower"]["panelPeakPowerW"] = json!(450.0);
+        current["solarThermal"][0]["collectorArea"] = json!(6.0);
+        let result = assess_relabel(&original, &current);
+        for path in [
+            "/ntaCalculation/pvSystems/0/tiltDeg",
+            "/ntaCalculation/pvSystems/0/azimuthDeg",
+            "/ntaCalculation/pvSystems/0/peakPower/panelPeakPowerW",
+            "/solarThermal/0/collectorArea",
+        ] {
+            assert_eq!(verdict(&result, path), RelabelVerdict::Review, "{path}");
+        }
+    }
+
+    #[test]
+    fn label_input_hash_ignores_key_order_nulls_and_registration() {
+        let a = json!({"b": 1.5, "a": {"y": null, "x": [1, null]}, "registration": {"x": 1}});
+        let b: Value = serde_json::from_str(r#"{"a":{"x":[1,null]},"b":1.5}"#).unwrap();
+        assert_eq!(label_input_hash(&a), label_input_hash(&b));
+        let c = json!({"a": {"x": [1, 2]}, "b": 1.5});
+        assert_ne!(label_input_hash(&a), label_input_hash(&c));
+    }
 
     fn project() -> Value {
         json!({

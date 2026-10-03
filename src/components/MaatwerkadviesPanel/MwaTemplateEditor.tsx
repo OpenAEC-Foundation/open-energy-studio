@@ -115,7 +115,7 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
   const { t } = useI18n();
   if (!measure.template) return null;
   // Saved snapshot forms (ventilation, lighting) open in their current form.
-  const { template, migrated } = normalizeTemplate(project, measure.template);
+  const { template } = normalizeTemplate(project, measure.template);
   const set = (next: MwaMeasureTemplate) => onChange(applyTemplate(project, measure, next));
   const { patch, problems } = buildTemplatePatch(project, measure.template, measure.id);
   const block = project.ntaCalculation as unknown as Block | undefined;
@@ -305,9 +305,9 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
       const current = (block?.lighting as Block[] | undefined) ?? [];
       const draft = { lighting: applyLightingChanges(current, template.zones), labelFunction: block?.labelFunction, calculationScope: block?.calculationScope };
       fields = <>
-        {migrated && <p className="mwa-wide nta-form-note" data-testid={`mwa-template-migrated-${measure.id}`}>
+        {template.reviewed === false && <p className="mwa-wide nta-form-note" data-testid={`mwa-template-migrated-${measure.id}`}>
           {t('mwa.template.migrated')}{' '}
-          <button type="button" className="btn" onClick={() => set(template)}>{t('mwa.template.migratedConfirm')}</button>
+          <button type="button" className="btn" onClick={() => set({ ...template, reviewed: true })}>{t('mwa.template.migratedConfirm')}</button>
         </p>}
         <DraftFields draft={draft} onDraft={(next) => set({ ...template, zones: lightingChanges(current, (next.lighting as Block[]) ?? []) })}>
           {(change) => <NtaLightingSection draft={draft} change={change} project={project} />}

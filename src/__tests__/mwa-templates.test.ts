@@ -5,7 +5,8 @@ import type { IProject } from '../core/energy/types';
 import { buildMaatwerkadviesInput, type MwaMeasure, type NtaMaatwerkadvies } from '../core/nta/KernelClient';
 import {
   applyLightingChanges, applyPatchOperation, buildTemplatePatch, diffOperations, heatPumpGeneratorTemplate, initialTemplate, insulationOptions,
-  insulationValues, lightingChanges, pvSystemTemplate, regenerateTemplatePatches, TEMPLATE_CATEGORY, TEMPLATE_LIFETIME, windowOptions,
+  insulationValues, lightingChanges, measureEvidenceNotes, normalizeTemplate, pvSystemTemplate, PV_OBSTRUCTION_SOURCE,
+  regenerateTemplatePatches, TEMPLATE_CATEGORY, TEMPLATE_LIFETIME, windowOptions,
   type LegacyTemplate, type MwaMeasureTemplate,
 } from '../core/nta/MwaTemplates';
 import { templateMeasure } from '../components/MaatwerkadviesPanel/MwaTemplateEditor';
@@ -215,6 +216,26 @@ describe('maatwerkadvies measure templates', () => {
     const light = buildTemplatePatch(office, { kind: 'lighting', lighting: snapshot } as LegacyTemplate, 'm1');
     expect(light.problems).toEqual(['migrationReview']);
     expect(light.patch.map((operation) => operation.path)).toEqual(['/ntaCalculation/lighting/0/lightingZones/0/occupancy']);
+
+    // Editing the migrated measure keeps the review open; only the
+    // adviser's confirmation (`reviewed: true`) clears it.
+    const { template: migrated } = normalizeTemplate(office, { kind: 'lighting', lighting: snapshot } as LegacyTemplate);
+    expect(migrated).toMatchObject({ kind: 'lighting', reviewed: false });
+    const edited = { ...(migrated as Extract<MwaMeasureTemplate, { kind: 'lighting' }>), zones: {} };
+    expect(buildTemplatePatch(office, edited, 'm1').problems).toContain('migrationReview');
+    expect(buildTemplatePatch(office, { ...edited, reviewed: true }, 'm1').problems).not.toContain('migrationReview');
+
+    // A ventilation snapshot without a system never writes `{}`.
+    const empty = buildTemplatePatch(dwelling, { kind: 'ventilation', ventilation: { other: 1 } } as LegacyTemplate, 'm1');
+    expect(empty.problems).toEqual(['ventilationSystemRequired']);
+    expect(empty.patch).toEqual([]);
+  });
+
+  it('keeps the minimal-obstruction evidence of PV for the report and dossier (table 17.3 a)', () => {
+    const system = { ...pvSystemTemplate(0), obstruction: { method: 'minimal' }, [PV_OBSTRUCTION_SOURCE]: 'foto zuiddak' };
+    const measure = { template: { kind: 'pv' as const, systems: [system, pvSystemTemplate(1)] } };
+    expect(measureEvidenceNotes(measure)).toEqual([{ id: 'pv-1', source: 'foto zuiddak' }]);
+    expect(measureEvidenceNotes({ template: { kind: 'pv', systems: [pvSystemTemplate(0)] } })).toEqual([]);
   });
 
   it('marks incomplete measures for the kernel and regenerates in the kernel input', () => {

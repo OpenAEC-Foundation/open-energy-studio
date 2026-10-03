@@ -58,9 +58,11 @@ describe('relabel comparison', () => {
     })) });
     await user.upload(screen.getByLabelText('Original project file:'), file);
     expect(await screen.findByText('Relabelling allowed')).toBeInTheDocument();
-    const stored = (registration as { relabelComparison?: { originalFileName: string; currentSha256?: string; assessment: unknown } })
+    const stored = (registration as { relabelComparison?: { originalFileName: string; currentSha256?: string; originalProjectText?: string; assessment: unknown } })
       .relabelComparison;
     expect(stored?.originalFileName).toBe('original.oes');
+    // The original file is kept so the registration check can compare again.
+    expect(JSON.parse(stored?.originalProjectText ?? '{}').project).toEqual({ id: 'original' });
     expect(stored?.currentSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(stored?.assessment).toEqual(verdict);
     expect(screen.queryByTestId('relabel-outdated')).not.toBeInTheDocument();
