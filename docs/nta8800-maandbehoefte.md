@@ -102,7 +102,7 @@ Invoer voor de zontoetreding per raam:
 6. Een maand met `H_tr + H_g;adj + H_ve ≤ 0` (bijvoorbeeld door warme toevoerlucht met negatieve `b_v`) wordt geweigerd; de tijdconstante is dan niet gedefinieerd.
 7. TOjuli (§5.7) gebruikt in de balans en in 5.40 de juliwaarde `H_gr;an`, en in de tijdconstante `H_C;g;adj`.
 8. Bijlage B: een vrijhangend plafond met ten minste 15 % open oppervlak telt niet mee voor de weerstand vanaf het binnenoppervlak. Omdat het geen bouwconstructie is, telt de module ook de massa ervan niet mee.
-9. Bijlage A: de correctiefactoren van stap 2 hebben geen forfaitaire waarde. Zonder opgegeven `correction` zijn ze 1. De kern heeft geen uurklimaat, dus de gewichten van stap 1 worden opgegeven. De nominale U van het raam moet in de transmissie-invoer staan, omdat de module per maand alleen het verschil corrigeert. TOjuli gebruikt per oriëntatie nog de nominale U.
+9. Bijlage A: de correctiefactoren van stap 2 hebben geen forfaitaire waarde. Zonder opgegeven `correction` zijn ze 1. De kern heeft geen uurklimaat, dus de gewichten van stap 1 worden opgegeven. De nominale U van het raam moet in de transmissie-invoer staan, omdat de module per maand alleen het verschil corrigeert. TOjuli gebruikt per oriëntatie de juliwaarde `U_jul` (`transmission_u_for_month`).
 10. 7.28: De legenda beschrijft `W_t` als het verlichtingsgebruik voor de vereiste lichtniveaus, wat op `W_L` (14.7) lijkt, maar het symbool en de verwijzing naar 14.2.2 wijzen naar het totaal `W_t = W_L + W_P` (14.6). De kern volgt het symbool en de verwijzing: de interne warmtelast van verlichting is `f_L·(W_L + W_P)·1000/t_an`, dus inclusief parasitaire energie (`internal_gain_w` in `lighting.rs`).
 
 ## Toetsing
