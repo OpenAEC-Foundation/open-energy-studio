@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ClipboardList } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
@@ -102,10 +102,11 @@ export function convertPatchValue(value: unknown, kind: PatchValueKind): unknown
 const VALUE_KINDS: PatchValueKind[] = ['number', 'text', 'boolean', 'null', 'json'];
 
 /** The value of one patch row with its JSON type chosen explicitly. */
-function PatchValueField({ value, onChange }: { value: unknown; onChange: (value: unknown) => void }) {
+function PatchValueField({ value, fresh, onChange }: { value: unknown; fresh: boolean; onChange: (value: unknown) => void }) {
   const { t } = useI18n();
-  // A fresh row (null) starts as a number, the usual change.
-  const [kind, setKind] = useState<PatchValueKind>(() => (value === null ? 'number' : patchValueKind(value)));
+  // A row added now (null) starts as a number, the usual change; a saved
+  // null reopens as null.
+  const [kind, setKind] = useState<PatchValueKind>(() => (fresh && value === null ? 'number' : patchValueKind(value)));
   const [text, setText] = useState(() => (kind === 'json' ? JSON.stringify(value)
     : typeof value === 'number' ? String(value) : ''));
   return <>
@@ -151,13 +152,19 @@ export function MeasurePatchFields({ patch, onChange }: {
   onChange: (patch: MwaPatchOperation[]) => void;
 }) {
   const { t } = useI18n();
+  // Stable row keys, so a row's local value state stays with its row when
+  // another row is removed; rows added in this editor are marked fresh.
+  const keys = useRef<{ next: number; ids: number[]; fresh: Set<number> }>({ next: 0, ids: [], fresh: new Set() });
+  const rows = keys.current;
+  while (rows.ids.length < patch.length) rows.ids.push(rows.next++);
+  if (rows.ids.length > patch.length) rows.ids.length = patch.length;
   const update = (index: number, operation: MwaPatchOperation) =>
     onChange(patch.map((item, other) => (other === index ? operation : item)));
   return (
     <fieldset className="mwa-wide mwa-patch">
       <legend>{t('mwa.measure.patch')}</legend>
       {patch.map((operation, index) => (
-        <div key={index} className="mwa-patch-row">
+        <div key={rows.ids[index]} className="mwa-patch-row">
           <label>{t('mwa.patch.op')}
             <select value={operation.op} onChange={(e) => {
               const op = e.target.value as MwaPatchOperation['op'];
@@ -173,12 +180,20 @@ export function MeasurePatchFields({ patch, onChange }: {
             <input value={operation.path} placeholder="/ntaCalculation/…"
               onChange={(e) => update(index, { ...operation, path: e.target.value })} />
           </label>
-          {operation.op !== 'remove' && <PatchValueField value={operation.value}
+          {operation.op !== 'remove' && <PatchValueField value={operation.value} fresh={rows.fresh.has(rows.ids[index])}
             onChange={(value) => update(index, { ...operation, value })} />}
-          <button type="button" onClick={() => onChange(patch.filter((_, other) => other !== index))}>{t('mwa.remove')}</button>
+          <button type="button" onClick={() => {
+            rows.ids.splice(index, 1);
+            onChange(patch.filter((_, other) => other !== index));
+          }}>{t('mwa.remove')}</button>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...patch, { op: 'replace', path: '', value: null }])}>
+      <button type="button" onClick={() => {
+        const id = rows.next++;
+        rows.ids.push(id);
+        rows.fresh.add(id);
+        onChange([...patch, { op: 'replace', path: '', value: null }]);
+      }}>
         {t('mwa.patch.addOperation')}
       </button>
     </fieldset>

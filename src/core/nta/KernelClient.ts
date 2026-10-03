@@ -3377,6 +3377,7 @@ export interface NtaAnnexPSystemResult {
     deliveredKwh: number;
     inputKwh: number;
     distributionLossKwh: number;
+    /** Q_XD;in;mi (P.33). For cold the months follow P.78 without dehumidification, so they can sum below `inputKwh`. */
     monthlyInputKwh: number[];
     auxiliaryElectricityKwh: number;
     auxiliary?: { distributionKwh: number; solarKwh: number; generatorsKwh: number; totalKwh: number };

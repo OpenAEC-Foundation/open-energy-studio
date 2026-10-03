@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { BuildingFunction } from '../../../core/energy/types';
 import type { NtaDetailSurveyTriggers, NtaRegistration } from '../../../core/nta/KernelClient';
 import {
-  bagConflicts, cleanRegistration, keepsSoftwareIdentity, readBagLedger, recordBagRegistration, softwareIdentity,
+  bagConflicts, cleanRegistration, readBagLedger, recordBagRegistration, registrationSoftware,
 } from '../../../core/nta/Registration';
+import { stampProject } from '../../../core/io/KernelStampClient';
 import { DialogShell } from '../DialogShell';
 import { EvidenceRegister } from './EvidenceRegister';
 
@@ -48,6 +49,14 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
   const [address, setAddress] = useState(project.address);
   const [city, setCity] = useState(project.city);
   const [registration, setRegistration] = useState<NtaRegistration>(project.registration ?? {});
+  // Calculation core of the kernel that calculates this project, stored with
+  // the program identity (BRL 9500-W §4.2.4, p. 24).
+  const [kernelVersion, setKernelVersion] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    void stampProject(project).then((stamp) => { if (active) setKernelVersion(stamp?.kernelVersion); });
+    return () => { active = false; };
+  }, [project]);
   const update = (patch: Partial<NtaRegistration>) => setRegistration((current) => ({ ...current, ...patch }));
   const advisor = (key: 'surveyingAdvisor' | 'registeringAdvisor') =>
     registration[key] ?? { name: '', competenceNumber: '' };
@@ -64,7 +73,7 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
     surveyDate: registration.surveyDate,
   };
   const conflicts = bagConflicts(ledgerEntry, readBagLedger());
-  const software = keepsSoftwareIdentity(registration) && registration.software ? registration.software : softwareIdentity();
+  const software = registrationSoftware(registration, kernelVersion);
 
   const handleSave = () => {
     // Keeps registered labels only and drops this project's entry when the
@@ -72,7 +81,7 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
     recordBagRegistration(ledgerEntry);
     dispatch({
       type: 'UPDATE_PROJECT_INFO',
-      payload: { name, description, buildingFunction, address, city, registration: cleanRegistration(registration) },
+      payload: { name, description, buildingFunction, address, city, registration: cleanRegistration(registration, kernelVersion) },
     });
     onClose();
   };

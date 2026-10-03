@@ -11,11 +11,32 @@ export const SOFTWARE_NAME = 'Open Energy Studio';
  */
 export const SOFTWARE_ATTEST_NUMBER = '';
 
-/** The program that makes the calculation, stored with the registration block. */
-export function softwareIdentity(): NtaSoftwareIdentity {
-  return SOFTWARE_ATTEST_NUMBER
-    ? { name: SOFTWARE_NAME, version, attestNumber: SOFTWARE_ATTEST_NUMBER }
-    : { name: SOFTWARE_NAME, version };
+/**
+ * The program that makes the calculation, stored with the registration block.
+ * `kernelVersion` is the calculation core of the kernel stamp; it is left out
+ * when the kernel is unavailable.
+ */
+export function softwareIdentity(kernelVersion?: string): NtaSoftwareIdentity {
+  return {
+    name: SOFTWARE_NAME,
+    version,
+    ...(SOFTWARE_ATTEST_NUMBER ? { attestNumber: SOFTWARE_ATTEST_NUMBER } : {}),
+    ...(kernelVersion ? { kernelVersion } : {}),
+  };
+}
+
+/**
+ * The program identity to store: a relabel keeps the stored identity and,
+ * when that has no calculation core, names the stated original core (BRL
+ * 9500-W §4.2.4, p. 24); otherwise this program with the current core.
+ */
+export function registrationSoftware(registration: NtaRegistration, kernelVersion?: string): NtaSoftwareIdentity {
+  if (keepsSoftwareIdentity(registration) && registration.software) {
+    const kept = registration.software;
+    const original = registration.originalKernelVersion?.trim();
+    return kept.kernelVersion || !original ? kept : { ...kept, kernelVersion: original };
+  }
+  return softwareIdentity(kernelVersion);
 }
 
 function cleanObject(value: object): Record<string, unknown> | undefined {
@@ -31,7 +52,7 @@ export function keepsSoftwareIdentity(registration: NtaRegistration): boolean {
 }
 
 /** Drops empty values so an untouched registration block is not saved. */
-export function cleanRegistration(registration: NtaRegistration): NtaRegistration | undefined {
+export function cleanRegistration(registration: NtaRegistration, kernelVersion?: string): NtaRegistration | undefined {
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(registration)) {
     let value: unknown = typeof raw === 'string' ? raw.trim() : raw;
@@ -57,9 +78,7 @@ export function cleanRegistration(registration: NtaRegistration): NtaRegistratio
   // A relabel keeps the program of the original calculation (BRL 9500-W
   // §4.2.4, p. 24); a replacement is a new calculation with the current
   // attested version (p. 23), so it records this program.
-  result.software = keepsSoftwareIdentity(registration) && registration.software
-    ? registration.software
-    : softwareIdentity();
+  result.software = registrationSoftware(registration, kernelVersion);
   return result as NtaRegistration;
 }
 
