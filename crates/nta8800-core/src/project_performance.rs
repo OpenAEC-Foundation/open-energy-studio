@@ -1105,6 +1105,42 @@ mod tests {
         assert_eq!(result.attest_status, "unattested");
     }
 
+    /// The example projects of the start screen (src/core/nta/ExampleProjects.ts)
+    /// calculate out of the box with plausible indicators.
+    #[test]
+    fn example_projects_reach_unverified_indicators() {
+        let examples = [
+            (
+                include_str!("../../../training-data/nta8800-example-terraced-dwelling.json"),
+                "residential",
+                5.0..60.0,
+            ),
+            (
+                include_str!("../../../training-data/nta8800-example-office.json"),
+                "office",
+                15.0..120.0,
+            ),
+        ];
+        for (json, function, ep2_range) in examples {
+            let value: Value = serde_json::from_str(json).unwrap();
+            let result = assess_project_performance(&value);
+            assert_eq!(
+                result.status, "calculated_unverified",
+                "{function}: {:?}",
+                result.gaps
+            );
+            let performance = result.performance.as_ref().unwrap();
+            let ep2 = performance
+                .primary_fossil_indicator_kwh_per_m2_year
+                .unwrap();
+            assert!(ep2_range.contains(&ep2), "{function}: EP2 {ep2}");
+            let rer = performance.renewable_share_percent.unwrap();
+            assert!((20.0..90.0).contains(&rer), "{function}: RER {rer}");
+            let label = performance.indicative_label_class.unwrap();
+            assert!(label.starts_with('A'), "{function}: label {label}");
+        }
+    }
+
     #[test]
     fn missing_block_and_data_are_reported_as_gaps() {
         let mut value = project();

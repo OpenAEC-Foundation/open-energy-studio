@@ -1,7 +1,8 @@
 import type { IProject } from '../energy/types';
 
 // Kernel-shaped starting values for the system inputs of the NTA form.
-// Unknown numbers start as null so the kernel reports them as missing.
+// Unknown values start as null so the form shows them as open; KernelInput
+// leaves nulls out, and the kernel reports a required one as a gap by path.
 
 type Block = Record<string, unknown>;
 

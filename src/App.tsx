@@ -35,6 +35,7 @@ import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
 import { stampProject } from './core/io/KernelStampClient';
+import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
 import { AppMenu } from './components/AppMenu/AppMenu';
 import type { DialogType, IProject } from './core/energy/types';
 
@@ -340,6 +341,19 @@ function AppContent() {
     docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: createEmptyProject() } });
   }, [docDispatch, createEmptyProject]);
 
+  const handleOpenExample = useCallback((kind: ExampleKind) => {
+    docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: exampleProject(kind) } });
+  }, [docDispatch]);
+
+  // `?example=small_office` opens an example at start (demo and review links).
+  const exampleFromUrl = useRef(false);
+  useEffect(() => {
+    if (exampleFromUrl.current) return;
+    exampleFromUrl.current = true;
+    const kind = new URLSearchParams(window.location.search).get('example');
+    if (EXAMPLE_KINDS.includes(kind as ExampleKind)) handleOpenExample(kind as ExampleKind);
+  }, [handleOpenExample]);
+
   // ── Open ──
   const handleOpenProject = useCallback(async () => {
     try {
@@ -478,6 +492,7 @@ function AppContent() {
           <WelcomeScreen
             onNewProject={handleNewProject}
             onOpenProject={handleOpenProject}
+            onOpenExample={handleOpenExample}
           />
           <EmptyStatusBar />
         </>

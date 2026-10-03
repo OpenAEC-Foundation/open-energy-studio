@@ -6,6 +6,9 @@ export const nl: Record<string, string> = {
 
   // Welcome
   'welcome.subtitle': 'Maak een nieuw project of open een bestaand project',
+  'welcome.examples': 'Of begin met een volledig voorbeeld',
+  'welcome.example.terraced_dwelling': 'Voorbeeld: tussenwoning',
+  'welcome.example.small_office': 'Voorbeeld: klein kantoor',
 
   // Ribbon tabs
   'ribbon.start': 'Start',
@@ -1188,6 +1191,7 @@ export const nl: Record<string, string> = {
   'nta.performance.advanced': 'Geavanceerd (JSON)',
   'nta.form.title': 'NTA-invoer',
   'nta.form.help': 'Vul elke waarde met bron in. Lege velden blijven invoergaten; de Rust-kern controleert alles bij de volgende berekening.',
+  'nta.form.openFields': 'Nog leeg ({{n}}): {{paths}}. Lege velden gaan niet mee naar de rekenkern; een verplicht veld verschijnt na de berekening als invoergat.',
   'nta.form.general': 'Algemeen',
   'nta.form.scope': 'Rekenscope',
   'nta.form.scope.residential': 'Woningbouw',

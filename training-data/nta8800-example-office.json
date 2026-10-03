@@ -1,0 +1,412 @@
+{
+  "id": "example-small-office",
+  "name": "Voorbeeld klein kantoor",
+  "description": "Fictief voorbeeldproject: kantoor 400 m2 in twee lagen, HR107-ketel, balansventilatie met WTW, LED-verlichting, 40 PV-panelen.",
+  "buildingFunction": "office",
+  "address": "",
+  "city": "Voorbeeldstad",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Kantoor",
+      "floorArea": 400.0,
+      "volume": 1400.0,
+      "height": 7.0,
+      "surfaces": [
+        {
+          "id": "wall-N",
+          "name": "Gevel N",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 140.0,
+          "orientation": "N",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-N",
+              "name": "Ramen N",
+              "area": 30.0,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "N",
+              "surfaceId": "wall-N"
+            }
+          ]
+        },
+        {
+          "id": "wall-E",
+          "name": "Gevel E",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 70.0,
+          "orientation": "E",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-E",
+              "name": "Ramen E",
+              "area": 10.0,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "E",
+              "surfaceId": "wall-E"
+            }
+          ]
+        },
+        {
+          "id": "wall-S",
+          "name": "Gevel S",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 140.0,
+          "orientation": "S",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-S",
+              "name": "Ramen S",
+              "area": 40.0,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "S",
+              "surfaceId": "wall-S"
+            }
+          ]
+        },
+        {
+          "id": "wall-W",
+          "name": "Gevel W",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 70.0,
+          "orientation": "W",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-W",
+              "name": "Ramen W",
+              "area": 10.0,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "wall-W"
+            }
+          ]
+        },
+        {
+          "id": "roof",
+          "name": "Plat dak",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 200.0,
+          "orientation": "horizontal",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "floor",
+          "name": "Begane grondvloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 200.0,
+          "orientation": "horizontal",
+          "constructionId": "c-floor",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb1",
+          "name": "Aansluiting vloer-gevel",
+          "psiValue": 0.05,
+          "length": 60.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor"
+        }
+      ],
+      "airTightness": {
+        "qv10": 0.6
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    }
+  ],
+  "heatingSystems": [
+    {
+      "id": "h1",
+      "name": "HR107",
+      "type": "hr107",
+      "cop": 0.975,
+      "coverageFraction": 1.0
+    }
+  ],
+  "ventilationSystems": [
+    {
+      "id": "v1",
+      "name": "D met WTW",
+      "type": "type_d",
+      "heatRecoveryEfficiency": 0.85,
+      "sfp": 0.3
+    }
+  ],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-wall",
+      "name": "Gevel Rc 4,7",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.21
+    },
+    {
+      "id": "c-roof",
+      "name": "Plat dak Rc 6,3",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.16
+    },
+    {
+      "id": "c-floor",
+      "name": "Vloer Rc 3,7",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.26
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "utility",
+    "areaSourceReference": "voorbeeld: plattegronden, 2 x 200 m2",
+    "usageFunction": "office",
+    "setpoints": {
+      "heatingC": 21.0,
+      "coolingC": 24.0,
+      "sourceReference": "NTA 8800 table 7.13 office"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "heavy",
+      "ceiling": "open_or_none",
+      "sourceReference": "voorbeeld: betonvloeren, kalkzandsteen"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14"
+    },
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "voorbeeld: vrij uitzicht, geen beweegbare zonwering"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "floor",
+        "exposedPerimeterM": 60.0,
+        "constructionResistanceM2kPerW": 3.87,
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "voorbeeld: Rc 3,7 + Rsi 0,17"
+      }
+    ],
+    "ventilationFlows": [
+      {
+        "id": "mech-d",
+        "sourceReference": "voorbeeld: balansventilatie met WTW, chapter 11",
+        "months": [
+          {
+            "month": 1,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 2,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 3,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 4,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 5,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 6,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 7,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 8,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 9,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 10,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 11,
+            "conductanceWPerK": 140.0
+          },
+          {
+            "month": 12,
+            "conductanceWPerK": 140.0
+          }
+        ]
+      }
+    ],
+    "emission": {
+      "system": "radiators_or_convectors",
+      "balancing": "none_or_unknown",
+      "control": "main_room_thermostat",
+      "sourceReference": "voorbeeld: opname"
+    },
+    "distribution": {
+      "method": "heated_zone_only_space_heating",
+      "sourceReference": "voorbeeld: leidingen binnen de thermische schil"
+    },
+    "generator": {
+      "kind": "gas_boiler",
+      "boiler": {
+        "generatorId": "boiler",
+        "role": "individual_main",
+        "location": "inside_thermal_boundary",
+        "kind": "hr107",
+        "fuel": "natural_gas",
+        "averageDesignEmissionTemperatureC": 55.0,
+        "emissionCircuit": "direct",
+        "equipmentReference": "voorbeeld: typeplaatje",
+        "locationReference": "voorbeeld: technische ruimte",
+        "temperatureAndCircuitReference": "voorbeeld: ontwerp",
+        "pilotFlamePresent": false,
+        "installationYear": 2021,
+        "installationYearReference": "voorbeeld: factuur"
+      }
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "voorbeeld: geen gebouwautomatisering (klasse D)",
+    "useInventoryComplete": true,
+    "declaredUses": [
+      {
+        "id": "dhw",
+        "service": "domestic_hot_water",
+        "carrier": "el",
+        "monthlyKwh": [
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0,
+          60.0
+        ],
+        "sourceReference": "voorbeeld: chapter 13 value, elektrische close-ups"
+      },
+      {
+        "id": "fans",
+        "service": "ventilation_fans",
+        "carrier": "el",
+        "monthlyKwh": [
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0,
+          180.0
+        ],
+        "sourceReference": "voorbeeld: chapter 11 value"
+      }
+    ],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "panels",
+          "panelPeakPowerW": 400.0,
+          "panelCount": 40
+        },
+        "azimuthDeg": 180.0,
+        "tiltDeg": 15.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "voorbeeld: datasheet"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "z1",
+        "functions": [
+          {
+            "function": "office",
+            "areaM2": 400.0
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "kantoor",
+            "areaM2": 400.0,
+            "power": {
+              "method": "forfait",
+              "ledFrom2017": true
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": true,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          }
+        ],
+        "sourceReference": "voorbeeld: LED-armaturen 2021"
+      }
+    ],
+    "labelFunction": "office",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "office"
+  }
+}

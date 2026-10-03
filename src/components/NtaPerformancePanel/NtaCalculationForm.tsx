@@ -16,6 +16,7 @@ import {
 import {
   buildVentilationDraft, removeVentilation, syncVentilation, utilityInternalGains,
 } from '../../core/nta/NtaFormModels';
+import { nullPaths } from '../../core/nta/KernelInput';
 
 // The block is edited as plain JSON data; the Rust kernel is the validator.
 
@@ -45,6 +46,7 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   const constantConductance = months.length === 12 && months.every((month) => month.conductanceWPerK === months[0].conductanceWPerK)
     ? months[0].conductanceWPerK : null;
   const surfaceName = (id: unknown) => surfaces.find((surface) => surface.id === id)?.name || String(id);
+  const emptyPaths = nullPaths(draft);
   const setConstantVentilation = (value: number | null) => change(['ventilationFlows', 0, 'months'],
     Array.from({ length: 12 }, (_, index) => ({ ...(months[index] ?? {}), month: index + 1, conductanceWPerK: value })));
 
@@ -374,6 +376,8 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         <TextField {...field} path={['storage', 'sourceReference']} label={t('nta.form.source')} />
       </>}
     </Section>
+    {emptyPaths.length > 0 && <p className="nta-form-note" role="status" data-testid="nta-open-fields">
+      {t('nta.form.openFields', { n: emptyPaths.length, paths: emptyPaths.join(', ') })}</p>}
     <div className="nta-form-actions">
       <button type="button" onClick={onCancel}>{t('dialog.cancel')}</button>
       <button type="submit">{t('dialog.save')}</button>
