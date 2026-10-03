@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Calculator, CircleHelp } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
+import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
 import {
   calculateProjectPerformanceWithRust,
@@ -15,6 +16,11 @@ import './NtaPerformancePanel.css';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
+type QueryState =
+  | { project: IProject; kind: 'loading' }
+  | { project: IProject; kind: 'done'; assessment: ProjectPerformanceAssessment }
+  | { project: IProject; kind: 'error'; error: string };
+
 function kwh(value: number | null | undefined): string {
   return value == null ? '–' : Math.round(value).toLocaleString('nl-NL');
 }
@@ -23,9 +29,7 @@ export function NtaPerformancePanel() {
   const { state, dispatch } = useEnergy();
   const { t, locale } = useI18n();
   const project = state.project;
-  const [assessment, setAssessment] = useState<ProjectPerformanceAssessment | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState<QueryState | null>(null);
   const [editing, setEditing] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -44,20 +48,22 @@ export function NtaPerformancePanel() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setAssessment(null);
+    setQuery({ project, kind: 'loading' });
     calculateProjectPerformanceWithRust(project).then(
-      (value) => { if (!cancelled) { setAssessment(value); setLoading(false); } },
+      (value) => { if (!cancelled) setQuery({ project, kind: 'done', assessment: value }); },
       (reason: unknown) => {
         if (!cancelled) {
-          setError(reason instanceof Error ? reason.message : String(reason));
-          setLoading(false);
+          setQuery({ project, kind: 'error', error: reason instanceof Error ? reason.message : String(reason) });
         }
       },
     );
     return () => { cancelled = true; };
   }, [project]);
+
+  const currentQuery = query?.project === project ? query : null;
+  const loading = currentQuery == null || currentQuery.kind === 'loading';
+  const assessment = currentQuery?.kind === 'done' ? currentQuery.assessment : null;
+  const error = currentQuery?.kind === 'error' ? currentQuery.error : null;
 
   const openEditor = () => {
     const block = project.ntaCalculation ?? buildNtaCalculationTemplate(project);

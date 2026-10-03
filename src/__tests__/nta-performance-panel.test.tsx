@@ -36,6 +36,28 @@ const month = (value: number, index: number) => ({
 });
 
 describe('NTA performance panel', () => {
+  it('hides a previous project’s indicative label while the next result is pending', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        status: 'calculated_unverified', gaps: [], performance: {
+          issues: [], warnings: [], indicativeLabelClass: 'A+', tojuli: [],
+          spaceHeating: {
+            monthly: Array.from({ length: 12 }, (_, index) => month(100, index)),
+            omittedTerms: [], additionalZoneDemands: [],
+            demand: { monthly: Array.from({ length: 12 }, () => ({ cooling: { needKwh: 0 } })),
+              annualCoolingNeedKwh: 0, omittedCorrections: [] },
+          },
+        },
+      }) })
+      .mockImplementation(() => new Promise(() => {}));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProviders(<ProjectSwitchHarness />);
+    expect(await screen.findByText('A+')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Switch project' }));
+    expect(screen.queryByText('A+')).not.toBeInTheDocument();
+  });
+
   it('discards an open NTA editor when another project is loaded', async () => {
     const user = userEvent.setup();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

@@ -10,6 +10,8 @@ De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
 
+Het uitgebreide NTA-prestatiepaneel gebruikt eveneens een projectgebonden aanvraagstatus, zodat BENG en de indicatieve labelklasse uit het vorige project tijdens een nieuwe aanvraag niet zichtbaar blijven. De gerichte paneeltests en frontend-build zijn geslaagd.
+
 De [debug-desktopbuild van commit `fc5a8a5`](nta8800-build-verificatie-2026-10-03-fc5a8a5.md) bundelt de Rust-kern en NTA-interface van die commit. De build en de genoemde tests zijn technisch geslaagd; de referentie- en attestkolommen hieronder worden daardoor niet automatisch vrijgegeven.
 
 | Onderdeel | Model | Audit | Rekenroute | Referentie | Attest | Volgende verificatie |
