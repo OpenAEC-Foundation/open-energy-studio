@@ -2,6 +2,24 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — energie per energiefunctie, rapportaanvullingen en opgegeven interne warmte
+
+Uitkomsten veranderen niet; er komen uitvoervelden en waarschuwingen bij.
+
+- **Energie per energiefunctie (§5.5.3, 5.20, p. 89–90):** Nieuwe uitvoer `energyByService`, met per energiefunctie (verwarming, warm tapwater, koeling, bevochtiging, ventilatie, verlichting, hulpenergie volgens 5.21, collectieve warmtepompbron), drager en maand:
+  - het gebruik E_EPus;ci;
+  - de afgenomen energie;
+  - de primaire fossiele energie;
+  - de hernieuwbare energie (5.39).
+
+  Export, opslagcorrectie en hernieuwbare elektriciteit staan apart als gebouwtermen. De som per drager is gelijk aan `carriers`; de som met de gebouwtermen is gelijk aan EPtot en EPrenTot (getoetst voor beide voorbeeldprojecten).
+- **Nieuwe uitvoer:** `cooling` (hoofdstuk 10, per koelsysteem in `systems`) en `pvSystems` (hoofdstuk 16, E_pr;el per systeem).
+- **Paneel en rapport:** een tabel per energiefunctie. Het rapport toont daarnaast warm tapwater (behoefte, verliezen, opwekker), koeling per systeem, PV per systeem, de ZEB-indicator (bijlage AB) en een bijlage met alle interpretaties van de kern.
+- **Waarschuwingen bij opgegeven interne warmte (§7.5.3.1/7.5.3.2, p. 179–180):**
+  - `internal_gains_declared_below_table`: lager dan q_Oc·f_τ + q_A van tabel 7.2/7.3;
+  - `internal_gains_declared_differs_from_table`: gelijk aan noch de tabelwaarde, noch de tabelwaarde met q_L van §5.4.2;
+  - `internal_gains_declared_residential`: een woonfunctie, waar 7.21 de formule voorschrijft.
+
 ## 3 oktober 2026 — invoerformulieren voor toestellen met productgegevens en de grondvloer
 
 Alleen de invoer verandert; opgeslagen projecten rekenen hetzelfde.

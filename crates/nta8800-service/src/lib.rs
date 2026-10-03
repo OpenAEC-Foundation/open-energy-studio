@@ -186,6 +186,7 @@ pub fn app() -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/v1/nta8800/capabilities", get(capabilities))
+        .route("/v1/nta8800/interpretations", get(interpretations))
         .route("/v1/nta8800/validate", post(validate))
         .route("/v1/nta8800/calculate", post(calculate))
         .route(
@@ -324,6 +325,12 @@ async fn health() -> Json<Value> {
 
 async fn capabilities() -> Json<Value> {
     Json(serde_json::to_value(nta8800_core::capabilities()).expect("capabilities serialize"))
+}
+
+async fn interpretations() -> Json<Value> {
+    Json(json!(
+        nta8800_core::interpretations::kernel_interpretations()
+    ))
 }
 
 async fn validate(Json(request): Json<ProjectRequest>) -> (StatusCode, Json<Value>) {
@@ -807,6 +814,28 @@ mod tests {
         http::Request,
     };
     use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn interpretations_route_lists_the_kernel_groups() {
+        let response = app()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/nta8800/interpretations")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let value: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let groups = value.as_array().unwrap();
+        assert!(groups.iter().any(|group| group["module"] == "annex_q"));
+        assert!(groups
+            .iter()
+            .all(|group| !group["items"].as_array().unwrap().is_empty()));
+    }
 
     #[tokio::test]
     async fn measured_heating_aux_route_derives_coefficients_without_forfait() {

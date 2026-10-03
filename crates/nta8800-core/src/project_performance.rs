@@ -1901,6 +1901,77 @@ mod tests {
         }
     }
 
+    /// §5.5.3: the per-function breakdown adds up to the carriers (5.20),
+    /// to EPTot (with the export and storage terms) and to EPrenTot.
+    #[test]
+    fn example_projects_energy_by_service_reconciles() {
+        for json in [
+            include_str!("../../../training-data/nta8800-example-terraced-dwelling.json"),
+            include_str!("../../../training-data/nta8800-example-office.json"),
+        ] {
+            let value: Value = serde_json::from_str(json).unwrap();
+            let result = assess_project_performance(&value);
+            let performance = result.performance.as_ref().unwrap();
+            let services = &performance.energy_by_service;
+            assert!(!services.months.is_empty());
+            for row in &performance.carriers {
+                let (used, delivered) = services
+                    .months
+                    .iter()
+                    .filter(|item| item.carrier == row.carrier && item.month == row.month)
+                    .fold((0.0, 0.0), |(u, d), item| {
+                        (u + item.used_kwh, d + item.delivered_kwh)
+                    });
+                assert!(
+                    (used - row.used_kwh).abs() < 1e-6,
+                    "{} {}: {used} vs {}",
+                    row.carrier,
+                    row.month,
+                    row.used_kwh
+                );
+                assert!((delivered - row.delivered_kwh).abs() < 1e-6);
+            }
+            let fossil: f64 = services
+                .months
+                .iter()
+                .map(|item| item.primary_fossil_kwh)
+                .sum::<f64>()
+                - services
+                    .adjustments
+                    .iter()
+                    .map(|item| item.exported_electricity_credit_kwh + item.storage_correction_kwh)
+                    .sum::<f64>();
+            let expected = performance.annual_primary_fossil_kwh.unwrap();
+            assert!((fossil - expected).abs() < 1e-6, "{fossil} vs {expected}");
+            let renewable: f64 = services
+                .renewable
+                .iter()
+                .map(|item| item.renewable_primary_kwh)
+                .sum::<f64>()
+                + services
+                    .adjustments
+                    .iter()
+                    .map(|item| item.renewable_electricity_kwh)
+                    .sum::<f64>();
+            let expected = performance.annual_renewable_primary_kwh.unwrap();
+            assert!(
+                (renewable - expected).abs() < 1e-6,
+                "{renewable} vs {expected}"
+            );
+            let annual: f64 = services.annual.iter().map(|item| item.used_kwh).sum();
+            let carriers: f64 = performance.carriers.iter().map(|item| item.used_kwh).sum();
+            assert!((annual - carriers).abs() < 1e-6);
+            assert!(services
+                .annual
+                .iter()
+                .any(|item| item.service == "heating" && item.used_kwh > 0.0));
+            assert!(services
+                .annual
+                .iter()
+                .any(|item| item.service == "hotWater" && item.used_kwh > 0.0));
+        }
+    }
+
     #[test]
     fn missing_block_and_data_are_reported_as_gaps() {
         let mut value = project();

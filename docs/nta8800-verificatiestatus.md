@@ -85,8 +85,10 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - daklichten (14.41, p. 673): de daglichtfactor maal 100, zodat hij in % is;
 - de maandverdeling van verlichting via t_mi/t_an;
 - W_t in de interne warmtelast van 7.28 is W_L + W_P (zie [maandbehoefte](nta8800-maandbehoefte.md)).
+- energie per energiefunctie (§5.5.3, 5.20): de eigen benutte opwekking (5.22) is naar rato van het elektriciteitsgebruik over de energiefuncties verdeeld; de norm bepaalt E_pr;EPus;el alleen per drager. Export (5.10/5.13), de opslagcorrectie (5.14a) en hernieuwbare elektriciteit (5.39a) blijven gebouwtermen;
+- opgegeven interne warmteproductie (`internalGains.method = declared`): tabel 7.2/7.3 (p. 179–180) en 7.21 (p. 177) zijn rekenwaarden zonder alternatief. Een afwijkende waarde geeft een waarschuwing en geen blokkade, omdat de opgegeven flux ook de termen van 7.28 en 7.29 kan bevatten. De gebruiksaanpassing van het maatwerkadvies (bijlage Z) wordt niet getoetst.
 
-Ze staan per module in `INTERPRETATIONS` en in de docs.
+Ze staan per module in `INTERPRETATIONS` en in de docs. `interpretations::kernel_interpretations()` verzamelt de lijsten; de API (`GET /v1/nta8800/interpretations`) en de desktop (`kernel_interpretations`) geven ze door, en het rekenrapport drukt ze af als bijlage.
 
 **Onafhankelijke herberekeningen (4 oktober 2026).** Bij gebrek aan officiële referentiegevallen zijn beide voorbeeldprojecten opnieuw doorgerekend. De agent schreef daarvoor een eigen Python-implementatie, rechtstreeks vanuit de normtekst en de gerenderde pagina's, zonder de Rust-formules te lezen.
 

@@ -53,6 +53,7 @@ pub mod hot_water_tests;
 pub mod humidification;
 pub mod hybrid_heat_pump_monthly_draft;
 pub mod indicators_draft;
+pub mod interpretations;
 pub mod label_class;
 pub mod label_data;
 pub mod lighting;

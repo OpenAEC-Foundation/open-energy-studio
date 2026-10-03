@@ -2,7 +2,7 @@ import type { IProject, IBENGResult } from '../energy/types';
 import { generateReportHTML } from './ReportTemplate';
 import { generateNtaInputDossierHTML } from './NtaInputDossier';
 import { generateNtaCalculationReportHTML } from './NtaCalculationReport';
-import { calculateProjectPerformanceWithRust } from '../nta/KernelClient';
+import { calculateProjectPerformanceWithRust, fetchKernelInterpretations } from '../nta/KernelClient';
 import { buildProjectDossier, zipProjectDossier } from './ProjectDossier';
 import { assessMaatwerkadviesWithRust } from '../nta/KernelClient';
 import { generateMaatwerkadviesReportHTML } from './MaatwerkadviesReport';
@@ -33,10 +33,19 @@ export function downloadNtaInputDossierHTML(project: IProject): void {
   URL.revokeObjectURL(url);
 }
 
+/** The kernel's interpretation lists for the report appendix; empty when unavailable. */
+async function interpretationsOrEmpty() {
+  try {
+    return await fetchKernelInterpretations();
+  } catch {
+    return [];
+  }
+}
+
 /** Runs the Rust project chain and downloads its unverified calculation report. */
 export async function downloadNtaCalculationReportHTML(project: IProject): Promise<void> {
   const assessment = await calculateProjectPerformanceWithRust(project);
-  const html = generateNtaCalculationReportHTML(project, assessment);
+  const html = generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty());
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -58,7 +67,9 @@ export async function downloadProjectDossier(project: IProject) {
   } catch {
     assessment = null;
   }
-  const reportHtml = assessment ? generateNtaCalculationReportHTML(project, assessment) : null;
+  const reportHtml = assessment
+    ? generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty())
+    : null;
   const bundle = await buildProjectDossier({ project, assessment, reportHtml });
   const zip = zipProjectDossier(bundle);
   const fileName = `Projectdossier-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.zip`;
