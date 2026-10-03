@@ -127,7 +127,8 @@ describe('NTA performance panel', () => {
     expect(JSON.parse(screen.getByTestId('block').textContent ?? 'null'))
       .toEqual({ calculationScope: 'residential' });
     // The saved block triggers a new kernel run.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // (after the kernel debounce)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
   it('shows unverified indicators, BENG 1 condition and monthly values', async () => {

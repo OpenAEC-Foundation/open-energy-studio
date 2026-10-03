@@ -2,6 +2,7 @@ import type { IProject, IBENGResult } from '../energy/types';
 import { generateReportHTML } from './ReportTemplate';
 import { generateNtaInputDossierHTML } from './NtaInputDossier';
 import { generateNtaCalculationReportHTML } from './NtaCalculationReport';
+import { calculateProjectPerformanceShared } from '../nta/useProjectPerformance';
 import { calculateProjectPerformanceWithRust, fetchKernelInterpretations } from '../nta/KernelClient';
 import { buildProjectDossier, zipProjectDossier } from './ProjectDossier';
 import { assessMaatwerkadviesWithRust } from '../nta/KernelClient';
@@ -93,12 +94,22 @@ export async function downloadProjectDossier(project: IProject) {
   return bundle.manifest;
 }
 
+/** The kernel assessment for the BENG report, or null when the kernel is unavailable. */
+async function kernelOrNull(project: IProject) {
+  try {
+    return await calculateProjectPerformanceShared(project);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Downloads the BENG report as a standalone HTML file.
+ * Downloads the BENG report as a standalone HTML file, in the UI language. The figures
+ * come from the NTA kernel; the simplified result is only used when the kernel has none.
  */
-export function downloadReportHTML(project: IProject, result: IBENGResult): void {
-  const html = generateReportHTML(project, result);
-  const blob = new Blob([html], { type: 'text/html' });
+export async function downloadReportHTML(project: IProject, result: IBENGResult | null, locale?: string): Promise<void> {
+  const html = generateReportHTML(project, result, { kernel: await kernelOrNull(project), locale });
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -110,8 +121,8 @@ export function downloadReportHTML(project: IProject, result: IBENGResult): void
 /**
  * Opens the BENG report in a new window and triggers print.
  */
-export function printReport(project: IProject, result: IBENGResult): void {
-  const html = generateReportHTML(project, result);
+export async function printReport(project: IProject, result: IBENGResult | null, locale?: string): Promise<void> {
+  const html = generateReportHTML(project, result, { kernel: await kernelOrNull(project), locale });
   const win = window.open('', '_blank');
   if (win) {
     win.document.write(html);

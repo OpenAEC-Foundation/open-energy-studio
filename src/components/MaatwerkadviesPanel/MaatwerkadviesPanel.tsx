@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { KernelCode } from '../KernelCode/KernelCode';
+import { adviceText } from '../../core/nta/MwaAdviceText';
 import { formatNumber } from '../../i18n/format';
 import { ClipboardList } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
@@ -264,11 +265,14 @@ export function orderResults(results: MwaVariantResult[], order: ResultOrder): M
   });
 }
 
-function ResultRow({ result }: { result: MwaVariantResult }) {
+/** A variant row; an invalid variant gets a second row with the kernel's reasons. */
+export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: string) => string }) {
   const use = result.actualUse;
+  const name = result.kind === 'current' ? t('mwa.current') : result.name;
   return (
-    <tr>
-      <th scope="row">{result.name}{!result.valid && ' ⚠'}</th>
+    <>
+    <tr data-invalid={result.valid ? undefined : 'true'}>
+      <th scope="row">{name}{!result.valid && <span aria-label={t('mwa.variantInvalid')} title={t('mwa.variantInvalid')}> ⚠</span>}</th>
       <td>{result.label.labelClass ?? '–'}</td>
       <td>{format(result.label.primaryFossilIndicatorKwhPerM2, 1)}</td>
       <td>{format(use?.gasM3)}</td>
@@ -280,6 +284,17 @@ function ResultRow({ result }: { result: MwaVariantResult }) {
       <td>{format(result.simplePaybackYears, 1)}</td>
       <td>{format(result.netPresentValueEur)}</td>
     </tr>
+    {result.issues.length > 0 && (
+      <tr className="mwa-variant-issues" data-testid={`mwa-issues-${result.id}`}>
+        <td colSpan={11}>
+          <ul>{result.issues.map((item, index) => (
+            <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} />
+              {item.path && <> <code>{item.path}</code></>}{item.detail && <> {item.detail}</>}</li>
+          ))}</ul>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 
@@ -599,9 +614,9 @@ export function MaatwerkadviesPanel() {
                   <th>{t('mwa.col.investment')}</th><th>{t('mwa.col.payback')}</th><th>{t('mwa.col.npv')}</th>
                 </tr></thead>
                 <tbody>
-                  <ResultRow result={assessment.current} />
-                  {orderResults(assessment.measures, order).map((item) => <ResultRow key={`m-${item.id}`} result={item} />)}
-                  {orderResults(assessment.packages, order).map((item) => <ResultRow key={`p-${item.id}`} result={item} />)}
+                  <ResultRow result={assessment.current} t={t} />
+                  {orderResults(assessment.measures, order).map((item) => <ResultRow key={`m-${item.id}`} result={item} t={t} />)}
+                  {orderResults(assessment.packages, order).map((item) => <ResultRow key={`p-${item.id}`} result={item} t={t} />)}
                 </tbody>
               </table>
             </div>
@@ -609,8 +624,8 @@ export function MaatwerkadviesPanel() {
           {advice && (
             <div className="nta-performance-bbl">
               <strong>{t('mwa.advice')}: {chosen?.name ?? '–'} ({advice.chosenBy === 'adviser' ? t('mwa.advised.adviser') : t('mwa.advised.automatic')})</strong>
-              {advice.warnings.length > 0 && <><em>{t('mwa.warnings')}</em><ul>{advice.warnings.map((item) => <li key={item}>{item}</li>)}</ul></>}
-              {advice.specialistNotes.length > 0 && <><em>{t('mwa.specialist')}</em><ul>{advice.specialistNotes.map((item) => <li key={item}>{item}</li>)}</ul></>}
+              {advice.warnings.length > 0 && <><em>{t('mwa.warnings')}</em><ul>{advice.warnings.map((item) => <li key={item}>{adviceText(item, i18next.language || 'nl')}</li>)}</ul></>}
+              {advice.specialistNotes.length > 0 && <><em>{t('mwa.specialist')}</em><ul>{advice.specialistNotes.map((item) => <li key={item}>{adviceText(item, i18next.language || 'nl')}</li>)}</ul></>}
               {chosen && chosen.systemChecks.some((check) => check.limit != null) && <><em>{t('mwa.systemChecks')}</em><ul>
                 {chosen.systemChecks.filter((check) => check.limit != null).map((check) => (
                   <li key={check.system}>{t(`mwa.system.${check.system}`)}: {format(check.value, 2)} / {format(check.limit, 2)} {check.unit} — {verdictText(check.meets)}</li>

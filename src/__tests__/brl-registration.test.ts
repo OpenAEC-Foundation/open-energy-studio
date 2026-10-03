@@ -136,7 +136,7 @@ describe('registration block', () => {
     expect(html).toContain('client_required');
     expect(html).toContain('bestaand gebouw');
     expect(html).toContain('Open Energy Studio 0.1.6-alpha, nog niet geattesteerd (BRL 9501)');
-    expect(html).toContain('7.50 kg CO₂-eq/m²·jr (wlc.pdf)');
+    expect(html).toContain('7,50 kg CO₂-eq/m²·jr (wlc.pdf)');
     expect(html).toContain('plausibility_borderline_label');
     expect(html).toContain('registratie');
     // Dossier state and readiness are shown apart (Regeling art. 2/3).

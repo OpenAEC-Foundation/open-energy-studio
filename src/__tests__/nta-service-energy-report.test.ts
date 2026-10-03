@@ -90,7 +90,7 @@ describe('§5.5.3 energy per energy function', () => {
     expect(html).toContain('Zonnestroom (hoofdstuk 16)');
     expect(html).toContain('pv-zuid');
     expect(html).toContain('ZEB-indicator (bijlage AB, informatief)');
-    expect(html).toContain('51.01');
+    expect(html).toContain('51,01');
     expect(html).toContain('Bijlage: interpretaties van de rekenkern');
     expect(html).toContain('θevap;nom −10 °C for air/water &lt;test&gt;');
   });

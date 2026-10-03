@@ -1,5 +1,6 @@
 import type { INtaHeatPumpInput, IProject } from '../energy/types';
 import { escapeHtml } from './HtmlEscaping';
+import { dutchTimestamp } from './DutchReportText';
 
 type PumpEntry = { context: string; pump: INtaHeatPumpInput };
 
@@ -154,7 +155,7 @@ function ntaSourceRows(value: unknown, path = 'ntaCalculation'): SourceRow[] {
 /** Standalone input/provenance dossier; deliberately has no energy result. */
 export function generateNtaInputDossierHTML(project: IProject): string {
   const pumps = allHeatPumps(project);
-  const generatedAt = new Date().toISOString();
+  const generatedAt = dutchTimestamp();
   return `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>NTA 8800 invoer- en bewijsoverzicht — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}

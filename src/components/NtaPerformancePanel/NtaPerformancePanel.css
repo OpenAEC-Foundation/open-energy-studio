@@ -147,3 +147,7 @@ fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-siz
 }
 .nta-performance-totals .nta-performance-wide { grid-column: 1 / -1; flex-direction: column; justify-content: flex-start; }
 .nta-performance-totals .nta-performance-wide dd { font-weight: 400; }
+/* Selects with long option texts take two columns so the chosen text stays readable. */
+.nta-form-wide { grid-column: span 2; }
+@media (max-width: 720px) { .nta-form-wide { grid-column: auto; } }
+.nta-form select { text-overflow: ellipsis; }

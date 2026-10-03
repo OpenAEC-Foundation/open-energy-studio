@@ -12,6 +12,8 @@ import {
   solarTemplate, surveyTemplate, windowTemplate, type StoredSurvey, type SurveyKind,
 } from '../../core/nta/SurveyTemplates';
 import { KernelCode } from '../KernelCode/KernelCode';
+import { formatNumber } from '../../i18n/format';
+import { dutchDefaultValue, snakeCase } from '../../core/nta/OpnameValueText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
 
@@ -276,16 +278,27 @@ export function renameZone(draft: Draft, index: number, id: string): Draft {
   return write(moved, ['zones', index, 'id'], id);
 }
 
-/** Removes zone `index` and clears the references to it (unless another zone has the same name). */
-/** A recorded default value: a translated enum id with the id as reference, otherwise the value itself. */
-export function defaultValueLabel(t: T, value: string) {
-  if (!/^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(value)) return value;
-  const key = `opname.value.${value}`;
-  const text = t(key);
-  const label = text === key ? value.replace(/_/g, ' ') : text;
-  return <>{label} <code className="kernel-code-ref">{value}</code></>;
+/**
+ * A recorded default value in the UI language: an enum id (snake_case or PascalCase)
+ * translated with the id as reference, yes/no for booleans, a number by locale, and the
+ * kernel's fixed value texts in Dutch for a Dutch UI. Other text stays as written.
+ */
+export function defaultValueLabel(t: T, value: string, locale = 'en') {
+  if (value === 'true' || value === 'false') return t(value === 'true' ? 'common.yes' : 'common.no');
+  if (/^-?\d+(\.\d+)?$/.test(value)) return formatNumber(Number(value), locale, value.split('.')[1]?.length ?? 0);
+  const pascal = /^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$/.test(value);
+  if (pascal || /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(value)) {
+    const id = pascal ? snakeCase(value) : value;
+    const key = `opname.value.${id}`;
+    const text = t(key);
+    const label = text === key ? id.replace(/_/g, ' ') : text;
+    return <>{label} <code className="kernel-code-ref">{value}</code></>;
+  }
+  if (locale.toLowerCase().startsWith('nl')) return dutchDefaultValue(value) ?? value;
+  return value;
 }
 
+/** Removes zone `index` and clears the references to it (unless another zone has the same name). */
 export function removeZone(draft: Draft, index: number): Draft {
   const zones = list(draft, ['zones']);
   const old = String(zones[index]?.id ?? '');
@@ -546,7 +559,7 @@ function list(draft: Draft, path: Path): Array<Record<string, unknown>> {
 }
 
 export function BasisopnamePanel() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
   const stored = state.project.basisopname as StoredSurvey | undefined;
   const [result, setResult] = useState<OpnameAssessment | null>(null);
@@ -975,9 +988,9 @@ export function BasisopnamePanel() {
       <p><strong>{t('opname.status')}:</strong> {t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
       {performance && <ul className="opname-indicators">
         <li>{t('opname.label')}: <strong>{performance.indicativeLabelClass ?? '—'}</strong></li>
-        <li>BENG 1: {performance.needIndicatorKwhPerM2Year ?? '—'} kWh/m²</li>
-        <li>BENG 2: {performance.primaryFossilIndicatorKwhPerM2Year ?? '—'} kWh/m²</li>
-        <li>BENG 3: {performance.renewableSharePercent ?? '—'} %</li>
+        <li>BENG 1: {formatNumber(performance.needIndicatorKwhPerM2Year, locale, 2)} kWh/m²</li>
+        <li>BENG 2: {formatNumber(performance.primaryFossilIndicatorKwhPerM2Year, locale, 2)} kWh/m²</li>
+        <li>BENG 3: {formatNumber(performance.renewableSharePercent, locale, 1)} %</li>
       </ul>}
       {result.issues.length > 0 && <ul className="opname-issues">
         {result.issues.map((item, index) => {
@@ -996,7 +1009,7 @@ export function BasisopnamePanel() {
           <th>{t('opname.defaults.source')}</th><th>{t('opname.defaults.reason')}</th></tr></thead>
         <tbody>
           {result.appliedDefaults.map((item, index) => <tr key={index}>
-            <td><code>{item.path}</code></td><td>{defaultValueLabel(t, item.value)}</td><td>{item.source}</td>
+            <td><code>{item.path}</code></td><td>{defaultValueLabel(t, item.value, locale)}</td><td>{item.source}</td>
             <td><input className="opname-reason" aria-label={`${t('opname.defaults.reason')} ${item.path}`} value={reasons[item.path] ?? ''}
               onChange={(event) => {
                 const next = { ...reasons };

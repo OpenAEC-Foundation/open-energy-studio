@@ -109,23 +109,100 @@ export function table713Setpoints(usageFunction: unknown): { heatingC: number; c
   return { heatingC, coolingC: 24 };
 }
 
+/** One setpoint check: the zone (null for the block), the table value and where its setpoints live. */
+export interface SetpointCheckRow {
+  zoneId: string | null;
+  /** Index in `zoneData`, null for the block. */
+  zoneIndex: number | null;
+  expected: { heatingC: number; coolingC: number };
+  actual: { heatingC: unknown; coolingC: unknown };
+  /** Path of the setpoints this zone uses: its own or the block's. */
+  path: Path;
+  ownSetpoints: boolean;
+}
+
+/** §6.5.3 profile setpoints: the table 7.13 values, area-weighted over `functionAreas` when given. */
+function profileSetpoints(usageFunction: unknown, functionAreas: unknown): { heatingC: number; coolingC: number } | null {
+  if (Array.isArray(functionAreas) && functionAreas.length > 0) {
+    let total = 0;
+    let heating = 0;
+    let cooling = 0;
+    for (const part of functionAreas as Draft[]) {
+      const values = table713Setpoints(part?.function);
+      const area = Number(part?.areaM2);
+      if (!values || !Number.isFinite(area) || area <= 0) return null;
+      total += area;
+      heating += values.heatingC * area;
+      cooling += values.coolingC * area;
+    }
+    return total > 0 ? { heatingC: heating / total, coolingC: cooling / total } : null;
+  }
+  return table713Setpoints(usageFunction);
+}
+
+/**
+ * The checks the kernel makes (monthly_demand.rs `function_profile`, setpoints_table_7_13_mismatch):
+ * per zone of `zoneData` its own function or function areas against the setpoints it uses
+ * (its own or the block's), otherwise the block. Empty when a usage fit replaces table 7.13.
+ */
+export function setpointChecks(draft: Draft): SetpointCheckRow[] {
+  if (read(draft, ['usageFit']) != null) return [];
+  const blockFunction = read(draft, ['usageFunction']);
+  const zones = (read(draft, ['zoneData']) as Draft[] | undefined) ?? [];
+  const rows: SetpointCheckRow[] = [];
+  const add = (zoneId: string | null, zoneIndex: number | null, expected: SetpointCheckRow['expected'] | null,
+    path: Path, ownSetpoints: boolean) => {
+    if (!expected) return;
+    rows.push({
+      zoneId, zoneIndex, expected, path, ownSetpoints,
+      actual: { heatingC: read(draft, [...path, 'heatingC']), coolingC: read(draft, [...path, 'coolingC']) },
+    });
+  };
+  if (zones.length === 0) {
+    add(null, null, profileSetpoints(blockFunction, read(draft, ['functionAreas'])), ['setpoints'], true);
+    return rows;
+  }
+  zones.forEach((zone, index) => {
+    const own = zone?.setpoints != null;
+    add(String(zone?.zoneId ?? index + 1), index, profileSetpoints(zone?.usageFunction ?? blockFunction, zone?.functionAreas),
+      own ? ['zoneData', index, 'setpoints'] : ['setpoints'], own);
+  });
+  return rows;
+}
+
+const close = (value: unknown, expected: number) => typeof value === 'number' && Math.abs(value - expected) <= 1e-9;
+const tableValue = (value: number) => Math.round(value * 1000) / 1000;
+
 /** The kernel refuses setpoints other than table 7.13 (setpoints_table_7_13_mismatch); say so before saving. */
 function SetpointCheck({ draft, change }: { draft: Draft; change: (path: Path, value: unknown) => void }) {
   const { t } = useI18n();
-  const expected = table713Setpoints(read(draft, ['usageFunction']));
-  if (!expected) return <p className="nta-form-note">{t('nta.form.setpointsTableNote')}</p>;
-  const heating = read(draft, ['setpoints', 'heatingC']);
-  const cooling = read(draft, ['setpoints', 'coolingC']);
-  const matches = heating === expected.heatingC && cooling === expected.coolingC;
-  return <p className={matches ? 'nta-form-note' : 'nta-form-note nta-form-error'} role={matches ? undefined : 'alert'}
-    data-testid="nta-setpoint-check">
-    {t(matches ? 'nta.form.setpointsTableMatch' : 'nta.form.setpointsTableMismatch',
-      { heating: expected.heatingC, cooling: expected.coolingC })}
-    {!matches && <> <button type="button" onClick={() => {
-      change(['setpoints', 'heatingC'], expected.heatingC);
-      change(['setpoints', 'coolingC'], expected.coolingC);
-    }}>{t('nta.form.setpointsUseTable')}</button></>}
-  </p>;
+  if (read(draft, ['usageFit']) != null) return <p className="nta-form-note">{t('nta.form.setpointsUsageFit')}</p>;
+  const rows = setpointChecks(draft);
+  if (rows.length === 0) return <p className="nta-form-note">{t('nta.form.setpointsTableNote')}</p>;
+  // Zones that share the block setpoints but need different table values cannot all match the block.
+  const sharedTargets = new Set(rows.filter((row) => !row.ownSetpoints)
+    .map((row) => `${tableValue(row.expected.heatingC)}/${tableValue(row.expected.coolingC)}`));
+  return <div data-testid="nta-setpoint-check">{rows.map((row) => {
+    const matches = close(row.actual.heatingC, row.expected.heatingC) && close(row.actual.coolingC, row.expected.coolingC);
+    const target: Path = !row.ownSetpoints && sharedTargets.size > 1 && row.zoneIndex != null
+      ? ['zoneData', row.zoneIndex, 'setpoints'] : row.path;
+    const message = t(matches ? 'nta.form.setpointsTableMatch' : 'nta.form.setpointsTableMismatch',
+      { heating: tableValue(row.expected.heatingC), cooling: tableValue(row.expected.coolingC) });
+    return <p key={row.zoneId ?? 'block'} className={matches ? 'nta-form-note' : 'nta-form-note nta-form-error'}
+      role={matches ? undefined : 'alert'}>
+      {row.zoneId != null && <strong>{t('nta.form.setpointsZone', { zone: row.zoneId })}: </strong>}
+      {message}
+      {!matches && <> <button type="button" onClick={() => {
+        const current = (read(draft, target) as Draft | undefined) ?? {};
+        change(target, {
+          sourceReference: '',
+          ...current,
+          heatingC: row.expected.heatingC,
+          coolingC: row.expected.coolingC,
+        });
+      }}>{t('nta.form.setpointsUseTable')}</button></>}
+    </p>;
+  })}</div>;
 }
 
 export function NtaCalculationForm({ project, initial, onSave, onCancel }: {

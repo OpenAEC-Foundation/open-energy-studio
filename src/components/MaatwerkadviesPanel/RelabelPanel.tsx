@@ -4,19 +4,15 @@ import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
 import { assessRelabelWithRust, type RelabelAssessment } from '../../core/nta/KernelClient';
 import { deserializeProject } from '../../core/io/ProjectSerializer';
+import { relabelCluster, relabelElementName, relabelNote, relabelValue } from '../../core/nta/RelabelText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './MaatwerkadviesPanel.css';
 
-function show(value: unknown): string {
-  if (value === undefined) return '–';
-  const text = JSON.stringify(value);
-  return text.length > 80 ? `${text.slice(0, 77)}…` : text;
-}
 
 /** BRL 9500 Bijlage 6a/6b: compares the project with the original label's project file. */
 export function RelabelPanel() {
   const { state } = useEnergy();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [result, setResult] = useState<RelabelAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -73,11 +69,11 @@ export function RelabelPanel() {
                   {result.changes.map((change, index) => (
                     <tr key={index}>
                       <td className={`relabel-${change.verdict}`}>{t(`relabel.verdict.${change.verdict}`)}</td>
-                      <td>{change.cluster}</td>
-                      <td><code>{change.path}</code></td>
-                      <td>{show(change.before)}</td>
-                      <td>{show(change.after)}</td>
-                      <td>{change.note ?? ''}</td>
+                      <td>{relabelCluster(t, change.cluster)}</td>
+                      <td title={change.path}>{relabelElementName(state.project, change.path)}</td>
+                      <td>{relabelValue(t, locale, change.before)}</td>
+                      <td>{relabelValue(t, locale, change.after)}</td>
+                      <td>{relabelNote(t, change.note)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,10 +1,11 @@
 import type { IProject } from '../energy/types';
 import type { MaatwerkadviesAssessment, MwaVariantResult, NtaMaatwerkadvies } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
+import { dutchCodeCell, dutchNumber, dutchTimestamp } from './DutchReportText';
 
 function cell(value: unknown): string { return `<td>${escapeHtml(value)}</td>`; }
 function num(value: number | null | undefined, digits = 0): string {
-  return value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('nl-NL', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return dutchNumber(value, digits);
 }
 function n(value: number | null | undefined, digits = 0): string { return `<td class="n">${num(value, digits)}</td>`; }
 
@@ -52,7 +53,7 @@ export function generateMaatwerkadviesReportHTML(
   definition: NtaMaatwerkadvies,
   assessment: MaatwerkadviesAssessment,
 ): string {
-  const generatedAt = new Date().toISOString();
+  const generatedAt = dutchTimestamp();
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>Maatwerkadvies — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -68,7 +69,7 @@ export function generateMaatwerkadviesReportHTML(
       <tr><th>Invoervingerafdruk</th><td colspan="3"><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>
     </tbody></table>`;
   if (assessment.status === 'invalid' || !assessment.current) {
-    const issues = assessment.issues.map((item) => `<tr>${cell(item.code)}${cell(item.path)}${cell(item.detail ?? '')}</tr>`).join('');
+    const issues = assessment.issues.map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}${cell(item.detail ?? '')}</tr>`).join('');
     return `${head}<h2>Geen uitkomst</h2><table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${issues}</tbody></table></body></html>`;
   }
   const current = assessment.current;

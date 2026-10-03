@@ -138,4 +138,5 @@
   color: var(--text-muted);
 }
 
-.results-stale-block { opacity: 0.6; }
+.results-stale-block > :not(.results-stale) { opacity: 0.6; }
+.results-stale-value { opacity: 0.6; }

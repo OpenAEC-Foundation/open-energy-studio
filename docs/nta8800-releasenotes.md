@@ -2,6 +2,22 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — BENG-rapport uit de kern, taal van exports en tweede UI-doorloop
+
+Geen wijziging in de rekenkern; wel in wat rapporten en schermen tonen.
+
+- **BENG-rapport.** Het tabblad Rapport, "Rapport exporteren" en de afdrukvoorbeeld gebruiken nu de NTA 8800-kernuitkomst: BENG 1/2/3 met de Bbl-eisen en het oordeel van de kern, TOjuli (alleen woonfunctie), indicatieve labelklasse, maandoverzicht (warmte-/koudebehoefte, zonwinst, transmissie), energiebalans en PV uit hoofdstuk 16. Het vereenvoudigde rekenmodel verschijnt alleen zonder kernuitkomst, gemarkeerd "Indicatief, niet volgens NTA 8800". Bij een ketel heet het rendement nu η in plaats van COP.
+- **Taal.** Het BENG-rapport volgt de taal van de interface (Nederlands, anders Engels): `lang`, decimalen, datums en teksten. Het NTA 8800-rekenrapport, het invoer- en projectdossier en het maatwerkadviesrapport blijven Nederlandse BRL 9500-documenten, maar gebruiken nu overal een decimale komma, Nederlandse datums en vertaalde meldingscodes (met de code ernaast). Registratiecodes (`client_required`, `plausibility_*` en andere) hebben Nederlandse en Engelse omschrijvingen.
+- **Maatwerkadvies.** Een variant die niet te berekenen is, toont nu de redenen van de kern in plaats van alleen "⚠". In het Engels worden de vaste adviesteksten van de kern vertaald; eigen teksten van de adviseur blijven zoals ingevoerd. "Huidige situatie" volgt de interfacetaal.
+- **Herlabelen.** Clusters en toelichtingen van Bijlage 6a/6b zijn vertaald, getallen volgen de taal, en een wijziging toont de namen van zone, vlak en raam in plaats van een JSON-pointer (de pointer staat in de tooltip).
+- **Basisopname.** Toegepaste standaardwaarden tonen ja/nee, getallen volgens de taal, PascalCase- en snake_case-waarden als vertaald label met de code, en de vaste Engelse waardeteksten van de kern in het Nederlands. De BENG-waarden van de opname volgen de taal.
+- **Projectgegevens.** Alle velden hebben een gekoppeld label; het venster heeft `role="dialog"` met `aria-modal` en is ingedeeld in secties met twee kolommen. Velden voor herlabelen en vervangen verschijnen alleen bij dat berichttype.
+- **Setpointcontrole (tabel 7.13).** De controle in het formulier volgt de kern: per zone van `zoneData` de eigen functie of het oppervlaktegewogen gemiddelde van `functionAreas` (§6.5.3), tegen de setpoints die de zone gebruikt; met een gebruiksaanpassing (bijlage Z) geen controle. "Tabelwaarden gebruiken" schrijft naar de zone zelf als zones met gedeelde setpoints verschillende tabelwaarden nodig hebben.
+- **Energiebalans.** De winsten volgen nu Q_H;gn van de kern; serrewinst (7.37) en andere termen staan als "overige winst". Ontbreekt de energie per energiefunctie, dan meldt de grafiek dat in plaats van nulwaarden.
+- **Verouderde uitkomsten.** Alle uitkomsten van het vereenvoudigde model (kaarten, GTO, grafieken, vloeroppervlak) staan in één gemarkeerd blok met een duidelijke melding.
+- **Kernaanroepen.** De resultatenweergave wacht 400 ms na een wijziging (zoals het live-voorbeeld) en deelt een lopende kernberekening met het live-voorbeeld, het rapport en de afdruk.
+- **Overig.** Keuzelijsten met lange teksten krijgen twee kolommen en de volledige tekst als tooltip; schuifbalken volgen het donkere thema.
+
 ## 3 oktober 2026 — resultatenweergave en bouwjaar
 
 - **Bouwjaar.** Zonder `ntaCalculation.constructionYear` neemt de projectroute het bouwjaar uit de registratie, en anders het bouwjaar van de ventilatiesectie (tabel 11.13, dezelfde grootheid). Projecten die alleen het ventilatiebouwjaar hadden, krijgen nu de standaard voor woningisolatie (§5.3.2) in plaats van de melding `standard_insulation_construction_year_missing`.

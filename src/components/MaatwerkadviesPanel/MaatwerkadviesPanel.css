@@ -16,3 +16,5 @@
 .mwa-patch { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
 .mwa-patch-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .mwa-patch-row label { display: flex; flex-direction: column; flex: 1 1 140px; }
+.mwa-variant-issues td { background: rgba(197, 140, 43, 0.12); font-size: 12px; }
+.mwa-variant-issues ul { margin: 0; padding-left: 18px; }

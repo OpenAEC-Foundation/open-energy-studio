@@ -48,12 +48,12 @@ describe('NTA calculation report', () => {
     expect(html).toContain('Woning &lt;test&gt;');
     expect(html).not.toContain('Woning <test>');
     expect(html).toContain('sha256:feed');
-    expect(html).toContain('11.09');
-    expect(html).toContain('77.7');
+    expect(html).toContain('11,09');
+    expect(html).toContain('77,7');
     expect(html).toContain('A+++');
     expect(html).toContain('vereist vast ventilatiesysteem C1');
     expect(html).toContain('voldoet (onverifieerd)');
-    expect(html).toContain('0.84');
+    expect(html).toContain('0,84');
     expect(html).toContain('7.9.2 intermittent heating reduction a_H;red');
     expect(html).toContain('NTA 8800 tables 17.1/17.2');
     expect(html.match(/<tr><th>(jan|feb|mrt|apr|mei|jun|jul|aug|sep|okt|nov|dec)<\/th>/g)).toHaveLength(12);
@@ -67,9 +67,9 @@ describe('NTA calculation report', () => {
     performance.labelRenewableSharePercent = null;
     const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
     const row = html.match(/<tr><th>Labelgegevens \(Reg\. art\. 4\)<\/th>.*?<\/tr>/)?.[0] ?? '';
-    expect(row).toContain('EP2 14.50');
+    expect(row).toContain('EP2 14,50');
     expect(row).toContain('hernieuwbaar — %');
-    expect(row).not.toContain('77.7');
+    expect(row).not.toContain('77,7');
   });
 
   it('reports chapter 11 ventilation and the fixed C1 basis of BENG 1', () => {
@@ -88,7 +88,7 @@ describe('NTA calculation report', () => {
     };
     const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
     expect(html).toContain('Ventilatie (hoofdstuk 11)');
-    expect(html).toContain('90.1');
+    expect(html).toContain('90,1');
     expect(html).toContain('212');
     expect(html).toContain('aparte run met vast ventilatiesysteem C1 (§5.4.2)');
     expect(html).toContain('4800');
@@ -110,7 +110,7 @@ describe('NTA calculation report', () => {
     };
     const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
     expect(html).toContain('Indicatoren hoofdstuk 5');
-    expect(html).toContain('61.27');
+    expect(html).toContain('61,27');
     expect(html).toContain('63 kWh/m²·jr — voldoet (onverifieerd)');
     expect(html).toContain('1068 m³ aeq');
     expect(html).toContain('Lokaal koolstofemissievrij');
@@ -140,6 +140,6 @@ describe('NTA calculation report', () => {
     expect(html).toContain('Geen uitkomst');
     expect(html).toContain('nta_calculation_block_missing');
     expect(html).not.toContain('BENG 2');
-    expect(html).toContain('232.8');
+    expect(html).toContain('232,8');
   });
 });

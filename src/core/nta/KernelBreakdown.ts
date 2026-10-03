@@ -8,6 +8,8 @@ import { summarizeServiceEnergy } from './ServiceEnergy';
  *
  * Losses and gains are the heating-balance terms of chapter 7 summed over zones and
  * months; infiltration is part of the ventilation term there and is reported as 0.
+ * The gains total is the kernel's own Q_H;gn (7.4), so terms beyond solar and internal
+ * gains (sunroom gains 7.37) appear as `otherGain` instead of being lost.
  * Delivered energy is the §5.5.3 delivered energy per energy function; PV is the
  * chapter 16 production; solar thermal is the chapter 13 solar yield plus standalone
  * space-heating solar systems.
@@ -26,12 +28,20 @@ export function kernelEnergyBreakdown(performance: BuildingPerformanceAssessment
   const solarThermal = (hotWater ? hotWater.annualSolarRenewableKwh + hotWater.annualSolarSpaceHeatingKwh : 0)
     + sum(performance.standaloneSolar?.spaceHeatingKwh ?? []);
 
+  const solarGain = sum(months.map((row) => row.windowSolarGainsKwh + row.opaqueSolarGainsKwh));
+  const internalGain = sum(months.map((row) => row.internalGainsKwh));
+  // Q_H;gn per month (7.4); without it in the output, nothing beyond solar and internal gains is known.
+  const gainsKnown = months.length > 0 && months.every((row) => Number.isFinite(row.heating?.gainsKwh));
+  const otherGain = gainsKnown ? sum(months.map((row) => row.heating.gainsKwh)) - solarGain - internalGain : 0;
+
   return {
     transmissionLoss: sum(months.map((row) => row.heating.transmissionKwh)),
     ventilationLoss: sum(months.map((row) => row.heating.ventilationKwh)),
     infiltrationLoss: 0,
-    solarGain: sum(months.map((row) => row.windowSolarGainsKwh + row.opaqueSolarGainsKwh)),
-    internalGain: sum(months.map((row) => row.internalGainsKwh)),
+    solarGain,
+    internalGain,
+    otherGain: Math.abs(otherGain) > 0.5 ? otherGain : 0,
+    deliveredUnavailable: services == null,
     heatingDemand: sum(zones.map((zone) => zone.annualHeatingNeedKwh ?? 0)),
     coolingDemand: sum(zones.map((zone) => zone.annualCoolingNeedKwh ?? 0)),
     heatingEnergy: delivered('heating'),
