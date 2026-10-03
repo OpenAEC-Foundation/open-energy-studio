@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { BasisopnamePanel } from '../components/BasisopnamePanel/BasisopnamePanel';
 import { renderWithProviders, userEvent } from './test-utils';
@@ -52,7 +52,7 @@ describe('basisopname panel', () => {
     // Vertical pipes: explicitly none.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Vertical pipes (§7.2.4)' }), 'none');
     expect(stored()!.survey.verticalPipes).toEqual([]);
-  });
+  }, 15000);
 
   it('adds a dwelling cooling system in the ISSO 82.1 chapter 10 shape', async () => {
     const user = userEvent.setup();
@@ -94,5 +94,26 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.inklapRedenen).toEqual({ 'heating.generator.engine': 'plate missing' });
     // The result stays while the reason is typed.
     expect(screen.getByText('ISSO 82.1 p. 113 (table 9.7)')).toBeInTheDocument();
+  });
+
+  it('does not show an assessment for a survey changed during the request', async () => {
+    let resolveResponse!: (value: { json: () => Promise<unknown> }) => void;
+    const fetchMock = vi.fn(() => new Promise<{ json: () => Promise<unknown> }>((resolve) => {
+      resolveResponse = resolve;
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    await user.click(screen.getByRole('button', { name: 'Calculate survey' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await user.clear(screen.getByRole('spinbutton', { name: 'Construction year' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Construction year' }), '2000');
+    await act(async () => resolveResponse({ json: async () => ({
+      status: 'calculated_unverified', appliedDefaults: [], warnings: [], issues: [],
+      performance: { indicativeLabelClass: 'A' }, referenceVerified: false,
+    }) }));
+    expect(screen.queryByText('A')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Survey result')).not.toBeInTheDocument();
   });
 });

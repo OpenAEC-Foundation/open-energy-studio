@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import {
@@ -137,10 +137,16 @@ export function BasisopnamePanel() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [json, setJson] = useState<string | null>(null);
+  const requestId = useRef(0);
 
   const save = (next: StoredSurvey | undefined, keepResult = false) => {
     dispatch({ type: 'SET_BASISOPNAME', payload: next });
-    if (!keepResult) setResult(null);
+    if (!keepResult) {
+      requestId.current += 1;
+      setResult(null);
+      setError(null);
+      setBusy(false);
+    }
   };
 
   if (!stored) {
@@ -168,16 +174,19 @@ export function BasisopnamePanel() {
   const verticalPipes = read(draft, ['verticalPipes']);
 
   const run = async () => {
+    const current = ++requestId.current;
     setBusy(true);
     setError(null);
+    setResult(null);
     try {
-      setResult(kind === 'residential'
+      const assessment = kind === 'residential'
         ? await assessResidentialSurveyWithRust(asResidential(stored))
-        : await assessUtilitySurveyWithRust(asUtility(stored)));
+        : await assessUtilitySurveyWithRust(asUtility(stored));
+      if (requestId.current === current) setResult(assessment);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      if (requestId.current === current) setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
-      setBusy(false);
+      if (requestId.current === current) setBusy(false);
     }
   };
 
