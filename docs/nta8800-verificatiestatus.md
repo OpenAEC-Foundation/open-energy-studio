@@ -69,6 +69,8 @@ Wat buiten bereik blijft:
 - Bijlage K: dit zijn meetregels; de oppervlakken zijn invoer.
 
 Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
+- `θ_e;avg;an` (7.14/7.15/7.73, bijlage D): §17.2 geeft geen jaarwaarde; de kern gebruikt overal de 10,67 °C die D.4 (p. 791) noemt;
+- §5.7.1 methode 3, tweede situatie: elke niet-beweegbare zonwering van tabel 7.4a/7.4b telt als beperking (eerste streepje), zonder g-toets;
 - bijlage Q: F_H;gen = 1 bij volledige dekking (ook met bijverwarming); Q.48 bij L/W; bronpomp dubbel geteld (Q.4 en 9.6.3.2); Q.4.4 met het verdampervermogen bij conditie 1;
 - koelmethode 1: f_C;PL boven 100 % niet begrensd (10.56/10.58), met waarschuwing;
 - de teken-keuze van Δθ_fan in 9.29 tegenover 10.20;
@@ -201,6 +203,13 @@ Alles kwam op ongeveer 1e-6 overeen, op één punt na. Vastgelegd of aangepast:
 - **Nieuwe waarschuwingen:** `ground_floor_resistance_below_surface_resistance`, `ground_floor_perimeter_implausible`, `detailed_thermal_bridges_none_entered` en `sunroom_values_differ_from_unheated_space`.
 - **D.7, tabel D.1, C.12 en tabel C.4:** vastgelegd als interpretatie (zie de lijst bovenaan, en `nta8800-maandbehoefte.md` en `nta8800-constructies.md`).
 - **Voorbeeld tussenwoning:** het dak was 52 m² bij 45° op een plattegrond van 5 × 10 m. Dat moet 70,7 m² zijn. Het dak bestaat nu uit twee schilden van 35,36 m² (noord en zuid).
+
+**Herberekening woningventilatie, BENG 1 en TOjuli, 3 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's, 23 varianten (systemen A, C1, C.4b, D met volledige en gedeeltelijke bypass, E, roostervoorverwarming, forfaitaire infiltratie, actieve koeling met bijlage AA). Hoofdstuk 11 (11.1–11.142), 7.19/7.20, de maandbehoefte, BENG 1 met de vaste C1-run (§5.4.3.1), de grenswaarde en TOjuli (5.40–5.41c, bijlage AA) kwamen op afrondingsniveau overeen. Vastgelegd of aangepast:
+- **`θ_e;avg;an` (interpretatie, gewijzigd).** 7.14/7.15/7.73 verwijzen naar §17.2, maar tabel 17.1 geeft alleen maandwaarden (p. 689). De enige jaarwaarde die de norm noemt, is θ_e = 10,67 °C onder D.4 (p. 791, op basis van NEN 5060). De transmissieterm en 7.73 gebruikten het ongewogen gemiddelde van tabel 17.1 (10,6717 °C), D.4 al 10,67 °C. Nu gebruikt alles 10,67 °C. Het effect is verwaarloosbaar (0,0017 K). Het uurgewogen gemiddelde (10,7023 °C) zou BENG 1 van de basistussenwoning met 0,02 kWh/m² verlagen.
+- **Bijlage AA met onvoldoende capaciteit (gecorrigeerd).** §5.7.1 (p. 114–115): alleen een koelsysteem met voldoende capaciteit geeft vrijstelling; "voor alle andere systemen en situaties" moet TOjuli worden bepaald. De kern gaf TOjuli = geen waarde. Nu volgt TOjuli uit 5.40 zoals zonder actieve koeling, met de niet-blokkerende waarschuwing `annex_aa_capacity_insufficient` (in `warnings` van de rekenzone en van het gebouw).
+- **Raam-id in bijlage AA (gecorrigeerd).** De afgeleide rekenzone noemt projectramen `window:<id>`; het projectraam-id werd niet gevonden. Beide schrijfwijzen worden nu herkend. Een afgewezen bewijs voor actieve koeling (bijvoorbeeld `annex_aa_window_unknown`) staat nu als gat in de projectuitkomst, met de rekenzone in `detail`.
+- **Zonwering als bewijs (methode 3, tweede situatie).** Dit was alleen een verklaring. Nu toetst de kern de raamgegevens: meer dan 95 % van het beoordeelde glasoppervlak (oriëntatie 45°–315° en horizontaal) moet niet-beweegbare lamellen van tabel 7.4a/7.4b hebben, `g_gl ≤ 0,4` (7.40/7.41/7.41a/7.41b, juli, koeling) of `F_sh;obst;juli < 0,67`. Anders `solar_limitation_not_met`; een onvolledige raaminventaris geeft `window_inventory_incomplete`. Beweegbare zonwering telt niet mee: tabel 7.4a/7.4b gaan over niet-beweegbare zonwering.
+- **`ventilation.months[].conductanceWPerK`.** Dit is ρ·c·Σq zonder b_v; de toevoertemperaturen dragen b_v. Het is dus niet de H_ve van 7.19 (bij D met WTW 68,8 tegen 32,1 W/K). Nieuw veld `weightedConductanceWPerK` geeft H_ve volgens 7.19/7.20. Het paneel en het rapport tonen nu die waarde.
 
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
@@ -382,7 +391,7 @@ Hoofdstuk 7, §8.3 met bijlage D en hoofdstuk 17 zijn nagelopen tegen de gelicen
 
 Nieuwe verplichte invoer: `usageFunction` (en bij wonen `dwellingType`) per rekenzone en `edgeThermalBridges` per vloer op grond. De expliciete grondroute vraagt nu twaalf `H_g;an;mi` en de twee seizoenswaarden. Terugwinbare systeemverliezen (7.3–7.5, 7.7–7.9) blijven buiten beschouwing en staan in `omittedCorrections`. De interpretatiepunten staan in [maandbehoefte](nta8800-maandbehoefte.md).
 
-Daarmee zijn interpretatievraag 1 en 8 hieronder beantwoord (zonwering op warmte: zie p. 197; `θ_e;avg;an`: ongewogen gemiddelde, D.4 gebruikt 10,67 °C) en is open punt 6 (`a_H;red`/7.78) opgelost.
+Daarmee zijn interpretatievraag 1 en 8 hieronder beantwoord (zonwering op warmte: zie p. 197; `θ_e;avg;an`: toen ongewogen gemiddelde, D.4 gebruikt 10,67 °C; sinds 3 oktober 2026 overal 10,67 °C) en is open punt 6 (`a_H;red`/7.78) opgelost.
 
 ## Stand 2 oktober 2026: hoofdstuk 5 en 9 tegen de doeleditie
 

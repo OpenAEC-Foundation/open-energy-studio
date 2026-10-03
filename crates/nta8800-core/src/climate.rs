@@ -58,7 +58,8 @@ pub const COLD_RECOVERY_SUPPLY_TEMPERATURE_C: [f64; 12] = [
     0.0, 0.0, 0.0, 0.0, 25.63, 27.49, 26.34, 27.29, 25.30, 0.0, 0.0, 0.0,
 ];
 
-/// §17.2 / annex D.2.1: annual mean outdoor temperature `θ̄_e` (NEN 5060).
+/// Annual mean outdoor temperature `θ_e;avg;an` = `θ̄_e` of D.4 (p. 791,
+/// based on NEN 5060). §17.2 gives no annual value; 7.14/7.15/7.73 use this one.
 pub const ANNUAL_MEAN_OUTDOOR_TEMPERATURE_C: f64 = 10.67;
 
 /// Tilts of table 17.2 in degrees (0 = facing up, 90 = vertical, 180 = facing down).

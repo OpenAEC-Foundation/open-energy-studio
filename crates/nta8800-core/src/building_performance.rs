@@ -2867,7 +2867,7 @@ pub fn assess_building_performance(
             apply_combi_chp_heating(&mut heating, shares, product.fuel);
         }
     }
-    let warnings = result_warnings(input, &heating, cooling.as_ref(), hot_water.as_ref());
+    let mut warnings = result_warnings(input, &heating, cooling.as_ref(), hot_water.as_ref());
     let mut external = resolve_external(input, &mut issues);
     let mut forfait_totals = None;
     if issues.is_empty() {
@@ -3024,6 +3024,14 @@ pub fn assess_building_performance(
     } else {
         Vec::new()
     };
+    // §5.7.1: an insufficient annex AA capacity leaves TOjuli calculated.
+    for (index, zone) in tojuli.iter().enumerate() {
+        warnings.extend(
+            zone.warnings
+                .iter()
+                .map(|item| issue(item.code, format!("tojuli[{index}].{}", item.path))),
+        );
+    }
     let tojuli_complete = !tojuli.is_empty()
         && tojuli
             .iter()
@@ -6319,6 +6327,51 @@ mod tests {
             result.issues
         );
         assert_eq!(result.tojuli_max_k, Some(0.0));
+
+        // §5.7.1: an annex AA capacity that falls short gives no exemption;
+        // TOjuli then follows 5.40 (this sample has no component transmission,
+        // so it stays undetermined instead of 0).
+        let window = sample.space_heating.demand.windows[0].id.clone();
+        let calculation = |area_m2: f64, window_id: String| crate::annex_aa::AnnexAaInput {
+            construction_year: 2020,
+            post_insulated: false,
+            generator_capacity_kw: Some(0.0),
+            rooms: vec![crate::annex_aa::AnnexAaRoom {
+                id: "living".into(),
+                area_m2,
+                living: true,
+                opaque_inner_area_m2: 20.0,
+                windows: vec![crate::annex_aa::AnnexAaWindow {
+                    window_id,
+                    u_with_shutter_w_per_m2k: None,
+                }],
+                installed_capacity_kw: 0.0,
+            }],
+        };
+        sample.active_cooling.as_mut().unwrap().capacity =
+            crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                calculation: Some(calculation(2.0, window)),
+                source_reference: "annex AA".into(),
+            };
+        let short = assess_building_performance(&sample);
+        assert_eq!(short.status, "calculated_unverified", "{:?}", short.issues);
+        assert_ne!(short.tojuli_max_k, Some(0.0));
+        assert!(short.tojuli[0]
+            .issues
+            .iter()
+            .all(|item| item.code != "annex_aa_capacity_insufficient"));
+        // An unknown window id rejects the evidence: TOjuli is not determined.
+        sample.active_cooling.as_mut().unwrap().capacity =
+            crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                calculation: Some(calculation(40.0, "missing".into())),
+                source_reference: "annex AA".into(),
+            };
+        let unknown = assess_building_performance(&sample);
+        assert_eq!(unknown.tojuli[0].status, "invalid");
+        assert!(unknown.tojuli[0]
+            .issues
+            .iter()
+            .any(|item| item.code == "annex_aa_window_unknown"));
     }
     #[test]
     fn review_fixes_bacs_on_district_heat_and_consistency_checks() {

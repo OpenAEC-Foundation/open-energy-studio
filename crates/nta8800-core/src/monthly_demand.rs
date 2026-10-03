@@ -1201,6 +1201,36 @@ fn sky_loss_kwh(tilt_deg: f64, u: f64, area: f64, hours: f64) -> f64 {
     sky_view_factor(tilt_deg) * R_SE * u * area * H_LR_E * DELTA_THETA_SKY * hours * 0.001
 }
 
+/// `g_gl;wi` of 7.40/7.41/7.41a/7.41b for the month and balance; rotatable
+/// louvres (7.41b) are closed for f_sh;with of 7.6.6.1.4.
+pub(crate) fn window_g_gl(window: &Window, month: u8, balance: Balance) -> f64 {
+    let closed = match window.glazing.as_ref().and_then(|item| item.fixed_louvres) {
+        Some(crate::solar_shading::FixedLouvres::Rotatable { control }) => {
+            crate::solar_shading::shading_fraction(
+                control,
+                window.orientation,
+                window.tilt_deg,
+                month,
+                balance,
+            )
+        }
+        _ => 0.0,
+    };
+    window.g_gl(usize::from(month - 1), closed)
+}
+
+/// `F_sh;obst` of the window for the month and balance (§17.3); `None` when
+/// the obstruction input is invalid.
+pub(crate) fn window_obstruction(window: &Window, month: u8, balance: Balance) -> Option<f64> {
+    obstruction_factor(
+        &window.obstruction,
+        window.orientation,
+        window.tilt_deg,
+        month,
+        balance,
+    )
+}
+
 /// 7.32 with 7.40, 7.42/7.43 and 7.39: net solar gain of one window in kWh.
 pub(crate) fn window_solar_kwh(window: &Window, month: u8, balance: Balance) -> f64 {
     let hours = MONTH_HOURS[usize::from(month - 1)];
@@ -1222,20 +1252,7 @@ pub(crate) fn window_solar_kwh(window: &Window, month: u8, balance: Balance) -> 
         balance,
     );
     let index = usize::from(month - 1);
-    // 7.41b: rotatable louvres are closed for f_sh;with of 7.6.6.1.4.
-    let closed = match window.glazing.as_ref().and_then(|item| item.fixed_louvres) {
-        Some(crate::solar_shading::FixedLouvres::Rotatable { control }) => {
-            crate::solar_shading::shading_fraction(
-                control,
-                window.orientation,
-                window.tilt_deg,
-                month,
-                balance,
-            )
-        }
-        _ => 0.0,
-    };
-    window.g_gl(index, closed)
+    window_g_gl(window, month, balance)
         * window.area_m2
         * (1.0 - window.frame_fraction)
         * obstruction
@@ -1785,8 +1802,12 @@ impl TransmissionSummary {
     }
 }
 
+/// `θ_e;avg;an` of 7.14/7.15/7.73 and D.1–D.4. §17.2 tabulates no annual
+/// value; the only one the norm states is θ_e = 10,67 °C under D.4 (p. 791,
+/// "op basis van NEN 5060"), so every term uses that value. The unweighted
+/// mean of table 17.1 is 10,6717 °C, the hour-weighted mean 10,7023 °C.
 pub fn annual_mean_outdoor_temperature_c() -> f64 {
-    OUTDOOR_TEMPERATURE_C.iter().sum::<f64>() / 12.0
+    crate::climate::ANNUAL_MEAN_OUTDOOR_TEMPERATURE_C
 }
 
 fn resolve_transmission(
@@ -2759,6 +2780,16 @@ mod tests {
             "fans": {"method": "forfait", "current": "dc", "manufactureYear": 2020},
             "sourceReference": "synthetic"
         })
+    }
+
+    #[test]
+    fn annual_mean_outdoor_temperature_is_the_d_4_value() {
+        // D.4 (p. 791) states 10,67 °C; 7.14/7.15/7.73 and annex D use it alike.
+        assert_eq!(annual_mean_outdoor_temperature_c(), 10.67);
+        assert_eq!(
+            annual_mean_outdoor_temperature_c(),
+            crate::climate::ANNUAL_MEAN_OUTDOOR_TEMPERATURE_C
+        );
     }
 
     #[test]

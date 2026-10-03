@@ -898,6 +898,25 @@ fn with_hot_water_reduction(mut system: HotWaterSystem, project: &ProjectInput) 
     system
 }
 
+/// §5.7.1 evidence the kernel rejects (e.g. an annex AA window it cannot
+/// resolve) drops TOjuli for that zone; name the cause at project level.
+fn tojuli_evidence_gaps(tojuli: &[crate::tojuli::TojuliAssessment]) -> Vec<InputGap> {
+    let mut gaps = Vec::new();
+    for zone in tojuli.iter().filter(|zone| zone.status == "invalid") {
+        for item in zone
+            .issues
+            .iter()
+            .filter(|item| item.path.starts_with("activeCooling"))
+        {
+            gaps.push(InputGap {
+                detail: Some(format!("TOjuli, rekenzone {}", zone.zone_id)),
+                ..gap(item.code, format!("ntaCalculation.{}", item.path))
+            });
+        }
+    }
+    gaps
+}
+
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
     // The maatwerkadvies definition (measures, tariffs) and the kept
     // basisopname survey do not change the energy performance of the
@@ -919,6 +938,9 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
     let mut gaps = Vec::new();
     let derived = derive_input(project_value, &mut gaps);
     let performance = derived.as_ref().map(assess_building_performance);
+    if let Some(result) = &performance {
+        gaps.extend(tojuli_evidence_gaps(&result.tojuli));
+    }
     let status = match (&derived, &performance) {
         (None, _) => "incomplete",
         (Some(_), Some(result)) if result.status == "calculated_unverified" => {
@@ -1590,6 +1612,42 @@ mod tests {
             "../../../training-data/nta8800-project-performance-synthetic.json"
         ))
         .unwrap()
+    }
+
+    #[test]
+    fn rejected_tojuli_evidence_becomes_a_project_gap() {
+        let zone = |status: &'static str, code: &'static str, path: &str| {
+            crate::tojuli::TojuliAssessment {
+                zone_id: "z1".into(),
+                status,
+                active_cooling: true,
+                orientations: Vec::new(),
+                max_tojuli_k: None,
+                meets_bbl_limit: None,
+                annex_aa: None,
+                issues: vec![crate::tojuli::TojuliIssue {
+                    code,
+                    path: path.into(),
+                }],
+                warnings: Vec::new(),
+            }
+        };
+        let gaps = tojuli_evidence_gaps(&[
+            zone(
+                "invalid",
+                "annex_aa_window_unknown",
+                "activeCooling.capacity.calculation.rooms[0].windows[0].windowId",
+            ),
+            // Kernel-internal causes stay out of the project gaps.
+            zone("invalid", "tojuli_components_required", "transmission"),
+        ]);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].code, "annex_aa_window_unknown");
+        assert_eq!(
+            gaps[0].path,
+            "ntaCalculation.activeCooling.capacity.calculation.rooms[0].windows[0].windowId"
+        );
+        assert_eq!(gaps[0].detail.as_deref(), Some("TOjuli, rekenzone z1"));
     }
 
     #[test]

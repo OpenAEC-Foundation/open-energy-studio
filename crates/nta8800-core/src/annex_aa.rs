@@ -359,17 +359,20 @@ pub fn assess_annex_aa(
         let mut windows = Vec::new();
         for (w, item) in room.windows.iter().enumerate() {
             let window_path = format!("{room_path}.windows[{w}]");
+            // The derived zone input names project windows `window:<id>`;
+            // both spellings resolve.
+            let derived_id = format!("window:{}", item.window_id);
             match input
                 .windows
                 .iter()
-                .find(|window| window.id == item.window_id)
+                .find(|window| window.id == item.window_id || window.id == derived_id)
             {
                 None => issues.push(issue(
                     "annex_aa_window_unknown",
                     format!("{window_path}.windowId"),
                 )),
                 Some(window) => {
-                    if !assigned.insert(item.window_id.as_str()) {
+                    if !assigned.insert(window.id.as_str()) {
                         issues.push(issue(
                             "annex_aa_window_assigned_twice",
                             format!("{window_path}.windowId"),
