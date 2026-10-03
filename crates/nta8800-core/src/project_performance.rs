@@ -83,6 +83,10 @@ pub struct NtaCalculationInput {
     pub heat_pump_renewable: Option<HeatPumpRenewableEvidence>,
     pub bacs_factor: f64,
     pub bacs_source_reference: String,
+    /// §5.5.8 systems and BACS evidence; when given, f_BACS is derived and
+    /// replaces `bacsFactor`.
+    #[serde(default)]
+    pub bacs: Option<crate::bacs_draft::BacsDraftInput>,
     pub use_inventory_complete: bool,
     #[serde(default)]
     pub declared_uses: Vec<DeclaredUse>,
@@ -104,6 +108,17 @@ pub struct NtaCalculationInput {
     pub cooling: Option<CoolingSystem>,
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
+    /// §5.3.1: use functions of an existing utility building with areas.
+    #[serde(default)]
+    pub label_functions: Vec<crate::label_class::LabelFunctionArea>,
+    /// Construction year for the Standaard voor woningisolatie; falls back
+    /// to `registration.constructionYear`.
+    #[serde(default)]
+    pub construction_year: Option<u32>,
+    /// §5.5.7: fossil-fuelled building-bound appliances left out of the
+    /// calculation.
+    #[serde(default)]
+    pub fossil_appliances_outside_calculation: Option<bool>,
     #[serde(default)]
     pub bbl_function: Option<BblFunction>,
     /// Annex AB footnote g: delivery temperature of external heat.
@@ -223,6 +238,9 @@ pub struct ProjectPerformanceAssessment {
     /// Registration data checks (BRL 9500 §4.2.3–4.2.5); `None` when the
     /// project has no registration block.
     pub registration: Option<crate::registration::RegistrationAssessment>,
+    /// §5.5.8 assessment when `ntaCalculation.bacs` is given.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bacs: Option<crate::bacs_draft::BacsDraftAssessment>,
     /// Label data of Regeling energieprestatie gebouwen art. 4.
     pub label_data: Option<crate::label_data::LabelData>,
 }
@@ -433,9 +451,21 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
             }
         }
     };
-    let label_data = project
-        .as_ref()
-        .map(|project| crate::label_data::label_data(project, derived.as_ref()));
+    let label_data = project.as_ref().map(|project| {
+        let mut data = crate::label_data::label_data(project, derived.as_ref());
+        data.indicators = performance
+            .as_ref()
+            .filter(|result| result.status == "calculated_unverified")
+            .map(crate::label_data::LabelIndicators::from_performance);
+        data
+    });
+    let bacs = project_value
+        .pointer("/ntaCalculation/bacs")
+        .filter(|value| !value.is_null())
+        .and_then(|value| {
+            serde_json::from_value::<crate::bacs_draft::BacsDraftInput>(value.clone()).ok()
+        })
+        .map(|input| crate::bacs_draft::assess_bacs_draft(&input));
     ProjectPerformanceAssessment {
         status,
         target_norm_version: TARGET_NORM_VERSION,
@@ -443,6 +473,7 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         input_fingerprint: fingerprint,
         attest_status: "unattested",
         registration,
+        bacs,
         label_data,
         gaps,
         geometry: project_geometry(project_value),
@@ -760,6 +791,20 @@ fn derive_input(
         return None;
     }
     let primary = zones.remove(0);
+    // §5.5.8: a derived f_BACS replaces the declared value.
+    let (bacs_factor, bacs_source_reference) = match &nta.bacs {
+        None => (nta.bacs_factor, nta.bacs_source_reference.clone()),
+        Some(bacs) => match crate::bacs_draft::assess_bacs_draft(bacs).factor {
+            Some(factor) => (
+                factor,
+                "NTA 8800 §5.5.8 (derived from ntaCalculation.bacs)".into(),
+            ),
+            None => {
+                gaps.push(gap("bacs_factor_undetermined", "ntaCalculation.bacs"));
+                return None;
+            }
+        },
+    };
     Some(BuildingPerformanceInput {
         hot_water_need_fit: None,
         calculation_scope: nta.calculation_scope,
@@ -779,8 +824,8 @@ fn derive_input(
             collective_connection: nta.collective_connection,
         },
         heat_pump_renewable: nta.heat_pump_renewable,
-        bacs_factor: nta.bacs_factor,
-        bacs_source_reference: nta.bacs_source_reference,
+        bacs_factor,
+        bacs_source_reference,
         use_inventory_complete: nta.use_inventory_complete,
         declared_uses: nta.declared_uses,
         declared_renewable_heat: nta.declared_renewable_heat,
@@ -792,6 +837,14 @@ fn derive_input(
         lighting: nta.lighting,
         cooling: nta.cooling,
         label_function: nta.label_function,
+        label_functions: nta.label_functions.clone(),
+        construction_year: nta.construction_year.or_else(|| {
+            project_value
+                .pointer("/registration/constructionYear")
+                .and_then(Value::as_u64)
+                .and_then(|year| u32::try_from(year).ok())
+        }),
+        fossil_appliances_outside_calculation: nta.fossil_appliances_outside_calculation,
         bbl_function: nta.bbl_function,
         bbl_functions: nta.bbl_functions.clone(),
         zeb_heat_delivery_temperature: nta.zeb_heat_delivery_temperature,
@@ -821,9 +874,59 @@ mod tests {
     }
 
     #[test]
+    fn bacs_block_derives_the_factor_of_5_5_8() {
+        let mut value = project();
+        value["ntaCalculation"]["bacs"] = serde_json::json!({
+            "buildingUse": "utility",
+            "systemInventoryComplete": true,
+            "systems": [{
+                "id": "heating", "service": "heating", "sourceReference": "plant room",
+                "generators": [{"id": "boiler", "nominalThermalCapacityKw": 400.0,
+                                "sourceReference": "type plate"}]
+            }],
+            "bacs": {"present": false, "sourceReference": "inspection"}
+        });
+        let result = assess_project_performance(&value);
+        let derived = result.derived_input.as_ref().unwrap();
+        // Above 290 kW without a BACS: f_BACS = 1,05.
+        assert_eq!(derived.bacs_factor, 1.05);
+        assert_eq!(result.bacs.as_ref().unwrap().factor, Some(1.05));
+        // Unknown power without BACS evidence leaves the factor open.
+        value["ntaCalculation"]["bacs"]["systems"][0]["generators"][0]
+            ["nominalThermalCapacityKw"] = serde_json::Value::Null;
+        value["ntaCalculation"]["bacs"]
+            .as_object_mut()
+            .unwrap()
+            .remove("bacs");
+        let open = assess_project_performance(&value);
+        assert_eq!(open.status, "incomplete");
+        assert!(open
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "bacs_factor_undetermined"));
+    }
+
+    #[test]
     fn complete_project_reaches_unverified_indicators() {
         let result = assess_project_performance(&project());
         assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        // Regeling art. 4: the label data carries the calculated indicators.
+        let label = result
+            .label_data
+            .as_ref()
+            .unwrap()
+            .indicators
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            label.primary_fossil_kwh_per_m2,
+            result
+                .performance
+                .as_ref()
+                .unwrap()
+                .primary_fossil_indicator_kwh_per_m2_year
+        );
+        assert!(label.heating_need_kwh_per_m2.is_some());
         let derived = result.derived_input.as_ref().unwrap();
         let demand = &derived.space_heating.demand;
         assert_eq!(demand.windows.len(), 2);

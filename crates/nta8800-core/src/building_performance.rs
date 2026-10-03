@@ -34,7 +34,10 @@ use crate::indicators_draft::{
     assess_indicators_draft, AnnualScenario, CalculationScope, IndicatorsDraftAssessment,
     IndicatorsDraftInput, ScenarioKind,
 };
-use crate::label_class::{indicative_label_class, LabelFunction, LABEL_SOURCE};
+use crate::label_class::{
+    indicative_label_class, indicative_label_class_mixed, renovation_standard, LabelFunction,
+    LabelFunctionArea, LABEL_SOURCE,
+};
 use crate::lighting::{
     assess_zone_lighting, validate_lighting, LightingContext, ZoneLighting, ZoneLightingResult,
 };
@@ -239,6 +242,18 @@ pub struct BuildingPerformanceInput {
     /// buildings use annex IX and may omit it.
     #[serde(default)]
     pub label_function: Option<LabelFunction>,
+    /// §5.3.1: use functions of an existing utility building with their
+    /// areas, for area-weighted label class bounds and the table 5.7
+    /// renovatiestandaard; replaces `labelFunction` when not empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub label_functions: Vec<LabelFunctionArea>,
+    /// Construction year, for the Standaard voor woningisolatie (§5.3.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub construction_year: Option<u32>,
+    /// §5.5.7: building-bound appliances burning fossil fuel that were
+    /// left out of the calculation by simplification (they still count).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fossil_appliances_outside_calculation: Option<bool>,
     /// Annex AB table AB.2/AB.3 footnote g: delivery temperature of external
     /// heat; unknown means ≥ 60 °C.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -434,6 +449,71 @@ pub struct CarrierMonth {
     pub month: u8,
     pub used_kwh: f64,
     pub delivered_kwh: f64,
+}
+
+/// Chapter 5 indicators reported on the label and in the record.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChapterFiveIndicators {
+    /// 5.3a E_H;nd (actual ventilation, without recoverable losses),
+    /// kWh/m² per year, rounded up to 0,01.
+    pub heating_need_kwh_per_m2: f64,
+    /// 5.3d E_C;nd, rounded up to 0,01.
+    pub cooling_need_kwh_per_m2: f64,
+    /// 5.3g E_H+C;nd.
+    pub heating_and_cooling_need_kwh_per_m2: f64,
+    /// §5.3.2 Standaard voor woningisolatie (dwellings with a known
+    /// construction year and loss area), rounded to a whole number.
+    pub standard_insulation_kwh_per_m2: Option<f64>,
+    pub meets_standard_insulation: Option<bool>,
+    /// §5.3.1.3 EwePrenTot, rounded down to 0,01.
+    pub renewable_indicator_kwh_per_m2: f64,
+    /// 5.3h EweFinal, rounded up to 0,01.
+    pub final_energy_kwh_per_m2: f64,
+    /// 5.3i EweFinal;EED, rounded up to 0,01.
+    pub final_energy_eed_kwh_per_m2: f64,
+    /// 5.17a/5.17b delivered electricity.
+    pub delivered_electricity_kwh: f64,
+    pub delivered_electricity_kwh_per_m2: f64,
+    /// 5.18a/5.18b external heat and cold, GJ.
+    pub delivered_external_gj: f64,
+    pub delivered_external_gj_per_m2: f64,
+    /// 5.19a/5.19b other carriers in natural gas equivalents, m³aeq.
+    pub delivered_other_m3_aeq: f64,
+    pub delivered_other_m3_aeq_per_m2: f64,
+    /// 5.39a–h.
+    pub renewable_by_carrier: RenewableByCarrier,
+    /// §5.5.7 locally carbon-emission free: no gas or oil used by
+    /// building-bound systems, including appliances outside the
+    /// calculation. `None` when that has not been stated.
+    pub locally_carbon_free: Option<bool>,
+    /// §5.3.1.2 table 5.7 for utility buildings, rounded to 0,01.
+    pub renovation_standard_kwh_per_m2: Option<f64>,
+    pub meets_renovation_standard: Option<bool>,
+}
+
+/// §5.3.2: Standaard voor woningisolatie, kWh/m² per year.
+pub fn standard_insulation(
+    apartment_building: bool,
+    construction_year: u32,
+    loss_area_ratio: f64,
+) -> Option<f64> {
+    if !loss_area_ratio.is_finite() || loss_area_ratio <= 0.0 {
+        return None;
+    }
+    let (base, slope) = match (apartment_building, construction_year <= 1945) {
+        (false, true) => (60.0, 105.0),
+        (false, false) => (43.0, 40.0),
+        (true, true) => (95.0, 70.0),
+        (true, false) => (45.0, 45.0),
+    };
+    let value = if loss_area_ratio < 1.0 {
+        base
+    } else {
+        base + slope * (loss_area_ratio - 1.0)
+    };
+    // "Rekenkundig afronden op een geheel getal".
+    Some(value.round())
 }
 
 /// Annex AB footnote g: ϑ_aflever;warmte of external heat.
@@ -649,6 +729,9 @@ pub struct BuildingPerformanceAssessment {
     pub annual_final_energy_eed_kwh: Option<f64>,
     /// `m_CO2;spec = m_CO2 / A_g`, kg CO2eq/m².
     pub co2_kg_per_m2: Option<f64>,
+    /// Chapter 5 label and record indicators (5.3a–i, 5.17–5.19, 5.39a–h,
+    /// 5.5.7, table 5.7).
+    pub chapter5: Option<ChapterFiveIndicators>,
     /// BENG 1, only with confirmed C1 ventilation.
     pub need_indicator_kwh_per_m2_year: Option<f64>,
     /// BENG 2.
@@ -2201,6 +2284,96 @@ pub fn assess_building_performance(
                 .map(|month| month.solar_renewable_kwh)
                 .sum::<f64>()
         });
+    let area = input.total_usable_floor_area_m2;
+    let label_functions: Vec<LabelFunctionArea> = if input.label_functions.is_empty() {
+        input
+            .label_function
+            .map(|function| LabelFunctionArea {
+                function,
+                area_m2: area,
+            })
+            .into_iter()
+            .collect()
+    } else {
+        input.label_functions.clone()
+    };
+    let chapter5 = match (totals, scenario, final_energy) {
+        (Some(item), Some(indicator), Some(final_kwh)) => {
+            use crate::indicators_draft::ceil_per_area;
+            // 5.3b/5.3c and 5.3e/5.3f: Q_nd;net per zone by 7.2 without the
+            // recoverable losses, with the actual ventilation.
+            let assessed =
+                || std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
+            let heating_net: f64 = assessed()
+                .map(|zone| {
+                    zone.annual_heating_need_without_recoverable_kwh
+                        .unwrap_or(0.0)
+                })
+                .sum();
+            let cooling_net: f64 = assessed()
+                .map(|zone| {
+                    zone.annual_cooling_need_without_recoverable_kwh
+                        .unwrap_or(0.0)
+                })
+                .sum();
+            let heating_indicator = ceil_per_area(heating_net, area).unwrap_or(f64::NAN);
+            let cooling_indicator = ceil_per_area(cooling_net, area).unwrap_or(f64::NAN);
+            let standard = match (residential, input.construction_year, input.loss_area_m2) {
+                (true, Some(year), Some(loss)) => standard_insulation(
+                    input.space_heating.demand.dwelling_type
+                        == Some(crate::monthly_demand::DwellingType::ApartmentBuilding),
+                    year,
+                    loss / area,
+                ),
+                _ => None,
+            };
+            // 5.17–5.19 from E_EPdel per carrier.
+            let delivered = |codes: &[&str]| -> f64 {
+                carriers
+                    .iter()
+                    .filter(|row| codes.contains(&row.carrier))
+                    .map(|row| row.delivered_kwh)
+                    .sum()
+            };
+            let electricity = delivered(&["el"]);
+            let external = delivered(&["dh", "dw", "dc"]) * 3.6 / 1000.0;
+            // 5.19a names ci ≠ el, dh; dw and dc are in 5.18a already.
+            let other = delivered(&["gas", "oil", "bm"]) * 3.6 / 35.17;
+            let renovation = if residential {
+                None
+            } else {
+                renovation_standard(&label_functions)
+            };
+            let ep2 = indicator.primary_fossil_indicator_kwh_per_m2_year;
+            Some(ChapterFiveIndicators {
+                heating_need_kwh_per_m2: heating_indicator,
+                cooling_need_kwh_per_m2: cooling_indicator,
+                heating_and_cooling_need_kwh_per_m2: ((heating_indicator + cooling_indicator)
+                    * 100.0)
+                    .round()
+                    / 100.0,
+                meets_standard_insulation: standard.map(|limit| heating_indicator <= limit),
+                standard_insulation_kwh_per_m2: standard,
+                renewable_indicator_kwh_per_m2: indicator.renewable_indicator_kwh_per_m2_year,
+                final_energy_kwh_per_m2: ceil_per_area(final_kwh, area).unwrap_or(f64::NAN),
+                final_energy_eed_kwh_per_m2: ceil_per_area(final_kwh + solar_yield, area)
+                    .unwrap_or(f64::NAN),
+                delivered_electricity_kwh: electricity,
+                delivered_electricity_kwh_per_m2: electricity / area,
+                delivered_external_gj: external,
+                delivered_external_gj_per_m2: external / area,
+                delivered_other_m3_aeq: other,
+                delivered_other_m3_aeq_per_m2: other / area,
+                renewable_by_carrier: item.renewable_by,
+                locally_carbon_free: input
+                    .fossil_appliances_outside_calculation
+                    .map(|outside| !outside && !on_site_fossil_use),
+                meets_renovation_standard: renovation.map(|limit| ep2 <= limit),
+                renovation_standard_kwh_per_m2: renovation,
+            })
+        }
+        _ => None,
+    };
     BuildingPerformanceAssessment {
         status: if valid {
             "calculated_unverified"
@@ -2236,6 +2409,7 @@ pub fn assess_building_performance(
         annual_storage_correction_kwh: totals.map(|item| item.storage_correction),
         annual_co2_kg: totals.map(|item| item.co2_kg),
         co2_kg_per_m2: totals.map(|item| item.co2_kg / input.total_usable_floor_area_m2),
+        chapter5,
         need_indicator_kwh_per_m2_year: need_indicator,
         primary_fossil_indicator_kwh_per_m2_year: scenario
             .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
@@ -2244,11 +2418,16 @@ pub fn assess_building_performance(
         indicative_label_class: scenario
             .filter(|_| !usage_fit_applied(input))
             .and_then(|item| {
-                let function = match input.calculation_scope {
-                    CalculationScope::Residential => Some(LabelFunction::Residential),
-                    CalculationScope::Utility => input.label_function,
-                };
-                indicative_label_class(function?, item.primary_fossil_indicator_kwh_per_m2_year)
+                let ep2 = item.primary_fossil_indicator_kwh_per_m2_year;
+                match input.calculation_scope {
+                    CalculationScope::Residential => {
+                        indicative_label_class(LabelFunction::Residential, ep2)
+                    }
+                    // §5.3.1: area-weighted bounds for several functions.
+                    CalculationScope::Utility => {
+                        indicative_label_class_mixed(&label_functions, ep2)
+                    }
+                }
             }),
         label_source: LABEL_SOURCE,
         tojuli_max_k: tojuli_max,
@@ -2296,6 +2475,51 @@ struct Totals {
     zeb_primary: f64,
     /// Annex AB m_CO2;ZEB, kg CO2eq.
     zeb_co2: f64,
+    /// 5.39a–h.
+    renewable_by: RenewableByCarrier,
+}
+
+/// 5.39a–h: annual renewable primary energy per carrier ri, kWh.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenewableByCarrier {
+    /// 5.39a renelect: PV (and other local renewable electricity).
+    pub electricity: f64,
+    /// 5.39c renheat from heat pumps (space heating and hot water) and
+    /// declared renewable heat.
+    pub heat_pump_heat: f64,
+    /// 5.39d renheat from solar collectors and PVT.
+    pub solar_heat: f64,
+    /// 5.39e rencold.
+    pub cold: f64,
+    /// 5.39f biomass.
+    pub biomass: f64,
+    /// 5.39g external heat (dh, dw and the collective heat-pump source).
+    pub external_heat: f64,
+    /// 5.39h external cold.
+    pub external_cold: f64,
+}
+
+impl RenewableByCarrier {
+    pub fn total(&self) -> f64 {
+        self.electricity
+            + self.heat_pump_heat
+            + self.solar_heat
+            + self.cold
+            + self.biomass
+            + self.external_heat
+            + self.external_cold
+    }
+
+    fn add(&mut self, other: &Self) {
+        self.electricity += other.electricity;
+        self.heat_pump_heat += other.heat_pump_heat;
+        self.solar_heat += other.solar_heat;
+        self.cold += other.cold;
+        self.biomass += other.biomass;
+        self.external_heat += other.external_heat;
+        self.external_cold += other.external_cold;
+    }
 }
 
 /// 5.14a: `f_BAT;cor`.
@@ -2329,6 +2553,7 @@ fn compute(
     let mut co2 = 0.0;
     let mut fossil = 0.0;
     let mut renewable = 0.0;
+    let mut renewable_by = RenewableByCarrier::default();
     let mut ambient_total = 0.0;
     let mut zeb_primary = 0.0;
     let mut zeb_co2 = 0.0;
@@ -2595,14 +2820,20 @@ fn compute(
             0.0
         };
         // 5.39: external supply at f_Pren;dX and the collective source.
-        renewable += renewable_dh_basis * dh.renewable_factor
-            + used_dw * dw.renewable_factor
-            + used_dc * dc.renewable_factor
-            + source.map_or(0.0, |item| source_heat * item.renewable_factor);
-        renewable += (ambient + declared_heat + hot_water_ambient + solar_heat) * F_PREN_RENHEAT
-            + biomass_heat * F_PREN_BIOMASS_B
-            + ambient_cold * F_PREN_RENCOLD
-            + produced_renewable * F_PREN_RENELECT;
+        // 5.39a–h per carrier ri; their sum is EPrenTot (5.28).
+        let month_renewable = RenewableByCarrier {
+            electricity: produced_renewable * F_PREN_RENELECT,
+            heat_pump_heat: (ambient + declared_heat + hot_water_ambient) * F_PREN_RENHEAT,
+            solar_heat: solar_heat * F_PREN_RENHEAT,
+            cold: ambient_cold * F_PREN_RENCOLD,
+            biomass: biomass_heat * F_PREN_BIOMASS_B,
+            external_heat: renewable_dh_basis * dh.renewable_factor
+                + used_dw * dw.renewable_factor
+                + source.map_or(0.0, |item| source_heat * item.renewable_factor),
+            external_cold: used_dc * dc.renewable_factor,
+        };
+        renewable += month_renewable.total();
+        renewable_by.add(&month_renewable);
     }
     let zone_demands = || std::iter::once(&heating.demand).chain(&heating.additional_zone_demands);
     // §5.4.2: the fixed C1 run, when chapter 11 supplied it for every zone.
@@ -2641,6 +2872,7 @@ fn compute(
         co2_kg: co2,
         zeb_primary,
         zeb_co2,
+        renewable_by,
     }
 }
 
@@ -3250,6 +3482,80 @@ mod tests {
         let delivered = 300.0 - 90.0 - 102.0;
         let exported = 400.0 - 90.0 - 120.0;
         assert!((p - (delivered * 1.35 + 50.0 * 0.29 - exported)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn standard_insulation_follows_5_3_2() {
+        // Ground-bound after 1945: 43 below A_ls/A_g 1,0, then 40 per unit.
+        assert_eq!(standard_insulation(false, 1975, 0.8), Some(43.0));
+        assert_eq!(standard_insulation(false, 1975, 1.5), Some(63.0));
+        // Up to 1945: 60 + 105·(x − 1).
+        assert_eq!(standard_insulation(false, 1945, 1.2), Some(81.0));
+        // Apartment building: 95/70 up to 1945, 45/45 after.
+        assert_eq!(standard_insulation(true, 1930, 2.0), Some(165.0));
+        assert_eq!(standard_insulation(true, 2000, 1.33), Some(60.0));
+        assert_eq!(standard_insulation(true, 2000, 0.0), None);
+    }
+
+    #[test]
+    fn chapter_5_indicators_are_reported() {
+        let mut sample = input();
+        sample.construction_year = Some(1975);
+        sample.loss_area_m2 = Some(150.0);
+        sample.loss_area_source_reference = Some("synthetic plan".into());
+        sample.fossil_appliances_outside_calculation = Some(false);
+        let result = assess_building_performance(&sample);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let indicators = result.chapter5.as_ref().unwrap();
+        // 5.28 = Σ 5.39a–h.
+        assert!(
+            (indicators.renewable_by_carrier.total()
+                - result.annual_renewable_primary_kwh.unwrap())
+            .abs()
+                < 1e-6
+        );
+        assert!(indicators.renewable_by_carrier.electricity > 0.0);
+        // 5.3a/5.3b: need without recoverable losses, rounded up to 0,01.
+        let net: f64 = std::iter::once(&result.space_heating.demand)
+            .chain(&result.space_heating.additional_zone_demands)
+            .map(|zone| zone.annual_heating_need_without_recoverable_kwh.unwrap())
+            .sum();
+        let expected = (net / 100.0 * 100.0).ceil() / 100.0;
+        assert!((indicators.heating_need_kwh_per_m2 - expected).abs() < 1e-9);
+        // §5.3.2 ground-bound dwelling after 1945, A_ls/A_g 1,5: 63.
+        assert_eq!(indicators.standard_insulation_kwh_per_m2, Some(63.0));
+        assert_eq!(
+            indicators.meets_standard_insulation,
+            Some(indicators.heating_need_kwh_per_m2 <= 63.0)
+        );
+        // 5.17a: delivered electricity; 5.19a gas in m³aeq.
+        let delivered = |code: &str| -> f64 {
+            result
+                .carriers
+                .iter()
+                .filter(|row| row.carrier == code)
+                .map(|row| row.delivered_kwh)
+                .sum()
+        };
+        assert!((indicators.delivered_electricity_kwh - delivered("el")).abs() < 1e-9);
+        assert!((indicators.delivered_other_m3_aeq - delivered("gas") * 3.6 / 35.17).abs() < 1e-9);
+        assert_eq!(indicators.delivered_external_gj, 0.0);
+        // §5.5.7: gas is burnt on site.
+        assert_eq!(indicators.locally_carbon_free, Some(false));
+        // 5.3h: E_Final per m², rounded up.
+        let final_kwh = result.annual_final_energy_kwh.unwrap();
+        assert!(indicators.final_energy_kwh_per_m2 >= final_kwh / 100.0);
+        assert!(indicators.final_energy_kwh_per_m2 - final_kwh / 100.0 < 0.01);
+        // Table 5.7 applies to utility buildings only.
+        assert!(indicators.renovation_standard_kwh_per_m2.is_none());
+        assert_eq!(
+            indicators.renewable_indicator_kwh_per_m2,
+            result.indicators.as_ref().unwrap().scenarios[0].renewable_indicator_kwh_per_m2_year
+        );
     }
 
     #[test]

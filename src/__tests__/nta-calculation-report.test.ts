@@ -83,6 +83,28 @@ describe('NTA calculation report', () => {
     expect(html).toContain('verrekend');
   });
 
+  it('reports the chapter 5 indicators', () => {
+    const assessment = calculated();
+    const performance = assessment.performance as unknown as Record<string, unknown>;
+    performance.chapter5 = {
+      heatingNeedKwhPerM2: 61.27, coolingNeedKwhPerM2: 4.5, heatingAndCoolingNeedKwhPerM2: 65.77,
+      standardInsulationKwhPerM2: 63, meetsStandardInsulation: true,
+      renewableIndicatorKwhPerM2: 38.7, finalEnergyKwhPerM2: 120.41, finalEnergyEedKwhPerM2: 131.02,
+      deliveredElectricityKwh: 2405, deliveredElectricityKwhPerM2: 24.05,
+      deliveredExternalGj: 0, deliveredExternalGjPerM2: 0,
+      deliveredOtherM3Aeq: 1068, deliveredOtherM3AeqPerM2: 10.68,
+      renewableByCarrier: { electricity: 3870, heatPumpHeat: 0, solarHeat: 0, cold: 0, biomass: 0, externalHeat: 0, externalCold: 0 },
+      locallyCarbonFree: false, renovationStandardKwhPerM2: null, meetsRenovationStandard: null,
+    };
+    const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
+    expect(html).toContain('Indicatoren hoofdstuk 5');
+    expect(html).toContain('61.27');
+    expect(html).toContain('63 kWh/m²·jr — voldoet (onverifieerd)');
+    expect(html).toContain('1068 m³ aeq');
+    expect(html).toContain('Lokaal koolstofemissievrij');
+    expect(html).toContain('<td>nee</td>');
+  });
+
   it('lists gaps instead of numbers when the kernel has no result', () => {
     const html = generateNtaCalculationReportHTML(createDefaultProject(), {
       status: 'incomplete', targetNormVersion: 'NTA 8800:2025+C1:2026', kernelVersion: '0.1.0',

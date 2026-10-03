@@ -72,6 +72,45 @@ pub struct LabelData {
     pub general: GeneralData,
     pub envelope: Vec<EnvelopeSummary>,
     pub installations: InstallationSummary,
+    /// The calculated indicators shown on the label (EP2 class basis,
+    /// renewable share, TOjuli, heat need with the Standaard voor
+    /// woningisolatie, renovatiestandaard); filled by the project route.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indicators: Option<LabelIndicators>,
+}
+
+/// Regeling art. 4 indicators taken from the calculation.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelIndicators {
+    pub primary_fossil_kwh_per_m2: Option<f64>,
+    pub renewable_share_percent: Option<f64>,
+    pub tojuli_max_k: Option<f64>,
+    pub heating_need_kwh_per_m2: Option<f64>,
+    pub standard_insulation_kwh_per_m2: Option<f64>,
+    pub energy_need_kwh_per_m2: Option<f64>,
+    pub renovation_standard_kwh_per_m2: Option<f64>,
+    pub indicative_label_class: Option<&'static str>,
+}
+
+impl LabelIndicators {
+    pub fn from_performance(
+        result: &crate::building_performance::BuildingPerformanceAssessment,
+    ) -> Self {
+        let chapter5 = result.chapter5.as_ref();
+        Self {
+            primary_fossil_kwh_per_m2: result.primary_fossil_indicator_kwh_per_m2_year,
+            renewable_share_percent: result.renewable_share_percent,
+            tojuli_max_k: result.tojuli_max_k,
+            heating_need_kwh_per_m2: chapter5.map(|item| item.heating_need_kwh_per_m2),
+            standard_insulation_kwh_per_m2: chapter5
+                .and_then(|item| item.standard_insulation_kwh_per_m2),
+            energy_need_kwh_per_m2: result.need_indicator_kwh_per_m2_year,
+            renovation_standard_kwh_per_m2: chapter5
+                .and_then(|item| item.renovation_standard_kwh_per_m2),
+            indicative_label_class: result.indicative_label_class,
+        }
+    }
 }
 
 pub const LABEL_DATA_SOURCE: &str =
@@ -293,6 +332,7 @@ pub fn label_data(project: &ProjectInput, derived: Option<&BuildingPerformanceIn
         general: general_data(project, derived),
         envelope: envelope_summary(project),
         installations: derived.map(installation_summary).unwrap_or_default(),
+        indicators: None,
     }
 }
 

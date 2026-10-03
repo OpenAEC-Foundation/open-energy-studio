@@ -734,3 +734,68 @@ Tapwatergenerator `chp` gebruikt één van twee methoden.
 - **Zonne-energie alleen voor verwarming (13.68).** Q_H;sol;ls;rbl telt mee in Q_H;ls;rbl van 7.3–7.8, verdeeld naar oppervlak. Een rekenfout wordt een issue in plaats van stil te verdwijnen.
 - **Drager.** Q_HD;hp;in;bron wordt volgens 5.20 gerapporteerd onder `dh`.
 - **Meerdere opwekkers en hulpenergie (9.85).** 9.85 rekent per toestel: A·N/12 + B·E_H;ci/(C·B_nom). De B-term, met de pomp, volgt de energie van elk toestel zelf. Bij `multiple` telt de pomp dus niet dubbel; alleen de standbyterm A/12 telt per toestel, zoals de norm voorschrijft.
+
+## Indicatoren van hoofdstuk 5 (label en registratie)
+
+`chapter5` in de uitvoer van de energieprestatie bevat de indicatoren voor het label en de registratie.
+
+**Behoefte-indicatoren**
+- E_H;nd (5.3a) en E_C;nd (5.3d): de behoefte met het werkelijke ventilatiesysteem en zonder terugwinbare systeemverliezen (5.3b/c, 5.3e/f), naar boven afgerond op 0,01. E_H+C;nd (5.3g) is de som van beide.
+- Standaard voor woningisolatie (§5.3.2): alleen voor woningen met een opgegeven `constructionYear` (in de projectroute anders `registration.constructionYear`) en A_ls. De waarde volgt uit:
+  - grondgebonden woning tot en met 1945: 60 + 105·(A_ls/A_g − 1);
+  - grondgebonden woning na 1945: 43 + 40·(A_ls/A_g − 1);
+  - woongebouw tot en met 1945: 95 + 70·(A_ls/A_g − 1);
+  - woongebouw na 1945: 45 + 45·(A_ls/A_g − 1).
+
+  Onder een verhouding van 1,0 geldt de basiswaarde. De uitkomst wordt rekenkundig afgerond op een geheel getal. Het woningtype volgt uit `dwellingType`.
+
+**Overige indicatoren**
+- EwePrenTot (§5.3.1.3): naar beneden afgerond op 0,01.
+- EweFinal en EweFinal;EED (5.3h/i): naar boven afgerond op 0,01.
+
+**Gebruik per energiedrager (5.17–5.19), uit E_EPdel**
+
+| Formule | Wat | Eenheid |
+|---|---|---|
+| 5.17 | elektriciteit | kWh |
+| 5.18 | externe warmte en koude (dh, dw, dc) | GJ |
+| 5.19 | gas, olie en biomassa | m³ aardgasequivalent (factor 35,17) |
+
+Interpretatie: in de tekst van 5.19a staan alleen el en dh uitgesloten. dw en dc vallen hier toch buiten, omdat ze al in 5.18 zitten.
+
+**Hernieuwbaar per drager (5.39a–h)**
+
+De drager-categorieën zijn:
+- elektriciteit;
+- warmtepompwarmte (inclusief opgegeven hernieuwbare warmte);
+- zonnewarmte;
+- koude;
+- biomassa;
+- externe warmte (inclusief de collectieve warmtepompbron);
+- externe koude.
+
+De som van deze categorieën is EPrenTot.
+
+**Lokaal koolstofemissievrij (§5.5.7)**
+
+Ja als er geen gas of olie wordt verbruikt en als `fossilAppliancesOutsideCalculation` op `false` staat. Zonder die opgave blijft de uitkomst open (`null`), omdat toestellen die bij de vereenvoudiging zijn weggelaten volgens de norm toch meetellen.
+
+**Renovatiestandaard (§5.3.1.2, tabel 5.7)**
+
+Alleen voor utiliteitsgebouwen: een naar oppervlak gewogen grenswaarde, afgerond op twee decimalen. Het gebouw voldoet als EwePTot daar niet boven komt.
+
+**Labelklasse bij meerdere gebruiksfuncties**
+
+Een bestaand utiliteitsgebouw met `labelFunctions` krijgt naar oppervlak gewogen klassegrenzen uit bijlage X (§5.3.1). Woon- en utiliteitsfuncties worden nooit samen gewogen.
+
+**f_BACS (§5.5.8)**
+
+Met `ntaCalculation.bacs` (systemen met nominale vermogens en BACS-klassen) leidt de projectroute f_BACS af en vervangt die `bacsFactor`:
+- 1,05 bij een systeem boven 290 kW of met onbekend vermogen, en zonder BACS, met klasse D voor automatische regelingen of met klasse C/D voor energiemanagement;
+- anders 1,0.
+
+Een onbepaalde factor geeft de melding `bacs_factor_undetermined`.
+
+**Labelgegevens**
+
+De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indicators`.

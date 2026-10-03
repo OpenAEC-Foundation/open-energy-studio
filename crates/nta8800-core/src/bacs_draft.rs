@@ -1,5 +1,10 @@
-//! Provisional fBACS applicability from public consultation chapter 5, §5.5.8.
-//! This is an evidence diagnostic, not a final-edition NTA calculation.
+//! f_BACS of NTA 8800:2025+C1:2026 §5.5.8 (p. 99–101): for utility buildings
+//! with a heating or cooling system above 290 kW, or one whose power cannot
+//! be determined (sum of the nominal generator powers per system, 9.6.1 and
+//! 10.5), f_BACS = 1,05 without a BACS, with class D automatic controls or
+//! with class C or D energy management; 1,0 otherwise. One failing system
+//! sets the factor for all heating and cooling. The module name keeps its
+//! history; the rules were checked against the target edition.
 
 use crate::final_energy_draft::{as_f64, decimal, DRAFT_SOURCE};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -283,12 +288,12 @@ pub fn assess_bacs_draft(input: &BacsDraftInput) -> BacsDraftAssessment {
     };
     BacsDraftAssessment {
         status,
-        scope: "public_chapter_5_draft_bacs_factor_only",
+        scope: "nta8800_5_5_8_bacs_factor",
         draft_source: DRAFT_SOURCE,
         target_norm_version: TARGET_NORM_VERSION,
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
-        final_edition_verified: false,
+        final_edition_verified: true,
         reference_verified: false,
         beng_calculation_available: false,
         factor,

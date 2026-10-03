@@ -3458,6 +3458,8 @@ export interface BuildingPerformanceAssessment {
   /** 5.60 E_Final;EED = E_Final + solar thermal yields, kWh. */
   annualFinalEnergyEedKwh: number | null;
   co2KgPerM2: number | null;
+  /** Chapter 5 label and record indicators (5.3a–i, 5.17–5.19, 5.39a–h, 5.5.7, table 5.7). */
+  chapter5?: NtaChapterFiveIndicators | null;
   needIndicatorKwhPerM2Year: number | null;
   primaryFossilIndicatorKwhPerM2Year: number | null;
   renewableSharePercent: number | null;
@@ -3569,6 +3571,25 @@ export interface NtaCalculationInput {
   lighting?: NtaZoneLighting[];
   cooling?: NtaCoolingSystem | null;
   labelFunction?: NtaLabelFunction | null;
+  /** §5.3.1: use functions of an existing utility building (label bounds and table 5.7 weighted by area). */
+  labelFunctions?: Array<{ function: NtaLabelFunction; areaM2: number }>;
+  /** For the Standaard voor woningisolatie; falls back to registration.constructionYear. */
+  constructionYear?: number;
+  /** §5.5.7: fossil-fuelled building-bound appliances left out of the calculation. */
+  fossilAppliancesOutsideCalculation?: boolean;
+  /** §5.5.8: systems and BACS evidence; derives f_BACS and replaces bacsFactor. */
+  bacs?: {
+    buildingUse: 'residential' | 'utility';
+    systemInventoryComplete: boolean;
+    systems: Array<{
+      id: string;
+      service: 'heating' | 'cooling';
+      sourceReference: string;
+      generators: Array<{ id: string; nominalThermalCapacityKw: number | null; sourceReference: string }>;
+      bacs?: NtaBacsEvidence;
+    }>;
+    bacs?: NtaBacsEvidence;
+  } | null;
   bblFunction?: NtaBblFunction | null;
   /** Annex AB footnote g: delivery temperature of external heat (unknown = ≥ 60 °C). */
   zebHeatDeliveryTemperature?: 'at_least60' | 'from40_to60' | 'from20_to40';
@@ -3581,6 +3602,48 @@ export interface NtaCalculationInput {
   storage?: NtaEnergyStorage | null;
   /** NTA 8800 §5.8 / annex P values for external supply. */
   externalSupply?: NtaExternalSupply;
+}
+
+/** NTA 8800 chapter 5 indicators; see crates/nta8800-core/src/building_performance.rs. */
+export interface NtaChapterFiveIndicators {
+  /** 5.3a E_H;nd, kWh/m², rounded up to 0,01. */
+  heatingNeedKwhPerM2: number;
+  /** 5.3d E_C;nd. */
+  coolingNeedKwhPerM2: number;
+  /** 5.3g E_H+C;nd. */
+  heatingAndCoolingNeedKwhPerM2: number;
+  /** §5.3.2 Standaard voor woningisolatie (dwellings), whole kWh/m². */
+  standardInsulationKwhPerM2: number | null;
+  meetsStandardInsulation: boolean | null;
+  /** §5.3.1.3 EwePrenTot, rounded down to 0,01. */
+  renewableIndicatorKwhPerM2: number;
+  /** 5.3h / 5.3i. */
+  finalEnergyKwhPerM2: number;
+  finalEnergyEedKwhPerM2: number;
+  /** 5.17a/b. */
+  deliveredElectricityKwh: number;
+  deliveredElectricityKwhPerM2: number;
+  /** 5.18a/b, GJ. */
+  deliveredExternalGj: number;
+  deliveredExternalGjPerM2: number;
+  /** 5.19a/b, m³ natural gas equivalent. */
+  deliveredOtherM3Aeq: number;
+  deliveredOtherM3AeqPerM2: number;
+  /** 5.39a–h, kWh primary renewable. */
+  renewableByCarrier: {
+    electricity: number;
+    heatPumpHeat: number;
+    solarHeat: number;
+    cold: number;
+    biomass: number;
+    externalHeat: number;
+    externalCold: number;
+  };
+  /** §5.5.7; null when fossil appliances outside the calculation are not stated. */
+  locallyCarbonFree: boolean | null;
+  /** Table 5.7 (utility), rounded to 0,01. */
+  renovationStandardKwhPerM2: number | null;
+  meetsRenovationStandard: boolean | null;
 }
 
 export interface ProjectPerformanceAssessment {
@@ -3603,6 +3666,14 @@ export interface ProjectPerformanceAssessment {
   performance: BuildingPerformanceAssessment | null;
   /** BRL 9500 §4.2.3–4.2.5 checks; null without a registration block. */
   registration?: RegistrationAssessment | null;
+  /** §5.5.8 f_BACS assessment when ntaCalculation.bacs is given. */
+  bacs?: {
+    status: string;
+    factor: number | null;
+    applicability: string;
+    triggeringSystemIds: string[];
+    issues: Array<{ code: string; path: string }>;
+  } | null;
   /** Regeling energieprestatie gebouwen art. 4 label data. */
   labelData?: LabelData | null;
 }
@@ -4008,6 +4079,13 @@ export interface RegistrationAssessment {
   issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
 }
 
+export interface NtaBacsEvidence {
+  present: boolean;
+  automaticControlsClass?: 'A' | 'B' | 'C' | 'D';
+  energyManagementClass?: 'A' | 'B' | 'C' | 'D';
+  sourceReference: string;
+}
+
 export interface LabelData {
   source: string;
   /** Regeling art. 4 a. */
@@ -4034,6 +4112,17 @@ export interface LabelData {
     solarWaterHeaterCount: number;
     solarWaterHeaterUses: string[];
   };
+  /** Regeling art. 4 indicators from the calculation. */
+  indicators?: {
+    primaryFossilKwhPerM2: number | null;
+    renewableSharePercent: number | null;
+    tojuliMaxK: number | null;
+    heatingNeedKwhPerM2: number | null;
+    standardInsulationKwhPerM2: number | null;
+    energyNeedKwhPerM2: number | null;
+    renovationStandardKwhPerM2: number | null;
+    indicativeLabelClass: string | null;
+  } | null;
 }
 
 export async function calculateProjectPerformanceWithRust(project: IProject): Promise<ProjectPerformanceAssessment> {

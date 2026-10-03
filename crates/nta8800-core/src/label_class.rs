@@ -103,9 +103,114 @@ pub fn indicative_label_class(
     })
 }
 
+/// One use function of a utility building with its usable floor area.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabelFunctionArea {
+    pub function: LabelFunction,
+    pub area_m2: f64,
+}
+
+fn utility_parts(functions: &[LabelFunctionArea]) -> Option<f64> {
+    let total: f64 = functions.iter().map(|part| part.area_m2).sum();
+    let valid = !functions.is_empty()
+        && total.is_finite()
+        && total > 0.0
+        && functions.iter().all(|part| {
+            part.area_m2.is_finite()
+                && part.area_m2 > 0.0
+                && part.function != LabelFunction::Residential
+        });
+    valid.then_some(total)
+}
+
+/// NTA 8800 §5.3.1: an existing utility building with several use functions
+/// gets label class bounds weighted by usable floor area. Dwellings are
+/// never weighted together with utility functions, so a list with
+/// `Residential` gives `None`.
+pub fn indicative_label_class_mixed(
+    functions: &[LabelFunctionArea],
+    ep2_kwh_per_m2: f64,
+) -> Option<&'static str> {
+    if functions.len() == 1 {
+        return indicative_label_class(functions[0].function, ep2_kwh_per_m2);
+    }
+    let total = utility_parts(functions)?;
+    if !ep2_kwh_per_m2.is_finite() {
+        return None;
+    }
+    let mut bounds = [0.0; 11];
+    for part in functions {
+        let own = utility_bounds(part.function)?;
+        for (bound, value) in bounds.iter_mut().zip(own) {
+            *bound += value * part.area_m2 / total;
+        }
+    }
+    Some(classify(UTILITY_CLASSES, &bounds, ep2_kwh_per_m2))
+}
+
+/// NTA 8800 table 5.7 (§5.3.1.2): EwePTot;Renovatiestandaard per use
+/// function, kWh/m² per year; `None` for dwellings.
+pub fn renovation_standard_limit(function: LabelFunction) -> Option<f64> {
+    Some(match function {
+        LabelFunction::AssemblyWithDayCare => 110.0,
+        LabelFunction::AssemblyWithoutDayCare => 100.0,
+        LabelFunction::Cell => 180.0,
+        LabelFunction::HealthcareWithBeds => 270.0,
+        LabelFunction::HealthcareWithoutBeds => 90.0,
+        LabelFunction::Office => 80.0,
+        LabelFunction::Lodging => 150.0,
+        LabelFunction::Education => 100.0,
+        LabelFunction::Sport => 105.0,
+        LabelFunction::Retail => 120.0,
+        LabelFunction::Residential => return None,
+    })
+}
+
+/// §5.3.1.2: the renovatiestandaard of a utility building, weighted by
+/// usable floor area over table 5.7 and rounded to two decimals.
+pub fn renovation_standard(functions: &[LabelFunctionArea]) -> Option<f64> {
+    let total = utility_parts(functions)?;
+    let mut weighted = 0.0;
+    for part in functions {
+        weighted += renovation_standard_limit(part.function)? * part.area_m2 / total;
+    }
+    Some((weighted * 100.0).round() / 100.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mixed_utility_bounds_and_renovation_standard() {
+        let parts = [
+            LabelFunctionArea {
+                function: LabelFunction::Office,
+                area_m2: 1000.0,
+            },
+            LabelFunctionArea {
+                function: LabelFunction::Retail,
+                area_m2: 500.0,
+            },
+        ];
+        // A+ bound: (1000·160 + 500·240)/1500 = 186,67.
+        assert_eq!(indicative_label_class_mixed(&parts, 186.0), Some("A+"));
+        assert_eq!(indicative_label_class_mixed(&parts, 186.7), Some("A"));
+        // Table 5.7: (1000·80 + 500·120)/1500 = 93,33.
+        assert_eq!(renovation_standard(&parts), Some(93.33));
+        let with_dwelling = [
+            parts[0],
+            LabelFunctionArea {
+                function: LabelFunction::Residential,
+                area_m2: 100.0,
+            },
+        ];
+        assert_eq!(indicative_label_class_mixed(&with_dwelling, 100.0), None);
+        assert_eq!(renovation_standard(&with_dwelling), None);
+        // One function falls back to its own column.
+        assert_eq!(indicative_label_class_mixed(&parts[..1], 300.01), Some("G"));
+    }
 
     #[test]
     fn residential_annex_ix_boundaries() {
