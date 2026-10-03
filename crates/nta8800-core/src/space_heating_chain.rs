@@ -4898,7 +4898,9 @@ mod tests {
                     outdoor_temperature_c: OUTDOOR_TEMPERATURE_C[index],
                     // 9.4.2: heated space at θ_int;op;H = θ_int;calc;H (7.9.6).
                     ambient_temperature_c: Some(
-                        result.demand.monthly[index].heating.calculation_temperature_c,
+                        result.demand.monthly[index]
+                            .heating
+                            .calculation_temperature_c,
                     ),
                 },
             );
