@@ -126,16 +126,6 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
 
   return <form className="nta-form" aria-label={t('nta.form.title')} onSubmit={(event) => {
     event.preventDefault();
-    const jsonFields = event.currentTarget.querySelectorAll<HTMLTextAreaElement>('textarea[data-nta-json-field]');
-    for (const field of jsonFields) {
-      if (field.value.trim() === '') continue;
-      try { JSON.parse(field.value); } catch {
-        field.setCustomValidity(t('nta.form.jsonInvalid'));
-        field.reportValidity();
-        field.focus();
-        return;
-      }
-    }
     onSave(syncVentilation(draft, project));
   }}>
     <p>{t('nta.form.help')}</p>
