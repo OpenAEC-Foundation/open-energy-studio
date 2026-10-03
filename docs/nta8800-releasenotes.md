@@ -2,6 +2,31 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — hoofdstuk 5, label, Bbl-functies en maatwerkadvies
+
+### Uitkomsten die veranderen
+
+- **Woninglabel met gebiedsmaatregelen (Regeling art. 2 lid 3, p. 4).** Met een kwaliteitsverklaring voor externe levering rekent het woninglabel nu met het forfaitaire scenario (EMGforf); de labelklasse kan daardoor lager uitvallen. BENG 2 en BENG 3 blijven op het scenario met verklaring. Utiliteit volgt art. 3 lid 3 en blijft op de verklaring. Nieuwe uitvoer: `labelPrimaryFossilIndicatorKwhPerM2Year` en `labelRenewableSharePercent`; de labelgegevens (art. 4) en het maatwerkadvies gebruiken die.
+- **Netto contante waarde.** Een maatregel die pas na de horizon wordt uitgevoerd, kreeg een restwaarde zonder investering; die restwaarde vervalt.
+- **Brandurenfactor (bijlage Z, p. 1133).** Een maatwerkadviesrun met een brandurenfactor op de verlichting geeft geen labelklasse meer.
+- **EPTot + EPrenTot = 0.** Dit maakte de hele indicatorset ongeldig. Nu blijft EP2 bepaald (0 geeft A++++) en is het aandeel hernieuwbare energie `null`.
+
+### Invoer die nu een gat geeft
+
+- `bbl_functions_residential_utility_mixed`: woon- en utiliteitsfuncties in één `bblFunctions`-lijst (§5.3.1, p. 70).
+- `bbl_functions_scope_mismatch`: een Bbl-functie die niet bij de berekening (woningbouw of utiliteit) past.
+- `bbl_function_areas_sum_mismatch` en `label_function_areas_sum_mismatch`: functieoppervlakten die niet binnen 0,5 % (of 0,5 m²) optellen tot A_g;tot.
+- `label_functions_residential_in_utility`: een woonfunctie in de labelfuncties van een utiliteitsgebouw (Regeling bijlage Ia).
+
+### Nieuwe waarschuwingen
+
+- `renewable_share_above_100_negative_primary_fossil`: RER boven 100 % door een negatieve EPTot (5.3 letterlijk).
+- `standard_insulation_construction_year_missing`: een woning zonder bouwjaar, zodat de standaard voor woningisolatie (§5.3.2) ontbreekt.
+
+### Overig
+
+- Het maatwerkadviespaneel sorteert maatregelen en pakketten desgewenst op terugverdientijd of netto contante waarde; ISSO 82.2 §6.2.4 schrijft geen rangorde voor.
+
 ## 3 oktober 2026 — reviewcorrecties lege velden, herlabeling en WLC-GWP
 
 ### Status die verandert

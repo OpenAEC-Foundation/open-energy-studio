@@ -71,7 +71,9 @@ pub struct IndicatorsDraftAssessment {
 pub struct ScenarioIndicator {
     pub kind: ScenarioKind,
     pub primary_fossil_indicator_kwh_per_m2_year: f64,
-    pub renewable_share_percent: f64,
+    /// 5.3 RER; `None` when EPTot + EPrenTot ≤ 0, where the share is
+    /// undefined (EP2 stays defined).
+    pub renewable_share_percent: Option<f64>,
     pub renewable_indicator_kwh_per_m2_year: f64,
 }
 
@@ -193,12 +195,9 @@ pub fn assess_indicators_draft(input: &IndicatorsDraftInput) -> IndicatorsDraftA
         );
         if let (Some(fossil), Some(renewable)) = (fossil, renewable) {
             match fossil.checked_add(renewable) {
-                Some(sum) if sum > Decimal::ZERO => {
-                    parsed.push((scenario.kind, fossil, renewable, sum))
-                }
-                Some(_) => {
-                    issues.push(issue("renewable_share_denominator_positive_required", path))
-                }
+                // EPTot + EPrenTot ≤ 0 leaves RER undefined; EP2 is still
+                // defined (e.g. 0 for A++++).
+                Some(sum) => parsed.push((scenario.kind, fossil, renewable, sum)),
                 None => issues.push(issue("annual_sum_overflow", path)),
             }
         }
@@ -211,9 +210,16 @@ pub fn assess_indicators_draft(input: &IndicatorsDraftInput) -> IndicatorsDraftA
             for (kind, fossil, renewable, total) in parsed {
                 let fossil_indicator =
                     rounded_div(fossil, area, 2, RoundingStrategy::ToPositiveInfinity);
-                let renewable_share = renewable
-                    .checked_mul(Decimal::from(100))
-                    .and_then(|v| rounded_div(v, total, 1, RoundingStrategy::ToNegativeInfinity));
+                let renewable_share = if total > Decimal::ZERO {
+                    renewable
+                        .checked_mul(Decimal::from(100))
+                        .and_then(|v| {
+                            rounded_div(v, total, 1, RoundingStrategy::ToNegativeInfinity)
+                        })
+                        .map(Some)
+                } else {
+                    Some(None)
+                };
                 let renewable_indicator =
                     rounded_div(renewable, area, 2, RoundingStrategy::ToNegativeInfinity);
                 if let (
@@ -294,7 +300,7 @@ mod tests {
             result.scenarios[0].renewable_indicator_kwh_per_m2_year,
             10.0
         );
-        assert_eq!(result.scenarios[0].renewable_share_percent, 31.9);
+        assert_eq!(result.scenarios[0].renewable_share_percent, Some(31.9));
         assert!(!result.reference_verified && !result.label_available);
     }
     #[test]
@@ -340,12 +346,30 @@ mod tests {
         assert_eq!(result.scenarios.len(), 2);
     }
     #[test]
-    fn invalid_denominator_or_area_never_returns_partial_indicators() {
+    fn zero_denominator_keeps_ep2_and_leaves_rer_undefined() {
         let mut input = sample();
+        // EPTot + EPrenTot = 0: EP2 defined, RER undefined (5.3).
         input.scenarios[0].annual_primary_fossil_kwh = -1000.0;
         let result = assess_indicators_draft(&input);
-        assert_eq!(result.status, "invalid");
-        assert!(result.scenarios.is_empty());
+        assert_eq!(result.status, "input_valid");
+        assert_eq!(
+            result.scenarios[0].primary_fossil_indicator_kwh_per_m2_year,
+            -10.0
+        );
+        assert_eq!(result.scenarios[0].renewable_share_percent, None);
+        // Both zero: EP2 = 0 (A++++), RER undefined.
+        input.scenarios[0].annual_primary_fossil_kwh = 0.0;
+        input.scenarios[0].annual_renewable_kwh = 0.0;
+        let result = assess_indicators_draft(&input);
+        assert_eq!(
+            result.scenarios[0].primary_fossil_indicator_kwh_per_m2_year,
+            0.0
+        );
+        assert_eq!(result.scenarios[0].renewable_share_percent, None);
+    }
+    #[test]
+    fn invalid_area_never_returns_partial_indicators() {
+        let mut input = sample();
         input.scenarios[0].annual_primary_fossil_kwh = 100.0;
         input.total_usable_floor_area_m2 = 0.0;
         assert!(assess_indicators_draft(&input)

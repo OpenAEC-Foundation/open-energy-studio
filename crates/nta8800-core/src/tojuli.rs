@@ -18,8 +18,11 @@
 //! heat-pump extraction `Q_C;HP;juli` is split by 5.41a–c. The July
 //! recoverable losses `Q_H;ls;rbl` and `Q_C;ls;rbl` of the zone are split by
 //! `A_T;or` (step B) and enter 7.7 with Δη (7.8). Results are rounded up to
-//! 0,01 K; the Bbl 4.149b
-//! limit is 1,20. A zone with an active cooling system of demonstrated
+//! 0,01 K. The limit, TOjuli not greater than 1,20 for woonfuncties, is
+//! Bbl art. 4.149b (consolidated text 2026-01-01, see the source register);
+//! NTA §5.7.1 (p. 114) still refers to the Omgevingsregeling. The annex AA
+//! explanation (p. 1145–1146) names "TOjuli < 1,2" only as the basis of the
+//! AA deduction, not as the limit, so the kernel keeps "≤ 1,20". A zone with an active cooling system of demonstrated
 //! capacity (§5.7.1) has TOjuli = 0; with the annex AA route the kernel
 //! checks AA.10–AA.13 itself.
 
@@ -35,7 +38,8 @@ use crate::solar_shading::Balance;
 use serde::{Deserialize, Serialize};
 
 pub const JULY: u8 = 7;
-/// Bbl 4.149b paragraph 1.
+/// Bbl 4.149b paragraph 1: not greater than 1,20 (NTA §5.7.1, p. 114,
+/// refers to the Omgevingsregeling for the same limit).
 pub const TOJULI_LIMIT_K: f64 = 1.20;
 /// §5.7.2 step A: orientations with at most this area are skipped.
 pub const MIN_ORIENTATION_AREA_M2: f64 = 3.0;

@@ -65,6 +65,10 @@ pub const INTERPRETATIONS: &[&str] = &[
     "13.184/13.185 with 5.20a (p. 653, p. 89): the hot-water share of a combi or delivery set on the heating generator is E_W and carries no f_BACS; the generator's auxiliary energy stays with space heating",
     "declared internal gains (§7.5.3.1/7.5.3.2, p. 179–180; 7.21, p. 177): a flux within 0,01 W/m² of the table value, or of the table value plus the §5.4.2 q_L, gives no warning; any other value a non-blocking warning",
     "16.11–16.13: only CHP electricity of heating and hot-water systems counts as on-site production (without f_BACS); the electricity of a CHP driving absorption cooling (ε_chp;el) is reported only",
+    "Regeling art. 2 lid 3 and art. 3 lid 3 (p. 4–5): with area measures (EMG) a dwelling label uses the forfait scenario (EMGforf), a utility label the quality declarations; BENG 2/3 and the Bbl check use the declaration scenario",
+    "5.3: when EPTot + EPrenTot ≤ 0 the renewable share is undefined (null) while EP2 stays defined; a negative EPTot giving RER > 100 % is kept literally with a warning",
+    "§5.3.1 (p. 70): residential (Bbl 1a–1e) and utility functions are never area-weighted together, so a mixed bblFunctions list is refused; function lists must sum to A_g;tot within 0,5 % (or 0,5 m²)",
+    "Bbl table 4.148A values are transcribed from the consolidated Bbl text of 2026-01-01 (not among the licensed sources); the education BENG 1 base 190 is to be verified against BWBR0041297",
 ];
 
 /// Table 5.2 `f_P;del` / `f_P;pr;us` / `f_P;exp` for electricity.
@@ -980,7 +984,12 @@ pub struct BuildingPerformanceAssessment {
     pub primary_fossil_indicator_kwh_per_m2_year: Option<f64>,
     /// BENG 3.
     pub renewable_share_percent: Option<f64>,
-    /// Class from annex IX/X for the rounded BENG 2; not a registered label.
+    /// EP2 of the label scenario: EMGforf for a dwelling with area
+    /// measures (Regeling art. 2 lid 3), otherwise BENG 2.
+    pub label_primary_fossil_indicator_kwh_per_m2_year: Option<f64>,
+    /// RER of the label scenario; `None` when undefined.
+    pub label_renewable_share_percent: Option<f64>,
+    /// Class from annex IX/X for the rounded label EP2; not a registered label.
     pub indicative_label_class: Option<&'static str>,
     pub label_source: &'static str,
     /// TOjuli per zone and orientation (§5.7); requires the component route.
@@ -1437,12 +1446,18 @@ pub fn fit_hot_water_need(result: &mut HotWaterAssessment, annual_need_kwh: f64)
 }
 
 /// True when a zone carries a maatwerkadvies usage fit (ISSO 82.2/75.2).
+/// Annex Z (p. 1133): the policy factors (table 14.1 burning hours among
+/// them) are fixed for the label; any actual-use fit gives no label.
 pub fn usage_fit_applied(input: &BuildingPerformanceInput) -> bool {
     input.hot_water_need_fit.is_some()
         || input
             .zone_inputs()
             .into_iter()
             .any(|zone| zone.usage_fit.is_some())
+        || input
+            .lighting
+            .iter()
+            .any(|zone| zone.burning_hours_factor.is_some())
 }
 
 /// The hot-water systems of the building with their input path.
@@ -1925,6 +1940,77 @@ fn validate_heating_systems(input: &BuildingPerformanceInput, issues: &mut Vec<P
     }
 }
 
+/// Bbl rows 1a–1e (woonfuncties).
+fn residential_bbl_function(function: BblFunction) -> bool {
+    matches!(
+        function,
+        BblFunction::ResidentialBuilding
+            | BblFunction::OtherResidential
+            | BblFunction::Caravan
+            | BblFunction::FloatingBuildingAfter2018Berth
+            | BblFunction::FloatingBuildingOtherBerth
+    )
+}
+
+/// Tolerance on Σ function areas against A_g;tot: 0,5 % or 0,5 m².
+fn function_area_sum_matches(sum: f64, total: f64) -> bool {
+    (sum - total).abs() <= (0.005 * total.abs()).max(0.5)
+}
+
+/// §5.3.1 (p. 70): residential and utility functions are determined
+/// separately and never area-weighted together; the function lists
+/// describe the whole A_g;tot of the calculation.
+fn validate_function_lists(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
+    let residential_scope = matches!(input.calculation_scope, CalculationScope::Residential);
+    let total = input.total_usable_floor_area_m2;
+    if !input.bbl_functions.is_empty() {
+        let dwelling = input
+            .bbl_functions
+            .iter()
+            .filter(|part| residential_bbl_function(part.function))
+            .count();
+        if dwelling > 0 && dwelling < input.bbl_functions.len() {
+            issues.push(issue(
+                "bbl_functions_residential_utility_mixed",
+                "bblFunctions",
+            ));
+        } else if (dwelling > 0) != residential_scope {
+            issues.push(issue("bbl_functions_scope_mismatch", "bblFunctions"));
+        }
+        let sum: f64 = input.bbl_functions.iter().map(|part| part.area_m2).sum();
+        if total.is_finite() && total > 0.0 && !function_area_sum_matches(sum, total) {
+            issues.push(issue("bbl_function_areas_sum_mismatch", "bblFunctions"));
+        }
+    } else if let Some(function) = input.bbl_function {
+        if residential_bbl_function(function) != residential_scope {
+            issues.push(issue("bbl_functions_scope_mismatch", "bblFunction"));
+        }
+    }
+    if !residential_scope {
+        let functions = input
+            .label_functions
+            .iter()
+            .map(|part| part.function)
+            .chain(input.label_function);
+        if functions
+            .into_iter()
+            .any(|function| function == LabelFunction::Residential)
+        {
+            // Regeling bijlage Ia (p. 17) has no woonfunctie column.
+            issues.push(issue(
+                "label_functions_residential_in_utility",
+                "labelFunctions",
+            ));
+        }
+        if !input.label_functions.is_empty() {
+            let sum: f64 = input.label_functions.iter().map(|part| part.area_m2).sum();
+            if total.is_finite() && total > 0.0 && !function_area_sum_matches(sum, total) {
+                issues.push(issue("label_function_areas_sum_mismatch", "labelFunctions"));
+            }
+        }
+    }
+}
+
 fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
     // 13.156a: E_W;gen;in;PFHRD needs the heating gas of the same combi.
     for (system, path) in hot_water_system_list(input) {
@@ -1986,6 +2072,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
     {
         issues.push(issue("zone_area_sum_mismatch", "totalUsableFloorAreaM2"));
     }
+    validate_function_lists(input, issues);
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
     if let Some(area) = input.loss_area_m2 {
         if !area.is_finite() || area <= 0.0 {
@@ -3225,6 +3312,45 @@ pub fn assess_building_performance(
         .as_ref()
         .filter(|_| valid)
         .and_then(|result| result.scenarios.first());
+    // Regeling art. 2 lid 3 (p. 4): a dwelling label uses the forfait values
+    // for area measures (EMGforf); art. 3 lid 3 (p. 5): a utility label uses
+    // the quality declarations, the first scenario. BENG and Bbl stay on the
+    // first scenario.
+    let label_scenario = match input.calculation_scope {
+        CalculationScope::Residential => indicators
+            .as_ref()
+            .filter(|_| valid)
+            .and_then(|result| {
+                result
+                    .scenarios
+                    .iter()
+                    .find(|item| item.kind == ScenarioKind::EmgForfait)
+            })
+            .or(scenario),
+        CalculationScope::Utility => scenario,
+    };
+    // 5.3 with EPTot < 0: RER exceeds 100 %; literal, but worth a look.
+    if scenario
+        .and_then(|item| item.renewable_share_percent)
+        .is_some_and(|value| value > 100.0)
+    {
+        warnings.push(issue(
+            "renewable_share_above_100_negative_primary_fossil",
+            "indicators.scenarios[0].renewableSharePercent",
+        ));
+    }
+    // §5.3.2 (p. 75–76): the standard voor woningisolatie needs the
+    // construction year of the dwelling.
+    if valid
+        && matches!(input.calculation_scope, CalculationScope::Residential)
+        && dwelling_count(input) == Some(1)
+        && input.construction_year.is_none()
+    {
+        warnings.push(issue(
+            "standard_insulation_construction_year_missing",
+            "constructionYear",
+        ));
+    }
     let totals = totals.filter(|_| valid);
     let need_from_fixed_c1 = totals.is_some_and(|item| item.need_from_fixed_c1);
     let need_indicator = indicators
@@ -3329,7 +3455,7 @@ pub fn assess_building_performance(
             heating_capacity,
             need_indicator,
             Some(item.primary_fossil_indicator_kwh_per_m2_year),
-            Some(item.renewable_share_percent),
+            item.renewable_share_percent,
         ),
         _ => None,
     };
@@ -3519,9 +3645,12 @@ pub fn assess_building_performance(
         need_indicator_kwh_per_m2_year: need_indicator,
         primary_fossil_indicator_kwh_per_m2_year: scenario
             .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
-        renewable_share_percent: scenario.map(|item| item.renewable_share_percent),
+        renewable_share_percent: scenario.and_then(|item| item.renewable_share_percent),
+        label_primary_fossil_indicator_kwh_per_m2_year: label_scenario
+            .map(|item| item.primary_fossil_indicator_kwh_per_m2_year),
+        label_renewable_share_percent: label_scenario.and_then(|item| item.renewable_share_percent),
         // A maatwerkadvies run with actual-use parameters gives no label.
-        indicative_label_class: scenario
+        indicative_label_class: label_scenario
             .filter(|_| !usage_fit_applied(input))
             .and_then(|item| {
                 let ep2 = item.primary_fossil_indicator_kwh_per_m2_year;
@@ -4595,6 +4724,154 @@ mod tests {
     }
 
     #[test]
+    fn function_lists_follow_section_5_3_1() {
+        use crate::bbl_requirements::{BblFunction, BblFunctionArea};
+        let codes = |sample: &BuildingPerformanceInput| -> Vec<&'static str> {
+            assess_building_performance(sample)
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        let mut sample = input();
+        // p. 70: a dwelling part and an office part are never weighted.
+        sample.bbl_functions = vec![
+            BblFunctionArea {
+                function: BblFunction::OtherResidential,
+                area_m2: 60.0,
+            },
+            BblFunctionArea {
+                function: BblFunction::Office,
+                area_m2: 40.0,
+            },
+        ];
+        assert!(codes(&sample).contains(&"bbl_functions_residential_utility_mixed"));
+        // A utility row on a residential calculation.
+        sample.bbl_functions = vec![BblFunctionArea {
+            function: BblFunction::Office,
+            area_m2: 100.0,
+        }];
+        assert!(codes(&sample).contains(&"bbl_functions_scope_mismatch"));
+        // Areas must describe A_g;tot.
+        sample.bbl_functions = vec![BblFunctionArea {
+            function: BblFunction::OtherResidential,
+            area_m2: 80.0,
+        }];
+        assert!(codes(&sample).contains(&"bbl_function_areas_sum_mismatch"));
+        sample.bbl_functions[0].area_m2 = 100.0;
+        assert!(!codes(&sample)
+            .iter()
+            .any(|code| code.starts_with("bbl_function")));
+        // Utility label functions: no woonfunctie, areas sum to A_g;tot.
+        let mut utility = input();
+        utility.calculation_scope = CalculationScope::Utility;
+        utility.label_functions = vec![
+            LabelFunctionArea {
+                function: LabelFunction::Office,
+                area_m2: 50.0,
+            },
+            LabelFunctionArea {
+                function: LabelFunction::Residential,
+                area_m2: 50.0,
+            },
+        ];
+        assert!(codes(&utility).contains(&"label_functions_residential_in_utility"));
+        utility.label_functions = vec![LabelFunctionArea {
+            function: LabelFunction::Office,
+            area_m2: 87.5,
+        }];
+        assert!(codes(&utility).contains(&"label_function_areas_sum_mismatch"));
+        utility.label_functions[0].area_m2 = 99.6;
+        assert!(!codes(&utility)
+            .iter()
+            .any(|code| code.starts_with("label_function")));
+    }
+
+    #[test]
+    fn lighting_burning_hours_factor_withholds_the_label() {
+        let mut sample = input();
+        assert!(!usage_fit_applied(&sample));
+        sample.lighting = vec![serde_json::from_value(json!({
+            "zoneId": "zone", "functions": [], "lightingZones": [],
+            "sourceReference": "x", "burningHoursFactor": 1.2
+        }))
+        .unwrap()];
+        // Annex Z (p. 1133): table 14.1 is a fixed policy factor.
+        assert!(usage_fit_applied(&sample));
+    }
+
+    #[test]
+    fn standard_insulation_needs_the_construction_year() {
+        let mut sample = input();
+        sample.construction_year = None;
+        let result = assess_building_performance(&sample);
+        assert_eq!(dwelling_count(&sample), Some(1));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|item| item.code == "standard_insulation_construction_year_missing"));
+        sample.construction_year = Some(1975);
+        let result = assess_building_performance(&sample);
+        assert!(!result
+            .warnings
+            .iter()
+            .any(|item| item.code == "standard_insulation_construction_year_missing"));
+    }
+
+    #[test]
+    fn dwelling_label_uses_emg_forfait_and_utility_the_declaration() {
+        let mut sample = external_heat_sample(true);
+        sample.external_supply.heating = Some(AnnexPRoute::Declared {
+            primary_factor: 0.42,
+            renewable_factor: 0.35,
+            co2_kg_per_kwh: 0.05,
+            declaration_reference: "BCRG EMG-verklaring".into(),
+            measured_only: true,
+        });
+        sample.calculation_scope = CalculationScope::Residential;
+        let dwelling = assess_building_performance(&sample);
+        assert_eq!(
+            dwelling.status, "calculated_unverified",
+            "{:?}",
+            dwelling.issues
+        );
+        let scenarios = &dwelling.indicators.as_ref().unwrap().scenarios;
+        let declared = &scenarios[0];
+        let forfait = scenarios
+            .iter()
+            .find(|item| item.kind == ScenarioKind::EmgForfait)
+            .unwrap();
+        assert!(
+            forfait.primary_fossil_indicator_kwh_per_m2_year
+                > declared.primary_fossil_indicator_kwh_per_m2_year
+        );
+        // Regeling art. 2 lid 3 (p. 4): the label uses EMGforf ...
+        assert_eq!(
+            dwelling.label_primary_fossil_indicator_kwh_per_m2_year,
+            Some(forfait.primary_fossil_indicator_kwh_per_m2_year)
+        );
+        assert_eq!(
+            dwelling.indicative_label_class,
+            indicative_label_class(
+                LabelFunction::Residential,
+                forfait.primary_fossil_indicator_kwh_per_m2_year
+            )
+        );
+        // ... while BENG 2 stays on the declaration.
+        assert_eq!(
+            dwelling.primary_fossil_indicator_kwh_per_m2_year,
+            Some(declared.primary_fossil_indicator_kwh_per_m2_year)
+        );
+        // Art. 3 lid 3 (p. 5): a utility label uses the declaration.
+        sample.calculation_scope = CalculationScope::Utility;
+        let utility = assess_building_performance(&sample);
+        assert_eq!(
+            utility.label_primary_fossil_indicator_kwh_per_m2_year,
+            utility.primary_fossil_indicator_kwh_per_m2_year
+        );
+    }
+
+    #[test]
     fn annex_p_declaration_gives_two_scenarios() {
         let forfait = assess_building_performance(&external_heat_sample(false));
         let mut sample = external_heat_sample(true);
@@ -4930,7 +5207,7 @@ mod tests {
         let mut sample = input();
         sample.bbl_functions = vec![
             BblFunctionArea {
-                function: BblFunction::ResidentialBuilding,
+                function: BblFunction::Office,
                 area_m2: 50.0,
             },
             BblFunctionArea {
@@ -4938,10 +5215,11 @@ mod tests {
                 area_m2: 50.0,
             },
         ];
-        // Text under table AB.1: July 0,5·0,15 + 0,5·0,01; January 0,65.
+        // Text under table AB.1: July 0,5·0,15 + 0,5·0,01; January 0,55.
+        // Dwellings and utility are never weighted together (§5.3.1).
         let f = zeb_direct_use_fraction(&sample);
         assert!((f[6] - 0.08).abs() < 1e-12);
-        assert!((f[0] - 0.65).abs() < 1e-12);
+        assert!((f[0] - 0.55).abs() < 1e-12);
     }
 
     #[test]

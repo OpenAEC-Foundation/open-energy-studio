@@ -54,7 +54,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "ISSO 75.2 table 2.4 gives NTA −20 % reduction hours for both energy-conscious and not energy-conscious users; read as +20 % (energy-conscious) and −20 % (not energy-conscious), in line with the weekend column; weekend hours are capped at 48",
     "gas costs use 35,17 MJ/m³ (Groningen equivalent, gross calorific value)",
     "heat from a collective heat-pump source (reported as carrier dh, 5.20) is priced at the district-heat tariff",
-    "the best-fit package is the adviser's choice; without one, the package with the highest net present value is proposed and marked as automatic",
+    "the best-fit package is the adviser's choice; without one, the package with the highest net present value is proposed and marked as automatic. ISSO 82.2 §6.2.4 (p. 82) prescribes no ranking: the payback time must be reported (clients usually decide on it), NPV and lifetime may be added; the panel can sort by either",
     "ISSO 82.2 §2.5.3: the NTA option carries the MWA practice correction for hot water; taken as the average-profile 545 kWh per occupant",
     "ventilation practice factors (82.2 table 2.7, 75.2 table 2.8) apply to the standard profiles or when entered, not to the NTA option (table 2.2 '–'); system B takes the system C value",
     "fit check (82.2 §3.2, Bijlage C.1): heating limit at the knee above the base load (mean of the months ≥ 15 °C); the measured line uses the local temperatures when given, the calculated line the NTA 8800 climate year; electricity is compared as monthly net delivery",
@@ -63,6 +63,8 @@ pub const INTERPRETATIONS: &[&str] = &[
     "utility persons route (75.2 table 2.6): N_p of the building split over the zones by area, q_oc;p 80 W, f_t and q_A from NTA tables 7.2/7.3 unless entered",
     "renovation passport (82.2 §1.10.2/§4.4): the Standaard voor Woningisolatie is the adviser's statement or an entered net heat need limit; gas-free means no natural gas or oil use in the actual-use run",
     "location-specific climate data (82.2 §2.6) is not used: NEN 5060 hourly or KNMI data is not available to the kernel",
+    "fit tolerances (82.2 Bijlage C.1, p. 105): the 5 % criteria are relative to the measurement, as the text says ('t.o.v. de meting'); the worked example on p. 110 (60 and 63, 4,7 %) is consistent with a measured slope of 63",
+    "a measure phased at or after the horizon has no investment within the NPV period and therefore no residual value",
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1066,8 +1068,9 @@ fn label_result(result: &BuildingPerformanceAssessment) -> LabelResult {
     LabelResult {
         label_class: result.indicative_label_class,
         need_indicator_kwh_per_m2: result.need_indicator_kwh_per_m2_year,
-        primary_fossil_indicator_kwh_per_m2: result.primary_fossil_indicator_kwh_per_m2_year,
-        renewable_share_percent: result.renewable_share_percent,
+        // The label scenario (Regeling art. 2 lid 3 / art. 3 lid 3).
+        primary_fossil_indicator_kwh_per_m2: result.label_primary_fossil_indicator_kwh_per_m2_year,
+        renewable_share_percent: result.label_renewable_share_percent,
         tojuli_max_k: result.tojuli_max_k,
     }
 }
@@ -1411,6 +1414,11 @@ pub fn net_present_value(
             (Some(year), Some(base)) if year > base => f64::from(year - base),
             _ => 0.0,
         };
+        // A measure phased at or after the horizon has no investment in
+        // the period, and therefore no residual value either.
+        if start >= horizon_years - 1e-9 {
+            continue;
+        }
         while start < horizon_years - 1e-9 {
             value -= measure.investment_eur / (1.0 + r).powf(start);
             start += lifetime;
@@ -2448,6 +2456,23 @@ mod tests {
         // r = 0: 15 × 100 − 1000 − 1000 (year 10) + 500 residual.
         let npv = net_present_value(&[&measure], 100.0, &economics, 15.0);
         assert!((npv - (1500.0 - 2000.0 + 500.0)).abs() < 1e-9);
+        // Phased after the horizon: no investment and no residual value.
+        let late = Measure {
+            phase_year: Some(2050),
+            ..measure.clone()
+        };
+        let phased = Economics {
+            base_year: Some(2026),
+            ..economics.clone()
+        };
+        assert!(net_present_value(&[&late], 0.0, &phased, 15.0).abs() < 1e-9);
+        // Phased inside the horizon: invested in 2031, residual 0,5 at 15 years.
+        let mid = Measure {
+            phase_year: Some(2031),
+            ..measure.clone()
+        };
+        let npv = net_present_value(&[&mid], 0.0, &phased, 15.0);
+        assert!((npv - (-1000.0 + 0.0)).abs() < 1e-9);
         // r = 5 %, horizon = lifetime: annuity factor.
         let economics = Economics {
             discount_rate: 0.05,
@@ -2725,6 +2750,19 @@ mod tests {
         assert_eq!(ventilation.limit, None);
         let assessed = assess_maatwerkadvies(&mwa(building()));
         assert_eq!(assessed.current.unwrap().system_checks.len(), checks.len());
+    }
+
+    #[test]
+    fn fit_tolerance_is_relative_to_the_measurement() {
+        // ISSO 82.2 p. 110: slopes 60 and 63, 4,7 % → within the fit with
+        // the measured 63 as base (p. 105: 't.o.v. de meting').
+        assert_eq!(within_percent(Some(60.0), Some(63.0)), Some(true));
+        assert!(((63.0_f64 - 60.0) / 63.0 * 100.0 - 4.76).abs() < 0.01);
+        // Borderline: 66,2 against a measured 63 is 5,08 % → outside.
+        assert_eq!(within_percent(Some(66.2), Some(63.0)), Some(false));
+        assert_eq!(within_percent(Some(63.0), Some(60.0)), Some(true));
+        assert_eq!(within_percent(Some(1.0), Some(0.0)), Some(false));
+        assert_eq!(within_percent(None, Some(60.0)), None);
     }
 
     #[test]

@@ -187,6 +187,9 @@ export function NtaPerformancePanel() {
             <span>{t('nta.performance.labelClass')}</span>
             <strong>{performance.indicativeLabelClass ?? '–'}</strong>
             <small>{t('nta.performance.labelIndicative')}</small>
+            {performance.labelPrimaryFossilIndicatorKwhPerM2Year != null
+              && performance.labelPrimaryFossilIndicatorKwhPerM2Year !== performance.primaryFossilIndicatorKwhPerM2Year
+              && <small data-testid="nta-label-ep2">{t('nta.performance.labelEp2', { value: performance.labelPrimaryFossilIndicatorKwhPerM2Year.toFixed(2) })}</small>}
           </div>
           <div>
             <span>BENG 3</span>

@@ -248,6 +248,21 @@ function MeasureEditor({ measure, onChange, onRemove }: {
   );
 }
 
+type ResultOrder = 'input' | 'payback' | 'npv';
+
+/** ISSO 82.2 §6.2.4 prescribes no ranking; the adviser may sort by payback or NPV. */
+export function orderResults(results: MwaVariantResult[], order: ResultOrder): MwaVariantResult[] {
+  if (order === 'input') return results;
+  const key = (item: MwaVariantResult) => (order === 'payback' ? item.simplePaybackYears : item.netPresentValueEur);
+  return [...results].sort((a, b) => {
+    const left = key(a);
+    const right = key(b);
+    if (left == null || !Number.isFinite(left)) return right == null || !Number.isFinite(right) ? 0 : 1;
+    if (right == null || !Number.isFinite(right)) return -1;
+    return order === 'payback' ? left - right : right - left;
+  });
+}
+
 function ResultRow({ result }: { result: MwaVariantResult }) {
   const use = result.actualUse;
   return (
@@ -276,6 +291,7 @@ export function MaatwerkadviesPanel() {
   const [assessment, setAssessment] = useState<MaatwerkadviesAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [order, setOrder] = useState<ResultOrder>('input');
 
   const update = (next: NtaMaatwerkadvies) => {
     dispatch({ type: 'SET_MAATWERKADVIES', payload: next });
@@ -568,6 +584,13 @@ export function MaatwerkadviesPanel() {
           )}
           {assessment.current && (
             <div className="nta-performance-table">
+              <label>{t('mwa.order')}{' '}
+                <select value={order} onChange={(event) => setOrder(event.target.value as ResultOrder)}>
+                  <option value="input">{t('mwa.order.input')}</option>
+                  <option value="payback">{t('mwa.order.payback')}</option>
+                  <option value="npv">{t('mwa.order.npv')}</option>
+                </select>
+              </label>
               <table>
                 <thead><tr>
                   <th>{t('mwa.col.variant')}</th><th>{t('mwa.col.label')}</th><th>EP2</th><th>{t('mwa.col.gas')}</th>
@@ -576,8 +599,8 @@ export function MaatwerkadviesPanel() {
                 </tr></thead>
                 <tbody>
                   <ResultRow result={assessment.current} />
-                  {assessment.measures.map((item) => <ResultRow key={`m-${item.id}`} result={item} />)}
-                  {assessment.packages.map((item) => <ResultRow key={`p-${item.id}`} result={item} />)}
+                  {orderResults(assessment.measures, order).map((item) => <ResultRow key={`m-${item.id}`} result={item} />)}
+                  {orderResults(assessment.packages, order).map((item) => <ResultRow key={`p-${item.id}`} result={item} />)}
                 </tbody>
               </table>
             </div>
