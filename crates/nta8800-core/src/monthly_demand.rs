@@ -1974,7 +1974,10 @@ fn resolve_transmission(
                 }
                 match slab_coefficients(slab) {
                     Some(value) => slabs.push(value),
-                    None => issues.push(issue("ground_floor_invalid", path)),
+                    None => issues.push(issue(
+                        crate::ground::combination_issue(slab).unwrap_or("ground_floor_invalid"),
+                        path,
+                    )),
                 }
             }
             if thermal_bridge_methods_mixed(components) {

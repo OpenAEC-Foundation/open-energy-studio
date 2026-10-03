@@ -26,6 +26,8 @@ use crate::materials::{
 
 /// Table C.2 R_se, (m²·K)/W.
 pub const R_SE: f64 = 0.04;
+/// R_si for downward heat flow (table C.2), m²K/W.
+pub const R_SI_DOWNWARD: f64 = 0.17;
 /// Table C.4: R_se for upward heat flow over a horizontal cavity with a
 /// reflective layer (value in brackets).
 pub const R_SE_UPWARD_REFLECTIVE: f64 = 0.05;
@@ -444,6 +446,17 @@ impl Layer {
         )
     }
 
+    /// A strongly ventilated air cavity (C.3.3).
+    fn strongly_ventilated(&self) -> bool {
+        matches!(
+            self,
+            Self::AirCavity {
+                ventilation: CavityVentilation::Strongly,
+                ..
+            }
+        )
+    }
+
     /// Thickness in m for the C.6 layer split; `None` when unknown.
     fn thickness(&self) -> Option<f64> {
         match self {
@@ -630,6 +643,11 @@ impl Layer {
             }
         }
     }
+}
+
+/// Position of the first strongly ventilated cavity (C.3.3).
+fn strong_cavity_index(layers: &[Layer]) -> Option<usize> {
+    layers.iter().position(Layer::strongly_ventilated)
 }
 
 /// Sum of layer resistances with surface resistances (C.3), applying the
@@ -879,13 +897,28 @@ impl OpaqueConstruction {
                         ));
                     }
                     for (i, layer) in section.layers.iter().enumerate() {
-                        if layer.thickness().is_none() || layer.resistance(self.heat_flow).is_none()
+                        if layer.thickness().is_none()
+                            || (layer.resistance(self.heat_flow).is_none()
+                                && !layer.strongly_ventilated())
                         {
                             issues.push(issue(
                                 "composite_layer_requires_thickness",
                                 format!("{base}[{i}]"),
                             ));
                         }
+                    }
+                }
+                // C.3.3 truncation in C.5 and C.6: every section has its
+                // strongly ventilated cavity at the same layer position.
+                let cavity = sections
+                    .first()
+                    .and_then(|s| strong_cavity_index(&s.layers));
+                for (s, section) in sections.iter().enumerate().skip(1) {
+                    if strong_cavity_index(&section.layers) != cavity {
+                        issues.push(issue(
+                            "composite_strong_cavity_mismatch",
+                            format!("{path}.build.sections[{s}].layers"),
+                        ));
                     }
                 }
                 if let Some(first) = sections.first() {
@@ -1114,9 +1147,19 @@ impl OpaqueConstruction {
                             s.area / total_resistance(&s.layers, self.heat_flow, self.exterior_air)
                         })
                         .sum::<f64>();
-                // C.6/C.7: λ″ per layer to three decimals.
-                let mut lower = self.heat_flow.r_si() + self.r_se();
-                for j in 0..sections[0].layers.len() {
+                // C.6/C.7: λ″ per layer to three decimals. With a strongly
+                // ventilated cavity (C.3.3) the layers from the cavity
+                // outward are left out and the still-air R_se replaces R_se.
+                let cavity = strong_cavity_index(&sections[0].layers);
+                let mut lower = self.heat_flow.r_si()
+                    + match cavity {
+                        Some(index) => still_air_exterior_resistance(
+                            self.heat_flow,
+                            sections[0].layers[index].effective_reflective(),
+                        ),
+                        None => self.r_se(),
+                    };
+                for j in 0..cavity.unwrap_or(sections[0].layers.len()) {
                     let d = sections[0].layers[j].thickness().unwrap_or(0.0);
                     let lambda: f64 = sections
                         .iter()
@@ -1494,6 +1537,63 @@ mod tests {
         assert!((r.r_t_lower.unwrap() - lower).abs() < 1e-12);
         assert_eq!(r.weighting_factor, Some(0.5));
         assert!((r.r_t - (0.5 * upper + lower) / (1.0 + 0.525)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn composite_with_strongly_ventilated_cavity_truncates_both_bounds() {
+        // Rafter roof under ventilated tiles: C.3.3 drops the cavity and
+        // the tiles and takes the still-air R_se (0,10 upward) in C.5 and C.6.
+        let strong = || Layer::AirCavity {
+            thickness_mm: 30.0,
+            ventilation: CavityVentilation::Strongly,
+            reflective_surface: false,
+            reflective_facing_up: false,
+            hermetically_sealed: false,
+        };
+        let section = |id: &str, area: f64, lambda: f64| Section {
+            id: id.into(),
+            area,
+            layers: vec![
+                material(0.012, 0.17),
+                material(0.15, lambda),
+                strong(),
+                material(0.02, 1.0),
+            ],
+        };
+        let roof = OpaqueConstruction {
+            heat_flow: HeatFlow::Upward,
+            exterior_air: true,
+            build: Build::Composite {
+                sections: vec![
+                    section("insulation", 0.85, 0.035),
+                    section("rafter", 0.15, 0.13),
+                ],
+                interruption: InterruptionClass::WoodyUnshielded,
+                insulation_section: None,
+            },
+            corrections: Corrections::default(),
+            unheated_reduction_factor: None,
+        };
+        assert!(roof.validate("r").is_empty(), "{:?}", roof.validate("r"));
+        let r = roof.calculate();
+        let skin = 0.012 / 0.17;
+        let ra = 0.10 + skin + 0.15 / 0.035 + 0.10;
+        let rb = 0.10 + skin + 0.15 / 0.13 + 0.10;
+        let upper = 1.0 / (0.85 / ra + 0.15 / rb);
+        let lambda = round_half_up(0.85 * 0.035 + 0.15 * 0.13, 3);
+        let lower = 0.10 + 0.10 + skin + 0.15 / lambda;
+        assert!((r.r_t_upper.unwrap() - upper).abs() < 1e-12);
+        assert!((r.r_t_lower.unwrap() - lower).abs() < 1e-12);
+
+        // The cavity must sit at the same position in every section.
+        let mut mixed = roof.clone();
+        if let Build::Composite { sections, .. } = &mut mixed.build {
+            sections[1].layers[2] = material(0.03, 0.025);
+        }
+        assert!(mixed
+            .validate("r")
+            .iter()
+            .any(|issue| issue.code == "composite_strong_cavity_mismatch"));
     }
 
     #[test]
