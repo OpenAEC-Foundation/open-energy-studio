@@ -68,10 +68,12 @@ export async function downloadProjectDossier(project: IProject) {
   } catch {
     assessment = null;
   }
+  // One moment for the report's <time datetime> and the manifest's generatedAt.
+  const generatedAt = new Date();
   const reportHtml = assessment
-    ? generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty())
+    ? generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty(), generatedAt)
     : null;
-  const bundle = await buildProjectDossier({ project, assessment, reportHtml });
+  const bundle = await buildProjectDossier({ project, assessment, reportHtml, generatedAt: generatedAt.toISOString() });
   const zip = zipProjectDossier(bundle);
   const fileName = `Projectdossier-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.zip`;
   try {

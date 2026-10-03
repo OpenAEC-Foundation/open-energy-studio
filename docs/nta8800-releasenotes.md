@@ -2,10 +2,28 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — reviewcorrecties rapportafronding, restset, bouwjaar en setpoints
+
+### Projecten die nu `incomplete` worden
+
+- **Restset naast een bijlage Q-warmtepomp met β ≥ 1 (opmerking 1, p. 323).** Is maar een deel van de nominale vermogens van de overige opwekkers ingevuld, dan meldt de projectroute het gat `rest_set_power_partial` bij elk ontbrekend vermogen, met het volledige projectpad (`ntaCalculation.generator.generators[i].nominalPowerKw` of `ntaCalculation.additionalHeatingSystems[k].generator…`). De status is `incomplete` en de melding zegt wat te doen: alle vermogens invullen of alle leegmaken. Rechtstreekse kerninvoer krijgt dezelfde code als kernmelding.
+
+### Uitkomsten die veranderen
+
+- **Bouwjaar (Regeling art. 4 a, p. 5; NTA §5.3.2, p. 75–76).** Het bouwjaar van de labelgegevens en van de standaard voor woningisolatie is nu het registratiejaar, anders het bouwjaar in het NTA-blok. Het ventilatiejaar valt niet meer terug als bouwjaar: tabel 11.13 (p. 486) vraagt een bouw- of renovatiejaar. Een project zonder registratie- en NTA-bouwjaar krijgt dus geen bouwjaar meer uit de ventilatie; beide voorbeeldprojecten hebben nu een bouwjaar in het NTA-blok (2020 en 2021).
+- **Waarschuwingen.** `construction_year_mismatch` vergelijkt nu het NTA-blok met de registratie. Het nieuwe `ventilation_year_before_construction_year` meldt alleen een ventilatiejaar vóór het bouwjaar; een later jaar is een renovatiejaar.
+- **Rekenrapport.** De regel ‘Bouwjaar’ toont hetzelfde opgeloste jaar als de labelgegevens.
+
+### Weergave
+
+- **BENG-rapport.** Eisen staan met dezelfde decimalen als de waarde: BENG 1 en 2 en TOjuli op 0,01, BENG 3 op 0,1. De kern toetst onafgeronde waarden; een rij als ‘74,11 | ≤ 74,1 | voldoet’ of ‘32,6 | ≥ 33 | voldoet’ kan niet meer voorkomen.
+- **Tabel 7.13 in het formulier.** De controle loopt nu, net als de kern, over de rekenzones van het project in plaats van over `zoneData`. De knop ‘Tabelwaarden gebruiken’ neemt de bronverwijzing van het blok over, anders ‘NTA 8800 tabel 7.13’, zodat de kern de setpoints niet weigert om een lege bron. De projectroute kent geen gebruiksaanpassing; die tak is uit de controle verwijderd.
+- **Tijdstempels.** Rekenrapport, invoerdossier en maatwerkadviesrapport tonen de generatietijd als `<time datetime="…">` met de exacte ISO-tijd. In het projectdossier is dat dezelfde tijd als `generatedAt` in `manifest.json`.
+
 ## 3 oktober 2026 — vakantiewoning in ZEB, reservevermogens, één bouwjaar en lege enum-tag
 
 - **ZEB-indicator (bijlage AB).** Een vakantiewoning (‘andere logiesfunctie’) telt in tabel AB.1 nu in de kolom woningbouw (f_du januari 0,75 in plaats van 0,55), zoals tabel 6.1 (p. 136) haar als woonfunctie behandelt. ZEB-uitkomsten van projecten met deze functie veranderen.
-- **Resterende opwekkers bij β ≥ 1 (9.56, p. 323; opmerking 1).** Een set waarin een bijlage Q-warmtepomp als preferentie 1 op β ≥ 1 is geschat, rekent de rest alleen nog met gelijke delen als **alle** resterende vermogens ontbreken. Ontbreekt een deel, dan meldt de kern `generator_nominal_power_invalid` bij elk ontbrekend vermogen; zulke opgeslagen projecten worden `incomplete`.
+- **Resterende opwekkers bij β ≥ 1 (9.56, p. 323; opmerking 1).** Een set waarin een bijlage Q-warmtepomp als preferentie 1 op β ≥ 1 is geschat, rekent de rest alleen nog met gelijke delen als **alle** resterende vermogens ontbreken. Ontbreekt een deel, dan meldt de projectroute het gat `rest_set_power_partial` bij elk ontbrekend vermogen en worden zulke opgeslagen projecten `incomplete`; de kern zelf meldt dezelfde code (status `invalid` bij rechtstreekse kerninvoer).
 - **Eén bouwjaar.** Het ventilatiebouwjaar wordt ook per rekenzone gelezen (`zoneData[i].ventilation.constructionYear`). De labelgegevens (Regeling art. 4 a) gebruiken nu hetzelfde bouwjaar als de standaard voor woningisolatie (§5.3.2). Een registratiebouwjaar dat afwijkt van het ventilatiebouwjaar geeft de waarschuwing `construction_year_mismatch`.
 - **Registratiewaarschuwingen.** `plausibility_borderline_label` en `plausibility_ep2_out_of_range` wijzen nu naar `performance.labelPrimaryFossilIndicatorKwhPerM2Year`.
 - **Lege enum-tag.** Is de tag van een variantblok leeg (bijvoorbeeld `method` of `kind`), dan meldt de kern alleen die tag; lege velden in hetzelfde blok worden pas beoordeeld als de variant gekozen is. Een tag is een enum-veld waarvan een andere variant de toegestane of verplichte velden van het blok verandert.

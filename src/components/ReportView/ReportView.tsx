@@ -7,7 +7,7 @@ import {
 } from '../../core/report/ReportGenerator';
 import { checkDossierCompleteness, type DossierItem } from '../../core/report/ProjectDossier';
 import { useProjectPerformance } from '../../core/nta/useProjectPerformance';
-import { kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
+import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
 import { formatNumber } from '../../i18n/format';
 import './ReportView.css';
 
@@ -206,16 +206,16 @@ export function ReportView() {
                   {model.indicators.map((row) => (
                     <tr key={row.key}>
                       <td>{t(`results.${row.key}.title`)} — {t(`results.${row.key}.subtitle`)}</td>
-                      <td>{formatNumber(row.value, locale, row.key === 'beng3' ? 1 : 2)} {t(`results.${row.key}.unit`)}</td>
-                      <td>{row.limit == null ? '–' : `${row.higherIsBetter ? '≥' : '≤'} ${formatNumber(row.limit, locale, row.key === 'beng3' ? 0 : 1)}`}</td>
+                      <td>{formatNumber(row.value, locale, indicatorDecimals(row.key))} {t(`results.${row.key}.unit`)}</td>
+                      <td>{row.limit == null ? '–' : `${row.higherIsBetter ? '≥' : '≤'} ${formatNumber(row.limit, locale, indicatorDecimals(row.key))}`}</td>
                       <td>{meetsText(row.meets)}</td>
                     </tr>
                   ))}
                   {model.tojuli && (
                     <tr>
                       <td>{t('results.toJuli')}</td>
-                      <td>{formatNumber(model.tojuli.value, locale, 2)} K</td>
-                      <td>{'≤'} {formatNumber(1.2, locale, 2)} K</td>
+                      <td>{formatNumber(model.tojuli.value, locale, indicatorDecimals('tojuli'))} K</td>
+                      <td>{'≤'} {formatNumber(1.2, locale, indicatorDecimals('tojuli'))} K</td>
                       <td>{meetsText(model.tojuli.meets)}</td>
                     </tr>
                   )}

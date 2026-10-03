@@ -1,7 +1,7 @@
 import type { IProject, IBENGResult, IEnergyBreakdown } from '../energy/types';
 import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
-import { kernelReportModel, type KernelReportModel } from './KernelReportModel';
+import { indicatorDecimals, kernelReportModel, type KernelReportModel } from './KernelReportModel';
 
 /** Languages of the standalone BENG report; every other UI language falls back to English. */
 export type ReportLanguage = 'nl' | 'en';
@@ -267,11 +267,11 @@ export function generateReportHTML(project: IProject, result: IBENGResult | null
   if (kernel) {
     const titles = { beng1: L.beng1, beng2: L.beng2, beng3: L.beng3 };
     const rows = kernel.indicators.map((row) => `
-      <tr><td>${titles[row.key]}</td><td>${fmt(row.value, row.key === 'beng3' ? 1 : 2)}</td>
-        <td>${row.limit == null ? '–' : `${row.higherIsBetter ? '≥' : '≤'} ${fmt(row.limit, row.key === 'beng3' ? 0 : 1)}`}</td>
+      <tr><td>${titles[row.key]}</td><td>${fmt(row.value, indicatorDecimals(row.key))}</td>
+        <td>${row.limit == null ? '–' : `${row.higherIsBetter ? '≥' : '≤'} ${fmt(row.limit, indicatorDecimals(row.key))}`}</td>
         <td>${row.key === 'beng3' ? '%' : L.perM2Year}</td><td>${status(row.meets)}</td></tr>`).join('');
     const tojuli = kernel.tojuli ? `
-      <tr><td>${L.tojuli}</td><td>${fmt(kernel.tojuli.value, 2)}</td><td>≤ ${fmt(1.2, 2)}</td><td>K</td><td>${status(kernel.tojuli.meets)}</td></tr>` : '';
+      <tr><td>${L.tojuli}</td><td>${fmt(kernel.tojuli.value, indicatorDecimals('tojuli'))}</td><td>≤ ${fmt(1.2, indicatorDecimals('tojuli'))}</td><td>K</td><td>${status(kernel.tojuli.meets)}</td></tr>` : '';
     bengHTML = `
       <h2>${L.bengKernel}</h2>
       <p class="verification-notice">${L.kernelNotice}</p>

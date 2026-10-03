@@ -176,6 +176,7 @@
   ],
   "ntaCalculation": {
     "calculationScope": "utility",
+    "constructionYear": 2021,
     "areaSourceReference": "voorbeeld: plattegronden, 2 x 200 m2",
     "usageFunction": "office",
     "setpoints": {

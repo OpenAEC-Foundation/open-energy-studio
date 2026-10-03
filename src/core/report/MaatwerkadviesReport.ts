@@ -1,7 +1,7 @@
 import type { IProject } from '../energy/types';
 import type { MaatwerkadviesAssessment, MwaVariantResult, NtaMaatwerkadvies } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
-import { dutchCodeCell, dutchNumber, dutchTimestamp } from './DutchReportText';
+import { dutchCodeCell, dutchNumber, dutchTimeHtml } from './DutchReportText';
 
 function cell(value: unknown): string { return `<td>${escapeHtml(value)}</td>`; }
 function num(value: number | null | undefined, digits = 0): string {
@@ -53,7 +53,7 @@ export function generateMaatwerkadviesReportHTML(
   definition: NtaMaatwerkadvies,
   assessment: MaatwerkadviesAssessment,
 ): string {
-  const generatedAt = dutchTimestamp();
+  const generatedTime = dutchTimeHtml();
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>Maatwerkadvies — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -61,7 +61,7 @@ export function generateMaatwerkadviesReportHTML(
     th{background:#edf3f8}td.n{text-align:right;font-variant-numeric:tabular-nums}.notice{border-left:5px solid #b45309;background:#fff8e7;padding:12px 16px}
     @media print{body{margin:12mm;padding:0;font-size:11px}table{break-inside:avoid}}</style></head><body>
     <h1>Maatwerkadvies</h1>
-    <p>Project: ${escapeHtml(project.name)} · ${escapeHtml(project.address ?? '')} ${escapeHtml(project.city ?? '')} · Gegenereerd: ${escapeHtml(generatedAt)}</p>
+    <p>Project: ${escapeHtml(project.name)} · ${escapeHtml(project.address ?? '')} ${escapeHtml(project.city ?? '')} · Gegenereerd: ${generatedTime}</p>
     <div class="notice"><strong>Onverifieerde berekening, niet geattesteerd.</strong> De energieberekening komt uit de Rust-rekenkern van Open Energy Studio (NTA 8800:2025+C1:2026). Werkelijke besparingen hangen af van gebruik, uitvoering en energieprijzen. TO<sub>juli</sub> is slechts een indicatie en is voor bestaande bouw niet gevalideerd (ISSO 82.2 §4.2.3).</div>
     <h2>Herleidbaarheid</h2><table><tbody>
       <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Kernelversie</th>${cell(assessment.kernelVersion)}</tr>
