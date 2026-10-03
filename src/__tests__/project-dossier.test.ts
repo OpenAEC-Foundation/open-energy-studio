@@ -152,8 +152,23 @@ describe('project dossier', () => {
     };
     const status = (items: ReturnType<typeof checkDossierCompleteness>, id: string) =>
       items.find((item) => item.id === id);
+    // The verdict comes from the kernel's fresh comparison at registration.
+    const rerun = { registration: { issues: [], readyForRegistration: false, relabelAssessment: assessmentW } } as unknown as ProjectPerformanceAssessment;
     let items = checkDossierCompleteness({ project: base, labelInputSha256: await labelInputSha256(base) });
+    expect(status(items, 'relabel_changes')?.status).toBe('check');
+    items = checkDossierCompleteness({ project: base, assessment: rerun, labelInputSha256: await labelInputSha256(base) });
     expect(status(items, 'relabel_changes')?.status).toBe('ok');
+    // A stored verdict edited to allowed does not count: the re-run decides.
+    const refused = { registration: { issues: [], readyForRegistration: false,
+      relabelAssessment: { ...assessmentW, allowed: false } } } as unknown as ProjectPerformanceAssessment;
+    items = checkDossierCompleteness({ project: base, assessment: refused, labelInputSha256: await labelInputSha256(base) });
+    expect(status(items, 'relabel_changes')?.status).toBe('missing');
+    // The kernel reports the comparison as out of date.
+    const outdatedRun = { registration: { issues: [{ code: 'relabel_comparison_outdated', path: 'relabelComparison', severity: 'error' }],
+      readyForRegistration: false, relabelAssessment: assessmentW } } as unknown as ProjectPerformanceAssessment;
+    items = checkDossierCompleteness({ project: base, assessment: outdatedRun, labelInputSha256: await labelInputSha256(base) });
+    expect(status(items, 'relabel_changes')?.status).toBe('check');
+    items = checkDossierCompleteness({ project: base, assessment: rerun, labelInputSha256: await labelInputSha256(base) });
     expect(status(items, 'relabel_original_label')?.status).toBe('ok');
     // An invoice without the relabel role does not prove the improvement.
     expect(status(items, 'relabel_invoice')?.status).toBe('missing');
@@ -186,12 +201,19 @@ describe('project dossier', () => {
 
     // The dossier export writes the kept comparison and the original file
     // on its own, so the manifest's SHA-256 is the one of the original.
-    const bundle = await buildProjectDossier({ project: base });
+    const bundle = await buildProjectDossier({ project: base, assessment: refused });
     const record = JSON.parse(strFromU8(bundle.files['herlabel-vergelijking.json']));
     expect(record.originalFileName).toBe('origineel.oes.json');
     expect(record.assessment.changes).toHaveLength(1);
+    expect(record.assessment.allowed).toBe(false);
+    expect(record.kernelRecheck).toBe(true);
     expect(record.originalProjectText).toBeUndefined();
     expect(strFromU8(bundle.files['herlabel-origineel.oes.json'])).toBe(originalText);
+    // The original goes in once: not again inside the project file.
+    expect(strFromU8(bundle.files['project.oes.json'])).not.toContain('originalProjectText');
+    const unchecked = JSON.parse(strFromU8((await buildProjectDossier({ project: base })).files['herlabel-vergelijking.json']));
+    expect(unchecked.kernelRecheck).toBe(false);
+    expect(unchecked.assessment).toBeUndefined();
 
     // A comparison kept without the original file cannot be checked again.
     const legacy = { ...base, registration: { ...base.registration!, originalCertificateNumber: 'K1',

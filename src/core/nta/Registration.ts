@@ -169,49 +169,146 @@ export function bagConflicts(entry: BagLedgerEntry, ledger: BagLedgerEntry[]): B
 }
 
 /**
+ * A number as `<digits>e<exponent>` with integer digits and no leading or
+ * trailing zeros (`0` for zero): the kernel's `canonical_number`, so both
+ * notations of one value (`1e-7`, `0.0000001`, `1e+21`) hash alike.
+ */
+export function canonicalNumber(text: string): string {
+  const negative = text.startsWith('-');
+  const unsigned = negative ? text.slice(1) : text;
+  const at = unsigned.search(/[eE]/);
+  const mantissa = at < 0 ? unsigned : unsigned.slice(0, at);
+  let exponent = at < 0 ? 0 : Number.parseInt(unsigned.slice(at + 1), 10) || 0;
+  const [whole, fraction = ''] = mantissa.split('.');
+  exponent -= fraction.length;
+  const digits = `${whole}${fraction}`.replace(/^0+/, '');
+  if (digits === '') return '0';
+  const trimmed = digits.replace(/0+$/, '');
+  exponent += digits.length - trimmed.length;
+  return `${negative ? '-' : ''}${trimmed}e${exponent}`;
+}
+
+const utf8 = new TextEncoder();
+
+function compareUtf8(a: string, b: string): number {
+  const x = utf8.encode(a);
+  const y = utf8.encode(b);
+  for (let index = 0; index < Math.min(x.length, y.length); index += 1) {
+    if (x[index] !== y[index]) return x[index] - y[index];
+  }
+  return x.length - y.length;
+}
+
+/**
+ * The kernel's canonical label-input text: object members that are null or
+ * undefined left out, keys sorted by UTF-8 bytes, numbers in canonical form.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'number') return canonicalNumber(String(value));
+  if (typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== null && item !== undefined)
+    .sort(([a], [b]) => compareUtf8(a, b));
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+}
+
+/**
  * SHA-256 of the project's label input: everything except the registration,
- * the maatwerkadvies and the basic survey, which the relabel comparison skips.
- * A stored comparison whose hash differs is out of date.
+ * the maatwerkadvies and the basic survey, which the relabel comparison
+ * skips, in the kernel's canonical form (`label_input_hash` in relabel.rs),
+ * so it equals the kernel's `currentLabelInputHash`. A stored comparison
+ * whose hash differs is out of date.
  */
 export async function labelInputSha256(project: object): Promise<string> {
   const rest: Record<string, unknown> = { ...(project as Record<string, unknown>) };
   delete rest.registration;
   delete rest.maatwerkadvies;
   delete rest.basisopname;
-  return sha256Hex(new TextEncoder().encode(JSON.stringify(rest)));
+  return sha256Hex(utf8.encode(canonicalJson(rest)));
 }
 
 /** Relabel fields required since 3 October 2026 (BRL 9500-W §4.2.3–4.2.4, p. 23–24). */
 export type RelabelMigrationField = 'originalCertificateNumber' | 'originalEpOnlineNumber' | 'relabelComparison' | 'relabelProof';
 
 /**
- * Brings a relabel project saved before the new relabel rules up to date:
- * an invoice without a relabel role counts as the specified invoice of the
- * improvement. Returns the fields still to fill in when the project shows
- * it predates the rules (an invoice was migrated, or the comparison lacks
- * the original project file); otherwise `missing` is empty.
+ * Whether a relabel project was saved before the relabel rules of
+ * 3 October 2026: none of the fields those rules added is present (no
+ * evidence role, no original certificate or EP-Online number, no stored
+ * original project).
  */
-export function migrateLegacyRelabel<T extends { registration?: NtaRegistration }>(project: T): { project: T; missing: RelabelMigrationField[] } {
+function predatesRelabelRules(registration: NtaRegistration): boolean {
+  return !(registration.evidence ?? []).some((item) => item.relabelProof !== undefined)
+    && registration.originalCertificateNumber === undefined
+    && registration.originalEpOnlineNumber === undefined
+    && !registration.relabelComparison?.originalProjectText;
+}
+
+/**
+ * Brings a relabel project saved before the new relabel rules up to date.
+ * Only such files are touched: each invoice without a relabel role is
+ * marked `review`, which does not count as proof (BRL 9500-W §4.2.3,
+ * p. 23) until the adviser picks its role. Returns the number of invoices
+ * marked and the fields still to fill in; both are empty for a file that
+ * already follows the rules, so running it again changes nothing.
+ */
+export function migrateLegacyRelabel<T extends { registration?: NtaRegistration }>(project: T): {
+  project: T; missing: RelabelMigrationField[]; markedForReview: number;
+} {
   const registration = project.registration;
-  if (!registration || (registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) !== 'relabel') {
-    return { project, missing: [] };
+  if (!registration || (registration.messageType ?? (registration.relabel ? 'relabel' : 'regular')) !== 'relabel'
+    || !predatesRelabelRules(registration)) {
+    return { project, missing: [], markedForReview: 0 };
   }
-  let migrated = false;
+  let markedForReview = 0;
   const evidence = (registration.evidence ?? []).map((item) => {
     if (item.kind === 'invoice' && !item.relabelProof) {
-      migrated = true;
-      return { ...item, relabelProof: 'specified_invoice' as const };
+      markedForReview += 1;
+      return { ...item, relabelProof: 'review' as const };
     }
     return item;
   });
-  const legacyComparison = Boolean(registration.relabelComparison && !registration.relabelComparison.originalProjectText);
-  if (!migrated && !legacyComparison) return { project, missing: [] };
   const missing: RelabelMigrationField[] = [];
   if (!registration.originalCertificateNumber?.trim()) missing.push('originalCertificateNumber');
   if (!registration.originalEpOnlineNumber?.trim()) missing.push('originalEpOnlineNumber');
   if (!registration.relabelComparison?.originalProjectText) missing.push('relabelComparison');
-  if (!evidence.some((item) => item.relabelProof === 'quote_with_order' || item.relabelProof === 'specified_invoice')) missing.push('relabelProof');
-  return { project: { ...project, registration: { ...registration, evidence } }, missing };
+  missing.push('relabelProof');
+  const migrated = markedForReview > 0 ? { ...project, registration: { ...registration, evidence } } : project;
+  return { project: migrated, missing, markedForReview };
+}
+
+/**
+ * Key for the one-time relabel notice: the project id, else the file path,
+ * else a hash of the file text, so projects without an id never share one.
+ */
+export async function relabelNoticeKey(projectId: string | undefined, filePath: string | undefined, text: string): Promise<string> {
+  const id = projectId?.trim() || filePath?.trim() || await sha256Hex(utf8.encode(text));
+  return `oes-relabel-migration-notice:${id}`;
+}
+
+/**
+ * Prepares the original project file for storage with the comparison: a
+ * relabel comparison inside it (with its own original file) is left out,
+ * so originals do not nest round after round. Other files stay as read.
+ */
+export function originalProjectTextForStorage(text: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return text;
+  }
+  const root = parsed as Record<string, unknown> | null;
+  const project = root && typeof root === 'object'
+    ? (root.type === 'open-energy-studio' && root.project && typeof root.project === 'object' ? root.project : root) as Record<string, unknown>
+    : null;
+  const registration = project?.registration as NtaRegistration | undefined;
+  if (!registration?.relabelComparison?.originalProjectText) return text;
+  const comparison = { ...registration.relabelComparison };
+  delete comparison.originalProjectText;
+  project!.registration = { ...registration, relabelComparison: comparison };
+  return JSON.stringify(parsed, null, 2);
 }
 
 /** Last day an improvement may be counted: 24 months after the survey (BRL 9500-W §4.2.3, p. 23). */

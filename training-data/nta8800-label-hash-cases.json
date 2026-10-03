@@ -1,0 +1,76 @@
+{
+  "cases": [
+    {
+      "name": "key order, nulls and excluded blocks",
+      "project": {
+        "basisopname": {
+          "kind": "residential"
+        },
+        "buildingFunction": "residential",
+        "maatwerkadvies": {
+          "measures": []
+        },
+        "registration": {
+          "surveyDate": "2026-01-31"
+        },
+        "zones": [
+          {
+            "floorArea": 100,
+            "id": "z1",
+            "note": null
+          }
+        ]
+      },
+      "sha256": "e5615739b124e83e3d4512d4055fd51e0676ab4678d0d580e8305ffbd1c0f564"
+    },
+    {
+      "name": "integral float and negative zero",
+      "project": {
+        "zones": [
+          {
+            "floorArea": 100.0,
+            "offset": -0.0,
+            "u": 0.25
+          }
+        ]
+      },
+      "sha256": "f0e2edc062ac3859487c9197cca1d93c1e151dc3b2cccb5aa1ffdcd348d14bd6"
+    },
+    {
+      "name": "small and large numbers",
+      "project": {
+        "a": 1e-7,
+        "b": 1e-6,
+        "c": 0.00001,
+        "d": 1e+21,
+        "e": 1.5e+16,
+        "f": 123456789.125,
+        "g": -0.5,
+        "h": 4503599627370496
+      },
+      "sha256": "7e5cef03d5942a94bfc1ebd2de43b6eb0964b7507751c5a6f2f139362d02f4af"
+    },
+    {
+      "name": "strings, unicode keys and nested arrays",
+      "project": {
+        "Z": "upper",
+        "a": "x",
+        "zz": [
+          1,
+          null,
+          [
+            true,
+            false,
+            {
+              "a": null,
+              "b": 2
+            }
+          ]
+        ],
+        "é": "één\ttab \"quote\" \\ back\u0001"
+      },
+      "sha256": "04006aab94b5276914380343e42cef441029976c5b4fc1a6b3f35dc071b0b77e"
+    }
+  ],
+  "description": "Shared cases for the relabel label-input hash: the kernel (relabel.rs) and the app (Registration.ts labelInputSha256) must both give `sha256` for `project`. Regenerate the hashes with LABEL_HASH_WRITE_FIXTURE=1 cargo test label_input_hash_matches_the_shared_cases."
+}

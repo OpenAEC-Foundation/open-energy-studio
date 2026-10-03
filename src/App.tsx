@@ -34,11 +34,10 @@ import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
-import { migrateLegacyRelabel } from './core/nta/Registration';
+import { migrateLegacyRelabel, relabelNoticeKey } from './core/nta/Registration';
 
-/** Shows the relabel migration notice once per project (per browser profile). */
-function relabelNoticeShown(projectId: string | undefined): boolean {
-  const key = `oes-relabel-migration-notice:${projectId ?? 'unknown'}`;
+/** Whether the relabel migration notice for this key was shown already (per browser profile). */
+function relabelNoticeShown(key: string): boolean {
   try {
     if (localStorage.getItem(key)) return true;
     localStorage.setItem(key, '1');
@@ -380,10 +379,16 @@ function AppContent() {
       if (!filePath) return;
       const json = await readTextFile(filePath as string);
       const { project: opened, kernel: saved } = deserializeProjectFile(json);
-      const { project: loaded, missing } = migrateLegacyRelabel(opened);
+      const { project: loaded, missing, markedForReview } = migrateLegacyRelabel(opened);
       docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath: filePath as string } });
-      if (missing.length > 0 && !relabelNoticeShown(loaded.id)) {
-        alert(t('relabel.migrationNotice', { fields: missing.map((field) => t(`relabel.migrationField.${field}`)).join(', ') }));
+      // Marked invoices are always reported; a notice with only open
+      // fields is shown once per project.
+      if (markedForReview > 0
+        || (missing.length > 0 && !relabelNoticeShown(await relabelNoticeKey(loaded.id, filePath as string, json)))) {
+        alert(t('relabel.migrationNotice', {
+          fields: missing.map((field) => t(`relabel.migrationField.${field}`)).join(', '),
+          count: String(markedForReview),
+        }));
       }
       const current = await stampProject(loaded);
       const [difference] = compareKernelStamp(saved, current);

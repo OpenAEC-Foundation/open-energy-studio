@@ -194,6 +194,10 @@ pub enum RelabelProof {
     /// Photo of PV or solar thermal panels traceable to this building,
     /// showing whether there is shading.
     ProductionPhoto,
+    /// An invoice kept with a relabel saved before the proof roles existed:
+    /// the adviser still has to decide whether it proves the improvement.
+    /// It does not satisfy the proof requirement.
+    Review,
 }
 
 /// The relabel comparison (Bijlage 6a/6b) kept with the registration, so the
@@ -453,6 +457,11 @@ pub struct RegistrationAssessment {
     /// Plausibility findings (severity `warning`); they never block
     /// registration.
     pub plausibility: Vec<RegistrationIssue>,
+    /// The relabel comparison as the kernel ran it again against the
+    /// stored original and the current project (`assess_relabel` output);
+    /// the dossier is built from this, never from the stored verdict.
+    /// `None` when there is no relabel or the original could not be read.
+    pub relabel_assessment: Option<Value>,
 }
 
 /// Calculation results the registration checks need; filled by the
@@ -1140,6 +1149,7 @@ pub fn assess_registration_with(
         software,
         issues,
         plausibility,
+        relabel_assessment: None,
     }
 }
 
@@ -1449,14 +1459,29 @@ fn recheck_relabel(
         ));
         return None;
     };
-    if let Some(expected) = record.original_sha256.as_deref() {
-        let actual = format!("{:x}", Sha256::digest(text.as_bytes()));
-        if !actual.eq_ignore_ascii_case(expected.trim()) {
-            issues.push(issue(
-                "relabel_original_project_hash_mismatch",
-                "relabelComparison.originalSha256",
-                "error",
-            ));
+    // The SHA-256 sits in the same editable file as the original, so it
+    // only detects accidental damage; the original is anchored to the
+    // registered label by its own registration block below.
+    match record
+        .original_sha256
+        .as_deref()
+        .map(str::trim)
+        .filter(|hash| !hash.is_empty())
+    {
+        None => issues.push(issue(
+            "relabel_original_project_hash_required",
+            "relabelComparison.originalSha256",
+            "missing",
+        )),
+        Some(expected) => {
+            let actual = format!("{:x}", Sha256::digest(text.as_bytes()));
+            if !actual.eq_ignore_ascii_case(expected) {
+                issues.push(issue(
+                    "relabel_original_project_hash_mismatch",
+                    "relabelComparison.originalSha256",
+                    "error",
+                ));
+            }
         }
     }
     let original: Value = match serde_json::from_str::<Value>(text) {
@@ -1478,6 +1503,7 @@ fn recheck_relabel(
             return None;
         }
     };
+    check_original_anchor(registration, &original, issues);
     let rerun = crate::relabel::assess_relabel(&original, project);
     let stored_hash = record
         .assessment
@@ -1498,6 +1524,61 @@ fn recheck_relabel(
     Some(checked)
 }
 
+/// Ties the stored original to the registered original label: its own
+/// registration block must carry the EP-Online number and certificate
+/// holder stated in this relabel, and the same survey date (BRL 9500-W
+/// §4.2.3–4.2.4 p. 23–24, U p. 18–20).
+fn check_original_anchor(
+    registration: &Registration,
+    original: &Value,
+    issues: &mut Vec<RegistrationIssue>,
+) {
+    let stored = |key: &str| {
+        original
+            .pointer(&format!("/registration/{key}"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_owned)
+    };
+    let stated = |value: &Option<String>| {
+        value
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_owned)
+    };
+    for (key, expected, path) in [
+        (
+            "epOnlineNumber",
+            stated(&registration.original_ep_online_number),
+            "relabelComparison.originalProjectText.registration.epOnlineNumber",
+        ),
+        (
+            "certificateNumber",
+            stated(&registration.original_certificate_number),
+            "relabelComparison.originalProjectText.registration.certificateNumber",
+        ),
+        (
+            "surveyDate",
+            stated(&registration.survey_date),
+            "relabelComparison.originalProjectText.registration.surveyDate",
+        ),
+    ] {
+        match (stored(key), expected) {
+            (None, _) => issues.push(issue(
+                "relabel_original_project_anchor_missing",
+                path,
+                "missing",
+            )),
+            (Some(found), Some(expected)) if !found.eq_ignore_ascii_case(&expected) => issues.push(
+                issue("relabel_original_project_anchor_mismatch", path, "error"),
+            ),
+            _ => {}
+        }
+    }
+}
+
 /// [`assess_registration`] plus the evidence cross-check against the
 /// project the block belongs to, and a fresh relabel comparison.
 pub fn assess_project_registration(
@@ -1509,6 +1590,10 @@ pub fn assess_project_registration(
     let checked = recheck_relabel(registration, project, &mut relabel_issues);
     let registration = checked.as_ref().unwrap_or(registration);
     let mut result = assess_registration_with(registration, context);
+    result.relabel_assessment = checked
+        .as_ref()
+        .and_then(|checked| checked.relabel_comparison.as_ref())
+        .map(|comparison| comparison.assessment.clone());
     result.issues.extend(relabel_issues);
     result
         .issues
@@ -2055,12 +2140,28 @@ mod tests {
         assert!(codes(&complete()).is_empty());
     }
 
+    #[test]
+    fn invoice_marked_for_review_is_not_relabel_proof() {
+        let mut relabel = complete();
+        relabel.message_type = Some(MessageType::Relabel);
+        relabel.original_kernel_version = Some(KERNEL_VERSION.into());
+        relabel.improvement_date = Some("2027-01-31".into());
+        relabel_dossier(&mut relabel);
+        assert!(!codes(&relabel).contains(&"relabel_proof_required"));
+        relabel.evidence[0].relabel_proof = Some(RelabelProof::Review);
+        assert!(codes(&relabel).contains(&"relabel_proof_required"));
+        let parsed: RelabelProof = serde_json::from_str("\"review\"").unwrap();
+        assert_eq!(parsed, RelabelProof::Review);
+    }
+
     /// The registration check compares the stored original with the
     /// current project again instead of trusting the stored verdict.
     #[test]
     fn relabel_comparison_is_checked_again() {
         let original = serde_json::json!({
             "buildingFunction": "residential",
+            "registration": {"epOnlineNumber": "EP-123", "certificateNumber": "K12345",
+                "surveyDate": "2026-01-31"},
             "zones": [{"id": "z1", "floorArea": 100.0,
                 "surfaces": [{"id": "gevel", "area": 40.0, "constructionId": "c1"}]}],
             "constructions": [{"id": "c1", "rcValue": 0.4}]
@@ -2098,8 +2199,10 @@ mod tests {
         // Key order and null members do not make the comparison outdated.
         let reordered: Value = serde_json::from_str(
             r#"{"constructions":[{"rcValue":3.5,"id":"c1","note":null}],
-                "zones":[{"surfaces":[{"constructionId":"c1","area":40.0,"id":"gevel"}],
-                "floorArea":100.0,"id":"z1"}],"buildingFunction":"residential"}"#,
+                "registration":{"surveyDate":"2026-01-31","certificateNumber":"K12345",
+                "epOnlineNumber":"EP-123"},
+                "zones":[{"surfaces":[{"constructionId":"c1","area":40,"id":"gevel"}],
+                "floorArea":100,"id":"z1"}],"buildingFunction":"residential"}"#,
         )
         .unwrap();
         assert!(
@@ -2148,6 +2251,56 @@ mod tests {
             check(&missing, &improved),
             vec!["relabel_original_project_required"]
         );
+
+        // The SHA-256 is required with the original.
+        let mut unhashed = relabel.clone();
+        unhashed
+            .relabel_comparison
+            .as_mut()
+            .unwrap()
+            .original_sha256 = None;
+        assert_eq!(
+            check(&unhashed, &improved),
+            vec!["relabel_original_project_hash_required"]
+        );
+
+        // The original must be the registered original label.
+        let mut other = relabel.clone();
+        other.original_ep_online_number = Some("EP-999".into());
+        assert_eq!(
+            check(&other, &improved),
+            vec!["relabel_original_project_anchor_mismatch"]
+        );
+        let anonymous = serde_json::to_string_pretty(&serde_json::json!({
+            "type": "open-energy-studio", "version": "1.0",
+            "project": {"buildingFunction": "residential", "zones": original["zones"].clone(),
+                "constructions": original["constructions"].clone()}
+        }))
+        .unwrap();
+        let mut unanchored = relabel.clone();
+        let record = unanchored.relabel_comparison.as_mut().unwrap();
+        record.original_sha256 = Some(format!("{:x}", Sha256::digest(anonymous.as_bytes())));
+        record.original_project_text = Some(anonymous);
+        let found = check(&unanchored, &improved);
+        assert!(
+            found.contains(&"relabel_original_project_anchor_missing"),
+            "{found:?}"
+        );
+
+        // The fresh comparison is returned for the dossier.
+        let result =
+            assess_project_registration(&tampered, &later, &RegistrationContext::default());
+        assert_eq!(
+            result
+                .relabel_assessment
+                .as_ref()
+                .and_then(|value| value.get("allowed"))
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+        assert!(assess_registration(&complete())
+            .relabel_assessment
+            .is_none());
     }
 
     #[test]
