@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { ConstructionEditorDialog } from '../components/dialogs/ConstructionEditorDialog/ConstructionEditorDialog';
 import { renderWithProviders, userEvent } from './test-utils';
@@ -42,5 +42,27 @@ describe('NTA construction section', () => {
     const after = JSON.parse(screen.getByTestId('constructions').textContent ?? '[]');
     expect(after).toHaveLength(before + 1);
     expect(after[after.length - 1].slice(1)).toEqual([4.5, 0.21]);
+  });
+
+  it('hides stale construction results when the input changes during or after calculation', async () => {
+    const assessment = { status: 'calculated_unverified', issues: [], elements: [{
+      id: 'construction', route: 'opaque', uRounded: 0.21, rCRounded: 4.5,
+    }] };
+    let resolveFirst!: (value: { ok: boolean; json: () => Promise<unknown> }) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({ ok: true, json: async () => assessment });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderWithProviders(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Calculate with the kernel' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat flow' }), 'upward');
+    await act(async () => resolveFirst({ ok: true, json: async () => assessment }));
+    expect(screen.queryByRole('button', { name: 'Apply to this construction' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Calculate with the kernel' }));
+    expect(await screen.findByRole('button', { name: 'Apply to this construction' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat flow' }), 'horizontal');
+    expect(screen.queryByRole('button', { name: 'Apply to this construction' })).not.toBeInTheDocument();
   });
 });

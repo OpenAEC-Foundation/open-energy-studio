@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import type { IConstructionLayer } from '../../../core/energy/types';
 import { calculateConstructionsWithRust, type EnvelopeAssessment } from '../../../core/nta/KernelClient';
@@ -33,21 +33,34 @@ export function NtaConstructionSection({ layers, onApply }: {
   const [result, setResult] = useState<EnvelopeAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const requestId = useRef(0);
+  useEffect(() => () => { requestId.current += 1; }, []);
+
+  const invalidate = () => {
+    requestId.current += 1;
+    setResult(null);
+    setError(null);
+    setBusy(false);
+  };
+  const editDraft = (next: NtaConstructionDraft) => { invalidate(); setDraft(next); };
+  const editForfait = (next: NtaForfaitDraft) => { invalidate(); setForfait(next); };
 
   const updateLayer = (index: number, layer: NtaLayerDraft) =>
-    setDraft((current) => ({ ...current, layers: current.layers.map((item, i) => (i === index ? layer : item)) }));
+    editDraft({ ...draft, layers: draft.layers.map((item, i) => (i === index ? layer : item)) });
 
   const calculate = async () => {
+    const current = ++requestId.current;
     setBusy(true);
     setError(null);
+    setResult(null);
     try {
       const input = mode === 'layers' ? envelopeFromLayers('construction', draft) : envelopeFromForfait('construction', forfait);
-      setResult(await calculateConstructionsWithRust(input));
+      const assessment = await calculateConstructionsWithRust(input);
+      if (requestId.current === current) setResult(assessment);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-      setResult(null);
+      if (requestId.current === current) setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
-      setBusy(false);
+      if (requestId.current === current) setBusy(false);
     }
   };
 
@@ -57,7 +70,7 @@ export function NtaConstructionSection({ layers, onApply }: {
     <legend>{t('nta.construction.title')}</legend>
     <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('nta.construction.help')}</p>
     <label>{t('nta.construction.mode')}
-      <select value={mode} onChange={(event) => { setMode(event.target.value as 'layers' | 'forfait'); setResult(null); }}>
+      <select value={mode} onChange={(event) => { invalidate(); setMode(event.target.value as 'layers' | 'forfait'); }}>
         <option value="layers">{t('nta.construction.mode.layers')}</option>
         <option value="forfait">{t('nta.construction.mode.forfait')}</option>
       </select>
@@ -65,14 +78,14 @@ export function NtaConstructionSection({ layers, onApply }: {
     {mode === 'layers' ? <>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <label>{t('nta.construction.heatFlow')}
-          <select value={draft.heatFlow} onChange={(event) => setDraft({ ...draft, heatFlow: event.target.value as NtaConstructionDraft['heatFlow'] })}>
+          <select value={draft.heatFlow} onChange={(event) => editDraft({ ...draft, heatFlow: event.target.value as NtaConstructionDraft['heatFlow'] })}>
             <option value="horizontal">{t('nta.construction.heatFlow.horizontal')}</option>
             <option value="upward">{t('nta.construction.heatFlow.upward')}</option>
             <option value="downward">{t('nta.construction.heatFlow.downward')}</option>
           </select>
         </label>
         <label><input type="checkbox" checked={draft.exteriorAir}
-          onChange={(event) => setDraft({ ...draft, exteriorAir: event.target.checked })} /> {t('nta.construction.exterior')}</label>
+          onChange={(event) => editDraft({ ...draft, exteriorAir: event.target.checked })} /> {t('nta.construction.exterior')}</label>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
@@ -108,16 +121,16 @@ export function NtaConstructionSection({ layers, onApply }: {
             <td style={cell} />
           </>}
           <td style={cell}><button type="button" className="btn btn-sm"
-            onClick={() => setDraft({ ...draft, layers: draft.layers.filter((_, i) => i !== index) })}>x</button></td>
+            onClick={() => editDraft({ ...draft, layers: draft.layers.filter((_, i) => i !== index) })}>x</button></td>
         </tr>)}</tbody>
       </table>
-      <button type="button" className="btn btn-sm" onClick={() => setDraft({ ...draft, layers: [...draft.layers,
+      <button type="button" className="btn btn-sm" onClick={() => editDraft({ ...draft, layers: [...draft.layers,
         { kind: 'material', name: '', thicknessM: 0.1, lambda: 0.04, sourceReference: '' }] })}>{t('dialog.construction.addLayer')}</button>
-      <button type="button" className="btn btn-sm" onClick={() => setDraft(constructionDraft({ layers }, draft.heatFlow))}>
+      <button type="button" className="btn btn-sm" onClick={() => editDraft(constructionDraft({ layers }, draft.heatFlow))}>
         {t('nta.construction.reload')}</button>
     </> : <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
       <label>{t('nta.construction.element')}
-        <select value={forfait.element} onChange={(event) => setForfait({ ...forfait, element: event.target.value as NtaForfaitDraft['element'] })}>
+        <select value={forfait.element} onChange={(event) => editForfait({ ...forfait, element: event.target.value as NtaForfaitDraft['element'] })}>
           <option value="facade">{t('nta.construction.element.facade')}</option>
           <option value="roof">{t('nta.construction.element.roof')}</option>
           <option value="floor">{t('nta.construction.element.floor')}</option>
@@ -125,10 +138,10 @@ export function NtaConstructionSection({ layers, onApply }: {
       </label>
       <label>{t('nta.vent.constructionYear')}
         <input type="number" step="1" value={forfait.constructionYear}
-          onChange={(event) => setForfait({ ...forfait, constructionYear: Number(event.target.value) })} />
+          onChange={(event) => editForfait({ ...forfait, constructionYear: Number(event.target.value) })} />
       </label>
       <label>{t('nta.construction.insulation')}
-        <select value={forfait.insulation} onChange={(event) => setForfait({ ...forfait, insulation: event.target.value as NtaForfaitDraft['insulation'] })}>
+        <select value={forfait.insulation} onChange={(event) => editForfait({ ...forfait, insulation: event.target.value as NtaForfaitDraft['insulation'] })}>
           <option value="absent_or_unknown">{t('nta.construction.insulation.absent')}</option>
           <option value="present_unknown_thickness">{t('nta.construction.insulation.unknownThickness')}</option>
           <option value="known_thickness">{t('nta.construction.insulation.known')}</option>
@@ -136,10 +149,10 @@ export function NtaConstructionSection({ layers, onApply }: {
       </label>
       {forfait.insulation === 'known_thickness' && <label>{t('nta.construction.insulationMm')}
         <input type="number" step="10" value={forfait.thicknessMm}
-          onChange={(event) => setForfait({ ...forfait, thicknessMm: Number(event.target.value) })} />
+          onChange={(event) => editForfait({ ...forfait, thicknessMm: Number(event.target.value) })} />
       </label>}
       <label><input type="checkbox" checked={forfait.cavity}
-        onChange={(event) => setForfait({ ...forfait, cavity: event.target.checked })} /> {t('nta.construction.cavityPresent')}</label>
+        onChange={(event) => editForfait({ ...forfait, cavity: event.target.checked })} /> {t('nta.construction.cavityPresent')}</label>
     </div>}
     <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <button type="button" className="btn btn-sm" disabled={busy} onClick={calculate}>{t('nta.construction.calculate')}</button>
