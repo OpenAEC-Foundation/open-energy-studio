@@ -54,6 +54,40 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.verticalPipes).toEqual([]);
   }, 60000);
 
+  it('edits ventilation controls, system E, heating strips, solar-control glass and the 90/70 declaration', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+
+    // ISSO 82.1 tables 11.4–11.6.
+    await user.click(screen.getByRole('checkbox', { name: 'Controls established (tables 11.4–11.6)' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'CO₂ measurement' }), 'living_room_and_main_bedroom');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'CO₂ control' }), 'extract');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Zoning' }), 'true');
+    await user.type(screen.getByRole('textbox', { name: 'Evidence for the controls' }), 'datasheet');
+    // §11.3.6 and §11.3.7.
+    await user.click(screen.getByRole('checkbox', { name: 'Combined system E (decentral heat recovery in part of the zone)' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Grilles with electric heating strips (§11.3.7)' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Maximum temperature rise, K' }), '8');
+    let survey = stored()!.survey;
+    expect(survey.ventilation.controls).toEqual({
+      evidenceReference: 'datasheet', co2Measurement: 'living_room_and_main_bedroom', co2Control: 'extract', zoning: true,
+    });
+    expect(survey.ventilation.combined).toEqual({ decentralAreaM2: 0, totalResidenceAreaM2: 0 });
+    expect(survey.ventilation.grilleHeatingStrips).toEqual({ sourceReference: '', maxTemperatureRiseK: 8 });
+
+    // p. 94: product g for solar-control glass.
+    await user.click(screen.getAllByRole('checkbox', { name: 'Solar-control glass or film with product data' })[0]);
+    await user.type(screen.getByRole('spinbutton', { name: 'g-value from the product data' }), '0.3');
+    // Table 9.9 / erratum §4.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Design temperature class (table 9.9)' }), 'c90_70');
+    await user.type(screen.getByRole('textbox', { name: 'Controlled declaration for a heat pump above 70 °C' }), 'BCRG 1');
+    survey = stored()!.survey;
+    expect(survey.envelope.windows[0].solarControl).toEqual({ gValue: 0.3, sourceReference: '' });
+    expect(survey.heating.designClass).toBe('c90_70');
+    expect(survey.heating.heatPumpAbove70Declaration).toBe('BCRG 1');
+  }, 60000);
+
   it('edits houseboats, sunrooms and rooflights in the dwelling survey', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);

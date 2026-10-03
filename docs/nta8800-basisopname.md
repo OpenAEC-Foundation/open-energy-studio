@@ -5,6 +5,11 @@ Route: `POST /v1/nta8800/opname/residential` met `{ "survey": … }`, MCP-tool `
 TS-client: `assessResidentialSurveyWithRust` in `src/core/nta/KernelClient.ts`.
 Bron: ISSO 82.1, 7e druk (2025), met het erratum van 6 januari 2026 en Wijzigingsdocument 82.1 2025 v1.1. Paginanummers verwijzen naar de pdf; de ISSO-tekst zelf staat niet in de repository.
 
+**Bronvolgorde.** Het wijzigingsdocument v1.1 (15 oktober 2025) wijzigt de 6e druk. Volgens WD p. 6 zijn alle wijzigingen verwerkt in de geconsolideerde 7e druk, door ISSO vastgesteld op 24 september 2025 (printdatum 11 december 2025). Het erratum van 6 januari 2026 corrigeert die 7e druk. Waar de 7e druk en het wijzigingsdocument verschillen, geldt dus de 7e druk met het erratum. Het wijzigingsdocument dient alleen als toelichting. Dit raakt twee punten:
+
+- het fabricagejaar van een ventilator dat onbekend is (tabel 11.15, p. 154);
+- de g-waarde van zonwerend glas zonder productgegevens (p. 94).
+
 Status: **ongeverifieerd**. De laag is niet getoetst aan referentieberekeningen en is geen geattesteerde basisopname-software (BRL 9500/9501).
 
 ## Werking
@@ -25,7 +30,7 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | Algemeen | Jaar van een toestel: fabricagejaar, dan installatiejaar, dan bouwjaar | p. 28 |
 | Renovatiejaar | Beslisschema afb. 7.3. Is het jaar onbekend, dan geldt het eerste jaar van de volgende jaarklasse | p. 52–55 |
 | Woningtype | Een niet in te delen eengezinswoning is een hoekwoning. "Deels plat" geldt alleen bij vrijstaande woningen. Daarmee volgt het type van NTA-tabel 11.14 | p. 51–52 |
-| Thermische massa | Tabellen 7.5/7.6 (erratum §2) worden omgezet naar de klassen van NTA-tabel 7.10. Een gesloten of verlaagd plafond (`closedOrSuspendedCeiling`) kiest de eerste kolom bij elk vloertype; `lighterCeiling` doet dat voor een (zeer) zware vloer met een lichter plafond | p. 62 |
+| Thermische massa | Tabellen 7.5/7.6 (erratum §2) worden omgezet naar de klassen van NTA-tabel 7.10. Alleen `lighterCeiling` kiest de eerste kolom van tabel 7.4: een (zeer) zware vloer waarvan de bovenzijde zwaarder is dan het plafond erboven. Het criterium "gesloten of verlaagd plafond" (`closedOrSuspendedCeiling`) komt uit ISSO 75.1 en geeft in de woningopname `closed_ceiling_not_in_dwelling_survey` | p. 62 |
 | Opake constructies | R_c volgens bouwjaar en isolatiestaat via NTA-bijlage I (`forfait_envelope`). Een nageïsoleerde spouw met onbekende breedte volgt tabel 8.26 (40/70/100 mm) | p. 84–93 |
 | Renovatie of aanbouw | Bij "aanwezig, dikte onbekend" met `renovation`: is het jaar bekend en is er bewijs dat aan de eis van dat jaar is voldaan, dan geldt de jaarklasse van dat jaar. Is het jaar bekend zonder dat bewijs, dan de klasse ervóór, ten hoogste "1992 tot 2014" (R_c 2,5). Is het jaar onbekend, dan de klasse na die van het bouwjaar; vóór 1965 de kolom "(na)geïsoleerd". Zonder `renovation` blijft de jaarklasse van het bouwjaar gelden (§8.7.2, prioriteit 3) | p. 84–85 (§8.7.2.1, afb. 8.14) |
 | Scheiding met onverwarmde ruimte | R_se is de R_si van de onverwarmde ruimte bij dezelfde warmtestroomrichting (0,13 / 0,10 / 0,17), niet 0,04 | NTA 8.4.2.1 |
@@ -56,6 +61,13 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 | Energieopslag | Gebouwgebonden elektrische en thermische opslag (kWh), alleen met PV | p. 193 (§15.5) |
 | Serre (AOS) | Grensvlak `sunroom`: in de basisopname telt een aangrenzende onverwarmde serre als buitenlucht, met zontoetreding. Vastgelegd als `sunroom_as_outdoor` | §6.3.4 p. 41 |
 | Woonwagen en woonboot | `envelope.buildingKind`: `caravan` of `floating` (bestaande ligplaats van vóór 2018, of `newBerthSince2018`). De schil volgt dan de forfaits van NTA-tabellen I.5–I.7. Het grensvlak `water` (alleen een vloer van een woonboot, anders `water_boundary_requires_houseboat_floor`) geeft de romp (`floating_hull`), naar buitenlucht. Vloer en wand tellen voor de massa als licht (`houseboat_caravan_light_mass`) | p. 49, 61 |
+| Zonwerend glas en zonwerende folie | `windows[].solarControl` met de g-waarde uit de productinformatie of de gecontroleerde kwaliteitsverklaring. Zonder die gegevens geldt de g-kolom van tabel 8.14. De kolom met g 0,4 uit het wijzigingsdocument (WD p. 38) staat niet in de 7e druk en wordt niet toegepast. Een lege bron geeft `solar_control_evidence_required` | p. 94 |
+| Woningpositie in een woongebouw | `floor`: `ground_or_intermediate` (posities 1, 2, 5, 6), `top` (3, 7) of `roof_and_floor` (4, 8). NTA-tabel 11.14 heeft geen rij voor dak + vloer; het dak maakt het een bovenwoning (`apartment_roof_and_floor_top_type`) | p. 51 |
+| Sturing ventilatie | `ventilation.controls` met CO₂-meting, CO₂-sturing, tijdsturing, zonering en (systeem C) afvoerpunten per verblijfsruimte, met een bewijsstuk. De combinatie wordt omgezet naar een woonrij van NTA-tabel 11.5 (B.1–B.3, C.1–C.5b, D.1–D.5c). Alleen combinaties die een rij van tabel 11.5 zijn, leveren die variant op; andere vallen terug op de variant zonder sturing. `declaredVariant` gaat voor. Centrale of decentrale WTW via `heatRecoveryLayout` | p. 143–145 (tabellen 11.4–11.6) |
+| Gecombineerd systeem E | `ventilation.combined` met de verblijfsoppervlakte van het decentrale deel en de totale verblijfsoppervlakte. Het decentrale deel is D.5b met de WTW uit `heatRecovery`; `principle` beschrijft het andere deel (natuurlijk, mechanische toevoer of afvoer; balans geeft `combined_other_part_not_balanced`) | p. 145 (§11.3.6), NTA tabel 11.5 E.1 |
+| Roosters met verwarmingslint | `ventilation.grilleHeatingStrips` met de vier regelgegevens; ontbreekt er een, dan geldt de terugvalwaarde 11.124. Is het aandeel onbekend, dan hebben alle roosters een lint | p. 145–146 (§11.3.7) |
+| Bypass bij onbekende gegevens | Het fabricagejaar van de WTW-unit bepaalt de keuze tussen 100 %, 70 % en 0 %. Alleen als dat jaar onbekend is, telt het bouwjaar. De opname geeft de fractie expliciet door, omdat NTA 11.3.2.2 "bouw- of fabricagejaar" noemt | p. 151–152 (tabel 11.12) |
+| Warmtepomp boven 70 °C | Een opgegeven klasse boven 70 °C (90/70) bij een warmtepomp vraagt `heating.heatPumpAbove70Declaration`, anders `heat_pump_above_70_requires_declaration` | p. 114 (tabel 9.9, erratum §4) |
 | Lichtkoepels en daklichten | Met een gecontroleerde kwaliteitsverklaring (BCRG): `envelope.rooflights` met A_rc en U_rc uit de verklaring en de beglazing voor g, als raam in een dak (`rooflight_from_quality_declaration`). Zonder verklaring voer je ze in als raam of paneel; een lege verwijzing geeft `rooflight_quality_declaration_required`, een niet-dakvlak `rooflight_requires_roof` | p. 68 |
 
 ## Bekende bronfouten
@@ -75,7 +87,7 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 
 1. Een appartement met een onbekende positie aan de zijkant is als kop- of hoekligging ingedeeld. P. 51 vraagt een onderbouwde keuze en geeft geen invoer bij onbekend; de laag kiest conservatief (p. 28).
 2. Een deur waarvan de isolatie niet vast te stellen is, telt als ongeïsoleerd. ISSO noemt dat niet expliciet; dit volgt uit de conservatieve regel op p. 28.
-3. ISSO-klasse 70/50 heeft geen rij in NTA-tabel 9.14. De distributie gebruikt 70/60 (gelijke aanvoertemperatuur). De ketel gebruikt de gemiddelde temperatuur 60 °C.
+3. ISSO-klasse 70/50 heeft geen rij in NTA-tabel 9.14. De distributie gebruikt 70/60 (gelijke aanvoertemperatuur), en de ketel nu ook de gemiddelde temperatuur van die klasse (65 °C), zodat beide hetzelfde circuit beschrijven. De ketelforfait leest de temperatuur alleen tegen de grens van 50 °C, dus de uitkomst verandert niet.
 4. ΔU_for (8.3) wordt niet toegepast op scheidingen met onverwarmde ruimten, omdat H_D;for alleen de buitenlucht betreft.
 5. Een combitoestel met Gaskeur CW zonder HR telt als "combi met Gaskeur" (0,50). Tabel 13.25 kent alleen de combinatie HR + CW als hogere rij.
 6. Formule 8.5 voor riet heeft geen R_ad en rondt half naar boven af op 50 mm. NTA I.2.1.4/I.3 telt R_ad wel mee en rondt naar beneden af. De opname volgt ISSO.
@@ -84,6 +96,10 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 9. Een deels plat dak bij een niet-vrijstaande woning telt als hellend dak; ISSO kent deels plat alleen bij vrijstaande woningen.
 10. Renovatie zonder bewijs volgt afb. 8.14 letterlijk, ook als de klasse vóór het renovatiejaar lager is dan die van het bouwjaar (bijvoorbeeld bij een aanbouw). "Aanwezig, dikte onbekend" zonder `renovation` geldt vanaf 1965 als oorspronkelijke isolatie (jaarklasse van het bouwjaar).
 11. Een raam in een wand naar een sterk geventileerde ruimte telt in H_D als buitenraam (U voor buiten), zonder zonwinst.
+12. Ventilatorfabricagejaar onbekend (tabel 11.15, p. 154): de 7e druk geeft het bouwjaar, het wijzigingsdocument v1.1 (WD p. 65) "onbekend". Volgens de bronvolgorde geldt de 7e druk, dus het bouwjaar (`fan_year_unknown_construction_year`).
+13. Romp van een woonboot met bouwjaar 2014: ISSO-tabel 8.10 (p. 89) geeft R_c 3,5 voor 2014–2018, NTA-tabel I.7 (p. 831) 2,5 voor 2014–2015. De forfaitaire R_c is een rekenwaarde van de NTA; ISSO neemt die tabel over. De kern volgt NTA-tabel I.7. De ISSO-afwijking is gemeld als vermoedelijke overnamefout.
+14. Een appartement met dak en vloer (posities 4 en 8) rekent voor de luchtdoorlatendheid als bovenwoning, omdat NTA-tabel 11.14 geen rij voor dak + vloer heeft.
+15. Energieopslag in een woongebouw (erratum §6): alle opslag achter de hoofdmeter telt mee. De woningopname neemt de opgegeven capaciteit over. De adviseur geeft het totaal achter de hoofdmeter op, inclusief de opslag van andere opgenomen appartementen.
 
 # Basisopname bestaande utiliteitsgebouwen (ISSO 75.1)
 

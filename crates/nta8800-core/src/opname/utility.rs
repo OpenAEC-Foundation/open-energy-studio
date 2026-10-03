@@ -1766,7 +1766,7 @@ fn ventilation_value(
                     "ahu_heating_from_air_heating",
                     "ventilation.ahu.heatingConnected",
                     "reheating coil: heating is air heating via the AHU".into(),
-                    "ISSO 82.1 p. 123 (table 9.16); ISSO 75.1 p. 149",
+                    "ISSO 82.1 p. 123 (table 9.16b); ISSO 75.1 p. 149",
                 );
                 return true;
             }
@@ -3567,7 +3567,7 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "ahu_cooling_requires_cooling_system"));
-        // Air heating via the AHU (ISSO 82.1 table 9.16) implies the coil.
+        // Air heating via the AHU (ISSO 82.1 table 9.16b) implies the coil.
         let mut air = fixture("1970");
         air.heating.emitters = crate::opname::heating::Emitters::AirHeating;
         air.heating.air_heating = Some(AirHeatingAnswer::ViaAirHandlingUnit);

@@ -184,6 +184,18 @@ pub struct SurveyWindow {
     /// Shading situation of tables 8.24/8.25 (NTA §17.3.2).
     #[serde(default)]
     pub shading: Option<ShadingSituation>,
+    /// Solar-control glass or film with g from the product information or
+    /// the controlled quality declaration (82.1 p. 94). Without it the g
+    /// column of table 8.14 applies; the 7e druk has no 0,4 default.
+    #[serde(default)]
+    pub solar_control: Option<SolarControlG>,
+    pub source_reference: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SolarControlG {
+    pub g_value: f64,
     pub source_reference: String,
 }
 
@@ -686,6 +698,27 @@ pub fn derive_envelope_with_cooling(
                 recorder,
                 &w_path,
             );
+            let g = match &window.solar_control {
+                Some(product) => {
+                    if !(product.g_value.is_finite()
+                        && product.g_value > 0.0
+                        && product.g_value <= 1.0)
+                    {
+                        recorder.issue(
+                            "solar_control_g_invalid",
+                            format!("{w_path}.solarControl.gValue"),
+                        );
+                    }
+                    if product.source_reference.trim().is_empty() {
+                        recorder.issue(
+                            "solar_control_evidence_required",
+                            format!("{w_path}.solarControl.sourceReference"),
+                        );
+                    }
+                    product.g_value
+                }
+                None => glass_g(row),
+            };
             push_window_or_partition(
                 &mut windows,
                 &mut partitions,
@@ -694,7 +727,7 @@ pub fn derive_envelope_with_cooling(
                     id: window.id.clone(),
                     area: window.area_m2,
                     u,
-                    g: glass_g(row),
+                    g,
                     orientation,
                     tilt,
                     obstruction,
@@ -1606,6 +1639,7 @@ mod tests {
                 frame: FrameAnswer::WoodOrPlastic,
                 obstruction: None,
                 shading: None,
+                solar_control: None,
                 source_reference: "survey".into(),
             }],
             doors: vec![SurveyDoor {
@@ -1659,6 +1693,52 @@ mod tests {
     }
 
     #[test]
+    fn solar_control_glass_takes_the_product_g_or_the_table_g() {
+        // 82.1 p. 94 (7e druk): product g, else the g column of table 8.14.
+        let envelope = |solar_control: Option<SolarControlG>| SurveyEnvelope {
+            surfaces: vec![surface(
+                "vlak",
+                SurfaceElement::Facade,
+                SurfaceBoundary::Outdoor,
+            )],
+            windows: vec![SurveyWindow {
+                id: "raam".into(),
+                surface_id: "vlak".into(),
+                area_m2: 2.0,
+                glass: GlassAnswer::HrPlusPlus,
+                frame: FrameAnswer::WoodOrPlastic,
+                obstruction: None,
+                shading: None,
+                solar_control,
+                source_reference: "survey".into(),
+            }],
+            doors: Vec::new(),
+            panels: Vec::new(),
+            unheated_spaces: Vec::new(),
+            rooflights: Vec::new(),
+            building_kind: None,
+        };
+        let run = |solar_control| {
+            let mut recorder = Recorder::default();
+            let derived = derive_envelope(&envelope(solar_control), 1990, &mut recorder);
+            let codes: Vec<&str> = recorder.issues.iter().map(|item| item.code).collect();
+            (derived.windows[0]["gPerpendicular"].clone(), codes)
+        };
+        assert_eq!(run(None).0, json!(0.6));
+        let (g, codes) = run(Some(SolarControlG {
+            g_value: 0.28,
+            source_reference: "BCRG kwaliteitsverklaring".into(),
+        }));
+        assert_eq!(g, json!(0.28));
+        assert!(codes.is_empty());
+        let (_, codes) = run(Some(SolarControlG {
+            g_value: 0.28,
+            source_reference: String::new(),
+        }));
+        assert_eq!(codes, vec!["solar_control_evidence_required"]);
+    }
+
+    #[test]
     fn shading_situations_follow_tables_8_24_and_8_25() {
         let envelope = |shading: Option<ShadingSituation>, element| SurveyEnvelope {
             surfaces: vec![surface("vlak", element, SurfaceBoundary::Outdoor)],
@@ -1670,6 +1750,7 @@ mod tests {
                 frame: FrameAnswer::WoodOrPlastic,
                 obstruction: None,
                 shading,
+                solar_control: None,
                 source_reference: "survey".into(),
             }],
             doors: Vec::new(),
@@ -1779,6 +1860,7 @@ mod tests {
                 frame: FrameAnswer::WoodOrPlastic,
                 obstruction: None,
                 shading: None,
+                solar_control: None,
                 source_reference: "survey".into(),
             }],
             doors: Vec::new(),

@@ -2473,6 +2473,29 @@ export type OpnameGlass =
 
 export type OpnameFrame = 'wood_or_plastic' | 'metal_with_thermal_break' | 'metal' | 'none';
 
+export type OpnameCo2Measurement = 'none' | 'living_room' | 'living_room_and_main_bedroom' | 'every_habitable_room';
+export type OpnameControlTarget = 'none' | 'supply' | 'extract' | 'supply_and_extract';
+
+/** ISSO 82.1 tables 11.4–11.6; unknown answers count as none. */
+export interface OpnameVentilationControls {
+  co2Measurement?: OpnameCo2Measurement | null;
+  co2Control?: OpnameControlTarget | null;
+  timeControl?: OpnameControlTarget | null;
+  zoning?: boolean | null;
+  /** System C: separate extract points in every habitable room (C.5b). */
+  extractPerHabitableRoom?: boolean | null;
+  evidenceReference: string;
+}
+
+/** ISSO 82.1 §11.3.7 (NTA 11.123); all four settings or the 11.124 fallback. */
+export interface OpnameGrilleHeatingStrips {
+  maxPowerWPerDm3PerS?: number | null;
+  maxTemperatureRiseK?: number | null;
+  switchOnBelowC?: number | null;
+  maxSupplyTemperatureC?: number | null;
+  sourceReference: string;
+}
+
 export interface ResidentialSurvey {
   id: string;
   constructionYear: number;
@@ -2486,7 +2509,8 @@ export interface ResidentialSurvey {
   } | null;
   dwelling:
     | { kind: 'single_family'; position: 'terraced' | 'end_or_corner' | 'detached' | 'unknown'; roofType: 'pitched' | 'partly_flat' | 'flat' }
-    | { kind: 'apartment'; floor: 'ground_or_intermediate' | 'top'; side: 'middle' | 'end_or_corner' | 'unknown' };
+    // floor: positions 1/2/5/6, 3/7 or 4/8 ("dak + vloer") of ISSO 82.1 afb. 7.1.
+    | { kind: 'apartment'; floor: 'ground_or_intermediate' | 'top' | 'roof_and_floor'; side: 'middle' | 'end_or_corner' | 'unknown' };
   usableFloorAreaM2: number;
   areaSourceReference: string;
   buildingHeightM: number;
@@ -2494,7 +2518,7 @@ export interface ResidentialSurvey {
     floor: 'light' | 'heavy' | 'very_heavy';
     wall: 'light' | 'heavy' | 'very_heavy';
     lighterCeiling?: boolean;
-    /** Closed or suspended ceiling, any floor type (table 7.5 first column). */
+    /** Closed or suspended ceiling, any floor type (ISSO 75.1 table 7.5 first column). Utility only: the dwelling survey rejects it (82.1 table 7.4). */
     closedOrSuspendedCeiling?: boolean;
     sourceReference: string;
   };
@@ -2541,6 +2565,8 @@ export interface ResidentialSurvey {
         | { situation: 'overhang_with_obstructions'; overhangRelativeHeight: number }
         | { situation: 'other' }
         | { situation: 'side_obstruction'; side: NtaObstructionSide; relativeWidth: number };
+      /** Solar-control glass or film: g from the product data or quality declaration (82.1 p. 94). */
+      solarControl?: { gValue: number; sourceReference: string } | null;
       sourceReference: string;
     }>;
     doors?: Array<{
@@ -2581,6 +2607,8 @@ export interface ResidentialSurvey {
     generator: OpnameHeatingGenerator;
     emitters: 'radiators' | 'low_temperature_radiators' | 'floor_heating' | 'floor_heating_and_radiators' | 'air_heating' | 'local_heaters';
     designClass?: 'c45_40' | 'c55_47' | 'c70_50' | 'c90_70' | null;
+    /** Controlled declaration for a heat pump above 70 °C (table 9.9, erratum §4). */
+    heatPumpAbove70Declaration?: string | null;
     balanced?: boolean | null;
     control: 'room_thermostat' | 'central_with_radiator_valves' | 'individual_room_control' | 'unknown';
     /** Afb. 9.1; absent: present with the forfait length when unheated spaces exist. */
@@ -2644,6 +2672,14 @@ export interface ResidentialSurvey {
     unitManufactureYear?: number | null;
     motor?: 'ac' | 'dc' | 'unknown' | null;
     passiveCooling?: OpnamePassiveCooling | null;
+    /** Table 11.6: central or decentral heat recovery; absent: central. */
+    heatRecoveryLayout?: 'central' | 'decentral' | null;
+    /** Tables 11.4–11.6 controls; absent: no control. `declaredVariant` overrides them. */
+    controls?: OpnameVentilationControls | null;
+    /** System E (§11.3.6): decentral D.5b part; `principle` is the other part. */
+    combined?: { decentralAreaM2: number; totalResidenceAreaM2: number } | null;
+    /** §11.3.7 grilles with electric heating strips; missing settings: NTA 11.124 fallback. */
+    grilleHeatingStrips?: OpnameGrilleHeatingStrips | null;
     sourceReference: string;
   };
   pv?: Array<{
@@ -2759,7 +2795,7 @@ export interface UtilitySurvey {
     groundAboveZeroDemonstrated?: boolean;
     sourceReference: string;
   } | null;
-  ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference'> & {
+  ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference' | 'heatRecoveryLayout' | 'controls' | 'combined' | 'grilleHeatingStrips'> & {
     ductsLukaAbc?: boolean | null;
     ahu?: {
       insideThermalZone?: boolean | null;

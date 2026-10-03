@@ -2,6 +2,28 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — basisopname woningen volgens ISSO 82.1 (7e druk met erratum)
+
+### Opnames die nu `incomplete` worden
+
+- **Gesloten of verlaagd plafond in de woningopname.** `construction.closedOrSuspendedCeiling` komt uit ISSO 75.1. ISSO 82.1 tabel 7.4 (p. 62) kent alleen `lighterCeiling`. De woningopname meldt nu `closed_ceiling_not_in_dwelling_survey`.
+- **Warmtepomp met een opgegeven klasse boven 70 °C.** Volgens tabel 9.9 en erratum §4 is dan een gecontroleerde verklaring nodig: `heating.heatPumpAbove70Declaration`, anders `heat_pump_above_70_requires_declaration`.
+- **Bewijsstukken bij nieuwe opties.** Ventilatiesturing zonder bewijsstuk geeft `ventilation_controls_evidence_required`. Zonwerend glas zonder bron geeft `solar_control_evidence_required`.
+
+### Opnames met een andere uitkomst
+
+- **Bypass bij een onbekend bypassaandeel (tabel 11.12, p. 151–152).** Het fabricagejaar van de WTW-unit gaat nu voor het bouwjaar. Een unit van vóór 2010 in een woning van 2010 of later krijgt dus geen 100 %-bypass meer, maar 70 % (bypass aanwezig) of 0 %.
+- **Ketel bij klasse 70/50.** De gemiddelde ontwerptemperatuur is nu 65 °C in plaats van 60 °C, gelijk aan de distributieklasse 70/60. De uitkomst verandert niet, omdat alleen de grens van 50 °C telt.
+
+### Nieuwe opties
+
+- Ventilatiesturing volgens de tabellen 11.4–11.6 zonder `declaredVariant`.
+- Gecombineerd systeem E.
+- Roosters met verwarmingslint.
+- Woningpositie "dak + vloer".
+- Zonwerend glas of folie met een g-waarde uit het product.
+- Centrale of decentrale WTW.
+
 ## 4 oktober 2026 — koelmethode 1 en bijlage Q
 
 ### Projecten die nu `invalid` worden
