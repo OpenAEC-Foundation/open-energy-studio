@@ -639,10 +639,58 @@ fn forfait_bridge_route(
 
 /// Plausibility checks that leave the calculation running: declared values
 /// the norm accepts but that contradict a norm default or other input.
+fn year_at(value: &Value, pointer: &str) -> Option<u32> {
+    value
+        .pointer(pointer)
+        .and_then(Value::as_u64)
+        .and_then(|year| u32::try_from(year).ok())
+}
+
+fn registration_construction_year(project_value: &Value) -> Option<u32> {
+    year_at(project_value, "/registration/constructionYear")
+}
+
+/// The chapter 11 bouwjaar (table 11.13): the block-level ventilation, else
+/// the first calculation zone that states one.
+fn ventilation_construction_year(project_value: &Value) -> Option<u32> {
+    year_at(
+        project_value,
+        "/ntaCalculation/ventilation/constructionYear",
+    )
+    .or_else(|| {
+        project_value
+            .pointer("/ntaCalculation/zoneData")
+            .and_then(Value::as_array)?
+            .iter()
+            .find_map(|zone| year_at(zone, "/ventilation/constructionYear"))
+    })
+}
+
 fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
     use crate::building_performance::{Carrier, Service};
     use crate::monthly_demand::CeilingColumn;
     let mut warnings = Vec::new();
+
+    // One building construction year feeds §5.3.2, the label data (art. 4)
+    // and table 11.13: a registration year that differs from the chapter 11
+    // bouwjaar means one of the two is wrong.
+    if let (Some(registered), Some(ventilation)) = (
+        registration_construction_year(project_value),
+        ventilation_construction_year(project_value),
+    ) {
+        if registered != ventilation {
+            warnings.push(InputGap {
+                detail: Some(format!(
+                    "registration {registered} against ventilation (table 11.13) {ventilation}"
+                )),
+                ..gap(
+                    "construction_year_mismatch",
+                    "registration.constructionYear",
+                )
+            });
+        }
+    }
+
     let Some(nta) = project_value
         .get("ntaCalculation")
         .filter(|value| !value.is_null())
@@ -1184,6 +1232,9 @@ struct Slot {
     /// A member that was never in the block (not a blank), filled only so
     /// the search can go on.
     absent: bool,
+    /// Variant names an "unknown variant" error listed for this location:
+    /// the location holds an enum (a plain enum field or a tag).
+    variants: Vec<String>,
 }
 
 impl Slot {
@@ -1208,6 +1259,7 @@ impl Slot {
             next: 0,
             siblings: Vec::new(),
             absent: false,
+            variants: Vec::new(),
         }
     }
 }
@@ -1408,6 +1460,20 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
             };
         }
     }
+    // A blank enum tag decides which members the object around it has, so
+    // the nulls next to it (and under them) are not classified against the
+    // variant the repair happened to choose: only the tag is reported, and
+    // the user fills the rest once the variant is known.
+    let tags = blank_tags(&work, &slots, &leaves, &blank, &first_error);
+    for (index, leaf) in leaves.iter().enumerate() {
+        if blank[index]
+            && tags
+                .iter()
+                .any(|(tag, parent)| leaf.path != *tag && is_under(&leaf.path, parent))
+        {
+            blank[index] = false;
+        }
+    }
     BlankSearch {
         paths: leaves
             .into_iter()
@@ -1417,6 +1483,56 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
             .collect(),
         residual: absent || !settled,
     }
+}
+
+/// Blank leaves that are enum tags, with the path of the object they tag.
+/// A blank leaf holding an enum (it learned variant names) is a tag when
+/// another of those variants changes which members its object may or must
+/// have (an unknown or missing field); a plain enum field (a fuel, a
+/// class) never does. At most eight other variants are tried per leaf.
+fn blank_tags<F>(
+    work: &Value,
+    slots: &[Slot],
+    leaves: &[NullLeaf],
+    blank: &[bool],
+    first_error: &F,
+) -> Vec<(String, String)>
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let baseline = first_error(work);
+    let mut tags = Vec::new();
+    for (index, leaf) in leaves.iter().enumerate() {
+        if !blank[index] {
+            continue;
+        }
+        let Some(slot) = slots.iter().find(|slot| slot.path == leaf.path) else {
+            continue;
+        };
+        if slot.variants.is_empty() || slot.steps.len() < 2 {
+            continue;
+        }
+        let current = walk(work, &slot.steps).and_then(Value::as_str);
+        let shapes_object = slot
+            .variants
+            .iter()
+            .filter(|name| Some(name.as_str()) != current)
+            .take(8)
+            .any(|name| {
+                let mut trial = work.clone();
+                set_at(&mut trial, &slot.steps, Value::from(name.as_str()));
+                let error = first_error(&trial);
+                error != baseline
+                    && error.is_some_and(|(_, message)| {
+                        message.starts_with("unknown field") || message.starts_with("missing field")
+                    })
+            });
+        if shapes_object {
+            let parent = render_path(&slot.steps[..slot.steps.len() - 1]);
+            tags.push((leaf.path.clone(), parent));
+        }
+    }
+    tags
 }
 
 /// Resolves ``missing field `field` `` at `at`: the removed null member of
@@ -1927,6 +2043,11 @@ where
 fn learn(message: &str, slot: &mut Slot) {
     let mut suggested = Vec::new();
     if message.starts_with("unknown variant") {
+        for name in variants(message) {
+            if !slot.variants.contains(&name) {
+                slot.variants.push(name);
+            }
+        }
         suggested.extend(variants(message).into_iter().map(Value::from));
         // An enum: its variants by name, not by index.
         let next = slot.next;
@@ -2833,19 +2954,10 @@ fn derive_input(
         label_functions: nta.label_functions.clone(),
         // One building construction year: the NTA block, else the registration, else the
         // chapter 11 bouwjaar of table 11.13 (the same quantity).
-        construction_year: nta.construction_year.or_else(|| {
-            [
-                "/registration/constructionYear",
-                "/ntaCalculation/ventilation/constructionYear",
-            ]
-            .iter()
-            .find_map(|pointer| {
-                project_value
-                    .pointer(pointer)
-                    .and_then(Value::as_u64)
-                    .and_then(|year| u32::try_from(year).ok())
-            })
-        }),
+        construction_year: nta
+            .construction_year
+            .or_else(|| registration_construction_year(project_value))
+            .or_else(|| ventilation_construction_year(project_value)),
         fossil_appliances_outside_calculation: nta.fossil_appliances_outside_calculation,
         bbl_function: nta.bbl_function,
         bbl_functions: nta.bbl_functions.clone(),
@@ -3239,6 +3351,37 @@ mod tests {
         assert_eq!(year(&registered), Some(1975));
         registered["ntaCalculation"]["constructionYear"] = serde_json::json!(1990);
         assert_eq!(year(&registered), Some(1990));
+
+        // The chapter 11 bouwjaar of a calculation zone counts too.
+        let zoned = serde_json::json!({"ntaCalculation": {"zoneData": [
+            {"zoneId": "a"},
+            {"zoneId": "b", "ventilation": {"constructionYear": 1984}}
+        ]}});
+        assert_eq!(ventilation_construction_year(&zoned), Some(1984));
+        assert_eq!(ventilation_construction_year(&base), Some(2020));
+
+        // Registration 1975 against bouwjaar 2020: a warning, none when equal.
+        let mut mismatch = base.clone();
+        mismatch["registration"] = serde_json::json!({"constructionYear": 1975});
+        let codes = |value: &Value| {
+            plausibility_warnings(value)
+                .into_iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        assert!(codes(&mismatch).contains(&"construction_year_mismatch"));
+        mismatch["registration"]["constructionYear"] = serde_json::json!(2020);
+        assert!(!codes(&mismatch).contains(&"construction_year_mismatch"));
+
+        // The label data (art. 4 a) carry the same resolved year as §5.3.2.
+        let assessment = assess_project_performance(&registered);
+        assert_eq!(
+            assessment
+                .label_data
+                .as_ref()
+                .and_then(|data| data.general.construction_year),
+            Some(1990)
+        );
     }
 
     /// The WLC-GWP area is per building: a terraced dwelling (party walls
@@ -3699,6 +3842,61 @@ mod tests {
             search.residual || search.paths == ["either.a"],
             "{search:?}"
         );
+    }
+
+    /// A blank tag: the variants share a member that is optional in one and
+    /// required in the other, so its blank could be reported or not
+    /// depending on the variant the repair picks. Only the tag is reported;
+    /// a blank next to a filled tag is still classified.
+    #[test]
+    fn blank_tag_is_reported_alone() {
+        #[derive(serde::Deserialize)]
+        #[serde(
+            tag = "method",
+            rename_all = "snake_case",
+            rename_all_fields = "camelCase",
+            deny_unknown_fields
+        )]
+        #[allow(dead_code)]
+        enum Loss {
+            Declared {
+                #[serde(default)]
+                value_kwh: Option<f64>,
+                source: String,
+            },
+            Measured {
+                value_kwh: f64,
+            },
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Holder {
+            loss: Loss,
+            other: f64,
+        }
+        for (declared_first, block) in [
+            (
+                true,
+                serde_json::json!({"loss": {"method": null, "valueKwh": null, "source": "s"}, "other": null}),
+            ),
+            (
+                false,
+                serde_json::json!({"loss": {"method": null, "valueKwh": null}, "other": null}),
+            ),
+        ] {
+            let search = blank_paths::<Holder>(&block);
+            assert_eq!(
+                search.paths,
+                ["loss.method", "other"],
+                "declared_first {declared_first}: {search:?}"
+            );
+        }
+        // With the tag filled the shared member follows its variant.
+        let measured =
+            serde_json::json!({"loss": {"method": "measured", "valueKwh": null}, "other": 1.0});
+        assert_eq!(blank_paths::<Holder>(&measured).paths, ["loss.valueKwh"]);
+        let declared = serde_json::json!({"loss": {"method": "declared", "valueKwh": null, "source": "s"}, "other": 1.0});
+        assert!(blank_paths::<Holder>(&declared).paths.is_empty());
     }
 
     #[test]
@@ -4394,6 +4592,71 @@ mod blank_fuzz {
             && matches!(path.as_bytes()[ancestor.len()], b'.' | b'[')
     }
 
+    /// Enum tags of the block, from serde alone: a string leaf is a tag when
+    /// an unknown value names variants and another of those variants
+    /// changes which members its object may or must have. Maps the tag path
+    /// to the path of the object it tags.
+    fn tags(block: &Value, all_nodes: &[(String, String, bool)]) -> HashMap<String, String> {
+        let error = |value: &Value| {
+            serde_path_to_error::deserialize::<_, NtaCalculationInput>(value.clone())
+                .err()
+                .map(|error| error.inner().to_string())
+        };
+        let mut found = HashMap::new();
+        for (path, pointer, scalar) in all_nodes {
+            let Some(current) = block.pointer(pointer).and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(dot) = path.rfind('.') else {
+                continue;
+            };
+            if !scalar || path.ends_with(']') {
+                continue;
+            }
+            let mut probe = block.clone();
+            *probe.pointer_mut(pointer).unwrap() = Value::from("\u{1}none");
+            let Some(message) = error(&probe).filter(|m| m.starts_with("unknown variant")) else {
+                continue;
+            };
+            let is_tag = super::variants(&message)
+                .into_iter()
+                .filter(|name| name != current)
+                .take(8)
+                .any(|name| {
+                    let mut trial = block.clone();
+                    *trial.pointer_mut(pointer).unwrap() = Value::from(name);
+                    error(&trial).is_some_and(|m| {
+                        m.starts_with("unknown field") || m.starts_with("missing field")
+                    })
+                });
+            if is_tag {
+                found.insert(path.clone(), path[..dot].to_string());
+            }
+        }
+        found
+    }
+
+    /// The tag-blank rule: next to a blank tag only the tag itself is
+    /// expected; the blanks under the object it tags are not classified.
+    fn drop_under_blank_tags(
+        expected: BTreeSet<String>,
+        tags: &HashMap<String, String>,
+    ) -> BTreeSet<String> {
+        let blank_tags: Vec<(&String, &String)> = expected
+            .iter()
+            .filter_map(|path| tags.get(path).map(|parent| (path, parent)))
+            .collect();
+        expected
+            .iter()
+            .filter(|path| {
+                !blank_tags
+                    .iter()
+                    .any(|(tag, parent)| *path != *tag && under(path, parent))
+            })
+            .cloned()
+            .collect()
+    }
+
     fn counted<F: FnOnce() -> BlankSearch>(search: F) -> (BlankSearch, usize) {
         let before = BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.get());
         let result = search();
@@ -4425,6 +4688,7 @@ mod blank_fuzz {
                 (path.clone(), !deserializes(&trial))
             })
             .collect();
+        let tags = tags(&block, &all_nodes);
         let mut rng = Rng(seed);
         let (mut false_positive, mut missed, mut residual) = (Vec::new(), Vec::new(), Vec::new());
         let mut worst = 0usize;
@@ -4448,11 +4712,14 @@ mod blank_fuzz {
             let (search, used) = counted(|| blank_paths::<NtaCalculationInput>(&trial));
             worst = worst.max(used);
             let found: BTreeSet<String> = search.paths.into_iter().collect();
-            let expected: BTreeSet<String> = picked
-                .iter()
-                .filter(|(path, _, _)| required[path])
-                .map(|(path, _, _)| path.clone())
-                .collect();
+            let expected: BTreeSet<String> = drop_under_blank_tags(
+                picked
+                    .iter()
+                    .filter(|(path, _, _)| required[path])
+                    .map(|(path, _, _)| path.clone())
+                    .collect(),
+                &tags,
+            );
             false_positive.extend(found.difference(&expected).cloned());
             missed.extend(expected.difference(&found).cloned());
             // Only blanks were introduced: once they are filled the block
@@ -4479,11 +4746,14 @@ mod blank_fuzz {
         }
         let (search, used) = counted(|| blank_paths::<NtaCalculationInput>(&all));
         let found: BTreeSet<String> = search.paths.into_iter().collect();
-        let expected: BTreeSet<String> = scalars
-            .iter()
-            .filter(|(path, _, _)| required[path])
-            .map(|(path, _, _)| path.clone())
-            .collect();
+        let expected: BTreeSet<String> = drop_under_blank_tags(
+            scalars
+                .iter()
+                .filter(|(path, _, _)| required[path])
+                .map(|(path, _, _)| path.clone())
+                .collect(),
+            &tags,
+        );
         let wrong: Vec<_> = found.difference(&expected).collect();
         let missed: Vec<_> = expected.difference(&found).collect();
         assert!(

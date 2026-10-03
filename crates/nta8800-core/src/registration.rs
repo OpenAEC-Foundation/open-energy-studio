@@ -690,7 +690,7 @@ pub fn plausibility_warnings(
                 if ep2 <= bound && bound - ep2 < margin {
                     found.push(warning(
                         "plausibility_borderline_label",
-                        "performance.primaryFossilIndicatorKwhPerM2Year",
+                        "performance.labelPrimaryFossilIndicatorKwhPerM2Year",
                     ));
                 }
             }
@@ -709,7 +709,7 @@ pub fn plausibility_warnings(
         if !(-500.0..=1500.0).contains(&ep2) {
             found.push(warning(
                 "plausibility_ep2_out_of_range",
-                "performance.primaryFossilIndicatorKwhPerM2Year",
+                "performance.labelPrimaryFossilIndicatorKwhPerM2Year",
             ));
         }
     }
@@ -1616,6 +1616,13 @@ mod tests {
         ] {
             assert!(found.contains(&code), "{code}: {found:?}");
         }
+        // The class follows the label EP2 (Regeling art. 2 lid 3), so the
+        // borderline warning points there.
+        assert!(result
+            .plausibility
+            .iter()
+            .any(|item| item.code == "plausibility_borderline_label"
+                && item.path == "performance.labelPrimaryFossilIndicatorKwhPerM2Year"));
         assert!(result
             .plausibility
             .iter()
