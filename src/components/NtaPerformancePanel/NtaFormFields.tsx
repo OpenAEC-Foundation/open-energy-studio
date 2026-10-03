@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 // Field components of the NTA input form; the block is edited as plain JSON
 // data and the Rust kernel is the validator.
@@ -73,27 +73,6 @@ export function TriStateField({ draft, path, label, onChange, yes, no }: FieldPr
       <option value="true">{yes}</option>
       <option value="false">{no}</option>
     </select>
-  </label>;
-}
-
-/** A nested kernel block edited as JSON; the text is kept while it does not parse. */
-export function JsonField({ draft, path, label, onChange, invalid }: FieldProps & { invalid: string }) {
-  const value = read(draft, path);
-  const [text, setText] = useState(() => (value == null ? '' : JSON.stringify(value, null, 2)));
-  const [error, setError] = useState(false);
-  return <label className="nta-form-json">{label}
-    <textarea rows={6} spellCheck={false} value={text} aria-invalid={error}
-      onChange={(event) => setText(event.target.value)}
-      onBlur={() => {
-        if (text.trim() === '') { setError(false); onChange(path, undefined); return; }
-        try {
-          onChange(path, JSON.parse(text));
-          setError(false);
-        } catch {
-          setError(true);
-        }
-      }} />
-    {error && <span className="nta-form-error">{invalid}</span>}
   </label>;
 }
 

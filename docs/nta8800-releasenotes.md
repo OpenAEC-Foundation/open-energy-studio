@@ -2,6 +2,24 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 3 oktober 2026 — formulieren zonder JSON-editors (bijlage P, hoofdstuk 14, randdelen, maatwerkadvies)
+
+Rekenuitkomsten en opgeslagen projecten veranderen niet; dezelfde invoer is nu met gewone velden te maken:
+
+- **Bijlage P:** de laatste JSON-vakken in het formulier voor externe levering zijn vervangen door velden:
+  - leidingdelen (P.13–P.18) met lagen, ligging, omgeving, correctie van tabel P.1, watertemperatuur van het net en buffervaten (P.43/P.44);
+  - de berekende tapwateropslag (P.35 met P.43–P.46): vaten, laadleidingen en externe wisselaar;
+  - de opwekkers collectieve zonnewarmte (opgegeven of volgens 13.7.2.2, P.33), elektrische flexmodus (5.8) en sorptiekoeling (tabel P.10);
+  - PV in het gebied (P.7/P.71) met de velden van hoofdstuk 16.
+
+  Bij het wisselen van soort, ligging of bron worden de velden van de vorige keuze gewist.
+- **Verlichting (hoofdstuk 14):** meerdere armaturengroepen (14.8 systeemvermogen of 14.9 lampvermogen met tabel 14.2), f_dyn, geïnstalleerd parasitair vermogen (14.10–14.12), daglichtsectoren (verticale ramen, daklichten en hellende ramen van bijlage Y) en extra verlichtingszones. Alleen verlichting per rekenzone bij meerdere rekenzones loopt nog via Geavanceerd (JSON).
+- **Vloerranden (8.36):** de ψ-waarden per randdeel hebben eigen velden.
+- **PV:** het wisselen van de route voor P_pk wist de velden van de vorige route; voorheen bleef bijvoorbeeld `panelCount` staan naast `panelAreaM2`, wat de kern als onbekend veld weigerde.
+- **Maatwerkadvies:** de wijzigingen van een maatregel (RFC 6902) staan per regel met bewerking, pad en waarde in plaats van in één JSON-tekstvak.
+
+De volledige JSON-weergave van het NTA-blok en van de basisopname blijft bestaan als geavanceerde invoer.
+
 ## 3 oktober 2026 — registratie: rekenprogramma, berichttypen, WLC-GWP, BAG en plausibiliteit
 
 Rekenuitkomsten veranderen niet. De registratiecontrole wordt strenger:

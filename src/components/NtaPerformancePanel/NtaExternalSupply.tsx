@@ -3,15 +3,18 @@ import {
   annexPGeneratorKindTemplate, annexPGeneratorTemplate, annexPPlotTemplate, annexPRouteTemplate,
 } from '../../core/nta/NtaSystemTemplates';
 import {
-  CheckField, JsonField, NumberField, read, SelectField, TextField, type Draft, type Path,
+  CheckField, NumberField, read, SelectField, TextField, type Draft, type Path,
 } from './NtaFormFields';
+import { CalculatedHotWaterStorageFields, PipeDistributionFields } from './NtaAnnexPDetails';
+import { PvSystemFields, peakPowerTemplate } from './NtaPvFields';
+import { MonthlyValues, SolarCalculatedFields } from './NtaSystemSections';
+import { calculatedSolarMethod } from '../../core/nta/NtaSystemTemplates';
 
 // §5.8 / annex P: values for external heat, hot water and cold, a
 // collective heat-pump source and area electricity. Each service is either
 // forfait (absent), a registered declaration, measured flows (P.6) or the
-// calculated route (P.7, P.9). The rarer parts of the calculated route
-// (pipe segments, calculated storage, solar and flex generators) keep a
-// JSON editor inside the structured form.
+// calculated route (P.7, P.9), with pipe segments, calculated storage and
+// every generator kind of P.6.5.4/P.6.7.4 as structured fields.
 
 interface SectionProps {
   draft: Draft;
@@ -24,10 +27,9 @@ export type AnnexPFunction = 'heating' | 'hot_water' | 'cooling';
 
 const CARRIERS = ['natural_gas', 'oil', 'electricity', 'biogas', 'biomass_above500_kw', 'waste_incineration', 'biofuel_mix'] as const;
 
-/** Generator kinds with own fields; the others are edited as JSON. */
-const STRUCTURED_KINDS = ['combustion', 'boiler', 'heat_pump', 'chp_without_loss', 'chp_with_loss', 'residual_heat',
-  'geothermal', 'solid_biomass_boiler', 'declared', 'compression_chiller', 'free_cooling'] as const;
-const JSON_KINDS = ['collective_solar', 'electric_flex', 'sorption_chiller'] as const;
+const GENERATOR_KINDS = ['combustion', 'boiler', 'heat_pump', 'chp_without_loss', 'chp_with_loss', 'residual_heat',
+  'geothermal', 'solid_biomass_boiler', 'declared', 'compression_chiller', 'free_cooling', 'collective_solar', 'electric_flex',
+  'sorption_chiller'] as const;
 
 const TABLE_P5_SOURCES = ['electric_ground', 'electric_outdoor_air', 'electric_groundwater_below15_c', 'electric_surface_water',
   'electric_source15_to20_c', 'electric_source20_to40_c', 'electric_source_at_least40_c', 'gas_ground_or_outdoor_air',
@@ -188,10 +190,113 @@ function GeneratorKindFields({ draft, change, base }: SectionProps & { base: Pat
           'other_low_temperature_source'])} />
         <CarrierFields draft={draft} change={change} base={at('drive')} label={t('nta.annexP.drive')} />
       </>;
+    case 'collective_solar':
+      return <CollectiveSolarFields draft={draft} change={change} base={at('contribution')} />;
+    case 'electric_flex':
+      return <ElectricFlexFields draft={draft} change={change} base={base} />;
+    case 'sorption_chiller':
+      return <SorptionHeatFields draft={draft} change={change} base={at('heat')} />;
     default:
-      return <JsonField key={`${base.join('.')}-${String(kind)}`} draft={draft} onChange={change} path={base}
-        label={t('nta.annexP.generatorJson')} invalid={t('nta.form.jsonInvalid')} />;
+      return null;
   }
+}
+
+/** P.6.5.4.10: the solar contribution of collective collectors, declared or by 13.7.2.2 (P.33). */
+function CollectiveSolarFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const method = read(draft, [...base, 'method']);
+  const monthly = Array.isArray(read(draft, [...base, 'monthlyKwh']));
+  const reference = read(draft, [...base, 'sourceReference']) ?? '';
+  return <>
+    <SelectField {...field} path={[...base, 'method']} label={t('nta.annexP.solar.method')} options={[
+      ['declared', t('nta.annexP.solar.declared')], ['calculated', t('nta.annexP.solar.calculated')]]}
+      onChange={(_, value) => {
+        if (value === 'calculated') {
+          const { collectors, storage, solarType } = calculatedSolarMethod();
+          change(base, { method: 'calculated', solarType, collectors, storage, networkSupplyC: null, networkReturnC: null,
+            storageAmbientC: null });
+        } else {
+          change(base, { method: 'declared', annualKwh: null, sourceReference: '' });
+        }
+      }} />
+    {method === 'declared' && <>
+      <label className="nta-form-check">
+        <input type="checkbox" checked={monthly} onChange={(event) => change(base, event.target.checked
+          ? { method: 'declared', monthlyKwh: Array(12).fill(null), sourceReference: reference }
+          : { method: 'declared', annualKwh: null, sourceReference: reference })} />
+        {t('nta.annexP.solar.monthly')}
+      </label>
+      {monthly
+        ? <MonthlyValues draft={draft} change={change} path={[...base, 'monthlyKwh']} label={t('nta.annexP.solar.monthlyKwh')} />
+        : <NumberField {...field} path={[...base, 'annualKwh']} label={t('nta.annexP.solar.annualKwh')} />}
+      <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
+    </>}
+    {method === 'calculated' && <>
+      <SelectField {...field} path={[...base, 'solarType']} label={t('nta.form.solar.type')} options={[
+        ['preheater', t('nta.form.solar.type.preheater')], ['integrated_backup', t('nta.form.solar.type.integrated')]]} />
+      <SolarCalculatedFields draft={draft} change={change} base={base} />
+      <NumberField {...field} path={[...base, 'networkSupplyC']} label={t('nta.annexP.solar.networkSupply')} />
+      <NumberField {...field} path={[...base, 'networkReturnC']} label={t('nta.annexP.solar.networkReturn')} />
+      <NumberField {...field} path={[...base, 'storageAmbientC']} label={t('nta.annexP.solar.storageAmbient')} />
+    </>}
+  </>;
+}
+
+/** P.6.5.4.11: an electric generator in flex mode (5.8, tables 5.5/5.6). */
+function ElectricFlexFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const at = (...rest: Path): Path => [...base, ...rest];
+  const generator = read(draft, at('generator', 'kind'));
+  return <>
+    <SelectField {...field} path={at('generator', 'kind')} label={t('nta.annexP.flex.generator')} options={[
+      ['electrode_boiler', t('nta.annexP.flex.electrodeBoiler')], ['heat_pump', t('nta.annexP.flex.heatPump')]]}
+      onChange={(_, value) => change(at('generator'), value === 'heat_pump'
+        ? { kind: 'heat_pump', efficiency: { method: 'table_p5', source: null, supplyTemperatureC: null } }
+        : { kind: 'electrode_boiler' })} />
+    {generator === 'heat_pump' ? <HeatPumpEfficiencyFields draft={draft} change={change} base={at('generator', 'efficiency')} /> : <>
+      <NumberField {...field} path={at('generator', 'efficiency')} label={t('nta.annexP.flex.electrodeEfficiency')} />
+      <TextField {...field} path={at('generator', 'efficiencyReference')} label={t('nta.form.source')} />
+    </>}
+    <NumberField {...field} path={at('connections')} label={t('nta.annexP.flex.connections')} step="1" />
+    <CheckField {...field} path={at('heatBuffer')} label={t('nta.annexP.flex.heatBuffer')} />
+    <TextField {...field} path={at('registrationReference')} label={t('nta.annexP.flex.registration')} />
+    <NumberField {...field} path={at('flexHeatKwh')} label={t('nta.annexP.flex.heat')} />
+    <TextField {...field} path={at('flexReference')} label={t('nta.form.source')} />
+    <NumberField {...field} path={at('networkProductionKwh')} label={t('nta.annexP.flex.networkProduction')} />
+  </>;
+}
+
+/** Table P.10: the heat source of a sorption chiller, collective heat or a CHP (P.26/P.27). */
+function SorptionHeatFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const source = read(draft, [...base, 'source']);
+  const at = (...rest: Path): Path => [...base, ...rest];
+  return <>
+    <SelectField {...field} path={at('source')} label={t('nta.annexP.sorption.source')} options={[
+      ['collective_heat', t('nta.annexP.sorption.collectiveHeat')], ['chp', t('nta.annexP.sorption.chp')]]}
+      onChange={(_, value) => change(base, value === 'chp'
+        ? { source: 'chp', carrier: { kind: 'natural_gas' }, tableP6: { electricalPowerKw: null, installedAfter2006: true } }
+        : { source: 'collective_heat', primaryFactor: null, co2KgPerKwh: null, sourceReference: '' })} />
+    {source === 'chp' ? <>
+      <CarrierFields draft={draft} change={change} base={at('carrier')} label={t('nta.annexP.carrier')} />
+      <NumberField {...field} path={at('thermalEfficiency')} label={t('nta.annexP.thermalEfficiency')} />
+      <NumberField {...field} path={at('electricalEfficiency')} label={t('nta.annexP.electricalEfficiency')} />
+      <TextField {...field} path={at('efficiencyReference')} label={t('nta.form.source')} />
+      <label className="nta-form-check">
+        <input type="checkbox" checked={read(draft, at('tableP6')) != null} onChange={(event) => change(at('tableP6'),
+          event.target.checked ? { electricalPowerKw: null, installedAfter2006: true } : null)} />
+        {t('nta.annexP.p6')}
+      </label>
+      {read(draft, at('tableP6')) != null && <TableP6Fields draft={draft} change={change} base={at('tableP6')} />}
+    </> : <>
+      <NumberField {...field} path={at('primaryFactor')} label={t('nta.annexP.primaryFactor')} />
+      <NumberField {...field} path={at('co2KgPerKwh')} label={t('nta.annexP.co2')} />
+      <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
+    </>}
+  </>;
 }
 
 /** P.6.5–P.6.7 generators of the calculated route. */
@@ -199,7 +304,7 @@ function GeneratorsFields({ draft, change, base }: SectionProps & { base: Path }
   const { t } = useI18n();
   const field = { draft, onChange: change };
   const generators = list(draft, base);
-  const kindOptions: Array<[string, string]> = [...STRUCTURED_KINDS, ...JSON_KINDS].map((key) => [key, t(`nta.annexP.kind.${key}`)]);
+  const kindOptions: Array<[string, string]> = GENERATOR_KINDS.map((key) => [key, t(`nta.annexP.kind.${key}`)]);
   return <>
     {generators.map((_, index) => {
       const at = (...rest: Path): Path => [...base, index, ...rest];
@@ -284,8 +389,7 @@ function DistributionFields({ draft, change, base }: SectionProps & { base: Path
     </>}
     {method === 'small_cold_forfait' &&
       <CheckField {...field} path={[...base, 'supplyBelow10C']} label={t('nta.annexP.supplyBelow10')} />}
-    {method === 'pipes' && <JsonField key={`${base.join('.')}-pipes`} draft={draft} onChange={change} path={base}
-      label={t('nta.annexP.pipesJson')} invalid={t('nta.form.jsonInvalid')} />}
+    {method === 'pipes' && <PipeDistributionFields draft={draft} change={change} base={base} />}
   </>;
 }
 
@@ -348,8 +452,7 @@ function HotWaterStorageFields({ draft, change, base }: SectionProps & { base: P
       <NumberField {...field} path={[...base, 'pipeLossKwh']} label={t('nta.annexP.pipeLoss')} />
       <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
     </>}
-    {method === 'calculated' && <JsonField key={`${base.join('.')}-calculated`} draft={draft} onChange={change} path={base}
-      label={t('nta.annexP.hwStorageJson')} invalid={t('nta.form.jsonInvalid')} />}
+    {method === 'calculated' && <CalculatedHotWaterStorageFields draft={draft} change={change} base={base} />}
   </>;
 }
 
@@ -443,8 +546,8 @@ export function ExternalSupplyFields({ draft, change }: SectionProps) {
         <TextField {...field} path={[...base, 'areaElectricity', index, 'id']} label={t('nta.annexP.generatorId')} />
         <NumberField {...field} path={[...base, 'areaElectricity', index, 'annualKwh']} label={t('nta.annexP.annualKwh')} />
         <TextField {...field} path={[...base, 'areaElectricity', index, 'sourceReference']} label={t('nta.form.source')} />
-      </> : <JsonField key={`area-${index}`} draft={draft} onChange={change} path={[...base, 'areaElectricity', index]}
-        label={t('nta.annexP.areaPvJson')} invalid={t('nta.form.jsonInvalid')} />}
+      </> : <PvSystemFields draft={draft} change={change} base={[...base, 'areaElectricity', index]}
+        label={String(item.id ?? '')} />}
       <RemoveButton label={t('nta.form.remove')}
         onClick={() => change([...base, 'areaElectricity'], area.filter((__, other) => other !== index))} />
     </fieldset>)}
@@ -453,7 +556,10 @@ export function ExternalSupplyFields({ draft, change }: SectionProps) {
       {t('nta.annexP.addAreaDeclared')}
     </button>
     <button type="button" onClick={() => change([...base, 'areaElectricity'],
-      [...area, { kind: 'pv', id: `gebied-pv-${area.length + 1}` }])}>
+      [...area, {
+        kind: 'pv', id: `gebied-pv-${area.length + 1}`, peakPower: peakPowerTemplate('panels'), azimuthDeg: null, tiltDeg: null,
+        mounting: 'unknown', obstructionFactors: [null], sourceReference: '',
+      }])}>
       {t('nta.annexP.addAreaPv')}
     </button>
     <p className="nta-form-note">{t('nta.form.externalSupplyNote')}</p>
