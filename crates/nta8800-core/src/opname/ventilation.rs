@@ -208,13 +208,16 @@ pub(crate) fn apply_passive_cooling(
     input: &mut Value,
     passive: Option<&SurveyPassiveCooling>,
     principle: VentilationPrinciple,
+    combined: bool,
     bypass_present: Option<bool>,
     recorder: &mut Recorder,
 ) {
     let Some(passive) = passive else {
         return;
     };
-    if principle == VentilationPrinciple::Natural {
+    // p. 152: passive cooling occurs with systems B to E; system E has the
+    // decentral balanced part even when the other part is natural.
+    if principle == VentilationPrinciple::Natural && !combined {
         recorder.issue(
             "passive_cooling_requires_mechanical_ventilation",
             "ventilation.passiveCooling",
@@ -310,30 +313,43 @@ fn recovery_input(
         "false".into(),
         "ISSO 82.1 p. 151 (table 11.11)",
     );
-    // Table 11.12 with p. 152: the manufacture year of the unit governs;
-    // the construction year is only the fallback. The NTA 11.3.2.2 list
-    // reads "bouw- of fabricagejaar", so the explicit fraction is passed to
-    // keep a pre-2010 unit in a newer dwelling off the 100 % default.
-    let (bypass_year, year_source) = match survey.unit_manufacture_year {
-        Some(year) => (year, "unit manufacture year"),
-        None => (
-            construction_year,
-            "construction year (manufacture year unknown)",
-        ),
-    };
-    let (bypass, share) = if bypass_year >= 2010 {
-        (json!({"kind": "full"}), "100 %")
-    } else if survey.bypass_present == Some(true) {
-        (json!({"kind": "partial", "fraction": 0.7}), "70 %")
+    // Table 11.12 with p. 152: the year defaults apply only while the bypass
+    // or its percentage is unknown. A bypass surveyed as absent is 0 %. The
+    // manufacture year of the unit governs; the construction year is only
+    // the fallback. The NTA 11.3.2.2 list reads "bouw- of fabricagejaar", so
+    // the explicit fraction is passed to keep a pre-2010 unit in a newer
+    // dwelling off the 100 % default.
+    let bypass = if survey.bypass_present == Some(false) {
+        recorder.record(
+            "bypass_surveyed_absent",
+            "ventilation.bypassPresent",
+            "0 %".into(),
+            "ISSO 82.1 p. 151 (table 11.12)",
+        );
+        json!({"kind": "none"})
     } else {
-        (json!({"kind": "none"}), "0 %")
+        let (bypass_year, year_source) = match survey.unit_manufacture_year {
+            Some(year) => (year, "unit manufacture year"),
+            None => (
+                construction_year,
+                "construction year (manufacture year unknown)",
+            ),
+        };
+        let (bypass, share) = if bypass_year >= 2010 {
+            (json!({"kind": "full"}), "100 %")
+        } else if survey.bypass_present == Some(true) {
+            (json!({"kind": "partial", "fraction": 0.7}), "70 %")
+        } else {
+            (json!({"kind": "none"}), "0 %")
+        };
+        recorder.record(
+            "bypass_table_11_12",
+            "ventilation.bypass",
+            format!("{share} ({year_source} {bypass_year})"),
+            "ISSO 82.1 p. 151-152 (table 11.12)",
+        );
+        bypass
     };
-    recorder.record(
-        "bypass_table_11_12",
-        "ventilation.bypass",
-        format!("{share} ({year_source} {bypass_year})"),
-        "ISSO 82.1 p. 151-152 (table 11.12)",
-    );
     let mut recovery = json!({
         "efficiency": {"method": "table", "exchanger": exchanger},
         "bypass": bypass,
@@ -536,6 +552,14 @@ pub fn derive_ventilation(
     } else {
         None
     };
+    // §11.3.6 (p. 145): the decentral part of system E has heat recovery,
+    // so the table 11.9 "none" default cannot apply to it.
+    if combined.is_some() && exchanger.is_none() {
+        recorder.issue(
+            "combined_requires_heat_recovery",
+            "ventilation.heatRecovery",
+        );
+    }
     let central_recovery = exchanger.is_some()
         && combined.is_none()
         && survey.heat_recovery_layout != Some(RecoveryLayout::Decentral);
@@ -668,6 +692,7 @@ pub fn derive_ventilation(
         &mut input,
         survey.passive_cooling.as_ref(),
         survey.principle,
+        survey.combined.is_some(),
         survey.bypass_present,
         recorder,
     );
@@ -965,6 +990,26 @@ mod tests {
         combined.principle = VentilationPrinciple::Balanced;
         let (_, recorder) = derive_with(&combined);
         assert_eq!(recorder.issues[0].code, "combined_other_part_not_balanced");
+        // §11.3.6: the decentral part has heat recovery; "unknown" (table
+        // 11.9 default none) cannot describe system E.
+        combined.principle = VentilationPrinciple::MechanicalExtract;
+        combined.heat_recovery = Some(ExchangerAnswer::Unknown);
+        let (_, recorder) = derive_with(&combined);
+        assert_eq!(recorder.issues[0].code, "combined_requires_heat_recovery");
+        // p. 152: passive cooling also with system E next to natural
+        // ventilation, given the bypass on the decentral heat recovery.
+        combined.principle = VentilationPrinciple::Natural;
+        combined.heat_recovery = Some(ExchangerAnswer::CounterFlowPlastic);
+        combined.passive_cooling = Some(SurveyPassiveCooling {
+            evidence_reference: "supplier project document".into(),
+            installed_capacity_dm3_per_s: None,
+        });
+        let (_, recorder) = derive_with(&combined);
+        assert_eq!(recorder.issues[0].code, "passive_cooling_requires_bypass");
+        combined.bypass_present = Some(true);
+        let (input, recorder) = derive_with(&combined);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        assert!(input.get("maximumCapacityForCooling").is_some());
     }
 
     #[test]
@@ -1011,5 +1056,10 @@ mod tests {
         );
         wtw.unit_manufacture_year = Some(2011);
         assert_eq!(bypass(&wtw, 1990), json!({"kind": "full"}));
+        // Surveyed absent: the year defaults of table 11.12 do not apply.
+        wtw.bypass_present = Some(false);
+        assert_eq!(bypass(&wtw, 2015), json!({"kind": "none"}));
+        wtw.unit_manufacture_year = None;
+        assert_eq!(bypass(&wtw, 2015), json!({"kind": "none"}));
     }
 }

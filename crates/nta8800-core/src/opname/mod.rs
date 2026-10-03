@@ -1473,6 +1473,26 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "high_temperature_source_collective_only"));
+
+        // A ticked collective source without its evidence (p. 111) is an
+        // issue, not a silent individual source.
+        survey.heating.generator = collective(
+            heating::HeatPumpSource::Groundwater,
+            Some(12.0),
+            Some(heating::GroundwaterSystem::Doublet),
+        );
+        if let heating::HeatingGenerator::HeatPump {
+            collective_source_reference,
+            ..
+        } = &mut survey.heating.generator
+        {
+            *collective_source_reference = Some("  ".into());
+        }
+        let invalid = assess_residential_survey(&survey);
+        assert!(invalid
+            .issues
+            .iter()
+            .any(|item| item.code == "collective_source_reference_required"));
     }
 
     #[test]
@@ -1501,6 +1521,25 @@ mod tests {
         assert!(rules(&result).contains(&"heat_pump_table_9_29"));
         // Table 9.29 outdoor air at 55 °C: 2,80.
         assert!((efficiency(&result) - 2.8).abs() < 1e-9);
+
+        // p. 111: surface water is a choice for a collective installation,
+        // also without a collective source (table 9.29 surface-water row).
+        survey.heating.generator = heat_pump(heating::HeatPumpSource::SurfaceWater);
+        if let heating::HeatingGenerator::HeatPump { capacity_kw, .. } =
+            &mut survey.heating.generator
+        {
+            *capacity_kw = Some(120.0);
+        }
+        let (result, input) = calculated(&survey);
+        let generator = &input["spaceHeating"]["generator"];
+        assert_eq!(generator["forfait"]["source"], "surface_water");
+        assert!(!rules(&result).contains(&"individual_surface_water_as_ground"));
+        let supply = generator["forfait"]["designSupplyTemperatureC"]
+            .as_f64()
+            .unwrap();
+        // Table 9.29 surface water: 3,3 at 55 °C, 3,7 at 45 °C.
+        let row = if supply > 45.0 { 3.3 } else { 3.7 };
+        assert!((efficiency(&result) - row).abs() < 1e-9, "{supply}");
     }
 
     #[test]
@@ -1520,6 +1559,37 @@ mod tests {
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
         };
+        // NTA p. 334: the table 9.27 GWP rows cover a collective building
+        // installation only; an individual dwelling unit up to 25 kW has no
+        // forfait row.
+        let individual = assess_residential_survey(&survey);
+        assert!(individual
+            .issues
+            .iter()
+            .any(|item| item.code == "gas_heat_pump_individual_no_forfait_row"));
+        // Above 25 kW: table 9.29.
+        if let heating::HeatingGenerator::HeatPump { capacity_kw, .. } =
+            &mut survey.heating.generator
+        {
+            *capacity_kw = Some(30.0);
+        }
+        let (_, input) = calculated(&survey);
+        assert_eq!(
+            input["spaceHeating"]["generator"]["table"],
+            "utility_collective_or_above25_kw"
+        );
+        // A collective installation up to 25 kW: the table 9.27 GWP rows.
+        if let heating::HeatingGenerator::HeatPump { capacity_kw, .. } =
+            &mut survey.heating.generator
+        {
+            *capacity_kw = Some(20.0);
+        }
+        survey.heating.collective = Some(heating::CollectiveHeating {
+            connected_usable_area_m2: None,
+            connected_dwellings: Some(4),
+            connected_storeys: Some(2),
+            heat_meters_present: Some(true),
+        });
         let (result, input) = calculated(&survey);
         let generator = &input["spaceHeating"]["generator"];
         assert_eq!(generator["kind"], "gas_heat_pump");

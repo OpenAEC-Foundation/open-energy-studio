@@ -133,6 +133,47 @@ describe('basisopname panel', () => {
     expect(heating.pipeInsulation).toEqual({ insulated: true, insulationYear: 1990, fittingsInsulated: true });
   }, 60000);
 
+  it('clears hidden heat-pump and local-heater answers when the source or appliance changes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    const generator = () => screen.getAllByRole('combobox', { name: 'Generator' })[0];
+
+    // A collective groundwater source, then an air source: the water-only
+    // answers go (collective_source_water_based_only otherwise).
+    await user.selectOptions(generator(), 'heat_pump');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'groundwater');
+    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
+    await user.type(screen.getByRole('textbox', { name: 'Evidence of the collective source' }), 'invoice');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Groundwater source system (unknown: recirculation)' }), 'doublet');
+    await user.type(screen.getByRole('spinbutton', { name: 'Source temperature, °C (unknown: ground)' }), '11');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'outdoor_air');
+    let heatPump = stored()!.survey.heating.generator;
+    expect(heatPump.source).toBe('outdoor_air');
+    expect(heatPump).not.toHaveProperty('collectiveSourceReference');
+    expect(heatPump).not.toHaveProperty('groundwaterSystem');
+    expect(heatPump).not.toHaveProperty('sourceTemperatureC');
+
+    // Unticking the collective source of surface water drops its temperature.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'surface_water');
+    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Source temperature, °C (unknown: ground)' }), '9');
+    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
+    heatPump = stored()!.survey.heating.generator;
+    expect(heatPump).not.toHaveProperty('collectiveSourceReference');
+    expect(heatPump).not.toHaveProperty('sourceTemperatureC');
+
+    // A steam boiler's fuel goes with the appliance (local_heater_fuel_contradiction otherwise).
+    await user.selectOptions(generator(), 'local_fired');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Appliance' }), 'steam_boiler');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Fuel' }), 'oil');
+    expect(stored()!.survey.heating.generator.fuel).toBe('oil');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Appliance' }), 'oil_heater');
+    const local = stored()!.survey.heating.generator;
+    expect(local.appliance).toBe('oil_heater');
+    expect(local).not.toHaveProperty('fuel');
+  }, 60000);
+
   it('edits houseboats, sunrooms and rooflights in the dwelling survey', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);

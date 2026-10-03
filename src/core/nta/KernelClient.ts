@@ -2594,7 +2594,7 @@ export interface ResidentialSurvey {
         | { situation: 'other' }
         | { situation: 'side_obstruction'; side: NtaObstructionSide; relativeWidth: number };
       /** Solar-control glass or film: g from the product data or quality declaration (82.1 p. 94). */
-      solarControl?: { gValue: number; sourceReference: string } | null;
+      solarControl?: { gValue: number | null; sourceReference: string } | null;
       sourceReference: string;
     }>;
     doors?: Array<{

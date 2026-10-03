@@ -107,11 +107,13 @@ Daarna rekent de kern de energieprestatie en de indicatieve labelklasse. Elke to
 13. Romp van een woonboot met bouwjaar 2014: ISSO-tabel 8.10 (p. 89) geeft R_c 3,5 voor 2014–2018, NTA-tabel I.7 (p. 831) 2,5 voor 2014–2015. De forfaitaire R_c is een rekenwaarde van de NTA; ISSO neemt die tabel over. De kern volgt NTA-tabel I.7. De ISSO-afwijking is gemeld als vermoedelijke overnamefout.
 14. Een appartement met dak en vloer (posities 4 en 8) rekent voor de luchtdoorlatendheid als bovenwoning, omdat NTA-tabel 11.14 geen rij voor dak + vloer heeft.
 15. Energieopslag in een woongebouw (erratum §6): alle opslag achter de hoofdmeter telt mee. De woningopname neemt de opgegeven capaciteit over. De adviseur geeft het totaal achter de hoofdmeter op, inclusief de opslag van andere opgenomen appartementen.
-16. De GWP-rijen van tabel 9.27 noemen een collectieve gebouwinstallatie, terwijl de titel van tabel 9.29 collectieve installaties ook omvat. Een gaswarmtepomp tot en met 25 kW rekent daarom met tabel 9.27, ook collectief; boven 25 kW met tabel 9.29. Elektrische warmtepompen in een collectieve installatie rekenen met tabel 9.29.
+16. De GWP-rijen van tabel 9.27 (p. 334) noemen alleen een collectieve gebouwinstallatie, terwijl de titel van tabel 9.29 collectieve installaties ook omvat. Een gaswarmtepomp tot en met 25 kW in een collectieve installatie rekent met tabel 9.27; boven 25 kW rekent hij met tabel 9.29. Een individuele gaswarmtepomp tot en met 25 kW past in geen van beide tabellen en geeft `gas_heat_pump_individual_no_forfait_row`. Tabel 9.27 heeft geen GWP-rij oppervlaktewater, dus oppervlaktewater neemt daar de rij grondwater. Elektrische warmtepompen in een collectieve installatie rekenen met tabel 9.29.
 17. Een gerenoveerd eenpijpssysteem (WD p. 50) heeft in NTA 8800 geen eigen regel. De opname rekent het als tweepijpssysteem.
 18. Een tweepijpssysteem is aangenomen als het distributietype niet is opgegeven. ISSO geeft geen invoer bij onbekend; alleen de pompweerstand van een berekende pomp hangt ervan af.
 19. Zonder P_H;gen (tabel 9.3 vraagt het niet) rekent 9.92 voor lokale verwarming en luchtverwarmers met een brander die de hele maand draait. Dat is de bovengrens die de begrenzing t_on ≤ t_mi toelaat.
 20. Een collectieve bron van onbekende temperatuur valt voor de primaire factor in de klasse "≥ 20 °C, oppervlaktewater of onbekend" (9.6.8.1.1.2.3 b); voor de COP neemt hij de rij bodem (p. 335).
+21. Bypass (tabel 11.12, p. 151–152): de jaarregel geldt alleen als de bypass of het percentage onbekend is. Een bypass die bij de opname afwezig is, telt als 0 %.
+22. Systeem E (§11.3.6, p. 145) heeft in het decentrale deel altijd WTW, dus een onbekende wisselaar kan hier niet "geen WTW" worden (`combined_requires_heat_recovery`). Passieve koeling is ook mogelijk als het andere deel natuurlijk is (p. 152).
 
 # Basisopname bestaande utiliteitsgebouwen (ISSO 75.1)
 

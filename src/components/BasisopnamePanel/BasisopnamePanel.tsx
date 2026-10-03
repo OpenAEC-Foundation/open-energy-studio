@@ -210,6 +210,30 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
   const kind = read(draft, [...path, 'kind']);
   const source = read(draft, [...path, 'source']);
   const collectiveSource = read(draft, [...path, 'collectiveSourceReference']) != null;
+  const generator = (read(draft, path) ?? {}) as Record<string, unknown>;
+  // Hidden answers must not survive a change of source or appliance: the
+  // kernel would reject them (collective_source_water_based_only,
+  // local_heater_fuel_contradiction).
+  const without = (keys: string[]) => Object.fromEntries(Object.entries(generator).filter(([key]) => !keys.includes(key)));
+  const changeSource = (_: Path, value: unknown) => {
+    const stale: string[] = [];
+    if (typeof value !== 'string' || !WATER_SOURCES.includes(value)) stale.push('collectiveSourceReference');
+    if (value !== 'groundwater') stale.push('groundwaterSystem');
+    const keepsCollective = !stale.includes('collectiveSourceReference') && collectiveSource;
+    if (!(value === 'groundwater' || value === 'high_temperature' || (value === 'surface_water' && keepsCollective))) {
+      stale.push('sourceTemperatureC', 'sourceTemperatureReference');
+    }
+    if (value !== 'high_temperature') stale.push('sourceQualityDeclarationReference');
+    change(path, { ...without(stale), source: value });
+  };
+  const changeCollectiveSource = (checked: boolean) => {
+    if (checked) change(path, { ...generator, collectiveSourceReference: '' });
+    else change(path, without(source === 'surface_water'
+      ? ['collectiveSourceReference', 'sourceTemperatureC', 'sourceTemperatureReference']
+      : ['collectiveSourceReference']));
+  };
+  const changeAppliance = (_: Path, value: unknown) =>
+    change(path, { ...(value === 'steam_boiler' ? generator : without(['fuel'])), appliance: value });
   return <>
     <KindSelect draft={draft} path={path} label={t('opname.heating.generator')} kinds={HEATING_KINDS}
       prefix="opname.heating.kind" template={heatingGeneratorTemplate} change={change} t={t} />
@@ -222,14 +246,14 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
     {kind === 'heat_pump' && <>
       <SelectField {...field} path={[...path, 'drive']} label={t('opname.heating.drive')}
         options={opts(t, 'opname.heating.driveKind', ['electric', 'gas_engine', 'gas_absorption'])} />
-      <SelectField {...field} path={[...path, 'source']} label={t('opname.heating.source')}
+      <SelectField {...field} onChange={changeSource} path={[...path, 'source']} label={t('opname.heating.source')}
         options={opts(t, 'opname.heating.hpSource', HEAT_PUMP_SOURCES)} />
       <NumberField {...field} path={[...path, 'capacityKw']} label={t('opname.capacityKw')} />
       <CheckField {...field} path={[...path, 'highTemperature']} label={t('opname.heating.highTemperature')} />
       {typeof source === 'string' && WATER_SOURCES.includes(source) && <>
         <label className="nta-form-check">
           <input type="checkbox" checked={collectiveSource}
-            onChange={(event) => change([...path, 'collectiveSourceReference'], event.target.checked ? '' : null)} />
+            onChange={(event) => changeCollectiveSource(event.target.checked)} />
           {t('opname.heating.collectiveSource')}
         </label>
         {collectiveSource && <TextField {...field} path={[...path, 'collectiveSourceReference']}
@@ -247,7 +271,7 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
       <p className="nta-form-note">{t('opname.heating.heatPumpNote')}</p>
     </>}
     {kind === 'local_fired' && <>
-      <SelectField {...field} path={[...path, 'appliance']} label={t('opname.heating.appliance')}
+      <SelectField {...field} onChange={changeAppliance} path={[...path, 'appliance']} label={t('opname.heating.appliance')}
         options={opts(t, 'opname.heating.localFired', ['gas_heater', 'oil_heater', 'steam_boiler'])} />
       {read(draft, [...path, 'appliance']) === 'steam_boiler' && <SelectField {...field} path={[...path, 'fuel']}
         label={t('opname.heating.fuel')} options={opts(t, 'opname.heating.fuelKind', ['natural_gas', 'oil'])} />}
