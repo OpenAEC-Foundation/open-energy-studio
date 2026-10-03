@@ -12,6 +12,8 @@ De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons a
 
 Het uitgebreide NTA-prestatiepaneel gebruikt eveneens een projectgebonden aanvraagstatus, zodat BENG en de indicatieve labelklasse uit het vorige project tijdens een nieuwe aanvraag niet zichtbaar blijven. De gerichte paneeltests en frontend-build zijn geslaagd.
 
+De Rust-invoeraudit toont op dezelfde manier alleen een beoordeling voor de projectreferentie waarop de aanvraag is uitgevoerd. Een eerder groen auditresultaat blijft bij projectwijziging niet zichtbaar tijdens de nieuwe controle; zes gerichte componenttests en de frontend-build zijn geslaagd.
+
 De [debug-desktopbuild van commit `fc5a8a5`](nta8800-build-verificatie-2026-10-03-fc5a8a5.md) bundelt de Rust-kern en NTA-interface van die commit. De build en de genoemde tests zijn technisch geslaagd; de referentie- en attestkolommen hieronder worden daardoor niet automatisch vrijgegeven.
 
 | Onderdeel | Model | Audit | Rekenroute | Referentie | Attest | Volgende verificatie |

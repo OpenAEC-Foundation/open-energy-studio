@@ -12,6 +12,23 @@ afterEach(() => {
 });
 
 describe('Rust kernel audit in the UI', () => {
+  it('hides the old audit as soon as the project input changes', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        status: 'structurally_valid', targetNormVersion: 'NTA 8800:2025+C1:2026',
+        kernelVersion: '0.1.0', inputFingerprint: 'sha256:first-project',
+        calculationAvailable: false, issues: [],
+        summary: { zoneCount: 1, surfaceCount: 0, systemCount: 0,
+          heatPumpCount: 0, classifiedHeatPumpCount: 0, floorAreaM2: 100 },
+      }) })
+      .mockImplementation(() => new Promise(() => {})));
+    const first = createDefaultProject();
+    const { rerender } = renderWithProviders(<KernelAuditPanel project={first} />);
+    expect(await screen.findByText('sha256:first-project')).toBeInTheDocument();
+    rerender(<KernelAuditPanel project={{ ...first, id: 'next-project' }} />);
+    expect(screen.queryByText('sha256:first-project')).not.toBeInTheDocument();
+  });
+
   it('shows the actual API assessment and its limited scope', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({

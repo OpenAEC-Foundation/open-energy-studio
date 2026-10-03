@@ -768,6 +768,7 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 | NTA-invoereditor bij projectwissel | Het prestatiepaneel sluit zowel het formulier als de JSON-editor bij een andere project-ID en wist de oude concepttekst. Gerichte componenttest: 7/7 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole; de Rust-kern valideert de opgeslagen invoer pas bij de volgende berekening. |
 | Zijbalk met indicatief label bij projectwissel | De respons draagt de projectreferentie van de aanvraag; een oudere BENG-/labeluitkomst wordt bij een gewijzigde projectreferentie direct verborgen. Gerichte previewtests: 5/5 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of onafhankelijke toets van de energie-uitkomst. |
 | Uitgebreid NTA-prestatiepaneel bij projectwissel | Projectgebonden aanvraagstatus verbergt de eerdere BENG-/labeluitkomst onmiddellijk. Gerichte paneeltests: 8/8 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of onafhankelijke toets van de energie-uitkomst. |
+| Rust-invoeraudit bij projectwissel | Projectgebonden aanvraagstatus verbergt de vorige audit direct. Gerichte audit-UI-tests: 6/6 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of bewijs dat het onderliggende project norminhoudelijk volledig is. |
 
 ## Nog nodig voor inhoudelijke en externe verificatie
 

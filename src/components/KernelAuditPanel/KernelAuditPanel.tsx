@@ -5,28 +5,33 @@ import type { IProject } from '../../core/energy/types';
 import { assessProjectWithRust, type KernelAssessment } from '../../core/nta/KernelClient';
 import './KernelAuditPanel.css';
 
+type AuditQuery =
+  | { project: IProject; kind: 'loading' }
+  | { project: IProject; kind: 'done'; assessment: KernelAssessment }
+  | { project: IProject; kind: 'error'; error: string };
+
 export function KernelAuditPanel({ project }: { project: IProject }) {
   const { t } = useI18n();
-  const [assessment, setAssessment] = useState<KernelAssessment | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState<AuditQuery | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setAssessment(null);
+    setQuery({ project, kind: 'loading' });
     assessProjectWithRust(project).then(
-      (value) => { if (!cancelled) { setAssessment(value); setLoading(false); } },
+      (value) => { if (!cancelled) setQuery({ project, kind: 'done', assessment: value }); },
       (reason: unknown) => {
         if (!cancelled) {
-          setError(reason instanceof Error ? reason.message : String(reason));
-          setLoading(false);
+          setQuery({ project, kind: 'error', error: reason instanceof Error ? reason.message : String(reason) });
         }
       },
     );
     return () => { cancelled = true; };
   }, [project]);
+
+  const currentQuery = query?.project === project ? query : null;
+  const loading = currentQuery == null || currentQuery.kind === 'loading';
+  const assessment = currentQuery?.kind === 'done' ? currentQuery.assessment : null;
+  const error = currentQuery?.kind === 'error' ? currentQuery.error : null;
 
   const errorCount = assessment?.issues.filter((item) => item.severity === 'error').length ?? 0;
   const warningCount = assessment?.issues.filter((item) => item.severity === 'warning').length ?? 0;
