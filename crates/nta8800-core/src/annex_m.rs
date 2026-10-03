@@ -21,6 +21,12 @@ pub const PRACTICE_FACTOR: f64 = 0.95;
 pub const AUX_TO_MEDIUM_FRACTION: f64 = 0.75;
 /// M.29: P_int = 0,3·P_n when nothing else is known.
 pub const DEFAULT_INTERMEDIATE_RATIO: f64 = 0.3;
+/// Plausibility floor for a declared P_int as a share of P_n (program
+/// choice; annex M gives no bound).
+pub const MIN_INTERMEDIATE_RATIO: f64 = 0.05;
+/// Plausibility ceiling for f_gen;ls;P0, the stand-by loss as a share of
+/// P_n (program choice; tested boilers lie far below 0,1).
+pub const MAX_STANDBY_LOSS_FACTOR: f64 = 0.1;
 
 /// Tables M.2 and M.4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -66,6 +72,12 @@ pub enum BoilerFuel {
     NaturalGas,
     Oil,
     Wood,
+    /// Table M.3 lists LPG, hard coal and lignite; tables 5.2/5.3 (p. 94,
+    /// p. 97) give them no f_P;del or K_CO2, so the chain refuses them with
+    /// `boiler_fuel_without_primary_factor`.
+    Lpg,
+    HardCoal,
+    Lignite,
 }
 
 impl BoilerFuel {
@@ -74,7 +86,19 @@ impl BoilerFuel {
             Self::NaturalGas => 1.11,
             Self::Oil => 1.06,
             Self::Wood => 1.08,
+            Self::Lpg => 1.09,
+            Self::HardCoal => 1.04,
+            Self::Lignite => 1.07,
         }
+    }
+
+    /// Tables 5.2/5.3 carry a factor for this fuel.
+    pub fn has_primary_factor(self) -> bool {
+        matches!(self, Self::NaturalGas | Self::Oil | Self::Wood)
+    }
+
+    fn solid(self) -> bool {
+        matches!(self, Self::Wood | Self::HardCoal | Self::Lignite)
     }
 }
 
@@ -235,6 +259,9 @@ pub struct BoilerMonth {
 #[serde(rename_all = "camelCase")]
 pub struct BoilerResult {
     pub load_ratio: f64,
+    /// β before the M.24 clamp to 1; above 1 the boiler cannot deliver the
+    /// month's output in t_H;op (infinite with output and t_op = 0).
+    pub load_ratio_unclamped: f64,
     pub full_load_efficiency: f64,
     pub part_load_efficiency: f64,
     pub generation_loss_kwh: f64,
@@ -273,7 +300,12 @@ pub fn validate_product_boiler(boiler: &ProductBoiler, path: &str) -> Vec<AnnexM
         push("boiler_power_invalid", "product.nominalPowerKw");
     }
     if let Some(intermediate) = product.intermediate_power_kw {
-        if !finite_positive(intermediate) || intermediate >= product.nominal_power_kw {
+        // P_int is the part-load test output (M.29 default 0,3·P_n); below
+        // MIN_INTERMEDIATE_RATIO·P_n it is not a credible test point.
+        if !finite_positive(intermediate)
+            || intermediate >= product.nominal_power_kw
+            || intermediate < MIN_INTERMEDIATE_RATIO * product.nominal_power_kw
+        {
             push("boiler_power_invalid", "product.intermediatePowerKw");
         }
     }
@@ -305,6 +337,13 @@ pub fn validate_product_boiler(boiler: &ProductBoiler, path: &str) -> Vec<AnnexM
         ) => {
             if !efficiency_ok(*efficiency_at_60) || !efficiency_ok(*efficiency_at_30) {
                 push("boiler_efficiency_invalid", "product.fullLoad");
+            } else if efficiency_at_60 > efficiency_at_30 {
+                // M.8: a condensing boiler gains efficiency at the lower
+                // return temperature, so η_Pn;60 ≤ η_Pn;30.
+                push(
+                    "boiler_condensing_efficiencies_inverted",
+                    "product.fullLoad.efficiencyAt60",
+                );
             }
         }
         _ => push(
@@ -324,7 +363,9 @@ pub fn validate_product_boiler(boiler: &ProductBoiler, path: &str) -> Vec<AnnexM
             "product.partLoadAdditionalTest",
         );
     }
-    if !(product.standby_loss_factor.is_finite() && product.standby_loss_factor >= 0.0) {
+    if !(product.standby_loss_factor.is_finite()
+        && (0.0..=MAX_STANDBY_LOSS_FACTOR).contains(&product.standby_loss_factor))
+    {
         push("boiler_standby_loss_invalid", "product.standbyLossFactor");
     }
     if !(product.standby_test_temperature_c.is_finite()
@@ -347,14 +388,11 @@ pub fn validate_product_boiler(boiler: &ProductBoiler, path: &str) -> Vec<AnnexM
             push("boiler_auxiliary_invalid", field);
         }
     }
-    if boiler.fuel == BoilerFuel::Wood && boiler.technology != BoilerTechnology::SolidFuelStandard {
-        push("boiler_technology_fuel_mismatch", "technology");
-    }
-    if boiler.fuel != BoilerFuel::Wood && boiler.technology == BoilerTechnology::SolidFuelStandard {
+    if boiler.fuel.solid() != (boiler.technology == BoilerTechnology::SolidFuelStandard) {
         push("boiler_technology_fuel_mismatch", "technology");
     }
     if boiler.fuel == BoilerFuel::Oil && boiler.technology == BoilerTechnology::CondensingGas
-        || boiler.fuel == BoilerFuel::NaturalGas
+        || matches!(boiler.fuel, BoilerFuel::NaturalGas | BoilerFuel::Lpg)
             && boiler.technology == BoilerTechnology::CondensingOil
     {
         push("boiler_technology_fuel_mismatch", "technology");
@@ -394,11 +432,14 @@ pub fn boiler_month(boiler: &ProductBoiler, month: BoilerMonth) -> BoilerResult 
 
     // M.24/M.25.
     let gen_out = boiler.control.factor() * month.heat_output_kwh;
-    let beta = if month.operating_hours > 0.0 {
-        (gen_out / (pn * month.operating_hours)).min(1.0)
+    let beta_unclamped = if month.operating_hours > 0.0 {
+        gen_out / (pn * month.operating_hours)
+    } else if gen_out > 0.0 {
+        f64::INFINITY
     } else {
         0.0
     };
+    let beta = beta_unclamped.min(1.0);
 
     // M.7/M.8 (with M.13).
     let (full, rated_full) = match &product.full_load {
@@ -469,6 +510,7 @@ pub fn boiler_month(boiler: &ProductBoiler, month: BoilerMonth) -> BoilerResult 
 
     BoilerResult {
         load_ratio: beta,
+        load_ratio_unclamped: beta_unclamped,
         full_load_efficiency: full,
         part_load_efficiency: part,
         generation_loss_kwh: generation_loss,
@@ -510,6 +552,64 @@ mod tests {
             },
             equipment_reference: "boiler".into(),
         }
+    }
+
+    #[test]
+    fn implausible_product_values_and_fuels_are_flagged() {
+        let codes = |boiler: &ProductBoiler| -> Vec<&'static str> {
+            validate_product_boiler(boiler, "b")
+                .into_iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        // M.8: η_Pn;60 above η_Pn;30 is inverted for a condensing boiler.
+        let mut inverted = condensing();
+        inverted.product.full_load = FullLoadEfficiency::Condensing {
+            efficiency_at_60: 1.10,
+            efficiency_at_30: 0.90,
+        };
+        assert!(codes(&inverted).contains(&"boiler_condensing_efficiencies_inverted"));
+        // f_gen;ls;P0 0,5 and P_int 0,0001 kW are not credible test values.
+        let mut standby = condensing();
+        standby.product.standby_loss_factor = 0.5;
+        assert!(codes(&standby).contains(&"boiler_standby_loss_invalid"));
+        let mut tiny = condensing();
+        tiny.product.intermediate_power_kw = Some(0.0001);
+        assert!(codes(&tiny).contains(&"boiler_power_invalid"));
+        // Table M.3: LPG is a gas fuel (1,09); coal needs a solid-fuel boiler.
+        let mut lpg = condensing();
+        lpg.fuel = BoilerFuel::Lpg;
+        assert!(codes(&lpg).is_empty());
+        assert_eq!(BoilerFuel::Lpg.gross_to_net(), 1.09);
+        assert!(!BoilerFuel::Lpg.has_primary_factor());
+        let mut coal = condensing();
+        coal.fuel = BoilerFuel::HardCoal;
+        assert!(codes(&coal).contains(&"boiler_technology_fuel_mismatch"));
+        assert_eq!(BoilerFuel::HardCoal.gross_to_net(), 1.04);
+        assert_eq!(BoilerFuel::Lignite.gross_to_net(), 1.07);
+    }
+
+    #[test]
+    fn load_ratio_reports_the_unclamped_value() {
+        let boiler = condensing();
+        let month = |output: f64, hours: f64| BoilerMonth {
+            heat_output_kwh: output,
+            operating_hours: hours,
+            month_hours: 744.0,
+            return_temperature_c: 35.0,
+            outdoor_temperature_c: 3.0,
+            ambient_temperature_c: None,
+        };
+        // 24 kW × 100 h = 2400 kWh; with f_ctr;ls 1,03, 3000 kWh is β 1,29.
+        let over = boiler_month(&boiler, month(3000.0, 100.0));
+        assert_eq!(over.load_ratio, 1.0);
+        assert!((over.load_ratio_unclamped - 3000.0 * 1.03 / 2400.0).abs() < 1e-12);
+        let none = boiler_month(&boiler, month(100.0, 0.0));
+        assert!(none.load_ratio_unclamped.is_infinite());
+        assert_eq!(
+            boiler_month(&boiler, month(0.0, 0.0)).load_ratio_unclamped,
+            0.0
+        );
     }
 
     #[test]
