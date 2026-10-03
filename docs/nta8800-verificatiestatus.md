@@ -106,7 +106,7 @@ De herberekeningen brachten wel invoer- en validatiepunten aan het licht:
 - TOjuli bij utiliteit;
 - onrealistische opgegeven gebruiken in de voorbeelden.
 
-Deze punten worden afgewerkt.
+Deze punten zijn afgewerkt in `3eec124`. De herberekende waarden in de tabel gelden voor de voorbeeldinvoer van vóór die correctie. De actuele uitkomsten staan in `docs/nta8800-voorbeeldproject-smoketest-2026-10-03.md`.
 
 **Herberekening van de berekende routes voor tapwater (H13) en koeling (H10, methode 2), 4 oktober 2026.** Ook deze controle is gedaan met een eigen Python-implementatie vanuit de normpagina's. Vergeleken scenario's:
 - tapwater: vijf scenario's (circulatie, voorraadvaten, warmtepompen volgens 13.160b, alle standaardwaarden);
