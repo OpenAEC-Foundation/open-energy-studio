@@ -49,8 +49,8 @@ use crate::space_cooling::{
     CoolingSystem, CoolingZoneNeed, FreeCoolingSource,
 };
 use crate::space_heating_chain::{
-    assess_space_heating_chain, combine_heating_systems, Generator, SpaceHeatingChainAssessment,
-    SpaceHeatingChainInput,
+    assess_space_heating_chain, combine_heating_systems, system_heat_pump, Generator,
+    SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
 use crate::tojuli::{assess_tojuli, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions};
 use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
@@ -1394,18 +1394,28 @@ fn cooling_assessment(
             })),
         })
         .collect();
-    // 10.84: heat taken from the source by the space-heating heat pump.
+    // 10.84: Σ(Q_H;gen;out − E_H;gen;in) per heating system, only of heat
+    // pumps with the ground storage (WKO) as source.
     let extraction: [f64; 12] = std::array::from_fn(|index| {
-        let row = &heating.monthly[index];
-        (row.heat_pump_output_kwh - row.generator_electricity_kwh).max(0.0)
+        heating
+            .heat_pump_systems
+            .iter()
+            .filter(|system| system.ground_storage_source)
+            .map(|system| {
+                let out = system
+                    .heat_pump_output_kwh
+                    .get(index)
+                    .copied()
+                    .unwrap_or(0.0);
+                let input = system
+                    .generator_electricity_kwh
+                    .get(index)
+                    .copied()
+                    .unwrap_or(0.0);
+                (out - input).max(0.0)
+            })
+            .sum()
     });
-    let extraction = if heat_pump_generator(input).heat_pump().is_some()
-        || heat_pump_generator(input).annex_q().is_some()
-    {
-        extraction
-    } else {
-        [0.0; 12]
-    };
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
     if let Some(system) = &input.cooling {
         return Some(assess_cooling(
@@ -1517,11 +1527,12 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             ));
         }
     }
-    let collective_source = input
-        .space_heating
-        .generator
-        .heat_pump()
-        .is_some_and(|(_, source)| source != SourceSystem::Individual);
+    let collective_source = input.heating_systems().into_iter().any(|system| {
+        system
+            .generator
+            .heat_pump()
+            .is_some_and(|(_, source)| source != SourceSystem::Individual)
+    });
     if input.external_supply.collective_heat_pump_source.is_some() && !collective_source {
         issues.push(issue(
             "collective_heat_pump_source_unused",
@@ -2605,7 +2616,17 @@ pub fn assess_building_performance(
         }));
         others.push(assessed);
     }
+    // Per-system heat pumps (5.20/5.31, 10.84) and the main system for
+    // annex V before the systems are summed.
+    let mut heat_pump_systems: Vec<_> = system_heat_pump(&chain_input.generator, &heating)
+        .into_iter()
+        .collect();
+    for (system, assessed) in input.additional_heating_systems.iter().zip(&others) {
+        heat_pump_systems.extend(system_heat_pump(&system.generator, assessed));
+    }
+    let main_heating = heating.clone();
     let mut heating = combine_heating_systems(heating, others);
+    heating.heat_pump_systems = heat_pump_systems;
     validate(input, &mut issues);
     validate_heating_systems(input, &mut issues);
     if let Some(error) = standalone_solar_issue {
@@ -2635,7 +2656,8 @@ pub fn assess_building_performance(
     let extras = hot_water_extras(input, &heating);
     let hot_water_from_heating = hot_water_from_heating(&heating);
     // Table V.1 c_source and W.3 Q_C;HP;si;mi for the hot-water systems.
-    let coupled = regeneration_source_correction(input, &chain_input, &heating);
+    // Annex V belongs to the regenerated (main) system only.
+    let coupled = regeneration_source_correction(input, &chain_input, &main_heating);
     let coupled_input = coupled_hot_water_input(input, coupled, cooling.as_ref());
     let hot_water_input = coupled_input.as_ref().unwrap_or(input);
     let hot_water = if issues.is_empty() {
@@ -3200,15 +3222,37 @@ fn compute(
         .map_or(1.0, |evidence| {
             evidence.outdoor_air_heat_fraction.unwrap_or(0.0)
         });
-    let cop = heating.generation_efficiency.unwrap_or(0.0);
-    // 9.6.8.1.1.2.3: heat taken from a collective heat-pump source.
+    // 9.6.8.1.1.2.3: heat taken from a collective heat-pump source, per
+    // heating system with its own COP (>= 1).
     let source = factors.heat_pump_source.filter(|_| {
-        input
-            .space_heating
-            .generator
-            .heat_pump()
-            .is_some_and(|(_, system)| system != SourceSystem::Individual)
+        heating
+            .heat_pump_systems
+            .iter()
+            .any(|system| system.collective_source)
     });
+    // Per month: (Q_HD;hp;in;bron, ambient heat of 5.30/5.31 before the
+    // outdoor share) over the heating systems.
+    let heat_pump_split = |index: usize| -> (f64, f64) {
+        let mut collective = 0.0;
+        let mut ambient = 0.0;
+        for system in &heating.heat_pump_systems {
+            let Some(cop) = system.generation_efficiency.filter(|cop| *cop >= 1.0) else {
+                continue;
+            };
+            let out = system
+                .heat_pump_output_kwh
+                .get(index)
+                .copied()
+                .unwrap_or(0.0);
+            let extracted = out * (1.0 - 1.0 / cop);
+            if system.collective_source {
+                collective += extracted;
+            } else {
+                ambient += extracted;
+            }
+        }
+        (collective, ambient)
+    };
     let pv_yields: Vec<[f64; 12]> = input
         .pv_systems
         .iter()
@@ -3346,9 +3390,11 @@ fn compute(
         co2 += used_dh * dh.co2_kg_per_kwh + used_dw * dw.co2_kg_per_kwh;
         // 5.20 and 9.6.8.1.1.2.3: Q_HD;hp;in;bron at the source factors,
         // not weighted by f_BACS.
-        let source_heat = match source {
-            Some(_) if cop >= 1.0 => row.heat_pump_output_kwh * (1.0 - 1.0 / cop),
-            _ => 0.0,
+        let (collective_extracted, individual_extracted) = heat_pump_split(index);
+        let source_heat = if source.is_some() {
+            collective_extracted
+        } else {
+            0.0
         };
         if let Some(source) = source {
             fossil += source_heat * source.primary_factor;
@@ -3435,8 +3481,9 @@ fn compute(
 
         // 5.30/5.31: ambient heat of the space-heating heat pump.
         // A collective source counts through f_Pren;dh;hp;in;bron instead.
-        let ambient = if heat_pump_renewable && source.is_none() && cop >= 1.0 {
-            row.heat_pump_output_kwh * (1.0 - 1.0 / cop) * outdoor_share
+        // A collective source counts through Q_HD;hp;in;bron instead.
+        let ambient = if heat_pump_renewable {
+            individual_extracted * outdoor_share
         } else {
             0.0
         };
@@ -5646,6 +5693,75 @@ mod tests {
     }
 
     #[test]
+    fn ambient_heat_is_booked_per_heating_system() {
+        // A boiler serves zone 1, an outdoor-air heat pump zone 2: only the
+        // heat pump's own output with its own COP gives ambient heat (5.31).
+        let base = input();
+        let mut second = base.space_heating.demand.clone();
+        second.zone_id = "z2".into();
+        let mut two = base.clone();
+        let mut system = base.space_heating.clone();
+        system.demand = second;
+        system.additional_zones.clear();
+        system.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
+            forfait: crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+                generator_id: "hp".into(),
+                classification_source_reference: "system design".into(),
+                scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
+                source: TableSource::OutdoorAir,
+                sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
+                design_supply_temperature_c: Some(35.0),
+                source_correction_factor: None,
+                source_correction_reference: None,
+                thermal_capacity_kw: Some(8.0),
+                capacity_source_reference: Some("rated".into()),
+                collective_building_installation: Some(false),
+                row_variant: crate::forfait_heat_pump_draft::TableRowVariant::Base,
+                high_efficiency_evidence: None,
+                source_temperature_c: None,
+                source_temperature_evidence_reference: None,
+                source_quality_declaration_reference: None,
+            },
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own unit".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        two.additional_heating_systems.push(system);
+        two.total_usable_floor_area_m2 *= 2.0;
+        two.heat_pump_renewable = Some(HeatPumpRenewableEvidence {
+            source_below_20_c: true,
+            exhaust_air_source: false,
+            source_reference: "unit".into(),
+            combined_outdoor_and_exhaust_air: false,
+            outdoor_air_heat_fraction: None,
+            outdoor_air_fraction_reference: None,
+        });
+        let result = assess_building_performance(&two);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let systems = &result.space_heating.heat_pump_systems;
+        assert_eq!(systems.len(), 1);
+        assert!(!systems[0].ground_storage_source && !systems[0].collective_source);
+        let cop = systems[0].generation_efficiency.unwrap();
+        let expected: f64 = systems[0]
+            .heat_pump_output_kwh
+            .iter()
+            .map(|out| out * (1.0 - 1.0 / cop))
+            .sum();
+        assert!(expected > 0.0);
+        let ambient = result.annual_heat_pump_ambient_heat_kwh.unwrap();
+        assert!(
+            (ambient - expected).abs() < 1e-6 * expected.max(1.0),
+            "{ambient} vs {expected}"
+        );
+    }
+
+    #[test]
     fn regeneration_surcharge_follows_the_ground_storage_system() {
         use crate::space_heating_chain::ChainZone;
         let mut sample = input();
@@ -5653,11 +5769,12 @@ mod tests {
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
-            source: TableSource::OutdoorAir,
+            // 10.84 concerns heat pumps with the ground storage as source.
+            source: TableSource::Ground,
             sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
             design_supply_temperature_c: Some(35.0),
-            source_correction_factor: None,
-            source_correction_reference: None,
+            source_correction_factor: Some(1.0),
+            source_correction_reference: Some("annex V not applicable".into()),
             thermal_capacity_kw: Some(8.0),
             capacity_source_reference: Some("rated".into()),
             collective_building_installation: Some(false),

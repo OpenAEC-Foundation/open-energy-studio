@@ -489,7 +489,13 @@ impl ForfaitOpaque {
             return self.renovated_rc(renovation);
         }
         if self.construction_year < 1965 {
-            table_i4(self.element, self.cavity, insulated)
+            // Table I.4 has no hull row: a houseboat hull before 1965 takes
+            // the first class of table I.7 (interpretation).
+            table_i4(self.element, self.cavity, insulated).or_else(|| {
+                (self.element == ElementType::FloatingHull)
+                    .then(|| year_table(self.element, self.building, 1965))
+                    .flatten()
+            })
         } else {
             year_table(self.element, self.building, self.construction_year)
         }
@@ -976,6 +982,13 @@ mod tests {
         roof.element = ElementType::Roof;
         roof.cavity = false;
         assert!((roof.calculate().r_c - (0.22 + 0.25 / 0.105)).abs() < 1e-12);
+        // Before 1965 table I.4 has no hull row: the first class of I.7.
+        let mut old_hull = element(1960, InsulationState::AbsentOrUnknown);
+        old_hull.element = ElementType::FloatingHull;
+        old_hull.building = BuildingKind::Floating {
+            new_berth_since_2018: false,
+        };
+        assert_eq!(old_hull.calculate().r_c, 0.17);
         let mut hull_regular = element(1990, InsulationState::AbsentOrUnknown);
         hull_regular.element = ElementType::FloatingHull;
         let codes: Vec<_> = hull_regular

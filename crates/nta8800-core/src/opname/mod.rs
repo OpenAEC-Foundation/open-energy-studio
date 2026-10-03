@@ -11,7 +11,7 @@
 //!
 //! Sunrooms (AOS) count as outdoor air (ISSO 82.1 §6.3.4); caravans and
 //! houseboats take the forfaits of NTA tables I.5–I.7 and light mass
-//! (p. 61). Quality declarations: a measured q_v10 and rooflights with a
+//! (p. 62). Quality declarations: a measured q_v10 and rooflights with a
 //! BCRG declaration (p. 68). Not covered: detail-survey (detailopname)
 //! routes.
 
@@ -408,7 +408,7 @@ pub fn derive_residential_input(
     let airtightness = general::airtightness_type(&survey.dwelling, recorder);
     let infiltration_year = general::infiltration_year(year, survey.renovation.as_ref(), recorder);
     let (mut floor, mut wall, ceiling) = general::thermal_mass(&survey.construction);
-    // p. 61: houseboats and caravans count as light floor and light wall.
+    // p. 62: houseboats and caravans count as light floor and light wall.
     if survey
         .envelope
         .building_kind
@@ -420,7 +420,7 @@ pub fn derive_residential_input(
             "houseboat_caravan_light_mass",
             "construction",
             "light floor, light wall".into(),
-            "ISSO 82.1 p. 61",
+            "ISSO 82.1 p. 62",
         );
         floor = crate::monthly_demand::MassClass::Light;
         wall = crate::monthly_demand::MassClass::Light;

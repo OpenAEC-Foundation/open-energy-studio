@@ -60,8 +60,9 @@ pub enum SurfaceBoundary {
     /// Adjacent unheated sunroom (AOS): as outdoor air in the basic survey
     /// (ISSO 82.1 §6.3.4 p. 41; 75.1 idem).
     Sunroom,
-    /// Water under a houseboat: the hull counts as towards outdoor air
-    /// (NTA C.2 note 2), with the floating-hull forfait (table I.7).
+    /// Water against a houseboat hull (bottom or sides below the waterline):
+    /// as outdoor air (NTA C.2 note 2), with the floating-hull forfait of
+    /// table I.7, which covers the whole hull ("drijflichaam").
     Water,
     /// Strongly ventilated space, such as a garage (NTA 3.134, 6.3; ISSO
     /// 82.1 §6.3.4 p. 41 with WD 2025 p. 22–24): losses as towards outdoor air,
@@ -555,6 +556,8 @@ fn thatch_rc(
 fn element_type(surface: &SurveySurface) -> (ElementType, Option<f64>) {
     match (surface.element, &surface.boundary) {
         (SurfaceElement::Floor, SurfaceBoundary::Water) => (ElementType::FloatingHull, None),
+        // Hull sides below the waterline: horizontal heat flow, R_si 0,13.
+        (SurfaceElement::Facade, SurfaceBoundary::Water) => (ElementType::FloatingHull, Some(0.13)),
         (SurfaceElement::Facade, _) => (ElementType::Facade, None),
         (
             SurfaceElement::Floor,
@@ -611,7 +614,10 @@ pub fn derive_envelope_with_cooling(
             }
             SurfaceBoundary::Water
                 if !matches!(building, BuildingKind::Floating { .. })
-                    || surface.element != SurfaceElement::Floor =>
+                    || !matches!(
+                        surface.element,
+                        SurfaceElement::Floor | SurfaceElement::Facade
+                    ) =>
             {
                 recorder.issue("water_boundary_requires_houseboat_floor", path);
             }
@@ -1412,8 +1418,18 @@ mod tests {
         };
         envelope.building_kind = Some(kind);
         let mut recorder = Recorder::default();
+        // Hull sides below the waterline take the same I.7 hull row.
+        envelope.surfaces.push(surface(
+            "romp-zijkant",
+            SurfaceElement::Facade,
+            SurfaceBoundary::Water,
+        ));
         let derived = derive_envelope(&envelope, 1990, &mut recorder);
         assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        assert!(derived
+            .direct_elements
+            .iter()
+            .any(|v| v["id"].as_str().unwrap().contains("romp-zijkant")));
         let hull = derived
             .direct_elements
             .iter()
