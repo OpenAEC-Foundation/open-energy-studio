@@ -333,6 +333,10 @@ pub struct CoolingPump {
     /// EEI per EU 622/2012; default 0,23 / 0,25.
     #[serde(default)]
     pub energy_efficiency_index: Option<f64>,
+    /// §10.4.2.3 (p. 386): actual maximum pipe length to the farthest
+    /// emitter, m; omitted means the forfait L_max of 10.27.
+    #[serde(default)]
+    pub max_pipe_length_m: Option<f64>,
     pub source_reference: String,
 }
 
@@ -2103,7 +2107,9 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         }
         if let Some(pump) = &distribution.pump {
             let floors = f64::from(pump.floor_count.max(1));
-            let max_length = 35.0 + 6.0 * floors + 0.13 * building_area / floors;
+            let max_length = pump
+                .max_pipe_length_m
+                .unwrap_or(35.0 + 6.0 * floors + 0.13 * building_area / floors);
             let mut additional = 360.0 / (ret - supply).powi(2);
             if pump.heat_meter {
                 additional += 10.0;
@@ -2763,6 +2769,7 @@ mod tests {
                 individual_dwelling_installation: false,
                 label_power_kw: None,
                 energy_efficiency_index: None,
+                max_pipe_length_m: None,
                 source_reference: "design".into(),
             }),
             source_reference: "design".into(),

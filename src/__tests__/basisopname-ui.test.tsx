@@ -210,7 +210,7 @@ describe('basisopname panel', () => {
 
     // §7.1.7, p. 65 and afb. 6.6.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Fossil-fuel installations on the plot (§7.1.7)' }), 'true');
-    await user.type(screen.getByRole('spinbutton', { name: 'Sport and swimming halls, A_g m² (p. 65)' }), '450');
+    await user.type(screen.getByRole('spinbutton', { name: 'Sport halls without the swimming-pool room, A_g m² (p. 65)' }), '450');
     await user.click(screen.getByRole('checkbox', { name: 'Residence areas openly connected (afb. 6.6)' }));
     // Tables 11.9–11.13 and §11.4.1.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Heat recovery (table 11.9)' }), 'cold_storage_with_ahu');
@@ -244,6 +244,21 @@ describe('basisopname panel', () => {
     expect(survey.cooling).toMatchObject({
       generator: 'gas_engine_compression', gasEngine: { electricPowerKw: 50 }, directExpansion: 'air_handling_unit',
       additionalGenerators: [{ generator: 'aquifer_from2013', capacityKw: null }],
+    });
+
+    // §10.4.1: switching to water-based clears the hidden direct-expansion
+    // answer; table 10.10 L_max and the table 10.11 a declaration.
+    await user.click(screen.getByRole('checkbox', { name: 'Water-based distribution' }));
+    survey = stored()!.survey;
+    expect(survey.cooling.waterBased).toBe(true);
+    expect(survey.cooling.directExpansion).toBeUndefined();
+    expect(screen.queryByRole('textbox', { name: /NEN-EN 14336/ })).toBeNull();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Hydronic balancing (table 10.6)' }), 'dynamic');
+    await user.type(screen.getByRole('textbox', { name: /NEN-EN 14336/ }), 'inregelrapport');
+    await user.type(screen.getByRole('spinbutton', { name: /Maximum supply-pipe length L_max/ }), '80');
+    survey = stored()!.survey;
+    expect(survey.cooling).toMatchObject({
+      balanced: 'dynamic', balancingEvidenceReference: 'inregelrapport', maxPipeLengthM: 80,
     });
   }, 60000);
 

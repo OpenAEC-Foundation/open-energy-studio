@@ -55,6 +55,47 @@ pub struct AppliedDefault {
 
 /// Attaches the adviser's collapse reasons to the applied defaults; a key
 /// matches the default's path or its rule. Unmatched keys are warned.
+/// Collapse-reason keys (path or rule) of saved surveys that were renamed
+/// or split; each old key also matches the listed new paths or rules.
+const COLLAPSE_REASON_ALIASES: &[(&str, &[&str])] = &[
+    (
+        "cooling_fittings_unknown_uninsulated_meters_present",
+        &[
+            "cooling_fittings_unknown_uninsulated",
+            "cooling_meters_unknown_present",
+        ],
+    ),
+    (
+        "cooling.distribution",
+        &[
+            "cooling.fittingsInsulated",
+            "cooling.coldMeters",
+            "cooling.pipeLengthM",
+        ],
+    ),
+    (
+        "ventilation.ductsLukaAbc",
+        &["ventilation.ductAirtightness"],
+    ),
+    ("ventilation.bypass", &["ventilation.bypassPercent"]),
+    (
+        "ventilation.heatRecovery",
+        &[
+            "ventilation.supplyDuctInsulation",
+            "ventilation.supplyDuctLengthM",
+            "ventilation.constantVolumeControl",
+        ],
+    ),
+];
+
+fn key_matches(key: &str, path: &str, rule: &str) -> bool {
+    key == path
+        || key == rule
+        || COLLAPSE_REASON_ALIASES
+            .iter()
+            .any(|(old, new)| *old == key && new.iter().any(|item| *item == path || *item == rule))
+}
+
 pub(crate) fn apply_collapse_reasons(
     recorder: &mut Recorder,
     reasons: &std::collections::BTreeMap<String, String>,
@@ -63,6 +104,12 @@ pub(crate) fn apply_collapse_reasons(
         item.collapse_reason = reasons
             .get(&item.path)
             .or_else(|| reasons.get(item.rule))
+            .or_else(|| {
+                reasons
+                    .iter()
+                    .find(|(key, _)| key_matches(key, &item.path, item.rule))
+                    .map(|(_, reason)| reason)
+            })
             .map(|reason| reason.trim().to_string())
             .filter(|reason| !reason.is_empty());
     }
@@ -72,7 +119,7 @@ pub(crate) fn apply_collapse_reasons(
             !recorder
                 .applied
                 .iter()
-                .any(|item| &item.path == *key || item.rule == key.as_str())
+                .any(|item| key_matches(key, &item.path, item.rule))
         })
         .cloned()
         .collect();
