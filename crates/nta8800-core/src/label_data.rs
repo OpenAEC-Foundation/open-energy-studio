@@ -257,16 +257,11 @@ pub fn installation_summary(input: &BuildingPerformanceInput) -> InstallationSum
             .filter_map(|variant| tag(&variant))
             .collect(),
         cooling_generators: input
-            .cooling
-            .as_ref()
-            .map(|system| {
-                system
-                    .generators
-                    .iter()
-                    .filter_map(|generator| tag(&generator.generator))
-                    .collect()
-            })
-            .unwrap_or_default(),
+            .cooling_list()
+            .into_iter()
+            .flat_map(|(system, _)| &system.generators)
+            .filter_map(|generator| tag(&generator.generator))
+            .collect(),
         pv_system_count: input.pv_systems.len(),
         lighting_zone_count: input.lighting.len(),
         solar_water_heater_count: input

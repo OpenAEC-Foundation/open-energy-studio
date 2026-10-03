@@ -54,6 +54,25 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.verticalPipes).toEqual([]);
   });
 
+  it('adds a dwelling cooling system in the ISSO 82.1 chapter 10 shape', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Building-bound cooling system present' }));
+    let survey = stored()!.survey;
+    expect(survey.coolingPresent).toBe(true);
+    expect(survey.cooling).toMatchObject({ generator: 'room_air_conditioner', emitter: 'split_indoor_units_on_wall', waterBased: false });
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Cooling generator' }), 'closed_ground_loop');
+    await user.click(screen.getByRole('checkbox', { name: 'Collective cooling generator (several dwellings)' }));
+    survey = stored()!.survey;
+    expect(survey.cooling.generator).toBe('closed_ground_loop');
+    expect(survey.coolingCollective).toBe(true);
+    await user.click(screen.getByRole('checkbox', { name: 'Building-bound cooling system present' }));
+    survey = stored()!.survey;
+    expect(survey.cooling).toBeNull();
+    expect(survey.coolingPresent).toBe(false);
+  });
+
   it('runs the kernel route and records a reason per applied default', async () => {
     const assessment = {
       status: 'calculated_unverified', scope: 'x', source: 'ISSO 82.1',

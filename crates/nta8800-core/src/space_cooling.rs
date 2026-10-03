@@ -838,6 +838,91 @@ pub struct CoolingAssessment {
     /// `Q_C;HP;zi` per zone and month (10.6), for TOjuli (5.41c).
     pub zone_booster_extraction_kwh: Vec<[f64; 12]>,
     pub interpretations: Vec<&'static str>,
+    /// §10.2 several cooling systems: the result of each system with the
+    /// zones it serves; empty for one system serving every zone.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub systems: Vec<ServedCoolingResult>,
+}
+
+/// One cooling system of a building with several (§10.2).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServedCoolingResult {
+    /// Indexes of the calculation zones the system serves.
+    pub zone_indexes: Vec<usize>,
+    pub assessment: CoolingAssessment,
+}
+
+/// §10.2: the building total of several cooling systems, each calculated
+/// for its own zones. Monthly energy is summed; the cooling limit, the
+/// internal-temperature shift and the operating hours are those of the
+/// first system (each system keeps its own in `systems`).
+pub fn combine_cooling(parts: Vec<ServedCoolingResult>, zone_count: usize) -> CoolingAssessment {
+    let mut months: Vec<CoolingMonth> = (1..=12)
+        .map(|month| CoolingMonth {
+            month,
+            ..CoolingMonth::default()
+        })
+        .collect();
+    let mut zone_booster = vec![[0.0; 12]; zone_count];
+    let mut shares = Vec::new();
+    let mut interpretations: Vec<&'static str> = Vec::new();
+    for (system_index, part) in parts.iter().enumerate() {
+        let result = &part.assessment;
+        for (total, month) in months.iter_mut().zip(&result.months) {
+            if system_index == 0 {
+                total.operating_hours = month.operating_hours;
+            }
+            total.need_kwh += month.need_kwh;
+            total.emission_loss_kwh += month.emission_loss_kwh;
+            total.distribution_loss_kwh += month.distribution_loss_kwh;
+            total.pump_recovered_kwh += month.pump_recovered_kwh;
+            total.booster_extraction_kwh += month.booster_extraction_kwh;
+            total.dehumidification_kwh += month.dehumidification_kwh;
+            total.ahu_cooling_kwh += month.ahu_cooling_kwh;
+            total.generator_cold_kwh += month.generator_cold_kwh;
+            total.electricity_kwh += month.electricity_kwh;
+            total.natural_gas_kwh += month.natural_gas_kwh;
+            total.district_heat_kwh += month.district_heat_kwh;
+            total.district_heat_cold_kwh += month.district_heat_cold_kwh;
+            total.chp_heat_kwh += month.chp_heat_kwh;
+            total.chp_electricity_kwh += month.chp_electricity_kwh;
+            total.district_cold_kwh += month.district_cold_kwh;
+            total.auxiliary_electricity_kwh += month.auxiliary_electricity_kwh;
+            total.ambient_cold_kwh += month.ambient_cold_kwh;
+            total.part_load_coverage = match (total.part_load_coverage, month.part_load_coverage) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+        }
+        for (local, zone) in part.zone_indexes.iter().enumerate() {
+            if let (Some(target), Some(source)) = (
+                zone_booster.get_mut(*zone),
+                result.zone_booster_extraction_kwh.get(local),
+            ) {
+                *target = *source;
+            }
+        }
+        shares.extend(result.generator_shares.iter().cloned().map(|mut share| {
+            share.id = format!("system{system_index}:{}", share.id);
+            share
+        }));
+        for item in &result.interpretations {
+            if !interpretations.contains(item) {
+                interpretations.push(item);
+            }
+        }
+    }
+    let first = parts.first().map(|part| &part.assessment);
+    CoolingAssessment {
+        cooling_limit_c: first.map_or(0.0, |item| item.cooling_limit_c),
+        internal_temperature_shift_k: first.map_or(0.0, |item| item.internal_temperature_shift_k),
+        generator_shares: shares,
+        months,
+        zone_booster_extraction_kwh: zone_booster,
+        interpretations,
+        systems: parts,
+    }
 }
 
 fn round_down(value: f64, step: f64) -> f64 {
@@ -2309,6 +2394,7 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
         months,
         interpretations: COOLING_INTERPRETATIONS.to_vec(),
         zone_booster_extraction_kwh: zone_booster,
+        systems: Vec::new(),
     }
 }
 

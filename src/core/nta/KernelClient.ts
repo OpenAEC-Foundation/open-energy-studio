@@ -2596,6 +2596,10 @@ export interface ResidentialSurvey {
   /** Building-bound storage (§15.5); requires PV. */
   storage?: OpnameStorage | null;
   coolingPresent?: boolean;
+  /** ISSO 82.1 chapter 10: the dwelling's main cooling system (same fields as the utility survey). */
+  cooling?: UtilitySurvey['cooling'];
+  /** The cooling generator serves several dwellings. */
+  coolingCollective?: boolean;
   sourceReference: string;
   /** Adviser's reason per applied default (path or rule) for the forfait ("inklappen", BRL 9500 §4.2.2). */
   inklapRedenen?: Record<string, string>;
@@ -2970,6 +2974,10 @@ export interface BuildingPerformanceInput {
     collective?: { buildingUsableFloorAreaM2: number; sourceReference: string } | null;
     sourceReference: string;
   }>;
+  /** Chapter 10: one cooling system serving every calculation zone. */
+  cooling?: NtaCoolingSystem | null;
+  /** §10.2: several cooling systems with the calculation zones they serve; exclusive with `cooling`. */
+  coolingSystems?: Array<{ zoneIds: string[]; system: NtaCoolingSystem }>;
   hotWater?: NtaHotWaterSystem | null;
   /** §13.7 solar systems for space heating only (SHS), without a hot-water system. */
   spaceHeatingSolar?: NtaSolarWaterHeater[];
@@ -3600,6 +3608,8 @@ export interface NtaCalculationInput {
   /** Utility lighting per calculation zone (NTA 8800 chapter 14). */
   lighting?: NtaZoneLighting[];
   cooling?: NtaCoolingSystem | null;
+  /** §10.2: several cooling systems with the calculation zones they serve; exclusive with `cooling`. */
+  coolingSystems?: Array<{ zoneIds: string[]; system: NtaCoolingSystem }>;
   labelFunction?: NtaLabelFunction | null;
   /** §5.3.1: use functions of an existing utility building (label bounds and table 5.7 weighted by area). */
   labelFunctions?: Array<{ function: NtaLabelFunction; areaM2: number }>;

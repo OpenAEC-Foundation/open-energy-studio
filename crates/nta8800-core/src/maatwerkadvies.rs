@@ -1143,12 +1143,11 @@ pub fn system_performance_checks(
     checks.push(check(
         "space_cooling",
         None,
-        input.cooling.as_ref().map(|_| LIMIT_COOLING),
+        input.has_cooling().then_some(LIMIT_COOLING),
         "-",
         input
-            .cooling
-            .as_ref()
-            .map(|_| "chapter 10 primary energy per system is not reported; check separately"),
+            .has_cooling()
+            .then_some("chapter 10 primary energy per system is not reported; check separately"),
     ));
     // 3. Hot water: (E_W − E_W;WKK) / Q_W;nd.
     let hot_water = result.hot_water.as_ref().map(|water| {

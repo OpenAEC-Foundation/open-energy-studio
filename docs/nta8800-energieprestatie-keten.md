@@ -840,3 +840,24 @@ De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indic
 - Factor: direct gestookt axiaal 0,014, radiaal 0,022; indirect 0,004–0,013. Bij een onbekende eigenschap geldt de hoogste waarde.
 - Q_h;b komt uit NEN-EN 12831-1, of anders uit de schatting van tabel 9.12: Q_H;ht van januari van 21 °C naar −10 °C, plus (√A_g·4·3 + A_g)·5 W.
 - Het resultaat telt bij de afgiftehulpenergie (`emissionFanElectricityKwh`).
+
+## Meerdere koelsystemen per gebouw (§10.2)
+
+Met `coolingSystems` kan een gebouw meer dan één koelsysteem krijgen. Elk systeem bedient de rekenzones in zijn eigen `zoneIds`. Het oude veld `cooling` blijft werken: één systeem voor alle zones. De twee velden sluiten elkaar uit (`cooling_and_cooling_systems_exclusive`).
+
+**Rekenwijze.**
+- Hoofdstuk 10 rekent per systeem alleen met de koudebehoefte, de LBK-koellast en de koelgrensbehoefte van de eigen zones.
+- Een zone die door geen systeem wordt bediend, is niet gekoeld. Zo'n zone geeft geen koude-energie, en het bewijs voor actieve koeling (§5.7.1) geldt er niet voor TOjuli.
+- Een zone mag maar bij één systeem horen (`cooling_zone_served_twice`). Een onbekende zone geeft `cooling_zone_unknown`.
+
+**Gebouwtotaal.** De resultaten worden per maand opgeteld. De totalen en de dragers lopen daarna ongewijzigd door de energieprestatie.
+- Koelgrens en bedrijfstijd van het totaal zijn die van het eerste systeem. Elk systeem houdt zijn eigen waarden onder `systems`.
+- De opwekkers krijgen het voorvoegsel `systemN:`.
+
+**Interpretatie.** De bronwarmte-onttrekking van de verwarmingswarmtepomp (10.84) gaat alleen naar het eerste systeem, zodat die niet dubbel telt.
+
+In de projectroute komen de systemen uit `ntaCalculation.coolingSystems`, met de zone-id's van het project.
+
+**Absorptiekoeling op externe warmte (tabel 10.30).** Hiervoor geldt ζ = 0,70 × η_H;gen;equiv;dh. Volgens 9.6.7.2 heeft η_H;gen;equiv;dh de vaste waarde 1,0; de kern rekent dus al conform. Bijlage P verandert de primaire factor van de warmte, niet dit rendement.
+
+**Niet gekoppeld.** De koude-onttrekking van een boosterwarmtepomp (W.3) wordt niet automatisch als Q_C;HP (10.6) aan de koeling doorgegeven. Beide blijven invoer: `cooling.boosterHeatPumpExtractionKwh` en `coolingExtractionKwh` van bijlage W.

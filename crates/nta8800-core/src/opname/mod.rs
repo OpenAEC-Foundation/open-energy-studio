@@ -9,10 +9,9 @@
 //! ISSO page for the dossier. ISSO prose is not reproduced; values are
 //! transcribed and cited.
 //!
-//! Not covered (rejected with a code or reported as a warning): cooling,
-//! collective installations, CHP, solar water heating, several heating
-//! generators, sunrooms (AOS), detail-survey (detailopname) routes and
-//! quality declarations other than a measured q_v10.
+//! Not covered (rejected with a code or reported as a warning): sunrooms
+//! (AOS), detail-survey (detailopname) routes and quality declarations
+//! other than a measured q_v10.
 
 pub mod envelope;
 pub mod general;
@@ -234,9 +233,16 @@ pub struct ResidentialSurvey {
     /// Building-bound electrical or thermal storage (§15.5).
     #[serde(default)]
     pub storage: Option<production::SurveyStorage>,
-    /// Building-bound cooling present; not covered by this layer yet.
+    /// Building-bound cooling present. Without `cooling` the survey is
+    /// rejected, because chapter 10 needs the system data.
     #[serde(default)]
     pub cooling_present: bool,
+    /// ISSO 82.1 chapter 10: the main cooling system of the dwelling.
+    #[serde(default)]
+    pub cooling: Option<utility::SurveyCooling>,
+    /// The cooling generator is collective (several dwellings).
+    #[serde(default)]
+    pub cooling_collective: bool,
     pub source_reference: String,
     /// Reason per applied default (path or rule) for falling back on the
     /// forfait (BRL 9500-W §4.2.2).
@@ -271,8 +277,9 @@ fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
     if !(survey.building_height_m.is_finite() && survey.building_height_m > 0.0) {
         recorder.issue("building_height_invalid", "buildingHeightM");
     }
-    if survey.cooling_present {
-        recorder.issue("cooling_not_supported_in_basisopname", "coolingPresent");
+    if survey.cooling_present && survey.cooling.is_none() {
+        // ISSO 82.1 §10.2: a cooled zone needs the cooling system data.
+        recorder.issue("cooling_system_data_required", "cooling");
     }
     for (field, value) in [
         ("sourceReference", &survey.source_reference),
@@ -342,7 +349,13 @@ pub fn derive_residential_input(
     let airtightness = general::airtightness_type(&survey.dwelling, recorder);
     let infiltration_year = general::infiltration_year(year, survey.renovation.as_ref(), recorder);
     let (floor, wall, ceiling) = general::thermal_mass(&survey.construction);
-    let envelope = envelope::derive_envelope(&survey.envelope, year, recorder);
+    // Table 8.24/8.25: the shading rows depend on cooling in the zone.
+    let envelope = envelope::derive_envelope_with_cooling(
+        &survey.envelope,
+        year,
+        survey.cooling.is_some(),
+        recorder,
+    );
     let ventilation = ventilation::derive_ventilation(
         &survey.ventilation,
         dwelling_kind,
@@ -492,6 +505,17 @@ pub fn derive_residential_input(
     if let Some(renewable) = heating.heat_pump_renewable {
         input["heatPumpRenewable"] = renewable;
     }
+    // ISSO 82.1 chapter 10: the main cooling system of the zone.
+    if let Some(cooling) = &survey.cooling {
+        input["cooling"] = utility::cooling_value(
+            cooling,
+            year,
+            storeys,
+            utility::CoolingBook::Residential,
+            !survey.cooling_collective,
+            recorder,
+        );
+    }
     Some(input)
 }
 
@@ -634,7 +658,7 @@ mod tests {
         assert_eq!(result.status, "invalid");
         let codes: Vec<_> = result.issues.iter().map(|item| item.code).collect();
         assert!(codes.contains(&"tap_length_required"));
-        assert!(codes.contains(&"cooling_not_supported_in_basisopname"));
+        assert!(codes.contains(&"cooling_system_data_required"));
     }
 
     #[test]
@@ -653,6 +677,55 @@ mod tests {
         let input = derive_residential_input(&survey, &mut recorder).unwrap();
         let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
         assert!(pipes.as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn dwelling_with_split_airco_is_cooled_per_isso_82_1_chapter_10() {
+        let mut survey = fixture("2015");
+        let base = assess_residential_survey(&survey);
+        survey.cooling_present = true;
+        survey.cooling = Some(
+            serde_json::from_value(json!({
+                "generator": "room_air_conditioner",
+                "emitter": "split_indoor_units_on_wall",
+                "fanCoilCount": 3,
+                "waterBased": false,
+                "sourceReference": "survey photos"
+            }))
+            .unwrap(),
+        );
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let input = result.derived_input.as_ref().unwrap();
+        assert!(input.cooling.is_some());
+        // Split indoor units count as fan convectors, cited from ISSO 82.1.
+        assert!(result.applied_defaults.iter().any(|item| {
+            item.rule == "split_indoor_units_fan_coils" && item.source.starts_with("ISSO 82.1")
+        }));
+        // Cooling adds electricity to the dwelling.
+        let electricity = |assessment: &OpnameAssessment| -> f64 {
+            assessment
+                .performance
+                .as_ref()
+                .unwrap()
+                .carriers
+                .iter()
+                .filter(|row| row.carrier == "el")
+                .map(|row| row.used_kwh)
+                .sum()
+        };
+        assert!(electricity(&result) > electricity(&base));
+        // Without the system data the survey is rejected.
+        survey.cooling = None;
+        let missing = assess_residential_survey(&survey);
+        assert!(missing
+            .issues
+            .iter()
+            .any(|item| item.code == "cooling_system_data_required"));
     }
 
     #[test]
