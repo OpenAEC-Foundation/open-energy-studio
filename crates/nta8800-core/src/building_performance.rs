@@ -861,9 +861,13 @@ pub struct BuildingPerformanceAssessment {
 /// Annual η_W;dis (13.25) below which circulation defaults are flagged.
 pub const CIRCULATION_EFFICIENCY_WARNING: f64 = 0.2;
 
+/// Monthly micro-CHP heat above full load (9.66) that is reported, kWh.
+const CHP_EXCESS_WARNING_KWH: f64 = 0.5;
+
 /// Warnings on the cooling and hot-water results (no effect on the result).
 fn result_warnings(
     input: &BuildingPerformanceInput,
+    heating: &SpaceHeatingChainAssessment,
     cooling: Option<&CoolingAssessment>,
     hot_water: Option<&HotWaterAssessment>,
 ) -> Vec<PerformanceIssue> {
@@ -876,6 +880,46 @@ fn result_warnings(
                 .collect()
         })
         .unwrap_or_default();
+    // 9.66: micro-CHP heat above P_th;chp_100+sup_100·t earns no electricity
+    // (16.15) and is booked as supplementary heat (interpretation).
+    if heating
+        .monthly
+        .iter()
+        .any(|month| month.chp_excess_kwh > CHP_EXCESS_WARNING_KWH)
+    {
+        warnings.push(issue(
+            "micro_chp_capacity_exceeded",
+            "spaceHeating.generator.method1",
+        ));
+    }
+    if hot_water.is_some_and(|result| {
+        result
+            .months
+            .iter()
+            .any(|month| month.chp_excess_kwh > CHP_EXCESS_WARNING_KWH)
+    }) {
+        warnings.push(issue(
+            "micro_chp_capacity_exceeded",
+            "hotWater.generator.method1",
+        ));
+    }
+    warnings.extend(pvt_warnings(input));
+    // 13.134 applied as printed: Σ f_dis < 1 raises the solar yield of an
+    // integrated-backup system tested as a whole.
+    for (index, heater) in input
+        .hot_water
+        .iter()
+        .chain(&input.additional_hot_water_systems)
+        .flat_map(|system| system.solar.iter())
+        .enumerate()
+    {
+        if crate::solar_thermal::tested_backup_distribution_below_one(heater) {
+            warnings.push(issue(
+                "solar_tested_backup_distribution_below_one",
+                format!("hotWater.solar[{index}].method"),
+            ));
+        }
+    }
     // 13.25 with the defaults of 13.31/table 13.4/13.29: correct per the
     // norm, but an extreme η_W;dis usually means the defaults do not
     // describe the installation.
@@ -913,6 +957,53 @@ fn result_warnings(
                 .into_iter()
                 .map(|item| issue(item.code, item.path)),
         );
+    }
+    warnings
+}
+
+/// §16.3 and 13.7.2.4: a PVT system has an electrical part (table 16.4 on
+/// the PV system) and a thermal part (table 13.16 on the solar water
+/// heater). The inputs carry no link, so the building is checked as a
+/// whole: each part needs a counterpart with the same cover.
+fn pvt_warnings(input: &BuildingPerformanceInput) -> Vec<PerformanceIssue> {
+    use crate::pv::PvtCover as Electric;
+    use crate::solar_thermal::PvtCover as Thermal;
+    let electric: Vec<(usize, Electric)> = input
+        .pv_systems
+        .iter()
+        .enumerate()
+        .filter_map(|(index, system)| system.pvt.map(|cover| (index, cover)))
+        .collect();
+    let thermal: Vec<(usize, Thermal)> = input
+        .hot_water
+        .iter()
+        .chain(&input.additional_hot_water_systems)
+        .flat_map(|system| system.solar.iter())
+        .enumerate()
+        .filter_map(|(index, heater)| heater.pvt.map(|cover| (index, cover)))
+        .collect();
+    // Unglazed pairs with unglazed; a single glass cover with single
+    // glazing or an NEN-EN-ISO 9806 test of the thermal part.
+    let matches = |e: Electric, t: Thermal| match e {
+        Electric::Unglazed => t == Thermal::Unglazed,
+        Electric::Glazed { .. } => t != Thermal::Unglazed,
+    };
+    let mut warnings = Vec::new();
+    for (index, cover) in &electric {
+        let path = format!("pvSystems[{index}].pvt");
+        if thermal.is_empty() {
+            warnings.push(issue("pvt_without_thermal_part", path));
+        } else if !thermal.iter().any(|(_, t)| matches(*cover, *t)) {
+            warnings.push(issue("pvt_cover_inconsistent", path));
+        }
+    }
+    for (index, cover) in &thermal {
+        let path = format!("hotWater.solar[{index}].pvt");
+        if electric.is_empty() {
+            warnings.push(issue("pvt_without_electric_part", path));
+        } else if !electric.iter().any(|(_, e)| matches(*e, *cover)) {
+            warnings.push(issue("pvt_cover_inconsistent", path));
+        }
     }
     warnings
 }
@@ -2776,7 +2867,7 @@ pub fn assess_building_performance(
             apply_combi_chp_heating(&mut heating, shares, product.fuel);
         }
     }
-    let warnings = result_warnings(input, cooling.as_ref(), hot_water.as_ref());
+    let warnings = result_warnings(input, &heating, cooling.as_ref(), hot_water.as_ref());
     let mut external = resolve_external(input, &mut issues);
     let mut forfait_totals = None;
     if issues.is_empty() {
@@ -4563,6 +4654,35 @@ mod tests {
             micro_chp_month(&product, q_h, row.chp_operating_hours, 744.0, 1.0, false).unwrap();
         let alone_w = micro_chp_month(&product, q_w, t_w, 744.0, 1.0, false).unwrap();
         assert!(joint.input_kwh < alone_h.input_kwh + alone_w.input_kwh);
+    }
+
+    #[test]
+    fn pvt_parts_are_cross_checked() {
+        let mut sample = input();
+        let codes = |sample: &BuildingPerformanceInput| -> Vec<&'static str> {
+            pvt_warnings(sample)
+                .into_iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        assert!(codes(&sample).is_empty());
+        sample.pv_systems.push(PvSystem {
+            id: "pvt".into(),
+            peak_power: crate::pv::PeakPower::Panels {
+                panel_peak_power_w: 300.0,
+                panel_count: 4,
+            },
+            azimuth_deg: 180.0,
+            tilt_deg: 35.0,
+            mounting: crate::pv::PvMounting::ModeratelyVentilated,
+            obstruction_factors: vec![1.0],
+            obstruction: None,
+            collective: None,
+            pvt: Some(crate::pv::PvtCover::Unglazed),
+            source_reference: "datasheet".into(),
+        });
+        // An electrical PVT part without any thermal part.
+        assert_eq!(codes(&sample), vec!["pvt_without_thermal_part"]);
     }
 
     #[test]

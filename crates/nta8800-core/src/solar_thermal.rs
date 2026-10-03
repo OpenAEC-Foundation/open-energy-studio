@@ -54,6 +54,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "13.129 (method 1) is applied per physical system and per building part as in 13.96: Q_W;sol;us/(f_gebouw;si;W·N_soli)",
     "13.130 is not extrapolated: an annual demand outside the tested range is rejected",
     "13.134: a negative monthly Q_W;ren of an integrated-backup system tested as a whole is set to 0",
+    "13.134 (p. 602) is applied as printed: Q_W;ren = Q_W;use − f_dis·Q_W;bu;out, so Σ f_dis below 1 (a worse orientation or more obstruction than south 45° unobstructed) shrinks the backup share and raises the solar yield. This is a defect of the norm; the kernel keeps the formula and reports solar_tested_backup_distribution_below_one",
     "13.77/13.85: Q_H;sol;us is the space-heating node output plus node losses of the chain before solar gains; the hot-water recoverable losses feeding that chain run do not yet include the solar losses (no iteration, cf. the note at 13.77)",
 ];
 
@@ -848,6 +849,51 @@ pub fn interpolate_test(points: &[(f64, f64)], demand_kwh: f64) -> Option<f64> {
     Some(last.1)
 }
 
+/// 13.128: the monthly distribution factors `f_dis;mi` of a tested system,
+/// I_sol·F_sh·t over the annual south-45° irradiation.
+pub fn tested_distribution(
+    orientation: Orientation,
+    tilt_deg: f64,
+    obstruction: &Obstruction,
+) -> [f64; 12] {
+    let incident = plane(orientation, tilt_deg, obstruction);
+    // 13.128 with I_sol;s45;an·t_an.
+    let reference: f64 = (0..12)
+        .map(|index| {
+            irradiance_w_per_m2(Orientation::South, 45.0, index as u8 + 1).unwrap_or(0.0)
+                * MONTH_HOURS[index]
+        })
+        .sum();
+    std::array::from_fn(|index| {
+        let (irradiance, obstruction) = incident[index];
+        irradiance * obstruction * MONTH_HOURS[index] / reference
+    })
+}
+
+/// Σ f_dis below which 13.134 (integrated backup, tested as a whole) gives
+/// more renewable heat for a worse orientation or more obstruction.
+pub const TESTED_DISTRIBUTION_WARNING: f64 = 1.0 - 1e-6;
+
+/// Whether a solar water heater is an integrated-backup system tested as a
+/// whole whose Σ f_dis is below 1 (`solar_tested_backup_distribution_below_one`).
+pub fn tested_backup_distribution_below_one(heater: &SolarWaterHeater) -> bool {
+    match &heater.method {
+        SolarMethod::Tested {
+            solar_type: SolarType::IntegratedBackup,
+            orientation,
+            tilt_deg,
+            obstruction,
+            ..
+        } => {
+            tested_distribution(*orientation, *tilt_deg, obstruction)
+                .iter()
+                .sum::<f64>()
+                < TESTED_DISTRIBUTION_WARNING
+        }
+        _ => false,
+    }
+}
+
 /// 13.7.2.3 hot water of one physical system tested as a whole; `None`
 /// when the annual demand lies outside the tested range.
 #[allow(clippy::too_many_arguments)]
@@ -862,18 +908,7 @@ pub fn tested_water(
     hot_water_c: f64,
     ambient_c: [f64; 12],
 ) -> Option<[ServiceMonth; 12]> {
-    let incident = plane(orientation, tilt_deg, obstruction);
-    // 13.128 with I_sol;s45;an·t_an.
-    let reference: f64 = (0..12)
-        .map(|index| {
-            irradiance_w_per_m2(Orientation::South, 45.0, index as u8 + 1).unwrap_or(0.0)
-                * MONTH_HOURS[index]
-        })
-        .sum();
-    let distribution: [f64; 12] = std::array::from_fn(|index| {
-        let (irradiance, obstruction) = incident[index];
-        irradiance * obstruction * MONTH_HOURS[index] / reference
-    });
+    let distribution = tested_distribution(orientation, tilt_deg, obstruction);
     let annual: f64 = use_kwh.iter().sum();
     let pick = |value: fn(&SolarTestPoint) -> Option<f64>| -> Option<f64> {
         let points: Option<Vec<(f64, f64)>> = test_points
@@ -1093,6 +1128,52 @@ mod tests {
         let h = (10.25 + 5.09 * 250.0_f64.powf(0.4)) / 45.0;
         let expected = h * 100.0 / 250.0 * 40.0 * MONTH_HOURS[0] / 1000.0;
         assert!((months[0].backup_storage_loss_kwh - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn tested_backup_flags_a_distribution_below_one() {
+        let heater = |solar_type, obstruction| SolarWaterHeater {
+            id: "sol".into(),
+            solar_use: SolarUse::WaterHeating,
+            count: 1,
+            method: SolarMethod::Tested {
+                solar_type,
+                orientation: Orientation::South,
+                tilt_deg: 37.5,
+                obstruction,
+                total_volume_l: 200.0,
+                test_points: Vec::new(),
+                backup_loss_in_generator_efficiency: false,
+                source_reference: "test".into(),
+            },
+            pvt: None,
+            source_reference: "test".into(),
+        };
+        // South 45° unobstructed: Σ f_dis = 1, no flag.
+        let open = SolarWaterHeater {
+            method: SolarMethod::Tested {
+                solar_type: SolarType::IntegratedBackup,
+                orientation: Orientation::South,
+                tilt_deg: 45.0,
+                obstruction: Obstruction::Minimal,
+                total_volume_l: 200.0,
+                test_points: Vec::new(),
+                backup_loss_in_generator_efficiency: false,
+                source_reference: "test".into(),
+            },
+            ..heater(SolarType::IntegratedBackup, Obstruction::Minimal)
+        };
+        assert!(!tested_backup_distribution_below_one(&open));
+        // Fully obstructed: Σ f_dis < 1 raises Q_W;ren by 13.134.
+        let full = heater(SolarType::IntegratedBackup, Obstruction::Full);
+        let distribution = tested_distribution(Orientation::South, 37.5, &Obstruction::Full);
+        assert!(distribution.iter().sum::<f64>() < 1.0);
+        assert!(tested_backup_distribution_below_one(&full));
+        // A preheater (13.131) scales its output down instead: not flagged.
+        assert!(!tested_backup_distribution_below_one(&heater(
+            SolarType::Preheater,
+            Obstruction::Full
+        )));
     }
 
     #[test]

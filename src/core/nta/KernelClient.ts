@@ -4699,6 +4699,8 @@ export interface NtaHotWaterAssessment {
     heatingSystemLoadKwh: number;
     /** 16.13/16.16 electricity of a hot-water CHP, kWh. */
     chpElectricityKwh: number;
+    /** 9.66: hot-water heat above the CHP full load, booked without electricity, kWh. */
+    chpExcessKwh?: number;
   }>;
   generators: Array<{ index: number; order: number; monthlyOutputKwh: number[]; monthlyShare: number[] }>;
   /** 13.148/13.149 data of an exhaust-air heat pump. */

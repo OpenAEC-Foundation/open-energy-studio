@@ -164,6 +164,26 @@ Hoofdstuk 13 kwam op elke maandterm overeen. In hoofdstuk 10 bleek één echte f
 - **10.63/10.64 (p. 408–409).** Het vijfde meetpunt moet de deellast van C en de condensorintrede van A hebben. Zonder vijfde punt moet de verdamperuittrede bij A en C gelijk zijn, anders is 10.64 met Δϑ_corr = 0 niet consistent. Beide worden nu gecontroleerd (tolerantie 0,5).
 - **§10.5.4 (p. 401).** Methode 1 is voor modulerende opwekkers; de kern eist een minimumvermogen onder het nominale vermogen.
 
+**Herberekening van PV (H16), zonneboilers en micro-WKK, 5 oktober 2026.** Eigen Python-implementatie vanuit de normpagina's. De tabellen 17.2, 17.12 en 17.15 zijn zelf uit de pdf gelezen. Getest zijn:
+- PV: 16.2–16.4b, PVT (16.10) en de collectieve verdeling;
+- zonneboilers: de berekende route (13.72–13.127) en de geteste route (13.128–13.140), voor voorverwarmer en geïntegreerde naverwarming;
+- micro-WKK: 9.66–9.83 en 16.15.
+
+Alle maandtermen kwamen overeen. Vastgelegd of aangepast:
+- **9.66/16.15: warmte boven vollast (gecorrigeerd).** 9.66 (p. 347) begrenst P_th;gen;out op P_th;chp_100+sup_100. 16.15 (p. 687) rekent alleen P_el·t bij dat begrensde vermogen.
+  - De kern boekte het overschot met η_el van het vollastpunt, en dus met elektriciteit. Voorbeeld: Stirling, 9 000 kWh in 300 h → 391 kWh in plaats van 313 kWh (+25 %).
+  - Nu levert het overschot geen elektriciteit.
+  - De norm wijst het overschot aan geen opwekker toe. Letterlijk zou het zelfs geen brandstof kosten. De kern boekt de invoer daarom als bijstookwarmte tegen f_prac·η_th;chp_100+sup_100 (interpretatie). Ze meldt dan de waarschuwing `micro_chp_capacity_exceeded`, ook in tapwater wanneer f_func van 13.183 begrenst.
+- **16.15: f_gebouw bij een collectieve WKK (interpretatie, ongewijzigd).** De gedrukte 16.15 heeft geen f_gebouw. 9.66 rekent echter met de output van de hele installatie (Q_H;gen;j;out/f_gebouw), dus P_el·t is de productie van de hele installatie. Zonder f_gebouw zou één gebouwdeel alle elektriciteit krijgen.
+- **Nummering van de methoden (normpunt).** Hoofdstuk 9 noemt de forfaitaire route methode 2 (9.6.6.1) en de NEN-EN 50465-route methode 1 (9.6.6.2); §16.4.2/16.4.3 nummeren andersom. De kern volgt hoofdstuk 9. §13.8.4.8.3/13.8.4.8.4 (p. 651) verwijzen voor de WKK naar 9.6.5.2; dat lezen we als 9.6.6.2.
+- **Oriëntatie precies tussen twee tabelrichtingen (17.3.7, p. 749).** De norm staat de hoogste naastliggende belemmeringswaarde toe ("mag"). De kern nam altijd de rechtsom liggende buur en neemt nu per maand de hoogste, net als bij I_sol in 17.2 (p. 694, waar het "moet"). Voorbeeld: 22,5° bij 45° met een dakrand gaf 476,6 kWh; nu de hogere waarde van N en NO.
+- **13.134: geteste zonneboiler met geïntegreerde naverwarming (normpunt, letterlijk met waarschuwing).** Q_W;ren = Q_W;use − f_dis·Q_W;bu;out (p. 602). Bij Σ f_dis < 1, dus een slechtere oriëntatie of meer belemmering dan zuid 45° vrij, krimpt het naverwarmingsdeel en stijgt de zonne-opbrengst. Volledig belemmerd zuid 37,5° geeft 1 920 in plaats van 931 kWh/jr. De kern houdt de formule aan en meldt `solar_tested_backup_distribution_below_one`.
+- **Tabel 16.3 onder F_sh;obst 0,80 (interpretatie).** De tabel loopt van 0,80 tot 1,00 en geeft geen regel daarbuiten. De kern houdt 0,75 vast, zoals andere tabellen aan hun randen. De opbrengst van 16.2/16.3 daalt wel verder met F_sh;obst zelf.
+- **Nieuwe controles:**
+  - η_th + η_el ≤ 1,2 per meetpunt (tabel 9.33, `micro_chp_total_efficiency_invalid`);
+  - P_el en η_el van één meetpunt moeten op 2 % na overeenkomen (`micro_chp_electric_values_inconsistent`);
+  - een PVT-paneel en een PVT-zonneboiler moeten elkaar in het gebouw hebben, met een passende afdekking (`pvt_without_thermal_part`, `pvt_without_electric_part`, `pvt_cover_inconsistent`; niet-blokkerend, omdat de invoer geen koppeling heeft).
+
 **Onafhankelijke reviews.** Elk hoofdstuk is door een tweede, onafhankelijke controle tegen de gerenderde normpagina's gelegd. De fouten die daaruit kwamen, zijn hersteld en staan in de secties hieronder en in de moduledocumentatie. Voorbeelden:
 
 - tabel 11.19 een kolom verschoven;

@@ -2,6 +2,24 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — micro-WKK, PV en zonneboilers na de herberekening
+
+### Projecten die nu `invalid` worden
+
+- **Micro-WKK met een totaalrendement boven 1,2.** Tabel 9.33 begrenst η_th + η_el per meetpunt op [0; 1,2]: `micro_chp_total_efficiency_invalid`.
+- **Micro-WKK met tegenstrijdige elektrische meetwaarden.** Zijn P_el en η_el allebei opgegeven, dan moeten ze op 2 % na passen bij P_th·η_el/η_th: `micro_chp_electric_values_inconsistent`.
+
+### Projecten met een andere uitkomst
+
+- **Micro-WKK boven vollast (9.66/16.15).** Warmte boven P_th;chp_100+sup_100·t levert geen eigen elektriciteit meer op. De invoer van dat overschot blijft geboekt als bijstookwarmte. Lagere opgewekte elektriciteit betekent een hogere primaire fossiele energie.
+- **PV met een belemmering, precies tussen twee oriëntaties (17.3.7).** Bij een azimut van 22,5°, 67,5° enzovoort geldt nu per maand de hoogste belemmeringsfactor van de twee buren. Eerder gold altijd de rechtsom liggende buur.
+
+### Nieuwe waarschuwingen (de berekening loopt door)
+
+- `micro_chp_capacity_exceeded`: de micro-WKK levert in een maand meer warmte dan zijn vollastvermogen (verwarming of tapwater).
+- `solar_tested_backup_distribution_below_one`: geteste zonneboiler met geïntegreerde naverwarming en Σ f_dis < 1; 13.134 verhoogt dan de zonne-opbrengst.
+- `pvt_without_thermal_part`, `pvt_without_electric_part` en `pvt_cover_inconsistent`: het elektrische en het thermische deel van een PVT-systeem passen niet bij elkaar.
+
 ## 5 oktober 2026 — reviewcorrecties woningopname (ISSO 82.1)
 
 ### Opnames die nu `incomplete` worden
