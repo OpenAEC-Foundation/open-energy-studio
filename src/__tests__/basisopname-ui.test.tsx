@@ -333,8 +333,22 @@ describe('basisopname panel', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Calculation zone of lighting zone kantoren' }), 'kantoor');
     expect(stored()!.survey.lighting[0].zoneId).toBe('kantoor');
 
+    // Renaming a zone moves its references along (p. 147 and p. 65 fields per zone).
+    await user.type(screen.getAllByRole('textbox', { name: 'Zone name' })[0], 'x');
+    expect(stored()!.survey.lighting[0].zoneId).toBe('kantoorx');
+    await user.type(screen.getAllByRole('spinbutton', {
+      name: "Installed ventilation capacity of this zone, dm³/s (p. 147; empty: share of the building's capacity by A_g)",
+    })[0], '800');
+    await user.type(screen.getAllByRole('spinbutton', { name: 'Swimming-pool room in this zone, m² (p. 65)' })[1], '120');
+    expect(stored()!.survey.zones[0].installedCapacityDm3PerS).toBe(800);
+    expect(stored()!.survey.zones[1].swimmingPoolAreaM2).toBe(120);
+
+    // Removing a zone clears the references to it.
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Calculation zone' })[0], 'zone2');
     await user.click(screen.getAllByRole('button', { name: 'Remove zone' })[1]);
     expect(stored()!.survey.zones).toHaveLength(1);
+    expect(stored()!.survey.envelope.surfaces[0].zoneId).toBeNull();
+    expect(stored()!.survey.lighting[0].zoneId).toBe('kantoorx');
     expect(screen.queryAllByRole('combobox', { name: 'Calculation zone' })).toHaveLength(0);
   }, 60000);
 

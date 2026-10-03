@@ -235,34 +235,73 @@ function GasEngineFields({ draft, base, change, t }: { draft: Draft; base: Path;
   </>;
 }
 
-/** ISSO 75.1 §10.3.2–§10.4.5 (p. 131–137): further generators and the distribution answers. */
-/** Zone of a surface or lighting zone; empty: split by A_g (surfaces) or not set. */
-function ZoneSelect({ draft, change, path, label, ids, empty }: {
-  draft: Draft; change: Change; path: Path; label: string; ids: string[]; empty: string;
+/** Zone of a surface or lighting zone; empty: split by A_g (surfaces) or not set. A reference to a zone that
+ * no longer exists is shown as such, so the kernel's `surface_zone_unknown` is visible in the form. */
+function ZoneSelect({ draft, change, path, label, ids, empty, unknown }: {
+  draft: Draft; change: Change; path: Path; label: string; ids: string[]; empty: string; unknown: string;
 }) {
   const value = read(draft, path);
+  const current = typeof value === 'string' ? value : '';
   return <label>{label}
-    <select value={typeof value === 'string' ? value : ''}
+    <select value={current}
       onChange={(event) => change(path, event.target.value === '' ? null : event.target.value)}>
       <option value="">{empty}</option>
+      {current !== '' && !ids.includes(current) && <option value={current}>{`${current} (${unknown})`}</option>}
       {ids.map((id) => <option key={id} value={id}>{id}</option>)}
     </select>
   </label>;
 }
 
+/** Rewrites the `zoneId` of surfaces and lighting zones from zone `from` to `to`, or clears them when `to` is null. */
+export function moveZoneReferences(draft: Draft, from: string, to: string | null): Draft {
+  const next = structuredClone(draft);
+  const lists = [read(next, ['envelope', 'surfaces']), read(next, ['lighting'])];
+  for (const items of lists) {
+    if (!Array.isArray(items)) continue;
+    for (const item of items as Array<Record<string, unknown>>) {
+      if (item && item.zoneId === from) item.zoneId = to;
+    }
+  }
+  return next;
+}
+
+/** Renames zone `index`; its references follow when the old name was unique and the new one is free. */
+export function renameZone(draft: Draft, index: number, id: string): Draft {
+  const zones = list(draft, ['zones']);
+  const old = String(zones[index]?.id ?? '');
+  const others = zones.filter((_, item) => item !== index).map((zone) => String(zone.id ?? ''));
+  const moved = old !== '' && id !== '' && !others.includes(old) && !others.includes(id)
+    ? moveZoneReferences(draft, old, id) : draft;
+  return write(moved, ['zones', index, 'id'], id);
+}
+
+/** Removes zone `index` and clears the references to it (unless another zone has the same name). */
+export function removeZone(draft: Draft, index: number): Draft {
+  const zones = list(draft, ['zones']);
+  const old = String(zones[index]?.id ?? '');
+  const others = zones.filter((_, item) => item !== index).map((zone) => String(zone.id ?? ''));
+  const cleared = old !== '' && !others.includes(old) ? moveZoneReferences(draft, old, null) : draft;
+  return write(cleared, ['zones'], zones.filter((_, item) => item !== index));
+}
+
 /** ISSO 75.1 §6.5 (afb. 6.6, p. 52–54): calculation zones with their use functions, and the zone per lighting zone. */
-export function CalculationZoneFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+export function CalculationZoneFields({ draft, change, replace, t }: {
+  draft: Draft; change: Change; replace: (next: Draft) => void; t: T;
+}) {
   const field = { draft, onChange: change };
   const zones = list(draft, ['zones']);
   const lighting = list(draft, ['lighting']);
   const ids = zones.map((zone) => String(zone.id ?? '')).filter((id) => id !== '');
+  const systemE = read(draft, ['ventilation', 'combined']) != null;
   return <>
     <p className="nta-form-note">{t('opname.zones.note')}</p>
     {zones.map((_, index) => {
       const base: Path = ['zones', index];
       const functions = list(draft, [...base, 'functions']);
+      const combined = read(draft, [...base, 'combined']) != null;
       return <div key={index} className="opname-item">
-        <TextField {...field} path={[...base, 'id']} label={t('opname.zones.id')} />
+        <TextField draft={draft} path={[...base, 'id']} label={t('opname.zones.id')}
+          onChange={(_, value) => replace(renameZone(draft, index, String(value ?? '')))} />
         {functions.map((_, functionIndex) => <div key={functionIndex} className="opname-served">
           <SelectField {...field} path={[...base, 'functions', functionIndex, 'function']} label={t('opname.zones.function')}
             options={opts(t, 'opname.functionKind', UTILITY_FUNCTIONS)} />
@@ -272,18 +311,31 @@ export function CalculationZoneFields({ draft, change, t }: { draft: Draft; chan
         </div>)}
         <ListControls label={t('opname.zones.addFunction')}
           onAdd={() => change([...base, 'functions'], [...functions, { function: 'office', areaM2: 0 }])} />
-        <RemoveButton label={t('opname.zones.remove')}
-          onRemove={() => change(['zones'], zones.filter((_, item) => item !== index))} />
+        <NumberField {...field} path={[...base, 'installedCapacityDm3PerS']} label={t('opname.zones.installedCapacity')} />
+        <NumberField {...field} path={[...base, 'swimmingPoolAreaM2']} label={t('opname.zones.swimmingPool')} />
+        {systemE && <label className="nta-form-check">
+          <input type="checkbox" checked={combined}
+            onChange={(event) => change([...base, 'combined'],
+              event.target.checked ? { decentralAreaM2: 0, totalResidenceAreaM2: 0 } : null)} />
+          {t('opname.zones.combined')}
+        </label>}
+        {systemE && combined && <>
+          <NumberField {...field} path={[...base, 'combined', 'decentralAreaM2']} label={t('opname.zones.combinedDecentral')} />
+          <NumberField {...field} path={[...base, 'combined', 'totalResidenceAreaM2']} label={t('opname.zones.combinedTotal')} />
+        </>}
+        <RemoveButton label={t('opname.zones.remove')} onRemove={() => replace(removeZone(draft, index))} />
       </div>;
     })}
     <ListControls label={t('opname.zones.add')}
       onAdd={() => change(['zones'], [...zones, calculationZoneTemplate(zones.length)])} />
     {ids.length > 1 && lighting.map((item, index) =>
       <ZoneSelect key={`l${index}`} draft={draft} change={change} path={['lighting', index, 'zoneId']}
-        label={`${t('opname.zones.lightingZone')} ${String(item.id ?? index)}`} ids={ids} empty={t('opname.zones.notSet')} />)}
+        label={`${t('opname.zones.lightingZone')} ${String(item.id ?? index)}`} ids={ids} empty={t('opname.zones.notSet')}
+        unknown={t('opname.zones.unknownZone')} />)}
   </>;
 }
 
+/** ISSO 75.1 §10.3.2–§10.4.5 (p. 131–137): further generators and the distribution answers. */
 export function UtilityCoolingFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
   const field = { draft, onChange: change };
   const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
@@ -584,7 +636,7 @@ export function BasisopnamePanel() {
     </Section>
 
     {kind === 'utility' && <Section title={t('opname.zones')}>
-      <CalculationZoneFields draft={draft} change={change} t={t} />
+      <CalculationZoneFields draft={draft} change={change} replace={(next) => save({ kind, survey: next })} t={t} />
     </Section>}
 
     <Section title={t('opname.envelope')}>
@@ -615,7 +667,7 @@ export function BasisopnamePanel() {
           <NumberField {...field} path={[...base, 'grossAreaM2']} label={t('opname.surface.area')} />
           {kind === 'utility' && zoneIds.length > 1 &&
             <ZoneSelect draft={draft} change={change} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
-              ids={zoneIds} empty={t('opname.zones.splitByArea')} />}
+              ids={zoneIds} empty={t('opname.zones.splitByArea')} unknown={t('opname.zones.unknownZone')} />}
           <label>{t('opname.surface.insulation')}
             <select value={typeof insulation === 'string' ? insulation : ''}
               onChange={(event) => change([...base, 'insulation'], event.target.value === 'thickness'

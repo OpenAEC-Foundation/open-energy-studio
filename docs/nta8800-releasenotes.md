@@ -21,6 +21,20 @@ Volgens 8.4.2.1 (p. 266) wordt bij een grens met een onverwarmde ruimte R_se ver
 
 - **Het label van het vinkje is aangepast.** "Grenst aan buitenlucht" heet nu "Buitenvlak in contact met lucht". Het hoort ook aan te staan bij een grens met een onverwarmde ruimte.
 - **`towardsUnheatedSpace` in het forfaitaire envelopmodel geldt alleen voor de basisopname.** Een U-waarde uit die route hoort niet in een projectconstructie thuis.
+## 5 oktober 2026 — reviewcorrecties rekenzones in de utiliteitsopname
+
+### Opnames die nu `incomplete` worden
+
+- **Zwembad met meerdere sportzones.** Hebben meerdere rekenzones sport en is de zwembadruimte niet per zone opgegeven, dan volgt `swimming_pool_zone_required` (p. 65). Eerder koos de opname de zone met de meeste sport.
+- **Nieuwe controles op de waarden per zone:** `zone_installed_capacity_invalid`, `zone_installed_capacity_exceeds_total`, `zone_swimming_pool_area_invalid`, `zone_swimming_pool_areas_mismatch`, `zone_combined_without_system` en `zone_combined_areas_mismatch`.
+
+### Opnames met een andere uitkomst
+
+- **Eén oppervlaktebron.** Bij meerdere zones komen de functiegroepen, het tapwater, `labelFunctions`, BACS en de totale A_g uit de zonesommen. Een afwijking binnen 0,05 m² gaf eerder `derived_input_rejected`; nu rekent de opname door.
+- **Geïnstalleerde capaciteit per zone (p. 147).** Met `zones[i].installedCapacityDm3PerS` krijgt die zone haar eigen capaciteit; alleen de rest wordt naar A_g verdeeld.
+- **Systeem E per zone (p. 145).** Met `zones[i].combined` krijgt alleen die zone een decentraal deel, met haar eigen oppervlakken.
+
+Opnames zonder `zones` geven dezelfde invoer als voorheen.
 
 ## 5 oktober 2026 — hoofdstuk 8 na de herberekening
 

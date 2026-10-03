@@ -68,6 +68,20 @@ pub struct SurveyCalculationZone {
     /// Use functions with their A_g in this zone; per function the zones add
     /// up to the survey's `functions`.
     pub functions: Vec<FunctionArea>,
+    /// §11.4.1 (p. 147): the installed ventilation capacity of the zone,
+    /// dm³/s. Zones without it share the rest of the building's capacity
+    /// by A_g ("niet kunt achterhalen").
+    #[serde(default)]
+    pub installed_capacity_dm3_per_s: Option<f64>,
+    /// p. 65: the swimming-pool room in this zone, m². With several zones
+    /// the pool rooms are given per zone; they add up to
+    /// `swimmingPoolAreaM2`.
+    #[serde(default)]
+    pub swimming_pool_area_m2: Option<f64>,
+    /// §11.3.6 (p. 145): system E in this zone, with the zone's decentral
+    /// and total residence area. Zones without it have no decentral part.
+    #[serde(default)]
+    pub combined: Option<SurveyCombined>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -3568,7 +3582,9 @@ fn zone_plans(
             groups.main
         }
     };
-    // p. 65: the swimming-pool room lies in the zone with the most sport.
+    // p. 65: the swimming-pool room is given per calculation zone. Without
+    // per-zone pool areas the pool lies in the only zone with sport; with
+    // several sport zones the zone must be stated.
     let sport_in = |zone: &SurveyCalculationZone| -> f64 {
         zone.functions
             .iter()
@@ -3576,20 +3592,113 @@ fn zone_plans(
             .map(|item| item.area_m2)
             .sum()
     };
-    let pool_zone = survey
-        .swimming_pool_area_m2
-        .filter(|pool| *pool > 0.0)
-        .and_then(|_| {
-            survey
-                .zones
-                .iter()
-                .enumerate()
-                .filter(|(_, zone)| sport_in(zone) > 0.0)
-                .max_by(|a, b| sport_in(a.1).total_cmp(&sport_in(b.1)))
-                .map(|(index, _)| index)
-        });
+    let building_pool = survey.swimming_pool_area_m2.filter(|pool| *pool > 0.0);
+    let zone_pools_given = survey
+        .zones
+        .iter()
+        .any(|zone| zone.swimming_pool_area_m2.is_some());
+    let mut pools: Vec<Option<f64>> = vec![None; survey.zones.len()];
+    if zone_pools_given {
+        let mut sum = 0.0;
+        for (index, zone) in survey.zones.iter().enumerate() {
+            match zone.swimming_pool_area_m2 {
+                Some(pool) if pool.is_finite() && pool >= 0.0 => {
+                    if pool > 0.0 {
+                        sum += pool;
+                        pools[index] = Some(pool);
+                    }
+                }
+                Some(_) => recorder.issue(
+                    "zone_swimming_pool_area_invalid",
+                    format!("zones[{index}].swimmingPoolAreaM2"),
+                ),
+                None => {}
+            }
+        }
+        let building = building_pool.unwrap_or(0.0);
+        if (sum - building).abs() > 1e-6 * building.max(1.0) {
+            recorder.issue("zone_swimming_pool_areas_mismatch", "zones");
+        }
+    } else if building_pool.is_some() {
+        let sport_zones: Vec<usize> = survey
+            .zones
+            .iter()
+            .enumerate()
+            .filter(|(_, zone)| sport_in(zone) > 0.0)
+            .map(|(index, _)| index)
+            .collect();
+        match sport_zones.as_slice() {
+            [only] => {
+                pools[*only] = building_pool;
+                recorder.record(
+                    "swimming_pool_in_only_sport_zone",
+                    "zones",
+                    format!("the pool room lies in zones[{only}], the only zone with sport"),
+                    "ISSO 75.1 p. 65",
+                );
+            }
+            [] => {}
+            _ => recorder.issue("swimming_pool_zone_required", "zones"),
+        }
+    }
+    // §11.4.1 (p. 147): the installed capacity per zone; only when the
+    // per-zone flows cannot be established is the building's capacity
+    // split by A_g. The capacity is one quantity, whichever answer gave it.
+    let building_capacity = survey.ventilation.installed_capacity_dm3_per_s.or_else(|| {
+        survey
+            .ventilation
+            .passive_cooling
+            .as_ref()
+            .and_then(|passive| passive.installed_capacity_dm3_per_s)
+    });
+    let mut known_capacity = 0.0;
+    let mut unknown_area = 0.0;
+    for (index, zone) in survey.zones.iter().enumerate() {
+        match zone.installed_capacity_dm3_per_s {
+            Some(value) if value.is_finite() && value > 0.0 => known_capacity += value,
+            Some(_) => recorder.issue(
+                "zone_installed_capacity_invalid",
+                format!("zones[{index}].installedCapacityDm3PerS"),
+            ),
+            None => unknown_area += zone.functions.iter().map(|item| item.area_m2).sum::<f64>(),
+        }
+    }
+    if let Some(total) = building_capacity {
+        if known_capacity > total * (1.0 + 1e-6) {
+            recorder.issue("zone_installed_capacity_exceeds_total", "zones");
+        }
+    }
+    let rest_capacity = building_capacity.map(|total| (total - known_capacity).max(0.0));
+    // §11.3.6 (p. 145): with per-zone system E data each zone keeps its own
+    // decentral area; the zones add up to the building's.
+    let zone_combined_given = survey.zones.iter().any(|zone| zone.combined.is_some());
+    if zone_combined_given {
+        match &survey.ventilation.combined {
+            None => recorder.issue("zone_combined_without_system", "zones"),
+            Some(building) => {
+                let (decentral, residence) = survey
+                    .zones
+                    .iter()
+                    .filter_map(|zone| zone.combined.as_ref())
+                    .fold((0.0, 0.0), |(d, r), item| {
+                        (d + item.decentral_area_m2, r + item.total_residence_area_m2)
+                    });
+                let off = |a: f64, b: f64| (a - b).abs() > 1e-6 * b.abs().max(1.0);
+                if off(decentral, building.decentral_area_m2)
+                    || (survey.zones.iter().all(|zone| zone.combined.is_some())
+                        && off(residence, building.total_residence_area_m2))
+                {
+                    recorder.issue("zone_combined_areas_mismatch", "zones");
+                }
+            }
+        }
+    }
+    if !recorder.issues.is_empty() {
+        return Vec::new();
+    }
     let total = groups.total_m2;
     let mut plans = Vec::new();
+    let mut capacity_split = false;
     for (index, zone) in survey.zones.iter().enumerate() {
         let mut zone_groups: Vec<(LabelFunction, f64)> = Vec::new();
         for (group, _) in &groups.groups {
@@ -3629,21 +3738,31 @@ fn zone_plans(
             .filter(|item| item.zone_id.as_deref() == Some(zone.id.as_str()))
             .cloned()
             .collect();
-        part.swimming_pool_area_m2 = if pool_zone == Some(index) {
-            survey.swimming_pool_area_m2
-        } else {
-            None
+        part.swimming_pool_area_m2 = pools[index];
+        let capacity = match zone.installed_capacity_dm3_per_s {
+            Some(value) => Some(value),
+            None => rest_capacity.filter(|_| unknown_area > 0.0).map(|rest| {
+                capacity_split = true;
+                let zone_area: f64 = zone.functions.iter().map(|item| item.area_m2).sum();
+                rest * zone_area / unknown_area
+            }),
         };
-        // §11.4.1 (p. 146–148): the installed capacity of the building's
-        // system is split over the zones by A_g.
-        part.ventilation.installed_capacity_dm3_per_s = survey
-            .ventilation
-            .installed_capacity_dm3_per_s
-            .map(|total| total * share);
-        if let Some(passive) = part.ventilation.passive_cooling.as_mut() {
-            passive.installed_capacity_dm3_per_s = passive
-                .installed_capacity_dm3_per_s
-                .map(|total| total * share);
+        // The capacity stays on the answer that supplied it.
+        let vent_given = survey.ventilation.installed_capacity_dm3_per_s.is_some();
+        match part.ventilation.passive_cooling.as_mut() {
+            Some(passive) if passive.installed_capacity_dm3_per_s.is_some() && !vent_given => {
+                passive.installed_capacity_dm3_per_s = capacity;
+            }
+            Some(passive) if passive.installed_capacity_dm3_per_s.is_some() => {
+                // Both answers given: the building-level check reports
+                // `installed_capacity_given_twice`; keep both in the zone.
+                passive.installed_capacity_dm3_per_s = capacity;
+                part.ventilation.installed_capacity_dm3_per_s = capacity;
+            }
+            _ => part.ventilation.installed_capacity_dm3_per_s = capacity,
+        }
+        if zone_combined_given {
+            part.ventilation.combined = zone.combined.clone();
         }
         part.zones = Vec::new();
         plans.push(ZonePlan {
@@ -3676,21 +3795,83 @@ fn zone_plans(
             "basisopname: interpretation (ISSO 75.1 §6.5 gives no split rule)",
         );
     }
-    if survey.ventilation.installed_capacity_dm3_per_s.is_some()
-        || survey
-            .ventilation
-            .passive_cooling
-            .as_ref()
-            .is_some_and(|passive| passive.installed_capacity_dm3_per_s.is_some())
-    {
+    if capacity_split {
         recorder.record(
             "installed_capacity_split_by_area",
             "ventilation.installedCapacityDm3PerS",
-            "split over the calculation zones by A_g".into(),
-            "basisopname: interpretation (ISSO 75.1 p. 146–148)",
+            "per-zone flows not established: the rest split over those zones by A_g".into(),
+            "ISSO 75.1 p. 147 (§11.4.1)",
+        );
+    }
+    if survey.ventilation.combined.is_some() && !zone_combined_given {
+        recorder.record(
+            "combined_area_ratio_every_zone",
+            "ventilation.combined",
+            "no per-zone system E areas: every zone keeps the building ratio".into(),
+            "basisopname: interpretation (ISSO 75.1 p. 145 asks the area per zone)",
         );
     }
     plans
+}
+
+/// With several zones whose function areas match the survey's within
+/// `ZONE_AREA_TOLERANCE_M2`, the survey with `functions` replaced by the
+/// zone sums per function (in the survey's order). Otherwise `None`: one
+/// zone, or a mismatch that `zone_plans` reports.
+fn zone_function_totals(survey: &UtilitySurvey, recorder: &mut Recorder) -> Option<UtilitySurvey> {
+    if survey.zones.len() < 2 {
+        return None;
+    }
+    let mut totals: Vec<FunctionArea> = Vec::new();
+    for item in survey.zones.iter().flat_map(|zone| zone.functions.iter()) {
+        match totals
+            .iter_mut()
+            .find(|total| total.function == item.function)
+        {
+            Some(total) => total.area_m2 += item.area_m2,
+            None => totals.push(item.clone()),
+        }
+    }
+    let building = |function: LabelFunction| -> f64 {
+        survey
+            .functions
+            .iter()
+            .filter(|item| item.function == function)
+            .map(|item| item.area_m2)
+            .sum()
+    };
+    if totals
+        .iter()
+        .any(|total| (building(total.function) - total.area_m2).abs() > ZONE_AREA_TOLERANCE_M2)
+        || survey
+            .functions
+            .iter()
+            .any(|item| !totals.iter().any(|total| total.function == item.function))
+    {
+        return None;
+    }
+    let mut ordered: Vec<FunctionArea> = Vec::new();
+    for item in &survey.functions {
+        if !ordered.iter().any(|done| done.function == item.function) {
+            if let Some(total) = totals.iter().find(|total| total.function == item.function) {
+                ordered.push(total.clone());
+            }
+        }
+    }
+    if ordered
+        .iter()
+        .any(|total| building(total.function) != total.area_m2)
+    {
+        recorder.record(
+            "zone_function_areas_govern",
+            "functions",
+            "the zone sums per function replace the building's function areas".into(),
+            "basisopname: one area source (ISSO 75.1 p. 52–54)",
+        );
+    }
+    let mut governed = survey.clone();
+    governed.functions = ordered;
+    Some(governed)
 }
 
 /// The envelope of one zone: its own surfaces, and the surfaces without a
@@ -3861,6 +4042,10 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
     if !recorder.issues.is_empty() {
         return None;
     }
+    // With several zones every area (groups, hot water, label functions,
+    // BACS, A_g) comes from the zone sums, so the kernel sees one source.
+    let governed = zone_function_totals(survey, recorder);
+    let survey = governed.as_ref().unwrap_or(survey);
     let groups = function_groups(&survey.functions, recorder)?;
     let plans = zone_plans(survey, &groups, recorder);
     if !recorder.issues.is_empty() {
@@ -5588,6 +5773,9 @@ mod tests {
                     function: LabelFunction::Education,
                     area_m2: 1400.0,
                 }],
+                installed_capacity_dm3_per_s: None,
+                swimming_pool_area_m2: None,
+                combined: None,
             },
             SurveyCalculationZone {
                 id: "sporthal".into(),
@@ -5595,6 +5783,9 @@ mod tests {
                     function: LabelFunction::Sport,
                     area_m2: 1000.0,
                 }],
+                installed_capacity_dm3_per_s: None,
+                swimming_pool_area_m2: None,
+                combined: None,
             },
         ];
         let mut hall = survey.lighting[0].clone();
@@ -5726,6 +5917,135 @@ mod tests {
         survey.lighting[2].area_m2 = 800.0;
         survey.lighting[1].area_m2 = 550.0;
         assert!(issues(&survey).contains(&"zone_lighting_area_mismatch"));
+    }
+
+    #[test]
+    fn calculation_zone_review_fixes() {
+        let derive = |survey: &UtilitySurvey| {
+            let mut recorder = Recorder::default();
+            let input = derive_utility_input(survey, &mut recorder);
+            (input, recorder)
+        };
+        let codes = |recorder: &Recorder| {
+            recorder
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        let zone = |input: &Value, index: usize| -> Value {
+            if index == 0 {
+                input["spaceHeating"]["demand"].clone()
+            } else {
+                input["spaceHeating"]["additionalZones"][index - 1]["demand"].clone()
+            }
+        };
+        // 1. One area source: a hall of 999,96 m² against 1 000 m² in
+        // `functions` calculates, with every area from the zone sums.
+        let mut survey = school_with_sports_hall();
+        survey.zones[1].functions[0].area_m2 = 999.96;
+        survey.lighting[2].area_m2 = 999.96;
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status,
+            "calculated_unverified",
+            "{:?} {:?}",
+            result.issues,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        let (input, recorder) = derive(&survey);
+        let input = input.unwrap();
+        assert!(applied(&recorder, "zone_function_areas_govern"));
+        assert!((input["totalUsableFloorAreaM2"].as_f64().unwrap() - 2399.96).abs() < 1e-9);
+        let labelled: f64 = input["labelFunctions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["areaM2"].as_f64().unwrap())
+            .sum();
+        assert!((labelled - 2399.96).abs() < 1e-9, "{labelled}");
+
+        // 2. p. 147: a known per-zone capacity is used; the rest of the
+        // building's capacity goes to the zones without one.
+        let capacity = |input: &Value, index: usize| {
+            zone(input, index)["ventilation"]["installedCapacity"]["totalDm3PerS"].as_f64()
+        };
+        let mut survey = school_with_sports_hall();
+        survey.ventilation.installed_capacity_dm3_per_s = Some(5556.0);
+        let (input, recorder) = derive(&survey);
+        let input = input.unwrap();
+        assert!((capacity(&input, 0).unwrap() - 5556.0 * 1400.0 / 2400.0).abs() < 1e-9);
+        assert!(applied(&recorder, "installed_capacity_split_by_area"));
+        survey.zones[0].installed_capacity_dm3_per_s = Some(5000.0);
+        let (input, recorder) = derive(&survey);
+        let input = input.unwrap();
+        assert_eq!(capacity(&input, 0), Some(5000.0));
+        assert!((capacity(&input, 1).unwrap() - 556.0).abs() < 1e-9);
+        assert!(applied(&recorder, "installed_capacity_split_by_area"));
+        survey.zones[1].installed_capacity_dm3_per_s = Some(556.0);
+        let (_, recorder) = derive(&survey);
+        assert!(!applied(&recorder, "installed_capacity_split_by_area"));
+        survey.zones[1].installed_capacity_dm3_per_s = Some(900.0);
+        assert!(codes(&derive(&survey).1).contains(&"zone_installed_capacity_exceeds_total"));
+
+        // 3. p. 65: the pool room per zone; without per-zone areas it lies
+        // in the only zone with sport.
+        let pool_in = |input: &Value, index: usize| {
+            zone(input, index)["ventilation"]["functions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["swimmingPool"] == true)
+        };
+        let mut survey = school_with_sports_hall();
+        survey.swimming_pool_area_m2 = Some(200.0);
+        let (input, recorder) = derive(&survey);
+        let input = input.unwrap();
+        assert!(applied(&recorder, "swimming_pool_in_only_sport_zone"));
+        assert!(pool_in(&input, 1) && !pool_in(&input, 0));
+        survey.zones[1].swimming_pool_area_m2 = Some(150.0);
+        assert!(codes(&derive(&survey).1).contains(&"zone_swimming_pool_areas_mismatch"));
+        survey.zones[1].swimming_pool_area_m2 = Some(200.0);
+        assert!(derive(&survey).0.is_some());
+        // Two zones with sport and no per-zone pool area: state the zone.
+        let mut survey = school_with_sports_hall();
+        survey.swimming_pool_area_m2 = Some(200.0);
+        survey.functions[1].area_m2 = 1010.0;
+        survey.zones[0].functions.push(FunctionArea {
+            function: LabelFunction::Sport,
+            area_m2: 10.0,
+        });
+        survey.lighting[0].area_m2 = 1060.0;
+        assert!(codes(&derive(&survey).1).contains(&"swimming_pool_zone_required"));
+        survey.zones[1].swimming_pool_area_m2 = Some(200.0);
+        let (input, recorder) = derive(&survey);
+        assert!(input.is_some(), "{:?}", codes(&recorder));
+
+        // 5. p. 145: system E areas per zone.
+        let mut survey = school_with_sports_hall();
+        survey.ventilation.heat_recovery = Some(ExchangerAnswer::CounterFlowAluminium);
+        survey.ventilation.combined = Some(SurveyCombined {
+            decentral_area_m2: 300.0,
+            total_residence_area_m2: 2400.0,
+        });
+        let (input, recorder) = derive(&survey);
+        let input = input.unwrap();
+        assert!(applied(&recorder, "combined_area_ratio_every_zone"));
+        assert_eq!(zone(&input, 0)["ventilation"]["system"]["kind"], "combined");
+        survey.zones[1].combined = Some(SurveyCombined {
+            decentral_area_m2: 300.0,
+            total_residence_area_m2: 1000.0,
+        });
+        let (input, recorder) = derive(&survey);
+        let input = input.unwrap();
+        assert!(!applied(&recorder, "combined_area_ratio_every_zone"));
+        assert_eq!(zone(&input, 0)["ventilation"]["system"]["kind"], "single");
+        let hall = &zone(&input, 1)["ventilation"]["system"];
+        assert_eq!(hall["kind"], "combined");
+        assert_eq!(hall["decentralAreaM2"], 300.0);
+        assert_eq!(hall["totalResidenceAreaM2"], 1000.0);
+        survey.zones[1].combined.as_mut().unwrap().decentral_area_m2 = 200.0;
+        assert!(codes(&derive(&survey).1).contains(&"zone_combined_areas_mismatch"));
     }
 
     #[test]
