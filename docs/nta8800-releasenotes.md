@@ -2,9 +2,23 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — verwijderen zonder losse verwijzingen, tapwatervaten, dialogen en dossierchecklist
+
+- **Verwijderen werkt door in de NTA-invoer.** Verwijder je een zone, vlak of raam, dan verdwijnt ook de NTA-invoer die er met id naar verwijst. Het gaat om `zoneData`, `dynamicWindows`, `groundFloors`, `surfaceTilts`, `lighting`, `humidifiers` en elk ander element met een `zoneId`, `surfaceId` of `windowId`. Een `zoneIds`-lijst van een verwarmings- of koelsysteem wordt ingekort. Een systeem dat alleen verwijderde zones bediende, verdwijnt. Voorheen bleven die verwijzingen staan en stopte de berekening met `zone_data_without_zone`, `dynamic_window_without_window`, `ground_floor_data_without_ground_surface` of `heating_system_zone_unknown`. De bevestiging noemt nu de NTA-onderdelen die meegaan. Een herlabelvergelijking van vóór de verwijdering raakt verouderd.
+- **Handmatige maatwerkadviesmaatregelen.** Een handmatige maatregel wijst het project aan op positie (`/zones/0/surfaces/2/…`). Zou een verwijdering die positie laten verschuiven, dan weigert de app de verwijdering en noemt de maatregelen. Anders zou de maatregel zonder foutmelding een ander onderdeel wijzigen. Sjabloonmaatregelen werken met id's en hebben hier geen last van.
+- **Tapwatervaten in het tapwatersjabloon (§13.6.2, opmerking 1, p. 566).** Het sjabloon beslist nu net als de kern over het hoofd- én de extra toestellen:
+  - een vat blijft bij een elektrische of indirecte boiler, een indirecte warmtepomp of externe warmte;
+  - bij een getest toestel blijven alleen de vaten die buiten de test vallen (`notInApplianceTest`); de andere vervallen, ook bij een mix;
+  - voorheen keek het sjabloon alleen naar het nieuwe hoofdtoestel en verwijderde het alle vaten.
+- **Dialogen.** Tab en Escape werken via een documentbrede afhandeling voor alleen het bovenste open dialoogvenster. Dat blijft werken als het veld met focus verdwijnt. Escape in een geneste dialoog sluit alleen die dialoog.
+- **Dossierchecklist.**
+  - De checklist in het tabblad en die in de export krijgen nu allebei de beoordeling van de opgeslagen basisopname. Daarmee wordt de inklapreden van toegepaste forfaitaire waarden echt getoetst.
+  - Terwijl de kern of de opname nog rekent, tonen de onderdelen die ervan afhangen "bezig" in plaats van "ontbreekt".
+- **Samenvoegen per zone gedocumenteerd.** Een functie die apart blijft omdat zij een eigen zone heeft, blijft ook apart in de zone met de hoofdfunctie. Die zone moet dan afb. 6.6 doorstaan; zie `docs/nta8800-basisopname.md`.
+
 ## 4 oktober 2026 — bestaande schildelen bewerken en toetsenbord in dialogen
 
-Geen rekenwijziging; alleen de invoer verandert.
+Het bewerken zelf verandert geen rekenregel. Het verwijderen van een zone, vlak of raam doet dat wel: de NTA-invoer die ernaar verwijst, gaat mee (zie de sectie hierboven).
 
 - **Bewerken en verwijderen.** Bestaande zones, vlakken, ramen, koudebruggen, puntkoudebruggen en constructies zijn te bewerken en te verwijderen vanuit:
   - de schilweergave, die nu ook een ramentabel per zone heeft;

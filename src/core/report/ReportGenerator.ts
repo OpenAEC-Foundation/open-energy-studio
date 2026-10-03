@@ -5,6 +5,7 @@ import { generateNtaCalculationReportHTML } from './NtaCalculationReport';
 import { calculateProjectPerformanceShared } from '../nta/useProjectPerformance';
 import { calculateProjectPerformanceWithRust, fetchKernelInterpretations } from '../nta/KernelClient';
 import { buildProjectDossier, zipProjectDossier } from './ProjectDossier';
+import { assessStoredSurvey } from '../nta/SurveyTemplates';
 import { assessMaatwerkadviesWithRust } from '../nta/KernelClient';
 import { generateMaatwerkadviesReportHTML } from './MaatwerkadviesReport';
 
@@ -73,7 +74,8 @@ export async function downloadProjectDossier(project: IProject) {
   const reportHtml = assessment
     ? generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty(), generatedAt)
     : null;
-  const bundle = await buildProjectDossier({ project, assessment, reportHtml, generatedAt: generatedAt.toISOString() });
+  const opname = await assessStoredSurvey(project.basisopname);
+  const bundle = await buildProjectDossier({ project, assessment, opname, reportHtml, generatedAt: generatedAt.toISOString() });
   const zip = zipProjectDossier(bundle);
   const fileName = `Projectdossier-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.zip`;
   try {

@@ -3,6 +3,8 @@ import { useEnergy } from '../../context/EnergyContext';
 import type { IBENGResultMonthly } from '../../core/energy/types';
 import { useEffect, useMemo, useState } from 'react';
 import { labelInputSha256 } from '../../core/nta/Registration';
+import { assessStoredSurvey } from '../../core/nta/SurveyTemplates';
+import type { OpnameAssessment } from '../../core/nta/KernelClient';
 import {
   downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML, downloadProjectDossier,
 } from '../../core/report/ReportGenerator';
@@ -76,10 +78,22 @@ export function ReportView() {
     return () => { cancelled = true; };
   }, [project]);
   const currentSha = labelSha?.project === project ? labelSha.sha : null;
+  // The survey assessment, as the export passes it, for the collapse reasons.
+  const survey = project.basisopname;
+  const [opname, setOpname] = useState<{ survey: typeof survey; result: OpnameAssessment | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    assessStoredSurvey(survey).then((result) => { if (!cancelled) setOpname({ survey, result }); });
+    return () => { cancelled = true; };
+  }, [survey]);
+  const opnameDone = opname?.survey === survey;
   const checklist = useMemo(() => {
     if (exported && exported.project === project) return exported.checklist;
-    return checkDossierCompleteness({ project, assessment, labelInputSha256: currentSha });
-  }, [exported, project, assessment, currentSha]);
+    return checkDossierCompleteness({
+      project, assessment, opname: opnameDone ? opname?.result ?? null : null, labelInputSha256: currentSha,
+      pending: kernelPending || !opnameDone,
+    });
+  }, [exported, project, assessment, currentSha, opname, opnameDone, kernelPending]);
   const open = checklist.filter((item) => item.status === 'missing' || item.status === 'check');
 
   return (

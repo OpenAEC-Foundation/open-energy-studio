@@ -21,6 +21,7 @@ import {
   DialogType,
   IDialogState,
 } from '../core/energy/types';
+import { deleteSurfaceFromProject, deleteWindowFromProject, deleteZoneFromProject } from '../core/energy/projectDelete';
 
 // ============================================================
 // State
@@ -448,14 +449,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
     }
 
     case 'DELETE_ZONE':
-      return {
-        ...state,
-        project: {
-          ...state.project,
-          zones: state.project.zones.filter(z => z.id !== action.payload),
-        },
-        isDirty: true,
-      };
+      return { ...state, project: deleteZoneFromProject(state.project, action.payload).project, isDirty: true };
 
     // ----------------------------------------------------------
     // Surfaces (nested in zone)
@@ -493,17 +487,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
 
     case 'DELETE_SURFACE': {
       const { zoneId, surfaceId } = action.payload;
-      return {
-        ...state,
-        project: {
-          ...state.project,
-          zones: mapZone(state.project.zones, zoneId, z => ({
-            ...z,
-            surfaces: z.surfaces.filter(s => s.id !== surfaceId),
-          })),
-        },
-        isDirty: true,
-      };
+      return { ...state, project: deleteSurfaceFromProject(state.project, zoneId, surfaceId).project, isDirty: true };
     }
 
     // ----------------------------------------------------------
@@ -548,20 +532,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
 
     case 'DELETE_WINDOW': {
       const { zoneId, surfaceId, windowId } = action.payload;
-      return {
-        ...state,
-        project: {
-          ...state.project,
-          zones: mapZone(state.project.zones, zoneId, z => ({
-            ...z,
-            surfaces: mapSurface(z.surfaces, surfaceId, s => ({
-              ...s,
-              windows: s.windows.filter(w => w.id !== windowId),
-            })),
-          })),
-        },
-        isDirty: true,
-      };
+      return { ...state, project: deleteWindowFromProject(state.project, zoneId, surfaceId, windowId).project, isDirty: true };
     }
 
     // ----------------------------------------------------------

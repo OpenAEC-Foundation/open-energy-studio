@@ -111,7 +111,9 @@ export const en: Record<string, string> = {
   // Dialogs
   'dialog.save': 'Save',
   'dialog.cancel': 'Cancel',
-  'item.deleteConfirm': "Delete \"{{name}}\"? References to this item in the NTA input, relabel comparison or tailored advice become invalid.",
+  'item.deleteConfirm': "Delete \"{{name}}\"? A relabel comparison made before this change becomes outdated.",
+  'item.deleteCascade': "The NTA input loses {{count}} entr(y/ies) that refer to it:",
+  'item.manualMeasuresShift': "Cannot delete: manual tailored-advice measure(s) {{list}} address the project by position, and this delete would make them change a different element. Edit or remove those measures first.",
   'item.deleteYes': "Yes, delete",
   'item.constructionInUse': "This construction is used by {{count}} surface(s): {{list}}. Assign those surfaces another construction first.",
   'envelope.actions': "Actions",
@@ -228,6 +230,7 @@ export const en: Record<string, string> = {
   'report.dossierStatus.missing': "missing",
   'report.dossierStatus.check': "check",
   'report.dossierStatus.not_applicable': "n/a",
+  'report.dossierStatus.pending': "pending",
   'project.kernelChanged': "This project was saved with a different kernel or norm version ({{saved}}) than the current one ({{current}}). Recalculate and check the differences before registering.",
   'project.inputChanged': "The input of this project was changed outside the application after saving (the fingerprint differs).",
   'preview.labelFromKernel': "The label class comes only from the NTA 8800 kernel; see the NTA panel.",

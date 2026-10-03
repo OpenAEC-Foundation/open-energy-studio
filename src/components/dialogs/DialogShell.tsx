@@ -10,6 +10,22 @@ function focusableIn(root: HTMLElement): HTMLElement[] {
     .filter((element) => !element.closest('[hidden], [inert]') && element.getAttribute('aria-hidden') !== 'true');
 }
 
+/**
+ * Open dialogs, innermost last. Keyboard handling and the focus trap act
+ * only for the topmost one, so a nested dialog owns Tab and Escape.
+ */
+const dialogStack: HTMLElement[] = [];
+
+function isTopmost(dialog: HTMLElement): boolean {
+  return dialogStack[dialogStack.length - 1] === dialog;
+}
+
+function focusFirst(dialog: HTMLElement) {
+  const items = focusableIn(dialog);
+  const first = items.find((element) => !element.classList.contains('dialog-close-btn')) ?? items[0];
+  (first ?? dialog).focus();
+}
+
 interface DialogShellProps {
   title: string;
   onClose: () => void;
@@ -77,42 +93,49 @@ export function DialogShell({
   }, []);
 
   // ── Keyboard: focus into the dialog, trap Tab, Escape closes, focus returns to the trigger ──
+  // The key handler sits on the document, so Tab and Escape still work when
+  // the focused field unmounts (focus falls to <body>); only the topmost
+  // open dialog reacts. Focus is not pulled back on `focusin`: the overlay
+  // already blocks the page, and panels shown beside a dialog keep focus.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const first = focusableIn(dialog).find((element) => !element.classList.contains('dialog-close-btn'))
-      ?? focusableIn(dialog)[0];
-    (first ?? dialog).focus();
+    dialogStack.push(dialog);
+    focusFirst(dialog);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTopmost(dialog) || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusableIn(dialog);
+      if (items.length === 0) { event.preventDefault(); dialog.focus(); return; }
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      const active = document.activeElement;
+      const inside = active instanceof Node && dialog.contains(active);
+      if (event.shiftKey && (active === firstItem || active === dialog || !inside)) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && (active === lastItem || !inside)) {
+        event.preventDefault();
+        firstItem.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
     return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      const index = dialogStack.lastIndexOf(dialog);
+      if (index >= 0) dialogStack.splice(index, 1);
       if (trigger && trigger.isConnected) trigger.focus();
     };
-  }, []);
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      event.preventDefault();
-      onCloseRef.current();
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const items = focusableIn(dialog);
-    if (items.length === 0) { event.preventDefault(); dialog.focus(); return; }
-    const firstItem = items[0];
-    const lastItem = items[items.length - 1];
-    const active = document.activeElement;
-    if (event.shiftKey && (active === firstItem || !dialog.contains(active))) {
-      event.preventDefault();
-      lastItem.focus();
-    } else if (!event.shiftKey && (active === lastItem || !dialog.contains(active))) {
-      event.preventDefault();
-      firstItem.focus();
-    }
   }, []);
 
   const [shake, setShake] = useState(false);
@@ -170,7 +193,6 @@ export function DialogShell({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        onKeyDown={handleKeyDown}
       >
         <div className="dialog-header" onMouseDown={handleHeaderMouseDown}>
           <span className="dialog-header-title" id={titleId}>{title}</span>
