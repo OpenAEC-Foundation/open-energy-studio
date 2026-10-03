@@ -2,6 +2,37 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — reviewcorrecties utiliteitsopname (ISSO 75.1) en waterzijdig inregelen van koeling
+
+### Opnames met een andere uitkomst
+
+- **Waterzijdig inregelen van koeling zonder verklaring (woning- en utiliteitsopname).** NTA-tabel 10.11 voetnoot a (p. 388) vraagt een verklaring volgens NEN-EN 14336. Zonder `cooling.balancingEvidenceReference` rekent statisch of dynamisch ingeregeld nu als niet ingeregeld: f_HB 1,15 in plaats van 1,00, en geen waterzijdige inregeling bij de afgifte. Opgeslagen opnames met "statisch" of "dynamisch" hebben deze verwijzing nog niet en krijgen dus een hoger pompenergiegebruik.
+- **f_BACS bij meerdere verwarmingsopwekkers.** Het systeemvermogen van tabel 7.3 (p. 63) is nu de som van de hoofdopwekker en de extra opwekkers. Daarvoor telde alleen de installatiecapaciteit. Een ketel van 200 kW met een warmtepomp van 150 kW geeft nu f_BACS 1,05 in plaats van 1,0 als BACS onbekend is.
+- **Directe expansie in de LBK.** Er zijn geen afgiftetoestellen in de ruimte meer: de afgifte is `other_or_unknown` zonder ventilatorconvectoren. Opgenomen split-binnendelen gaven ventilatorenergie voor toestellen die er niet zijn.
+- **Zwembadruimte in 13.32a.** Het oppervlak van de zwembadruimte telt nu mee met de sportzalen (p. 65). `sportHallAreaM2` is voortaan het oppervlak zonder de zwembadruimte.
+- **L_max van koelleidingen.** Een opgenomen `cooling.maxPipeLengthM` vervangt de forfaitaire L_max van 10.27 in de pompberekening.
+- **Geïnstalleerde capaciteit met een zwembad.** Komt de capaciteit uit de passieve koeling, dan telt hij bij een zwembad in de zone nu ook als onbekend (p. 148).
+
+### Opnames die nu `incomplete` worden
+
+- **Capaciteit dubbel opgegeven.** `ventilation.installedCapacityDm3PerS` naast `ventilation.passiveCooling.installedCapacityDm3PerS` geeft `installed_capacity_given_twice`. Voorheen won stilzwijgend de waarde van de passieve koeling.
+- **Gasmotor tot en met 2 kW uit 2006 of eerder.** NTA-tabel 9.31 heeft hiervoor geen waarden. De opname meldt nu `gas_engine_small_old_no_table_row`; voorheen faalde de kern zonder duidelijke melding.
+- **Zwembad plus sportzalen groter dan de sportfunctie.** Dit geeft `sport_hall_area_invalid`.
+
+### Nu toegestaan
+
+- **Passieve koeling bij systeem E naast natuurlijke ventilatie** in de utiliteitsopname (p. 152). De woningopname stond dit al toe.
+- **Bypasspercentage als bypass.** Een opgenomen bypasspercentage van 10 % of meer telt voor passieve koeling als aanwezige bypass.
+- **Verborgen directe-expansieantwoord.** Bij een watergevoerd systeem wordt het genegeerd in plaats van `cooling_direct_expansion_not_water_based`. Het formulier wist het antwoord bij het aanvinken van "watergevoerd".
+
+### Inklapredenen
+
+- Opgeslagen inklapredenen met een hernoemd pad of een gesplitste regel blijven gekoppeld (aliastabel), in plaats van een waarschuwing `collapse_reason_unmatched` te geven.
+
+### Rekenzones
+
+- `calculation_zone_split_required` toont in het paneel nu de vervolgstap. Het ontwerp voor meerdere rekenzones in de opname staat in `docs/nta8800-basisopname.md`.
+
 ## 5 oktober 2026 — reviewcorrecties woningopname (ISSO 82.1)
 
 ### Opnames die nu `incomplete` worden

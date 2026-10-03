@@ -181,8 +181,7 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 
 ## Niet ondersteund
 
-- Meer dan één rekenzone (een gemengde rekenzone wordt wel ondersteund). Vraagt afb. 6.6 een splitsing, dan stopt de opname met `calculation_zone_split_required`: de schil is niet per rekenzone opgenomen.
-- De maximale leidinglengte L_max van koelleidingen (tabel 10.10): de kern rekent L_max forfaitair (10.27).
+- Meer dan één rekenzone (een gemengde rekenzone wordt wel ondersteund). Vraagt afb. 6.6 een splitsing, dan stopt de opname met `calculation_zone_split_required`: de schil is niet per rekenzone opgenomen. Het paneel toont dan de vervolgstap: voer het gebouw in via de NTA-projectberekening met een rekenzone per groep, of neem zelfstandig gelabelde gebouwdelen elk als eigen opname op. Zie het ontwerp hieronder.
 - Passieve koeling, warmtepompen die ook koelen, ontvochtiging en luchtverwarming (ook via de LBK) worden nu ondersteund; zie de tabel hierboven. Hetzelfde geldt voor WKK, meerdere verwarmingsopwekkers, meerdere tapwatersystemen en zonneboilers.
 - Daglichtsectoren. Een bekende daglichtregeling rekent met de forfaitaire daglichtmethode.
 
@@ -198,6 +197,27 @@ De utiliteitslaag hergebruikt de gedeelde delen van de woninglaag: schil (`envel
 8. Is de sportfunctie samengevoegd met de hoofdfunctie, dan vervalt de zwembadfactor (`swimming_pool_in_merged_sport_function`). Het oppervlak van de sport- en zwemzalen telt dan nog wel in 13.32a voor het systeem dat de hoofdfunctie bedient.
 9. Directe expansie in de LBK wordt in de koeling zonder distributie doorgegeven; de koude gaat via de koelbatterij van de LBK (NTA 11.116). Onbekend of de koeling op de LBK is aangesloten → aangesloten (`ahu_cooling_from_direct_expansion`).
 10. Passieve koeling met ventilatoren staat in 75.1 in §11.5.6 (p. 152); §11.8 [DETAIL] (p. 154) gaat over natuurlijke ventilatieve koeling. De citaten volgen dat.
+11. NTA-tabel 10.11 voetnoot a (p. 388): waterzijdig inregelen telt alleen met een verklaring volgens NEN-EN 14336. Statisch of dynamisch ingeregeld zonder `balancingEvidenceReference` rekent als niet ingeregeld (`cooling_balancing_without_declaration_none`). Dit geldt voor de woning- en de utiliteitsopname.
+12. Tabel 7.3 (p. 63): het vermogen van een verwarmingssysteem is de som van de opwekkers van dat systeem. Met extra opwekkers telt de laag `heating.nominalPowerKw` (anders de installatiecapaciteit) plus de extra opwekkers. Bij één opwekker telt de installatiecapaciteit, anders het nominale vermogen.
+13. Directe expansie in de LBK (p. 130, §10.4.1 p. 133): de koude bereikt de ruimten via de ventilatielucht. Er zijn dan geen afgiftetoestellen in de ruimte: de laag zet de afgifte op `other_or_unknown` zonder ventilatorconvectoren (`cooling_dx_ahu_no_room_emitters`). Een verborgen antwoord over directe expansie bij een watergevoerd systeem wordt genegeerd (`cooling_direct_expansion_ignored_water_based`).
+14. De geïnstalleerde ventilatiecapaciteit (§11.4.1) wordt één keer opgegeven: bij ventilatie of bij passieve koeling (`installed_capacity_given_twice`). Met een zwembad in de zone telt hij als onbekend (p. 148), ook als hij uit de passieve koeling komt.
+15. Een opgenomen bypasspercentage (tabel 11.12) groter dan 0 na afronding op tientallen telt voor passieve koeling als aanwezige bypass.
+16. 13.32a (p. 65, "sport- en/of zwemzalen"): `sportHallAreaM2` is het oppervlak van de sportzalen zonder de zwembadruimte; `swimmingPoolAreaM2` wordt erbij opgeteld. Samen mogen ze niet groter zijn dan de sportfunctie.
+17. Tabel 10.10 vraagt L en L_max. Elk onbekend gegeven krijgt zijn eigen forfaitaire waarde van 10.27 (§10.4.2.3, p. 386); het deel door niet-gekoelde ruimten is dan 15 %. De kern neemt een opgenomen L_max over (`maxPipeLengthM` van de pomp).
+18. NTA-tabel 9.31 heeft geen waarden voor een gasmotor tot en met 2 kW uit 2006 of eerder. Bij een gasmotorkoelmachine meldt de opname `gas_engine_small_old_no_table_row` in plaats van een fout in de kern.
+19. Inklapredenen van opgeslagen opnames met een hernoemd pad of een gesplitste regel blijven gekoppeld via een aliastabel (`COLLAPSE_REASON_ALIASES`): `cooling.distribution`, `cooling_fittings_unknown_uninsulated_meters_present`, `ventilation.ductsLukaAbc`, `ventilation.bypass` en de kanaal- en constant-volumeregels onder `ventilation.heatRecovery`.
+
+## Ontwerp: meerdere rekenzones in de utiliteitsopname
+
+Afb. 6.6 met tabel 6.4 (p. 53–54) kan een splitsing in rekenzones vragen. De opname rekent nu met één (gemengde) rekenzone en stopt dan. Een uitbreiding binnen redelijke omvang ziet er zo uit:
+
+1. **Zones in de opname.** Een nieuwe lijst `zones` met per zone een id, de functies met hun A_g, het setpoint dat volgt uit tabel 6.4 en, optioneel, het ventilatiesysteem. Zonder lijst blijft het huidige gedrag: één zone met alle functies.
+2. **Schil per zone.** Elk vlak in `envelope.surfaces` krijgt een optionele `zoneId`. Ontbreekt die, dan wordt het vlak naar rato van A_g over de zones verdeeld. Vlakken tussen twee zones zijn adiabatisch (§6.4: geen warmte-uitwisseling tussen rekenzones). Een `zoneId` die niet bestaat, geeft een issue.
+3. **Installaties.** Verwarming, koeling en tapwater blijven per gebouw en bedienen alle zones; de afleiding geeft per zone het bediende deel door, zoals de projectroute voor meerdere zones dat al doet. Ventilatie kan per zone verschillen. Zonder zone-antwoord geldt het gebouwsysteem.
+4. **Afleiding.** `derive_utility_input` bouwt per zone het bestaande zone-blok; de projectroute met meerdere zones rekent ze door. `check_zone_split` controleert dan of de opgegeven indeling aan afb. 6.6 voldoet, en niet langer alleen of er gesplitst moet worden.
+5. **Inklapredenen en registratie.** De paden krijgen een zoneprefix (`zones[1].envelope...`). De registratie blijft per gebouw.
+
+Tot die uitbreiding er is, is de vervolgstap de NTA-projectberekening, die meerdere rekenzones ondersteunt.
 
 ## Fixtures
 

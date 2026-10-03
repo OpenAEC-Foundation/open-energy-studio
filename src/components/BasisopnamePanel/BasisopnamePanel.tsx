@@ -251,6 +251,7 @@ export function UtilityCoolingFields({ draft, change, t }: { draft: Draft; chang
       <TriStateField {...field} {...yesNo} path={['cooling', 'coldMeters']} label={t('opname.cooling.coldMeters')} />
       <NumberField {...field} path={['cooling', 'pipeLengthM']} label={t('opname.cooling.pipeLength')} />
       <NumberField {...field} path={['cooling', 'uncooledPipeLengthM']} label={t('opname.cooling.uncooledPipeLength')} />
+      <NumberField {...field} path={['cooling', 'maxPipeLengthM']} label={t('opname.cooling.maxPipeLength')} />
     </>}
     {extras.map((_, index) => {
       const base: Path = ['cooling', 'additionalGenerators', index];
@@ -770,10 +771,21 @@ export function BasisopnamePanel() {
           options={opts(t, 'opname.cooling.emitterKind', COOLING_EMITTERS)} />
         <NumberField {...field} path={['cooling', 'fanCoilCount']} label={t('opname.cooling.fanCoilCount')} step="1" />
         <NumberField {...field} path={['cooling', 'capacityKw']} label={t('opname.cooling.capacityKw')} />
-        <CheckField {...field} path={['cooling', 'waterBased']} label={t('opname.cooling.waterBased')} />
+        <label className="nta-form-check">
+          <input type="checkbox" checked={read(draft, ['cooling', 'waterBased']) === true}
+            onChange={(event) => {
+              // §10.4.1: direct expansion only without a water distribution; the
+              // hidden answer is cleared so it cannot block the survey.
+              const next = write(draft, ['cooling', 'waterBased'], event.target.checked);
+              save({ kind, survey: event.target.checked ? write(next, ['cooling', 'directExpansion'], undefined) : next });
+            }} />
+          {t('opname.cooling.waterBased')}
+        </label>
         <SelectField {...field} path={['cooling', 'balanced']} label={t('opname.cooling.balanced')}
           options={[['none', t('opname.cooling.balanced.none')], ['static', t('opname.cooling.balanced.static')],
             ['dynamic', t('opname.cooling.balanced.dynamic')]]} />
+        {['static', 'dynamic', true].includes(read(draft, ['cooling', 'balanced']) as string | boolean) &&
+          <TextField {...field} path={['cooling', 'balancingEvidenceReference']} label={t('opname.cooling.balancingEvidence')} />}
         <CheckField {...field} path={['cooling', 'heatPumpSource']} label={t('opname.cooling.heatPumpSource')} />
         <CheckField {...field} path={['cooling', 'groundAboveZeroDemonstrated']} label={t('opname.cooling.groundAboveZero')} />
         {kind === 'residential' &&
@@ -844,7 +856,10 @@ export function BasisopnamePanel() {
         <li>BENG 3: {performance.renewableSharePercent ?? '—'} %</li>
       </ul>}
       {result.issues.length > 0 && <ul className="opname-issues">
-        {result.issues.map((item, index) => <li key={index}><code>{item.code}</code> {item.path}</li>)}
+        {result.issues.map((item, index) => {
+          const hint = t(`opname.issueHint.${item.code}`, { defaultValue: '' });
+          return <li key={index}><code>{item.code}</code> {item.path}{hint && <small> {hint}</small>}</li>;
+        })}
       </ul>}
       {result.warnings.length > 0 && <ul className="opname-warnings">
         {result.warnings.map((item, index) => <li key={index}><code>{item.code}</code> {item.note}</li>)}

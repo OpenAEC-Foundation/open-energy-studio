@@ -2817,6 +2817,8 @@ export interface UtilitySurvey {
     designTemperature?: 't6_to12' | 't12_to16' | 't12_to18' | 't17_to21' | null;
     /** Table 10.6; `true`/`false` of older surveys mean static / none. */
     balanced?: 'none' | 'static' | 'dynamic' | boolean | null;
+    /** NTA table 10.11 footnote a: NEN-EN 14336 balancing declaration; absent: balancing counts as none. */
+    balancingEvidenceReference?: string | null;
     control?: 'standalone' | 'central_with_room_control' | 'other_or_unknown' | null;
     pipesInsulated?: boolean | null;
     pipeInsulationYear?: number | null;
@@ -2836,6 +2838,8 @@ export interface UtilitySurvey {
     /** Table 10.10: actual pipe length L and the length through uncooled spaces, m; absent: forfait. */
     pipeLengthM?: number | null;
     uncooledPipeLengthM?: number | null;
+    /** Table 10.10: actual maximum supply-pipe length L_max, m; absent: forfait (10.27). */
+    maxPipeLengthM?: number | null;
     /** §10.3.2: further generators on the same distribution, each with its nominal power. */
     additionalGenerators?: Array<{
       generator: NonNullable<UtilitySurvey['cooling']>['generator'];
@@ -3714,6 +3718,8 @@ export interface NtaCoolingSystem {
       individualDwellingInstallation: boolean;
       labelPowerKw?: number | null;
       energyEfficiencyIndex?: number | null;
+      /** §10.4.2.3: actual L_max, m; absent: forfait 10.27. */
+      maxPipeLengthM?: number | null;
       sourceReference: string;
     } | null;
     sourceReference: string;
