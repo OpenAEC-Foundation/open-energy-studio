@@ -1912,7 +1912,8 @@ fn hot_water_from_heating(heating: &SpaceHeatingChainAssessment) -> Vec<HotWater
                 share,
                 natural_gas_kwh: share * row.natural_gas_kwh,
                 oil_kwh: share * row.oil_kwh,
-                biomass_kwh: share * row.biomass_kwh,
+                biomass_kwh: share
+                    * (row.biomass_kwh + row.biomass_class_a_kwh + row.biomass_class_c_kwh),
                 district_heat_kwh: share * row.district_heat_kwh,
                 electricity_kwh: share * row.generator_electricity_kwh,
             }
@@ -3007,6 +3008,9 @@ fn compute(
         if let Some(solar) = standalone_solar {
             used_el += solar.auxiliary_kwh.get(index).copied().unwrap_or(0.0);
         }
+        // §13.8.4.6: table 13.22 biomass appliances (bmB).
+        let mut hot_water_biomass = 0.0;
+        let mut hot_water_biomass_heat = 0.0;
         if let Some(months) = &hot_water {
             let row = &months[index];
             // 13.1/13.3 per generator carrier; table 5.2 or annex P for
@@ -3020,6 +3024,8 @@ fn compute(
             hot_water_ambient = row.ambient_heat_kwh;
             hot_water_chp = row.chp_electricity_kwh;
             solar_heat += row.solar_renewable_kwh;
+            hot_water_biomass = row.biomass_kwh;
+            hot_water_biomass_heat = row.biomass_output_kwh;
         }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
         let produced_renewable: f64 = input
@@ -3069,9 +3075,13 @@ fn compute(
         }
         // 5.20 books Q_HD;hp;in;bron as carrier dh (its own factors above).
         let reported_dh = used_dh + if source.is_some() { source_heat } else { 0.0 };
-        let used_bm = bacs * row.biomass_kwh;
-        fossil += used_bm * F_P_BIOMASS_B;
-        co2 += used_bm * K_CO2_BIOMASS_B;
+        // Tables 5.2/5.3: bmA f_P 0,0, bmB 0,5, bmC 1,0 (× 0,104 for CO2).
+        let used_bm_b = bacs * row.biomass_kwh + hot_water_biomass;
+        let used_bm_a = bacs * row.biomass_class_a_kwh;
+        let used_bm_c = bacs * row.biomass_class_c_kwh;
+        let used_bm = used_bm_a + used_bm_b + used_bm_c;
+        fossil += used_bm_b * F_P_BIOMASS_B + used_bm_c;
+        co2 += used_bm_b * K_CO2_BIOMASS_B + used_bm_c * 0.104;
         if used_bm > 0.0 {
             carriers.push(CarrierMonth {
                 carrier: "bm",
@@ -3157,11 +3167,16 @@ fn compute(
             .sum();
         // 5.29 and 5.39.
         // 5.30: biomass counts its delivered heat with f_Pren;bmB.
-        let biomass_heat = if row.biomass_kwh > 0.0 {
+        // 5.39f with table 5.4: f_Pren bmA 1,0, bmB 0,5, bmC 0 on the
+        // delivered heat, split by fuel when classes are mixed.
+        let biomass_fuel = row.biomass_kwh + row.biomass_class_a_kwh + row.biomass_class_c_kwh;
+        let biomass_heat = if biomass_fuel > 0.0 {
             row.generator_output_kwh
+                * (row.biomass_class_a_kwh / F_PREN_BIOMASS_B + row.biomass_kwh)
+                / biomass_fuel
         } else {
             0.0
-        };
+        } + hot_water_biomass_heat;
         // 5.39: external supply at f_Pren;dX and the collective source.
         // 5.39a–h per carrier ri; their sum is EPrenTot (5.28).
         let month_renewable = RenewableByCarrier {
@@ -3982,6 +3997,7 @@ mod tests {
             obstruction_factors: vec![1.0],
             obstruction: None,
             collective: None,
+            pvt: None,
             source_reference: "datasheet".into(),
         });
         let result = assess_building_performance(&sample);
@@ -5443,6 +5459,7 @@ mod tests {
             obstruction_factors: vec![1.0],
             obstruction: None,
             collective: None,
+            pvt: None,
             source_reference: "datasheet".into(),
         });
         assert!(assess_building_performance(&sample)

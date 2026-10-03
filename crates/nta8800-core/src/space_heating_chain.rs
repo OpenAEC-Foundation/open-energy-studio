@@ -419,6 +419,11 @@ pub struct MultipleGenerators {
     /// f_gebouw;si;H to Φ_H;tot = Σ Q_H;node;in / 1139.
     #[serde(default)]
     pub added_preferred_generator: bool,
+    /// 9.6.1 note 1: β_H;gen;i;pref estimated for preferences 1 … n−1 when
+    /// the nominal powers are unknown (cumulative, non-decreasing, 0–1).
+    /// Generators with the same preference then share equally.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub estimated_beta: Vec<f64>,
     pub source_reference: String,
 }
 
@@ -428,7 +433,9 @@ pub struct PreferredGenerator {
     /// 1 is the highest priority (9.2.2.1.3, table 9.1).
     pub preference: u32,
     /// Φ_H;gen;i nominal heating power, kW (type plate, NEN-EN 14511-2 for
-    /// heat pumps, at most 40 % of a combi boiler's maximum).
+    /// heat pumps, at most 40 % of a combi boiler's maximum); may be
+    /// omitted with `estimatedBeta`.
+    #[serde(default)]
     pub nominal_power_kw: f64,
     pub generator: Generator,
 }
@@ -471,6 +478,9 @@ pub struct ProductBoilerGenerator {
     pub annex_r_compliant_at_most_500_kw: Option<bool>,
     #[serde(default)]
     pub annex_r_reference: Option<String>,
+    /// Biomass above 500 kW thermal per installation (bmA of table 5.2).
+    #[serde(default)]
+    pub biomass_above_500_kw: bool,
 }
 
 /// Fuel of an annex N heater.
@@ -505,6 +515,9 @@ pub struct LocalHeaterGenerator {
     pub annex_r_compliant_at_most_500_kw: Option<bool>,
     #[serde(default)]
     pub annex_r_reference: Option<String>,
+    /// Biomass above 500 kW thermal per installation (bmA of table 5.2).
+    #[serde(default)]
+    pub biomass_above_500_kw: bool,
     #[serde(default)]
     pub sole_heating_in_served_rooms: Option<bool>,
 }
@@ -865,6 +878,11 @@ pub struct ChainMonth {
     pub district_heat_kwh: f64,
     /// Solid biomass input, carrier `bm` (9.64).
     pub biomass_kwh: f64,
+    /// Biomass of appliances above 500 kW per installation (bmA, table 5.2:
+    /// f_P 0,0, f_Pren 1,0), kWh.
+    pub biomass_class_a_kwh: f64,
+    /// Other biomass (bmC, table 5.2: f_P 1,0, f_Pren 0), kWh.
+    pub biomass_class_c_kwh: f64,
     /// Fuel oil input (annex M/N, table 9.25 oil appliances).
     pub oil_kwh: f64,
     /// Annex M/N/CHP generator losses recoverable in the space (M.16/M.19,
@@ -2185,6 +2203,8 @@ fn assess_chain_pass(
                 natural_gas_kwh: 0.0,
                 district_heat_kwh: 0.0,
                 biomass_kwh: 0.0,
+                biomass_class_a_kwh: 0.0,
+                biomass_class_c_kwh: 0.0,
                 generator_electricity_kwh: 0.0,
                 auxiliary_electricity_kwh: None,
                 distribution_auxiliary_electricity_kwh: distribution.pump_electricity[index],
@@ -2344,7 +2364,9 @@ fn assess_chain_pass(
         annual_auxiliary_electricity_kwh: auxiliary,
         annual_collective_source_heat_kwh: sum(|row| row.collective_source_heat_kwh),
         annual_district_heat_kwh: sum(|row| row.district_heat_kwh),
-        annual_biomass_kwh: sum(|row| row.biomass_kwh),
+        annual_biomass_kwh: sum(|row| {
+            row.biomass_kwh + row.biomass_class_a_kwh + row.biomass_class_c_kwh
+        }),
         distribution: distribution_summary,
         zone_recoverable_losses,
         annex_q: annex_q_result.filter(|_| valid),
@@ -2566,23 +2588,60 @@ fn generator_conditions(
     }
 }
 
-/// Biomass checks shared by annex M boilers and annex N stoves.
+/// Table 5.2 biomass classes: bmA (> 500 kW per installation), bmB
+/// (≤ 500 kW meeting annex R), bmC (other).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BiomassClass {
+    A,
+    B,
+    C,
+}
+
+/// Biomass class of annex M boilers and annex N stoves (method 1, so all
+/// three classes of table 5.2 occur); the annex R evidence is needed for
+/// bmB.
 fn validate_biomass_evidence(
     compliant: Option<bool>,
+    above_500_kw: bool,
     reference: Option<&String>,
     issues: &mut Vec<ChainIssue>,
-) {
+) -> BiomassClass {
+    if above_500_kw {
+        if compliant == Some(true) {
+            // Annex R covers appliances of at most 500 kW.
+            issues.push(issue(
+                "biomass_class_conflict",
+                "generator.annexRCompliantAtMost500Kw",
+            ));
+        }
+        return BiomassClass::A;
+    }
     if compliant != Some(true) {
-        issues.push(issue(
-            "biomass_class_unsupported",
-            "generator.annexRCompliantAtMost500Kw",
-        ));
+        return BiomassClass::C;
     }
     if reference.map_or(true, |value| value.trim().is_empty()) {
         issues.push(issue(
             "source_reference_required",
             "generator.annexRReference",
         ));
+    }
+    BiomassClass::B
+}
+
+/// Moves the biomass of a generator to its table 5.2 class.
+fn apply_biomass_class(monthly: &mut [ChainMonth], class: BiomassClass) {
+    for row in monthly.iter_mut() {
+        match class {
+            BiomassClass::A => {
+                row.biomass_class_a_kwh += row.biomass_kwh;
+                row.biomass_kwh = 0.0;
+            }
+            BiomassClass::C => {
+                row.biomass_class_c_kwh += row.biomass_kwh;
+                row.biomass_kwh = 0.0;
+            }
+            BiomassClass::B => {}
+        }
     }
 }
 
@@ -2884,8 +2943,28 @@ fn generate_multiple(
             "generator.generators",
         ));
     }
+    let estimated = !set.estimated_beta.is_empty();
+    if estimated {
+        let n = preferences.len();
+        let values = &set.estimated_beta;
+        if values.len() + 1 != n
+            || values.iter().any(|value| !(0.0..=1.0).contains(value))
+            || values.windows(2).any(|pair| pair[1] < pair[0])
+        {
+            issues.push(issue(
+                "generator_estimated_beta_invalid",
+                "generator.estimatedBeta",
+            ));
+        }
+        if set.added_preferred_generator {
+            issues.push(issue(
+                "generator_estimated_beta_and_added_preferred",
+                "generator.estimatedBeta",
+            ));
+        }
+    }
     for (index, part) in set.generators.iter().enumerate() {
-        if !part.nominal_power_kw.is_finite() || part.nominal_power_kw <= 0.0 {
+        if !estimated && (!part.nominal_power_kw.is_finite() || part.nominal_power_kw <= 0.0) {
             issues.push(issue(
                 "generator_nominal_power_invalid",
                 format!("generator.generators[{index}].nominalPowerKw"),
@@ -2952,7 +3031,14 @@ fn generate_multiple(
         1.0
     };
     let beta = |preference: u32| -> f64 {
-        if preference == 0 || reference <= 0.0 {
+        if preference == 0 {
+            0.0
+        } else if estimated {
+            set.estimated_beta
+                .get(preference as usize - 1)
+                .copied()
+                .unwrap_or(1.0)
+        } else if reference <= 0.0 {
             0.0
         } else {
             power_up_to(preference) * scale / reference
@@ -2981,7 +3067,16 @@ fn generate_multiple(
             .filter(|other| other.preference == part.preference)
             .map(|other| other.nominal_power_kw)
             .sum();
-        let share = part.nominal_power_kw / same;
+        let count = set
+            .generators
+            .iter()
+            .filter(|other| other.preference == part.preference)
+            .count() as f64;
+        let share = if estimated || same <= 0.0 {
+            1.0 / count
+        } else {
+            part.nominal_power_kw / same
+        };
         let sub_outputs: Vec<MonthlyEnergy> = outputs
             .iter()
             .enumerate()
@@ -3031,6 +3126,8 @@ fn generate_multiple(
             row.natural_gas_kwh += sub.natural_gas_kwh;
             row.district_heat_kwh += sub.district_heat_kwh;
             row.biomass_kwh += sub.biomass_kwh;
+            row.biomass_class_a_kwh += sub.biomass_class_a_kwh;
+            row.biomass_class_c_kwh += sub.biomass_class_c_kwh;
             row.oil_kwh += sub.oil_kwh;
             row.generator_recoverable_loss_kwh += sub.generator_recoverable_loss_kwh;
             row.generator_electricity_kwh += sub.generator_electricity_kwh;
@@ -3047,6 +3144,8 @@ fn generate_multiple(
             total_input += sub.natural_gas_kwh
                 + sub.district_heat_kwh
                 + sub.biomass_kwh
+                + sub.biomass_class_a_kwh
+                + sub.biomass_class_c_kwh
                 + sub.oil_kwh
                 + sub.generator_electricity_kwh;
         }
@@ -3134,6 +3233,8 @@ fn generate_identical(
         row.natural_gas_kwh = n * one.natural_gas_kwh;
         row.district_heat_kwh = n * one.district_heat_kwh;
         row.biomass_kwh = n * one.biomass_kwh;
+        row.biomass_class_a_kwh = n * one.biomass_class_a_kwh;
+        row.biomass_class_c_kwh = n * one.biomass_class_c_kwh;
         row.oil_kwh = n * one.oil_kwh;
         row.generator_recoverable_loss_kwh = n * one.generator_recoverable_loss_kwh;
         row.generator_electricity_kwh = n * one.generator_electricity_kwh;
@@ -3342,7 +3443,9 @@ fn generate(
         }
         Generator::GasBoiler(generator) => {
             let collective = generator.boiler.role == BoilerRole::Collective;
-            if collective {
+            // 9.6.8.2.2: W_H;aux;gen = 0 for an unknown collective generator.
+            let unknown = generator.boiler.kind == crate::boiler_forfait_draft::BoilerKind::Unknown;
+            if collective && !unknown {
                 validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
             } else if generator.auxiliary.is_some() {
                 issues.push(issue(
@@ -3364,7 +3467,12 @@ fn generate(
             generation_efficiency = result.generation_efficiency;
             for (row, boiler) in monthly.iter_mut().zip(&result.monthly) {
                 row.natural_gas_kwh = boiler.input_natural_gas_kwh;
-                row.auxiliary_electricity_kwh = boiler.auxiliary_electricity_kwh;
+                row.oil_kwh = boiler.input_oil_kwh;
+                row.auxiliary_electricity_kwh = if unknown {
+                    Some(0.0)
+                } else {
+                    boiler.auxiliary_electricity_kwh
+                };
             }
             if let Some(measurements) = &generator.auxiliary_measurements {
                 if collective {
@@ -3395,7 +3503,7 @@ fn generate(
             if result.monthly.len() != 12 && issues.is_empty() {
                 issues.push(issue("generator_result_incomplete", "generator"));
             }
-            if let (true, Some(auxiliary)) = (collective, &generator.auxiliary) {
+            if let (true, false, Some(auxiliary)) = (collective, unknown, &generator.auxiliary) {
                 if issues.is_empty() {
                     for (index, row) in monthly.iter_mut().enumerate() {
                         row.auxiliary_electricity_kwh = Some(other_generator_auxiliary_kwh(
@@ -3724,13 +3832,14 @@ fn generate(
                     .into_iter()
                     .map(|item| issue(item.code, item.path)),
             );
-            if generator.boiler.fuel == BoilerFuel::Wood {
+            let biomass_class = (generator.boiler.fuel == BoilerFuel::Wood).then(|| {
                 validate_biomass_evidence(
                     generator.annex_r_compliant_at_most_500_kw,
+                    generator.biomass_above_500_kw,
                     generator.annex_r_reference.as_ref(),
                     issues,
-                );
-            }
+                )
+            });
             let Some(hours) = conditions.hours else {
                 issues.push(issue("heating_limit_undetermined", "demand"));
                 return None;
@@ -3779,6 +3888,9 @@ fn generate(
                 input_total += fuel;
             }
             generation_efficiency = (input_total > 0.0).then(|| output_total / input_total);
+            if let Some(class) = biomass_class {
+                apply_biomass_class(monthly, class);
+            }
         }
         Generator::LocalHeater(generator) => {
             issues.extend(
@@ -3786,12 +3898,15 @@ fn generate(
                     .into_iter()
                     .map(|item| issue(item.code, item.path)),
             );
-            if generator.fuel == LocalHeaterFuel::Biomass {
+            let biomass_class = (generator.fuel == LocalHeaterFuel::Biomass).then(|| {
                 validate_biomass_evidence(
                     generator.annex_r_compliant_at_most_500_kw,
+                    generator.biomass_above_500_kw,
                     generator.annex_r_reference.as_ref(),
                     issues,
-                );
+                )
+            });
+            if generator.fuel == LocalHeaterFuel::Biomass {
                 match generator.sole_heating_in_served_rooms {
                     None => issues.push(issue(
                         "biomass_sole_heating_confirmation_required",
@@ -3846,6 +3961,9 @@ fn generate(
                 input_total += fuel;
             }
             generation_efficiency = (input_total > 0.0).then(|| output_total / input_total);
+            if let Some(class) = biomass_class {
+                apply_biomass_class(monthly, class);
+            }
         }
         Generator::ForfaitHeater(generator) => {
             if generator.equipment_reference.trim().is_empty() {
@@ -4228,6 +4346,7 @@ mod tests {
                 },
             ],
             added_preferred_generator: false,
+            estimated_beta: Vec::new(),
             source_reference: "survey".into(),
         }));
         // Two generators at preference 1 only are also a valid split.
@@ -4287,6 +4406,108 @@ mod tests {
     }
 
     #[test]
+    fn unknown_collective_generator_has_no_auxiliary_energy() {
+        // 9.6.8.2.2: W_H;aux;gen = 0; table 9.25 a) 0,70.
+        let mut input = boiler_chain();
+        if let Generator::GasBoiler(generator) = &mut input.generator {
+            generator.boiler.role = BoilerRole::Collective;
+            generator.boiler.kind = crate::boiler_forfait_draft::BoilerKind::Unknown;
+            generator.auxiliary = None;
+        }
+        input.distribution_system = Some(system(calculated_pump()));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert_eq!(result.generation_efficiency, Some(0.70));
+        let jan = &result.monthly[0];
+        assert!(
+            (jan.auxiliary_electricity_kwh.unwrap() - jan.distribution_auxiliary_electricity_kwh)
+                .abs()
+                < 1e-9
+        );
+    }
+
+    #[test]
+    fn biomass_classes_of_table_5_2() {
+        let mut issues = Vec::new();
+        assert_eq!(
+            validate_biomass_evidence(Some(true), false, Some(&"annex R".to_string()), &mut issues),
+            BiomassClass::B
+        );
+        assert_eq!(
+            validate_biomass_evidence(None, false, None, &mut issues),
+            BiomassClass::C
+        );
+        assert_eq!(
+            validate_biomass_evidence(Some(false), true, None, &mut issues),
+            BiomassClass::A
+        );
+        assert!(issues.is_empty());
+        validate_biomass_evidence(Some(true), true, None, &mut issues);
+        assert!(issues
+            .iter()
+            .any(|item| item.code == "biomass_class_conflict"));
+        let mut rows = vec![ChainMonth {
+            biomass_kwh: 100.0,
+            ..ChainMonth::default()
+        }];
+        apply_biomass_class(&mut rows, BiomassClass::C);
+        assert_eq!(rows[0].biomass_kwh, 0.0);
+        assert_eq!(rows[0].biomass_class_c_kwh, 100.0);
+    }
+
+    #[test]
+    fn estimated_beta_replaces_unknown_powers() {
+        // 9.6.1 note 1: β estimated when nominal powers are unknown.
+        let mut input = boiler_chain();
+        let boiler = input.generator.clone();
+        let heat_pump_generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
+            forfait: heat_pump(),
+            source_system: SourceSystem::Individual,
+            source_system_reference: "own outdoor unit".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        input.generator = Generator::Multiple(Box::new(MultipleGenerators {
+            generators: vec![
+                PreferredGenerator {
+                    preference: 1,
+                    nominal_power_kw: 0.0,
+                    generator: heat_pump_generator,
+                },
+                PreferredGenerator {
+                    preference: 2,
+                    nominal_power_kw: 0.0,
+                    generator: boiler,
+                },
+            ],
+            added_preferred_generator: false,
+            estimated_beta: vec![0.3],
+            source_reference: "adviser estimate".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        // January, β 0,3: f = 0,59 (table 9.23).
+        let jan = &result.monthly[0];
+        assert!((jan.heat_pump_output_kwh - 0.59 * jan.generator_output_kwh).abs() < 1e-6);
+        if let Generator::Multiple(set) = &mut input.generator {
+            set.estimated_beta = vec![1.2];
+        }
+        assert!(assess_space_heating_chain(&input)
+            .issues
+            .iter()
+            .any(|item| item.code == "generator_estimated_beta_invalid"));
+    }
+
+    #[test]
     fn multiple_generators_split_by_table_9_23() {
         // β per 9.56: heat pump 4 kW of 24 kW → β 1/6; winter
         // 0,20 + (1/6 − 0,1)·10·0,20 = 1/3; July 0,87 + 0,5·0,08 = 0,91.
@@ -4317,6 +4538,7 @@ mod tests {
                 },
             ],
             added_preferred_generator: false,
+            estimated_beta: Vec::new(),
             source_reference: "installation survey".into(),
         }));
         let result = assess_space_heating_chain(&input);
@@ -5297,6 +5519,7 @@ mod tests {
                 },
             ],
             added_preferred_generator: false,
+            estimated_beta: Vec::new(),
             source_reference: "survey".into(),
         }));
         assert!(codes(&input).contains(&"heat_pump_above55_requires_annex_q"));

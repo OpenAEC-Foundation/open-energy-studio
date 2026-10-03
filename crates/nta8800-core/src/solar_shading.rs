@@ -822,10 +822,167 @@ impl ShadingControl {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MovableShading {
-    /// `F_c` from table 7.5/7.6 (rounded up to two decimals by the caller).
+    /// `F_c` (7.43), rounded up to two decimals; omitted when `device`
+    /// gives the table 7.5/7.6 value.
+    #[serde(default = "nan")]
     pub reduction_factor: f64,
+    /// Table 7.5/7.6 device; replaces `reductionFactor`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device: Option<ShadingDevice>,
     pub control: ShadingControl,
     pub source_reference: String,
+}
+
+fn nan() -> f64 {
+    f64::NAN
+}
+
+impl MovableShading {
+    /// `F_c` of 7.43: table 7.5/7.6 for a `device`, otherwise the given
+    /// value rounded up to two decimals.
+    pub fn reduction_factor_for(&self, orientation: Orientation) -> f64 {
+        match &self.device {
+            Some(device) => device.reduction_factor(orientation),
+            None => (self.reduction_factor * 100.0 - 1e-9).ceil() / 100.0,
+        }
+    }
+}
+
+/// Table 7.5 colour classes (by T_s or R_s, footnote a).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShadeColour {
+    /// Black, anthracite, dark brown.
+    Dark,
+    Other,
+    White,
+    Unknown,
+}
+
+/// Tables 7.5 and 7.6: common movable shading devices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ShadingDevice {
+    ExternalScreen {
+        colour: ShadeColour,
+    },
+    ExternalVenetianBlind {
+        colour: ShadeColour,
+    },
+    /// Table 7.5 has no dark row for roller shutters: dark counts as other.
+    ExternalRollerShutter {
+        colour: ShadeColour,
+    },
+    /// Metallised fabric inside, R_s > 0,72 of the metal layer.
+    InternalMetallisedFabric,
+    /// Uitvalscherm (table 7.6).
+    DropArmAwning,
+    /// Knikarmscherm (table 7.6).
+    FoldingArmAwning,
+}
+
+impl ShadingDevice {
+    /// `F_c` of tables 7.5/7.6; table 7.6 by orientation.
+    pub fn reduction_factor(self, orientation: Orientation) -> f64 {
+        use Orientation::*;
+        use ShadeColour::*;
+        match self {
+            Self::ExternalScreen { colour } => match colour {
+                Dark => 0.12,
+                Other | Unknown => 0.20,
+                White => 0.25,
+            },
+            Self::ExternalVenetianBlind { colour } => match colour {
+                Dark => 0.05,
+                Other | Unknown => 0.10,
+                White => 0.20,
+            },
+            Self::ExternalRollerShutter { colour } => match colour {
+                Dark | Other | Unknown => 0.11,
+                White => 0.04,
+            },
+            Self::InternalMetallisedFabric => 0.45,
+            Self::DropArmAwning => match orientation {
+                North => 0.50,
+                NorthEast | NorthWest => 0.45,
+                _ => 0.35,
+            },
+            Self::FoldingArmAwning => match orientation {
+                North => 0.90,
+                NorthEast | NorthWest => 0.80,
+                East | West => 0.65,
+                SouthEast | SouthWest => 0.55,
+                South => 0.50,
+            },
+        }
+    }
+}
+
+/// Table 7.4: `g_gl;n` of common glazing types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GlazingType {
+    Single,
+    Double,
+    /// HR++: double with a spectrally selective low-e coating.
+    DoubleLowE,
+    /// Triple without or with one low-e coating.
+    TripleOneCoating,
+    TripleTwoCoatings,
+    /// Single with an uncoated secondary pane (voor-/achterzetraam).
+    SingleWithSecondaryPane,
+    /// Solar-control film or glass (footnote b: utility buildings only,
+    /// when no g of the film or glass is known).
+    SolarControl,
+}
+
+impl GlazingType {
+    pub fn g_perpendicular(self) -> f64 {
+        match self {
+            Self::Single => 0.85,
+            Self::Double | Self::SingleWithSecondaryPane => 0.75,
+            Self::DoubleLowE => 0.60,
+            Self::TripleOneCoating => 0.50,
+            Self::TripleTwoCoatings | Self::SolarControl => 0.40,
+        }
+    }
+}
+
+/// Fixed external horizontal louvres (7.41a/7.41b, tables 7.4a/7.4b).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FixedLouvres {
+    /// Lamellae perpendicular to the window (90°): F_c;lam 0,27.
+    Horizontal90,
+    /// Downward-angled lamellae: F_c;lam 0,15.
+    HorizontalAngled,
+    /// Rotatable lamellae (7.41b): open 0,27, closed 0,06, closed for
+    /// `f_sh;with` of 7.6.6.1.4.
+    Rotatable { control: ShadingControl },
+}
+
+/// 7.41: diffusing glazing or fixed shading with ISO 15099 values.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DiffusingGlazing {
+    /// `g_gl,alt` at a solar altitude of 45°.
+    pub g_altitude45: f64,
+    /// `g_gl,dif` for isotropic diffuse radiation.
+    pub g_diffuse: f64,
+    pub source_reference: String,
+}
+
+/// §7.6.6.1.2/7.6.6.1.3 glazing details of a window.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GlazingSolar {
+    /// Table 7.4 type; replaces `gPerpendicular`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glazing_type: Option<GlazingType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed_louvres: Option<FixedLouvres>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diffusing: Option<DiffusingGlazing>,
 }
 
 /// `F_sh;obst` for one month and balance; `None` for unsupported input.
@@ -936,7 +1093,7 @@ pub fn movable_shading_factor(
     match shading {
         Some(shading) => {
             let fraction = shading_fraction(shading.control, orientation, tilt_deg, month, balance);
-            (1.0 - fraction) + fraction * shading.reduction_factor
+            (1.0 - fraction) + fraction * shading.reduction_factor_for(orientation)
         }
         None => 1.0,
     }
@@ -1012,6 +1169,7 @@ mod tests {
     fn movable_shading_follows_7_42_per_balance() {
         let screen = MovableShading {
             reduction_factor: 0.2,
+            device: None,
             control: ShadingControl::ManualResidential,
             source_reference: "table 7.5".into(),
         };

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::climate::Orientation;
 use crate::monthly_demand::{
-    occupants_per_dwelling, InternalGains, MonthlyDemandAssessment, MonthlyDemandInput, Window, F_W,
+    occupants_per_dwelling, InternalGains, MonthlyDemandAssessment, MonthlyDemandInput, Window,
 };
 use crate::solar_shading::{obstruction_factor, Balance};
 
@@ -278,12 +278,12 @@ fn window_solar_w(window: &Window, hour: usize) -> f64 {
     let shading = window
         .movable_shading
         .as_ref()
-        .map_or(1.0, |item| item.reduction_factor);
+        .map_or(1.0, |item| item.reduction_factor_for(window.orientation));
     GLASS_RATIO
         * window.area_m2
-        * F_W
-        // AA.6b: g_gl;C;juli, the July value of a dynamic window (annex A).
-        * window.g_for_month(6)
+        // AA.6b: g_gl;C;juli, the July value of a dynamic window (annex A),
+        // with fixed louvres (7.41a); rotatable louvres count closed (note 3).
+        * window.g_gl(6, 1.0)
         * obstruction
         * shading
         * irradiance_at_hour(window.orientation, window.tilt_deg, hour)

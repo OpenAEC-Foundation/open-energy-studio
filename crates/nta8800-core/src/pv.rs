@@ -172,7 +172,51 @@ pub struct PvSystem {
     pub obstruction: Option<crate::solar_shading::CollectorObstruction>,
     #[serde(default)]
     pub collective: Option<CollectivePv>,
+    /// §16.3: a PVT system; its electricity is 16.10 = the PV yield of
+    /// 16.2 × f_PVT;PV of table 16.4 (the heat follows 13.7.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pvt: Option<PvtCover>,
     pub source_reference: String,
+}
+
+/// Table 16.4 covers of a PVT system.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PvtCover {
+    /// Unglazed: f_PVT;PV = 1,00.
+    Unglazed,
+    /// Covered with single glass: by (A_sol;mod·N_col)/V_sto;tot.
+    Glazed {
+        #[serde(rename = "collectorAreaM2")]
+        collector_area_m2: f64,
+        #[serde(rename = "storageVolumeL")]
+        storage_volume_l: f64,
+    },
+}
+
+impl PvtCover {
+    /// Table 16.4 f_PVT;PV.
+    pub fn factor(self) -> Option<f64> {
+        match self {
+            Self::Unglazed => Some(1.0),
+            Self::Glazed {
+                collector_area_m2,
+                storage_volume_l,
+            } => {
+                if !(collector_area_m2 > 0.0 && storage_volume_l > 0.0) {
+                    return None;
+                }
+                let ratio = collector_area_m2 / storage_volume_l;
+                Some(if ratio < 0.015 {
+                    0.88
+                } else if ratio <= 0.03 {
+                    0.84
+                } else {
+                    0.80
+                })
+            }
+        }
+    }
 }
 
 /// Nearest table orientation of an azimuth (0 = north, clockwise).
@@ -311,6 +355,9 @@ pub fn validate_pv(system: &PvSystem, path: &str) -> Vec<PvIssue> {
             }
         }
     }
+    if system.pvt.is_some_and(|cover| cover.factor().is_none()) {
+        push("pvt_cover_invalid", "pvt");
+    }
     if let Some(collective) = &system.collective {
         if !positive(collective.building_usable_floor_area_m2) {
             push(
@@ -350,7 +397,13 @@ pub fn monthly_yield_kwh(system: &PvSystem, assessed_usable_floor_area_m2: f64) 
         // 16.3
         let solar = irradiance * MONTH_HOURS[index] * obstruction / 1000.0;
         // 16.2 with table 16.3
-        *value = solar * peak * performance * shading_correction(obstruction) * F_PRAC_PV / I_REF;
+        *value = solar
+            * peak
+            * performance
+            * shading_correction(obstruction)
+            * F_PRAC_PV
+            * system.pvt.and_then(PvtCover::factor).unwrap_or(1.0)
+            / I_REF;
     }
     values
 }
@@ -372,8 +425,40 @@ mod tests {
             obstruction_factors: vec![1.0],
             obstruction: None,
             collective: None,
+            pvt: None,
             source_reference: "datasheet".into(),
         }
+    }
+
+    #[test]
+    fn pvt_electricity_follows_16_10_and_table_16_4() {
+        let plain = monthly_yield_kwh(&system(), 100.0);
+        let mut pvt = system();
+        pvt.pvt = Some(PvtCover::Glazed {
+            collector_area_m2: 4.0,
+            storage_volume_l: 200.0,
+        });
+        // 4/200 = 0,02 m²/dm³: 0,84.
+        let glazed = monthly_yield_kwh(&pvt, 100.0);
+        assert!((glazed[5] - 0.84 * plain[5]).abs() < 1e-9);
+        assert_eq!(
+            PvtCover::Glazed {
+                collector_area_m2: 2.0,
+                storage_volume_l: 200.0
+            }
+            .factor(),
+            Some(0.88)
+        );
+        assert_eq!(
+            PvtCover::Glazed {
+                collector_area_m2: 8.0,
+                storage_volume_l: 200.0
+            }
+            .factor(),
+            Some(0.80)
+        );
+        pvt.pvt = Some(PvtCover::Unglazed);
+        assert!((monthly_yield_kwh(&pvt, 100.0)[5] - plain[5]).abs() < 1e-12);
     }
 
     #[test]

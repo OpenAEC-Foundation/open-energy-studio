@@ -67,13 +67,56 @@ pub struct SlabOnGround {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HeatedBasement {
-    /// z: actual depth of the floor below ground level, m.
+    /// z: actual depth of the floor below ground level, m; omit it when
+    /// `wall_depths` gives the depth per wall part.
+    #[serde(default = "unset")]
     pub depth_m: f64,
+    /// 8.42/D.12: depth z_j per wall part j along the perimeter; z is the
+    /// length-weighted mean and Σℓ_j must equal the exposed perimeter.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wall_depths: Vec<BasementWallDepth>,
     /// R_c of the basement walls against the ground (8.34), m²K/W.
     pub wall_resistance_m2k_per_w: f64,
     /// ΔU_for of 8.2.1 for the walls in the 8.38 forfait route, W/(m²K).
     #[serde(default)]
     pub forfait_delta_u_w_per_m2k: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BasementWallDepth {
+    pub length_m: f64,
+    pub depth_m: f64,
+}
+
+fn unset() -> f64 {
+    f64::NAN
+}
+
+impl HeatedBasement {
+    /// z of 8.42/D.12 (length-weighted over the wall parts) for an exposed
+    /// perimeter `P`; NaN for missing, conflicting or inconsistent input.
+    pub fn depth(&self, perimeter: f64) -> f64 {
+        if self.wall_depths.is_empty() {
+            return self.depth_m;
+        }
+        if !self.depth_m.is_nan()
+            || self.wall_depths.iter().any(|part| {
+                !(positive(part.length_m) && part.depth_m.is_finite() && part.depth_m >= 0.0)
+            })
+        {
+            return f64::NAN;
+        }
+        let length: f64 = self.wall_depths.iter().map(|part| part.length_m).sum();
+        if (length - perimeter).abs() > 1e-3 * perimeter.abs().max(1.0) {
+            return f64::NAN;
+        }
+        self.wall_depths
+            .iter()
+            .map(|part| part.length_m * part.depth_m)
+            .sum::<f64>()
+            / length
+    }
 }
 
 /// 8.3.5 class of the depth `z` of a crawlspace or basement floor.
@@ -339,7 +382,7 @@ fn heated_basement_terms(
     slab: &SlabOnGround,
     basement: &HeatedBasement,
 ) -> Option<(f64, f64, f64, f64)> {
-    let z = basement.depth_m;
+    let z = basement.depth(slab.exposed_perimeter_m);
     if !(positive(z)
         && positive(basement.wall_resistance_m2k_per_w)
         && positive(slab.area_m2)
@@ -370,7 +413,8 @@ pub fn slab_on_ground_conductance(slab: &SlabOnGround) -> Option<f64> {
                 if !(delta.is_finite() && delta >= 0.0) {
                     return None;
                 }
-                0.5 * slab.exposed_perimeter_m + basement.depth_m * slab.exposed_perimeter_m * delta
+                0.5 * slab.exposed_perimeter_m
+                    + basement.depth(slab.exposed_perimeter_m) * slab.exposed_perimeter_m * delta
             }
             EdgeThermalBridges::Detailed { bridges } => {
                 let mut sum = 0.0;
@@ -448,8 +492,8 @@ pub fn slab_coefficients(slab: &SlabOnGround) -> Option<SlabCoefficients> {
     let delta = PENETRATION_DEPTH_M;
     if let Some(basement) = &slab.heated_basement {
         let (_, _, d_bf, d_bw) = heated_basement_terms(slab, basement)?;
-        let z = basement.depth_m;
         let perimeter = slab.exposed_perimeter_m;
+        let z = basement.depth(perimeter);
         // D.10.
         let internal = slab.area_m2 * LAMBDA_GROUND / d_bf
             * (2.0 / ((1.0 + delta / d_bf).powi(2) + 1.0)).sqrt()
@@ -851,6 +895,7 @@ mod tests {
         let mut floor = slab(50.0, 30.0, 0.17 + 1.0);
         floor.heated_basement = Some(HeatedBasement {
             depth_m: 2.0,
+            wall_depths: Vec::new(),
             wall_resistance_m2k_per_w: 1.5,
             forfait_delta_u_w_per_m2k: None,
         });
@@ -885,5 +930,30 @@ mod tests {
             .forfait_delta_u_w_per_m2k = Some(0.05);
         let forfait = slab_on_ground_conductance(&floor).unwrap();
         assert!((forfait - (steady + 0.5 * 30.0 + 2.0 * 30.0 * 0.05)).abs() < 1e-9);
+        // D.12/8.42: 20 m at 2,5 m and 10 m at 1,0 m give the same z = 2,0.
+        floor.edge_thermal_bridges = EdgeThermalBridges::Forfait;
+        let basement = floor.heated_basement.as_mut().unwrap();
+        basement.depth_m = f64::NAN;
+        basement.wall_depths = vec![
+            BasementWallDepth {
+                length_m: 20.0,
+                depth_m: 2.5,
+            },
+            BasementWallDepth {
+                length_m: 10.0,
+                depth_m: 1.0,
+            },
+        ];
+        assert!((basement.depth(30.0) - 2.0).abs() < 1e-12);
+        assert!((slab_on_ground_conductance(&floor).unwrap() - forfait).abs() < 1e-9);
+        let coefficients_parts = slab_coefficients(&floor).unwrap();
+        assert!((coefficients_parts.periodic_external_w_per_k - external).abs() < 1e-9);
+        // Σℓ_j must equal P, and z and z_j are exclusive.
+        let basement = floor.heated_basement.as_mut().unwrap();
+        basement.wall_depths[1].length_m = 5.0;
+        assert!(basement.depth(30.0).is_nan());
+        basement.wall_depths[1].length_m = 10.0;
+        basement.depth_m = 2.0;
+        assert!(slab_on_ground_conductance(&floor).is_none());
     }
 }
