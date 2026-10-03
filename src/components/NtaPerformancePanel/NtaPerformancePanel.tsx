@@ -77,6 +77,12 @@ export function NtaPerformancePanel() {
     return text === key ? code : text;
   };
 
+  const warningLabel = (code: string) => {
+    const key = `nta.warning.${code}`;
+    const text = t(key);
+    return text === key ? code : text;
+  };
+
   const performance = assessment?.performance ?? null;
   const calculated = assessment?.status === 'calculated_unverified' && performance;
   const heating = performance?.spaceHeating;
@@ -116,6 +122,19 @@ export function NtaPerformancePanel() {
               <strong>{gapLabel(gap.code)}</strong>
               <code>{gap.path}</code>
               {gap.detail && <small>{gap.detail}</small>}
+            </li>
+          ))}</ul>
+        </div>
+      )}
+
+      {!loading && assessment && (assessment.warnings?.length ?? 0) > 0 && (
+        <div className="nta-performance-gaps" data-testid="nta-plausibility-warnings">
+          <p><AlertCircle size={16} /> {t('nta.performance.warnings')}</p>
+          <ul>{assessment.warnings!.map((warning, index) => (
+            <li key={`${warning.code}-${index}`}>
+              <strong>{warningLabel(warning.code)}</strong>
+              <code>{warning.path}</code>
+              {warning.detail && <small>{warning.detail}</small>}
             </li>
           ))}</ul>
         </div>
@@ -205,7 +224,8 @@ export function NtaPerformancePanel() {
                 )))}
             <li>
               <span>{t('nta.performance.tojuliMax')} ≤ 1,20</span>
-              <em>{performance.tojuliMeetsBblLimit == null ? t('nta.performance.bblUnknown')
+              <em>{performance.tojuliMeetsBblLimit == null
+                ? t(assessment?.derivedInput?.calculationScope === 'utility' ? 'nta.performance.bblNotApplicable' : 'nta.performance.bblUnknown')
                 : performance.tojuliMeetsBblLimit ? t('nta.performance.bblMeets') : t('nta.performance.bblFails')}</em>
             </li>
           </ul>

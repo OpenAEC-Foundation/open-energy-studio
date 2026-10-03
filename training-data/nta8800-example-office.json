@@ -120,16 +120,7 @@
           "windows": []
         }
       ],
-      "thermalBridges": [
-        {
-          "id": "tb1",
-          "name": "Aansluiting vloer-gevel",
-          "psiValue": 0.05,
-          "length": 60.0,
-          "zoneId": "z1",
-          "thermalBoundary": "outdoor"
-        }
-      ],
+      "thermalBridges": [],
       "airTightness": {
         "qv10": 0.6
       },
@@ -195,8 +186,8 @@
     "thermalMass": {
       "floor": "heavy",
       "wall": "heavy",
-      "ceiling": "open_or_none",
-      "sourceReference": "voorbeeld: betonvloeren, kalkzandsteen"
+      "ceiling": "closed_or_suspended",
+      "sourceReference": "voorbeeld: betonvloeren, kalkzandsteen, systeemplafond (tabel 7.10 a)"
     },
     "internalGains": {
       "method": "utility",
@@ -223,62 +214,7 @@
         "sourceReference": "voorbeeld: Rc 3,7 + Rsi 0,17"
       }
     ],
-    "ventilationFlows": [
-      {
-        "id": "mech-d",
-        "sourceReference": "voorbeeld: balansventilatie met WTW, chapter 11",
-        "months": [
-          {
-            "month": 1,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 2,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 3,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 4,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 5,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 6,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 7,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 8,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 9,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 10,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 11,
-            "conductanceWPerK": 140.0
-          },
-          {
-            "month": 12,
-            "conductanceWPerK": 140.0
-          }
-        ]
-      }
-    ],
+    "ventilationFlows": [],
     "emission": {
       "system": "radiators_or_convectors",
       "balancing": "none_or_unknown",
@@ -308,50 +244,9 @@
       }
     },
     "bacsFactor": 1.0,
-    "bacsSourceReference": "voorbeeld: geen gebouwautomatisering (klasse D)",
+    "bacsSourceReference": "NTA 8800 §5.5.8: verwarming 60 kW ≤ 290 kW",
     "useInventoryComplete": true,
-    "declaredUses": [
-      {
-        "id": "dhw",
-        "service": "domestic_hot_water",
-        "carrier": "el",
-        "monthlyKwh": [
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0,
-          60.0
-        ],
-        "sourceReference": "voorbeeld: chapter 13 value, elektrische close-ups"
-      },
-      {
-        "id": "fans",
-        "service": "ventilation_fans",
-        "carrier": "el",
-        "monthlyKwh": [
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0,
-          180.0
-        ],
-        "sourceReference": "voorbeeld: chapter 11 value"
-      }
-    ],
+    "declaredUses": [],
     "productionInventoryComplete": true,
     "pvSystems": [
       {
@@ -407,6 +302,124 @@
     "labelFunction": "office",
     "demandUsesFixedC1Ventilation": false,
     "batteryStoragePresent": false,
-    "bblFunction": "office"
+    "bblFunction": "office",
+    "verticalPipes": [
+      {
+        "id": "toiletgroep",
+        "buildingHeightM": 7.5,
+        "insulated": false,
+        "sourceReference": "voorbeeld: één toiletgroep, aanwezigheid leidingen onbekend (7.3.3, 7.17a)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 400.0,
+      "category": "utility",
+      "functions": [
+        {
+          "function": "office",
+          "areaM2": 400.0,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 0,
+      "apartmentBuilding": false,
+      "buildingHeightM": 7.5,
+      "constructionYear": 2021,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 21.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d2",
+          "ducts": "luka_a_b_c",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "table",
+              "exchanger": "counter_flow_plastic"
+            },
+            "bypass": {
+              "kind": "full"
+            },
+            "layout": "central",
+            "constantVolumeControl": false,
+            "supplyDuctInsulation": {
+              "kind": "insulated"
+            },
+            "manufactureYear": 2021,
+            "equipmentReference": "voorbeeld: WTW-unit tegenstroom"
+          },
+          "equipmentReference": "voorbeeld: balansventilatie met WTW"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.4,
+        "sourceReference": "voorbeeld: D2 balansventilatie met WTW, gemeten qv10 0,4 dm³/(s·m²)"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2021
+      },
+      "sourceReference": "voorbeeld: D2 balansventilatie met WTW, gemeten qv10 0,4 dm³/(s·m²)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "office",
+            "areaM2": 400.0
+          }
+        ],
+        "sourceReference": "voorbeeld: kantoorfunctie, tabel 13.1"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 2.0,
+        "sourceReference": "voorbeeld: close-ups bij de pantry"
+      },
+      "storage": [
+        {
+          "id": "close-in",
+          "volumeL": 30.0,
+          "loss": {
+            "method": "unknown_label",
+            "producedFrom2018": true
+          },
+          "connectionFactor": 3,
+          "inHeatedZone": true,
+          "sourceReference": "voorbeeld: 30 l close-in boiler in de pantry, label onbekend (13.59)"
+        }
+      ],
+      "generator": {
+        "kind": "electric_boiler"
+      },
+      "equipmentReference": "voorbeeld: elektrische close-in boilers"
+    },
+    "bacs": {
+      "buildingUse": "utility",
+      "systemInventoryComplete": true,
+      "systems": [
+        {
+          "id": "verwarming",
+          "service": "heating",
+          "sourceReference": "voorbeeld: installatieoverzicht",
+          "generators": [
+            {
+              "id": "boiler",
+              "nominalThermalCapacityKw": 60.0,
+              "sourceReference": "voorbeeld: typeplaatje HR107 60 kW"
+            }
+          ]
+        }
+      ]
+    }
   }
 }

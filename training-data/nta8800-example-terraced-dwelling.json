@@ -78,16 +78,7 @@
           "windows": []
         }
       ],
-      "thermalBridges": [
-        {
-          "id": "tb1",
-          "name": "Aansluiting vloer-gevel",
-          "psiValue": 0.05,
-          "length": 10.0,
-          "zoneId": "z1",
-          "thermalBoundary": "outdoor"
-        }
-      ],
+      "thermalBridges": [],
       "pointThermalBridges": [],
       "pointBridgeInventoryComplete": true,
       "airTightness": {
@@ -187,62 +178,7 @@
         "sourceReference": "synthetic: Rc 3,7 + Rsi 0,17"
       }
     ],
-    "ventilationFlows": [
-      {
-        "id": "mech-c",
-        "sourceReference": "synthetic chapter 11 value",
-        "months": [
-          {
-            "month": 1,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 2,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 3,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 4,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 5,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 6,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 7,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 8,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 9,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 10,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 11,
-            "conductanceWPerK": 35.0
-          },
-          {
-            "month": 12,
-            "conductanceWPerK": 35.0
-          }
-        ]
-      }
-    ],
+    "ventilationFlows": [],
     "emission": {
       "system": "radiators_or_convectors",
       "balancing": "none_or_unknown",
@@ -274,48 +210,7 @@
     "bacsFactor": 1.0,
     "bacsSourceReference": "residential without BACS",
     "useInventoryComplete": true,
-    "declaredUses": [
-      {
-        "id": "dhw",
-        "service": "domestic_hot_water",
-        "carrier": "gas",
-        "monthlyKwh": [
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0,
-          150.0
-        ],
-        "sourceReference": "synthetic chapter 13 value"
-      },
-      {
-        "id": "fans",
-        "service": "ventilation_fans",
-        "carrier": "el",
-        "monthlyKwh": [
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0,
-          15.0
-        ],
-        "sourceReference": "synthetic chapter 11 value"
-      }
-    ],
+    "declaredUses": [],
     "productionInventoryComplete": true,
     "pvSystems": [
       {
@@ -336,6 +231,75 @@
     ],
     "demandUsesFixedC1Ventilation": false,
     "batteryStoragePresent": false,
-    "bblFunction": "other_residential"
+    "bblFunction": "other_residential",
+    "verticalPipes": [
+      {
+        "id": "standleiding",
+        "storeys": 2,
+        "insulated": false,
+        "sourceReference": "synthetic: one uninsulated soil stack over both storeys (7.3.3, table 7.1)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 100.0,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 100.0,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 9.0,
+      "constructionYear": 2020,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 20.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "c1",
+          "ducts": "luka_a_b_c",
+          "equipmentReference": "synthetic: mechanical extract, DC fan"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.4,
+        "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2020
+      },
+      "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "one dwelling"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "kitchen_and_bathroom",
+        "kitchenLengthM": 3.0,
+        "bathroomLengthM": 5.0,
+        "sourceReference": "synthetic floor plan"
+      },
+      "generator": {
+        "kind": "gas_appliance",
+        "appliance": "combi_gaskeur_hr_cw"
+      },
+      "equipmentReference": "synthetic: HR combi boiler with Gaskeur CW label"
+    }
   }
 }

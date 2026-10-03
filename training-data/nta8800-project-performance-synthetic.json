@@ -103,7 +103,7 @@
       "thermalBridges": [
         {
           "id": "tb1",
-          "name": "Aansluiting vloer-gevel",
+          "name": "Aansluiting dak-gevel",
           "psiValue": 0.05,
           "length": 30.0,
           "zoneId": "z1",
@@ -203,10 +203,20 @@
         "surfaceId": "floor",
         "exposedPerimeterM": 20.0,
         "constructionResistanceM2kPerW": 3.87,
-        "edgeThermalBridges": { "method": "forfait" },
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 20.0,
+              "psiWPerMk": 0.1,
+              "sourceReference": "synthetic floor-façade detail, ψ_gr (8.3.6)"
+            }
+          ]
+        },
         "sourceReference": "synthetic: Rc 3,7 + Rsi 0,17"
       }
     ],
+    "verticalPipes": [],
     "ventilationFlows": [
       {
         "id": "mech-c",

@@ -26,6 +26,52 @@ const AIR_HEAT_CAPACITY_W_PER_M3H_K = (1.205 * 1005) / 3600;
 const USAGE_FUNCTIONS = ['residential', 'office', 'education', 'retail', 'other_assembly', 'assembly_child_care',
   'other_healthcare', 'healthcare_with_beds', 'lodging', 'cell', 'sport'] as const;
 
+/**
+ * 7.3.3 vertical pipes: unknown (null, a kernel gap), none ([]) or a list.
+ * Dwellings give the storeys of the zone, utility buildings the building
+ * height H of 7.17a.
+ */
+function VerticalPipesFields({ draft, change, residential, path, label }: {
+  draft: Draft;
+  change: (path: Path, value: unknown) => void;
+  residential: boolean;
+  path: Path;
+  label?: string;
+}) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const pipes = read(draft, path);
+  const list = Array.isArray(pipes) ? pipes as Draft[] : null;
+  const newPipe = (index: number): Draft => ({
+    id: `leiding-${index + 1}`,
+    ...(residential ? { storeys: null } : { buildingHeightM: null }),
+    insulated: false,
+    sourceReference: '',
+  });
+  return <>
+    <label>{label ? `${label} — ${t('nta.form.verticalPipes.state')}` : t('nta.form.verticalPipes.state')}
+      <select value={list == null ? 'unknown' : list.length === 0 ? 'none' : 'listed'} onChange={(event) => change(path,
+        event.target.value === 'unknown' ? null : event.target.value === 'none' ? [] : [newPipe(0)])}>
+        <option value="unknown">{t('nta.form.verticalPipes.unknown')}</option>
+        <option value="none">{t('nta.form.verticalPipes.none')}</option>
+        <option value="listed">{t('nta.form.verticalPipes.listed')}</option>
+      </select>
+    </label>
+    {list?.map((_, index) => <div key={index} className="nta-form-row">
+      {residential
+        ? <NumberField {...field} path={[...path, index, 'storeys']} label={t('nta.form.verticalPipes.storeys')} step="1" />
+        : <NumberField {...field} path={[...path, index, 'buildingHeightM']} label={t('nta.form.verticalPipes.height')} />}
+      <CheckField {...field} path={[...path, index, 'insulated']} label={t('nta.form.verticalPipes.insulated')} />
+      <NumberField {...field} path={[...path, index, 'sharedZones']} label={t('nta.form.verticalPipes.shared')} step="1" />
+      <TextField {...field} path={[...path, index, 'sourceReference']} label={t('nta.form.source')} />
+      <button type="button" onClick={() => change(path, list.filter((_, other) => other !== index))}>
+        {t('nta.form.verticalPipes.remove')}</button>
+    </div>)}
+    {list != null && list.length > 0 &&
+      <button type="button" onClick={() => change(path, [...list, newPipe(list.length)])}>{t('nta.form.verticalPipes.add')}</button>}
+  </>;
+}
+
 export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   project: IProject;
   initial: Draft;
@@ -175,7 +221,17 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
         </label>
         <TextField {...field} path={['groundFloors', index, 'sourceReference']} label={t('nta.form.source')} />
       </div>)}
+      {ground.some((item) => read(item, ['edgeThermalBridges', 'method']) === 'forfait') &&
+        <p className="nta-form-note">{t('nta.form.edgeBridges.forfaitNote')}</p>}
     </Section>}
+    <Section title={t('nta.form.verticalPipes')}>
+      {project.zones.length > 1
+        ? ((read(draft, ['zoneData']) as Draft[] | undefined) ?? []).map((item, index) =>
+          <VerticalPipesFields key={String(item.zoneId)} draft={draft} change={change} residential={residential}
+            path={['zoneData', index, 'verticalPipes']} label={String(item.zoneId)} />)
+        : <VerticalPipesFields draft={draft} change={change} residential={residential} path={['verticalPipes']} />}
+      <p className="nta-form-note">{t('nta.form.verticalPipes.note')}</p>
+    </Section>
     <Section title={t('nta.form.ventilation')}>
       <label>{t('nta.vent.mode')}
         <select value={chapter11 ? 'chapter11' : 'explicit'} onChange={(event) => setDraft((current) => event.target.value === 'chapter11'

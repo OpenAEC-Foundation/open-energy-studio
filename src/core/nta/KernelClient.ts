@@ -3959,7 +3959,7 @@ export interface NtaCalculationInput {
   }>;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
   ventilation?: VentilationInput | null;
-  /** 7.3.3 vertical pipes (single-zone projects; per zone in `zoneData`). */
+  /** 7.3.3 vertical pipes (single-zone projects; per zone in `zoneData`); `[]` is none, absent is unknown (a gap). */
   verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }>;
   zoneData?: Array<{
     zoneId: string;
@@ -4087,6 +4087,8 @@ export interface ProjectPerformanceAssessment {
   inputFingerprint: string;
   attestStatus: 'unattested';
   gaps: Array<{ code: string; path: string; detail?: string }>;
+  /** Plausibility findings that leave the calculation running. */
+  warnings?: Array<{ code: string; path: string; detail?: string }>;
   geometry: null | {
     usableFloorAreaM2: number;
     /** A_ls with f_ls (6.7.3): ground and crawlspace weighted 0,7. */

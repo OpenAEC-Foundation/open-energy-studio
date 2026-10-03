@@ -110,7 +110,10 @@ export function generateNtaCalculationReportHTML(
       ${assessment.geometry ? `<tr><th>A<sub>g</sub> / A<sub>ls</sub></th><td>${num(assessment.geometry.usableFloorAreaM2, 1)} / ${num(assessment.geometry.lossAreaM2, 1)} m²</td>
         <th>A<sub>ls</sub>/A<sub>g</sub></th><td>${num(assessment.geometry.lossAreaRatio, 3)}</td></tr>` : ''}
     </tbody></table>
-    ${registrationSection(project.registration, assessment.registration)}`;
+    ${registrationSection(project.registration, assessment.registration)}
+    ${(assessment.warnings?.length ?? 0) > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen, maar de invoer botst met de norm of met andere invoer.</p>
+      <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${assessment.warnings!
+        .map((warning) => `<tr>${cell(warning.code)}${cell(warning.path)}${cell(warning.detail ?? '')}</tr>`).join('')}</tbody></table>` : ''}`;
   if (!performance || assessment.status !== 'calculated_unverified') {
     const gaps = assessment.gaps.map((gap) => `<tr>${cell(gap.code)}${cell(gap.path)}${cell(gap.detail ?? '')}</tr>`).join('');
     const issues = (performance?.issues ?? []).map((item) => `<tr>${cell(item.code)}${cell(item.path)}<td></td></tr>`).join('');
@@ -183,7 +186,7 @@ export function generateNtaCalculationReportHTML(
     </tbody></table>` : ''}
     <h2>TO<sub>juli</sub> (§5.7)</h2>
     ${tojuliRows ? `<table><thead><tr><th>Zone</th><th>Oriëntatie</th><th>TO<sub>juli</sub> [K]</th></tr></thead><tbody>${tojuliRows}</tbody></table>
-      <p>Hoogste waarde: ${num(performance.tojuliMaxK, 2)} K — Bbl 4.149b (≤ 1,20): ${meets(performance.tojuliMeetsBblLimit)}.</p>` : '<p>Niet bepaald.</p>'}
+      <p>Hoogste waarde: ${num(performance.tojuliMaxK, 2)} K — Bbl 4.149b (≤ 1,20): ${project.ntaCalculation?.calculationScope === 'utility' ? 'niet van toepassing (alleen woonfunctie)' : meets(performance.tojuliMeetsBblLimit)}.</p>` : '<p>Niet bepaald.</p>'}
     <h2>Rekenzones</h2>
     <table><thead><tr><th>Transmissieroute</th><th>H<sub>tr</sub> [W/K]</th><th>H<sub>H;g;adj</sub> [W/K]</th><th>D<sub>m</sub> [kJ/m²K]</th><th>Q<sub>H;nd</sub> [kWh]</th><th>Q<sub>C;nd</sub> [kWh]</th></tr></thead><tbody>${zoneRows}</tbody></table>
     <h2>Maandoverzicht [kWh]</h2>

@@ -2740,6 +2740,7 @@ pub fn assess_building_performance(
         fossil,
         renewable,
         need,
+        need_from_fixed_c1,
         ..
     }) = totals
     {
@@ -2761,7 +2762,7 @@ pub fn assess_building_performance(
                 source_reference: "derived by building_performance (tables 5.2–5.4)".into(),
             });
         }
-        let result = assess_indicators_draft(&IndicatorsDraftInput {
+        let mut result = assess_indicators_draft(&IndicatorsDraftInput {
             calculation_scope: input.calculation_scope,
             total_usable_floor_area_m2: input.total_usable_floor_area_m2,
             area_source_reference: input.area_source_reference.clone(),
@@ -2775,6 +2776,11 @@ pub fn assess_building_performance(
                 .iter()
                 .map(|item| issue(item.code, format!("indicators.{}", item.path))),
         );
+        // §5.4: BENG 1 only from the fixed C1 ventilation run; E_H+C;nd with
+        // the supplied ventilation stays in the chapter 5 block.
+        if !(input.demand_uses_fixed_c1_ventilation || need_from_fixed_c1) {
+            result.need_indicator_kwh_per_m2_year = None;
+        }
         indicators = Some(result);
     }
     let valid = issues.is_empty();
@@ -3089,7 +3095,10 @@ pub fn assess_building_performance(
             }),
         label_source: LABEL_SOURCE,
         tojuli_max_k: tojuli_max,
-        tojuli_meets_bbl_limit: tojuli_max.map(|value| value <= crate::tojuli::TOJULI_LIMIT_K),
+        // Bbl art. 4.149b sets the TOjuli limit for woonfuncties only.
+        tojuli_meets_bbl_limit: tojuli_max
+            .filter(|_| matches!(input.calculation_scope, CalculationScope::Residential))
+            .map(|value| value <= crate::tojuli::TOJULI_LIMIT_K),
         tojuli,
         a0_check: bbl
             .as_ref()

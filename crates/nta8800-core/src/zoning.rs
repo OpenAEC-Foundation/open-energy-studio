@@ -96,7 +96,7 @@ fn largest_share<T: PartialEq + Copy>(values: impl Iterator<Item = (T, f64)>) ->
     groups.iter().map(|(_, area)| *area).fold(0.0, f64::max) / total
 }
 
-fn ventilation_function(function: UsageFunction) -> VentilationFunction {
+pub(crate) fn ventilation_function(function: UsageFunction) -> VentilationFunction {
     match function {
         UsageFunction::Residential => VentilationFunction::Residential,
         UsageFunction::AssemblyChildCare => VentilationFunction::AssemblyChildCare,

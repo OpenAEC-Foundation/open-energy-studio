@@ -43,6 +43,8 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
         edgeThermalBridges: null,
         sourceReference: '',
       })),
+    // 7.3.3: unknown until the adviser lists the pipes or states none.
+    ...(project.zones.length > 1 ? {} : { verticalPipes: null }),
     ventilationFlows: [{
       id: 'ventilation',
       sourceReference: '',
@@ -51,6 +53,7 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
     ...(project.zones.length > 1 ? {
       zoneData: project.zones.map((zone) => ({
         zoneId: zone.id,
+        verticalPipes: null,
         ventilationFlows: [{
           id: `ventilation-${zone.id}`,
           sourceReference: '',
