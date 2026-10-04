@@ -55,6 +55,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Uitbreiding van deelresultaten (4 oktober).** Het harnas accepteert nu ook jaarlijkse primaire energie/CO₂ en de hoofdstuk-5-energieboekhouding per dienst, drager en maand of jaar. Dienst-, drager- en maandcodes zijn begrensd; een ontbrekende rij wordt niet als nul behandeld. Gerichte Rust- en HTTP-tests controleren de padkeuze, eenheden, afwijking en foutafhandeling. De testverwachtingen komen uit een synthetische interne fixture en zijn geen officiële referentie-uitkomsten.
 
+**Ruimteverwarmingsmaanden in het harnas (4 oktober).** Geselecteerde H9-maandtermen van de samengevoegde keten zijn nu met vaste veldnamen en eenheden vergelijkbaar, onder meer opwekkeruitgang, warmtepompwarmte, opwekker-/hulpstroom en collectieve bronwarmte. Een ontbrekende optionele term wordt niet als nul aangenomen. Gerichte Rust-tests (18/18 referentietests) en Clippy slaagden; een actuele EDR-verwachting is nog niet ingevoerd.
+
 **Technische controle op `e9419da` (4 oktober).** De volledige interne Rust-suites slaagden: 759 kerntests plus drie integratietests en 56 servicetests. Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de nieuwe API-/MCP-binaries slaagden. Het [bouwdossier](nta8800-build-verificatie-2026-10-04-e9419da.md) bewaart bestandshashes. De visuele UI-acceptatie en officiële EDR-vergelijking staan nog open.
 
 De gebouwde API- en MCP-processen gaven voor dezelfde synthetische BENG 2-verwachting ook dezelfde `compared_pass`-meetpost en manifestvingerafdruk; beide lieten `referenceVerified=false`. De tijdelijke API en MCP-server zijn daarna gestopt. Dit is een transportcontrole, geen onafhankelijke normtoets.

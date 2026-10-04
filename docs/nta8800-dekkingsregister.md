@@ -42,6 +42,8 @@ Het algemene referentiemanifest heeft nu een begrensde numerieke vergelijking vo
 
 Dezelfde vergelijking kan nu ook jaarlijkse primaire energie/CO₂ en maand- en jaarsommen per energiedienst en drager controleren. De paden kiezen dienst, drager en maand expliciet, zonder afhankelijkheid van de volgorde van JSON-lijsten. Ontbrekende rijen worden niet als nul ingevuld. Dit maakt deelresultaten voor toekomstige officiële referentiecases vergelijkbaar, maar voegt zelf geen onafhankelijke verwachte waarden toe.
 
+Het harnas vergelijkt nu ook geselecteerde maandtermen van de samengevoegde ruimteverwarmingsketen, inclusief warmtepompwarmte, opwekkerstroom, hulpstroom en bronwarmte. De pad- en eenheidscontrole en een synthetische match/mismatch-test zijn geslaagd. De externe referentie- en attestkolommen blijven open.
+
 Op `e9419da` slaagden 759 kern- en drie integratietests, 56 servicetests, Rust-formatcontrole, Clippy en een [nieuwe Linux-debugbuild](nta8800-build-verificatie-2026-10-04-e9419da.md). De actuele API- en MCP-binaries zijn opnieuw gebouwd en met SHA-256 bewaard; de officiële referentie- en atteststatus blijft open.
 
 Op broncommit `47c84f3` slaagden 758 kern- en drie integratietests, 55 servicetests, Rust-formatcontrole, Clippy, de frontend-build en een [nieuwe Linux-debugbuild](nta8800-build-verificatie-2026-10-04-47c84f3.md). De API- en MCP-binaries zijn eveneens gebouwd en met hashes bewaard. De laatste volledige frontendtest blijft die van `7ac7e52`.

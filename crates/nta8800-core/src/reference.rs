@@ -97,6 +97,27 @@ fn metric_unit(path: &str) -> Option<&'static str> {
         _ => {}
     }
     let parts: Vec<_> = path.split('/').collect();
+    if let ["heatingMonth", month, field] = parts.as_slice() {
+        let Ok(parsed_month) = month.parse::<u8>() else {
+            return None;
+        };
+        if !(1..=12).contains(&parsed_month) || parsed_month.to_string() != *month {
+            return None;
+        }
+        return match *field {
+            "heatingNeedKwh"
+            | "emissionInputKwh"
+            | "distributionLossKwh"
+            | "generatorOutputKwh"
+            | "heatPumpOutputKwh"
+            | "generatorElectricityKwh"
+            | "auxiliaryElectricityKwh"
+            | "naturalGasKwh"
+            | "districtHeatKwh"
+            | "collectiveSourceHeatKwh" => Some("kWh"),
+            _ => None,
+        };
+    }
     let (service, carrier, field) = match parts.as_slice() {
         ["serviceAnnual", service, carrier, field] => (*service, *carrier, *field),
         ["serviceMonth", service, carrier, month, field] => {
@@ -136,6 +157,27 @@ fn actual_metric(
         _ => {}
     }
     let parts: Vec<_> = path.split('/').collect();
+    if let ["heatingMonth", month, field] = parts.as_slice() {
+        let month = month.parse::<u8>().ok()?;
+        let row = result
+            .space_heating
+            .monthly
+            .iter()
+            .find(|row| row.month == month)?;
+        return match *field {
+            "heatingNeedKwh" => Some(row.heating_need_kwh),
+            "emissionInputKwh" => Some(row.emission_input_kwh),
+            "distributionLossKwh" => Some(row.distribution_loss_kwh),
+            "generatorOutputKwh" => Some(row.generator_output_kwh),
+            "heatPumpOutputKwh" => Some(row.heat_pump_output_kwh),
+            "generatorElectricityKwh" => Some(row.generator_electricity_kwh),
+            "auxiliaryElectricityKwh" => row.auxiliary_electricity_kwh,
+            "naturalGasKwh" => Some(row.natural_gas_kwh),
+            "districtHeatKwh" => Some(row.district_heat_kwh),
+            "collectiveSourceHeatKwh" => Some(row.collective_source_heat_kwh),
+            _ => None,
+        };
+    }
     let row_value = |used: f64, delivered: f64, fossil: f64, field: &str| match field {
         "usedKwh" => Some(used),
         "deliveredKwh" => Some(delivered),
@@ -519,6 +561,43 @@ mod tests {
         }
         let wrong_unit = compare_reference_case(comparison_case(project, "annualCO2", 0.0, "kWh"));
         assert_eq!(wrong_unit.status, "invalid_case");
+    }
+
+    #[test]
+    fn compares_heating_chain_month_and_rejects_noncanonical_month() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        let performance = assessment.performance.unwrap();
+        let month = performance.space_heating.monthly.first().unwrap();
+        let path = format!("heatingMonth/{}/generatorOutputKwh", month.month);
+        let pass = compare_reference_case(comparison_case(
+            project.clone(),
+            &path,
+            month.generator_output_kwh,
+            "kWh",
+        ));
+        assert_eq!(pass.status, "compared_pass");
+        let fail = compare_reference_case(comparison_case(
+            project.clone(),
+            &path,
+            month.generator_output_kwh + 1.0,
+            "kWh",
+        ));
+        assert_eq!(fail.status, "compared_fail");
+        assert!(!fail.reference_verified);
+        for invalid in [
+            "heatingMonth/00/generatorOutputKwh",
+            "heatingMonth/13/generatorOutputKwh",
+            "heatingMonth/1/inputFingerprint",
+        ] {
+            let result =
+                compare_reference_case(comparison_case(project.clone(), invalid, 0.0, "kWh"));
+            assert_eq!(result.status, "invalid_case", "{invalid}");
+            assert!(result.metrics.is_empty());
+        }
     }
 
     #[test]
