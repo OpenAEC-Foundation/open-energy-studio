@@ -1,5 +1,6 @@
 import { nl } from '../../i18n/nl';
 import { kernelCodeLabel } from '../../i18n/format';
+import { kernelDetailText } from '../../i18n/kernelDetail';
 import { escapeHtml } from './HtmlEscaping';
 
 /*
@@ -34,6 +35,13 @@ const PREFIXES = ['nta.gap.', 'nta.warning.', 'kernel.issue.', 'opname.issue.', 
 export function dutchCodeHtml(code: string): string {
   const { text, known } = kernelCodeLabel((key) => nl[key] ?? key, code, PREFIXES);
   return known ? `${escapeHtml(text)} <code>${escapeHtml(code)}</code>` : `<code>${escapeHtml(code)}</code>`;
+}
+
+/** Escaped HTML of a kernel detail: the Dutch sentence when known, else the raw text marked as technical. */
+export function dutchDetailHtml(detail: string | null | undefined): string {
+  if (!detail) return '';
+  const { text, translated } = kernelDetailText(detail, (key) => nl[key] ?? key, 'nl');
+  return translated ? escapeHtml(text) : `<span lang="en">${escapeHtml(nl['kernel.detail.technical'])}: ${escapeHtml(text)}</span>`;
 }
 
 /** A table cell with the translated code. */

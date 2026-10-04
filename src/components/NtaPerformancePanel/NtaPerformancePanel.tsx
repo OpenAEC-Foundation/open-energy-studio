@@ -6,7 +6,7 @@ import { useI18n } from '../../i18n/i18n';
 import type { NtaCalculationInput } from '../../core/nta/KernelClient';
 import { useProjectPerformance, type ProjectPerformanceQuery } from '../../core/nta/useProjectPerformance';
 import { formatNumber } from '../../i18n/format';
-import { KernelCode } from '../KernelCode/KernelCode';
+import { KernelCode, KernelDetail } from '../KernelCode/KernelCode';
 import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTemplate';
 import { NtaCalculationForm } from './NtaCalculationForm';
 import { summarizeExtras } from '../../core/nta/NtaResultSummary';
@@ -116,7 +116,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
             <li key={`${gap.code}-${index}`}>
               <KernelCode code={gap.code} />
               <code>{gap.path}</code>
-              {gap.detail && <small>{gap.detail}</small>}
+              <KernelDetail detail={gap.detail} />
             </li>
           ))}</ul>
         </div>
@@ -129,7 +129,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
             <li key={`${warning.code}-${index}`}>
               <KernelCode code={warning.code} prefixes={['nta.warning.', 'nta.gap.', 'kernel.issue.']} />
               <code>{warning.path}</code>
-              {warning.detail && <small>{warning.detail}</small>}
+              <KernelDetail detail={warning.detail} />
             </li>
           ))}</ul>
         </div>

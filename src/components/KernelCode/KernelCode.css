@@ -5,3 +5,12 @@
   margin-inline-start: 0.35em;
   word-break: break-all;
 }
+
+.kernel-code-detail {
+  display: block;
+  opacity: 0.85;
+}
+
+.kernel-code-detail-label {
+  font-weight: 600;
+}

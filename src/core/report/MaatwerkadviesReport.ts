@@ -1,7 +1,7 @@
 import type { IProject } from '../energy/types';
 import type { MaatwerkadviesAssessment, MwaVariantResult, NtaMaatwerkadvies } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
-import { dutchCodeCell, dutchCodeHtml, dutchNumber, dutchTimeHtml } from './DutchReportText';
+import { dutchCodeCell, dutchCodeHtml, dutchDetailHtml, dutchNumber, dutchTimeHtml } from './DutchReportText';
 import { measureEvidenceNotes } from '../nta/MwaTemplates';
 import { nl } from '../../i18n/nl';
 
@@ -64,7 +64,7 @@ function variantRow(result: MwaVariantResult): string {
   const savings = result.savings;
   if (!result.valid) {
     // A variant that could not be calculated: its reasons instead of dashes.
-    const reasons = result.issues.map((item) => `${dutchCodeHtml(item.code)}${item.detail ? ` — ${escapeHtml(item.detail)}` : ''}`).join('<br>');
+    const reasons = result.issues.map((item) => `${dutchCodeHtml(item.code)}${item.detail ? ` — ${dutchDetailHtml(item.detail)}` : ''}`).join('<br>');
     return `<tr>${cell(result.name)}<td colspan="12">Niet berekend: ${reasons || 'onbekende reden'}</td></tr>`;
   }
   return `<tr>${cell(result.name)}${cell(result.label.labelClass ?? '—')}${n(result.label.primaryFossilIndicatorKwhPerM2, 1)}${n(result.label.tojuliMaxK, 2)}
@@ -94,7 +94,7 @@ export function generateMaatwerkadviesReportHTML(
       <tr><th>Invoervingerafdruk</th><td colspan="3"><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>
     </tbody></table>`;
   if (assessment.status === 'invalid' || !assessment.current) {
-    const issues = assessment.issues.map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}${cell(item.detail ?? '')}</tr>`).join('');
+    const issues = assessment.issues.map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}<td>${dutchDetailHtml(item.detail)}</td></tr>`).join('');
     return `${head}<h2>Geen uitkomst</h2><table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${issues}</tbody></table></body></html>`;
   }
   const current = assessment.current;

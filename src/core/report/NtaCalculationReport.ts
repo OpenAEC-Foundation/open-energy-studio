@@ -6,7 +6,7 @@ import type {
 import { escapeHtml } from './HtmlEscaping';
 import { summarizeExtras } from '../nta/NtaResultSummary';
 import { summarizeServiceEnergy } from '../nta/ServiceEnergy';
-import { dutchCodeCell, dutchNumber, dutchTimeHtml } from './DutchReportText';
+import { dutchCodeCell, dutchDetailHtml, dutchNumber, dutchTimeHtml } from './DutchReportText';
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 
@@ -245,9 +245,9 @@ export function generateNtaCalculationReportHTML(
     ${registrationSection(project.registration, assessment.registration, assessment.labelData?.general.constructionYear)}
     ${warnings.length > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen. De invoer of de uitkomst botst met de norm of met andere invoer, of is extreem volgens de letter van de norm.</p>
       <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${warnings
-        .map((warning) => `<tr>${dutchCodeCell(warning.code)}${cell(warning.path)}${cell(warning.detail ?? '')}</tr>`).join('')}</tbody></table>` : ''}`;
+        .map((warning) => `<tr>${dutchCodeCell(warning.code)}${cell(warning.path)}<td>${dutchDetailHtml(warning.detail)}</td></tr>`).join('')}</tbody></table>` : ''}`;
   if (!performance || assessment.status !== 'calculated_unverified') {
-    const gaps = assessment.gaps.map((gap) => `<tr>${dutchCodeCell(gap.code)}${cell(gap.path)}${cell(gap.detail ?? '')}</tr>`).join('');
+    const gaps = assessment.gaps.map((gap) => `<tr>${dutchCodeCell(gap.code)}${cell(gap.path)}<td>${dutchDetailHtml(gap.detail)}</td></tr>`).join('');
     const issues = (performance?.issues ?? []).map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}<td></td></tr>`).join('');
     return `${head}<h2>Geen uitkomst</h2><p>De rekenkern geeft geen uitkomst. Onderstaande invoergaten of afwijzingen moeten eerst worden opgelost.</p>
       <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${gaps}${issues}</tbody></table></body></html>`;

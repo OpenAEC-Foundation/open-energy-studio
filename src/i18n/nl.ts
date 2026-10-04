@@ -1,4 +1,12 @@
+import { kernelCodeLabelsNl } from './kernelCodeLabels';
+import { toolLabelsNl } from './toolLabels';
+import { kernelDetailLabelsNl } from './kernelDetailLabels';
+
 export const nl: Record<string, string> = {
+  // Generated kernel and survey code labels; specific keys below take precedence.
+  ...kernelCodeLabelsNl,
+  ...toolLabelsNl,
+  ...kernelDetailLabelsNl,
   // App
   'app.title': 'Open Energy Studio',
   'app.untitledProject': 'Naamloos Project',

@@ -2,6 +2,15 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — vertaalde meldingen en rekenhulpen
+
+Geen rekenwijziging; alleen de weergave verandert.
+
+- **Elke kernmelding vertaald.** Alle 608 meldingscodes van de rekenkern en de basisopname die nog als ruwe code verschenen, hebben nu een Nederlandse en Engelse tekst die zegt wat er mis is en wat te doen, met de normparagraaf waar dat helpt. Ze staan in `src/i18n/kernelCodeLabels.ts`. Een code zonder eigen tekst op de plek waar hij verschijnt, valt terug op deze algemene tekst.
+- **Bewaking.** De test `kernel-code-labels.test.ts` haalt alle meldingscodes uit de Rust-bronnen en faalt zodra een code geen Nederlandse of Engelse tekst heeft. Een nieuwe code kan dus niet onvertaald worden uitgeleverd.
+- **Technische details.** De Engelse toelichting die de kern bij sommige meldingen meegeeft (zoals "7.3.3: zone list [] …" of "A_ls/A_g 200001.4"), wordt voor de bekende vormen vertaald, met getallen in de notatie van de gekozen taal. Een onbekende toelichting blijft zichtbaar, gemarkeerd als technisch detail. Dat geldt in het paneel, de invoercontrole, het maatwerkadvies en de Nederlandse rapporten.
+- **Rekenhulpen.** De U-waardecalculator en de koudebrugcalculator toonden ruwe sleutels (`uvalue.*`, `tb.*`); ze hebben nu Nederlandse en Engelse teksten en tonen getallen in de notatie van de gekozen taal.
+
 ## 4 oktober 2026 — robuustheid: vangnet op alle uitvoerroutes en bijgestelde grenzen
 
 - **Vangnet op elke kernuitvoer.** De HTTP-dienst en de desktopapp controleren nu elk kernresultaat op NaN en oneindig voordat het wordt geserialiseerd. Zo'n resultaat wordt niet uitgegeven: de dienst antwoordt met HTTP 500 en `{"error": "non_finite_result", "path": …}`, de desktopapp met de fout `non_finite_result: <pad>`. Dat geldt ook voor de diagnostische routes (H7, H9, H11, de `*_draft`-modules) die het projectvangnet niet hadden.
