@@ -163,6 +163,16 @@ describe('opening a file without air tightness', () => {
     for (const zone of fixed.zones) expect(zone.airTightness).toEqual({ qv10: 0.4, assumed: true });
     expect(normalizeProject(project)).toBe(project);
   });
+
+  it('refuses an explicitly invalid qv10 instead of replacing the recorded value with an assumption', () => {
+    const project = createDefaultProject();
+    for (const invalid of ['unknown', 0, -0.1]) {
+      const broken = { ...project, zones: [{ ...project.zones[0], airTightness: { qv10: invalid } }] } as unknown as IProject;
+      expect(() => normalizeProject(broken)).toThrow('airTightness.qv10 must be a positive finite number');
+    }
+    const missing = { ...project, zones: [{ ...project.zones[0], airTightness: {} }] } as unknown as IProject;
+    expect(normalizeProject(missing).zones[0].airTightness).toEqual({ qv10: ASSUMED_QV10, assumed: true });
+  });
 });
 
 describe('kernel detail numbers', () => {

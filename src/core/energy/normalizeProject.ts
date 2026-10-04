@@ -53,9 +53,12 @@ export function normalizeProject(project: IProject): IProject {
     if (airTightness != null && (typeof airTightness !== 'object' || Array.isArray(airTightness))) {
       throw new Error(`Invalid project: zones[${zoneIndex}].airTightness must be an object`);
     }
-    if (airTightness == null || typeof airTightness.qv10 !== 'number' || !Number.isFinite(airTightness.qv10)) {
+    if (airTightness == null || airTightness.qv10 == null) {
       changed = true;
       airTightness = { qv10: ASSUMED_QV10, assumed: true };
+    } else if (typeof airTightness.qv10 !== 'number' || !Number.isFinite(airTightness.qv10)
+      || airTightness.qv10 <= 0) {
+      throw new Error(`Invalid project: zones[${zoneIndex}].airTightness.qv10 must be a positive finite number`);
     }
     const same = surfaces.every((surface, index) => surface === zone.surfaces?.[index])
       && thermalBridges === zone.thermalBridges && airTightness === zone.airTightness;

@@ -45,6 +45,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Integratiecontrole op `af69ada` (4 oktober).** De gedeelde beslisregel voor achtergehouden BENG-uitkomsten is toegepast op resultaten, rapporten en IFC-export. Op deze bronstand slaagden 756 kern- en drie integratietests, 54 servicetests en 451 frontendtests in 69 bestanden. TypeScript, Vite en de Linux-debugbuild slaagden; het [bouwdossier](nta8800-build-verificatie-2026-10-04-af69ada.md) legt pakketmetadata en SHA-256 vast. Dit is een interne consistentietoets, geen actuele onafhankelijke referentievergelijking of visuele acceptatie.
 
+**Luchtdichtheid bij openen (4 oktober).** Alleen een werkelijk ontbrekende `airTightness` of `qv10` krijgt de herkenbaar aangenomen 0,4 dm³/(s·m²). Een expliciet ingevulde tekst, nul of negatieve waarde wordt vóór `DOC_OPEN` geweigerd in plaats van stilzwijgend vervangen. De gerichte tests (12/12) en TypeScript-/Vite-build slaagden. Dit beschermt de herkomst van de invoer; de aanname is geen gemeten of geverifieerde NTA-waarde.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
