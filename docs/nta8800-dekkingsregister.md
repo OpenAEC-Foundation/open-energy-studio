@@ -8,6 +8,8 @@ Doeluitgave: **NTA 8800:2025+C1:2026**. Dit register beschrijft implementatiedek
 
 De referentiegate kan op `dba3ca2` ook `labelPrimaryFossil` en `labelRenewableShare` tegen later te verkrijgen externe waarden vergelijken. Een gerichte synthetische test en de [Linux-debugbuild](nta8800-build-verificatie-2026-10-04-dba3ca2.md) slaagden. Dit wijzigt de kolommen Referentie en Attest niet; officiële actuele W/U-waarden zijn nog niet opgenomen.
 
+Op dezelfde bronstand slaagde daarna de volledige lokale technische gate: 762 kern- en drie integratietests, 57 service- en vijf CLI-tests, de kern en integratietests op Rust 1.77.2, formatcontrole, Clippy, Tauri-check, TypeScript en 452 frontendtests. De geplande referentiebatch werd wegens ontbrekende officiële cases overgeslagen; de dekkingskolommen blijven ongewijzigd.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
