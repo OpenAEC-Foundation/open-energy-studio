@@ -1012,6 +1012,8 @@ export const nl: Record<string, string> = {
   'kernel.issue.metric_unit_mismatch': 'De eenheid van de verwachting komt niet overeen met de kernuitvoer.',
   'kernel.issue.project_calculation_unavailable': 'Dit project levert geen volledige Rust-berekening op.',
   'kernel.issue.metric_calculation_unavailable': 'Deze uitkomst is voor dit project niet beschikbaar.',
+  'kernel.issue.expected_label_class_invalid': 'De verwachte labelklasse is ongeldig.',
+  'kernel.issue.label_class_calculation_unavailable': 'Voor dit project is geen indicatieve labelklasse beschikbaar.',
   'kernel.issue.quality_declaration_registry_record_missing': 'De registratie en het exacte product zijn nog niet vastgelegd.',
   'kernel.issue.quality_declaration_registry_field_required': 'Vul registratie, product en fabrikant van de verklaring in.',
   'kernel.issue.quality_declaration_source_url_invalid': 'Vul een HTTPS-link naar de bronverklaring in.',

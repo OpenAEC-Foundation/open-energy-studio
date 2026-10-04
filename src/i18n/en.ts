@@ -1012,6 +1012,8 @@ export const en: Record<string, string> = {
   'kernel.issue.metric_unit_mismatch': 'The expected unit does not match the kernel output.',
   'kernel.issue.project_calculation_unavailable': 'This project does not yield a complete Rust calculation.',
   'kernel.issue.metric_calculation_unavailable': 'This result is unavailable for this project.',
+  'kernel.issue.expected_label_class_invalid': 'The expected label class is invalid.',
+  'kernel.issue.label_class_calculation_unavailable': 'No indicative label class is available for this project.',
   'kernel.issue.quality_declaration_registry_record_missing': 'The declaration registration and exact product are not yet recorded.',
   'kernel.issue.quality_declaration_registry_field_required': 'Complete the declaration registration, product, and manufacturer.',
   'kernel.issue.quality_declaration_source_url_invalid': 'Enter an HTTPS link to the declaration source.',

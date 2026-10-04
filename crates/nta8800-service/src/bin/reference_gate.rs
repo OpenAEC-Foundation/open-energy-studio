@@ -138,12 +138,15 @@ fn check_coverage(plan: CoveragePlan, report: &mut GateReport) -> bool {
                     });
                     passed = false;
                 }
-                let compared: HashSet<_> = case
+                let mut compared: HashSet<_> = case
                     .comparison
                     .metrics
                     .iter()
                     .map(|metric| metric.path.as_str())
                     .collect();
+                if case.comparison.label_class.is_some() {
+                    compared.insert("indicativeLabelClass");
+                }
                 for path in &required.required_paths {
                     if !compared.contains(path.as_str()) {
                         report.errors.push(GateError {
@@ -440,6 +443,46 @@ mod tests {
         let malformed = run(std::slice::from_ref(&passing), Some(&plan_path));
         assert_eq!(malformed.planned_coverage_passed, Some(false));
         fs::remove_file(passing).unwrap();
+        fs::remove_file(plan_path).unwrap();
+    }
+
+    #[test]
+    fn coverage_plan_can_require_the_indicative_label_class() {
+        let mut reference = case(8.17);
+        reference.expected_label_class = Some("A+++".into());
+        let fingerprint = compare_reference_case(reference.clone()).manifest_fingerprint;
+        let case_path = temporary_case_file(&reference);
+        let plan_path = case_path.with_extension("plan.json");
+        fs::write(
+            &plan_path,
+            json!({"targetNormVersion":TARGET_NORM_VERSION,
+                "requiredCases":[{"caseId":"synthetic-gate",
+                    "manifestFingerprint":fingerprint,
+                    "requiredPaths":["beng2","indicativeLabelClass"]}]})
+            .to_string(),
+        )
+        .unwrap();
+        let pass = run(std::slice::from_ref(&case_path), Some(&plan_path));
+        assert!(pass.numeric_comparison_passed);
+        assert_eq!(pass.planned_coverage_passed, Some(true));
+        assert!(
+            pass.cases[0]
+                .comparison
+                .label_class
+                .as_ref()
+                .unwrap()
+                .matches
+        );
+
+        reference.expected_label_class = None;
+        fs::write(&case_path, serde_json::to_vec(&reference).unwrap()).unwrap();
+        let missing = run(std::slice::from_ref(&case_path), Some(&plan_path));
+        assert_eq!(missing.planned_coverage_passed, Some(false));
+        assert!(missing
+            .errors
+            .iter()
+            .any(|error| error.error.contains("Missing compared path")));
+        fs::remove_file(case_path).unwrap();
         fs::remove_file(plan_path).unwrap();
     }
 }

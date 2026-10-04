@@ -2683,6 +2683,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reference_comparison_http_exposes_only_an_indicative_label_class() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let body = json!({"case": {
+            "caseId": "synthetic-label", "normVersion": "NTA 8800:2025+C1:2026",
+            "project": project,
+            "source": {"publisher":"synthetic", "documentId":"internal-1", "edition":"test",
+                "usePermission":"internal", "independentReviewer":"test"},
+            "expected": [{"path":"beng2", "value":8.17, "unit":"kWh/m2.year",
+                "normReference":"internal test", "absoluteTolerance":0.0}],
+            "expectedLabelClass": "A+++"
+        }});
+        let response = app()
+            .oneshot(
+                Request::post("/v1/nta8800/reference/compare")
+                    .header("content-type", "application/json")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let result: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(result["status"], "compared_pass");
+        assert_eq!(result["labelClass"]["path"], "indicativeLabelClass");
+        assert_eq!(result["labelClass"]["actual"], "A+++");
+        assert_eq!(result["labelClass"]["matches"], true);
+        assert_eq!(result["referenceVerified"], false);
+        assert_eq!(result["attestStatus"], "unattested");
+    }
+
+    #[tokio::test]
     async fn reference_comparison_http_exposes_service_month_difference() {
         let project: Value = serde_json::from_str(include_str!(
             "../../../training-data/nta8800-project-performance-synthetic.json"

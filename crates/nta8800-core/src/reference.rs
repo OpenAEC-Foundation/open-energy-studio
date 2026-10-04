@@ -14,6 +14,9 @@ pub struct ReferenceCase {
     pub project: Value,
     pub source: ReferenceSource,
     pub expected: Vec<ExpectedMetric>,
+    /// Optional comparison of the calculated, unregistered label class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_label_class: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -70,7 +73,18 @@ pub struct ReferenceComparison {
     pub reference_verified: bool,
     pub attest_status: &'static str,
     pub metrics: Vec<MetricComparison>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_class: Option<LabelClassComparison>,
     pub issues: Vec<ReferenceIssue>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelClassComparison {
+    pub path: &'static str,
+    pub expected: String,
+    pub actual: String,
+    pub matches: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -231,6 +245,7 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
         reference_verified: false,
         attest_status: "unattested",
         metrics: Vec::new(),
+        label_class: None,
         issues: audit.issues,
     };
     if !audit.manifest_complete {
@@ -302,7 +317,29 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
             within_tolerance: difference <= expected.absolute_tolerance,
         });
     }
-    result.status = if metrics.iter().all(|metric| metric.within_tolerance) {
+    if let Some(expected) = case.expected_label_class {
+        let Some(actual) = performance.indicative_label_class else {
+            result.status = "calculation_unavailable";
+            result.issues.push(issue(
+                "label_class_calculation_unavailable",
+                "expectedLabelClass",
+                "Indicative label class is unavailable for this project",
+            ));
+            return result;
+        };
+        result.label_class = Some(LabelClassComparison {
+            path: "indicativeLabelClass",
+            matches: expected == actual,
+            expected,
+            actual: actual.into(),
+        });
+    }
+    result.status = if metrics.iter().all(|metric| metric.within_tolerance)
+        && result
+            .label_class
+            .as_ref()
+            .map_or(true, |class| class.matches)
+    {
         "compared_pass"
     } else {
         "compared_fail"
@@ -358,6 +395,15 @@ pub fn audit_reference_case(case: ReferenceCase) -> ReferenceAudit {
             "expected",
             "Independent expected values are required",
         ));
+    }
+    if let Some(expected) = &case.expected_label_class {
+        if expected.trim() != expected || crate::label_class::class_rank(expected).is_none() {
+            issues.push(issue(
+                "expected_label_class_invalid",
+                "expectedLabelClass",
+                "Expected label class must be a recognized class without surrounding whitespace",
+            ));
+        }
     }
     let mut metric_paths = HashSet::new();
     for (index, metric) in case.expected.iter().enumerate() {
@@ -460,6 +506,7 @@ mod tests {
                 norm_reference: "internal arithmetic test".into(),
                 absolute_tolerance: 0.0,
             }],
+            expected_label_class: None,
         }
     }
 
@@ -499,6 +546,34 @@ mod tests {
         ));
         assert_eq!(fail.status, "compared_fail");
         assert!(!fail.metrics[0].within_tolerance);
+    }
+
+    #[test]
+    fn compares_indicative_label_class_without_issuing_a_label() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let mut reference = comparison_case(project, "beng2", 8.17, "kWh/m2.year");
+        reference.expected_label_class = Some("A+++".into());
+        let pass = compare_reference_case(reference.clone());
+        assert_eq!(pass.status, "compared_pass");
+        let class = pass.label_class.unwrap();
+        assert_eq!(class.actual, "A+++");
+        assert!(class.matches);
+        assert!(!pass.reference_verified);
+
+        reference.expected_label_class = Some("B".into());
+        let mismatch = compare_reference_case(reference.clone());
+        assert_eq!(mismatch.status, "compared_fail");
+        assert!(!mismatch.label_class.unwrap().matches);
+
+        reference.expected_label_class = Some("Z".into());
+        assert!(!audit_reference_case(reference.clone()).manifest_complete);
+        let invalid = compare_reference_case(reference);
+        assert_eq!(invalid.status, "invalid_case");
+        assert!(invalid.metrics.is_empty());
+        assert!(invalid.label_class.is_none());
     }
 
     #[test]
