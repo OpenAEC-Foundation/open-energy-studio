@@ -12,6 +12,8 @@ Op dezelfde bronstand slaagde daarna de volledige lokale technische gate: 762 ke
 
 Het harnas kan daarna dertien maandtermen van de samengevoegde hoofdstuk-10-koelketen als `coolingMonth` vergelijken. Bij afwezige koeling is de term onbeschikbaar en niet nul. De gerichte synthetische Rust-test en Clippy slaagden; de [lijst met paden](nta8800-referentieprotocol.md) vormt alleen een toekomstige vergelijkingsinterface. De [nieuwe Linux-devbuild op `e2d2a69`](nta8800-build-verificatie-2026-10-04-e2d2a69.md) en drie servicebinaries zijn met SHA-256 bewaard. Onafhankelijke actuele koeluitkomsten en externe attestering ontbreken nog.
 
+Een [runtimecontrole van HTTP en MCP](nta8800-koelreferentie-transport-2026-10-04.md) gaf voor één synthetische juli-koelpost identieke vergelijkingsdata met `compared_fail` voor een bewust afwijkende verwachting. Beide transporten behielden de ongetoetste referentie- en atteststatus. De controle verandert de dekkingskolommen niet.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
