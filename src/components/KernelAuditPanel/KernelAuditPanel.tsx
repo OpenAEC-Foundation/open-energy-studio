@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import type { IProject } from '../../core/energy/types';
 import { assessProjectWithRust, type KernelAssessment } from '../../core/nta/KernelClient';
+import { KernelDetail } from '../KernelCode/KernelCode';
 import './KernelAuditPanel.css';
 
 type AuditQuery =
@@ -167,7 +168,7 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
             return <li key={`${item.path}-${item.code}-${index}`} className={`kernel-audit-issue ${item.severity}`}>
               <span className="kernel-audit-path">{item.path}</span>
               <span>{translated === `kernel.issue.${item.code}` ? item.message : translated}</span>
-              {item.detail && <small className="kernel-audit-detail">{item.detail}</small>}
+              <KernelDetail detail={item.detail} />
             </li>;
           })}
         </ul>}

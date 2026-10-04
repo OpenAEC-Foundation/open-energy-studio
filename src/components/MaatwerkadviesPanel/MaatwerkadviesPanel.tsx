@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { KernelCode } from '../KernelCode/KernelCode';
+import { KernelCode, KernelDetail } from '../KernelCode/KernelCode';
 import { adviceText } from '../../core/nta/MwaAdviceText';
 import { formatNumber } from '../../i18n/format';
 import { ClipboardList } from 'lucide-react';
@@ -310,7 +310,7 @@ export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: st
             <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} />
               {item.detail && <> {item.code === 'measure_template_incomplete'
                 ? item.detail.split(', ').map((key) => t(`mwa.template.problem.${key}`)).join(' ')
-                : item.detail}</>}
+                : <KernelDetail detail={item.detail} />}</>}
               {item.path && <> <code className="kernel-code-ref" title={item.path}>{item.path}</code></>}</li>
           ))}</ul>
         </td>
@@ -623,7 +623,7 @@ export function MaatwerkadviesPanel() {
         <div className="mwa-results">
           {assessment.issues.length > 0 && (
             <ul className="nta-performance-gaps">
-              {assessment.issues.map((item, index) => <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} /> <code>{item.path}</code> {item.detail}</li>)}
+              {assessment.issues.map((item, index) => <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} /> <code>{item.path}</code> <KernelDetail detail={item.detail} /></li>)}
             </ul>
           )}
           {assessment.current && (
