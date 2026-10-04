@@ -489,6 +489,29 @@ impl EnergyMcp {
     }
 
     #[tool(
+        description = "Compare submitted BENG/TOjuli expectations to the unverified Rust project result; never attests or verifies source independence"
+    )]
+    fn compare_reference_case(
+        &self,
+        Parameters(args): Parameters<ReferenceArgs>,
+    ) -> CallToolResult {
+        match serde_json::from_value::<nta8800_core::reference::ReferenceCase>(args.case) {
+            Ok(case) => {
+                let result = nta8800_core::reference::compare_reference_case(case);
+                if result.status == "invalid_case" || result.status == "calculation_unavailable" {
+                    CallToolResult::error(vec![ContentBlock::text(json!(result).to_string())])
+                } else {
+                    CallToolResult::success(vec![ContentBlock::text(json!(result).to_string())])
+                }
+            }
+            Err(message) => CallToolResult::error(vec![ContentBlock::text(
+                json!({"error": "invalid_reference_shape", "message": message.to_string()})
+                    .to_string(),
+            )]),
+        }
+    }
+
+    #[tool(
         description = "Diagnose the direct-to-outdoor A·U + L·psi + chi sum; does not produce NTA BENG or a verified label"
     )]
     fn diagnose_direct_transmission(

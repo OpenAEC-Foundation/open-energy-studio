@@ -57,6 +57,148 @@ pub struct ReferenceIssue {
     pub message: &'static str,
 }
 
+/// Numeric comparison only. A matching submitted expectation is never proof
+/// that the source is independent or that the kernel is attested.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceComparison {
+    pub status: &'static str,
+    pub case_id: String,
+    pub manifest_fingerprint: String,
+    pub input_fingerprint: Option<String>,
+    pub calculation_available: bool,
+    pub reference_verified: bool,
+    pub attest_status: &'static str,
+    pub metrics: Vec<MetricComparison>,
+    pub issues: Vec<ReferenceIssue>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricComparison {
+    pub path: String,
+    pub expected: f64,
+    pub actual: f64,
+    pub unit: String,
+    pub absolute_difference: f64,
+    pub absolute_tolerance: f64,
+    pub within_tolerance: bool,
+}
+
+/// Deliberately small, unit-bound output allowlist: input or metadata paths
+/// must never be compared to values supplied in the same case manifest.
+fn actual_metric(
+    result: &crate::building_performance::BuildingPerformanceAssessment,
+    path: &str,
+) -> Option<(Option<f64>, &'static str)> {
+    match path {
+        "beng1" => Some((result.need_indicator_kwh_per_m2_year, "kWh/m2.year")),
+        "beng2" => Some((
+            result.primary_fossil_indicator_kwh_per_m2_year,
+            "kWh/m2.year",
+        )),
+        "beng3" => Some((result.renewable_share_percent, "%")),
+        "tojuliMax" => Some((result.tojuli_max_k, "K")),
+        _ => None,
+    }
+}
+
+pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
+    let audit = audit_reference_case(case.clone());
+    let mut result = ReferenceComparison {
+        status: "invalid_case",
+        case_id: audit.case_id,
+        manifest_fingerprint: audit.manifest_fingerprint,
+        input_fingerprint: audit.input_fingerprint,
+        calculation_available: false,
+        reference_verified: false,
+        attest_status: "unattested",
+        metrics: Vec::new(),
+        issues: audit.issues,
+    };
+    if !audit.manifest_complete {
+        return result;
+    }
+    for (index, metric) in case.expected.iter().enumerate() {
+        let unit = match metric.path.as_str() {
+            "beng1" | "beng2" => Some("kWh/m2.year"),
+            "beng3" => Some("%"),
+            "tojuliMax" => Some("K"),
+            _ => None,
+        };
+        if unit.is_none() {
+            result.issues.push(issue(
+                "metric_path_unsupported",
+                format!("expected[{index}].path"),
+                "Only published numeric performance output paths can be compared",
+            ));
+        } else if unit != Some(metric.unit.as_str()) {
+            result.issues.push(issue(
+                "metric_unit_mismatch",
+                format!("expected[{index}].unit"),
+                "Metric unit does not match the kernel output unit",
+            ));
+        }
+    }
+    if !result.issues.is_empty() {
+        return result;
+    }
+    let assessment = crate::project_performance::assess_project_performance(&case.project);
+    result.input_fingerprint = Some(assessment.input_fingerprint);
+    if assessment.status != "calculated_unverified" {
+        result.status = "calculation_unavailable";
+        result.issues.push(issue(
+            "project_calculation_unavailable",
+            "project",
+            "Project does not yield a complete unverified Rust calculation",
+        ));
+        return result;
+    }
+    let Some(performance) = assessment.performance else {
+        result.status = "calculation_unavailable";
+        return result;
+    };
+    result.calculation_available = true;
+    let mut metrics = Vec::with_capacity(case.expected.len());
+    for (index, expected) in case.expected.iter().enumerate() {
+        let Some((Some(actual), _)) = actual_metric(&performance, &expected.path) else {
+            result.status = "calculation_unavailable";
+            result.issues.push(issue(
+                "metric_calculation_unavailable",
+                format!("expected[{index}].path"),
+                "Requested metric is unavailable for this project",
+            ));
+            return result;
+        };
+        let difference = (actual - expected.value).abs();
+        if !difference.is_finite() {
+            result.status = "invalid_case";
+            result.issues.push(issue(
+                "metric_difference_overflow",
+                format!("expected[{index}].value"),
+                "Absolute difference is not finite",
+            ));
+            return result;
+        }
+        metrics.push(MetricComparison {
+            path: expected.path.clone(),
+            expected: expected.value,
+            actual,
+            unit: expected.unit.clone(),
+            absolute_difference: difference,
+            absolute_tolerance: expected.absolute_tolerance,
+            within_tolerance: difference <= expected.absolute_tolerance,
+        });
+    }
+    result.status = if metrics.iter().all(|metric| metric.within_tolerance) {
+        "compared_pass"
+    } else {
+        "compared_fail"
+    };
+    result.metrics = metrics;
+    result
+}
+
 fn issue(code: &'static str, path: impl Into<String>, message: &'static str) -> ReferenceIssue {
     ReferenceIssue {
         code,
@@ -185,6 +327,84 @@ mod tests {
         json!({"id":"p", "name":"Reference input", "buildingFunction":"residential",
             "zones":[{"id":"z", "floorArea":100, "volume":250, "surfaces":[{
                 "id":"s", "area":50, "zoneId":"z", "windows":[]}]}]})
+    }
+
+    fn comparison_case(project: Value, path: &str, value: f64, unit: &str) -> ReferenceCase {
+        ReferenceCase {
+            case_id: "synthetic-comparison".into(),
+            norm_version: TARGET_NORM_VERSION.into(),
+            project,
+            source: ReferenceSource {
+                publisher: "synthetic internal test".into(),
+                document_id: "internal-1".into(),
+                edition: "test".into(),
+                use_permission: "internal".into(),
+                independent_reviewer: "test fixture".into(),
+            },
+            expected: vec![ExpectedMetric {
+                path: path.into(),
+                value,
+                unit: unit.into(),
+                norm_reference: "internal arithmetic test".into(),
+                absolute_tolerance: 0.0,
+            }],
+        }
+    }
+
+    #[test]
+    fn compares_only_calculated_output_and_never_verifies_reference() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        assert_eq!(
+            assessment.status, "calculated_unverified",
+            "{:?}",
+            assessment.gaps
+        );
+        let actual = assessment
+            .performance
+            .unwrap()
+            .primary_fossil_indicator_kwh_per_m2_year
+            .unwrap();
+        let pass = compare_reference_case(comparison_case(
+            project.clone(),
+            "beng2",
+            actual,
+            "kWh/m2.year",
+        ));
+        assert_eq!(pass.status, "compared_pass");
+        assert_eq!(pass.metrics.len(), 1);
+        assert!(!pass.reference_verified);
+        assert_eq!(pass.attest_status, "unattested");
+
+        let fail = compare_reference_case(comparison_case(
+            project,
+            "beng2",
+            actual + 1.0,
+            "kWh/m2.year",
+        ));
+        assert_eq!(fail.status, "compared_fail");
+        assert!(!fail.metrics[0].within_tolerance);
+    }
+
+    #[test]
+    fn comparison_rejects_input_paths_units_and_incomplete_projects() {
+        let unsupported = compare_reference_case(comparison_case(
+            project(),
+            "derivedInput/floorArea",
+            100.0,
+            "m2",
+        ));
+        assert_eq!(unsupported.status, "invalid_case");
+        assert!(unsupported.metrics.is_empty());
+        let wrong_unit = compare_reference_case(comparison_case(project(), "beng2", 1.0, "kWh"));
+        assert_eq!(wrong_unit.status, "invalid_case");
+        let incomplete =
+            compare_reference_case(comparison_case(project(), "beng2", 1.0, "kWh/m2.year"));
+        assert_eq!(incomplete.status, "calculation_unavailable");
+        assert!(!incomplete.calculation_available);
     }
 
     #[test]

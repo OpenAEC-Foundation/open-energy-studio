@@ -51,6 +51,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Nieuwste interne buildcontrole op `7ac7e52` (4 oktober).** De volledige kern-, service- en frontendsuites slaagden (756 + 3, 54 en 452 tests). De Linux-debugbuild bevat de aangescherpte projectimport en is met SHA-256 en pakketmetadata bewaard; zie het [bouwdossier](nta8800-build-verificatie-2026-10-04-7ac7e52.md). Het [referentieprotocol](nta8800-referentieprotocol.md) vermeldt nu ook de actuele beschikbaarheid van de gelicentieerde normtekst, zonder de ontbrekende officiële referentie-uitkomsten te verhullen.
 
+**Referentievergelijkingsharnas (4 oktober).** De Rust-kern, HTTP-route en MCP-tool vergelijken nu aangeleverde BENG 1/2/3- en TOjuliMax-verwachtingen met een opnieuw berekende projectuitkomst. Een match blijft `referenceVerified=false` en `attestStatus=unattested`; de meegegeven bron en tolerantie zijn niet onafhankelijk beoordeeld. Gerichte tests controleren match, mismatch, ongeldige paden/eenheden en het achterhouden van resultaten bij een onvolledig project. Officiële actuele EDR-resultaten blijven nodig voordat dit harnas normatieve bewijskracht heeft.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:

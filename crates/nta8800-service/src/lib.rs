@@ -309,6 +309,7 @@ pub fn app() -> Router {
             post(diagnose_heating_aux_measured_draft),
         )
         .route("/v1/nta8800/reference/audit", post(audit_reference))
+        .route("/v1/nta8800/reference/compare", post(compare_reference))
         .route(
             "/v1/nta8800/reference/direct-diagnostic/compare",
             post(compare_direct_diagnostic),
@@ -386,6 +387,16 @@ async fn audit_reference(Json(request): Json<ReferenceRequest>) -> (StatusCode, 
         StatusCode::OK,
         &nta8800_core::reference::audit_reference_case(request.case),
     )
+}
+
+async fn compare_reference(Json(request): Json<ReferenceRequest>) -> (StatusCode, Json<Value>) {
+    let result = nta8800_core::reference::compare_reference_case(request.case);
+    let status = if result.status == "invalid_case" || result.status == "calculation_unavailable" {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::OK
+    };
+    finite_json(status, &result)
 }
 
 async fn compare_direct_diagnostic(
@@ -2639,6 +2650,36 @@ mod tests {
             .as_str()
             .unwrap()
             .starts_with("sha256:"));
+    }
+
+    #[tokio::test]
+    async fn reference_comparison_with_incomplete_project_has_no_metric_result() {
+        let body = json!({"case": {
+            "caseId": "synthetic-incomplete", "normVersion": "NTA 8800:2025+C1:2026",
+            "project": {"id":"house", "name":"House", "buildingFunction":"residential",
+                "zones":[{"id":"z", "floorArea":100, "volume":250,
+                    "surfaces":[{"id":"s", "area":50, "zoneId":"z", "windows":[]}]}]},
+            "source": {"publisher":"synthetic", "documentId":"internal-1", "edition":"test",
+                "usePermission":"internal", "independentReviewer":"test"},
+            "expected": [{"path":"beng2", "value":1, "unit":"kWh/m2.year",
+                "normReference":"internal test", "absoluteTolerance":0}]
+        }});
+        let response = app()
+            .oneshot(
+                Request::post("/v1/nta8800/reference/compare")
+                    .header("content-type", "application/json")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let result: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(result["status"], "calculation_unavailable");
+        assert_eq!(result["metrics"], json!([]));
+        assert_eq!(result["referenceVerified"], false);
+        assert_eq!(result["attestStatus"], "unattested");
     }
 
     #[tokio::test]
