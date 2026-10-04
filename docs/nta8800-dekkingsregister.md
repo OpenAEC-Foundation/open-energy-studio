@@ -34,6 +34,8 @@ Op `af69ada` gebruikt de UI een gedeelde regel om BENG-getallen uit de vereenvou
 
 De importaanname `qv10 = 0,4` geldt nu alleen voor afwezige legacy-invoer en blijft als aangenomen gemarkeerd. Expliciet ongeldige luchtdichtheid wordt bij het openen geweigerd; zij wordt niet door de importaanname overschreven. Gerichte tests en frontend-build slaagden. De aanname is geen normatieve meting.
 
+Een [runtime-smoketest van HTTP-API en MCP](nta8800-api-mcp-smoketest-2026-10-04.md) bevestigt dezelfde Rust-projectuitkomst voor een complete fixture en dezelfde weigering zonder `ntaCalculation`. Dit controleert de transportkoppeling; de waarde komt uit een interne fixture en is geen actuele EDR-referentie.
+
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
 
 Een latere controle vanaf `02fafc5` gaf 735 groene kerntests, 53 groene servicetests, geslaagde Rust-formatcontroles en een geslaagde frontend-build. De volledige frontendrun overlapte een relabel-merge en is daarom geen vrijgave voor de nieuwe stand; de twee betrokken testbestanden zijn na de merge opnieuw uitgevoerd (10/10 groen). De precieze testgrens staat in de [verificatiestatus](nta8800-verificatiestatus.md).

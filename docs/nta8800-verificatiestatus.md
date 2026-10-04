@@ -47,6 +47,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Luchtdichtheid bij openen (4 oktober).** Alleen een werkelijk ontbrekende `airTightness` of `qv10` krijgt de herkenbaar aangenomen 0,4 dm³/(s·m²). Een expliciet ingevulde tekst, nul of negatieve waarde wordt vóór `DOC_OPEN` geweigerd in plaats van stilzwijgend vervangen. De gerichte tests (12/12) en TypeScript-/Vite-build slaagden. Dit beschermt de herkomst van de invoer; de aanname is geen gemeten of geverifieerde NTA-waarde.
 
+**Runtimecontrole API/MCP (4 oktober).** De gebouwde HTTP-API en MCP-stdio-server gaven voor dezelfde complete projectfixture `calculated_unverified` en BENG 2 = 8,17; voor dezelfde onvolledige fixture weigerden beide een getal met `nta_calculation_block_missing`. De [smoketest](nta8800-api-mcp-smoketest-2026-10-04.md) legt transport, binary-hashes en de beperkte bewijswaarde vast.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
