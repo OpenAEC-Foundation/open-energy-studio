@@ -16,7 +16,7 @@ De registratiegegevens staan in **Projectgegevens** → *Registratie (BRL 9500)*
 - **WLC-GWP:** voor nieuwe gebouwen boven 1000 m² bij een toets Bbl vanaf 1-1-2028 en de oplevering daarna (BRL 9500-W p. 18, 21, 62).
 - **Vorige labelklasse:** alleen voor de plausibiliteitscontrole.
 
-Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, versie, kernversie en attestnummer (Regeling art. 5 lid 1 onder b, p. 6).
+Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, versie, kernversie en attestnummer (Regeling art. 5 lid 1 onder b, p. 6). Bij een herlabeling is dat anders: dan blijft de opgeslagen identiteit van de oorspronkelijke berekening staan en schrijft de app niet de huidige (BRL 9500-W §4.2.4, p. 24).
 
 **Controles van de kern**
 - **Termijn:** registratie binnen drie maanden na de opname, of zes bij seriematige projecten (BRL §4.2.5).
@@ -51,7 +51,10 @@ Herlabelen kan alleen bij bestaande bouw. Het geldt voor verbeteringen die binne
 3. Zet het berichttype op *herlabelen*. Vul in:
    - de verbeteringsdatum;
    - het oorspronkelijke certificaatnummer en EP-Online-nummer;
-   - eventueel de verwijzing naar het oorspronkelijke dossier.
+   - de **Kernelversie oorspronkelijke opname (herlabelen)**; zonder dit veld meldt de kern `original_kernel_version_required`;
+   - eventueel de verwijzing naar het oorspronkelijke dossier;
+   - bij gewijzigde PV of zonthermie het vinkje **PV of zonthermie exclusief en fysiek verbonden met dit gebouw (herlabelen)** (BRL 9500-W p. 23);
+   - bij utiliteit het vinkje **Utiliteit: met opdrachtgever en stukken vastgesteld dat er geen 6b-wijzigingen zijn (herlabelen)** (BRL 9500-U p. 19).
 4. Kies in het paneel **Herlabelen (BRL 9500 bijlage 6a/6b)**, op het tabblad Resultaten, het oorspronkelijke projectbestand.
 
 **De vergelijking.** Het paneel deelt elke wijziging in:
@@ -101,7 +104,7 @@ Kies **Rapport** → **Projectdossier exporteren (ZIP)**. De ZIP bevat:
 | `herlabel-origineel.oes.json` | het origineel, byte voor byte, bij herlabelen |
 | bewijsbestanden | uit het bewijsregister |
 | `dossier-checklist.json` | de volledigheidscontrole (BRL 9500 bijlage 3, p. 61–63) |
-| `manifest.json` | moment, project, kernversie, attestatus, en per bestand pad, SHA-256 en grootte |
+| `manifest.json` | moment, projectnaam, kernversie met normversie en invoervingerafdruk, attestatus, per bestand pad, SHA-256 en grootte, het aantal ontbrekende bewijsstukken (`missingEvidence`) en de checklist |
 
 **Checklist.** De checklist hangt af van het doel, het opnametype, de representativiteit en herlabelen. Bij een basisopname toetst ze de redenen voor de toegepaste standaardwaarden. Het tabblad Rapport toont dezelfde checklist als de export. Terwijl de berekening loopt, staan punten op "bezig"; in een export komt die status nooit voor.
 

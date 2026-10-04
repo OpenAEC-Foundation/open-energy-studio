@@ -44,7 +44,7 @@ Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, st
 De rekenkern is gebouwd op gelicentieerde bronnen:
 - NTA 8800:2025+C1:2026;
 - ISSO 82.1 (7e druk, met erratum), ISSO 75.1 (7e druk), ISSO 82.2 en ISSO 75.2 (3e druk);
-- BRL 9500-W/U en BRL 9500-MWA;
+- BRL 9500-W en BRL 9500-U in de versie van 14 oktober 2025 (bindend verklaard, nog niet vastgesteld), en BRL 9500-MWA-W/U van 19 juni 2024; paginaverwijzingen gelden voor deze versies;
 - het Besluit en de Regeling energieprestatie gebouwen;
 - het Praktijkhandboek v2.
 

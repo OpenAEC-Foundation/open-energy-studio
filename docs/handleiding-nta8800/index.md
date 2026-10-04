@@ -25,6 +25,7 @@ De handleiding citeert geen tekst uit NTA 8800, ISSO-publicaties of BRL-document
    - het bewijs;
    - de registratiegegevens en de dossierexport.
 8. [Versies en verwijzingen](08-versies-en-verwijzingen.md): kernversie, invoervingerafdruk, het bewaren van oudere builds en de overige documentatie.
+9. [Bestanden en uitwisseling](09-bestanden-en-uitwisseling.md): opslaan en openen van `.oes.json`, de voorbeeldprojecten, UNIEC3-export en -import en de exports op het tabblad Rapport.
 
 ## Belangrijk vooraf
 

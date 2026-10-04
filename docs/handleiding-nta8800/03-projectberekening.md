@@ -31,9 +31,18 @@ Elke opgegeven waarde vraagt een bron, zoals een tekening, productblad, normtabe
 - Een constructie die nog in gebruik is, kan niet worden verwijderd.
 - Een verwijdering die de paden van een handmatige maatwerkadviesmaatregel zou verschuiven, wordt geweigerd.
 
+## Panelen op het tabblad Project
+
+Naast het paneel *NTA 8800-berekening (Rust-kern)* en de basisopname staan op het tabblad Project vier hulppanelen.
+
+- **Invoercontrole.** Een structuurcontrole van het projectmodel door de rekenkern: fouten, aandachtspunten en de indeling van de warmtepompen. Het paneel toont ook de herkomst van de controle (doelnorm, kernelversie en invoervingerafdruk). Het is geen NTA 8800-berekening en geen energielabel.
+- **Onverwarmde ruimtes.** Hier leg je per onverwarmde ruimte een reductiefactor b (0 t/m 1) met een bron vast. Een afgeleide b_U (8.53–8.59) geef je op via de NTA-invoer. Het paneel toont ook een diagnose van de transmissie via deze ruimtes (A·U, L·Ψ en χ met de opgegeven b); die diagnose is geen geverifieerde uitkomst.
+- **NTA-warmtepompen.** Een lijst van losse warmtepompen met brontype en bediende zones. De invoercontrole classificeert ze, maar de energieberekening gebruikt ze niet: die rekent met de opwekkers uit het NTA-invoerformulier. Bij het verwijderen van een zone verdwijnt die zone uit de lijst van bediende zones.
+- **Gaswarmtepomp-referentievergelijking.** Je laadt een case met 25 verwachte waarden (een synthetisch voorbeeld of een eigen JSON-bestand) en vergelijkt die met de conceptberekening voor gaswarmtepompen. Een overeenkomst bewijst geen NTA-conformiteit en levert geen BENG-uitkomst of label op.
+
 ## Het NTA-invoerformulier
 
-Het formulier vraagt alleen wat het projectmodel nog niet heeft. Opslaan en Annuleren staan onderaan in een vaste balk. Lege velden staan na het formulier in de lijst "open velden".
+Het formulier vraagt alleen wat het projectmodel nog niet heeft. Opslaan en Annuleren staan onderaan in een vaste balk. Lege velden staan na het formulier in de melding **Nog leeg (n): …**. Ze gaan niet mee naar de rekenkern; een verplicht veld verschijnt na de berekening als invoergat.
 
 | Onderdeel | Inhoud | Normbasis |
 |---|---|---|

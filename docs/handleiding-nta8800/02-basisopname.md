@@ -70,7 +70,7 @@ Elke zone moet zelf weer aan afb. 6.6 voldoen (`calculation_zone_criteria_not_me
 - Het criterium voor de specifieke interne warmtecapaciteit wordt niet getoetst, omdat de opname één constructie per gebouw kent.
 
 **Meldingen die vaak voorkomen**
-- **Ontbrekend bewijs voor inregeling van koeling** (tabel 10.11, voetnoot a): geef een verklaring op, anders telt de inregeling als niet uitgevoerd.
+- **Ontbrekend bewijs voor inregeling van koeling** (NTA 8800 tabel 10.11, voetnoot a, p. 388): geef een verklaring op, anders telt de inregeling als niet uitgevoerd.
 - **Oppervlak zwemzaal zonder zone** (`swimming_pool_zone_required`): bij meerdere sportzones moet de zone worden gekozen.
 - **Kleine oude gasmotor** (`gas_engine_small_old_no_table_row`): tabel 9.31 heeft hiervoor geen rij.
 

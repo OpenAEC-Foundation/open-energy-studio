@@ -1,0 +1,44 @@
+# 9. Bestanden en uitwisseling
+
+## Projectbestanden (`.oes.json`)
+
+**Opslaan.** Met **Opslaan** (Ctrl+S) of **Opslaan als** in het lint schrijft de app het project als `<projectnaam>.oes.json`.
+- In de desktopapp kies je de plaats in een opslagvenster; een project dat al een bestandspad heeft, wordt daar direct overschreven.
+- In de browser wordt het bestand gedownload.
+
+Het bestand bevat het volledige project, inclusief de NTA-invoer, de basisopname, het maatwerkadvies en de registratiegegevens. Daarnaast bevat het een stempel van de rekenkern: kernelversie, normversie en de invoervingerafdruk op het moment van opslaan.
+
+**Openen.** Met **Openen** kies je een `.oes.json`- of `.json`-bestand. Bij het openen:
+- vergelijkt de app de opgeslagen stempel met de huidige rekenkern. Is de kern of de normversie anders, dan meldt ze dat; reken dan opnieuw en controleer de verschillen voordat je registreert. Verschilt alleen de invoervingerafdruk, dan is het bestand buiten de app gewijzigd en meldt ze dat ook.
+- zet ze oude herlabelprojecten om naar de huidige vorm (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)). Facturen zonder herlabelrol krijgen de rol "Te beoordelen", die nog niet als bewijs telt; de app meldt welke velden nog ontbreken.
+
+## Voorbeeldprojecten
+
+Het startscherm biedt twee volledige voorbeelden: **Voorbeeld: tussenwoning** en **Voorbeeld: klein kantoor**. Ze openen ook via de adresparameter `?example=terraced_dwelling` of `?example=small_office`.
+
+De voorbeelden zijn fictieve oefenprojecten. BENG en labelklasse zijn indicatief; er hoort geen geregistreerd energielabel bij. De bronbestanden staan in `training-data/nta8800-example-*.json`.
+
+## UNIEC3-uitwisseling
+
+Het lint heeft een groep **UNIEC3** met twee knoppen.
+
+**UNIEC3 invoerconcept** exporteert het projectmodel als een zip-bestand `<projectnaam>.input-draft.uniec3`. De indeling is nagebouwd op basis van bestaande UNIEC3-bestanden van NTA 8800 v3.4. Het bestand bevat:
+- gebouw, rekenzones, begrenzingsvlakken, constructies, ramen, koudebruggen en de luchtdoorlatendheid (q_v10);
+- de installaties: verwarming, ventilatie, koeling, tapwater, PV en zonthermie.
+
+Wat het **niet** bevat of garandeert:
+- geen NTA-invoerblok (`ntaCalculation`), geen basisopname, geen maatwerkadvies en geen registratiegegevens;
+- geen rekenuitkomsten (de samenvatting is leeg) en geen label;
+- geen garantie dat een ander programma het bestand accepteert of de waarden op dezelfde manier leest. Controleer na het inlezen elders altijd de invoer.
+
+**UNIEC3 import** leest een `.uniec3`-bestand en opent het als een nieuw project. Alleen het projectmodel komt mee: zones, vlakken, ramen, koudebruggen, constructies en installaties. De NTA-invoer, opname en registratie moet je daarna zelf invullen; tot dan geeft de rekenkern invoergaten.
+
+## Exports op het tabblad Rapport
+
+| Knop | Uitvoer |
+|---|---|
+| **NTA-invoerdossier exporteren** | de ingevoerde toestellen en het bewijs, zonder BENG-uitkomst of label |
+| **NTA-rekenrapport exporteren** | het rapport van de rekenkern: indicatoren, labelklasse, Bbl-toets, TO-juli, maandwaarden, weggelaten correcties, bronnen en de bijlage Interpretaties |
+| **Projectdossier exporteren (ZIP)** | het dossier met projectbestand, kernuitvoer, rekenrapport, bewijs, checklist en manifest (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)) |
+
+Het BENG-rapport exporteer je met **Exporteer rapport** in het lint of het menu (zie [hoofdstuk 4](04-uitvoer.md)).
