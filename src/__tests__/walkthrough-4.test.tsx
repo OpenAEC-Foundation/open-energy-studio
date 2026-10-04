@@ -18,7 +18,8 @@ import { CoolingSystemDialog } from '../components/dialogs/CoolingSystemDialog/C
 import { SolarPVDialog } from '../components/dialogs/SolarPVDialog/SolarPVDialog';
 import { SolarThermalDialog } from '../components/dialogs/SolarThermalDialog/SolarThermalDialog';
 import { ErrorBoundary } from '../components/ErrorBoundary/ErrorBoundary';
-import type { IConstruction, IHeatingSystem, IHotWaterSystem, IProject, IVentilationSystem } from '../core/energy/types';
+import type { IConstruction, ICoolingSystem, IHeatingSystem, IHotWaterSystem, IProject, ISolarPV, ISolarThermal, IVentilationSystem } from '../core/energy/types';
+import { exampleProject } from '../core/nta/ExampleProjects';
 import { renderWithProviders, userEvent } from './test-utils';
 
 /** Construction without layers, as in both example projects: only Rc/U are stored. */
@@ -36,10 +37,18 @@ const HEATING: IHeatingSystem = {
 const VENTILATION: IVentilationSystem = { id: 'vs-test', name: 'WTW', type: 'type_d', heatRecoveryEfficiency: 0.29, sfp: 0.45 };
 const HOT_WATER: IHotWaterSystem = { id: 'hw-test', name: 'Boiler', type: 'electric_boiler', efficiency: 0.9, hasSolarBoiler: true, solarBoilerFraction: 0.29 };
 
-function Harness() {
+const COOLING: ICoolingSystem = { id: 'cs-test', name: 'Split', type: 'split_unit', eer: 3.4 };
+const PV: ISolarPV = { id: 'pv-test', name: 'PV dak', peakPower: 2.1, orientation: 'S', tilt: 35, area: 11.3 };
+const SOLAR_THERMAL: ISolarThermal = { id: 'st-test', name: 'Zonneboiler', collectorArea: 2.6, type: 'flat_plate', orientation: 'SW', tilt: 40 };
+
+/** The live project of the harness, for a strict comparison of the object itself. */
+let latest: IProject | null = null;
+
+function Harness({ initial }: { initial?: IProject }) {
   const { state, dispatch } = useEnergy();
   const close = () => dispatch({ type: 'CLOSE_DIALOG' });
   const { dialog, project } = state;
+  latest = project;
   const zone = project.zones[0];
   const surface = zone?.surfaces[0];
   const window = zone?.surfaces.flatMap((s) => s.windows)[0];
@@ -49,10 +58,14 @@ function Harness() {
   };
   return <>
     <button type="button" onClick={() => {
+      if (initial) dispatch({ type: 'SET_PROJECT', payload: initial });
       dispatch({ type: 'ADD_CONSTRUCTION', payload: BARE });
       dispatch({ type: 'ADD_HEATING_SYSTEM', payload: HEATING });
       dispatch({ type: 'ADD_VENTILATION_SYSTEM', payload: VENTILATION });
       dispatch({ type: 'ADD_HOT_WATER_SYSTEM', payload: HOT_WATER });
+      dispatch({ type: 'ADD_COOLING_SYSTEM', payload: COOLING });
+      dispatch({ type: 'ADD_SOLAR_PV', payload: PV });
+      dispatch({ type: 'ADD_SOLAR_THERMAL', payload: SOLAR_THERMAL });
     }}>setup</button>
     <button type="button" onClick={() => open('construction', 'con-test-bare')}>open construction</button>
     <button type="button" onClick={() => open('zone', zone?.id)}>open zone</button>
@@ -61,9 +74,9 @@ function Harness() {
     <button type="button" onClick={() => open('heatingSystem', 'hs-test')}>open heating</button>
     <button type="button" onClick={() => open('ventilationSystem', 'vs-test')}>open ventilation</button>
     <button type="button" onClick={() => open('hotWaterSystem', 'hw-test')}>open hot water</button>
-    <button type="button" onClick={() => open('coolingSystem', project.coolingSystems[0]?.id)}>open cooling</button>
-    <button type="button" onClick={() => open('solarPV', project.solarPV[0]?.id)}>open pv</button>
-    <button type="button" onClick={() => open('solarThermal', project.solarThermal[0]?.id)}>open solar thermal</button>
+    <button type="button" onClick={() => open('coolingSystem', 'cs-test')}>open cooling</button>
+    <button type="button" onClick={() => open('solarPV', 'pv-test')}>open pv</button>
+    <button type="button" onClick={() => open('solarThermal', 'st-test')}>open solar thermal</button>
     {dialog.type === 'construction-editor' && <ConstructionEditorDialog editId={dialog.editId} onClose={close} />}
     {dialog.type === 'zone-editor' && <ZoneEditorDialog editId={dialog.editId} onClose={close} />}
     {dialog.type === 'surface-editor' && <SurfaceEditorDialog editId={dialog.editId} onClose={close} />}
@@ -80,20 +93,32 @@ function Harness() {
 
 const projectJson = () => JSON.parse(screen.getByTestId('project').textContent ?? '{}') as IProject;
 
+const EDITORS = ['open construction', 'open zone', 'open surface', 'open window', 'open heating',
+  'open ventilation', 'open hot water', 'open cooling', 'open pv', 'open solar thermal'];
+
+/** Opens and saves every editor without a change; the project object must stay strictly equal. */
+async function roundTripEveryEditor(initial?: IProject) {
+  const user = userEvent.setup();
+  renderWithProviders(<Harness initial={initial} />);
+  await user.click(screen.getByRole('button', { name: 'setup' }));
+  if (initial?.ntaCalculation) expect(latest?.ntaCalculation).toBeDefined();
+  for (const name of EDITORS) {
+    const before = latest!;
+    await user.click(screen.getByRole('button', { name }));
+    const dialog = screen.queryByRole('dialog');
+    expect(dialog, `${name} must open a dialog`).not.toBeNull();
+    await user.click(within(dialog!).getByRole('button', { name: 'Save' }));
+    expect(latest, name).toStrictEqual(before);
+  }
+}
+
 describe('opening and saving an editor without changes is a no-op', () => {
   it('keeps every stored value of each editor', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Harness />);
-    await user.click(screen.getByRole('button', { name: 'setup' }));
-    for (const name of ['open construction', 'open zone', 'open surface', 'open window', 'open heating',
-      'open ventilation', 'open hot water', 'open cooling', 'open pv', 'open solar thermal']) {
-      const before = projectJson();
-      await user.click(screen.getByRole('button', { name }));
-      const dialog = screen.queryByRole('dialog');
-      if (!dialog) continue; // nothing of that kind in the default project
-      await user.click(within(dialog).getByRole('button', { name: 'Save' }));
-      expect(projectJson(), name).toEqual(before);
-    }
+    await roundTripEveryEditor();
+  }, 60000);
+
+  it('keeps every stored value, including the NTA input, on a project with ntaCalculation', async () => {
+    await roundTripEveryEditor(exampleProject('terraced_dwelling'));
   }, 60000);
 
   it('shows the stored Rc and U of a construction without layers and only recomputes after a layer edit', async () => {

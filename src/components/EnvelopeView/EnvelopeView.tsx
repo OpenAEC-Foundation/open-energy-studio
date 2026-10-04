@@ -162,7 +162,8 @@ export function EnvelopeView() {
           {/* Air tightness */}
           <div className="envelope-section">
             <h4>{t('browser.airTightness')}</h4>
-            <p className="envelope-meta">qv;10 = {num(zone.airTightness.qv10)} dm³/(s·m²)</p>
+            <p className="envelope-meta">qv;10 = {num(zone.airTightness.qv10)} dm³/(s·m²)
+              {zone.airTightness.assumed && <> — <em data-testid="air-tightness-assumed">{t('browser.airTightnessAssumed')}</em></>}</p>
           </div>
         </div>
       ))}

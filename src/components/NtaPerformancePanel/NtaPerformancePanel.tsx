@@ -142,7 +142,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
             <li key={`gap-${gap.code}-${index}`}>
               <KernelCode code={gap.code} />
               <code>{gap.path}</code>
-              {gap.detail && <small>{gap.detail}</small>}
+              <KernelDetail detail={gap.detail} />
             </li>
           ))}{issues.map((item, index) => (
             <li key={`${item.code}-${index}`}><KernelCode code={item.code} /><code>{item.path}</code></li>

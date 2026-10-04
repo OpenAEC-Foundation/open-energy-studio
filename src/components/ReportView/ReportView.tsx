@@ -11,6 +11,7 @@ import {
 import { checkDossierCompleteness, openDossierItems, type DossierItem } from '../../core/report/ProjectDossier';
 import { useProjectPerformance } from '../../core/nta/useProjectPerformance';
 import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
+import { kernelWithheld } from '../../core/nta/KernelVerdict';
 import { formatNumber } from '../../i18n/format';
 import './ReportView.css';
 
@@ -48,7 +49,11 @@ export function ReportView() {
   const { project, result } = state;
   const kernelQuery = useProjectPerformance(project);
   const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
-  const model = kernelReportModel(kernelQuery?.kind === 'done' ? kernelQuery.assessment : null);
+  const kernelAssessment = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
+  const model = kernelReportModel(kernelAssessment);
+  // Shared rule (KernelVerdict): a refused kernel result withholds every BENG number.
+  const withheld = !kernelPending && kernelWithheld(kernelAssessment);
+  const indicativeShown = !model && !kernelPending && result != null && !withheld;
   const meetsText = (meets: boolean | null) =>
     t(meets == null ? 'report.notTestable' : meets ? 'report.meetsUnverified' : 'report.fails');
   const [calculationError, setCalculationError] = useState<string | null>(null);
@@ -104,8 +109,10 @@ export function ReportView() {
           <p className="report-date">{new Date().toLocaleDateString(locale)}</p>
         </div>
         <div className="report-verification-notice" role="status">
-          <strong>{model ? t('report.kernelStatus') : result ? t('results.indicative') : t('results.noResults')}</strong>
-          <p>{model ? t('report.kernelSource') : result ? t('results.indicativeDescription') : t('report.inputDossierScope')}</p>
+          <strong>{model ? t('report.kernelStatus') : withheld ? t('results.withheld.title') : indicativeShown ? t('results.indicative') : t('results.noResults')}</strong>
+          <p>{model ? t('report.kernelSource')
+            : withheld ? t(kernelAssessment?.status === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')
+            : indicativeShown ? t('results.indicativeDescription') : t('report.inputDossierScope')}</p>
         </div>
         <div className="report-input-dossier">
           <button type="button" onClick={() => downloadNtaInputDossierHTML(project)}>{t('report.exportInputDossier')}</button>
@@ -294,7 +301,7 @@ export function ReportView() {
           </>
         )}
 
-        {!model && !kernelPending && result && (() => {
+        {indicativeShown && result && (() => {
           const monthlyResult = 'monthly' in result ? result as IBENGResultMonthly : null;
           return (
             <>
