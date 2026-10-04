@@ -1,180 +1,189 @@
 use tauri::image::Image;
 use tauri::Manager;
 
+/// Refuses a kernel result that holds a non-finite number. Tauri serializes
+/// with `serde_json`, which would write NaN or infinity as `null`.
+fn finite<T: serde::Serialize>(value: T) -> Result<T, String> {
+    match nta8800_core::finite::first_non_finite(&value) {
+        None => Ok(value),
+        Some(path) => Err(format!("non_finite_result: {path}")),
+    }
+}
+
 #[tauri::command]
 fn validate_nta_project(
     project: serde_json::Value,
 ) -> Result<nta8800_core::InputAssessment, String> {
-    nta8800_core::assess_json(project)
+    nta8800_core::assess_json(project).and_then(finite)
 }
 
 #[tauri::command]
 fn diagnose_declared_heating_table(
     input: nta8800_core::declared_heating_table::DeclaredHeatingTableInput,
-) -> nta8800_core::declared_heating_table::DeclaredHeatingTableAssessment {
-    nta8800_core::declared_heating_table::assess_declared_heating_table(&input)
+) -> Result<nta8800_core::declared_heating_table::DeclaredHeatingTableAssessment, String> {
+    finite(nta8800_core::declared_heating_table::assess_declared_heating_table(&input))
 }
 
 #[tauri::command]
 fn diagnose_forfait_heat_pump_draft(
     input: nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput,
-) -> nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftAssessment {
-    nta8800_core::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(&input)
+) -> Result<nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftAssessment, String> {
+    finite(nta8800_core::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_gas_heat_pump_forfait_draft(
     input: nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftInput,
-) -> nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftAssessment {
-    nta8800_core::gas_heat_pump_forfait_draft::assess_gas_heat_pump_forfait_draft(&input)
+) -> Result<nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftAssessment, String> {
+    finite(nta8800_core::gas_heat_pump_forfait_draft::assess_gas_heat_pump_forfait_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_gas_heat_pump_aux_draft(
     input: nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftInput,
-) -> nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftAssessment {
-    nta8800_core::gas_heat_pump_aux_draft::assess_gas_heat_pump_aux_draft(&input)
+) -> Result<nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftAssessment, String> {
+    finite(nta8800_core::gas_heat_pump_aux_draft::assess_gas_heat_pump_aux_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_gas_heat_pump_monthly_draft(
     input: nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftInput,
-) -> nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftAssessment {
-    nta8800_core::gas_heat_pump_monthly_draft::assess_gas_heat_pump_monthly_draft(&input)
+) -> Result<nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftAssessment, String> {
+    finite(nta8800_core::gas_heat_pump_monthly_draft::assess_gas_heat_pump_monthly_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_gas_heat_pump_chain_draft(
     input: nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftInput,
-) -> nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftAssessment {
-    nta8800_core::gas_heat_pump_chain_draft::assess_gas_heat_pump_chain_draft(&input)
+) -> Result<nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftAssessment, String> {
+    finite(nta8800_core::gas_heat_pump_chain_draft::assess_gas_heat_pump_chain_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_gas_collective_source_draft(
     input: nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftInput,
-) -> nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftAssessment {
-    nta8800_core::gas_collective_source_draft::assess_gas_collective_source_draft(&input)
+) -> Result<nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftAssessment, String> {
+    finite(nta8800_core::gas_collective_source_draft::assess_gas_collective_source_draft(&input))
 }
 
 #[tauri::command]
 fn compare_gas_heat_pump_chain_diagnostic(
     case: nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticCase,
-) -> nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticComparison {
-    nta8800_core::gas_heat_pump_chain_reference::compare_gas_heat_pump_chain_diagnostic(case)
+) -> Result<nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticComparison, String> {
+    finite(nta8800_core::gas_heat_pump_chain_reference::compare_gas_heat_pump_chain_diagnostic(case))
 }
 
 #[tauri::command]
 fn diagnose_forfait_heat_pump_monthly_draft(
     input: nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftInput,
-) -> nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftAssessment {
-    nta8800_core::forfait_heat_pump_monthly_draft::assess_forfait_heat_pump_monthly_draft(&input)
+) -> Result<nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftAssessment, String> {
+    finite(nta8800_core::forfait_heat_pump_monthly_draft::assess_forfait_heat_pump_monthly_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_generator_dispatch_draft(
     input: nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftInput,
-) -> nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftAssessment {
-    nta8800_core::generator_dispatch_draft::assess_generator_dispatch_draft(&input)
+) -> Result<nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftAssessment, String> {
+    finite(nta8800_core::generator_dispatch_draft::assess_generator_dispatch_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_hybrid_heat_pump_monthly_draft(
     input: nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftInput,
-) -> nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftAssessment {
-    nta8800_core::hybrid_heat_pump_monthly_draft::assess_hybrid_heat_pump_monthly_draft(&input)
+) -> Result<nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftAssessment, String> {
+    finite(nta8800_core::hybrid_heat_pump_monthly_draft::assess_hybrid_heat_pump_monthly_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_boiler_forfait_draft(
     input: nta8800_core::boiler_forfait_draft::BoilerForfaitDraftInput,
-) -> nta8800_core::boiler_forfait_draft::BoilerForfaitDraftAssessment {
-    nta8800_core::boiler_forfait_draft::assess_boiler_forfait_draft(&input)
+) -> Result<nta8800_core::boiler_forfait_draft::BoilerForfaitDraftAssessment, String> {
+    finite(nta8800_core::boiler_forfait_draft::assess_boiler_forfait_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_boiler_forfait_monthly_draft(
     input: nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftInput,
-) -> nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftAssessment {
-    nta8800_core::boiler_forfait_draft::assess_boiler_forfait_monthly_draft(&input)
+) -> Result<nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftAssessment, String> {
+    finite(nta8800_core::boiler_forfait_draft::assess_boiler_forfait_monthly_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_declared_dhw(
     input: nta8800_core::heat_pumps::HeatPumpInput,
-) -> nta8800_core::declared_dhw::DeclaredDhwAssessment {
-    nta8800_core::declared_dhw::assess_declared_dhw(&input)
+) -> Result<nta8800_core::declared_dhw::DeclaredDhwAssessment, String> {
+    finite(nta8800_core::declared_dhw::assess_declared_dhw(&input))
 }
 
 #[tauri::command]
 fn diagnose_final_energy_draft(
     input: nta8800_core::final_energy_draft::FinalEnergyDraftInput,
-) -> nta8800_core::final_energy_draft::FinalEnergyDraftAssessment {
-    nta8800_core::final_energy_draft::assess_final_energy_draft(&input)
+) -> Result<nta8800_core::final_energy_draft::FinalEnergyDraftAssessment, String> {
+    finite(nta8800_core::final_energy_draft::assess_final_energy_draft(&input))
 }
 
 #[tauri::command]
 fn calculate_monthly_demand(
     input: nta8800_core::monthly_demand::MonthlyDemandInput,
-) -> nta8800_core::monthly_demand::MonthlyDemandAssessment {
-    nta8800_core::monthly_demand::assess_monthly_demand(&input)
+) -> Result<nta8800_core::monthly_demand::MonthlyDemandAssessment, String> {
+    finite(nta8800_core::monthly_demand::assess_monthly_demand(&input))
 }
 
 #[tauri::command]
 fn calculate_constructions(
     input: nta8800_core::envelope_elements::EnvelopeInput,
-) -> nta8800_core::envelope_elements::EnvelopeAssessment {
-    nta8800_core::envelope_elements::assess_envelope(&input)
+) -> Result<nta8800_core::envelope_elements::EnvelopeAssessment, String> {
+    finite(nta8800_core::envelope_elements::assess_envelope(&input))
 }
 
 #[tauri::command]
 fn assess_residential_survey(
     survey: nta8800_core::opname::ResidentialSurvey,
-) -> nta8800_core::opname::OpnameAssessment {
-    nta8800_core::opname::assess_residential_survey(&survey)
+) -> Result<nta8800_core::opname::OpnameAssessment, String> {
+    finite(nta8800_core::opname::assess_residential_survey(&survey))
 }
 
 #[tauri::command]
 fn assess_utility_survey(
     survey: nta8800_core::opname::utility::UtilitySurvey,
-) -> nta8800_core::opname::OpnameAssessment {
-    nta8800_core::opname::utility::assess_utility_survey(&survey)
+) -> Result<nta8800_core::opname::OpnameAssessment, String> {
+    finite(nta8800_core::opname::utility::assess_utility_survey(&survey))
 }
 
 #[tauri::command]
 fn assess_maatwerkadvies(
     input: serde_json::Value,
 ) -> Result<nta8800_core::maatwerkadvies::MaatwerkadviesAssessment, String> {
-    nta8800_core::maatwerkadvies::assess_maatwerkadvies_json(input)
+    nta8800_core::maatwerkadvies::assess_maatwerkadvies_json(input).and_then(finite)
 }
 
 #[tauri::command]
 fn assess_relabel(
     original: serde_json::Value,
     current: serde_json::Value,
-) -> nta8800_core::relabel::RelabelAssessment {
-    nta8800_core::relabel::assess_relabel(&original, &current)
+) -> Result<nta8800_core::relabel::RelabelAssessment, String> {
+    finite(nta8800_core::relabel::assess_relabel(&original, &current))
 }
 
 #[tauri::command]
 fn calculate_ventilation(
     input: nta8800_core::ventilation::VentilationInput,
-) -> nta8800_core::ventilation::VentilationAssessment {
-    nta8800_core::ventilation::assess_ventilation(&input)
+) -> Result<nta8800_core::ventilation::VentilationAssessment, String> {
+    finite(nta8800_core::ventilation::assess_ventilation(&input))
 }
 
 #[tauri::command]
 fn calculate_space_heating_chain(
     input: nta8800_core::space_heating_chain::SpaceHeatingChainInput,
-) -> nta8800_core::space_heating_chain::SpaceHeatingChainAssessment {
-    nta8800_core::space_heating_chain::assess_space_heating_chain(&input)
+) -> Result<nta8800_core::space_heating_chain::SpaceHeatingChainAssessment, String> {
+    finite(nta8800_core::space_heating_chain::assess_space_heating_chain(&input))
 }
 
 #[tauri::command]
 fn calculate_building_performance(
     input: nta8800_core::building_performance::BuildingPerformanceInput,
-) -> nta8800_core::building_performance::BuildingPerformanceAssessment {
-    nta8800_core::building_performance::assess_building_performance(&input)
+) -> Result<nta8800_core::building_performance::BuildingPerformanceAssessment, String> {
+    finite(nta8800_core::building_performance::assess_building_performance(&input))
 }
 
 #[tauri::command]
@@ -185,43 +194,43 @@ fn kernel_interpretations() -> Vec<nta8800_core::interpretations::Interpretation
 #[tauri::command]
 fn calculate_project_performance(
     project: serde_json::Value,
-) -> nta8800_core::project_performance::ProjectPerformanceAssessment {
-    nta8800_core::project_performance::assess_project_performance(&project)
+) -> Result<nta8800_core::project_performance::ProjectPerformanceAssessment, String> {
+    finite(nta8800_core::project_performance::assess_project_performance(&project))
 }
 
 #[tauri::command]
 fn diagnose_epus_draft(
     input: nta8800_core::epus_draft::EpusDraftInput,
-) -> nta8800_core::epus_draft::EpusDraftAssessment {
-    nta8800_core::epus_draft::assess_epus_draft(&input)
+) -> Result<nta8800_core::epus_draft::EpusDraftAssessment, String> {
+    finite(nta8800_core::epus_draft::assess_epus_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_bacs_draft(
     input: nta8800_core::bacs_draft::BacsDraftInput,
-) -> nta8800_core::bacs_draft::BacsDraftAssessment {
-    nta8800_core::bacs_draft::assess_bacs_draft(&input)
+) -> Result<nta8800_core::bacs_draft::BacsDraftAssessment, String> {
+    finite(nta8800_core::bacs_draft::assess_bacs_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_indicators_draft(
     input: nta8800_core::indicators_draft::IndicatorsDraftInput,
-) -> nta8800_core::indicators_draft::IndicatorsDraftAssessment {
-    nta8800_core::indicators_draft::assess_indicators_draft(&input)
+) -> Result<nta8800_core::indicators_draft::IndicatorsDraftAssessment, String> {
+    finite(nta8800_core::indicators_draft::assess_indicators_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_heating_aux_draft(
     input: nta8800_core::heating_aux_draft::HeatingAuxDraftInput,
-) -> nta8800_core::heating_aux_draft::HeatingAuxDraftAssessment {
-    nta8800_core::heating_aux_draft::assess_heating_aux_draft(&input)
+) -> Result<nta8800_core::heating_aux_draft::HeatingAuxDraftAssessment, String> {
+    finite(nta8800_core::heating_aux_draft::assess_heating_aux_draft(&input))
 }
 
 #[tauri::command]
 fn diagnose_heating_aux_measured_draft(
     input: nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftInput,
-) -> nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftAssessment {
-    nta8800_core::heating_aux_draft::assess_heating_aux_measured_draft(&input)
+) -> Result<nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftAssessment, String> {
+    finite(nta8800_core::heating_aux_draft::assess_heating_aux_measured_draft(&input))
 }
 
 #[derive(serde::Serialize)]

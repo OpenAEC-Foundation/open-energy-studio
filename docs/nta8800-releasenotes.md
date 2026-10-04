@@ -2,6 +2,18 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — robuustheid: vangnet op alle uitvoerroutes en bijgestelde grenzen
+
+- **Vangnet op elke kernuitvoer.** De HTTP-dienst en de desktopapp controleren nu elk kernresultaat op NaN en oneindig voordat het wordt geserialiseerd. Zo'n resultaat wordt niet uitgegeven: de dienst antwoordt met HTTP 500 en `{"error": "non_finite_result", "path": …}`, de desktopapp met de fout `non_finite_result: <pad>`. Dat geldt ook voor de diagnostische routes (H7, H9, H11, de `*_draft`-modules) die het projectvangnet niet hadden.
+- **Maatwerkadvies.** Een maatwerkadvies met een niet-eindig getal krijgt status `invalid` met `non_finite_result`; de varianten worden achtergehouden. Een gebouwinvoer als basis, en elke gebouwinvoer na maatregelen op het gebouw, wordt nu gecontroleerd op:
+  - gebruiksoppervlakte boven 10.000.000 m² (`area_out_of_range`);
+  - opgegeven maandgebruik boven 1.000.000 kWh per m² per maand (`declared_use_out_of_range`);
+  - elk getal groter dan 10¹² (`value_out_of_range`).
+
+  Zo'n variant wordt niet berekend. Projectmaatregelen liepen al via de projectcontrole.
+- **Waarschuwingsgrenzen verhoogd.** De waarschuwing voor een vlak of raam gaat nu af boven 500.000 m² (was 100.000 m²): grote distributiecentra en terminals hebben daken van meer dan 100.000 m². De waarschuwing voor opgegeven maandgebruik gaat af boven 5000 kWh per m² per maand (was 1000): een datacentrum haalt ruim 1000. De blokkerende grenzen zijn ongewijzigd.
+- **Teksten.** Een gebouwhoogte boven 1000 m heeft nu een eigen melding. De meldingen over levensduur en opgegeven gebruik noemen de grens.
+
 ## 4 oktober 2026 — robuustheid: aantallen, niet-eindige getallen en bereikgrenzen
 
 Een robuustheidstest met ongeveer 49.000 verstoorde invoeren vond geen paniek, maar wel één crash, twee niet-eindige uitkomsten en uitkomsten die als berekend werden gemeld bij onzinnige invoer. De grenzen hieronder zijn keuzes van het programma, geen normwaarden.
@@ -18,16 +30,16 @@ Een robuustheidstest met ongeveer 49.000 verstoorde invoeren vond geen paniek, m
   - oppervlakte van een vlak of raam boven 10.000.000 m² (`surface_area_out_of_range`);
   - U-waarde boven 100 W/m²K (`u_value_out_of_range`);
   - q_v10 boven 1000 dm³/s·m² (`qv10_out_of_range`);
-  - opgegeven maandgebruik boven 1.000.000 kWh per m² (`declared_use_out_of_range`).
+  - opgegeven maandgebruik boven 1.000.000 kWh per m² per maand (`declared_use_out_of_range`).
 - **Vangnet voor niet-eindige getallen.** Bevat een project- of opnameresultaat toch NaN of oneindig, dan wordt het niet uitgegeven (serde_json zou er `null` van maken). De status wordt `invalid` met `non_finite_result` en het pad van het eerste getal. `geometry.lossAreaRatio` en de gemiddelde U van de labelgegevens zijn nu alleen nog eindig.
 
 ### Nieuwe waarschuwingen (de berekening loopt door)
 
 - Zone-A_g boven 1.000.000 m² of onder 1 m² (`zone_area_out_of_range`, `zone_area_implausible`).
-- Vlak of raam boven 100.000 m² (`surface_area_out_of_range`).
+- Vlak of raam boven 500.000 m² (`surface_area_out_of_range`).
 - U-waarde boven 10 W/m²K (`u_value_out_of_range`).
 - q_v10 boven 10 dm³/s·m² (`qv10_out_of_range`).
-- Opgegeven maandgebruik boven 1000 kWh/m² (`declared_use_out_of_range`).
+- Opgegeven maandgebruik boven 5000 kWh per m² per maand (`declared_use_out_of_range`).
 - Minder dan 10 m² per woning (`dwelling_count_implausible`).
 - A_ls/A_g boven 20 (`loss_area_ratio_implausible`).
 
