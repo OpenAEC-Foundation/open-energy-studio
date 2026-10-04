@@ -1,8 +1,8 @@
 import type { DialogType, IProject } from './types';
-import type { EnergyAction } from '../../context/EnergyContext';
+import { type EnergyAction, projectAfterAction } from '../../context/EnergyContext';
 import {
   type CascadeEntry, type DeleteResult, deleteSurfaceFromProject, deleteWindowFromProject, deleteZoneFromProject,
-  manualMeasuresShiftedBy,
+  buildingMeasuresAffectedBy, manualMeasuresShiftedBy,
 } from './projectDelete';
 
 /**
@@ -48,37 +48,52 @@ export function constructionUsage(project: IProject, constructionId: string): st
 }
 
 export type DeleteTarget =
-  /** `cascade`: NTA input entries that the delete removes with it. */
-  | { kind: 'action'; action: EnergyAction; cascade: CascadeEntry[] }
+  /**
+   * `cascade`: NTA input entries that the delete removes with it.
+   * `buildingMeasures`: manual maatwerkadvies measures on the derived input
+   * whose index paths may shift; the user is asked to review them.
+   */
+  | { kind: 'action'; action: EnergyAction; cascade: CascadeEntry[]; buildingMeasures: string[] }
   | { kind: 'blocked'; reason: 'constructionInUse' | 'manualMeasures'; usedBy: string[] }
   | { kind: 'none' };
 
-/** Geometry deletes cascade into the NTA block and are refused when they renumber a manual measure's path. */
-function geometryDelete(project: IProject, action: EnergyAction, result: DeleteResult): DeleteTarget {
-  const shifted = manualMeasuresShiftedBy(project, result.project, project.maatwerkadvies?.measures);
+/**
+ * Every delete is previewed on the reducer's after-state: it is refused when
+ * it renumbers an index path of a manual project measure, and it names the
+ * manual building measures to review. Geometry deletes also report the NTA
+ * input they remove with them.
+ */
+function guardedDelete(project: IProject, action: EnergyAction, result?: DeleteResult): DeleteTarget {
+  const after = result?.project ?? projectAfterAction(project, action);
+  const measures = project.maatwerkadvies?.measures;
+  const shifted = manualMeasuresShiftedBy(project, after, measures);
   return shifted.length > 0
     ? { kind: 'blocked', reason: 'manualMeasures', usedBy: shifted }
-    : { kind: 'action', action, cascade: result.cascade };
+    : { kind: 'action', action, cascade: result?.cascade ?? [], buildingMeasures: buildingMeasuresAffectedBy(project, after, measures) };
+}
+
+function listed(items: Array<{ id: string }> | undefined, id: string): boolean {
+  return (items ?? []).some((item) => item.id === id);
 }
 
 export function deleteTarget(project: IProject, itemType: string, id: string): DeleteTarget {
-  const action = (a: EnergyAction): DeleteTarget => ({ kind: 'action', action: a, cascade: [] });
+  const action = (a: EnergyAction): DeleteTarget => guardedDelete(project, a);
   switch (itemType as ProjectItemType) {
     case 'zone':
       return project.zones.some((z) => z.id === id)
-        ? geometryDelete(project, { type: 'DELETE_ZONE', payload: id }, deleteZoneFromProject(project, id))
+        ? guardedDelete(project, { type: 'DELETE_ZONE', payload: id }, deleteZoneFromProject(project, id))
         : { kind: 'none' };
     case 'surface':
       for (const zone of project.zones)
         if (zone.surfaces.some((s) => s.id === id))
-          return geometryDelete(project, { type: 'DELETE_SURFACE', payload: { zoneId: zone.id, surfaceId: id } },
+          return guardedDelete(project, { type: 'DELETE_SURFACE', payload: { zoneId: zone.id, surfaceId: id } },
             deleteSurfaceFromProject(project, zone.id, id));
       return { kind: 'none' };
     case 'window':
       for (const zone of project.zones)
         for (const surface of zone.surfaces)
           if (surface.windows.some((w) => w.id === id))
-            return geometryDelete(project,
+            return guardedDelete(project,
               { type: 'DELETE_WINDOW', payload: { zoneId: zone.id, surfaceId: surface.id, windowId: id } },
               deleteWindowFromProject(project, zone.id, surface.id, id));
       return { kind: 'none' };
@@ -99,12 +114,12 @@ export function deleteTarget(project: IProject, itemType: string, id: string): D
         ? { kind: 'blocked', reason: 'constructionInUse', usedBy }
         : action({ type: 'DELETE_CONSTRUCTION', payload: id });
     }
-    case 'heatingSystem': return action({ type: 'DELETE_HEATING_SYSTEM', payload: id });
-    case 'ventilationSystem': return action({ type: 'DELETE_VENTILATION_SYSTEM', payload: id });
-    case 'coolingSystem': return action({ type: 'DELETE_COOLING_SYSTEM', payload: id });
-    case 'hotWaterSystem': return action({ type: 'DELETE_HOT_WATER_SYSTEM', payload: id });
-    case 'solarPV': return action({ type: 'DELETE_SOLAR_PV', payload: id });
-    case 'solarThermal': return action({ type: 'DELETE_SOLAR_THERMAL', payload: id });
+    case 'heatingSystem': return listed(project.heatingSystems, id) ? action({ type: 'DELETE_HEATING_SYSTEM', payload: id }) : { kind: 'none' };
+    case 'ventilationSystem': return listed(project.ventilationSystems, id) ? action({ type: 'DELETE_VENTILATION_SYSTEM', payload: id }) : { kind: 'none' };
+    case 'coolingSystem': return listed(project.coolingSystems, id) ? action({ type: 'DELETE_COOLING_SYSTEM', payload: id }) : { kind: 'none' };
+    case 'hotWaterSystem': return listed(project.hotWaterSystems, id) ? action({ type: 'DELETE_HOT_WATER_SYSTEM', payload: id }) : { kind: 'none' };
+    case 'solarPV': return listed(project.solarPV, id) ? action({ type: 'DELETE_SOLAR_PV', payload: id }) : { kind: 'none' };
+    case 'solarThermal': return listed(project.solarThermal, id) ? action({ type: 'DELETE_SOLAR_THERMAL', payload: id }) : { kind: 'none' };
     default: return { kind: 'none' };
   }
 }

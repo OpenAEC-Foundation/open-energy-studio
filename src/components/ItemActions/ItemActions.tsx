@@ -11,6 +11,7 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
   const [confirming, setConfirming] = useState(false);
   const [blocked, setBlocked] = useState<{ reason: 'constructionInUse' | 'manualMeasures'; usedBy: string[] } | null>(null);
   const [cascade, setCascade] = useState<string[]>([]);
+  const [buildingMeasures, setBuildingMeasures] = useState<string[]>([]);
   const edit = editAction(itemType, id);
 
   const requestDelete = () => {
@@ -19,6 +20,7 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
     if (target.kind === 'none') return;
     setBlocked(null);
     setCascade(target.cascade.map((entry) => entry.path));
+    setBuildingMeasures(target.buildingMeasures);
     setConfirming(true);
   };
   const confirmDelete = () => {
@@ -42,6 +44,9 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
         {cascade.length > 0 && <>
           {' '}{t('item.deleteCascade', { count: cascade.length })}
           <ul className="item-actions-cascade">{cascade.map((path) => <li key={path}><code>{path}</code></li>)}</ul>
+        </>}
+        {buildingMeasures.length > 0 && <>
+          {' '}{t('item.buildingMeasuresReview', { list: buildingMeasures.join(', ') })}
         </>}
       </span>
       <button type="button" className="btn btn-sm btn-danger" onClick={confirmDelete}>{t('item.deleteYes')}</button>

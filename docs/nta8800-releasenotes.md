@@ -2,6 +2,20 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — verwijderen: warmtepompzones, alle onderdelen, gebouwmaatregelen
+
+- **Bediende zones van warmtepompen.** Verwijder je een zone, dan haalt de app die zone ook uit `servedZoneIds` van `heatingSystems[].ntaHeatPump`, `hotWaterSystems[].ntaHeatPump` en `ntaHeatPumps[]`. De bevestiging noemt die onderdelen. Voorheen meldde de kern daarna `heat_pump_zone_missing`, wat blokkeert. Een lijst die leeg wordt, blijft bestaan; de kern geeft dan alleen de waarschuwing `heat_pump_zones_missing`.
+- **Elke verwijdering wordt gecontroleerd op handmatige maatregelen.** De weigering bij een verschuivende positie gold alleen voor zones, vlakken en ramen. Hij geldt nu ook voor:
+  - lineaire en puntkoudebruggen;
+  - constructies;
+  - verwarmings-, ventilatie-, koel- en tapwatersystemen;
+  - PV en zonthermische systemen.
+
+  De app bepaalt de toestand na de verwijdering met dezelfde reducer als de echte verwijdering. Een verwijdering van een onderdeel dat niet bestaat, doet niets.
+- **Handmatige maatregelen op de afgeleide rekeninvoer** (`target: 'building'`). De bevestiging noemt ze voortaan ter controle. Of hun posities verschuiven, is vooraf niet te bepalen. Verwijderen blijft mogelijk.
+- **Dossier.** Een geëxporteerde checklist bevat nooit de status "bezig", ook niet als de aanroeper die doorgeeft. In de rapportweergave tellen onderdelen met "bezig" mee als open.
+- **Geneste dialogen.** Een dialoog die binnen een andere dialoog staat, krijgt altijd de focus en de Tab- en Escape-toetsen, ook als beide in één keer verschijnen.
+
 ## 4 oktober 2026 — verwijderen zonder losse verwijzingen, tapwatervaten, dialogen en dossierchecklist
 
 - **Verwijderen werkt door in de NTA-invoer.** Verwijder je een zone, vlak of raam, dan verdwijnt ook de NTA-invoer die er met id naar verwijst. Het gaat om `zoneData`, `dynamicWindows`, `groundFloors`, `surfaceTilts`, `lighting`, `humidifiers` en elk ander element met een `zoneId`, `surfaceId` of `windowId`. Een `zoneIds`-lijst van een verwarmings- of koelsysteem wordt ingekort. Een systeem dat alleen verwijderde zones bediende, verdwijnt. Voorheen bleven die verwijzingen staan en stopte de berekening met `zone_data_without_zone`, `dynamic_window_without_window`, `ground_floor_data_without_ground_surface` of `heating_system_zone_unknown`. De bevestiging noemt nu de NTA-onderdelen die meegaan. Een herlabelvergelijking van vóór de verwijdering raakt verouderd.

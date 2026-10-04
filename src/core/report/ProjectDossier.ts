@@ -67,6 +67,11 @@ function withoutStoredOriginal(project: IProject): IProject {
   return { ...project, registration: { ...project.registration, relabelComparison: rest } };
 }
 
+/** Items that still need the adviser's attention; a pending item is not done yet either. */
+export function openDossierItems(items: DossierItem[]): DossierItem[] {
+  return items.filter((item) => item.status === 'missing' || item.status === 'check' || item.status === 'pending');
+}
+
 /** Completeness of the project dossier per BRL 9500 Bijlage 3. */
 export function checkDossierCompleteness(context: DossierContext): DossierItem[] {
   const items = dossierItems(context);
@@ -321,7 +326,7 @@ export async function buildProjectDossier(
     if (bytes) files[evidenceArchiveName(item)] = bytes;
     else missingEvidence.push({ id: item.id, fileName: item.fileName, reason: 'bestand niet beschikbaar of hash wijkt af' });
   }
-  const checklist = checkDossierCompleteness({ ...context, labelInputSha256: labelSha });
+  const checklist = checkDossierCompleteness({ ...context, pending: false, labelInputSha256: labelSha });
   files['dossier-checklist.json'] = strToU8(JSON.stringify(checklist, null, 2));
   const entries: DossierManifestEntry[] = [];
   for (const [path, bytes] of Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) {

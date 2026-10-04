@@ -16,8 +16,25 @@ function focusableIn(root: HTMLElement): HTMLElement[] {
  */
 const dialogStack: HTMLElement[] = [];
 
+/**
+ * The last dialog pushed, but a dialog nested in the DOM of another always
+ * wins over its parent. React runs a child's effects before its parent's,
+ * so when both mount in one commit the parent is pushed last.
+ */
+function topmostDialog(): HTMLElement | undefined {
+  let current = dialogStack[dialogStack.length - 1];
+  if (!current) return undefined;
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const other of dialogStack) {
+      if (other !== current && current.contains(other)) { current = other; changed = true; break; }
+    }
+  }
+  return current;
+}
+
 function isTopmost(dialog: HTMLElement): boolean {
-  return dialogStack[dialogStack.length - 1] === dialog;
+  return topmostDialog() === dialog;
 }
 
 function focusFirst(dialog: HTMLElement) {
@@ -104,7 +121,9 @@ export function DialogShell({
     if (!dialog) return;
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogStack.push(dialog);
-    focusFirst(dialog);
+    // A parent mounted in the same commit as a nested dialog must not take
+    // the focus the nested one already moved into itself.
+    if (isTopmost(dialog)) focusFirst(dialog);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isTopmost(dialog) || event.defaultPrevented) return;

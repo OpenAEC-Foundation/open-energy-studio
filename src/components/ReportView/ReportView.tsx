@@ -8,7 +8,7 @@ import type { OpnameAssessment } from '../../core/nta/KernelClient';
 import {
   downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML, downloadProjectDossier,
 } from '../../core/report/ReportGenerator';
-import { checkDossierCompleteness, type DossierItem } from '../../core/report/ProjectDossier';
+import { checkDossierCompleteness, openDossierItems, type DossierItem } from '../../core/report/ProjectDossier';
 import { useProjectPerformance } from '../../core/nta/useProjectPerformance';
 import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
 import { formatNumber } from '../../i18n/format';
@@ -94,7 +94,7 @@ export function ReportView() {
       pending: kernelPending || !opnameDone,
     });
   }, [exported, project, assessment, currentSha, opname, opnameDone, kernelPending]);
-  const open = checklist.filter((item) => item.status === 'missing' || item.status === 'check');
+  const open = openDossierItems(checklist);
 
   return (
     <div className="report-view">

@@ -98,10 +98,61 @@ function emptyRemoved(): RemovedIds {
   return { zoneIds: new Set(), surfaceIds: new Set(), windowIds: new Set() };
 }
 
+type ServedPump = { servedZoneIds?: string[] };
+
+/**
+ * Heat-pump inputs outside the NTA block list the zones they serve
+ * (`servedZoneIds`); the kernel refuses an unknown one
+ * (`heat_pump_zone_missing`). The list is filtered and kept, also when it
+ * becomes empty: that only gives the warning `heat_pump_zones_missing`.
+ */
+function filterServed<T extends ServedPump>(pump: T, path: string, removed: RemovedIds, log: CascadeEntry[]): T {
+  const ids = pump.servedZoneIds;
+  if (!ids || !ids.some((id) => removed.zoneIds.has(id))) return pump;
+  ids.forEach((id, index) => { if (removed.zoneIds.has(id)) log.push({ path: `${path}.servedZoneIds[${index}]`, id }); });
+  return { ...pump, servedZoneIds: ids.filter((id) => !removed.zoneIds.has(id)) };
+}
+
+function cascadeServedZones(project: IProject, removed: RemovedIds, log: CascadeEntry[]): Partial<IProject> {
+  if (removed.zoneIds.size === 0) return {};
+  const out: Partial<IProject> = {};
+  const withPump = <S extends { ntaHeatPump?: ServedPump }>(systems: S[], key: string): S[] => {
+    let changed = false;
+    const next = systems.map((system, index) => {
+      if (!system.ntaHeatPump) return system;
+      const pump = filterServed(system.ntaHeatPump, `${key}[${index}].ntaHeatPump`, removed, log);
+      if (pump === system.ntaHeatPump) return system;
+      changed = true;
+      return { ...system, ntaHeatPump: pump };
+    });
+    return changed ? next : systems;
+  };
+  const heating = withPump(project.heatingSystems, 'heatingSystems');
+  if (heating !== project.heatingSystems) out.heatingSystems = heating;
+  const hotWater = withPump(project.hotWaterSystems, 'hotWaterSystems');
+  if (hotWater !== project.hotWaterSystems) out.hotWaterSystems = hotWater;
+  if (project.ntaHeatPumps) {
+    let changed = false;
+    const pumps = project.ntaHeatPumps.map((pump, index) => {
+      const next = filterServed(pump, `ntaHeatPumps[${index}]`, removed, log);
+      if (next !== pump) changed = true;
+      return next;
+    });
+    if (changed) out.ntaHeatPumps = pumps;
+  }
+  return out;
+}
+
 function finish(project: IProject, zones: IProject['zones'], removed: RemovedIds): DeleteResult {
-  if (!project.ntaCalculation) return { project: { ...project, zones }, cascade: [] };
-  const { nta, cascade } = cascadeNtaReferences(project.ntaCalculation, removed);
-  return { project: { ...project, zones, ntaCalculation: nta }, cascade };
+  const cascade: CascadeEntry[] = [];
+  let ntaCalculation = project.ntaCalculation;
+  if (ntaCalculation) {
+    const result = cascadeNtaReferences(ntaCalculation, removed);
+    ntaCalculation = result.nta;
+    cascade.push(...result.cascade);
+  }
+  const served = cascadeServedZones(project, removed, cascade);
+  return { project: { ...project, zones, ...served, ...(ntaCalculation ? { ntaCalculation } : {}) }, cascade };
 }
 
 export function deleteZoneFromProject(project: IProject, zoneId: string): DeleteResult {
@@ -190,4 +241,17 @@ export function manualMeasuresShiftedBy(before: IProject, after: IProject, measu
     if ((measure.patch ?? []).some((op) => pathShifted(before, after, op.path))) hits.push(measure.name || measure.id);
   }
   return hits;
+}
+
+/**
+ * Manual measures with `target: 'building'` patch the derived kernel input,
+ * whose arrays are numbered from the project during derivation. Whether a
+ * delete renumbers them cannot be decided here, so every delete that
+ * changes the project names them for review.
+ */
+export function buildingMeasuresAffectedBy(before: IProject, after: IProject, measures: MwaMeasure[] | undefined): string[] {
+  if (before === after) return [];
+  return (measures ?? [])
+    .filter((measure) => !measure.template && measure.target === 'building' && (measure.patch ?? []).length > 0)
+    .map((measure) => measure.name || measure.id);
 }
