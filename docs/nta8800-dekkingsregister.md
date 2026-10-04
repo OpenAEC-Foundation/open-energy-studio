@@ -40,6 +40,8 @@ Op `7ac7e52` zijn de volledige interne suites opnieuw uitgevoerd en is een [nieu
 
 Het algemene referentiemanifest heeft nu een begrensde numerieke vergelijking voor BENG 1/2/3 en TOjuliMax via Rust, HTTP en MCP. De vergelijking gebruikt alleen een complete `calculated_unverified`-projectuitkomst en toont afwijkingen per post; foutieve paden/eenheden en onvolledige projecten geven geen gedeeltelijke match. De synthetische regressietests verifiëren het vergelijkingsmechanisme. Geen actuele onafhankelijke referentiewaarden zijn toegevoegd; de kolommen Referentie en Attest blijven ongewijzigd.
 
+Dezelfde vergelijking kan nu ook jaarlijkse primaire energie/CO₂ en maand- en jaarsommen per energiedienst en drager controleren. De paden kiezen dienst, drager en maand expliciet, zonder afhankelijkheid van de volgorde van JSON-lijsten. Ontbrekende rijen worden niet als nul ingevuld. Dit maakt deelresultaten voor toekomstige officiële referentiecases vergelijkbaar, maar voegt zelf geen onafhankelijke verwachte waarden toe.
+
 Op broncommit `47c84f3` slaagden 758 kern- en drie integratietests, 55 servicetests, Rust-formatcontrole, Clippy, de frontend-build en een [nieuwe Linux-debugbuild](nta8800-build-verificatie-2026-10-04-47c84f3.md). De API- en MCP-binaries zijn eveneens gebouwd en met hashes bewaard. De laatste volledige frontendtest blijft die van `7ac7e52`.
 
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.

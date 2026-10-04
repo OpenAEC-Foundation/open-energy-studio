@@ -85,20 +85,95 @@ pub struct MetricComparison {
     pub within_tolerance: bool,
 }
 
-/// Deliberately small, unit-bound output allowlist: input or metadata paths
-/// must never be compared to values supplied in the same case manifest.
+/// Output allowlist: input and metadata paths must never be compared to values
+/// supplied in the same case manifest. A missing row is not assumed to be zero.
+fn metric_unit(path: &str) -> Option<&'static str> {
+    match path {
+        "beng1" | "beng2" => return Some("kWh/m2.year"),
+        "beng3" => return Some("%"),
+        "tojuliMax" => return Some("K"),
+        "annualPrimaryFossil" | "annualRenewablePrimary" => return Some("kWh"),
+        "annualCO2" => return Some("kg CO2eq"),
+        _ => {}
+    }
+    let parts: Vec<_> = path.split('/').collect();
+    let (service, carrier, field) = match parts.as_slice() {
+        ["serviceAnnual", service, carrier, field] => (*service, *carrier, *field),
+        ["serviceMonth", service, carrier, month, field] => {
+            let Ok(parsed_month) = month.parse::<u8>() else {
+                return None;
+            };
+            if !(1..=12).contains(&parsed_month) || parsed_month.to_string() != *month {
+                return None;
+            }
+            (*service, *carrier, *field)
+        }
+        _ => return None,
+    };
+    if !crate::building_performance::ENERGY_FUNCTIONS.contains(&service)
+        || !crate::building_performance::BREAKDOWN_CARRIERS.contains(&carrier)
+    {
+        return None;
+    }
+    match field {
+        "usedKwh" | "deliveredKwh" | "primaryFossilKwh" => Some("kWh"),
+        _ => None,
+    }
+}
+
 fn actual_metric(
     result: &crate::building_performance::BuildingPerformanceAssessment,
     path: &str,
-) -> Option<(Option<f64>, &'static str)> {
+) -> Option<f64> {
     match path {
-        "beng1" => Some((result.need_indicator_kwh_per_m2_year, "kWh/m2.year")),
-        "beng2" => Some((
-            result.primary_fossil_indicator_kwh_per_m2_year,
-            "kWh/m2.year",
-        )),
-        "beng3" => Some((result.renewable_share_percent, "%")),
-        "tojuliMax" => Some((result.tojuli_max_k, "K")),
+        "beng1" => return result.need_indicator_kwh_per_m2_year,
+        "beng2" => return result.primary_fossil_indicator_kwh_per_m2_year,
+        "beng3" => return result.renewable_share_percent,
+        "tojuliMax" => return result.tojuli_max_k,
+        "annualPrimaryFossil" => return result.annual_primary_fossil_kwh,
+        "annualRenewablePrimary" => return result.annual_renewable_primary_kwh,
+        "annualCO2" => return result.annual_co2_kg,
+        _ => {}
+    }
+    let parts: Vec<_> = path.split('/').collect();
+    let row_value = |used: f64, delivered: f64, fossil: f64, field: &str| match field {
+        "usedKwh" => Some(used),
+        "deliveredKwh" => Some(delivered),
+        "primaryFossilKwh" => Some(fossil),
+        _ => None,
+    };
+    match parts.as_slice() {
+        ["serviceAnnual", service, carrier, field] => result
+            .energy_by_service
+            .annual
+            .iter()
+            .find(|row| row.service == *service && row.carrier == *carrier)
+            .and_then(|row| {
+                row_value(
+                    row.used_kwh,
+                    row.delivered_kwh,
+                    row.primary_fossil_kwh,
+                    field,
+                )
+            }),
+        ["serviceMonth", service, carrier, month, field] => {
+            let month = month.parse::<u8>().ok()?;
+            result
+                .energy_by_service
+                .months
+                .iter()
+                .find(|row| {
+                    row.service == *service && row.carrier == *carrier && row.month == month
+                })
+                .and_then(|row| {
+                    row_value(
+                        row.used_kwh,
+                        row.delivered_kwh,
+                        row.primary_fossil_kwh,
+                        field,
+                    )
+                })
+        }
         _ => None,
     }
 }
@@ -120,17 +195,12 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
         return result;
     }
     for (index, metric) in case.expected.iter().enumerate() {
-        let unit = match metric.path.as_str() {
-            "beng1" | "beng2" => Some("kWh/m2.year"),
-            "beng3" => Some("%"),
-            "tojuliMax" => Some("K"),
-            _ => None,
-        };
+        let unit = metric_unit(&metric.path);
         if unit.is_none() {
             result.issues.push(issue(
                 "metric_path_unsupported",
                 format!("expected[{index}].path"),
-                "Only published numeric performance output paths can be compared",
+                "Only allowlisted numeric performance output paths can be compared",
             ));
         } else if unit != Some(metric.unit.as_str()) {
             result.issues.push(issue(
@@ -161,7 +231,7 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     result.calculation_available = true;
     let mut metrics = Vec::with_capacity(case.expected.len());
     for (index, expected) in case.expected.iter().enumerate() {
-        let Some((Some(actual), _)) = actual_metric(&performance, &expected.path) else {
+        let Some(actual) = actual_metric(&performance, &expected.path) else {
             result.status = "calculation_unavailable";
             result.issues.push(issue(
                 "metric_calculation_unavailable",
@@ -405,6 +475,50 @@ mod tests {
             compare_reference_case(comparison_case(project(), "beng2", 1.0, "kWh/m2.year"));
         assert_eq!(incomplete.status, "calculation_unavailable");
         assert!(!incomplete.calculation_available);
+    }
+
+    #[test]
+    fn compares_service_and_carrier_month_without_array_index_assumptions() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        let performance = assessment.performance.unwrap();
+        let row = performance.energy_by_service.months.first().unwrap();
+        let path = format!(
+            "serviceMonth/{}/{}/{}/usedKwh",
+            row.service, row.carrier, row.month
+        );
+        let result =
+            compare_reference_case(comparison_case(project.clone(), &path, row.used_kwh, "kWh"));
+        assert_eq!(result.status, "compared_pass");
+        let annual = performance.energy_by_service.annual.first().unwrap();
+        let path = format!(
+            "serviceAnnual/{}/{}/deliveredKwh",
+            annual.service, annual.carrier
+        );
+        let result = compare_reference_case(comparison_case(
+            project.clone(),
+            &path,
+            annual.delivered_kwh,
+            "kWh",
+        ));
+        assert_eq!(result.status, "compared_pass");
+
+        for path in [
+            "serviceMonth/heating/el/0/usedKwh",
+            "serviceMonth/heating/el/01/usedKwh",
+            "serviceMonth/heating/el/13/usedKwh",
+            "serviceMonth/heating/el/1/inputFingerprint",
+            "serviceAnnual/unknown/el/usedKwh",
+        ] {
+            let result = compare_reference_case(comparison_case(project.clone(), path, 0.0, "kWh"));
+            assert_eq!(result.status, "invalid_case", "{path}");
+            assert!(result.metrics.is_empty());
+        }
+        let wrong_unit = compare_reference_case(comparison_case(project, "annualCO2", 0.0, "kWh"));
+        assert_eq!(wrong_unit.status, "invalid_case");
     }
 
     #[test]

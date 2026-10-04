@@ -2683,6 +2683,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reference_comparison_http_exposes_service_month_difference() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let performance = nta8800_core::project_performance::assess_project_performance(&project)
+            .performance
+            .unwrap();
+        let row = performance.energy_by_service.months.first().unwrap();
+        let path = format!(
+            "serviceMonth/{}/{}/{}/usedKwh",
+            row.service, row.carrier, row.month
+        );
+        let body = json!({"case": {
+            "caseId": "synthetic-month", "normVersion": "NTA 8800:2025+C1:2026",
+            "project": project,
+            "source": {"publisher":"synthetic", "documentId":"internal-1", "edition":"test",
+                "usePermission":"internal", "independentReviewer":"test"},
+            "expected": [{"path":path, "value":row.used_kwh + 1.0, "unit":"kWh",
+                "normReference":"internal test", "absoluteTolerance":0.0}]
+        }});
+        let response = app()
+            .oneshot(
+                Request::post("/v1/nta8800/reference/compare")
+                    .header("content-type", "application/json")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let result: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(result["status"], "compared_fail");
+        assert_eq!(result["metrics"][0]["absoluteDifference"], 1.0);
+        assert_eq!(result["referenceVerified"], false);
+    }
+
+    #[tokio::test]
     async fn direct_transmission_endpoint_returns_diagnostic_without_enabling_beng() {
         let body = json!({"input": {
             "elements": [{"id":"wall", "areaM2":10, "uValueWPerM2k":0.2,
