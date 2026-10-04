@@ -87,6 +87,8 @@ De gebouwde referentiegate-CLI accepteerde vervolgens een passend tijdelijk plan
 
 **Lokale bouwgate (4 oktober).** `scripts/verify-nta.sh` draait nu na de TypeScript- en UI-tests ook `npm run build`, zoals de frontend-CI. Shell-syntaxcontrole en de TypeScript-/Vite-build slaagden; de volledige scriptketen is op de voorafgaande bronstand al geslaagd, maar is na deze ene extra stap niet opnieuw doorlopen. Het script blijft de geplande referentiebatch expliciet overslaan zolang geen plan en case-map zijn ingesteld.
 
+**Vastgezette frontendafhankelijkheden (5 oktober).** De matrixbouw in `.github/workflows/ci.yml` gebruikt nu `npm ci` met het bestaande lockbestand, net als de test- en releasejobs. Een offline `npm ci --dry-run --ignore-scripts` slaagde; dit controleert lockbestandcompatibiliteit, geen platformbuild in CI. De NTA-referentie- en atteststatus verandert niet.
+
 **Aparte labelscenario-indicatoren in het harnas (4 oktober).** Naast BENG 2/3 zijn nu `labelPrimaryFossil` en `labelRenewableShare` numeriek vergelijkbaar. Zij lezen de bestaande Rust-uitvoer van het labelscenario, zodat bij een woning met EMG-maatregelen een forfaitaire labelwaarde niet met de declaratiegebaseerde BENG-waarde wordt verward. De gerichte vergelijkingstest en Clippy slaagden. De verwachting kwam uit een interne synthetische fixture; een onafhankelijke actuele EDR-labelvergelijking ontbreekt nog.
 
 **Technische controle op `37ccce1` (4 oktober).** 760 kerntests plus drie integratietests, 56 servicetests, Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de API-/MCP-binaries slaagden. Pakket- en binaryhashes staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-37ccce1.md). De officiële referentie- en atteststatus verandert hierdoor niet.

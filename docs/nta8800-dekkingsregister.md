@@ -20,6 +20,8 @@ De volledige lokale technische gate op de bronstand `e2d2a69` slaagde vervolgens
 
 De lokale verificatiescript voert nu ook de TypeScript-/Vite-productiebouw uit na de UI-tests. Shell-syntax en de nieuwe bouwstap zijn afzonderlijk gecontroleerd. Dit scherpt de technische gate aan, zonder een referentie- of atteststatus te veranderen.
 
+De desktopmatrix in CI installeert frontendafhankelijkheden nu met `npm ci` uit het lockbestand in plaats van een nieuwe oplossing van versies. De offline dry-run slaagde; deze wijziging raakt alleen de technische bouwherleidbaarheid, niet de normatieve dekking.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
