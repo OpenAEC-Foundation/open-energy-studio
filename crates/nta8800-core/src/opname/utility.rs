@@ -3396,6 +3396,57 @@ fn validate(survey: &UtilitySurvey, recorder: &mut Recorder) {
     {
         recorder.issue("residential_function_use_residential_survey", "functions");
     }
+    super::check_count(
+        recorder,
+        Some(survey.storeys),
+        super::MAX_STOREYS,
+        "storeys_out_of_range",
+        "storeys",
+    );
+    super::check_count(
+        recorder,
+        survey.toilet_stacks,
+        super::MAX_COUNT,
+        "count_out_of_range",
+        "toiletStacks",
+    );
+    if survey
+        .functions
+        .iter()
+        .any(|item| item.area_m2 > super::MAX_AREA_M2)
+    {
+        recorder.issue("area_out_of_range", "functions");
+    }
+    if survey.building_height_m > super::MAX_BUILDING_HEIGHT_M {
+        recorder.issue("building_height_invalid", "buildingHeightM");
+    }
+    super::validate_envelope_bounds(&survey.envelope, recorder);
+    super::validate_heating_counts(&survey.heating, recorder);
+    super::validate_vertical_pipe_counts(survey.vertical_pipes.as_deref(), recorder);
+    if let Some(cooling) = &survey.cooling {
+        super::check_count(
+            recorder,
+            Some(cooling.fan_coil_count),
+            super::MAX_COUNT,
+            "count_out_of_range",
+            "cooling.fanCoilCount",
+        );
+    }
+    for (path, hot) in std::iter::once(("hotWater".to_string(), &survey.hot_water)).chain(
+        survey
+            .additional_hot_water_systems
+            .iter()
+            .enumerate()
+            .map(|(index, hot)| (format!("additionalHotWaterSystems[{index}]"), hot)),
+    ) {
+        super::check_count(
+            recorder,
+            Some(hot.showers),
+            super::MAX_COUNT,
+            "count_out_of_range",
+            &format!("{path}.showers"),
+        );
+    }
     if !(survey.building_height_m.is_finite() && survey.building_height_m > 0.0) {
         recorder.issue("building_height_invalid", "buildingHeightM");
     }
@@ -4512,7 +4563,7 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
         Some(_) => "derived_input_rejected",
         None => "invalid",
     };
-    OpnameAssessment {
+    super::refuse_non_finite(OpnameAssessment {
         status,
         scope: "isso_75_1_basisopname_utility_unverified",
         source: ISSO_UTILITY_SOURCE,
@@ -4522,7 +4573,7 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
         derived_input,
         performance,
         reference_verified: false,
-    }
+    })
 }
 
 #[cfg(test)]

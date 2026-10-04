@@ -219,7 +219,9 @@ pub(crate) fn vertical_pipes(
     let pipes = match pipes {
         Some(pipes) => pipes,
         None => {
-            defaulted = vec![SurveyVerticalPipe::default(); default_count as usize];
+            // The validation bounds the counts; the cap keeps a missed
+            // count from exhausting memory.
+            defaulted = vec![SurveyVerticalPipe::default(); default_count.min(MAX_COUNT) as usize];
             &defaulted
         }
     };
@@ -317,6 +319,134 @@ pub struct OpnameAssessment {
     pub reference_verified: bool,
 }
 
+/// Upper bound for storey counts in a survey. A program choice, not a norm
+/// value: the counts size the derived input (one vertical pipe per storey),
+/// so an unbounded count could exhaust memory.
+pub(crate) const MAX_STOREYS: u32 = 200;
+/// Upper bound for other survey counts (dwellings, showers, emitters,
+/// heaters, collectors). A program choice, not a norm value.
+pub(crate) const MAX_COUNT: u32 = 100_000;
+
+/// Records `code` at `path` when the count exceeds `max`.
+pub(crate) fn check_count(
+    recorder: &mut Recorder,
+    value: Option<u32>,
+    max: u32,
+    code: &'static str,
+    path: &str,
+) {
+    if value.is_some_and(|value| value > max) {
+        recorder.issue(code, path.to_string());
+    }
+}
+
+/// Range checks of the counts in the heating answers, shared by the
+/// residential and the utility survey.
+pub(crate) fn validate_heating_counts(heating: &SurveyHeating, recorder: &mut Recorder) {
+    check_count(
+        recorder,
+        Some(heating.storeys),
+        MAX_STOREYS,
+        "storeys_out_of_range",
+        "heating.storeys",
+    );
+    if let Some(collective) = &heating.collective {
+        check_count(
+            recorder,
+            collective.connected_storeys,
+            MAX_STOREYS,
+            "storeys_out_of_range",
+            "heating.collective.connectedStoreys",
+        );
+        check_count(
+            recorder,
+            collective.connected_dwellings,
+            MAX_COUNT,
+            "count_out_of_range",
+            "heating.collective.connectedDwellings",
+        );
+    }
+    if let Some(heating::DistributionTypeAnswer::OnePipe { emitter_count }) =
+        &heating.distribution_type
+    {
+        check_count(
+            recorder,
+            Some(*emitter_count),
+            MAX_COUNT,
+            "count_out_of_range",
+            "heating.distributionType.emitterCount",
+        );
+    }
+    if let heating::HeatingGenerator::GasAirHeater { count, .. } = &heating.generator {
+        check_count(
+            recorder,
+            *count,
+            MAX_COUNT,
+            "count_out_of_range",
+            "heating.generator.count",
+        );
+    }
+    match &heating.air_heating {
+        Some(heating::AirHeatingAnswer::Direct { count, .. })
+        | Some(heating::AirHeatingAnswer::Indirect { count, .. }) => {
+            check_count(
+                recorder,
+                *count,
+                MAX_COUNT,
+                "count_out_of_range",
+                "heating.airHeating.count",
+            );
+        }
+        _ => {}
+    }
+}
+
+/// Largest area a survey can describe (A_g, a surface or a window), m², and
+/// the largest building height, m. Program choices, not norm values: above
+/// them the input cannot describe a building.
+pub(crate) const MAX_AREA_M2: f64 = 1.0e7;
+pub(crate) const MAX_BUILDING_HEIGHT_M: f64 = 1000.0;
+
+/// Upper bounds of the envelope areas, shared by both surveys.
+pub(crate) fn validate_envelope_bounds(envelope: &SurveyEnvelope, recorder: &mut Recorder) {
+    for (index, surface) in envelope.surfaces.iter().enumerate() {
+        if surface.gross_area_m2 > MAX_AREA_M2 {
+            recorder.issue(
+                "area_out_of_range",
+                format!("envelope.surfaces[{index}].grossAreaM2"),
+            );
+        }
+    }
+    for (index, window) in envelope.windows.iter().enumerate() {
+        if window.area_m2 > MAX_AREA_M2 {
+            recorder.issue(
+                "area_out_of_range",
+                format!("envelope.windows[{index}].areaM2"),
+            );
+        }
+    }
+}
+
+/// Range checks of the vertical pipes, shared by both surveys.
+pub(crate) fn validate_vertical_pipe_counts(
+    pipes: Option<&[SurveyVerticalPipe]>,
+    recorder: &mut Recorder,
+) {
+    let Some(pipes) = pipes else { return };
+    if pipes.len() > MAX_COUNT as usize {
+        recorder.issue("count_out_of_range", "verticalPipes");
+    }
+    for (index, pipe) in pipes.iter().enumerate() {
+        check_count(
+            recorder,
+            pipe.shared_zones,
+            MAX_COUNT,
+            "count_out_of_range",
+            &format!("verticalPipes[{index}].sharedZones"),
+        );
+    }
+}
+
 fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
     if survey.id.trim().is_empty() {
         recorder.issue("survey_id_required", "id");
@@ -329,6 +459,62 @@ fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
     }
     if !(survey.building_height_m.is_finite() && survey.building_height_m > 0.0) {
         recorder.issue("building_height_invalid", "buildingHeightM");
+    }
+    if survey.usable_floor_area_m2 > MAX_AREA_M2 {
+        recorder.issue("area_out_of_range", "usableFloorAreaM2");
+    }
+    if survey.building_height_m > MAX_BUILDING_HEIGHT_M {
+        recorder.issue("building_height_invalid", "buildingHeightM");
+    }
+    validate_envelope_bounds(&survey.envelope, recorder);
+    check_count(
+        recorder,
+        survey.storeys,
+        MAX_STOREYS,
+        "storeys_out_of_range",
+        "storeys",
+    );
+    validate_heating_counts(&survey.heating, recorder);
+    validate_vertical_pipe_counts(survey.vertical_pipes.as_deref(), recorder);
+    let hot = &survey.hot_water;
+    check_count(
+        recorder,
+        Some(hot.showers),
+        MAX_COUNT,
+        "count_out_of_range",
+        "hotWater.showers",
+    );
+    check_count(
+        recorder,
+        hot.connected_bathrooms,
+        MAX_COUNT,
+        "count_out_of_range",
+        "hotWater.connectedBathrooms",
+    );
+    check_count(
+        recorder,
+        hot.connected_kitchens,
+        MAX_COUNT,
+        "count_out_of_range",
+        "hotWater.connectedKitchens",
+    );
+    if let Some(collective) = &hot.collective {
+        check_count(
+            recorder,
+            collective.connected_dwellings,
+            MAX_COUNT,
+            "count_out_of_range",
+            "hotWater.collective.connectedDwellings",
+        );
+    }
+    for (index, solar) in hot.solar.iter().enumerate() {
+        check_count(
+            recorder,
+            Some(solar.collector_count),
+            MAX_COUNT,
+            "count_out_of_range",
+            &format!("hotWater.solar[{index}].collectorCount"),
+        );
     }
     // The dwelling survey derives one calculation zone.
     for (index, surface) in survey.envelope.surfaces.iter().enumerate() {
@@ -681,7 +867,7 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
         None => "invalid",
     };
     apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
-    OpnameAssessment {
+    refuse_non_finite(OpnameAssessment {
         status,
         scope: "isso_82_1_basisopname_residential_unverified",
         source: ISSO_SOURCE,
@@ -691,7 +877,25 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
         derived_input,
         performance,
         reference_verified: false,
-    }
+    })
+}
+
+/// Safety net: a survey result with a non-finite number (NaN, ±∞) is never
+/// handed out (serde_json would write `null`). The status becomes `invalid`
+/// with `non_finite_result` at the first such path, and the computed parts
+/// are withheld.
+pub(crate) fn refuse_non_finite(mut assessment: OpnameAssessment) -> OpnameAssessment {
+    let Some(path) = crate::finite::first_non_finite(&assessment) else {
+        return assessment;
+    };
+    assessment.status = "invalid";
+    assessment.performance = None;
+    assessment.derived_input = None;
+    assessment.issues.push(OpnameIssue {
+        code: "non_finite_result",
+        path,
+    });
+    assessment
 }
 
 #[cfg(test)]

@@ -1997,7 +1997,9 @@ pub fn validate_hot_water(
         }
     }
     if let Some(circulation) = &system.circulation {
-        if circulation.floor_count == 0 {
+        if circulation.floor_count == 0
+            || circulation.floor_count > crate::monthly_demand::MAX_STOREYS
+        {
             push("hot_water_floor_count_invalid", "circulation.floorCount");
         }
         for (field, value) in [

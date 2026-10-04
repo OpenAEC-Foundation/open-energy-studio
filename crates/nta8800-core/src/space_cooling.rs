@@ -1041,7 +1041,7 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
             }
         }
         if let Some(pump) = &distribution.pump {
-            if pump.floor_count == 0 {
+            if pump.floor_count == 0 || pump.floor_count > crate::monthly_demand::MAX_STOREYS {
                 push(
                     "cooling_floor_count_invalid",
                     "distribution.pump.floorCount".into(),

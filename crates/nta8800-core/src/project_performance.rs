@@ -426,7 +426,9 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
         usable_floor_area_m2: floor,
         loss_area_m2: loss,
         envelope_area_m2: envelope,
-        loss_area_ratio: (floor > 0.0).then(|| loss / floor),
+        loss_area_ratio: (floor > 0.0)
+            .then(|| loss / floor)
+            .filter(|ratio| ratio.is_finite()),
         unclassified_surface_count: unclassified,
     })
 }
@@ -676,6 +678,230 @@ fn ventilation_construction_year(project_value: &Value) -> Option<u32> {
             .iter()
             .find_map(|zone| year_at(zone, "/ventilation/constructionYear"))
     })
+}
+
+/// Bounds of the input range checks. They are program choices, not norm
+/// values: a value above the warning bound is unusual for a building and is
+/// flagged; a value above the blocking bound cannot describe a building and
+/// stops the calculation (docs/nta8800-releasenotes.md lists them).
+struct RangeBound {
+    warn: f64,
+    block: f64,
+}
+
+/// Zone usable area A_g and surface or window area, m².
+const AREA_BOUND: RangeBound = RangeBound {
+    warn: 1.0e6,
+    block: 1.0e7,
+};
+const SURFACE_AREA_BOUND: RangeBound = RangeBound {
+    warn: 1.0e5,
+    block: 1.0e7,
+};
+/// Thermal transmittance, W/(m²·K).
+const U_BOUND: RangeBound = RangeBound {
+    warn: 10.0,
+    block: 100.0,
+};
+/// Air permeability q_v10, dm³/(s·m²).
+const QV10_BOUND: RangeBound = RangeBound {
+    warn: 10.0,
+    block: 1000.0,
+};
+/// Declared monthly use per m² of A_g, kWh/(m²·month).
+const MONTHLY_USE_BOUND: RangeBound = RangeBound {
+    warn: 1000.0,
+    block: 1.0e6,
+};
+/// Smallest plausible usable area of a zone, m².
+const MIN_ZONE_AREA_M2: f64 = 1.0;
+/// Smallest plausible usable area per dwelling, m².
+const MIN_AREA_PER_DWELLING_M2: f64 = 10.0;
+/// Largest plausible A_ls/A_g.
+const MAX_LOSS_AREA_RATIO: f64 = 20.0;
+
+#[derive(Default)]
+struct RangeFindings {
+    blocking: Vec<InputGap>,
+    warnings: Vec<InputGap>,
+}
+
+impl RangeFindings {
+    fn check(&mut self, value: f64, bound: &RangeBound, code: &'static str, path: String) {
+        if value > bound.block {
+            self.blocking.push(InputGap {
+                detail: Some(format!("{value} > {}", bound.block)),
+                ..gap(code, path)
+            });
+        } else if value > bound.warn {
+            self.warnings.push(InputGap {
+                detail: Some(format!("{value} > {}", bound.warn)),
+                ..gap(code, path)
+            });
+        }
+    }
+}
+
+/// Range findings of the project input: (blocking gaps, warnings).
+fn input_range_findings(project_value: &Value) -> (Vec<InputGap>, Vec<InputGap>) {
+    let mut found = RangeFindings::default();
+    let number = |value: &Value, key: &str| value.get(key).and_then(Value::as_f64);
+    let empty = Vec::new();
+    let zones = project_value
+        .get("zones")
+        .and_then(Value::as_array)
+        .unwrap_or(&empty);
+    let mut total_area = 0.0;
+    for (z, zone) in zones.iter().enumerate() {
+        if let Some(area) = number(zone, "floorArea") {
+            total_area += area;
+            found.check(
+                area,
+                &AREA_BOUND,
+                "zone_area_out_of_range",
+                format!("zones[{z}].floorArea"),
+            );
+        }
+        let surfaces = zone
+            .get("surfaces")
+            .and_then(Value::as_array)
+            .unwrap_or(&empty);
+        for (s, surface) in surfaces.iter().enumerate() {
+            if let Some(area) = number(surface, "area") {
+                found.check(
+                    area,
+                    &SURFACE_AREA_BOUND,
+                    "surface_area_out_of_range",
+                    format!("zones[{z}].surfaces[{s}].area"),
+                );
+            }
+            let windows = surface
+                .get("windows")
+                .and_then(Value::as_array)
+                .unwrap_or(&empty);
+            for (w, window) in windows.iter().enumerate() {
+                let path = format!("zones[{z}].surfaces[{s}].windows[{w}]");
+                if let Some(area) = number(window, "area") {
+                    found.check(
+                        area,
+                        &SURFACE_AREA_BOUND,
+                        "surface_area_out_of_range",
+                        format!("{path}.area"),
+                    );
+                }
+                if let Some(u) = number(window, "uValue") {
+                    found.check(
+                        u,
+                        &U_BOUND,
+                        "u_value_out_of_range",
+                        format!("{path}.uValue"),
+                    );
+                }
+            }
+        }
+    }
+    let constructions = project_value
+        .get("constructions")
+        .and_then(Value::as_array)
+        .unwrap_or(&empty);
+    for (c, construction) in constructions.iter().enumerate() {
+        if let Some(u) = number(construction, "uValue") {
+            found.check(
+                u,
+                &U_BOUND,
+                "u_value_out_of_range",
+                format!("constructions[{c}].uValue"),
+            );
+        }
+    }
+    // q_v10 and the dwelling counts may sit at several places in the NTA
+    // block (block level, per zone, per ventilation system).
+    let mut keyed = Vec::new();
+    if let Some(nta) = project_value.get("ntaCalculation") {
+        collect_keys(
+            nta,
+            "ntaCalculation",
+            &["qv10DmPerSM2", "dwellingCount"],
+            &mut keyed,
+        );
+    }
+    for (key, path, value) in &keyed {
+        match key.as_str() {
+            "qv10DmPerSM2" => found.check(*value, &QV10_BOUND, "qv10_out_of_range", path.clone()),
+            _ if total_area > 0.0
+                && *value > 0.0
+                && total_area / *value < MIN_AREA_PER_DWELLING_M2 =>
+            {
+                found.warnings.push(InputGap {
+                    detail: Some(format!("{:.1} m² per dwelling", total_area / *value)),
+                    ..gap("dwelling_count_implausible", path.clone())
+                });
+            }
+            _ => {}
+        }
+    }
+    if total_area > 0.0 {
+        let uses = project_value
+            .pointer("/ntaCalculation/declaredUses")
+            .and_then(Value::as_array)
+            .unwrap_or(&empty);
+        for (u, item) in uses.iter().enumerate() {
+            let months = item
+                .get("monthlyKwh")
+                .and_then(Value::as_array)
+                .unwrap_or(&empty);
+            if let Some(max) = months.iter().filter_map(Value::as_f64).reduce(f64::max) {
+                found.check(
+                    max / total_area,
+                    &MONTHLY_USE_BOUND,
+                    "declared_use_out_of_range",
+                    format!("ntaCalculation.declaredUses[{u}].monthlyKwh"),
+                );
+            }
+        }
+    }
+    for (z, zone) in zones.iter().enumerate() {
+        if number(zone, "floorArea").is_some_and(|area| area > 0.0 && area < MIN_ZONE_AREA_M2) {
+            found.warnings.push(gap(
+                "zone_area_implausible",
+                format!("zones[{z}].floorArea"),
+            ));
+        }
+    }
+    if let Some(ratio) =
+        project_geometry(project_value).and_then(|geometry| geometry.loss_area_ratio)
+    {
+        if ratio > MAX_LOSS_AREA_RATIO {
+            found.warnings.push(InputGap {
+                detail: Some(format!("A_ls/A_g {ratio:.1}")),
+                ..gap("loss_area_ratio_implausible", "zones")
+            });
+        }
+    }
+    (found.blocking, found.warnings)
+}
+
+/// Every numeric value under one of `keys`, with its path.
+fn collect_keys(value: &Value, path: &str, keys: &[&str], out: &mut Vec<(String, String, f64)>) {
+    match value {
+        Value::Object(map) => {
+            for (key, item) in map {
+                let child = format!("{path}.{key}");
+                if keys.contains(&key.as_str()) {
+                    if let Some(number) = item.as_f64() {
+                        out.push((key.clone(), child.clone(), number));
+                    }
+                }
+                collect_keys(item, &child, keys, out);
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                collect_keys(item, &format!("{path}[{index}]"), keys, out);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
@@ -1201,7 +1427,12 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
             serde_json::from_value::<crate::bacs_draft::BacsDraftInput>(value.clone()).ok()
         })
         .map(|input| crate::bacs_draft::assess_bacs_draft(&input));
-    ProjectPerformanceAssessment {
+    let (range_gaps, range_warnings) = input_range_findings(project_value);
+    let mut warnings = plausibility_warnings(project_value);
+    warnings.extend(range_warnings);
+    let blocked_by_range = !range_gaps.is_empty();
+    gaps.extend(range_gaps);
+    let mut assessment = ProjectPerformanceAssessment {
         status,
         target_norm_version: TARGET_NORM_VERSION,
         kernel_version: KERNEL_VERSION,
@@ -1211,7 +1442,7 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         bacs,
         label_data,
         gaps,
-        warnings: plausibility_warnings(project_value),
+        warnings,
         geometry: project_geometry(project_value),
         schematisation: derived
             .as_ref()
@@ -1219,7 +1450,39 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
             .unwrap_or_default(),
         derived_input: derived,
         performance,
+    };
+    if blocked_by_range {
+        withhold_results(&mut assessment);
     }
+    refuse_non_finite(assessment)
+}
+
+/// Marks the assessment invalid and withholds every computed part.
+fn withhold_results(assessment: &mut ProjectPerformanceAssessment) {
+    assessment.status = "invalid";
+    assessment.performance = None;
+    assessment.label_data = None;
+    assessment.registration = None;
+    assessment.bacs = None;
+    assessment.geometry = None;
+    assessment.schematisation.clear();
+    assessment.derived_input = None;
+}
+
+/// Safety net: a result with a non-finite number (NaN, ±∞) is never handed
+/// out, because serde_json would write it as `null`. The status becomes
+/// `invalid` with `non_finite_result` at the first such path, and the parts
+/// that carry computed numbers are withheld.
+fn refuse_non_finite(mut assessment: ProjectPerformanceAssessment) -> ProjectPerformanceAssessment {
+    let Some(path) = crate::finite::first_non_finite(&assessment) else {
+        return assessment;
+    };
+    withhold_results(&mut assessment);
+    assessment.gaps.push(InputGap {
+        detail: Some(path),
+        ..gap("non_finite_result", "result")
+    });
+    assessment
 }
 
 /// A deserialization error caused by a blank (null) value.

@@ -2,6 +2,41 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — robuustheid: aantallen, niet-eindige getallen en bereikgrenzen
+
+Een robuustheidstest met ongeveer 49.000 verstoorde invoeren vond geen paniek, maar wel één crash, twee niet-eindige uitkomsten en uitkomsten die als berekend werden gemeld bij onzinnige invoer. De grenzen hieronder zijn keuzes van het programma, geen normwaarden.
+
+### Opnames en projecten die nu `invalid` worden
+
+- **Onbegrensde aantallen in de opname.** Een opname met `heating.storeys` = 4.294.967.295 en zonder verticale leidingen probeerde 51,5 GB geheugen te reserveren en brak het proces af. Nu geldt:
+  - bouwlagen (`storeys`, `heating.storeys`, `heating.collective.connectedStoreys`) hoogstens 200, anders `storeys_out_of_range`;
+  - andere aantallen hoogstens 100.000, anders `count_out_of_range`. Dat geldt voor woningen op een collectieve installatie, douches, collectoren, afgiftetoestellen op een eenpijpssysteem, luchtverwarmers, ventilatorconvectoren, `toiletStacks` en gedeelde zones van verticale leidingen;
+  - oppervlakten (A_g, functies, vlakken, ramen) hoogstens 10.000.000 m², anders `area_out_of_range`; gebouwhoogte hoogstens 1000 m.
+- **Kern.** Verticale leidingen hoogstens 200 bouwlagen of 1000 m gebouwhoogte (`vertical_pipe_storeys_invalid`). Bouwlagen van tapwatercirculatie en koeldistributie hoogstens 200. Het aantal woningen hoogstens 100.000 (`dwelling_count_invalid`). De levensduur van een maatregel in het maatwerkadvies hoogstens 100 jaar (`measure_lifetime_invalid`), omdat de standaardhorizon anders de netto contante waarde eindeloos laat doorrekenen.
+- **Projectinvoer buiten elk denkbaar gebouw** blokkeert de berekening; de uitkomsten worden achtergehouden:
+  - gebruiksoppervlakte van een zone boven 10.000.000 m² (`zone_area_out_of_range`);
+  - oppervlakte van een vlak of raam boven 10.000.000 m² (`surface_area_out_of_range`);
+  - U-waarde boven 100 W/m²K (`u_value_out_of_range`);
+  - q_v10 boven 1000 dm³/s·m² (`qv10_out_of_range`);
+  - opgegeven maandgebruik boven 1.000.000 kWh per m² (`declared_use_out_of_range`).
+- **Vangnet voor niet-eindige getallen.** Bevat een project- of opnameresultaat toch NaN of oneindig, dan wordt het niet uitgegeven (serde_json zou er `null` van maken). De status wordt `invalid` met `non_finite_result` en het pad van het eerste getal. `geometry.lossAreaRatio` en de gemiddelde U van de labelgegevens zijn nu alleen nog eindig.
+
+### Nieuwe waarschuwingen (de berekening loopt door)
+
+- Zone-A_g boven 1.000.000 m² of onder 1 m² (`zone_area_out_of_range`, `zone_area_implausible`).
+- Vlak of raam boven 100.000 m² (`surface_area_out_of_range`).
+- U-waarde boven 10 W/m²K (`u_value_out_of_range`).
+- q_v10 boven 10 dm³/s·m² (`qv10_out_of_range`).
+- Opgegeven maandgebruik boven 1000 kWh/m² (`declared_use_out_of_range`).
+- Minder dan 10 m² per woning (`dwelling_count_implausible`).
+- A_ls/A_g boven 20 (`loss_area_ratio_implausible`).
+
+TOjuli leidt zijn invoer af uit dezelfde oppervlakten, U-waarden, q_v10 en woningaantallen, dus de grenzen gelden daar ook.
+
+### Test
+
+`crates/nta8800-core/tests/robustness.rs` verstoort in elke testrun 30 keer per fixture één tot drie getallen van de drie projectvoorbeelden en de zes opnamefixtures. De test eist: geen paniek, geen niet-eindig getal en geen ingreep van het vangnet. Met `ROBUST_TRIALS` en `ROBUST_SEED` kan een lokale run breder; 3 × 1500 proeven per fixture gaven geen bevinding.
+
 ## 4 oktober 2026 — verwijderen: warmtepompzones, alle onderdelen, gebouwmaatregelen
 
 - **Bediende zones van warmtepompen.** Verwijder je een zone, dan haalt de app die zone ook uit `servedZoneIds` van `heatingSystems[].ntaHeatPump`, `hotWaterSystems[].ntaHeatPump` en `ntaHeatPumps[]`. De bevestiging noemt die onderdelen. Voorheen meldde de kern daarna `heat_pump_zone_missing`, wat blokkeert. Een lijst die leeg wordt, blijft bestaan; de kern geeft dan alleen de waarschuwing `heat_pump_zones_missing`.

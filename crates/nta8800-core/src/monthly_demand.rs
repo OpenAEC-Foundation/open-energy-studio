@@ -247,6 +247,11 @@ pub struct ComponentTransmission {
     pub vertical_pipes: Option<Vec<VerticalPipe>>,
 }
 
+/// Upper bound for the storeys of a vertical pipe (program choice).
+pub const MAX_STOREYS: u32 = 200;
+/// Upper bound for the dwellings of a zone (program choice).
+pub const MAX_DWELLINGS: u32 = 100_000;
+
 /// One vertical pipe of 7.3.3.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1495,7 +1500,7 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             dwelling_count,
             source_reference,
         } => {
-            if *dwelling_count == 0 {
+            if *dwelling_count == 0 || *dwelling_count > MAX_DWELLINGS {
                 issues.push(issue(
                     "dwelling_count_invalid",
                     "internalGains.dwellingCount",
@@ -1945,7 +1950,12 @@ fn resolve_transmission(
                         format!("{path}.areaShare"),
                     ));
                 }
-                if pipe.storeys == 0 && pipe.building_height_m.is_none() {
+                // Upper bounds are program choices (no building has more
+                // than 200 storeys or is higher than 1000 m).
+                if (pipe.storeys == 0 && pipe.building_height_m.is_none())
+                    || pipe.storeys > MAX_STOREYS
+                    || pipe.building_height_m.is_some_and(|height| height > 1000.0)
+                {
                     issues.push(issue(
                         "vertical_pipe_storeys_invalid",
                         format!("{path}.storeys"),
