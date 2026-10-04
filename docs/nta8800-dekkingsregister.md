@@ -40,6 +40,8 @@ Op `7ac7e52` zijn de volledige interne suites opnieuw uitgevoerd en is een [nieu
 
 Het algemene referentiemanifest heeft nu een begrensde numerieke vergelijking voor BENG 1/2/3 en TOjuliMax via Rust, HTTP en MCP. De vergelijking gebruikt alleen een complete `calculated_unverified`-projectuitkomst en toont afwijkingen per post; foutieve paden/eenheden en onvolledige projecten geven geen gedeeltelijke match. De synthetische regressietests verifiëren het vergelijkingsmechanisme. Geen actuele onafhankelijke referentiewaarden zijn toegevoegd; de kolommen Referentie en Attest blijven ongewijzigd.
 
+Op broncommit `47c84f3` slaagden 758 kern- en drie integratietests, 55 servicetests, Rust-formatcontrole, Clippy, de frontend-build en een [nieuwe Linux-debugbuild](nta8800-build-verificatie-2026-10-04-47c84f3.md). De API- en MCP-binaries zijn eveneens gebouwd en met hashes bewaard. De laatste volledige frontendtest blijft die van `7ac7e52`.
+
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
 
 Een latere controle vanaf `02fafc5` gaf 735 groene kerntests, 53 groene servicetests, geslaagde Rust-formatcontroles en een geslaagde frontend-build. De volledige frontendrun overlapte een relabel-merge en is daarom geen vrijgave voor de nieuwe stand; de twee betrokken testbestanden zijn na de merge opnieuw uitgevoerd (10/10 groen). De precieze testgrens staat in de [verificatiestatus](nta8800-verificatiestatus.md).

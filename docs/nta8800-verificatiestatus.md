@@ -53,6 +53,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Referentievergelijkingsharnas (4 oktober).** De Rust-kern, HTTP-route en MCP-tool vergelijken nu aangeleverde BENG 1/2/3- en TOjuliMax-verwachtingen met een opnieuw berekende projectuitkomst. Een match blijft `referenceVerified=false` en `attestStatus=unattested`; de meegegeven bron en tolerantie zijn niet onafhankelijk beoordeeld. Gerichte tests controleren match, mismatch, ongeldige paden/eenheden en het achterhouden van resultaten bij een onvolledig project. Officiële actuele EDR-resultaten blijven nodig voordat dit harnas normatieve bewijskracht heeft.
 
+**Technische controle op `47c84f3` (4 oktober).** 758 kern- en drie integratietests, 55 servicetests, Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de bouw van HTTP-API/MCP-binaries slaagden. Pakket- en binaryhashes staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-47c84f3.md). De visuele UI-acceptatie en officiële EDR-vergelijking zijn nog niet uitgevoerd.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
