@@ -51,6 +51,7 @@ struct CoveragePlan {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RequiredCase {
     case_id: String,
+    manifest_fingerprint: String,
     required_paths: Vec<String>,
 }
 
@@ -76,6 +77,21 @@ fn check_coverage(plan: CoveragePlan, report: &mut GateReport) -> bool {
             report.errors.push(GateError {
                 file: String::new(),
                 error: format!("Blank or duplicate planned caseId: {}", required.case_id),
+            });
+            passed = false;
+        }
+        if required.manifest_fingerprint.len() != 71
+            || !required.manifest_fingerprint.starts_with("sha256:")
+            || !required.manifest_fingerprint[7..]
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            report.errors.push(GateError {
+                file: String::new(),
+                error: format!(
+                    "Invalid planned manifestFingerprint for caseId: {}",
+                    required.case_id
+                ),
             });
             passed = false;
         }
@@ -112,6 +128,16 @@ fn check_coverage(plan: CoveragePlan, report: &mut GateReport) -> bool {
                 passed = false;
             }
             Some(case) => {
+                if case.comparison.manifest_fingerprint != required.manifest_fingerprint {
+                    report.errors.push(GateError {
+                        file: case.file.clone(),
+                        error: format!(
+                            "Manifest fingerprint differs for caseId: {}",
+                            required.case_id
+                        ),
+                    });
+                    passed = false;
+                }
                 let compared: HashSet<_> = case
                     .comparison
                     .metrics
@@ -324,10 +350,12 @@ mod tests {
     #[test]
     fn coverage_plan_requires_every_case_and_compared_metric() {
         let passing = temporary_case_file(&case(8.17));
+        let fingerprint = compare_reference_case(case(8.17)).manifest_fingerprint;
         let plan_path = passing.with_extension("plan.json");
         let plan = |case_id: &str, paths: Vec<&str>| {
             json!({"targetNormVersion":TARGET_NORM_VERSION,
-                "requiredCases":[{"caseId":case_id,"requiredPaths":paths}]})
+                "requiredCases":[{"caseId":case_id,"manifestFingerprint":fingerprint,
+                    "requiredPaths":paths}]})
         };
         fs::write(
             &plan_path,
@@ -342,6 +370,18 @@ mod tests {
             .as_ref()
             .unwrap()
             .starts_with("sha256:"));
+
+        let mut altered = case(8.17);
+        altered.source.document_id = "changed-with-same-value".into();
+        fs::write(&passing, serde_json::to_vec(&altered).unwrap()).unwrap();
+        let changed_case = run(std::slice::from_ref(&passing), Some(&plan_path));
+        assert!(changed_case.numeric_comparison_passed);
+        assert_eq!(changed_case.planned_coverage_passed, Some(false));
+        assert!(changed_case
+            .errors
+            .iter()
+            .any(|error| error.error.contains("Manifest fingerprint differs")));
+        fs::write(&passing, serde_json::to_vec(&case(8.17)).unwrap()).unwrap();
 
         fs::write(
             &plan_path,
@@ -370,7 +410,8 @@ mod tests {
         fs::write(
             &plan_path,
             json!({"targetNormVersion":"obsolete",
-            "requiredCases":[{"caseId":"synthetic-gate","requiredPaths":["beng2"]}]})
+            "requiredCases":[{"caseId":"synthetic-gate","manifestFingerprint":fingerprint,
+                "requiredPaths":["beng2"]}]})
             .to_string(),
         )
         .unwrap();
@@ -384,6 +425,16 @@ mod tests {
         .unwrap();
         let duplicate_path = run(std::slice::from_ref(&passing), Some(&plan_path));
         assert_eq!(duplicate_path.planned_coverage_passed, Some(false));
+
+        let mut invalid_fingerprint = plan("synthetic-gate", vec!["beng2"]);
+        invalid_fingerprint["requiredCases"][0]["manifestFingerprint"] = json!("sha256:bad");
+        fs::write(&plan_path, invalid_fingerprint.to_string()).unwrap();
+        let invalid = run(std::slice::from_ref(&passing), Some(&plan_path));
+        assert_eq!(invalid.planned_coverage_passed, Some(false));
+        assert!(invalid
+            .errors
+            .iter()
+            .any(|error| error.error.contains("Invalid planned manifestFingerprint")));
 
         fs::write(&plan_path, "{}").unwrap();
         let malformed = run(std::slice::from_ref(&passing), Some(&plan_path));
