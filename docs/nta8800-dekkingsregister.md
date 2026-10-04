@@ -52,7 +52,7 @@ De lokale verificatiescript kan dit plan met alle JSON-cases uit een opgegeven m
 
 De [Linux-desktop-devbuild op `58bf6c7`](nta8800-build-verificatie-2026-10-04-58bf6c7.md) bevat deze wijzigingen. Het pakket en de geplande referentie-CLI zijn met SHA-256 bewaard. De desktop is nog niet visueel geaccepteerd; de onafhankelijke actuele referentie- en atteststatus blijft open.
 
-Het dekkingsplan zet nu per case de canonieke manifestvingerafdruk vast, zodat een gewijzigd project, verwachte waarde, tolerantie of bronmetadata met dezelfde case-ID niet stilzwijgend groen blijft. Een synthetische runtimeproef liet bij ongewijzigd getal maar gewijzigde bron-ID de numerieke vergelijking slagen en het plan falen. De vingerafdruk is een integriteitscontrole, geen onafhankelijke broncontrole; Referentie en Attest blijven open.
+Het dekkingsplan zet nu per case de canonieke manifestvingerafdruk vast, zodat een gewijzigd project, verwachte waarde, tolerantie of bronmetadata met dezelfde case-ID niet stilzwijgend groen blijft. Een synthetische runtimeproef liet bij ongewijzigd getal maar gewijzigde bron-ID de numerieke vergelijking slagen en het plan falen; de [CLI-binary en hash](nta8800-referentie-gate-verificatie-2026-10-04-cd2e81a.md) zijn bewaard. De vingerafdruk is een integriteitscontrole, geen onafhankelijke broncontrole; Referentie en Attest blijven open.
 
 Op `de45278` slaagden 56 servicetests en drie CLI-tests, formatcontrole, Clippy en een runtimecontrole van de gebouwde CLI op match, mismatch en lege invoer. De [binary en SHA-256](nta8800-referentie-gate-verificatie-2026-10-04-de45278.md) zijn bewaard. De kern en desktopcode zijn niet gewijzigd; de actuele devbuild blijft die van `37ccce1`.
 
