@@ -50,4 +50,7 @@ npx tsc --noEmit
 step "UI tests"
 npx vitest run --testTimeout=20000 --maxWorkers="${NTA_VITEST_MAX_WORKERS:-4}"
 
+step "frontend bundle"
+npm run build
+
 printf '\nAll configured technical NTA gates passed; reference verification and attestation require separate evidence.\n'
