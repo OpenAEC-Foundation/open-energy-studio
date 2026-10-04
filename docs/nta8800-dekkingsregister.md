@@ -10,7 +10,7 @@ De referentiegate kan op `dba3ca2` ook `labelPrimaryFossil` en `labelRenewableSh
 
 Op dezelfde bronstand slaagde daarna de volledige lokale technische gate: 762 kern- en drie integratietests, 57 service- en vijf CLI-tests, de kern en integratietests op Rust 1.77.2, formatcontrole, Clippy, Tauri-check, TypeScript en 452 frontendtests. De geplande referentiebatch werd wegens ontbrekende officiële cases overgeslagen; de dekkingskolommen blijven ongewijzigd.
 
-Het harnas kan daarna dertien maandtermen van de samengevoegde hoofdstuk-10-koelketen als `coolingMonth` vergelijken. Bij afwezige koeling is de term onbeschikbaar en niet nul. De gerichte synthetische Rust-test en Clippy slaagden; de [lijst met paden](nta8800-referentieprotocol.md) vormt alleen een toekomstige vergelijkingsinterface. Onafhankelijke actuele koeluitkomsten, een nieuwe desktopbuild en externe attestering ontbreken nog.
+Het harnas kan daarna dertien maandtermen van de samengevoegde hoofdstuk-10-koelketen als `coolingMonth` vergelijken. Bij afwezige koeling is de term onbeschikbaar en niet nul. De gerichte synthetische Rust-test en Clippy slaagden; de [lijst met paden](nta8800-referentieprotocol.md) vormt alleen een toekomstige vergelijkingsinterface. De [nieuwe Linux-devbuild op `e2d2a69`](nta8800-build-verificatie-2026-10-04-e2d2a69.md) en drie servicebinaries zijn met SHA-256 bewaard. Onafhankelijke actuele koeluitkomsten en externe attestering ontbreken nog.
 
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
