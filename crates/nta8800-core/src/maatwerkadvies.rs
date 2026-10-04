@@ -1302,6 +1302,19 @@ fn variant_input(
             }
         }
     }
+    // The project route checks its own input; a building base and every
+    // building-target patch are checked here.
+    let range_blocks = crate::project_performance::building_input_range_blocks(&building_value);
+    if !range_blocks.is_empty() {
+        for gap in range_blocks {
+            issues.push(MwaIssue {
+                code: gap.code,
+                path: format!("base.{}", gap.path),
+                detail: gap.detail,
+            });
+        }
+        return None;
+    }
     match serde_json::from_value::<BuildingPerformanceInput>(building_value) {
         Ok(input) => Some(input),
         Err(message) => {
@@ -2033,6 +2046,29 @@ fn validate(input: &MaatwerkadviesInput, issues: &mut Vec<MwaIssue>) {
 }
 
 pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
+    let assessment = assess_unchecked(input);
+    // serde would write NaN or infinity as null; withhold the results instead.
+    match crate::finite::first_non_finite(&assessment) {
+        None => assessment,
+        Some(path) => MaatwerkadviesAssessment {
+            status: "invalid",
+            current: None,
+            measures: Vec::new(),
+            packages: Vec::new(),
+            fit_check: None,
+            advice: None,
+            renovation_passport: None,
+            issues: vec![MwaIssue {
+                code: "non_finite_result",
+                path,
+                detail: None,
+            }],
+            ..assessment
+        },
+    }
+}
+
+fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     let mut issues = Vec::new();
@@ -2547,6 +2583,40 @@ mod tests {
             "tariffs": serde_json::to_value(tariffs()).unwrap()
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn building_inputs_out_of_range_are_refused() {
+        let mut base = building();
+        base["totalUsableFloorAreaM2"] = json!(2.0e7);
+        let result = serde_json::to_value(assess_maatwerkadvies(&mwa(base))).unwrap();
+        assert!(result.to_string().contains("area_out_of_range"), "{result}");
+
+        // A building-target patch is checked after it is applied.
+        let mut input = mwa(building());
+        input.measures = vec![Measure {
+            id: "huge".into(),
+            name: "Te groot".into(),
+            category: MeasureCategory::Other,
+            target: PatchTarget::Building,
+            patch: vec![PatchOperation::Replace {
+                path: "/totalUsableFloorAreaM2".into(),
+                value: json!(1.0e15),
+            }],
+            investment_eur: 1000.0,
+            cost_source: "offerte".into(),
+            lifetime_years: 20.0,
+            maintenance_eur_per_year: 0.0,
+            phase_year: None,
+            specialist_note: None,
+            template: None,
+            incomplete: Vec::new(),
+        }];
+        let result = assess_maatwerkadvies(&input);
+        let measure = serde_json::to_value(&result.measures).unwrap().to_string();
+        assert!(measure.contains("value_out_of_range"), "{measure}");
+        assert!(measure.contains("base.totalUsableFloorAreaM2"), "{measure}");
+        assert!(crate::finite::first_non_finite(&result).is_none());
     }
 
     #[test]

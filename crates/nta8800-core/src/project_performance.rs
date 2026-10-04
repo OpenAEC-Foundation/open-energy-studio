@@ -695,7 +695,7 @@ const AREA_BOUND: RangeBound = RangeBound {
     block: 1.0e7,
 };
 const SURFACE_AREA_BOUND: RangeBound = RangeBound {
-    warn: 1.0e5,
+    warn: 5.0e5,
     block: 1.0e7,
 };
 /// Thermal transmittance, W/(m²·K).
@@ -710,7 +710,7 @@ const QV10_BOUND: RangeBound = RangeBound {
 };
 /// Declared monthly use per m² of A_g, kWh/(m²·month).
 const MONTHLY_USE_BOUND: RangeBound = RangeBound {
-    warn: 1000.0,
+    warn: 5000.0,
     block: 1.0e6,
 };
 /// Smallest plausible usable area of a zone, m².
@@ -739,6 +739,80 @@ impl RangeFindings {
                 ..gap(code, path)
             });
         }
+    }
+}
+
+/// Largest magnitude any number in a derived building input may have. No NTA
+/// quantity of a building within the bounds above comes near it; a larger
+/// value can only come from a wrong patch or input. A program choice.
+const BUILDING_VALUE_MAGNITUDE_BLOCK: f64 = 1.0e12;
+
+/// Blocking range findings of a building input that does not pass the project
+/// route: a maatwerkadvies base given as building input, or a building input
+/// after building-target measure patches. Uses the area and declared-use
+/// bounds of the project route plus a generic magnitude bound.
+pub(crate) fn building_input_range_blocks(input: &Value) -> Vec<InputGap> {
+    let mut found = RangeFindings::default();
+    let area = input
+        .get("totalUsableFloorAreaM2")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    found.check(
+        area,
+        &AREA_BOUND,
+        "area_out_of_range",
+        "totalUsableFloorAreaM2".to_string(),
+    );
+    if area > 0.0 {
+        let empty = Vec::new();
+        let uses = input
+            .get("declaredUses")
+            .and_then(Value::as_array)
+            .unwrap_or(&empty);
+        for (u, item) in uses.iter().enumerate() {
+            let months = item
+                .get("monthlyKwh")
+                .and_then(Value::as_array)
+                .unwrap_or(&empty);
+            if let Some(max) = months.iter().filter_map(Value::as_f64).reduce(f64::max) {
+                found.check(
+                    max / area,
+                    &MONTHLY_USE_BOUND,
+                    "declared_use_out_of_range",
+                    format!("declaredUses[{u}].monthlyKwh"),
+                );
+            }
+        }
+    }
+    let mut blocks = found.blocking;
+    if let Some((path, value)) = first_huge_number(input, String::new()) {
+        blocks.push(InputGap {
+            detail: Some(format!("|{value}| > {BUILDING_VALUE_MAGNITUDE_BLOCK}")),
+            ..gap("value_out_of_range", path)
+        });
+    }
+    blocks
+}
+
+fn first_huge_number(value: &Value, path: String) -> Option<(String, f64)> {
+    match value {
+        Value::Number(number) => number
+            .as_f64()
+            .filter(|n| n.abs() > BUILDING_VALUE_MAGNITUDE_BLOCK)
+            .map(|n| (path, n)),
+        Value::Array(items) => items
+            .iter()
+            .enumerate()
+            .find_map(|(i, item)| first_huge_number(item, format!("{path}[{i}]"))),
+        Value::Object(map) => map.iter().find_map(|(key, item)| {
+            let next = if path.is_empty() {
+                key.clone()
+            } else {
+                format!("{path}.{key}")
+            };
+            first_huge_number(item, next)
+        }),
+        _ => None,
     }
 }
 

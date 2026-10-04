@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 #[derive(Deserialize)]
@@ -319,6 +319,23 @@ pub fn app() -> Router {
         )
 }
 
+/// Serializes a kernel result, refusing it when it holds a non-finite number.
+/// `serde_json` would otherwise write NaN or infinity as `null`, which a client
+/// cannot tell apart from an absent value.
+fn finite_json<T: Serialize + ?Sized>(status: StatusCode, value: &T) -> (StatusCode, Json<Value>) {
+    match nta8800_core::finite::first_non_finite(value) {
+        None => (status, Json(json!(value))),
+        Some(path) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "error": "non_finite_result",
+                "path": path,
+                "message": "The kernel produced a non-finite number; the result is withheld"
+            })),
+        ),
+    }
+}
+
 async fn health() -> Json<Value> {
     Json(json!({ "status": "ok", "kernel": "rust" }))
 }
@@ -335,7 +352,7 @@ async fn interpretations() -> Json<Value> {
 
 async fn validate(Json(request): Json<ProjectRequest>) -> (StatusCode, Json<Value>) {
     match nta8800_core::assess_json(request.project) {
-        Ok(assessment) => (StatusCode::OK, Json(json!(assessment))),
+        Ok(assessment) => finite_json(StatusCode::OK, &assessment),
         Err(message) => (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "invalid_project_shape", "message": message })),
@@ -364,10 +381,11 @@ async fn calculate(Json(request): Json<ProjectRequest>) -> (StatusCode, Json<Val
     }
 }
 
-async fn audit_reference(Json(request): Json<ReferenceRequest>) -> Json<Value> {
-    Json(json!(nta8800_core::reference::audit_reference_case(
-        request.case
-    )))
+async fn audit_reference(Json(request): Json<ReferenceRequest>) -> (StatusCode, Json<Value>) {
+    finite_json(
+        StatusCode::OK,
+        &nta8800_core::reference::audit_reference_case(request.case),
+    )
 }
 
 async fn compare_direct_diagnostic(
@@ -379,7 +397,7 @@ async fn compare_direct_diagnostic(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(result)))
+    finite_json(status, &result)
 }
 
 async fn compare_gas_heat_pump_chain_diagnostic(
@@ -394,7 +412,7 @@ async fn compare_gas_heat_pump_chain_diagnostic(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(result)))
+    finite_json(status, &result)
 }
 
 async fn diagnose_direct_transmission(
@@ -406,7 +424,7 @@ async fn diagnose_direct_transmission(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_monthly_direct(
@@ -419,7 +437,7 @@ async fn diagnose_monthly_direct(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn calculate_monthly_demand(
@@ -431,7 +449,7 @@ async fn calculate_monthly_demand(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn calculate_constructions(
@@ -443,7 +461,7 @@ async fn calculate_constructions(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn assess_residential_survey(
@@ -455,7 +473,7 @@ async fn assess_residential_survey(
     } else {
         StatusCode::UNPROCESSABLE_ENTITY
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn assess_maatwerkadvies(Json(request): Json<Value>) -> (StatusCode, Json<Value>) {
@@ -472,7 +490,7 @@ async fn assess_maatwerkadvies(Json(request): Json<Value>) -> (StatusCode, Json<
             } else {
                 StatusCode::OK
             };
-            (status, Json(json!(assessment)))
+            finite_json(status, &assessment)
         }
         Err(message) => (
             StatusCode::BAD_REQUEST,
@@ -481,11 +499,11 @@ async fn assess_maatwerkadvies(Json(request): Json<Value>) -> (StatusCode, Json<
     }
 }
 
-async fn assess_relabel(Json(request): Json<RelabelRequest>) -> Json<Value> {
-    Json(json!(nta8800_core::relabel::assess_relabel(
-        &request.original,
-        &request.current
-    )))
+async fn assess_relabel(Json(request): Json<RelabelRequest>) -> (StatusCode, Json<Value>) {
+    finite_json(
+        StatusCode::OK,
+        &nta8800_core::relabel::assess_relabel(&request.original, &request.current),
+    )
 }
 
 async fn assess_utility_survey(
@@ -497,7 +515,7 @@ async fn assess_utility_survey(
     } else {
         StatusCode::UNPROCESSABLE_ENTITY
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn calculate_ventilation(
@@ -509,7 +527,7 @@ async fn calculate_ventilation(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn calculate_space_heating_chain(
@@ -521,7 +539,7 @@ async fn calculate_space_heating_chain(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn calculate_project_performance(
@@ -533,7 +551,7 @@ async fn calculate_project_performance(
         "calculated_unverified" => StatusCode::OK,
         _ => StatusCode::UNPROCESSABLE_ENTITY,
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn calculate_building_performance(
@@ -546,7 +564,7 @@ async fn calculate_building_performance(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_unheated_transmission(
@@ -559,7 +577,7 @@ async fn diagnose_unheated_transmission(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_declared_heating_table(
@@ -572,7 +590,7 @@ async fn diagnose_declared_heating_table(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_forfait_heat_pump_draft(
@@ -585,7 +603,7 @@ async fn diagnose_forfait_heat_pump_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_gas_heat_pump_forfait_draft(
@@ -599,7 +617,7 @@ async fn diagnose_gas_heat_pump_forfait_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_gas_heat_pump_aux_draft(
@@ -612,7 +630,7 @@ async fn diagnose_gas_heat_pump_aux_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_gas_heat_pump_monthly_draft(
@@ -626,7 +644,7 @@ async fn diagnose_gas_heat_pump_monthly_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_gas_heat_pump_chain_draft(
@@ -639,7 +657,7 @@ async fn diagnose_gas_heat_pump_chain_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_gas_collective_source_draft(
@@ -653,7 +671,7 @@ async fn diagnose_gas_collective_source_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_forfait_heat_pump_monthly_draft(
@@ -668,7 +686,7 @@ async fn diagnose_forfait_heat_pump_monthly_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_generator_dispatch_draft(
@@ -681,7 +699,7 @@ async fn diagnose_generator_dispatch_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_hybrid_heat_pump_monthly_draft(
@@ -696,7 +714,7 @@ async fn diagnose_hybrid_heat_pump_monthly_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_boiler_forfait_draft(
@@ -709,7 +727,7 @@ async fn diagnose_boiler_forfait_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_boiler_forfait_monthly_draft(
@@ -722,7 +740,7 @@ async fn diagnose_boiler_forfait_monthly_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_declared_dhw(
@@ -734,7 +752,7 @@ async fn diagnose_declared_dhw(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_final_energy_draft(
@@ -746,7 +764,7 @@ async fn diagnose_final_energy_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_epus_draft(Json(request): Json<EpusDraftRequest>) -> (StatusCode, Json<Value>) {
@@ -756,7 +774,7 @@ async fn diagnose_epus_draft(Json(request): Json<EpusDraftRequest>) -> (StatusCo
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_bacs_draft(Json(request): Json<BacsDraftRequest>) -> (StatusCode, Json<Value>) {
@@ -766,7 +784,7 @@ async fn diagnose_bacs_draft(Json(request): Json<BacsDraftRequest>) -> (StatusCo
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_indicators_draft(
@@ -778,7 +796,7 @@ async fn diagnose_indicators_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_heating_aux_draft(
@@ -790,7 +808,7 @@ async fn diagnose_heating_aux_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 async fn diagnose_heating_aux_measured_draft(
@@ -803,7 +821,7 @@ async fn diagnose_heating_aux_measured_draft(
     } else {
         StatusCode::OK
     };
-    (status, Json(json!(assessment)))
+    finite_json(status, &assessment)
 }
 
 #[cfg(test)]
@@ -814,6 +832,27 @@ mod tests {
         http::Request,
     };
     use tower::ServiceExt;
+
+    #[test]
+    fn non_finite_kernel_results_are_withheld() {
+        #[derive(Serialize)]
+        struct Result {
+            months: Vec<f64>,
+        }
+        let (status, Json(body)) = finite_json(
+            StatusCode::OK,
+            &Result {
+                months: vec![1.0, f64::NAN],
+            },
+        );
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["error"], "non_finite_result");
+        assert_eq!(body["path"], "months[1]");
+
+        let (status, Json(body)) = finite_json(StatusCode::OK, &Result { months: vec![2.5] });
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["months"][0], 2.5);
+    }
 
     #[tokio::test]
     async fn interpretations_route_lists_the_kernel_groups() {
