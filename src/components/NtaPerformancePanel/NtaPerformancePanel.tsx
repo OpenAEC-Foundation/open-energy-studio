@@ -138,7 +138,13 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
       {!loading && assessment && assessment.status === 'invalid' && (
         <div className="nta-performance-gaps">
           <p role="status"><AlertCircle size={16} /> {t('nta.performance.invalid')}</p>
-          <ul>{issues.map((item, index) => (
+          <ul data-testid="nta-invalid-reasons">{assessment.gaps.map((gap, index) => (
+            <li key={`gap-${gap.code}-${index}`}>
+              <KernelCode code={gap.code} />
+              <code>{gap.path}</code>
+              {gap.detail && <small>{gap.detail}</small>}
+            </li>
+          ))}{issues.map((item, index) => (
             <li key={`${item.code}-${index}`}><KernelCode code={item.code} /><code>{item.path}</code></li>
           ))}</ul>
         </div>

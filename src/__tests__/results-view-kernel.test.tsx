@@ -113,6 +113,19 @@ describe('results view', () => {
   }, 60000);
 });
 
+describe('results withheld when the kernel refuses the input', () => {
+  for (const [status, gap] of [['invalid', 'surface_area_out_of_range'], ['incomplete', 'ventilation_flow_required']] as const) {
+    it(`shows no simplified BENG values when the kernel result is ${status}`, async () => {
+      stubKernel({ status, gaps: [{ code: gap, path: 'zones[0]' }], derivedInput: null, performance: null });
+      const user = userEvent.setup();
+      renderWithProviders(<Harness />);
+      await user.click(screen.getByRole('button', { name: 'Calculate' }));
+      expect(await screen.findByTestId('results-withheld')).toHaveTextContent('Results withheld');
+      expect(screen.queryByTestId('beng-cards-indicative')).not.toBeInTheDocument();
+    }, 60000);
+  }
+});
+
 describe('labels and number formatting', () => {
   it('formats numbers in the UI language', () => {
     expect(formatNumber(4997.4, 'en')).toBe('4,997');

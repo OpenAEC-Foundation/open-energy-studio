@@ -46,7 +46,16 @@ export function ResultsView() {
   if (kernelQuery && kernelQuery.kind !== 'loading') settled.current = { projectId: project.id, calculated: kernel != null };
   const kernelHadNoResult = settled.current?.projectId === project.id && !settled.current.calculated;
   // Output of the simplified engine: only without a kernel result, and marked stale after an edit.
-  const indicative = !performance && shown != null && (!kernelPending || kernelHadNoResult);
+  // A kernel that refused the input (invalid or incomplete) withholds every number: the
+  // simplified engine must not fill that gap with values the kernel would not stand behind.
+  // A project without any NTA input yet (only `nta_calculation_block_missing`) has no kernel
+  // verdict on its numbers; there the indicative engine may still show its estimate.
+  const kernelDone = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
+  const kernelStatus = kernelDone?.status ?? null;
+  const noNtaInputYet = kernelStatus === 'incomplete'
+    && (kernelDone?.gaps ?? []).every((gap) => gap.code === 'nta_calculation_block_missing');
+  const withheld = kernelStatus != null && kernel == null && kernelStatus !== 'calculated_unverified' && !noNtaInputYet;
+  const indicative = !withheld && !performance && shown != null && (!kernelPending || kernelHadNoResult);
   const bbl = performance?.bblCheck ?? null;
   const utility = kernel?.derivedInput?.calculationScope === 'utility';
 
@@ -136,6 +145,11 @@ export function ResultsView() {
       )}
       {performance && <EnergyBreakdownChart breakdown={kernelEnergyBreakdown(performance)} source="kernel" />}
 
+      {withheld && <div className="results-withheld" role="status" data-testid="results-withheld">
+        <strong>{t('results.withheld.title')}</strong>
+        <p>{t(kernelStatus === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')}</p>
+      </div>}
+
       {/* The simplified engine only when the kernel has no result; never next to kernel values. */}
       {indicative && shown && <div className={stale ? 'results-indicative results-stale-block' : 'results-indicative'}
         data-testid="results-indicative">
@@ -174,7 +188,7 @@ export function ResultsView() {
             <div className="to-juli-value">
               GTO: {formatNumber(monthlyResult.toJuli.gto, locale, 2)}
               <span className="to-juli-limit">
-                {' '}/ {t('results.limit')}: {'≤'} {monthlyResult.toJuli.limit}
+                {' '}/ {t('results.limit')}: {'≤'} {formatNumber(monthlyResult.toJuli.limit, locale, 2)}
               </span>
             </div>
           </div>

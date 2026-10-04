@@ -35,6 +35,9 @@ import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
 import { migrateLegacyRelabel, relabelNoticeKey } from './core/nta/Registration';
+import { normalizeProject } from './core/energy/normalizeProject';
+import { isTauri } from '@tauri-apps/api/core';
+import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 
 /** Whether the relabel migration notice for this key was shown already (per browser profile). */
 function relabelNoticeShown(key: string): boolean {
@@ -208,9 +211,9 @@ function ActiveDocumentContent({
         />
       )}
       <div className="main-content">
-        <ProjectBrowser />
-        <MainView />
-        {state.previewVisible ? <PreviewPanel /> : <PropertiesPanel />}
+        <ErrorBoundary resetKey={state.project}><ProjectBrowser /></ErrorBoundary>
+        <ErrorBoundary resetKey={state.project}><MainView /></ErrorBoundary>
+        <ErrorBoundary resetKey={state.project}>{state.previewVisible ? <PreviewPanel /> : <PropertiesPanel />}</ErrorBoundary>
       </div>
       <StatusBar />
 
@@ -368,23 +371,18 @@ function AppContent() {
   }, [handleOpenExample]);
 
   // ── Open ──
-  const handleOpenProject = useCallback(async () => {
+  // Shared by the desktop dialog and the browser file input. `filePath` is the
+  // saved location (desktop) or null (browser: a later save downloads a copy).
+  const openProjectText = useCallback(async (json: string, filePath: string | null, label: string) => {
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const { readTextFile } = await import('@tauri-apps/plugin-fs');
-      const filePath = await open({
-        filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }],
-        multiple: false,
-      });
-      if (!filePath) return;
-      const json = await readTextFile(filePath as string);
-      const { project: opened, kernel: saved } = deserializeProjectFile(json);
+      const { project: rawProject, kernel: saved } = deserializeProjectFile(json);
+      const opened = normalizeProject(rawProject);
       const { project: loaded, missing, markedForReview } = migrateLegacyRelabel(opened);
-      docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath: filePath as string } });
+      docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath } });
       // Marked invoices are always reported; a notice with only open
       // fields is shown once per project.
       if (markedForReview > 0
-        || (missing.length > 0 && !relabelNoticeShown(await relabelNoticeKey(loaded.id, filePath as string, json)))) {
+        || (missing.length > 0 && !relabelNoticeShown(await relabelNoticeKey(loaded.id, label, json)))) {
         alert(t('relabel.migrationNotice', {
           fields: missing.map((field) => t(`relabel.migrationField.${field}`)).join(', '),
           count: String(markedForReview),
@@ -398,12 +396,40 @@ function AppContent() {
         alert(t('project.inputChanged'));
       }
     } catch (err) {
-      const msg = (err as Error).message;
-      if (msg && !msg.includes('cancelled')) {
-        alert('Failed to open project: ' + msg);
-      }
+      alert(t('project.openFailed', { message: (err as Error).message ?? String(err) }));
     }
   }, [docDispatch, t]);
+
+  const handleOpenProject = useCallback(async () => {
+    if (!isTauri()) {
+      // Browser build: no native dialog, so pick the file with an input element.
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.oes.json,.json,application/json';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (file) void file.text().then((json) => openProjectText(json, null, file.name));
+      };
+      input.click();
+      return;
+    }
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
+      const filePath = await open({
+        filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }],
+        multiple: false,
+      });
+      if (!filePath) return;
+      const json = await readTextFile(filePath as string);
+      await openProjectText(json, filePath as string, filePath as string);
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg && !msg.includes('cancelled')) {
+        alert(t('project.openFailed', { message: msg }));
+      }
+    }
+  }, [openProjectText, t]);
 
   // ── Save (Ctrl+S) — save to existing path, or prompt Save As if new ──
   const handleSaveProject = useCallback(async () => {

@@ -140,3 +140,12 @@
 
 .results-stale-block > :not(.results-stale) { opacity: 0.6; }
 .results-stale-value { opacity: 0.6; }
+
+.results-withheld {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--warning, #c58a00);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+.results-withheld p { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary); }

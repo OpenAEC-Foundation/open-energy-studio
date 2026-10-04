@@ -651,7 +651,9 @@ export function MaatwerkadviesPanel() {
           )}
           {advice && (
             <div className="nta-performance-bbl">
-              <strong>{t('mwa.advice')}: {chosen?.name ?? '–'} — {advice.chosenBy === 'adviser' ? t('mwa.advised.adviser') : t('mwa.advised.automatic')}</strong>
+              <strong>{t('mwa.advice')}: {chosen
+                ? <>{chosen.name} — {advice.chosenBy === 'adviser' ? t('mwa.advised.adviser') : t('mwa.advised.automatic')}</>
+                : t('mwa.advice.none')}</strong>
               {advice.warnings.length > 0 && <><em>{t('mwa.warnings')}</em><ul>{advice.warnings.map((item) => <li key={item}>{adviceText(item, i18next.language || 'nl')}</li>)}</ul></>}
               {advice.specialistNotes.length > 0 && <><em>{t('mwa.specialist')}</em><ul>{advice.specialistNotes.map((item) => <li key={item}>{adviceText(item, i18next.language || 'nl')}</li>)}</ul></>}
               {chosen && chosen.systemChecks.some((check) => check.limit != null) && <><em>{t('mwa.systemChecks')}</em><ul>

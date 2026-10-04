@@ -5,6 +5,7 @@
 .uvalue-view {
   max-width: 1000px;
   margin: 0 auto;
+  min-width: 0;
 }
 
 .uvalue-view h2 {
@@ -23,7 +24,9 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 16px;
-  overflow: hidden;
+  /* Narrow windows scroll the layer table inside the card, not the page. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .uvalue-card-header {
@@ -89,8 +92,9 @@
 
 .uvalue-results-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  gap: 12px 20px;
   padding: 14px 20px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
@@ -102,6 +106,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .uvalue-result-label {

@@ -2,6 +2,7 @@ import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IHotWaterSystem, HotWaterSystemType } from '../../../core/energy/types';
+import { fractionFromPercent, heatPumpDraftOf } from '../dialogValues';
 import { DialogShell } from '../DialogShell';
 import { defaultHeatPumpDraft, hasDhwDeclarationMismatch, hasElectricCarrierMismatch, hasIncompleteRegistryRecord, hasOperatingLimitEvidenceMismatch, HeatPumpMetadataFields, type HeatPumpDraft } from '../HeatPumpMetadataFields/HeatPumpMetadataFields';
 
@@ -41,15 +42,7 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
   const [classifyHeatPump, setClassifyHeatPump] = useState(Boolean(existing?.ntaHeatPump));
   const [heatPumpError, setHeatPumpError] = useState<string | null>(null);
   const [heatPumpDraft, setHeatPumpDraft] = useState<HeatPumpDraft>(existing?.ntaHeatPump
-    ? { source: existing.ntaHeatPump.source, sink: existing.ntaHeatPump.sink, drive: existing.ntaHeatPump.drive,
-        servedZoneIds: existing.ntaHeatPump.servedZoneIds,
-        reversible: existing.ntaHeatPump.reversible, hybrid: existing.ntaHeatPump.hybrid,
-        booster: existing.ntaHeatPump.booster, performanceEvidence: existing.ntaHeatPump.performanceEvidence,
-        performancePoints: existing.ntaHeatPump.performancePoints,
-        dhwTestPoints: existing.ntaHeatPump.dhwTestPoints,
-        declaredOperatingLimits: existing.ntaHeatPump.declaredOperatingLimits,
-        auxiliaryComponents: existing.ntaHeatPump.auxiliaryComponents,
-        systemLinks: existing.ntaHeatPump.systemLinks }
+    ? heatPumpDraftOf(existing.ntaHeatPump)
     : defaultHeatPumpDraft('outdoor_air', 'domestic_hot_water'));
 
   const handleSave = () => {
@@ -76,7 +69,7 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
       type,
       efficiency,
       hasSolarBoiler,
-      solarBoilerFraction: solarFractionPercent / 100,
+      solarBoilerFraction: fractionFromPercent(solarFractionPercent, existing ? existing.solarBoilerFraction : 0),
       ntaHeatPump: type === 'heat_pump' && classifyHeatPump ? { id, ...heatPumpDraft } : undefined,
     };
 

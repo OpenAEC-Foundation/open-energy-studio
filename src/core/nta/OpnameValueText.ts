@@ -81,9 +81,41 @@ export function snakeCase(value: string): string {
   return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z])([A-Z][a-z])/g, '$1_$2').toLowerCase();
 }
 
-/** Decimal points between digits as Dutch decimal commas ("1.47" → "1,47"). */
+/**
+ * Decimal points between digits as Dutch decimal commas ("1.47" → "1,47").
+ * Norm references keep their point: "(11.109)", "table 11.14", "§13.6.2",
+ * "formula 9.26" are section, table or formula numbers, not decimals. A bare
+ * number in brackets counts as a reference only with a chapter 5–19 or annex
+ * letter before the point, so "(0.35)" still becomes "(0,35)".
+ */
 export function dutchDecimals(text: string): string {
-  return text.replace(/(\d)\.(\d)/g, '$1,$2');
+  const kept: string[] = [];
+  const protect = (match: string) => { kept.push(match); return `\u0000${kept.length - 1}\u0000`; };
+  const guarded = text
+    .replace(/\((?:(?:[5-9]|1\d|[A-Z])\.\d+[a-z]?)(?:\s*[/–-]\s*(?:[5-9]|1\d|[A-Z])\.\d+[a-z]?)*\)/g, protect)
+    .replace(/(?:table|tabel|tables|tabellen|formula|formule|formulas|formules|§|NTA|afb\.|figure)\s*\d+(?:\.\d+)+[a-z]?(?:\s*[/–-]\s*\d+(?:\.\d+)+[a-z]?)*/gi, protect);
+  return guarded.replace(/(\d)\.(\d)/g, '$1,$2').replace(/\u0000(\d+)\u0000/g, (_, index) => kept[Number(index)]);
+}
+
+/** Words in the kernel's default sources (ISSO/NTA references) in Dutch. */
+const SOURCE_WORDS: [RegExp, string][] = [
+  [/\bkernel default\b/g, 'kernstandaard'],
+  [/\binterpretation\b/g, 'interpretatie'],
+  [/\btables\b/g, 'tabellen'],
+  [/\btable\b/g, 'tabel'],
+  [/\bformulas\b/g, 'formules'],
+  [/\bformula\b/g, 'formule'],
+  [/\bpositions\b/g, 'posities'],
+  [/\bfigure\b/g, 'afbeelding'],
+  [/\band\b/g, 'en'],
+  [/\bfootnote\b/g, 'voetnoot'],
+  [/\bnote\b/g, 'opmerking'],
+  [/\bannex\b/g, 'bijlage'],
+];
+
+/** A default's source (an ISSO/NTA reference written by the kernel) in Dutch. */
+export function dutchSource(source: string): string {
+  return SOURCE_WORDS.reduce((text, [pattern, word]) => text.replace(pattern, word), source);
 }
 
 /** Use-function names in the kernel's value texts. */
@@ -119,6 +151,8 @@ const DUTCH_PATTERNS: [RegExp, (match: RegExpMatchArray) => string][] = [
   [/^table 14\.5 \(LED from 2017: (true|false)\)$/, (m) => `tabel 14.5 (LED vanaf 2017: ${m[1] === 'true' ? 'ja' : 'nee'})`],
   [/^the pool room lies in (.+), the only zone with sport$/, (m) => `de zwembadruimte ligt in ${m[1]}, de enige zone met sport`],
   [/^ΔU_for (\S+) W\/\(m²K\)$/, (m) => `ΔU_for ${m[1]} W/(m²K)`],
+  [/^kernel default for a (central|decentral) system \((.+)\)$/,
+    (m) => `kernstandaard voor een ${m[1] === 'central' ? 'centraal' : 'decentraal'} systeem (${m[2]})`],
 ];
 
 /**

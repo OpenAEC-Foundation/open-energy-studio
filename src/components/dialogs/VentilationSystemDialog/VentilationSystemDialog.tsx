@@ -2,6 +2,7 @@ import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IVentilationSystem, VentilationType } from '../../../core/energy/types';
+import { fractionFromPercent } from '../dialogValues';
 import { DialogShell } from '../DialogShell';
 
 interface VentilationSystemDialogProps {
@@ -38,7 +39,7 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
       id: existing?.id ?? crypto.randomUUID(),
       name,
       type,
-      heatRecoveryEfficiency: heatRecoveryPercent / 100,
+      heatRecoveryEfficiency: fractionFromPercent(heatRecoveryPercent, existing ? existing.heatRecoveryEfficiency : 0),
       sfp,
     };
 

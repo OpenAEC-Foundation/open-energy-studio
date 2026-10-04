@@ -26,6 +26,10 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
 
   // Kernel result applied by the user; replaces the simple Σd/λ values below.
   const [ntaResult, setNtaResult] = useState<NtaConstructionResult | null>(null);
+  // An existing construction keeps its stored Rc/U (and R_se basis) until the
+  // user changes a layer or applies a kernel result; many constructions carry
+  // an Rc without layers, which Σd/λ would turn into 0.
+  const [layersEdited, setLayersEdited] = useState(!existing);
 
   // Rsi + Rse for walls (NTA 8800 default)
   const rSurface = 0.13 + 0.04; // 0.17
@@ -44,8 +48,13 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
     return rTotal > 0 ? 1 / rTotal : 0;
   }, [rcValue]);
 
+  const keepStored = existing != null && !layersEdited && !ntaResult;
+  const shownRc = keepStored ? existing.rcValue : rcValue;
+  const shownU = keepStored ? existing.uValue : uValue;
+
   const handleLayerChange = (index: number, field: keyof IConstructionLayer, value: string | number) => {
     setNtaResult(null);
+    setLayersEdited(true);
     setLayers((prev) =>
       prev.map((layer, i) =>
         i === index ? { ...layer, [field]: value } : layer
@@ -55,31 +64,38 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
 
   const addLayer = () => {
     setNtaResult(null);
+    setLayersEdited(true);
     setLayers((prev) => [...prev, { material: '', thickness: 0.1, lambda: 0.04 }]);
   };
 
   const removeLayer = (index: number) => {
     setNtaResult(null);
+    setLayersEdited(true);
     setLayers((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = () => {
-    const construction: IConstruction = {
-      id: existing?.id ?? crypto.randomUUID(),
-      name,
-      layers,
-      rcValue: ntaResult?.rc ?? Math.round(rcValue * 100) / 100,
-      uValue: ntaResult?.u ?? Math.round(uValue * 1000) / 1000,
-      // Only stored when it differs from the R_se = 0,04 the kernel assumes (C.10).
-      exteriorSurfaceResistance: ntaResult && Math.abs(ntaResult.rse - 0.04) > 1e-9 ? ntaResult.rse : undefined,
-    };
+    const rc = keepStored ? existing.rcValue : ntaResult?.rc ?? Math.round(rcValue * 100) / 100;
+    const u = keepStored ? existing.uValue : ntaResult?.u ?? Math.round(uValue * 1000) / 1000;
+    // Only stored when it differs from the R_se = 0,04 the kernel assumes (C.10).
+    const rse = keepStored
+      ? existing.exteriorSurfaceResistance
+      : ntaResult && Math.abs(ntaResult.rse - 0.04) > 1e-9 ? ntaResult.rse : undefined;
 
     if (existing) {
       dispatch({
         type: 'UPDATE_CONSTRUCTION',
-        payload: { id: existing.id, data: { name, layers, rcValue: construction.rcValue, uValue: construction.uValue, exteriorSurfaceResistance: construction.exteriorSurfaceResistance } },
+        payload: { id: existing.id, data: { name, layers, rcValue: rc, uValue: u, exteriorSurfaceResistance: rse } },
       });
     } else {
+      const construction: IConstruction = {
+        id: crypto.randomUUID(),
+        name,
+        layers,
+        rcValue: rc,
+        uValue: u,
+        exteriorSurfaceResistance: rse,
+      };
       dispatch({ type: 'ADD_CONSTRUCTION', payload: construction });
     }
     onClose();
@@ -180,11 +196,11 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
         <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
           <div className="dialog-field" style={{ flex: 1 }}>
             <label htmlFor={`${fieldId}-2`}>{t('dialog.construction.rcValue')}</label>
-            <input id={`${fieldId}-2`} type="text" readOnly value={rcValue.toFixed(2)} />
+            <input id={`${fieldId}-2`} type="text" readOnly value={shownRc.toFixed(2)} />
           </div>
           <div className="dialog-field" style={{ flex: 1 }}>
             <label htmlFor={`${fieldId}-3`}>{t('dialog.construction.uValue')}</label>
-            <input id={`${fieldId}-3`} type="text" readOnly value={uValue.toFixed(3)} />
+            <input id={`${fieldId}-3`} type="text" readOnly value={shownU.toFixed(3)} />
           </div>
         </div>
         {ntaResult && <p role="status" style={{ fontSize: 12 }}>

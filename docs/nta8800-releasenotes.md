@@ -2,6 +2,15 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — UI-doorloop 4: geen gegevensverlies bij bewerken, achtergehouden resultaten, openen
+
+- **Constructie bewerken verliest niets meer.** Een constructie zonder lagen (zoals alle constructies in beide voorbeelden) kreeg bij openen Rc 0 en U 5,882, en opslaan schreef die waarden weg, ook na alleen hernoemen. De bewerker houdt nu de opgeslagen Rc, U en R_se-basis vast tot u een laag wijzigt of een kernresultaat toepast. Openen en opslaan zonder wijziging laat het project ongewijzigd; dat geldt nu ook aantoonbaar voor de zone-, vlak-, raam-, verwarmings-, ventilatie-, tapwater-, koel-, PV- en zonthermiebewerkers. De verwarmings- en tapwaterbewerker gooiden bij opslaan opgeslagen warmtepompconcepten (onder meer `forfaitHeatPumpDraft`) weg; die blijven nu staan. Een percentageveld (dekking, WTW-rendement, zonnefractie) wordt alleen teruggerekend als u het wijzigt.
+- **Resultaten achtergehouden.** Keurt de kern de invoer af (`invalid`) of is de NTA-invoer onvolledig, dan toont het resultatentabblad geen vereenvoudigde BENG-waarden meer maar de melding "Resultaten achtergehouden". Alleen een project zonder enige NTA-invoer (`nta_calculation_block_missing`) toont nog de indicatieve schatting. Het NTA-paneel toont bij `invalid` nu ook de blokkerende gaten.
+- **Project openen.** Een projectbestand waarin lijsten ontbreken (zoals `thermalBridges` of `windows`) wordt bij openen aangevuld met lege lijsten; een volledig bestand blijft ongewijzigd. Een fout in één weergave maakt de applicatie niet meer leeg: die weergave toont een melding met "Opnieuw proberen". In de browserversie opent "Openen" nu een bestandskiezer.
+- **Verwijderen.** De bevestiging noemt de NTA-invoer die meegaat met naam (zone, vlak, raam, systeem) in plaats van JSON-paden, en zegt hoeveel vlakken en ramen met een zone of vlak meegaan.
+- **Maatregelsjablonen** noemen het ontbrekende veld ("Ontbreekt: rendement warmteterugwinning").
+- **Kleinere punten.** Het projectoverzicht telt kWp uit de NTA-PV-invoer; de GTO-grens volgt de taalinstelling; formule- en tabelnummers in opnamewaarden blijven "(11.109)"; bronnen van opnamestandaarden en de herlabelbron zijn in het Nederlands; "geen variant geadviseerd" als niets is geadviseerd; de U-waardecalculator past op 1280 px.
+
 ## 4 oktober 2026 — robuustheid: vangnet op alle uitvoerroutes en bijgestelde grenzen
 
 - **Vangnet op elke kernuitvoer.** De HTTP-dienst en de desktopapp controleren nu elk kernresultaat op NaN en oneindig voordat het wordt geserialiseerd. Zo'n resultaat wordt niet uitgegeven: de dienst antwoordt met HTTP 500 en `{"error": "non_finite_result", "path": …}`, de desktopapp met de fout `non_finite_result: <pad>`. Dat geldt ook voor de diagnostische routes (H7, H9, H11, de `*_draft`-modules) die het projectvangnet niet hadden.

@@ -294,13 +294,13 @@ export interface DocumentManagerState {
 
 export type DocumentManagerAction =
   | { type: 'DOC_NEW'; payload: { id: string; project: IProject } }
-  | { type: 'DOC_OPEN'; payload: { id: string; project: IProject; filePath: string } }
+  | { type: 'DOC_OPEN'; payload: { id: string; project: IProject; filePath: string | null } }
   | { type: 'DOC_CLOSE'; payload: string }
   | { type: 'DOC_SET_ACTIVE'; payload: string }
   | { type: 'DOC_SET_FILE_PATH'; payload: { id: string; filePath: string } }
   | { type: 'DOC_DISPATCH'; payload: { id: string; action: EnergyAction } };
 
-function documentManagerReducer(
+export function documentManagerReducer(
   state: DocumentManagerState,
   action: DocumentManagerAction,
 ): DocumentManagerState {
@@ -317,7 +317,10 @@ function documentManagerReducer(
       };
     }
     case 'DOC_OPEN': {
-      const existing = state.documents.find(d => d.filePath === action.payload.filePath);
+      // Only a saved location identifies an open document; a browser open has none.
+      const existing = action.payload.filePath != null
+        ? state.documents.find(d => d.filePath === action.payload.filePath)
+        : undefined;
       if (existing) {
         return { ...state, activeDocumentId: existing.id };
       }

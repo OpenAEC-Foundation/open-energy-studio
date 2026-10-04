@@ -364,6 +364,8 @@ export interface TemplatePatch {
   problems: string[];
   /** i18n keys (mwa.template.warning.*) of points to check; they do not block the measure. */
   warnings?: string[];
+  /** Field names (mwa.template.field.*) behind a `valueRequired` problem. */
+  missingFields?: string[];
 }
 
 /** Appends `items` to the list at `path`, creating it when absent. */
@@ -422,20 +424,27 @@ const HOT_WATER_REQUIRED: string[][] = [
   ['low', 'inputKwhPerDay'], ['high', 'inputKwhPerDay'],
 ];
 
+/** Required members (see the lists above) that are present but blank, as dotted paths without `*`. */
+export function requiredBlanks(value: unknown, paths: string[][]): string[] {
+  const found: string[] = [];
+  const walk = (node: unknown, path: string[], trail: string[]) => {
+    if (path.length === 0 || !isObject(node)) return;
+    const [head, ...rest] = path;
+    const keys = head === '*' ? Object.keys(node) : head in node ? [head] : [];
+    for (const key of keys) {
+      const child = node[key];
+      const named = head === '*' ? trail : [...trail, key];
+      if (rest.length === 0) { if (child === null) found.push(named.join('.')); }
+      else walk(child, rest, named);
+    }
+  };
+  for (const path of paths) walk(value, path, []);
+  return [...new Set(found)];
+}
+
 /** Whether a required member (see the lists above) is present but blank. */
 export function hasRequiredBlank(value: unknown, paths: string[][]): boolean {
-  const walk = (node: unknown, path: string[]): boolean => {
-    if (path.length === 0) return false;
-    const [head, ...rest] = path;
-    if (!isObject(node)) return false;
-    const children = head === '*' ? Object.values(node) : [node[head]];
-    return children.some((child) => {
-      if (head !== '*' && !(head in node)) return false;
-      if (rest.length === 0) return child === null;
-      return walk(child, rest);
-    });
-  };
-  return paths.some((path) => walk(value, path));
+  return requiredBlanks(value, paths).length > 0;
 }
 
 /** The patch of a template against the current project. */
@@ -444,11 +453,13 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
   const block = nta(project);
   const problems: string[] = template.kind === 'lighting' && template.reviewed === false ? ['migrationReview'] : [];
   const warnings: string[] = [];
+  const missing: string[] = [];
+  const requireValue = (...fields: string[]) => { problems.push('valueRequired'); missing.push(...fields); };
   const patch: MwaPatchOperation[] = [];
   switch (template.kind) {
     case 'insulation': {
       const values = insulationValues(template.part, template.rcValue, template.uValue);
-      if (!values) problems.push('valueRequired');
+      if (!values) requireValue('rcOrU');
       const all = insulationOptions(project, template.part);
       const options = all.filter((option) => template.surfaces.includes(option.key));
       if (template.surfaces.some((key) => !all.some((option) => option.key === key))) problems.push('selectionStale');
@@ -492,7 +503,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       if (template.windows.some((key) => !all.some((option) => option.key === key))) problems.push('selectionStale');
       if (options.length === 0) problems.push('selectionRequired');
       const u = template.uValue;
-      if (u == null || !Number.isFinite(u) || u <= 0) { problems.push('valueRequired'); break; }
+      if (u == null || !Number.isFinite(u) || u <= 0) { requireValue('uValue'); break; }
       for (const option of options) {
         const base = ['zones', option.zoneIndex, 'surfaces', option.surfaceIndex, 'windows', option.windowIndex] as const;
         patch.push({ op: 'replace', path: pointer(...base, 'uValue'), value: u });
@@ -504,7 +515,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
     }
     case 'airtightness': {
       const qv10 = template.qv10DmPerSM2;
-      if (qv10 == null || !Number.isFinite(qv10) || qv10 <= 0) problems.push('valueRequired');
+      if (qv10 == null || !Number.isFinite(qv10) || qv10 <= 0) requireValue('qv10');
       if (!template.sourceReference.trim()) problems.push('sourceRequired');
       const infiltration = { method: 'measured', qv10DmPerSM2: qv10, sourceReference: template.sourceReference };
       const targets: string[] = [];
@@ -526,7 +537,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       if (!current) { problems.push('ventilationRequired'); break; }
       // A migrated snapshot without a system: never replace the system with `{}`.
       if (!isObject(template.system) || Object.keys(template.system).length === 0) { problems.push('ventilationSystemRequired'); break; }
-      if (hasRequiredBlank(template.system, VENTILATION_REQUIRED)) problems.push('valueRequired');
+      { const blanks = requiredBlanks(template.system, VENTILATION_REQUIRED); if (blanks.length > 0) requireValue(...blanks); }
       // Only the system is replaced: the project's flows, controls and
       // infiltration (the airtightness measure) stay as they are.
       if (JSON.stringify(current.system) !== JSON.stringify(template.system)) {
@@ -572,7 +583,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
     case 'hot_water': {
       const hotWater = block?.hotWater as Block | undefined;
       if (!hotWater) { problems.push('hotWaterRequired'); break; }
-      if (hasRequiredBlank(template.generator, HOT_WATER_REQUIRED)) problems.push('valueRequired');
+      { const blanks = requiredBlanks(template.generator, HOT_WATER_REQUIRED); if (blanks.length > 0) requireValue(...blanks); }
       patch.push({ op: 'replace', path: pointer('ntaCalculation', 'hotWater', 'generator'), value: template.generator });
       // §13.6.2 with the kernel's storage rule (domestic_hot_water.rs),
       // decided over the main and the additional generators: a separate
@@ -604,7 +615,8 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       if (template.systems.length === 0) problems.push('selectionRequired');
       for (const system of template.systems) {
         if (hasBlank(system.peakPower)) problems.push('peakPowerRequired');
-        if (system.azimuthDeg == null || system.tiltDeg == null) problems.push('valueRequired');
+        if (system.azimuthDeg == null) requireValue('azimuthDeg');
+        if (system.tiltDeg == null) requireValue('tiltDeg');
         const obstruction = system.obstruction as Block | undefined;
         if (obstruction?.method === 'minimal' && !String(system[PV_OBSTRUCTION_SOURCE] ?? '').trim()) problems.push('obstructionEvidenceRequired');
       }
@@ -649,7 +661,7 @@ export function buildTemplatePatch(project: IProject, saved: MwaMeasureTemplate 
       break;
     }
   }
-  return { patch, problems: [...new Set(problems)], warnings: [...new Set(warnings)] };
+  return { patch, problems: [...new Set(problems)], warnings: [...new Set(warnings)], missingFields: [...new Set(missing)] };
 }
 
 /**
