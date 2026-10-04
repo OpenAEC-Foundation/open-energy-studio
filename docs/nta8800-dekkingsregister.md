@@ -44,6 +44,8 @@ Dezelfde vergelijking kan nu ook jaarlijkse primaire energie/CO₂ en maand- en 
 
 Het harnas vergelijkt nu ook geselecteerde maandtermen van de samengevoegde ruimteverwarmingsketen, inclusief warmtepompwarmte, opwekkerstroom, hulpstroom en bronwarmte. De pad- en eenheidscontrole en een synthetische match/mismatch-test zijn geslaagd. De externe referentie- en attestkolommen blijven open.
 
+Een aparte Rust-batch-CLI leest één of meer referentiemanifesten en geeft alleen bij complete, unieke en numeriek passende gevallen exitcode 0. Het JSON-rapport laat `referenceVerified=false` en `attestStatus=unattested` staan; de CLI controleert de onafhankelijkheid of rechten van een externe bron niet. Deze route is gereed om rechtmatig verkregen officiële gevallen in een latere blokkerende regressiegate op te nemen.
+
 Op `37ccce1` slaagden 760 kern- en drie integratietests, 56 servicetests, Rust-formatcontrole en Clippy. De [Linux-debugbuild](nta8800-build-verificatie-2026-10-04-37ccce1.md) en nieuwe API-/MCP-binaries zijn met hashes vastgelegd. Dit is een technische build en geen actuele onafhankelijke EDR-toets.
 
 Op `e9419da` slaagden 759 kern- en drie integratietests, 56 servicetests, Rust-formatcontrole, Clippy en een [nieuwe Linux-debugbuild](nta8800-build-verificatie-2026-10-04-e9419da.md). De actuele API- en MCP-binaries zijn opnieuw gebouwd en met SHA-256 bewaard; de officiële referentie- en atteststatus blijft open.

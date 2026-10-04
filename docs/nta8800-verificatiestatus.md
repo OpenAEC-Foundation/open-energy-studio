@@ -57,6 +57,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Ruimteverwarmingsmaanden in het harnas (4 oktober).** Geselecteerde H9-maandtermen van de samengevoegde keten zijn nu met vaste veldnamen en eenheden vergelijkbaar, onder meer opwekkeruitgang, warmtepompwarmte, opwekker-/hulpstroom en collectieve bronwarmte. Een ontbrekende optionele term wordt niet als nul aangenomen. Gerichte Rust-tests (18/18 referentietests) en Clippy slaagden; een actuele EDR-verwachting is nog niet ingevoerd.
 
+**Batchvergelijking (4 oktober).** `reference_gate` leest meerdere losse JSON-manifesten en levert een machineleesbaar numeriek oordeel per geval. Lege batches, dubbele case-ID's, onleesbare/ongeldige bestanden, onvolledige projecten en mismatches falen de gate. De drie gerichte CLI-tests en Clippy slaagden. Het rapport kent geen bronverificatie of atteststatus toe; officiële actuele referentiegevallen ontbreken nog.
+
 **Technische controle op `37ccce1` (4 oktober).** 760 kerntests plus drie integratietests, 56 servicetests, Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de API-/MCP-binaries slaagden. Pakket- en binaryhashes staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-37ccce1.md). De officiële referentie- en atteststatus verandert hierdoor niet.
 
 **Technische controle op `e9419da` (4 oktober).** De volledige interne Rust-suites slaagden: 759 kerntests plus drie integratietests en 56 servicetests. Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de nieuwe API-/MCP-binaries slaagden. Het [bouwdossier](nta8800-build-verificatie-2026-10-04-e9419da.md) bewaart bestandshashes. De visuele UI-acceptatie en officiële EDR-vergelijking staan nog open.

@@ -17,6 +17,14 @@ cargo run --manifest-path crates/nta8800-service/Cargo.toml --bin mcp
 
 The API binds to `127.0.0.1:3007` by default. `OES_API_PORT` changes the port. It is intended for local development only.
 
+To compare a batch of separately obtained reference-case manifests without running the HTTP server:
+
+```bash
+cargo run --manifest-path crates/nta8800-service/Cargo.toml --bin reference_gate -- case-1.json case-2.json
+```
+
+The command prints one JSON report and exits successfully only when every supplied numeric comparison passes. An empty batch, unreadable or malformed file, duplicate `caseId`, incomplete project or mismatch fails. `numericComparisonPassed` is only a comparison result; `referenceVerified` remains `false` and `attestStatus` remains `unattested`. Each argument is a bare reference-case object, not the HTTP `{ "case": ... }` envelope.
+
 ## HTTP endpoints
 
 | Method | Path | Purpose |
