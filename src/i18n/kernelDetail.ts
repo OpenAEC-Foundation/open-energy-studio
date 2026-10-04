@@ -59,9 +59,12 @@ const DETAIL_PATTERNS: DetailPattern[] = [
   { pattern: /^7\.3\.3: state the pipes, \[\] for none;/, key: 'kernel.detail.verticalPipesUnknown' },
 ];
 
+const MAX_DETAIL_DECIMALS = 2;
+
+/** Decimals to show for a number as the kernel wrote it, at most 2 (Rust `{value}` has no precision). */
 function decimals(raw: string): number {
   const fraction = raw.split('e')[0].split('.')[1];
-  return fraction ? fraction.length : 0;
+  return Math.min(fraction ? fraction.length : 0, MAX_DETAIL_DECIMALS);
 }
 
 /**

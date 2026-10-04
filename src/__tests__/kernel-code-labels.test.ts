@@ -1,47 +1,29 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { nl } from '../i18n/nl';
 import { en } from '../i18n/en';
 import { KERNEL_CODE_PREFIXES } from '../i18n/format';
-
-/** Every `.rs` file under the crates, without build output. */
-function rustFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    if (name === 'target') return [];
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return rustFiles(path);
-    return name.endsWith('.rs') ? [path] : [];
-  });
-}
-
-/**
- * Code literals the kernel and the survey emit: the first string argument of an
- * `issue`/`gap`/`warning`-like call and every `code: "…"` field, outside test modules.
- */
-function emittedCodes(): Map<string, string> {
-  const call = /\b([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*"([a-z][a-z0-9_]*)"/g;
-  const field = /\bcode\s*:\s*"([a-z][a-z0-9_]*)"/g;
-  const codes = new Map<string, string>();
-  for (const file of rustFiles(join(__dirname, '..', '..', 'crates'))) {
-    const source = readFileSync(file, 'utf8').split('#[cfg(test)]')[0];
-    for (const match of source.matchAll(call)) {
-      const [, fn, code] = match;
-      if (fn !== 'issues' && /(issue|gap|warning|warn|finding)/i.test(fn)) codes.set(code, file);
-    }
-    for (const match of source.matchAll(field)) codes.set(match[1], file);
-  }
-  return codes;
-}
+import { emittedCodes } from './kernelCodeExtraction';
 
 const labelled = (table: Record<string, string>, code: string) =>
   KERNEL_CODE_PREFIXES.some((prefix) => typeof table[`${prefix}${code}`] === 'string');
 
 describe('kernel code labels', () => {
-  const codes = emittedCodes();
+  const codes = emittedCodes(join(__dirname, '..', '..', 'crates'));
 
-  it('finds the kernel codes', () => {
-    expect(codes.size).toBeGreaterThan(700);
+  it('finds the kernel codes, including the forms the first extractor missed', () => {
+    expect(codes.size).toBeGreaterThan(1000);
+    // push helpers, multi-line `issue(Severity, "…")`, tuple pushes and `unwrap_or("…")`.
+    for (const code of ['pv_tilt_invalid', 'pv_peak_power_invalid', 'system_record_invalid', 'project_name_required',
+      'boiler_efficiency_invalid', 'booster_test_invalid', 'regeneration_efficiency_invalid', 'micro_chp_efficiency_invalid',
+      'obstruction_geometry_invalid', 'hot_water_mixed_air_invalid', 'ground_floor_invalid', 'annex_u_run_invalid',
+      'zone_multiple_heating_systems', 'residential_capacity_above25']) {
+      expect(codes.has(code), code).toBe(true);
+    }
+    // Internal survey rule ids (`recorder.record("rule", …)`) and JSON enum values are not codes.
+    for (const notCode of ['bypass_table_11_12', 'gas_boiler', 'table16_1', 'electric_resistance']) {
+      expect(codes.has(notCode), notCode).toBe(false);
+    }
   });
 
   it('every emitted code has a Dutch and an English label', () => {

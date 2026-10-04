@@ -94,6 +94,7 @@ export const nl: Record<string, string> = {
   'browser.solarPV': 'Zonnepanelen',
   'browser.solarThermal': 'Zonneboiler',
   'browser.airTightness': 'Luchtdichtheid',
+  'browser.airTightnessAssumed': "Aangenomen standaardwaarde (ontbrak in het bestand); controleer en vul de werkelijke waarde in.",
 
   // Properties Panel
   'properties.title': 'Eigenschappen',

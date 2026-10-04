@@ -2,6 +2,7 @@ import type { IProject, IBENGResult, IEnergyBreakdown } from '../energy/types';
 import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
 import { indicatorDecimals, kernelReportModel, type KernelReportModel } from './KernelReportModel';
+import { kernelWithheld } from '../nta/KernelVerdict';
 
 /** Languages of the standalone BENG report; every other UI language falls back to English. */
 export type ReportLanguage = 'nl' | 'en';
@@ -32,6 +33,9 @@ const TEXT = {
     bengKernel: 'BENG-indicatoren (NTA 8800-kern)',
     kernelNotice: 'Uit de Rust-rekenkern van Open Energy Studio (NTA 8800:2025+C1:2026). Onverifieerde berekening: geen officieel energielabel, niet geattesteerd en niet geregistreerd.',
     bengIndicative: 'Indicatieve BENG-waarden',
+    withheldTitle: 'BENG-resultaten achtergehouden',
+    withheldInvalid: 'De NTA-rekenkern keurt de invoer af. Dit rapport bevat daarom geen BENG-waarden, ook geen vereenvoudigde. Los eerst de meldingen in het NTA-paneel op.',
+    withheldIncomplete: 'De NTA-invoer is nog onvolledig. Dit rapport bevat daarom geen BENG-waarden, ook geen vereenvoudigde. Vul eerst de ontbrekende gegevens aan.',
     indicativeNotice: 'Indicatief, niet volgens NTA 8800. Uitkomsten uit het oude vereenvoudigde rekenmodel. Geen geverifieerde NTA 8800-berekening, officieel energielabel of wettelijke toetsing.',
     indicator: 'Indicator', calculated: 'Berekend', limit: 'Eis', unit: 'Eenheid', status: 'Status',
     indicativeStatus: 'Indicatief', meets: 'voldoet (onverifieerd)', fails: 'voldoet niet', notTestable: 'niet te toetsen',
@@ -84,6 +88,9 @@ const TEXT = {
     bengKernel: 'BENG indicators (NTA 8800 kernel)',
     kernelNotice: 'From the Open Energy Studio Rust kernel (NTA 8800:2025+C1:2026). Unverified calculation: not an official energy label, not attested and not registered.',
     bengIndicative: 'Indicative BENG values',
+    withheldTitle: 'BENG results withheld',
+    withheldInvalid: 'The NTA kernel refuses the input. This report therefore contains no BENG values, not even simplified ones. Resolve the messages in the NTA panel first.',
+    withheldIncomplete: 'The NTA input is still incomplete. This report therefore contains no BENG values, not even simplified ones. Complete the missing data first.',
     indicativeNotice: 'Indicative, not according to NTA 8800. Results of the old simplified model. Not a verified NTA 8800 calculation, official energy label or legal check.',
     indicator: 'Indicator', calculated: 'Calculated', limit: 'Limit', unit: 'Unit', status: 'Status',
     indicativeStatus: 'Indicative', meets: 'meets (unverified)', fails: 'does not meet', notTestable: 'cannot be tested',
@@ -287,6 +294,11 @@ export function generateReportHTML(project: IProject, result: IBENGResult | null
           <td>${fmt(row.coolingNeedKwh, 0)} kWh</td><td>${fmt(row.solarGainKwh, 0)} kWh</td><td>${fmt(row.transmissionKwh, 0)} kWh</td></tr>`).join('')}
       </table>`;
     breakdown = kernel.breakdown;
+  } else if (kernelWithheld(options.kernel)) {
+    // The kernel refused the input: no simplified numbers in its place (shared rule, KernelVerdict).
+    bengHTML = `
+      <h2>${L.withheldTitle}</h2>
+      <p class="verification-notice" data-withheld="true">${options.kernel?.status === 'incomplete' ? L.withheldIncomplete : L.withheldInvalid}</p>`;
   } else if (result) {
     bengHTML = `
       <h2>${L.bengIndicative}</h2>

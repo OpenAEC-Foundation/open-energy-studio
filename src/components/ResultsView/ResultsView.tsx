@@ -12,6 +12,7 @@ import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel'
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import { useProjectPerformance, calculatedAssessment } from '../../core/nta/useProjectPerformance';
 import { kernelEnergyBreakdown } from '../../core/nta/KernelBreakdown';
+import { kernelVerdict, type KernelVerdict } from '../../core/nta/KernelVerdict';
 import type { IBENGResult, IBENGResultMonthly } from '../../core/energy/types';
 import './ResultsView.css';
 
@@ -40,21 +41,21 @@ export function ResultsView() {
     + project.coolingSystems.length + project.hotWaterSystems.length;
   const kernelFloorArea = kernel?.geometry?.usableFloorAreaM2 ?? null;
   const floorArea = kernelFloorArea ?? shown?.totalFloorArea ?? null;
-  // Whether the last settled kernel run of this project had a result: while the next (debounced)
-  // run is pending, the simplified output stays only if the kernel had none before.
-  const settled = useRef<{ projectId: string; calculated: boolean } | null>(null);
-  if (kernelQuery && kernelQuery.kind !== 'loading') settled.current = { projectId: project.id, calculated: kernel != null };
-  const kernelHadNoResult = settled.current?.projectId === project.id && !settled.current.calculated;
-  // Output of the simplified engine: only without a kernel result, and marked stale after an edit.
-  // A kernel that refused the input (invalid or incomplete) withholds every number: the
-  // simplified engine must not fill that gap with values the kernel would not stand behind.
-  // A project without any NTA input yet (only `nta_calculation_block_missing`) has no kernel
-  // verdict on its numbers; there the indicative engine may still show its estimate.
+  // Output of the simplified engine follows one shared rule (`kernelVerdict`): a kernel that
+  // refused the input withholds every number; only without any NTA input yet, or without a
+  // settled kernel answer, may the indicative estimate show (marked stale after an edit).
   const kernelDone = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
-  const kernelStatus = kernelDone?.status ?? null;
-  const noNtaInputYet = kernelStatus === 'incomplete'
-    && (kernelDone?.gaps ?? []).every((gap) => gap.code === 'nta_calculation_block_missing');
-  const withheld = kernelStatus != null && kernel == null && kernelStatus !== 'calculated_unverified' && !noNtaInputYet;
+  // The last settled kernel answer of this project. While the next (debounced) run is pending its
+  // verdict holds: a withheld result stays withheld (no flash of simplified numbers), and the
+  // simplified output stays only when the kernel had no verdict against it before either.
+  const settled = useRef<{ projectId: string; verdict: KernelVerdict; status: string | null } | null>(null);
+  if (kernelQuery && kernelQuery.kind !== 'loading') {
+    settled.current = { projectId: project.id, verdict: kernelVerdict(kernelDone), status: kernelDone?.status ?? null };
+  }
+  const last = settled.current?.projectId === project.id ? settled.current : null;
+  const withheld = last?.verdict === 'withheld';
+  const kernelStatus = last?.status ?? null;
+  const kernelHadNoResult = last != null && last.verdict !== 'calculated' && last.verdict !== 'withheld';
   const indicative = !withheld && !performance && shown != null && (!kernelPending || kernelHadNoResult);
   const bbl = performance?.bblCheck ?? null;
   const utility = kernel?.derivedInput?.calculationScope === 'utility';

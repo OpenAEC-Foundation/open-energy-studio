@@ -29,7 +29,8 @@ import { hasUnmodelledHeatPumpDetails, legacyHeatPumpInputIssue, validProjectFlo
 import { useI18n } from './i18n/i18n';
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel';
 import { downloadReportHTML } from './core/report/ReportGenerator';
-import { downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
+import { bengIfcModel, downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
+import { calculateProjectPerformanceShared } from './core/nta/useProjectPerformance';
 import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
@@ -134,9 +135,20 @@ function ActiveDocumentContent({
     setPrintPreviewOpen(true);
   }, []);
 
+  // The BENG IFC export follows the shared rule (KernelVerdict): kernel figures when calculated,
+  // nothing when the kernel refused the input, the indicative result only without a verdict.
   const handleExportIFC = useCallback(() => {
-    if (result) downloadBENGIFC(project, result);
-  }, [project, result]);
+    calculateProjectPerformanceShared(project)
+      .then((assessment) => assessment, () => null)
+      .then((assessment) => {
+        const model = bengIfcModel(project, result, assessment);
+        if (model === 'withheld') {
+          setCalculationError(t(assessment?.status === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid'));
+        } else if (model) {
+          downloadBENGIFC(project, model);
+        }
+      });
+  }, [project, result, t]);
 
   const handleExportModelIFC = useCallback(() => {
     downloadModelIFC(project);

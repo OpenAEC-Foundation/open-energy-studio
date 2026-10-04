@@ -117,6 +117,8 @@ export interface IPointThermalBridge {
 // ------------------------------------------------------------
 export interface IAirTightness {
   qv10: number;           // dm³/(s·m²)  at 10 Pa
+  /** Set when the value was not in the file but filled in on open (importer default 0,4); the user should check it. */
+  assumed?: boolean;
 }
 
 // ------------------------------------------------------------

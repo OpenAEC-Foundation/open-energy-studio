@@ -391,6 +391,11 @@ function mapZone(zones: IZone[], zoneId: string, updater: (zone: IZone) => IZone
 }
 
 /** Return a new surfaces array with the surface matching `surfaceId` replaced by `updater(surface)`. */
+/** The object without keys whose value is `undefined`, so an editor round trip adds no empty keys. */
+function withoutUndefined<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 function mapSurface(surfaces: ISurface[], surfaceId: string, updater: (s: ISurface) => ISurface): ISurface[] {
   return surfaces.map(s => (s.id === surfaceId ? updater(s) : s));
 }
@@ -445,7 +450,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          zones: mapZone(state.project.zones, id, z => ({ ...z, ...data })),
+          zones: mapZone(state.project.zones, id, z => withoutUndefined({ ...z, ...data })),
         },
         isDirty: true,
       };
@@ -481,7 +486,8 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
           ...state.project,
           zones: mapZone(state.project.zones, zoneId, z => ({
             ...z,
-            surfaces: mapSurface(z.surfaces, surfaceId, s => ({ ...s, ...data })),
+            // An `undefined` field in the update removes it (a cleared boundary), and is not stored as a key.
+            surfaces: mapSurface(z.surfaces, surfaceId, s => withoutUndefined({ ...s, ...data })),
           })),
         },
         isDirty: true,
@@ -525,7 +531,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
             ...z,
             surfaces: mapSurface(z.surfaces, surfaceId, s => ({
               ...s,
-              windows: s.windows.map(w => (w.id === windowId ? { ...w, ...data } : w)),
+              windows: s.windows.map(w => (w.id === windowId ? withoutUndefined({ ...w, ...data }) : w)),
             })),
           })),
         },
@@ -565,7 +571,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
           ...state.project,
           zones: mapZone(state.project.zones, zoneId, z => ({
             ...z,
-            thermalBridges: z.thermalBridges.map(b => (b.id === bridgeId ? { ...b, ...data } : b)),
+            thermalBridges: z.thermalBridges.map(b => (b.id === bridgeId ? withoutUndefined({ ...b, ...data }) : b)),
           })),
         },
         isDirty: true,
@@ -601,7 +607,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
       const { zoneId, bridgeId, data } = action.payload;
       return { ...state, project: { ...state.project,
         zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
-          pointThermalBridges: (z.pointThermalBridges ?? []).map(b => b.id === bridgeId ? { ...b, ...data } : b),
+          pointThermalBridges: (z.pointThermalBridges ?? []).map(b => b.id === bridgeId ? withoutUndefined({ ...b, ...data }) : b),
         })),
       }, isDirty: true };
     }
@@ -655,7 +661,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          constructions: state.project.constructions.map(c => (c.id === id ? { ...c, ...data } : c)),
+          constructions: state.project.constructions.map(c => (c.id === id ? withoutUndefined({ ...c, ...data }) : c)),
         },
         isDirty: true,
       };
@@ -691,7 +697,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          heatingSystems: state.project.heatingSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          heatingSystems: state.project.heatingSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -727,7 +733,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          ventilationSystems: state.project.ventilationSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          ventilationSystems: state.project.ventilationSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -763,7 +769,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          coolingSystems: state.project.coolingSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          coolingSystems: state.project.coolingSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -799,7 +805,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          hotWaterSystems: state.project.hotWaterSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          hotWaterSystems: state.project.hotWaterSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -869,7 +875,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          solarPV: state.project.solarPV.map(s => (s.id === id ? { ...s, ...data } : s)),
+          solarPV: state.project.solarPV.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -905,7 +911,7 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         ...state,
         project: {
           ...state.project,
-          solarThermal: state.project.solarThermal.map(s => (s.id === id ? { ...s, ...data } : s)),
+          solarThermal: state.project.solarThermal.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };

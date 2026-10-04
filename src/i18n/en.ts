@@ -94,6 +94,7 @@ export const en: Record<string, string> = {
   'browser.solarPV': 'Solar PV',
   'browser.solarThermal': 'Solar Thermal',
   'browser.airTightness': 'Air Tightness',
+  'browser.airTightnessAssumed': "Assumed default (missing from the file); check it and enter the actual value.",
 
   // Properties Panel
   'properties.title': 'Properties',

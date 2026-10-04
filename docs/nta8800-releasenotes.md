@@ -2,6 +2,18 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 4 oktober 2026 — achtergehouden resultaten overal, volledige codelijst, luchtdichtheid bij openen
+
+Geen rekenwijziging in de kern.
+
+- **Eén regel voor vereenvoudigde getallen** (`src/core/nta/KernelVerdict.ts`). Keurt de NTA-kern de invoer af (ongeldig of onvolledig), dan tonen het BENG-rapport (tabblad, HTML-export, afdrukken en afdrukvoorbeeld), de IFC-export en het resultatenoverzicht geen vereenvoudigde BENG-waarden meer. Het rapport meldt "BENG-resultaten achtergehouden"; de IFC-export weigert met dezelfde melding. Alleen zonder NTA-invoer of zonder antwoord van de kern blijft de indicatieve schatting zichtbaar.
+- **IFC met kernwaarden.** Heeft de kern gerekend, dan bevat de IFC-export de kernwaarden met de Bbl-toets (MEETS / DOES_NOT_MEET / NOT_TESTABLE) in plaats van de vereenvoudigde waarden.
+- **Geen flits van vereenvoudigde getallen.** Na een afgekeurde berekening blijft het resultatenoverzicht "achtergehouden" tonen terwijl de volgende berekening loopt.
+- **Codelijst compleet.** De test die controleert of elke kerncode een Nederlandse en Engelse tekst heeft, vindt nu ook codes uit hulpfuncties (`push`/`add`), meerregelige `issue(…)`-aanroepen, tupels en `unwrap_or`. Daarmee zijn 148 extra codes gevonden en vertaald (o.a. bijlage M/V/W, micro-WKK, koeling, PV, zonneboiler, verlichting, zone-indeling). Twee teksten zijn gecorrigeerd: bijlage Q verdamperintrede (1 waarde of 27 waarden) en ontwerpaanvoertemperatuur (groter dan 0 en hoogstens 75 °C).
+- **Luchtdichtheid bij openen.** Een bestand zonder luchtdichtheid krijgt nu q_v10 = 0,4 dm³/(s·m²) (de importstandaard), gemarkeerd als aangenomen, in plaats van 0 (volkomen luchtdicht). De gebouwschilweergave vraagt de waarde te controleren.
+- **Details.** Getallen in technische details tonen hoogstens 2 decimalen; ook de details bij afgekeurde invoer zijn vertaald.
+- **Editors.** Opslaan zonder wijziging voegt geen lege velden meer toe aan vlakken en installaties.
+
 ## 4 oktober 2026 — vertaalde meldingen en rekenhulpen
 
 Geen rekenwijziging; alleen de weergave verandert.

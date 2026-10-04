@@ -7,6 +7,9 @@ import type { IConstruction, IProject, ISurface, IZone } from './types';
  * fingerprint. Optional fields whose absence means something (such as the
  * point-bridge inventory) are left alone.
  */
+/** Importer default for a missing air tightness, dm³/(s·m²) at 10 Pa (same as UNIEC3Exporter and the zone editor). */
+export const ASSUMED_QV10 = 0.4;
+
 export function normalizeProject(project: IProject): IProject {
   let changed = false;
   const list = <T,>(value: T[] | undefined | null): T[] => {
@@ -26,10 +29,14 @@ export function normalizeProject(project: IProject): IProject {
       return windows === surface.windows ? surface : { ...surface, windows };
     });
     const thermalBridges = list(zone.thermalBridges);
+    // A missing air tightness gets the importer default (UNIEC3/zone editor: 0,4 dm³/(s·m²)),
+    // flagged as assumed so the envelope view asks the user to check it. Never 0: that would
+    // claim a perfectly airtight building in the simplified engine, the heat-pump sizing and
+    // the UNIEC3 export.
     let airTightness = zone.airTightness;
-    if (airTightness == null) {
+    if (airTightness == null || typeof airTightness.qv10 !== 'number' || !Number.isFinite(airTightness.qv10)) {
       changed = true;
-      airTightness = { qv10: 0 };
+      airTightness = { qv10: ASSUMED_QV10, assumed: true };
     }
     const same = surfaces.every((surface, index) => surface === zone.surfaces?.[index])
       && thermalBridges === zone.thermalBridges && airTightness === zone.airTightness;
