@@ -4,6 +4,7 @@
 use nta8800_core::reference::{compare_reference_case, ReferenceCase, ReferenceComparison};
 use nta8800_core::{KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -31,6 +32,8 @@ struct GateReport {
     numeric_comparison_passed: bool,
     /// None means that no independently agreed coverage plan was supplied.
     planned_coverage_passed: Option<bool>,
+    /// SHA-256 of the exact plan bytes, for release-level traceability only.
+    coverage_plan_fingerprint: Option<String>,
     reference_verified: bool,
     attest_status: &'static str,
     cases: Vec<GateCase>,
@@ -148,6 +151,7 @@ fn run(paths: &[PathBuf], plan_path: Option<&Path>) -> GateReport {
         kernel_version: KERNEL_VERSION,
         numeric_comparison_passed: !paths.is_empty(),
         planned_coverage_passed: None,
+        coverage_plan_fingerprint: None,
         reference_verified: false,
         attest_status: "unattested",
         cases: Vec::new(),
@@ -187,10 +191,12 @@ fn run(paths: &[PathBuf], plan_path: Option<&Path>) -> GateReport {
         }
     }
     if let Some(path) = plan_path {
-        let plan = fs::read_to_string(path)
+        let plan = fs::read(path)
             .map_err(|error| error.to_string())
             .and_then(|content| {
-                serde_json::from_str::<CoveragePlan>(&content).map_err(|error| error.to_string())
+                report.coverage_plan_fingerprint =
+                    Some(format!("sha256:{:x}", Sha256::digest(&content)));
+                serde_json::from_slice::<CoveragePlan>(&content).map_err(|error| error.to_string())
             });
         report.planned_coverage_passed = Some(match plan {
             Ok(plan) => check_coverage(plan, &mut report),
@@ -331,6 +337,11 @@ mod tests {
         let report = run(std::slice::from_ref(&passing), Some(&plan_path));
         assert!(report.numeric_comparison_passed);
         assert_eq!(report.planned_coverage_passed, Some(true));
+        assert!(report
+            .coverage_plan_fingerprint
+            .as_ref()
+            .unwrap()
+            .starts_with("sha256:"));
 
         fs::write(
             &plan_path,

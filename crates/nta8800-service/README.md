@@ -30,7 +30,9 @@ The command prints one JSON report and exits successfully only when every suppli
 {"targetNormVersion":"NTA 8800:2025+C1:2026","requiredCases":[{"caseId":"case-1","requiredPaths":["beng1","beng2","beng3","tojuliMax"]}]}
 ```
 
-`numericComparisonPassed` is only a comparison result. Neither the plan nor its provenance is authenticated; `referenceVerified` remains `false` and `attestStatus` remains `unattested`. Each case argument is a bare reference-case object, not the HTTP `{ "case": ... }` envelope.
+`numericComparisonPassed` is only a comparison result. The report includes `coveragePlanFingerprint`, the SHA-256 of the exact plan file bytes, so the plan used by a release run can be identified later. Neither the plan nor its provenance is authenticated; `referenceVerified` remains `false` and `attestStatus` remains `unattested`. Each case argument is a bare reference-case object, not the HTTP `{ "case": ... }` envelope.
+
+The repository verification script can run the same planned batch when both `NTA_REFERENCE_PLAN` and `NTA_REFERENCE_CASE_DIR` are set. It reads every top-level `*.json` file in that directory as a case and fails the technical gate if the planned comparison fails. Without these variables it states explicitly that the reference gate was skipped; no official reference set is bundled with the repository.
 
 ## HTTP endpoints
 
