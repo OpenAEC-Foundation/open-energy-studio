@@ -91,9 +91,9 @@ De lijst is in het Engels; het rapport vermeldt dat het de eigen tekst van de ke
 
 | Rapport | Inhoud | Taal |
 |---|---|---|
-| BENG-rapport (tab Rapport, Export Report) | indicatoren, grenzen, maandoverzicht, energiebalans | volgt de taal van de interface |
-| NTA-rekenrapport | volledige uitkomst, labelgegevens, registratie, interpretaties | Nederlands (BRL 9500-document) |
-| NTA-invoerdossier | de invoer | Nederlands |
+| BENG-rapport (tab Rapport; knop **Exporteer rapport** in het lint en het menu) | indicatoren, grenzen, maandoverzicht, energiebalans | volgt de taal van de interface |
+| NTA-rekenrapport (knop **NTA-rekenrapport exporteren** op het tabblad Rapport) | volledige uitkomst, labelgegevens, registratie, interpretaties | Nederlands (BRL 9500-document) |
+| NTA-invoerdossier (knop **NTA-invoerdossier exporteren** op het tabblad Rapport) | de ingevoerde toestellen en het bewijs, zonder BENG-uitkomst of label | Nederlands |
 | Adviesrapport maatwerkadvies | zie [hoofdstuk 6](06-maatwerkadvies.md) | Nederlands |
 
 **Opmaak in de Nederlandse documenten**

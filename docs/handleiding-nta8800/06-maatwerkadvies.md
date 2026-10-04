@@ -5,9 +5,9 @@ Het paneel **Maatwerkadvies** staat op het tabblad Resultaten. Het werkt volgens
 ## Werkwijze
 
 1. Kies **Maatwerkadvies starten**.
-2. Leg het **gebruiksprofiel** vast (ISSO 82.2/75.2 §2.5, tabel 2.2). Kies een profiel of vul de velden vrij in: setpoints, bewoners, branduren, tapwater en praktijkfactoren voor ventilatie.
-3. Leg het **werkelijke verbruik** vast, per jaar of per maand, voor de fitcontrole (ISSO 82.2 hoofdstuk 3, bijlage C.1). Leg ook de **tarieven** vast, met een bron.
-4. Voeg **maatregelen** toe (zie hieronder) en stel **pakketten** samen. Volgens ISSO 82.2/75.2 §4.2.2 (p. 52) zijn er minimaal twee.
+2. Leg het **Gebruikersprofiel** vast (ISSO 82.2/75.2 §2.5, tabel 2.2). Kies een profiel of vul de velden vrij in: setpoints, bewoners, branduren, tapwater en praktijkfactoren voor ventilatie.
+3. Leg het **Gemeten verbruik (fitprocedure)** vast, per jaar of per maand, voor de fitcontrole (ISSO 82.2 hoofdstuk 3, bijlage C.1). Leg ook de **Tarieven en rekenrente** vast, met een bron.
+4. Voeg **maatregelen** toe (zie hieronder) en stel **pakketten** samen. Volgens §4.2.2 zijn er minimaal twee (ISSO 82.2 p. 52; ISSO 75.2 p. 64).
 5. Kies **Doorrekenen**.
 
 Het resultaat toont per variant (huidig, elke maatregel, elk pakket):

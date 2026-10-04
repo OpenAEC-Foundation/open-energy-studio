@@ -38,8 +38,7 @@ Deze grenzen zijn **geen normwaarden**. Ze vangen invoer af die geen bestaand ge
 **Waarschuwingen zonder blokkade:**
 - A_g van een zone onder 1 m²;
 - minder dan 10 m² per woning;
-- A_ls/A_g boven 20;
-- A_g met meer dan twee decimalen (`usable_floor_area_precision`).
+- A_ls/A_g boven 20.
 
 **Aantallen in de opnames en de kern:**
 - bouwlagen tot 200;
@@ -68,6 +67,7 @@ Bij registratie meldt het programma, zonder te blokkeren, onwaarschijnlijke uitk
 - een EP2 vlak onder een klassegrens;
 - een sprong van drie of meer klassen;
 - EP2, A_ls/A_g of A_g buiten een bandbreedte;
-- een onwaarschijnlijke gemiddelde U.
+- een onwaarschijnlijke gemiddelde U;
+- A_g met meer dan twee decimalen (`usable_floor_area_precision`, Praktijkhandboek p. 70).
 
 Ook deze drempels zijn keuzes van het programma.
