@@ -1,6 +1,6 @@
 # NTA 8800 dekkingsregister
 
-Bijgewerkt op 3 oktober 2026 na de derde dekkingsaudit; elke rij is tegen de code nagelopen.
+Bijgewerkt op 4 oktober 2026. De derde volledige dekkingsaudit vond op 3 oktober plaats.
 
 **Nieuwe begrensde deelroute:** de [collectieve gaswarmtepompbron-conceptdiagnose](nta8800-gaswarmtepomp-collectieve-bron-concept.md) rekent bronwarmte uit een geldige twaalfmaandsketen apart als `dh` door. Temperatuur- en verklaringbewijs zijn verplicht. De route levert alleen conceptbijdragen, zonder onafhankelijke actuele referentie, attest, gasdragerboeking of BENG.
 
@@ -45,6 +45,8 @@ Dezelfde vergelijking kan nu ook jaarlijkse primaire energie/CO₂ en maand- en 
 Het harnas vergelijkt nu ook geselecteerde maandtermen van de samengevoegde ruimteverwarmingsketen, inclusief warmtepompwarmte, opwekkerstroom, hulpstroom en bronwarmte. De pad- en eenheidscontrole en een synthetische match/mismatch-test zijn geslaagd. De externe referentie- en attestkolommen blijven open.
 
 Een aparte Rust-batch-CLI leest één of meer referentiemanifesten en geeft alleen bij complete, unieke en numeriek passende gevallen exitcode 0. Het JSON-rapport laat `referenceVerified=false` en `attestStatus=unattested` staan; de CLI controleert de onafhankelijkheid of rechten van een externe bron niet. Deze route is gereed om rechtmatig verkregen officiële gevallen in een latere blokkerende regressiegate op te nemen.
+
+Met `--plan` toetst de batch-CLI nu ook een opgegeven normversie, de volledige geplande lijst case-ID's en de vereiste vergelijkingspaden per case. Ontbrekende of extra cases, ontbrekende paden en een ongeldig plan geven een falende `plannedCoveragePassed` en exitcode. Zonder plan is dit veld `null`: een numeriek passende losse case bewijst geen dekking. Vier CLI-tests, 56 servicetests en Clippy slaagden. Het plan is nog niet onafhankelijk vastgesteld en bevat geen officiële actuele W/U-set; Referentie en Attest blijven `nee`.
 
 Op `de45278` slaagden 56 servicetests en drie CLI-tests, formatcontrole, Clippy en een runtimecontrole van de gebouwde CLI op match, mismatch en lege invoer. De [binary en SHA-256](nta8800-referentie-gate-verificatie-2026-10-04-de45278.md) zijn bewaard. De kern en desktopcode zijn niet gewijzigd; de actuele devbuild blijft die van `37ccce1`.
 

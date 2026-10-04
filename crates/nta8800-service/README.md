@@ -21,9 +21,16 @@ To compare a batch of separately obtained reference-case manifests without runni
 
 ```bash
 cargo run --manifest-path crates/nta8800-service/Cargo.toml --bin reference_gate -- case-1.json case-2.json
+cargo run --manifest-path crates/nta8800-service/Cargo.toml --bin reference_gate -- --plan coverage-plan.json case-1.json case-2.json
 ```
 
-The command prints one JSON report and exits successfully only when every supplied numeric comparison passes. An empty batch, unreadable or malformed file, duplicate `caseId`, incomplete project or mismatch fails. `numericComparisonPassed` is only a comparison result; `referenceVerified` remains `false` and `attestStatus` remains `unattested`. Each argument is a bare reference-case object, not the HTTP `{ "case": ... }` envelope.
+The command prints one JSON report and exits successfully only when every supplied numeric comparison passes. An empty batch, unreadable or malformed file, duplicate `caseId`, incomplete project or mismatch fails. With `--plan`, the JSON plan must name the exact target norm version and every required case and metric path; missing or extra cases, missing compared metrics, duplicate plan entries and a wrong version fail `plannedCoveragePassed` and the exit code. Without a plan, `plannedCoveragePassed` is `null`: the CLI has no evidence that the supplied batch is complete. Example plan:
+
+```json
+{"targetNormVersion":"NTA 8800:2025+C1:2026","requiredCases":[{"caseId":"case-1","requiredPaths":["beng1","beng2","beng3","tojuliMax"]}]}
+```
+
+`numericComparisonPassed` is only a comparison result. Neither the plan nor its provenance is authenticated; `referenceVerified` remains `false` and `attestStatus` remains `unattested`. Each case argument is a bare reference-case object, not the HTTP `{ "case": ... }` envelope.
 
 ## HTTP endpoints
 
