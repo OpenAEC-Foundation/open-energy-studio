@@ -1,5 +1,7 @@
 # Bronnenregister NTA 8800 en softwareattestering
 
+**Huidige stand (4 oktober 2026):** de gelicentieerde NTA 8800:2025+C1:2026 is lokaal beschikbaar en de Rust-rekenroutes zijn tegen die editie uitgewerkt; zie de [verificatiestatus](nta8800-verificatiestatus.md) en het [dekkingsregister](nta8800-dekkingsregister.md). De inventaris hieronder bewaart ook de historische onderzoeksstand van 29 september en afzonderlijke conceptdiagnoses. Zij mag niet worden gelezen als de actuele implementatiestatus. Officiële actuele EDR-verwachtingswaarden en een extern BRL 9501-attest ontbreken nog.
+
 De [collectieve-bron-conceptdiagnose](nta8800-gaswarmtepomp-collectieve-bron-concept.md) combineert §9.6.8.1.1.2.3 uit [openbaar consultatiehoofdstuk 9](https://www.internetconsultatie.nl/epg2026/document/14150) met de afzonderlijke `dh`-term uit [hoofdstuk 5](https://www.internetconsultatie.nl/epg2026/document/14147), waaronder conceptvergelijkingen 5.20 en 5.30 en tabellen 5.2/5.4. De geraadpleegde PDF-bestanden hebben respectievelijk SHA-256 `89465ebe5cdfbba0a6d2da7596107e2d16bc26b0297ef3d7a2297fe8cd04d035` en `b37f3cb9afd4747a156922d9c9f106808032134f476b816efa6e8f332def8fe4`. Beide zijn consultatieconcepten; de definitieve editie en actuele EDR-deelresultaten zijn niet aangetoond.
 
 **Controle:** 29 september 2026. Dit register onderscheidt publiek bevestigde versiegegevens van de nog ontbrekende normtekst en onafhankelijke testuitkomsten. Het is geen verklaring van normconformiteit.
@@ -29,7 +31,7 @@ Uit dezelfde openbare hoofdstuk-9-PDF zijn §9.6.8.2.2–9.6.8.2.3 en vergelijki
 
 Een codepad krijgt pas de status `intern gevalideerd` wanneer de toepasselijke normeditie en paragraaf, invoerregels, coëfficiënten/tabellen, eenheden, afronding, onafhankelijke verwachte deeluitkomsten en testtoleranties zijn vastgelegd en gereviewd. `Extern gevalideerd` vereist een onafhankelijke toets; `geattesteerd` vereist een positief besluit voor de exacte release en scope. Een overeenkomende handberekening of zelf opgegeven W/K-verwachting voldoet hier niet aan.
 
-Voor warmtepompen ontbreken hierdoor nog de normatieve prestatie- en hulpenergieroutes per configuratie. Voor BENG, TO-juli en labels ontbreekt de geverifieerde volledige rekenketen. De huidige Rust-directe-transmissiesom is alleen diagnostisch en blijft buiten de BENG-route. Zie [dekkingsregister](nta8800-dekkingsregister.md) en [verificatiestatus](nta8800-verificatiestatus.md).
+Deze vrijgaveregel werd op 29 september voor de toenmalige losse conceptdiagnoses opgesteld. De latere Rust-kern bevat rekenroutes voor warmtepompen, BENG, TO-juli en indicatieve labels; hun dekking en interne herberekeningen staan in het [dekkingsregister](nta8800-dekkingsregister.md) en de [verificatiestatus](nta8800-verificatiestatus.md). Zonder officiële actuele EDR-gevallen en externe toets is de volledige keten nog niet geattesteerd. De afzonderlijke directe-transmissiesom blijft diagnostisch; de project-BENG-route gebruikt de eigen transmissieberekening.
 
 ## Labelklassen (toegevoegd 1 oktober 2026)
 

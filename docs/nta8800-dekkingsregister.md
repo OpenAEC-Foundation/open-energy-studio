@@ -22,6 +22,10 @@ Op `aace329` slaagden later de volledige interne suites opnieuw (751 Rust-kernte
 
 De [Linux-debugbuild van `c62794c`](nta8800-build-verificatie-2026-10-04-c62794c.md) bevat de latere invoer- en UI-wijzigingen. Op die commit slaagden 753 Rust-kerntests, 53 servicetests, 399 frontendtests en de TypeScript-/Vite-build. Het pakket is met SHA-256 vastgelegd; de referentie- en atteststatus hieronder verandert daardoor niet.
 
+Op `cd46024` zijn invoerbereiken en aantallen begrensd en worden niet-eindige rekenresultaten geweigerd voordat serialisatie ze als `null` zou tonen. De kern- en servicetests, frontendtests, build, formatcontrole en Clippy slaagden; de robuustheidstest is ook met 200 mutaties per negen fixtures uitgevoerd. Dit is foutafhandeling en geen actuele EDR-vergelijking.
+
+De [Linux-debugbuild van `cd46024`](nta8800-build-verificatie-2026-10-04-cd46024.md) is als afzonderlijk bestand met SHA-256 bewaard. De bouw wijzigt de open referentie-, visuele acceptatie- en atteststatus niet.
+
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
 
 Een latere controle vanaf `02fafc5` gaf 735 groene kerntests, 53 groene servicetests, geslaagde Rust-formatcontroles en een geslaagde frontend-build. De volledige frontendrun overlapte een relabel-merge en is daarom geen vrijgave voor de nieuwe stand; de twee betrokken testbestanden zijn na de merge opnieuw uitgevoerd (10/10 groen). De precieze testgrens staat in de [verificatiestatus](nta8800-verificatiestatus.md).
