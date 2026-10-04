@@ -2,7 +2,9 @@
 
 Datum: 4 oktober 2026. Broncommit: `e2d2a69` (`nta8800-kernel`). Doeluitgave: NTA 8800:2025+C1:2026.
 
-Deze bronstand voegt de `coolingMonth`-meetpaden voor de hoofdstuk-10-koelketen aan het referentieharnas toe. De gerichte synthetische Rust-test controleerde een berekende koelmaand, ontbrekende koeling, een afwijking en een ongeldig maandpad. `cargo fmt`, Clippy voor alle Rust-kern-targets met waarschuwingen als fouten, `cargo build --manifest-path crates/nta8800-service/Cargo.toml --bins` en `npm run tauri build -- --debug --bundles deb` slaagden. De laatste volledige kern-, service-, MSRV- en frontendrun was op de voorafgaande bronstand `dba3ca2`; die is niet als test van deze wijziging opgevoerd.
+Deze bronstand voegt de `coolingMonth`-meetpaden voor de hoofdstuk-10-koelketen aan het referentieharnas toe. De gerichte synthetische Rust-test controleerde een berekende koelmaand, ontbrekende koeling, een afwijking en een ongeldig maandpad. `cargo fmt`, Clippy voor alle Rust-kern-targets met waarschuwingen als fouten, `cargo build --manifest-path crates/nta8800-service/Cargo.toml --bins` en `npm run tauri build -- --debug --bundles deb` slaagden.
+
+Daarna slaagde `scripts/verify-nta.sh` op dezelfde ongewijzigde bronstand: 763 Rust-kerntests plus drie integratietests, 57 servicetests plus vijf CLI-tests, dezelfde kern- en integratietests op Rust 1.77.2, beide Rust-format- en Clippy-controles, Tauri-check, TypeScript en 452 frontendtests in 69 bestanden. De geplande referentiebatch werd overgeslagen omdat geen officieel plan en geen officiële case-map zijn ingesteld. De tests zijn geen onafhankelijke NTA-berekeningsreferentie.
 
 Het pakket is een Linux amd64 **debug/devbuild** (`open-energy-studio`, `0.1.6-alpha`). De bestanden zijn uit dezelfde bronstand gebouwd.
 

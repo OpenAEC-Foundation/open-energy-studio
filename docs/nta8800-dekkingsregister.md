@@ -16,6 +16,8 @@ Een [runtimecontrole van HTTP en MCP](nta8800-koelreferentie-transport-2026-10-0
 
 De gebouwde batch-CLI liet ook een tijdelijk dekkingsplan voor dit koelpad slagen en wees een gewijzigde verwachte waarde met oude manifestvingerafdruk af. Dit toetst de technische koppeling van `coolingMonth` aan het plan, niet de juistheid of onafhankelijkheid van de synthetische verwachting.
 
+De volledige lokale technische gate op de bronstand `e2d2a69` slaagde vervolgens met 763 kern- en drie integratietests, 57 service- en vijf CLI-tests, de kern en integratietests op Rust 1.77.2, Rust-formatcontrole, Clippy, Tauri-check, TypeScript en 452 frontendtests. De officiële referentiebatch bleef wegens ontbrekende cases uitgeschakeld. Visuele UI-acceptatie en externe attestering staan open.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
