@@ -39,6 +39,8 @@
 
 De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetadata vastgelegd in het [bouwdossier van `cd46024`](nta8800-build-verificatie-2026-10-04-cd46024.md).
 
+**Controle op `e440704` (4 oktober).** Na de uitbreiding van de eindigheidscontroles, robuustheidstest en NTA-handleiding slaagden 756 Rust-kerntests plus drie integratietests, 54 servicetests, 420 frontendtests, TypeScript-/Vite-build, Rust-formatcontrole en Clippy. Een aanvullende robuustheidsrun met 100 varianten per project-/opnamefixture en een kleinere maatwerkadviesreeks slaagde. De Linux-debugbuild is opnieuw verpakt; pakketmetadata en SHA-256 staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-e440704.md). De externe verificatiegrenzen blijven gelden.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:
@@ -809,6 +811,7 @@ De Rust-core is daarnaast daadwerkelijk met de gedeclareerde minimumversie Rust 
 | Vernieuwde desktop-devbuild `e811eb3` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-03-e811eb3.md): 747 kerntests, 53 servicetests en 380 frontendtests groen; TypeScript, Vite en Linux `.deb` gebouwd; pakketmetadata en SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
 | Vernieuwde desktop-devbuild `c62794c` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-04-c62794c.md): 753 kerntests, 53 servicetests en 399 frontendtests groen; TypeScript, Vite en Linux `.deb` gebouwd; pakketmetadata en SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
 | Vernieuwde desktop-devbuild `cd46024` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-04-cd46024.md): 755 kerntests, 3 integratietests, 53 servicetests en 420 frontendtests groen; extra robuustheidsrun, format, Clippy, Vite en Linux `.deb` geslaagd; SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
+| Vernieuwde desktop-devbuild `e440704` | [Bouw- en testdossier](nta8800-build-verificatie-2026-10-04-e440704.md): 756 kerntests, 3 integratietests, 54 servicetests en 420 frontendtests groen; extra robuustheidsrun, format, Clippy, Vite en Linux `.deb` geslaagd; SHA-256 vastgelegd | Debugpakket; visuele acceptatie, onafhankelijke actuele EDR-toets en attest staan nog open |
 | Visuele UI-controle | Niet uitgevoerd | Browsertoegang tot `127.0.0.1:3006` door opgeslagen gebruikersinstelling geblokkeerd; deze blokkade is niet omzeild |
 | NTA-invoereditor bij projectwissel | Het prestatiepaneel sluit zowel het formulier als de JSON-editor bij een andere project-ID en wist de oude concepttekst. Gerichte componenttest: 7/7 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole; de Rust-kern valideert de opgeslagen invoer pas bij de volgende berekening. |
 | Zijbalk met indicatief label bij projectwissel | De respons draagt de projectreferentie van de aanvraag; een oudere BENG-/labeluitkomst wordt bij een gewijzigde projectreferentie direct verborgen. Gerichte previewtests: 5/5 geslaagd; TypeScript- en Vite-build geslaagd. | Geen visuele desktopcontrole of onafhankelijke toets van de energie-uitkomst. |
