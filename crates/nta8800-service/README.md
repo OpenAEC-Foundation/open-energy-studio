@@ -32,7 +32,7 @@ The command prints one JSON report and exits successfully only when every suppli
 
 `numericComparisonPassed` is only a comparison result. The report includes `coveragePlanFingerprint`, the SHA-256 of the exact plan file bytes, so the plan used by a release run can be identified later. Neither the plan nor its provenance is authenticated; `referenceVerified` remains `false` and `attestStatus` remains `unattested`. Each case argument is a bare reference-case object, not the HTTP `{ "case": ... }` envelope.
 
-A case may additionally contain `expectedLabelClass` (for example `"A+++"`) alongside its numeric `expected` array. The comparison then reports an exact `indicativeLabelClass` match or mismatch. The plan may require that path. It is an unregistered, indicative class; a passing comparison never issues an energy label.
+A case may additionally contain `expectedLabelClass` (for example `"A+++"`) alongside its numeric `expected` array. The comparison then reports an exact `indicativeLabelClass` match or mismatch. Numeric paths `labelPrimaryFossil` (`kWh/m2.year`) and `labelRenewableShare` (`%`) compare the label scenario separately from BENG 2/3. The plan may require these paths. The class is unregistered and indicative; a passing comparison never issues an energy label.
 
 The repository verification script can run the same planned batch when both `NTA_REFERENCE_PLAN` and `NTA_REFERENCE_CASE_DIR` are set. It reads every top-level `*.json` file in that directory as a case and fails the technical gate if the planned comparison fails. Without these variables it states explicitly that the reference gate was skipped; no official reference set is bundled with the repository.
 

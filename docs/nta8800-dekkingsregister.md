@@ -58,6 +58,8 @@ Het algemene referentieharnas kan nu ook de indicatieve labelklasse uit het Rust
 
 De [devbuild op `599c48d`](nta8800-build-verificatie-2026-10-04-599c48d.md) en de bijbehorende HTTP-, MCP- en referentiegate-binaries zijn met SHA-256 vastgelegd. Het pakket is technisch gebouwd, nog niet visueel geaccepteerd en niet extern geattesteerd.
 
+Het vergelijkingsharnas heeft nu afzonderlijke paden voor de fossiele EP2 en hernieuwbaar-aandeel van het labelscenario (`labelPrimaryFossil`, `labelRenewableShare`). De NTA-kern berekende deze velden al; het harnas maakt ze nu naast BENG 2/3 als aparte verwachte meetposten toetsbaar. Een gerichte synthetische test controleert waarden, eenheden en mismatch. Er is nog geen onafhankelijke actuele labelreferentie; de Referentie- en Attestkolommen veranderen niet.
+
 Op `de45278` slaagden 56 servicetests en drie CLI-tests, formatcontrole, Clippy en een runtimecontrole van de gebouwde CLI op match, mismatch en lege invoer. De [binary en SHA-256](nta8800-referentie-gate-verificatie-2026-10-04-de45278.md) zijn bewaard. De kern en desktopcode zijn niet gewijzigd; de actuele devbuild blijft die van `37ccce1`.
 
 Op `37ccce1` slaagden 760 kern- en drie integratietests, 56 servicetests, Rust-formatcontrole en Clippy. De [Linux-debugbuild](nta8800-build-verificatie-2026-10-04-37ccce1.md) en nieuwe API-/MCP-binaries zijn met hashes vastgelegd. Dit is een technische build en geen actuele onafhankelijke EDR-toets.

@@ -103,8 +103,8 @@ pub struct MetricComparison {
 /// supplied in the same case manifest. A missing row is not assumed to be zero.
 fn metric_unit(path: &str) -> Option<&'static str> {
     match path {
-        "beng1" | "beng2" => return Some("kWh/m2.year"),
-        "beng3" => return Some("%"),
+        "beng1" | "beng2" | "labelPrimaryFossil" => return Some("kWh/m2.year"),
+        "beng3" | "labelRenewableShare" => return Some("%"),
         "tojuliMax" => return Some("K"),
         "annualPrimaryFossil" | "annualRenewablePrimary" => return Some("kWh"),
         "annualCO2" => return Some("kg CO2eq"),
@@ -164,6 +164,10 @@ fn actual_metric(
         "beng1" => return result.need_indicator_kwh_per_m2_year,
         "beng2" => return result.primary_fossil_indicator_kwh_per_m2_year,
         "beng3" => return result.renewable_share_percent,
+        "labelPrimaryFossil" => {
+            return result.label_primary_fossil_indicator_kwh_per_m2_year;
+        }
+        "labelRenewableShare" => return result.label_renewable_share_percent,
         "tojuliMax" => return result.tojuli_max_k,
         "annualPrimaryFossil" => return result.annual_primary_fossil_kwh,
         "annualRenewablePrimary" => return result.annual_renewable_primary_kwh,
@@ -574,6 +578,41 @@ mod tests {
         assert_eq!(invalid.status, "invalid_case");
         assert!(invalid.metrics.is_empty());
         assert!(invalid.label_class.is_none());
+    }
+
+    #[test]
+    fn compares_label_scenario_indicators_separately_from_beng() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        let performance = assessment.performance.unwrap();
+        let fossil = performance
+            .label_primary_fossil_indicator_kwh_per_m2_year
+            .unwrap();
+        let renewable = performance.label_renewable_share_percent.unwrap();
+        let mut case = comparison_case(project, "labelPrimaryFossil", fossil, "kWh/m2.year");
+        case.expected.push(ExpectedMetric {
+            path: "labelRenewableShare".into(),
+            value: renewable,
+            unit: "%".into(),
+            norm_reference: "internal test".into(),
+            absolute_tolerance: 0.0,
+        });
+        let pass = compare_reference_case(case.clone());
+        assert_eq!(pass.status, "compared_pass");
+        assert_eq!(pass.metrics.len(), 2);
+
+        case.expected[0].value += 1.0;
+        let mismatch = compare_reference_case(case.clone());
+        assert_eq!(mismatch.status, "compared_fail");
+        assert!(!mismatch.metrics[0].within_tolerance);
+
+        case.expected[0].unit = "kWh".into();
+        let invalid = compare_reference_case(case);
+        assert_eq!(invalid.status, "invalid_case");
+        assert!(invalid.metrics.is_empty());
     }
 
     #[test]
