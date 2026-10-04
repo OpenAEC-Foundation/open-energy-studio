@@ -13,7 +13,7 @@ import {
 } from '../../core/nta/SurveyTemplates';
 import { KernelCode } from '../KernelCode/KernelCode';
 import { formatNumber } from '../../i18n/format';
-import { dutchDefaultValue, snakeCase } from '../../core/nta/OpnameValueText';
+import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
 
@@ -283,6 +283,19 @@ export function renameZone(draft: Draft, index: number, id: string): Draft {
  * translated with the id as reference, yes/no for booleans, a number by locale, and the
  * kernel's fixed value texts in Dutch for a Dutch UI. Other text stays as written.
  */
+/**
+ * The survey section a default belongs to (its first path segment), in the UI
+ * language; the full path stays next to it as a small reference.
+ */
+export function defaultPathLabel(t: T, path: string): string {
+  const section = path.split(/[.[]/)[0];
+  for (const key of [`opname.section.${section}`, `opname.${section}`]) {
+    const text = t(key);
+    if (text !== key) return text;
+  }
+  return section;
+}
+
 export function defaultValueLabel(t: T, value: string, locale = 'en') {
   if (value === 'true' || value === 'false') return t(value === 'true' ? 'common.yes' : 'common.no');
   // Recorded numbers (years, counts, areas) without thousands grouping: "1985", not "1.985".
@@ -1043,7 +1056,9 @@ export function BasisopnamePanel() {
           <th>{t('opname.defaults.source')}</th><th>{t('opname.defaults.reason')}</th></tr></thead>
         <tbody>
           {result.appliedDefaults.map((item, index) => <tr key={index}>
-            <td><code>{item.path}</code></td><td>{defaultValueLabel(t, item.value, locale)}</td><td>{item.source}</td>
+            <td>{defaultPathLabel(t, item.path)} <small><code>{item.path}</code></small></td>
+            <td>{defaultValueLabel(t, item.value, locale)}</td>
+            <td>{locale.toLowerCase().startsWith('nl') ? dutchSource(item.source) : item.source}</td>
             <td><input className="opname-reason" aria-label={`${t('opname.defaults.reason')} ${item.path}`} value={reasons[item.path] ?? ''}
               onChange={(event) => {
                 const next = { ...reasons };

@@ -7,6 +7,7 @@ import { deserializeProject } from '../../core/io/ProjectSerializer';
 import { sha256Hex } from '../../core/nta/Evidence';
 import { labelInputSha256, originalProjectTextForStorage } from '../../core/nta/Registration';
 import { relabelCluster, relabelElementName, relabelNote, relabelValue } from '../../core/nta/RelabelText';
+import { dutchSource } from '../../core/nta/OpnameValueText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './MaatwerkadviesPanel.css';
 
@@ -112,7 +113,7 @@ export function RelabelPanel() {
               </table>
             </div>
           )}
-          <small>{result.scheme === 'u' ? 'BRL 9500-U' : 'BRL 9500-W'} · {result.source}</small>
+          <small>{result.scheme === 'u' ? 'BRL 9500-U' : 'BRL 9500-W'} · {locale.toLowerCase().startsWith('nl') ? dutchSource(result.source) : result.source}</small>
           <div className="nta-performance-actions">
             <button type="button" className="btn" onClick={() => store(undefined)}>{t('relabel.clear')}</button>
           </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { deleteTarget, editAction } from '../../core/energy/projectItems';
+import { containedItems, describeCascade } from '../../core/energy/cascadeLabels';
 import './ItemActions.css';
 
 /** Edit and delete buttons for one project item; delete asks for confirmation inline. */
@@ -10,7 +11,8 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
   const { state, dispatch } = useEnergy();
   const [confirming, setConfirming] = useState(false);
   const [blocked, setBlocked] = useState<{ reason: 'constructionInUse' | 'manualMeasures'; usedBy: string[] } | null>(null);
-  const [cascade, setCascade] = useState<string[]>([]);
+  const [cascade, setCascade] = useState<Array<{ path: string; label: string }>>([]);
+  const [contained, setContained] = useState({ surfaces: 0, windows: 0 });
   const [buildingMeasures, setBuildingMeasures] = useState<string[]>([]);
   const edit = editAction(itemType, id);
 
@@ -19,7 +21,8 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
     if (target.kind === 'blocked') { setBlocked({ reason: target.reason, usedBy: target.usedBy }); return; }
     if (target.kind === 'none') return;
     setBlocked(null);
-    setCascade(target.cascade.map((entry) => entry.path));
+    setCascade(target.cascade.map((entry) => ({ path: entry.path, label: describeCascade(entry, state.project, t) })));
+    setContained(containedItems(state.project, itemType, id));
     setBuildingMeasures(target.buildingMeasures);
     setConfirming(true);
   };
@@ -41,9 +44,12 @@ export function ItemActions({ itemType, id, name }: { itemType: string; id: stri
     {confirming && <>
       <span className="item-actions-confirm" role="alert">
         {t('item.deleteConfirm', { name })}
+        {(contained.surfaces > 0 || contained.windows > 0) && <>
+          {' '}{t('item.deleteContained', { surfaces: contained.surfaces, windows: contained.windows })}
+        </>}
         {cascade.length > 0 && <>
           {' '}{t('item.deleteCascade', { count: cascade.length })}
-          <ul className="item-actions-cascade">{cascade.map((path) => <li key={path}><code>{path}</code></li>)}</ul>
+          <ul className="item-actions-cascade">{cascade.map((entry) => <li key={entry.path} title={entry.path}>{entry.label}</li>)}</ul>
         </>}
         {buildingMeasures.length > 0 && <>
           {' '}{t('item.buildingMeasuresReview', { list: buildingMeasures.join(', ') })}

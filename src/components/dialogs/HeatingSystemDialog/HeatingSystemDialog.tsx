@@ -2,6 +2,7 @@ import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IHeatingSystem, HeatingSystemType } from '../../../core/energy/types';
+import { fractionFromPercent, heatPumpDraftOf } from '../dialogValues';
 import { DialogShell } from '../DialogShell';
 import { defaultHeatPumpDraft, hasDhwDeclarationMismatch, hasElectricCarrierMismatch, hasIncompleteRegistryRecord, hasOperatingLimitEvidenceMismatch, HeatPumpMetadataFields, type HeatPumpDraft } from '../HeatPumpMetadataFields/HeatPumpMetadataFields';
 
@@ -51,15 +52,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
   const [classifyHeatPump, setClassifyHeatPump] = useState(Boolean(existing?.ntaHeatPump));
   const [heatPumpError, setHeatPumpError] = useState<string | null>(null);
   const [heatPumpDraft, setHeatPumpDraft] = useState<HeatPumpDraft>(existing?.ntaHeatPump
-    ? { source: existing.ntaHeatPump.source, sink: existing.ntaHeatPump.sink, drive: existing.ntaHeatPump.drive,
-        servedZoneIds: existing.ntaHeatPump.servedZoneIds,
-        reversible: existing.ntaHeatPump.reversible, hybrid: existing.ntaHeatPump.hybrid,
-        booster: existing.ntaHeatPump.booster, performanceEvidence: existing.ntaHeatPump.performanceEvidence,
-        performancePoints: existing.ntaHeatPump.performancePoints,
-        dhwTestPoints: existing.ntaHeatPump.dhwTestPoints,
-        declaredOperatingLimits: existing.ntaHeatPump.declaredOperatingLimits,
-        auxiliaryComponents: existing.ntaHeatPump.auxiliaryComponents,
-        systemLinks: existing.ntaHeatPump.systemLinks }
+    ? heatPumpDraftOf(existing.ntaHeatPump)
     : defaultHeatPumpDraft(existing?.type === 'heat_pump_ground' ? 'ground' : 'outdoor_air', 'hydronic'));
 
   const handleTypeChange = (newType: HeatingSystemType) => {
@@ -95,7 +88,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
       name,
       type,
       cop,
-      coverageFraction: coveragePercent / 100,
+      coverageFraction: fractionFromPercent(coveragePercent, existing?.coverageFraction ?? 1),
       ntaHeatPump: isHeatPumpType(type) && classifyHeatPump ? { id, ...heatPumpDraft } : undefined,
     };
 

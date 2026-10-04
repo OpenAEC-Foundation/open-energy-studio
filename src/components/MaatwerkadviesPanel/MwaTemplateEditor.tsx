@@ -117,7 +117,7 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
   // Saved snapshot forms (ventilation, lighting) open in their current form.
   const { template } = normalizeTemplate(project, measure.template);
   const set = (next: MwaMeasureTemplate) => onChange(applyTemplate(project, measure, next));
-  const { patch, problems, warnings = [] } = buildTemplatePatch(project, measure.template, measure.id);
+  const { patch, problems, warnings = [], missingFields = [] } = buildTemplatePatch(project, measure.template, measure.id);
   const block = project.ntaCalculation as unknown as Block | undefined;
 
   let fields: ReactNode = null;
@@ -322,7 +322,15 @@ export function MwaTemplateEditor({ project, measure, onChange }: {
       <p className="nta-form-note">{t(`mwa.template.help.${template.kind}`)}</p>
       <div className="mwa-measure-fields">{fields}</div>
       {problems.length > 0 && <ul className="nta-performance-gaps mwa-template-problems" data-testid={`mwa-template-problems-${measure.id}`}>
-        {problems.map((problem) => <li key={problem}>{t(`mwa.template.problem.${problem}`)}</li>)}
+        {problems.map((problem) => <li key={problem}>{t(`mwa.template.problem.${problem}`)}
+          {problem === 'valueRequired' && missingFields.length > 0 && <> {t('mwa.template.missingFields', {
+            list: missingFields.map((field) => {
+              const key = `mwa.template.field.${field}`;
+              const label = t(key);
+              return label === key ? field : label;
+            }).join(', '),
+          })}</>}
+        </li>)}
       </ul>}
       {warnings.length > 0 && <ul className="mwa-template-warnings" data-testid={`mwa-template-warnings-${measure.id}`}>
         {warnings.map((warning) => <li key={warning}>{t(`mwa.template.warning.${warning}`)}</li>)}
