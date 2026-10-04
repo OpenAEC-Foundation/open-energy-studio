@@ -55,6 +55,10 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Uitbreiding van deelresultaten (4 oktober).** Het harnas accepteert nu ook jaarlijkse primaire energie/CO₂ en de hoofdstuk-5-energieboekhouding per dienst, drager en maand of jaar. Dienst-, drager- en maandcodes zijn begrensd; een ontbrekende rij wordt niet als nul behandeld. Gerichte Rust- en HTTP-tests controleren de padkeuze, eenheden, afwijking en foutafhandeling. De testverwachtingen komen uit een synthetische interne fixture en zijn geen officiële referentie-uitkomsten.
 
+**Technische controle op `e9419da` (4 oktober).** De volledige interne Rust-suites slaagden: 759 kerntests plus drie integratietests en 56 servicetests. Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de nieuwe API-/MCP-binaries slaagden. Het [bouwdossier](nta8800-build-verificatie-2026-10-04-e9419da.md) bewaart bestandshashes. De visuele UI-acceptatie en officiële EDR-vergelijking staan nog open.
+
+De gebouwde API- en MCP-processen gaven voor dezelfde synthetische BENG 2-verwachting ook dezelfde `compared_pass`-meetpost en manifestvingerafdruk; beide lieten `referenceVerified=false`. De tijdelijke API en MCP-server zijn daarna gestopt. Dit is een transportcontrole, geen onafhankelijke normtoets.
+
 **Technische controle op `47c84f3` (4 oktober).** 758 kern- en drie integratietests, 55 servicetests, Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de bouw van HTTP-API/MCP-binaries slaagden. Pakket- en binaryhashes staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-47c84f3.md). De visuele UI-acceptatie en officiële EDR-vergelijking zijn nog niet uitgevoerd.
 
 ## Samenvatting stand 3 oktober 2026
