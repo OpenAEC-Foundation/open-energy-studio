@@ -6,6 +6,8 @@ Bijgewerkt op 4 oktober 2026. De derde volledige dekkingsaudit vond op 3 oktober
 
 Doeluitgave: **NTA 8800:2025+C1:2026**. Dit register beschrijft implementatiedekking; het kent geen normconformiteit toe. Het [bronnenregister](nta8800-bronnenregister.md) legt vast welke primaire documenten en onafhankelijke uitkomsten nog ontbreken. `Model` betekent dat invoer kan worden vastgelegd, `Audit` dat basiscontroles bestaan, `Rekenroute` dat normformules zijn geïmplementeerd, `Referentie` dat deelresultaten onafhankelijk zijn vergeleken, en `Attest` dat de variant in de extern getoetste scope valt.
 
+De referentiegate kan op `dba3ca2` ook `labelPrimaryFossil` en `labelRenewableShare` tegen later te verkrijgen externe waarden vergelijken. Een gerichte synthetische test en de [Linux-debugbuild](nta8800-build-verificatie-2026-10-04-dba3ca2.md) slaagden. Dit wijzigt de kolommen Referentie en Attest niet; officiële actuele W/U-waarden zijn nog niet opgenomen.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
