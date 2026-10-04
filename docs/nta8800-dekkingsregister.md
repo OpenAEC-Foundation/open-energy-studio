@@ -28,6 +28,8 @@ De [Linux-debugbuild van `cd46024`](nta8800-build-verificatie-2026-10-04-cd46024
 
 Op `e440704` zijn de aanvullende eindigheidscontroles en de bijgewerkte NTA-handleiding samen gecontroleerd. De [Linux-debugbuild](nta8800-build-verificatie-2026-10-04-e440704.md), 756 kern- en drie integratietests, 54 service- en 420 frontendtests, formatcontrole en Clippy slaagden. Een extra robuustheidsrun met 100 mutaties per project-/opnamefixture en maatwerkadviesmutaties slaagde. Officiële actuele EDR-vergelijking, visuele acceptatie en attest staan nog open.
 
+Het openen van `.oes.json` vult ontbrekende legacy-lijsten aan, maar weigert nu beschadigde collecties en ontbrekende projectidentiteit of gebruiksfunctie vóór de UI-wissel. De gerichte test en frontend-build zijn geslaagd. Dit is bestandsveiligheid, geen inhoudelijke NTA-referentietoets.
+
 Op commit `02a09b0` is de volledige interne integratiesuite opnieuw gedraaid: 734 Rust-kerntests, 53 service-/MCP-tests en 353 frontendtests zijn groen; ook de TypeScript-/Vite-build is geslaagd. Dit is geen actuele onafhankelijke EDR-vergelijking.
 
 Een latere controle vanaf `02fafc5` gaf 735 groene kerntests, 53 groene servicetests, geslaagde Rust-formatcontroles en een geslaagde frontend-build. De volledige frontendrun overlapte een relabel-merge en is daarom geen vrijgave voor de nieuwe stand; de twee betrokken testbestanden zijn na de merge opnieuw uitgevoerd (10/10 groen). De precieze testgrens staat in de [verificatiestatus](nta8800-verificatiestatus.md).

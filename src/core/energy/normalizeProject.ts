@@ -8,50 +8,68 @@ import type { IConstruction, IProject, ISurface, IZone } from './types';
  * point-bridge inventory) are left alone.
  */
 export function normalizeProject(project: IProject): IProject {
+  if (project == null || typeof project !== 'object' || Array.isArray(project)) {
+    throw new Error('Invalid project: expected an object');
+  }
+  if (typeof project.id !== 'string' || project.id.trim() === '') {
+    throw new Error('Invalid project: id is missing');
+  }
+  if (typeof project.buildingFunction !== 'string' || project.buildingFunction.trim() === '') {
+    throw new Error('Invalid project: buildingFunction is missing');
+  }
   let changed = false;
-  const list = <T,>(value: T[] | undefined | null): T[] => {
-    if (Array.isArray(value)) return value;
+  const list = <T,>(value: T[] | undefined | null, path: string): T[] => {
+    if (Array.isArray(value)) {
+      if (value.some((item) => item == null || typeof item !== 'object' || Array.isArray(item))) {
+        throw new Error(`Invalid project: ${path} contains a non-object item`);
+      }
+      return value;
+    }
+    if (value != null) throw new Error(`Invalid project: ${path} must be an array`);
     changed = true;
     return [];
   };
-  const text = (value: string | undefined | null): string => {
+  const text = (value: string | undefined | null, path: string): string => {
     if (typeof value === 'string') return value;
+    if (value != null) throw new Error(`Invalid project: ${path} must be text`);
     changed = true;
     return '';
   };
   const raw = project as Partial<IProject>;
-  const zones = list(raw.zones).map((zone: IZone) => {
-    const surfaces = list(zone.surfaces).map((surface: ISurface) => {
-      const windows = list(surface.windows);
+  const zones = list(raw.zones, 'zones').map((zone: IZone, zoneIndex) => {
+    const surfaces = list(zone.surfaces, `zones[${zoneIndex}].surfaces`).map((surface: ISurface, surfaceIndex) => {
+      const windows = list(surface.windows, `zones[${zoneIndex}].surfaces[${surfaceIndex}].windows`);
       return windows === surface.windows ? surface : { ...surface, windows };
     });
-    const thermalBridges = list(zone.thermalBridges);
+    const thermalBridges = list(zone.thermalBridges, `zones[${zoneIndex}].thermalBridges`);
     let airTightness = zone.airTightness;
     if (airTightness == null) {
       changed = true;
       airTightness = { qv10: 0 };
+    } else if (typeof airTightness !== 'object' || Array.isArray(airTightness)) {
+      throw new Error(`Invalid project: zones[${zoneIndex}].airTightness must be an object`);
     }
     const same = surfaces.every((surface, index) => surface === zone.surfaces?.[index])
       && thermalBridges === zone.thermalBridges && airTightness === zone.airTightness;
     return same ? zone : { ...zone, surfaces, thermalBridges, airTightness };
   });
-  const constructions = list(raw.constructions).map((construction: IConstruction) => {
-    const layers = list(construction.layers);
+  const constructions = list(raw.constructions, 'constructions').map((construction: IConstruction, index) => {
+    const layers = list(construction.layers, `constructions[${index}].layers`);
     return layers === construction.layers ? construction : { ...construction, layers };
   });
   const normalized: IProject = {
     ...project,
-    name: text(raw.name),
-    description: text(raw.description),
-    address: text(raw.address),
-    city: text(raw.city),
+    name: text(raw.name, 'name'),
+    description: text(raw.description, 'description'),
+    address: text(raw.address, 'address'),
+    city: text(raw.city, 'city'),
     zones,
-    heatingSystems: list(raw.heatingSystems),
-    ventilationSystems: list(raw.ventilationSystems),
-    coolingSystems: list(raw.coolingSystems),
-    hotWaterSystems: list(raw.hotWaterSystems),
-    solarPV: list(raw.solarPV),
-    solarThermal: list(raw.solarThermal),
+    heatingSystems: list(raw.heatingSystems, 'heatingSystems'),
+    ventilationSystems: list(raw.ventilationSystems, 'ventilationSystems'),
+    coolingSystems: list(raw.coolingSystems, 'coolingSystems'),
+    hotWaterSystems: list(raw.hotWaterSystems, 'hotWaterSystems'),
+    solarPV: list(raw.solarPV, 'solarPV'),
+    solarThermal: list(raw.solarThermal, 'solarThermal'),
     constructions,
   };
   return changed ? normalized : project;

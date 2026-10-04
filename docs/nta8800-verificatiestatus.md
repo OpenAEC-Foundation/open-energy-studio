@@ -41,6 +41,8 @@ De Linux-debugbuild op dezelfde commit is gebouwd en met SHA-256 en pakketmetada
 
 **Controle op `e440704` (4 oktober).** Na de uitbreiding van de eindigheidscontroles, robuustheidstest en NTA-handleiding slaagden 756 Rust-kerntests plus drie integratietests, 54 servicetests, 420 frontendtests, TypeScript-/Vite-build, Rust-formatcontrole en Clippy. Een aanvullende robuustheidsrun met 100 varianten per project-/opnamefixture en een kleinere maatwerkadviesreeks slaagde. De Linux-debugbuild is opnieuw verpakt; pakketmetadata en SHA-256 staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-e440704.md). De externe verificatiegrenzen blijven gelden.
 
+**Projectbestand-invoer na `2941fd1` (4 oktober).** Bij het openen worden ontbrekende legacy-lijsten nog aangevuld, maar een niet-lege onjuist getypeerde lijst, een primitief item, een ontbrekende project-ID of ontbrekende gebruiksfunctie wordt nu vóór `DOC_OPEN` afgewezen. Daardoor kan een beschadigd bestand niet stilzwijgend invoer wissen of pas na het openen de UI laten vastlopen. De gerichte componenttest (9/9) en TypeScript-/Vite-build slaagden; een visuele desktopcontrole blijft open.
+
 ## Samenvatting stand 3 oktober 2026
 
 **Wat de kern doet.** De Rust-kern rekent de volledige keten van NTA 8800:2025+C1:2026 door. Dat loopt van projectinvoer of basisopname tot en met:

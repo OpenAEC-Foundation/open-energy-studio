@@ -124,6 +124,21 @@ describe('normalising an opened project', () => {
     expect(fixed.zones[0].surfaces[0].windows).toEqual([]);
     expect(fixed.solarThermal).toEqual([]);
   });
+
+  it('rejects malformed collections before opening instead of silently dropping data or crashing later', () => {
+    const project = createDefaultProject();
+    expect(() => normalizeProject({} as IProject)).toThrow('id is missing');
+    expect(() => normalizeProject({ ...project, buildingFunction: null as never }))
+      .toThrow('buildingFunction is missing');
+    expect(() => normalizeProject({ ...project, zones: {} as never })).toThrow('zones must be an array');
+    expect(() => normalizeProject({ ...project, zones: [null] as never })).toThrow('zones contains a non-object item');
+    expect(() => normalizeProject({
+      ...project,
+      zones: [{ ...project.zones[0], surfaces: [null] as never }],
+    })).toThrow('zones[0].surfaces contains a non-object item');
+    expect(() => normalizeProject({ ...project, heatingSystems: [false] as never }))
+      .toThrow('heatingSystems contains a non-object item');
+  });
 });
 
 function Thrower(): never {
