@@ -111,24 +111,37 @@ fn metric_unit(path: &str) -> Option<&'static str> {
         _ => {}
     }
     let parts: Vec<_> = path.split('/').collect();
-    if let ["heatingMonth", month, field] = parts.as_slice() {
+    if let [kind @ ("heatingMonth" | "coolingMonth"), month, field] = parts.as_slice() {
         let Ok(parsed_month) = month.parse::<u8>() else {
             return None;
         };
         if !(1..=12).contains(&parsed_month) || parsed_month.to_string() != *month {
             return None;
         }
-        return match *field {
-            "heatingNeedKwh"
-            | "emissionInputKwh"
-            | "distributionLossKwh"
-            | "generatorOutputKwh"
-            | "heatPumpOutputKwh"
-            | "generatorElectricityKwh"
-            | "auxiliaryElectricityKwh"
-            | "naturalGasKwh"
-            | "districtHeatKwh"
-            | "collectiveSourceHeatKwh" => Some("kWh"),
+        return match (*kind, *field) {
+            ("heatingMonth", "heatingNeedKwh")
+            | ("heatingMonth", "emissionInputKwh")
+            | ("heatingMonth", "distributionLossKwh")
+            | ("heatingMonth", "generatorOutputKwh")
+            | ("heatingMonth", "heatPumpOutputKwh")
+            | ("heatingMonth", "generatorElectricityKwh")
+            | ("heatingMonth", "auxiliaryElectricityKwh")
+            | ("heatingMonth", "naturalGasKwh")
+            | ("heatingMonth", "districtHeatKwh")
+            | ("heatingMonth", "collectiveSourceHeatKwh")
+            | ("coolingMonth", "needKwh")
+            | ("coolingMonth", "emissionLossKwh")
+            | ("coolingMonth", "distributionLossKwh")
+            | ("coolingMonth", "boosterExtractionKwh")
+            | ("coolingMonth", "dehumidificationKwh")
+            | ("coolingMonth", "ahuCoolingKwh")
+            | ("coolingMonth", "generatorColdKwh")
+            | ("coolingMonth", "electricityKwh")
+            | ("coolingMonth", "naturalGasKwh")
+            | ("coolingMonth", "districtHeatKwh")
+            | ("coolingMonth", "districtColdKwh")
+            | ("coolingMonth", "auxiliaryElectricityKwh")
+            | ("coolingMonth", "ambientColdKwh") => Some("kWh"),
             _ => None,
         };
     }
@@ -193,6 +206,31 @@ fn actual_metric(
             "naturalGasKwh" => Some(row.natural_gas_kwh),
             "districtHeatKwh" => Some(row.district_heat_kwh),
             "collectiveSourceHeatKwh" => Some(row.collective_source_heat_kwh),
+            _ => None,
+        };
+    }
+    if let ["coolingMonth", month, field] = parts.as_slice() {
+        let month = month.parse::<u8>().ok()?;
+        let row = result
+            .cooling
+            .as_ref()?
+            .months
+            .iter()
+            .find(|row| row.month == month)?;
+        return match *field {
+            "needKwh" => Some(row.need_kwh),
+            "emissionLossKwh" => Some(row.emission_loss_kwh),
+            "distributionLossKwh" => Some(row.distribution_loss_kwh),
+            "boosterExtractionKwh" => Some(row.booster_extraction_kwh),
+            "dehumidificationKwh" => Some(row.dehumidification_kwh),
+            "ahuCoolingKwh" => Some(row.ahu_cooling_kwh),
+            "generatorColdKwh" => Some(row.generator_cold_kwh),
+            "electricityKwh" => Some(row.electricity_kwh),
+            "naturalGasKwh" => Some(row.natural_gas_kwh),
+            "districtHeatKwh" => Some(row.district_heat_kwh),
+            "districtColdKwh" => Some(row.district_cold_kwh),
+            "auxiliaryElectricityKwh" => Some(row.auxiliary_electricity_kwh),
+            "ambientColdKwh" => Some(row.ambient_cold_kwh),
             _ => None,
         };
     }
@@ -610,6 +648,73 @@ mod tests {
         assert!(!mismatch.metrics[0].within_tolerance);
 
         case.expected[0].unit = "kWh".into();
+        let invalid = compare_reference_case(case);
+        assert_eq!(invalid.status, "invalid_case");
+        assert!(invalid.metrics.is_empty());
+    }
+
+    #[test]
+    fn compares_cooling_month_only_when_cooling_is_calculated() {
+        let mut project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let missing = compare_reference_case(comparison_case(
+            project.clone(),
+            "coolingMonth/7/generatorColdKwh",
+            0.0,
+            "kWh",
+        ));
+        assert_eq!(missing.status, "calculation_unavailable");
+        assert!(missing.metrics.is_empty());
+
+        project["ntaCalculation"]["cooling"] = json!({
+            "emission": {
+                "emitter": "other_or_unknown",
+                "balancing": "not_applicable",
+                "control": "central_with_room_control",
+                "sourceReference": "synthetic test"
+            },
+            "generators": [{
+                "id": "cold",
+                "generator": {"kind": "compression"},
+                "equipmentReference": "synthetic test"
+            }]
+        });
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        assert_eq!(
+            assessment.status, "calculated_unverified",
+            "{:?}",
+            assessment.gaps
+        );
+        let performance = assessment.performance.unwrap();
+        let july = performance
+            .cooling
+            .unwrap()
+            .months
+            .into_iter()
+            .find(|month| month.month == 7)
+            .unwrap();
+        let mut case = comparison_case(
+            project,
+            "coolingMonth/7/generatorColdKwh",
+            july.generator_cold_kwh,
+            "kWh",
+        );
+        case.expected.push(ExpectedMetric {
+            path: "coolingMonth/7/electricityKwh".into(),
+            value: july.electricity_kwh,
+            unit: "kWh".into(),
+            norm_reference: "internal test".into(),
+            absolute_tolerance: 0.0,
+        });
+        let pass = compare_reference_case(case.clone());
+        assert_eq!(pass.status, "compared_pass");
+        assert_eq!(pass.metrics.len(), 2);
+
+        case.expected[1].value += 1.0;
+        assert_eq!(compare_reference_case(case.clone()).status, "compared_fail");
+        case.expected[0].path = "coolingMonth/07/generatorColdKwh".into();
         let invalid = compare_reference_case(case);
         assert_eq!(invalid.status, "invalid_case");
         assert!(invalid.metrics.is_empty());
