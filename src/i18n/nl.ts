@@ -113,6 +113,7 @@ export const nl: Record<string, string> = {
   'dialog.cancel': 'Annuleren',
   'item.deleteConfirm': "\"{{name}}\" verwijderen? Een herlabelvergelijking van vóór deze wijziging raakt verouderd.",
   'item.deleteCascade': "De NTA-invoer verliest {{count}} verwijzing(en) naar dit onderdeel:",
+  'item.buildingMeasuresReview': "Controleer daarna de handmatige maatwerkadviesmaatregel(en) op de afgeleide invoer: {{list}}. Hun posities in de rekeninvoer kunnen verschuiven.",
   'item.manualMeasuresShift': "Verwijderen kan niet: de handmatige maatwerkadviesmaatregel(en) {{list}} wijzen het project aan op positie, en na deze verwijdering zouden ze een ander onderdeel wijzigen. Pas die maatregelen eerst aan of verwijder ze.",
   'item.deleteYes': "Ja, verwijderen",
   'item.constructionInUse': "Deze constructie is in gebruik bij {{count}} vlak(ken): {{list}}. Koppel die vlakken eerst aan een andere constructie.",

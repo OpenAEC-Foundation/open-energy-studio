@@ -965,6 +965,15 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
   }
 }
 
+/** The project after an action, without touching UI state; used to preview a delete. */
+export function projectAfterAction(project: IProject, action: EnergyAction): IProject {
+  const state: EnergyState = {
+    project, result: null, viewMode: 'project', activeRibbonTab: 'start',
+    dialog: { type: null, editId: null }, selectedItemId: null, selectedItemType: null, isDirty: false, previewVisible: false,
+  };
+  return applyEnergyAction(state, action).project;
+}
+
 function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
   const next = applyEnergyAction(state, action);
   return next.project !== state.project && next.result !== null

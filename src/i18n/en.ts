@@ -113,6 +113,7 @@ export const en: Record<string, string> = {
   'dialog.cancel': 'Cancel',
   'item.deleteConfirm': "Delete \"{{name}}\"? A relabel comparison made before this change becomes outdated.",
   'item.deleteCascade': "The NTA input loses {{count}} entr(y/ies) that refer to it:",
+  'item.buildingMeasuresReview': "Afterwards, check the manual tailored-advice measure(s) on the derived input: {{list}}. Their positions in the calculation input may shift.",
   'item.manualMeasuresShift': "Cannot delete: manual tailored-advice measure(s) {{list}} address the project by position, and this delete would make them change a different element. Edit or remove those measures first.",
   'item.deleteYes': "Yes, delete",
   'item.constructionInUse': "This construction is used by {{count}} surface(s): {{list}}. Assign those surfaces another construction first.",

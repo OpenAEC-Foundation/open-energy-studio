@@ -99,9 +99,10 @@ describe('editing existing envelope elements', () => {
   }, 60000);
 
   it('maps every item type to a delete action', () => {
-    const project = { zones: [], constructions: [] } as never;
-    expect(deleteTarget(project, 'heatingSystem', 'h1')).toEqual({ kind: 'action', action: { type: 'DELETE_HEATING_SYSTEM', payload: 'h1' }, cascade: [] });
+    const project = { zones: [], constructions: [], heatingSystems: [{ id: 'h1' }] } as never;
+    expect(deleteTarget(project, 'heatingSystem', 'h1')).toEqual({ kind: 'action', action: { type: 'DELETE_HEATING_SYSTEM', payload: 'h1' }, cascade: [], buildingMeasures: [] });
     expect(deleteTarget(project, 'surface', 'missing')).toEqual({ kind: 'none' });
+    expect(deleteTarget(project, 'heatingSystem', 'missing')).toEqual({ kind: 'none' });
   });
 });
 
