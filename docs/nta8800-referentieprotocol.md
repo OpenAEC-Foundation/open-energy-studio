@@ -43,9 +43,9 @@ Voor de [gekoppelde gaswarmtepomp-conceptdiagnose](nta8800-gaswarmtepomp-gekoppe
 7. Leg voor iedere vrijgegeven route vast: invoerfingerprint, normprofiel, kernelversie, referentiebron, reviewer, testdatum en attestscope. Publiceer een route pas als al deze velden en de externe toetsstatus controleerbaar zijn.
 8. Voer de volledige actuele EDR-set bij iedere wijziging en iedere marktversie opnieuw uit en lever de resultaten volgens de aangewezen BRL aan de certificerende instelling. De [Staatscourant 2026, nr. 18113](https://zoek.officielebekendmakingen.nl/stcrt-2026-18113.html) beschrijft deze releasecyclus en meldt extra rekentesten voor de nieuwe BRL; een eenmalige geslaagde set volstaat niet.
 
-## Status
+## Status van het externe referentiedossier (4 oktober 2026)
 
-Er zijn nog geen onafhankelijke officiële referentiegevallen of door een attesteringsinstelling bevestigde toleranties in de repository. De volledige normtekst is nog niet in het ontwikkelwerkdossier beschikbaar. De huidige Rust-kernel heeft daarom geen vrijgegeven BENG-, TO-juli- of labelberekening.
+De gelicentieerde NTA 8800:2025+C1:2026 is lokaal beschikbaar en de Rust-kern bevat BENG-, TO-juli- en labelroutes; zie de [verificatiestatus](nta8800-verificatiestatus.md). Er staan nog geen onafhankelijke officiële referentiegevallen of door een attesteringsinstelling bevestigde toleranties voor deze editie in de repository. De routes zijn daarom niet extern gevalideerd of geattesteerd en geven geen geregistreerd energielabel af.
 
 ## EDR EP-W001 (1 oktober 2026)
 
