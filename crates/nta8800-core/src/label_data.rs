@@ -209,7 +209,9 @@ pub fn envelope_summary(project: &ProjectInput) -> Vec<EnvelopeSummary> {
         .map(|(category, total)| EnvelopeSummary {
             category: *category,
             area_m2: total.area,
-            mean_u_w_per_m2k: (total.u_area > 0.0).then(|| total.ua / total.u_area),
+            mean_u_w_per_m2k: (total.u_area > 0.0)
+                .then(|| total.ua / total.u_area)
+                .filter(|mean| mean.is_finite()),
             min_rc_m2k_per_w: total.rc.iter().copied().reduce(f64::min),
             max_rc_m2k_per_w: total.rc.iter().copied().reduce(f64::max),
         })

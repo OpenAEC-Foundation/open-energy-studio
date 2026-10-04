@@ -34,6 +34,7 @@ pub mod domestic_hot_water;
 pub mod envelope_elements;
 pub mod epus_draft;
 pub mod final_energy_draft;
+pub mod finite;
 pub mod forfait_envelope;
 pub mod forfait_heat_pump_draft;
 pub mod forfait_heat_pump_monthly_draft;

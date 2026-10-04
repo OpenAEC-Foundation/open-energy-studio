@@ -1877,7 +1877,12 @@ fn validate(input: &MaatwerkadviesInput, issues: &mut Vec<MwaIssue>) {
                 format!("{path}.investmentEur"),
             ));
         }
-        if !measure.lifetime_years.is_finite() || measure.lifetime_years <= 0.0 {
+        // Above 100 years the default horizon (the longest lifetime) would
+        // make the NPV loop run for ages; no measure lasts that long.
+        if !measure.lifetime_years.is_finite()
+            || measure.lifetime_years <= 0.0
+            || measure.lifetime_years > 100.0
+        {
             issues.push(issue(
                 "measure_lifetime_invalid",
                 format!("{path}.lifetimeYears"),

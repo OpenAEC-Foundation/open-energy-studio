@@ -1202,6 +1202,9 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
     if input.category == Category::Residential && input.dwelling_count == 0 {
         issues.push(issue("dwelling_count_required", "dwellingCount"));
     }
+    if input.dwelling_count > crate::monthly_demand::MAX_DWELLINGS {
+        issues.push(issue("dwelling_count_invalid", "dwellingCount"));
+    }
     if let Some(area) = input.whole_dwelling_area_m2 {
         if !finite_positive(area) || area + 1e-9 < input.usable_floor_area_m2 {
             issues.push(issue("whole_dwelling_area_invalid", "wholeDwellingAreaM2"));
