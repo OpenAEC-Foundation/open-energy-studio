@@ -58,6 +58,7 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
       { id: 'ventilation', labelKey: 'nav.sub.installations.ventilation' },
       { id: 'cooling', labelKey: 'nav.sub.installations.cooling' },
       { id: 'humidification', labelKey: 'nav.sub.installations.humidification' },
+      { id: 'lighting', labelKey: 'nav.sub.installations.lighting' },
       { id: 'generation', labelKey: 'nav.sub.installations.generation' },
       { id: 'heatPumps', labelKey: 'nav.sub.installations.heatPumps' },
       { id: 'bacs', labelKey: 'nav.sub.installations.bacs' },

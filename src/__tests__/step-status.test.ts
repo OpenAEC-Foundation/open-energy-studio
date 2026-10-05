@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { IProject } from '../core/energy/types';
 import type { ProjectPerformanceAssessment } from '../core/nta/KernelClient';
-import { isNewBuild, kernelIssues, stepStatuses } from '../core/nta/stepStatus';
+import { invalidBlockPath, isNewBuild, kernelIssues, stepStatuses } from '../core/nta/stepStatus';
 import { WORKFLOW_STEPS } from '../core/navigation/routes';
 
 const root = resolve(__dirname, '../..');
@@ -48,10 +48,11 @@ describe('stepStatuses on the example projects', () => {
       };
       const statuses = stepStatuses(project, broken);
       expect(statuses.building).toMatchObject({ state: 'errors', errors: 1, warnings: 0 });
-      expect(statuses.check).toMatchObject({ state: 'errors', errors: 1 });
+      // Since F6 an NTA input path counts for the step that edits it (generator: Installaties).
+      expect(statuses.check).toMatchObject({ errors: 0, warnings: 0 });
       expect(statuses.registration).toMatchObject({ state: 'errors', errors: 1 });
-      expect(statuses.installations).toMatchObject({ state: 'warnings', errors: 0, warnings: 1 });
-      expect(statuses.installations.issues[0].path).toBe('ntaHeatPumps[0].declaration');
+      expect(statuses.installations).toMatchObject({ state: 'errors', errors: 1, warnings: 1 });
+      expect(statuses.installations.issues.map((issue) => issue.path)).toEqual(['ntaCalculation.generator.kind', 'ntaHeatPumps[0].declaration']);
       // Withheld: no result, no report.
       expect(statuses.results.state).toBe('todo');
       expect(statuses.report.state).toBe('todo');
@@ -86,5 +87,18 @@ describe('stepStatuses on the example projects', () => {
     expect(statuses.check.state).toBe('todo');
     expect(statuses.results.state).toBe('todo');
     expect(statuses.building.state).toBe('complete');
+  });
+});
+
+describe('invalid NTA block', () => {
+  it('locates the field from the serde path in the detail ("Ga naar")', () => {
+    expect(invalidBlockPath('nta_calculation_block_invalid', 'ntaCalculation', 'setpoints: missing field `heatingC`'))
+      .toBe('ntaCalculation.setpoints.heatingC');
+    expect(invalidBlockPath('nta_calculation_block_invalid', 'ntaCalculation', '.: missing field `thermalMass`'))
+      .toBe('ntaCalculation.thermalMass');
+    expect(invalidBlockPath('nta_calculation_block_invalid', 'ntaCalculation', 'ventilationFlows[0].months[3].conductanceWPerK: invalid type: null'))
+      .toBe('ntaCalculation.ventilationFlows[0].months[3].conductanceWPerK');
+    expect(invalidBlockPath('nta_calculation_block_invalid', 'ntaCalculation', 'invalid type: map')).toBe('ntaCalculation');
+    expect(invalidBlockPath('missing_generator', 'ntaCalculation.generator', 'generator: x')).toBe('ntaCalculation.generator');
   });
 });

@@ -8,7 +8,6 @@ import { Box, Download, FileDown, Printer } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { useKernel } from '../../context/KernelProvider';
-import { isPathWithin } from '../../core/nta/pathUtil';
 import { routeForPath } from '../../core/nta/gapRoutes';
 import { kernelIssues, type StepStatus } from '../../core/nta/stepStatus';
 import type { Route, StepId } from '../../core/navigation/routes';
@@ -37,28 +36,10 @@ import {
 } from './pages/BuildingPages';
 import { RegistrationEditButton, RegistrationPage } from './pages/RegistrationPage';
 import { ShellActionsProvider, type ShellActions } from './ShellActions';
+import { focusPathIn } from './focusPath';
+import { NtaApplyBar, NtaDraftNotice, NtaStepSections } from './NtaStepPage';
 
-const FLASH_MS = 1200;
-
-/** Scroll to and focus the element of a kernel path ("Ga naar"); the deepest `[data-path]` that contains it wins. */
-export function focusPathIn(container: HTMLElement, path: string): HTMLElement | null {
-  let best: HTMLElement | null = null;
-  let bestLength = -1;
-  for (const element of Array.from(container.querySelectorAll<HTMLElement>('[data-path]'))) {
-    const candidate = element.dataset.path ?? '';
-    if (candidate && isPathWithin(path, candidate) && candidate.length > bestLength) {
-      best = element;
-      bestLength = candidate.length;
-    }
-  }
-  if (!best) return null;
-  best.scrollIntoView?.({ block: 'center' });
-  if (!best.hasAttribute('tabindex') && !/^(INPUT|SELECT|TEXTAREA|BUTTON|A)$/.test(best.tagName)) best.tabIndex = -1;
-  best.focus({ preventScroll: true });
-  best.classList.add('focus-flash');
-  window.setTimeout(() => best?.classList.remove('focus-flash'), FLASH_MS);
-  return best;
-}
+export { focusPathIn } from './focusPath';
 
 interface StepRouterProps {
   project: IProject;
@@ -100,7 +81,10 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
   let page: React.ReactNode;
   switch (route.step) {
     case 'project':
-      page = <ProjectOverview project={project} statuses={statuses} actions={actions} />;
+      page = <>
+        <ProjectOverview project={project} statuses={statuses} actions={actions} />
+        <div className="page-body page-body--nta"><NtaStepSections route={route} /></div>
+      </>;
       break;
     case 'building':
       page = <>
@@ -122,6 +106,7 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
           {route.sub === 'airTightness' && <AirTightnessPage />}
           {route.sub === 'unheated' && <UnheatedSpacesPanel />}
           {route.sub === 'model3d' && <Building3DView />}
+          {route.sub !== 'model3d' && <NtaStepSections route={route} />}
         </div>
       </>;
       break;
@@ -133,7 +118,8 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
         })}
         <div className="page-body">
           {(route.sub === 'systems' || !route.sub) && <InstallationsOverview />}
-          {route.sub && route.sub !== 'systems' && route.sub !== 'heatPumps' && <ServicePage key={route.sub} sub={route.sub as ServiceId} />}
+          {route.sub && route.sub !== 'systems' && route.sub !== 'heatPumps' && <ServicePage key={route.sub} sub={route.sub as ServiceId}
+            focusPath={route.focusPath} />}
           {route.sub === 'heatPumps' && <ServicePage sub="heatPumps" extra={<>
             <HeatPumpInventoryPanel />
             <details className="diagnostic-card">
@@ -160,7 +146,11 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
             </Card>
             <KernelAuditPanel project={project} />
           </>}
-          {route.sub === 'input' && <NtaPerformancePanel />}
+          {route.sub === 'input' && <>
+            <NtaDraftNotice />
+            <NtaStepSections route={route} />
+            <NtaPerformancePanel />
+          </>}
         </div>
       </>;
       break;
@@ -216,7 +206,10 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
 
   return (
     <div className="step-page" ref={bodyRef} data-step={route.step} style={{ display: 'contents' }}>
-      <ShellActionsProvider value={actions}><ErrorBoundary resetKey={state.project}>{page}</ErrorBoundary></ShellActionsProvider>
+      <ShellActionsProvider value={actions}>
+        <ErrorBoundary resetKey={state.project}>{page}</ErrorBoundary>
+        <NtaApplyBar route={route} navigate={actions.navigate} />
+      </ShellActionsProvider>
     </div>
   );
 }

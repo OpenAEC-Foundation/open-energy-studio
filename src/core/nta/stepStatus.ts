@@ -32,11 +32,27 @@ export interface StepStatus {
   issues: StepIssue[];
 }
 
+/**
+ * The field behind an invalid NTA block. The kernel reports a block it cannot
+ * read at `ntaCalculation`, with the serde path in the detail
+ * (`setpoints: missing field \`heatingC\``, `ventilationFlows[0].months[3].conductanceWPerK: invalid type: null`);
+ * that path is where "Ga naar" should go.
+ */
+export function invalidBlockPath(code: string, path: string, detail: string | null | undefined): string {
+  if (code !== 'nta_calculation_block_invalid' || path !== 'ntaCalculation' || !detail) return path;
+  const missing = /^(?:\.|([A-Za-z_][\w.[\]]*)): missing field `(\w+)`/.exec(detail);
+  if (missing) return `ntaCalculation.${missing[1] ? `${missing[1]}.` : ''}${missing[2]}`;
+  const located = /^([A-Za-z_][\w.[\]]*): /.exec(detail);
+  return located ? `ntaCalculation.${located[1]}` : path;
+}
+
 /** Kernel findings with their kind; gaps are errors whatever the status (both block a result). */
 export function kernelIssues(assessment: ProjectPerformanceAssessment | null | undefined): StepIssue[] {
   if (!assessment) return [];
   return [
-    ...(assessment.gaps ?? []).map((gap) => ({ kind: 'error' as const, code: gap.code, path: gap.path, ...(gap.detail ? { detail: gap.detail } : {}) })),
+    ...(assessment.gaps ?? []).map((gap) => ({
+      kind: 'error' as const, code: gap.code, path: invalidBlockPath(gap.code, gap.path, gap.detail), ...(gap.detail ? { detail: gap.detail } : {}),
+    })),
     ...(assessment.warnings ?? []).map((warning) => ({ kind: 'warning' as const, code: warning.code, path: warning.path, ...(warning.detail ? { detail: warning.detail } : {}) })),
   ];
 }

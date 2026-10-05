@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EnergyProvider, useEnergy, useDocumentManager, useHasActiveDocument } from './context/EnergyContext';
 import { KernelProvider, useKernel } from './context/KernelProvider';
+import { NtaDraftProvider } from './context/NtaDraftProvider';
 import { I18nProvider } from './i18n/I18nProvider';
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen';
 import { StatusBar } from './components/StatusBar/StatusBar';
@@ -345,7 +346,9 @@ function ActiveDocumentContent(props: { files: FileCommands; paletteOpen: boolea
   const { state } = useEnergy();
   return (
     <KernelProvider project={state.project}>
-      <ActiveDocumentShell {...props} />
+      <NtaDraftProvider>
+        <ActiveDocumentShell {...props} />
+      </NtaDraftProvider>
     </KernelProvider>
   );
 }

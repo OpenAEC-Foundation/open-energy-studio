@@ -1,0 +1,88 @@
+/* NTA input on the workflow steps (UI redesign F6, mockup 04). Tokens only. */
+
+.nta-step { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+.nta-step__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-3); }
+.nta-step__title { margin: 0; font-family: var(--font-display); font-size: var(--fs-md); font-weight: var(--weight-semibold); color: var(--fg-1); }
+.nta-step__lead { margin: 2px 0 0; color: var(--fg-3); font-size: var(--fs-sm); }
+.nta-step__parts { padding: var(--space-2) 0; border-bottom: 1px solid var(--line-subtle); overflow-x: auto; }
+.nta-step__sections { margin-top: 0; gap: var(--space-3); }
+
+.nta-part-count {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px;
+  border-radius: 9px; background: var(--warn-subtle); color: var(--warn-text); font-size: var(--fs-2xs); font-weight: var(--weight-semibold);
+}
+.nta-part-count--error { background: var(--error-subtle); color: var(--error-text); }
+
+/* One section: a card with the fields and "Bron & bewijs" at the bottom. */
+.nta-step-section { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-card); overflow: hidden; }
+.nta-step-section .nta-form-section { border: 0; border-radius: 0; padding: var(--space-3) var(--space-4); }
+.nta-step-section .nta-form-section legend { float: left; width: 100%; margin-bottom: var(--space-2); padding: 0; font-family: var(--font-display); font-size: var(--fs-md); color: var(--fg-1); }
+.nta-step-section .nta-form-section legend + * { clear: both; }
+.nta-step-section--bare { padding: var(--space-2); }
+.nta-step-section--bare > .nta-form-section { border: 0; }
+
+/* The ui NumberInput inside the older NTA form styles. */
+.nta-form .ui-input .ui-input__control { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.nta-form label[data-issue="error"] > .ui-input,
+.nta-form label[data-issue="error"] > select,
+.nta-form label[data-issue="error"] > input:not([type="checkbox"]) { border-color: var(--error); box-shadow: 0 0 0 2px var(--error-subtle); }
+.nta-form label[data-issue="warning"] > .ui-input,
+.nta-form label[data-issue="warning"] > select,
+.nta-form label[data-issue="warning"] > input:not([type="checkbox"]) { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn-subtle); }
+.nta-form label[data-issue="error"] { color: var(--error-text); }
+
+.nta-evidence { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--line-subtle); background: var(--surface-sunken); font-size: var(--fs-sm); }
+.nta-evidence--open { background: var(--warn-subtle); border-top-color: var(--warn); }
+.nta-evidence__head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); color: var(--fg-1); }
+.nta-evidence__badge { padding: 1px 8px; border-radius: 10px; border: 1px solid var(--warn); color: var(--warn-text); font-size: var(--fs-xs); }
+.nta-evidence__ok { color: var(--ok-text); font-size: var(--fs-xs); }
+.nta-evidence__list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.nta-evidence__list li { display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.nta-evidence__list code { overflow: hidden; color: var(--fg-3); font-family: var(--font-mono); font-size: var(--fs-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.nta-evidence__value { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; color: var(--fg-2); text-overflow: ellipsis; white-space: nowrap; }
+.nta-evidence__value svg { width: 14px; height: 14px; flex: none; }
+.nta-evidence__list li.filled .nta-evidence__value { color: var(--accent); }
+.nta-evidence__list li.open .nta-evidence__value { color: var(--warn-text); }
+@media (max-width: 720px) { .nta-evidence__list li { grid-template-columns: minmax(0, 1fr) auto; } .nta-evidence__list code { grid-column: 1 / -1; } }
+
+/* "Geavanceerd · n secties — … · alle op standaard" */
+.nta-advanced { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-card); }
+.nta-advanced > summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: var(--space-3) var(--space-4);
+  cursor: pointer; color: var(--fg-2); font-size: var(--fs-sm); list-style: none;
+}
+.nta-advanced > summary::-webkit-details-marker { display: none; }
+.nta-advanced > summary::before { content: '›'; display: inline-block; width: 1em; color: var(--fg-3); transition: transform var(--dur-fast) var(--ease); }
+.nta-advanced[open] > summary::before { transform: rotate(90deg); }
+.nta-advanced > summary:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-lg); }
+.nta-advanced__title { color: var(--fg-1); font-weight: var(--weight-semibold); }
+.nta-advanced__list { flex: 1; min-width: 12rem; color: var(--fg-3); }
+.nta-advanced__state { color: var(--fg-3); font-size: var(--fs-xs); }
+.nta-advanced__body { display: grid; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); }
+
+/* The one bar for the draft, floating at the bottom of the work area. */
+.nta-apply-bar {
+  position: sticky; bottom: var(--space-3); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  margin: var(--space-4) var(--space-5, 24px) var(--space-3); padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--shadow-3);
+}
+.nta-apply-bar__dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--accent); }
+.nta-apply-bar__text { margin: 0; color: var(--fg-2); font-size: var(--fs-sm); }
+.nta-apply-bar__text strong { color: var(--fg-1); }
+.nta-apply-bar__names { display: inline-flex; align-items: center; gap: 4px; flex: 1; min-width: 8rem; margin: 0; overflow: hidden; color: var(--fg-3); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.nta-apply-bar__names svg { width: 14px; height: 14px; flex: none; }
+.nta-apply-bar__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+
+/* Inspector › Controle */
+.inspector-check { display: grid; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); }
+.inspector-check__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.inspector-check__tiles > div { padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.inspector-check__tiles dd { order: -1; margin: 0; font-family: var(--font-display); font-size: var(--fs-xl, 1.5rem); color: var(--fg-1); }
+.inspector-check__tiles > div { display: flex; flex-direction: column; }
+.inspector-check__tiles dt { color: var(--fg-3); font-size: var(--fs-xs); }
+.inspector-check__tiles .err dd { color: var(--error-text); }
+.inspector-check__tiles .warn dd { color: var(--warn-text); }
+.inspector-check__hint { margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--fg-2); font-size: var(--fs-sm); }
+.inspector-check__none { margin: 0; color: var(--ok-text); font-size: var(--fs-sm); }
+.inspector-check__group { margin: var(--space-2) 0 0; color: var(--fg-3); font-size: var(--fs-2xs); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; }
+.inspector-check__omitted { display: grid; gap: 6px; margin: 0; padding-left: 1.1rem; color: var(--fg-2); font-size: var(--fs-sm); }

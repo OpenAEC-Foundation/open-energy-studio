@@ -38,6 +38,18 @@ Rekenuitkomsten veranderen niet. Resultaten toont de kernuitkomst nu als dashboa
 - **Ingehouden en indicatief.** Een ingehouden of indicatieve uitkomst toont het dashboard niet; daar blijft het bestaande gedrag gelden.
 - **Paginatitel.** De titel noemt nu de subpagina, bijvoorbeeld Constructies of Per dienst.
 
+## 5 oktober 2026 — UI-herontwerp, fase F6: NTA-invoer in de stappen (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd; het NTA-blok heeft dezelfde vorm.
+- **De NTA-invoer staat bij de stap waar hij hoort.** Project: uitgave, rekenomvang en de andere algemene gegevens. Gebouw: gebruiksfuncties, setpoints, massa en interne warmte bij Rekenzones; ramen, dynamische ramen, dakhellingen en vloeren op grond bij Schil & ramen; serres bij Onverwarmde ruimten. Installaties: Verwarming in vijf plus één delen (Opwekking, Distributie, Afgifte, Regeling & BCRG, Hulpenergie, Zonneverwarming), Warm tapwater, Ventilatie, Koeling, Bevochtiging, Verlichting (nieuw, utiliteit), Opwekking (PV, externe levering en bijlage P, opgegeven stromen, opslag) en Gebouwautomatisering. Controle › NTA-invoer houdt de bevestigingen, het volledige formulier en de JSON-editor.
+- **Eén concept, één keer toepassen.** Alle stappen bewerken hetzelfde concept; van stap wisselen verliest niets. De balk onderaan toont het aantal wijzigingen, Ongedaan maken, Vorige stap en Toepassen en verder. Toepassen doet wat Opslaan in het formulier deed.
+- **Basis / Alle velden.** Minder gebruikte secties staan in Basis achter "Geavanceerd" en klappen vanzelf open bij invoer, een kernmelding of Ga naar.
+- **Bron & bewijs per sectie** met de bronvelden van die sectie, ingevuld of open, en Ga naar.
+- **Getallen** accepteren een komma of een punt en tonen de waarde in de taal van de app.
+- **Controle in het contextpaneel**: fouten, aandachtspunten en weggelaten correcties, de punten van de open pagina eerst, met Ga naar naar het veld. Een veld met een kernmelding heeft een rode of gele rand.
+- **Ga naar** opent nu de juiste stap, subpagina, het verwarmingsdeel en zo nodig het ingeklapte blok, en zet de focus in het veld. Een ongeldig NTA-blok (`nta_calculation_block_invalid`) wijst naar het veld uit de kernmelding, bijvoorbeeld `ntaCalculation.setpoints.heatingC`. Daardoor tellen NTA-meldingen in de navigatie bij Gebouw of Installaties in plaats van bij Controle.
+- **Alleen bij de editie 2024** staan de velden effectieve massa en dakoppervlak per vertrek (bijlage AA) en "collectieve bron gerealiseerd vanaf 2013" (bijlage P). Bij een andere editie meldt de app achtergebleven waarden en biedt Verwijderen aan.
+
 ## 5 oktober 2026 — UI-herontwerp, fase F5: Gebouw en Installaties per onderdeel (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd; ids van zones, vlakken, ramen en systemen blijven gelijk.

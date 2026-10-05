@@ -2,8 +2,8 @@
  * Step 3 Installaties (UI redesign F5, mockup 03). The overview shows one
  * chain card per service with its key figures and the status from the kernel
  * findings; each service has its own sub page with the systems of the project
- * model and a summary of its NTA 8800 input. The NTA sections themselves stay
- * under Controle › NTA-invoer until F6 splits that form. Click selects
+ * model and, since F6, the NTA 8800 sections of the service on the shared
+ * draft (`NtaStepSections`). Click selects
  * (inspector), double click or Enter opens the editor as a side sheet.
  */
 import type { ReactNode } from 'react';
@@ -24,6 +24,7 @@ import { Banner, Button, Card, DataTable, IssueList, StatusPill, Tag, type Colum
 import { ItemActions } from '../../ItemActions/ItemActions';
 import { useShellActions } from '../ShellActions';
 import { routeLabel } from '../PageHeader';
+import { NtaStepSections } from '../NtaStepPage';
 
 /**
  * Installed PV peak power: from the NTA input when it has PV systems (16.4a/16.4b),
@@ -44,14 +45,14 @@ export function projectPvPeak(project: IProject): { kwp: number; partial: boolea
   return { kwp: watts / 1000, partial };
 }
 
-export type ServiceId = 'heating' | 'hotWater' | 'ventilation' | 'cooling' | 'humidification' | 'generation' | 'heatPumps' | 'bacs';
+export type ServiceId = 'heating' | 'hotWater' | 'ventilation' | 'cooling' | 'humidification' | 'lighting' | 'generation' | 'heatPumps' | 'bacs';
 
 interface ServiceDef {
   id: ServiceId;
   /** NTA 8800 chapter or paragraph of the service. */
   ref: string;
   lists: SystemListKey[];
-  /** NTA input blocks of the service (shown as a summary, edited under Controle › NTA-invoer). */
+  /** NTA input blocks of the service (its chain card; the sections are edited on its sub page). */
   ntaKeys: string[];
   /** Kernel path prefixes whose findings count for this service. */
   paths: string[];
@@ -61,9 +62,10 @@ interface ServiceDef {
 export const SERVICES: ServiceDef[] = [
   {
     id: 'heating', ref: '§9', lists: ['heatingSystems'],
-    ntaKeys: ['generator', 'emission', 'distribution', 'distributionSystem', 'additionalHeatingSystems', 'heatingSystems'],
+    ntaKeys: ['generator', 'emission', 'distribution', 'distributionSystem', 'additionalHeatingSystems', 'heatingSystems', 'spaceHeatingSolar'],
     paths: ['heatingSystems', 'ntaCalculation.generator', 'ntaCalculation.emission', 'ntaCalculation.distribution',
-      'ntaCalculation.distributionSystem', 'ntaCalculation.additionalHeatingSystems', 'ntaCalculation.verticalPipes', 'ntaCalculation.heatingSystems'],
+      'ntaCalculation.distributionSystem', 'ntaCalculation.additionalHeatingSystems', 'ntaCalculation.verticalPipes', 'ntaCalculation.heatingSystems',
+      'ntaCalculation.identicalSystems', 'ntaCalculation.collectiveConnection', 'ntaCalculation.heatPumpRenewable', 'ntaCalculation.spaceHeatingSolar'],
     add: [{ dialog: 'heating-system', labelKey: 'ribbon.addHeating' }],
   },
   {
@@ -72,23 +74,25 @@ export const SERVICES: ServiceDef[] = [
     add: [{ dialog: 'hot-water-system', labelKey: 'ribbon.addHotWater' }],
   },
   {
-    id: 'ventilation', ref: '§11', lists: ['ventilationSystems'], ntaKeys: ['ventilation'],
-    paths: ['ventilationSystems', 'ntaCalculation.ventilation', 'ntaCalculation.ventilationFlows'],
+    id: 'ventilation', ref: '§11', lists: ['ventilationSystems'], ntaKeys: ['ventilation', 'ventilationFlows'],
+    paths: ['ventilationSystems', 'ntaCalculation.ventilation', 'ntaCalculation.ventilationFlows', 'ntaCalculation.demandUsesFixedC1Ventilation'],
     add: [{ dialog: 'ventilation-system', labelKey: 'ribbon.addVentilation' }],
   },
   {
-    id: 'cooling', ref: '§10', lists: ['coolingSystems'], ntaKeys: ['cooling', 'coolingSystems'],
+    id: 'cooling', ref: '§10', lists: ['coolingSystems'], ntaKeys: ['activeCooling', 'cooling', 'coolingSystems'],
     paths: ['coolingSystems', 'ntaCalculation.cooling', 'ntaCalculation.coolingSystems', 'ntaCalculation.activeCooling'],
     add: [{ dialog: 'cooling-system', labelKey: 'ribbon.addCooling' }],
   },
   { id: 'humidification', ref: '§12', lists: [], ntaKeys: ['humidifiers'], paths: ['ntaCalculation.humidifiers'], add: [] },
+  { id: 'lighting', ref: '§14', lists: [], ntaKeys: ['lighting'], paths: ['ntaCalculation.lighting'], add: [] },
   {
-    id: 'generation', ref: '§16', lists: ['solarPV', 'solarThermal'], ntaKeys: ['pvSystems', 'onSiteProduction', 'spaceHeatingSolar'],
-    paths: ['solarPV', 'solarThermal', 'ntaCalculation.pvSystems', 'ntaCalculation.onSiteProduction', 'ntaCalculation.spaceHeatingSolar'],
+    id: 'generation', ref: '§16', lists: ['solarPV', 'solarThermal'], ntaKeys: ['pvSystems', 'externalSupply', 'onSiteProduction', 'declaredUses', 'storage'],
+    paths: ['solarPV', 'solarThermal', 'ntaCalculation.pvSystems', 'ntaCalculation.externalSupply', 'ntaCalculation.onSiteProduction',
+      'ntaCalculation.declaredUses', 'ntaCalculation.declaredRenewableHeat', 'ntaCalculation.batteryStoragePresent', 'ntaCalculation.storage'],
     add: [{ dialog: 'solar-pv', labelKey: 'ribbon.addSolarPV' }, { dialog: 'solar-thermal', labelKey: 'ribbon.addSolarThermal' }],
   },
   { id: 'heatPumps', ref: '§9.6', lists: [], ntaKeys: [], paths: ['ntaHeatPumps'], add: [] },
-  { id: 'bacs', ref: '§5.5.8', lists: [], ntaKeys: ['bacs'], paths: ['ntaCalculation.bacs', 'ntaCalculation.bacsFactor'], add: [] },
+  { id: 'bacs', ref: '§5.5.8', lists: [], ntaKeys: ['bacs', 'bacsFactor'], paths: ['ntaCalculation.bacs', 'ntaCalculation.bacsFactor', 'ntaCalculation.bacsSourceReference'], add: [] },
 ];
 
 export const serviceDef = (id: string | undefined) => SERVICES.find((service) => service.id === id);
@@ -252,7 +256,7 @@ export function InstallationsOverview() {
               {blocks.map((key) => (
                 <li key={key} data-path={`ntaCalculation.${key}`}>
                   <button type="button" className="chain-stage chain-stage--nta"
-                    onClick={() => actions?.navigate({ step: 'check', sub: 'input', focusPath: `ntaCalculation.${key}` })}>
+                    onClick={() => actions?.navigate(routeForPath(`ntaCalculation.${key}`))}>
                     <span className="chain-stage__kicker"><Tag>NTA 8800</Tag></span>
                     <span className="chain-stage__name">{t(`installations.block.${key}`)}</span>
                     <span className="chain-figs"><span>{t('installations.openNta')}</span></span>
@@ -284,41 +288,7 @@ export function InstallationsOverview() {
 
 // ── Sub page per service ────────────────────────────────────────────
 
-/** NTA input of the service: which blocks are filled in, with the way to Controle › NTA-invoer. */
-function NtaBlockCard({ service }: { service: ServiceDef }) {
-  const { t } = useI18n();
-  const { state } = useEnergy();
-  const actions = useShellActions();
-  const blocks = ntaBlocks(state.project, service);
-  if (service.ntaKeys.length === 0) return null;
-  const nta = state.project.ntaCalculation as Record<string, unknown> | undefined;
-  return (
-    <Card level={2} title={t('installations.ntaInput')} subtitle={`NTA 8800 ${service.ref}`}
-      actions={actions ? <Button size="sm" onClick={() => actions.navigate({ step: 'check', sub: 'input', focusPath: `ntaCalculation.${blocks[0] ?? service.ntaKeys[0]}` })}>
-        {t('installations.openNta')} <ArrowRight aria-hidden="true" />
-      </Button> : undefined}>
-      {!nta ? <p className="page-lead">{t('installations.ntaMissing')}</p> : (
-        <ul className="nta-blocks">
-          {service.ntaKeys.map((key) => {
-            const value = nta[key];
-            const filled = hasBlock(value);
-            return (
-              <li key={key} className={filled ? 'ok' : undefined}>
-                <span>{t(`installations.block.${key}`)}</span>
-                <code>ntaCalculation.{key}</code>
-                <span className="nta-blocks__state">{filled
-                  ? (Array.isArray(value) ? t('installations.blockCount').replace('{n}', String(value.length)) : t('installations.blockFilled'))
-                  : t('installations.blockEmpty')}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-export function ServicePage({ sub, extra }: { sub: ServiceId; extra?: ReactNode }) {
+export function ServicePage({ sub, extra, focusPath }: { sub: ServiceId; extra?: ReactNode; focusPath?: string }) {
   const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
   const kernel = useKernel();
@@ -359,8 +329,8 @@ export function ServicePage({ sub, extra }: { sub: ServiceId; extra?: ReactNode 
         </Card>
       );
     })}
-    <NtaBlockCard service={service} />
     {extra}
+    <NtaStepSections route={{ step: 'installations', sub, ...(focusPath ? { focusPath } : {}) }} />
   </>;
 }
 

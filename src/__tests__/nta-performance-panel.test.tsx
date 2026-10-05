@@ -227,7 +227,7 @@ describe('NTA performance panel', () => {
     const panel = within(await screen.findByRole('region', { name: 'NTA 8800 calculation (Rust kernel)' }));
     await user.click(await panel.findByRole('button', { name: 'Start NTA input' }));
     const form = within(panel.getByRole('form', { name: 'NTA input' }));
-    expect(form.getByLabelText('Heating setpoint °C')).toHaveValue(20);
+    expect(form.getByLabelText('Heating setpoint °C')).toHaveValue('20');
     fireEvent.change(form.getByLabelText('Source of usable floor area'), { target: { value: 'floor plan A-01' } });
     fireEvent.change(form.getAllByLabelText('Source')[0], { target: { value: 'table 7.13' } });
     await user.selectOptions(form.getByLabelText('Floors'), 'very_heavy');

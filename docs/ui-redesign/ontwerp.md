@@ -972,3 +972,30 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - nieuw: `results-dashboard.test.tsx` (sommen tegen de kerntotalen voor beide voorbeelden, meters, tabbladen, verouderd, ingehouden);
   - aangepast: `workflow-nav` (paginatitel Constructies).
 - Schermafdrukken: `~/oes-shots/f7/`.
+
+### Uitgevoerd in F6 (5 oktober 2026)
+
+- Sectieregister `src/components/NtaPerformancePanel/NtaSections.tsx` (`NTA_SECTIONS`): elke sectie van het oude formulier heeft een stap, een subpagina, voor Verwarming een stepperdeel, `paths`, `advanced`, `when` en een component. Velden en paden zijn ongewijzigd.
+  - Afwijking van §6.1: het register staat naast de veldcomponenten in `NtaPerformancePanel/` en niet in `src/components/nta/`. Een sectie heeft één component; "Geavanceerd" werkt per sectie (`advanced`), niet per veld.
+  - Gesplitst: Afgifte en distributie in Afgifte, Hulpenergie (ventilatoren), Regeling en Distributie; actieve koeling uit Algemeen naar Koeling; Bevestigingen in GBS, Externe levering, Opgegeven stromen en Opslag; C1 bij Ventilatie.
+  - Toewijzing: Project ← Algemeen (uitgave, rekenomvang); Gebouw › Rekenzones ← gebruiksfuncties, setpoints, massa, interne warmte; Schil & ramen ← ramen, dynamische ramen, dakhellingen, vloeren op grond; Onverwarmde ruimten ← serres; Installaties › Verwarming ← Opwekking / Distributie (met verticale leidingen) / Afgifte / Regeling & BCRG / Hulpenergie / Zonneverwarming; Warm tapwater, Ventilatie (met H11), Koeling, Bevochtiging, nieuwe subpagina Verlichting (utiliteit), Opwekking (PV, bijlage P, opgegeven stromen, opslag), Gebouwautomatisering; Controle › NTA-invoer ← Bevestigingen.
+- `NtaCalculationForm` rendert alle secties uit het register in de oude volgorde en blijft het volledige formulier onder Controle › NTA-invoer (met de JSON-editor). Exports voor de tests (`table713Setpoints`, `setpointChecks`, `setpointWriteBack`, `GroundEdgeBridgesFields`) blijven.
+- `src/context/NtaDraftProvider.tsx`: één concept per document (in `App` binnen `KernelProvider`, ook in `renderWithProviders`). Gewijzigde bladpaden, ongedaan maken per bewerking, en Toepassen = het oude Opslaan (`SET_NTA_CALCULATION` met `syncVentilation`). Een blok dat van buiten verandert (JSON, volledig formulier, import) vervangt het concept. Het volledige formulier begint met het concept als dat wijzigingen heeft.
+- `src/components/shell/NtaStepPage.tsx`:
+  - `NtaStepSections` op Project, Gebouw, Installaties en Controle › NTA-invoer, met Basis/Alle velden (`Segmented`, per kijker in localStorage), "Geavanceerd · n secties — … · alle op standaard" (klapt open bij invoer, een kernmelding of de Ga naar-plek), de stepper voor Verwarming en per sectie "Bron & bewijs" (alle `*Reference`-velden, ingevuld of aandachtspunt, met Ga naar);
+  - velden met een kernmelding krijgen een rode of gele rand;
+  - `NtaApplyBar`: "n wijzigingen … · Ongedaan maken · Vorige stap · Toepassen en verder"; verder en terug lopen over de NTA-pagina's en de verwarmingsdelen.
+- `NtaFormFields`: `NumberField` gebruikt `ui/NumberInput` (komma of punt, eenheid, ↑/↓) en houdt de rol spinbutton. Elk veld krijgt `data-path` (`ntaCalculation.…`) via `FieldPathPrefixProvider`; de basisopname en het maatwerkadvies gebruiken de velden zonder prefix.
+- `GAP_ROUTES`: `NTA_INPUT_ROUTES` stuurt elk lid van `ntaCalculation` naar de pagina van zijn sectie; alleen `ntaCalculation` zelf en de bevestigingen gaan naar Controle › NTA-invoer. Paden van de gebouwbeoordeling zonder prefix (bijv. `externalSupply.collectiveHeatPumpSource.realisedFrom2013`) worden als NTA-pad gerouteerd en gefocust. `nta_calculation_block_invalid` krijgt het pad uit de serde-melding (`setpoints: missing field \`heatingC\`` → `ntaCalculation.setpoints.heatingC`).
+- `focusPathIn` (nu `shell/focusPath.ts`): kijkt ook naar `data-paths` van een sectie, opent een ingeklapte `<details>`, geeft de focus aan het invoerveld in een label en kiest bij gelijke paden het binnenste element.
+- Inspector: derde tab Controle (`InspectorCheckPanel`) met fouten, aandachtspunten en weggelaten correcties, de punten van deze pagina eerst en de rest per stap, elk met Ga naar.
+- Alleen in de editie 2024: velden voor bijlage AA `effectiveMassKgPerM2` en `rooms[].roofAreaM2` (als `capacity.calculation` bestaat) en `collectiveHeatPumpSource.realisedFrom2013`. Onder een andere editie staan achtergebleven waarden als melding met Verwijderen.
+- Labels: `src/i18n/ntaStepLabels.ts` (NL/EN).
+- Tests: nieuw `nta-step-pages.test.tsx`; aangepast `gap-routes` (nieuwe doelen, register-consistentie, details openen), `step-status` (generator-gap telt bij Installaties, pad uit de serde-melding) en `nta-performance-panel` (tekstveld geeft `'20'`). De overige `nta-*`-tests zijn ongewijzigd groen.
+- Schermafdrukken: `~/oes-shots/f6/`.
+- Nog open:
+  - Bron & bewijs toont de bronvelden samen met Ga naar; de velden zelf staan nog in de sectie (geen documentkeuze/paperclip-upload);
+  - "Geavanceerd" per veld binnen een sectie, en eenheden uit de labeltekst halen (§6.5);
+  - de ConfirmDialog bij het sluiten van een document met een niet-toegepast concept;
+  - een preview-run op het concept ("effect op uitkomst").
+
