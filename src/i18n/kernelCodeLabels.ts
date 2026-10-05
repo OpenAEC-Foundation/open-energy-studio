@@ -6,6 +6,15 @@
 
 /** Dutch labels. */
 export const kernelCodeLabelsNl: Record<string, string> = {
+  'kernel.issue.unknown_tool': "MCP: de gevraagde tool bestaat niet; vraag de toollijst op met tools/list.",
+  'kernel.issue.kernel_panic': "De rekenkern is onverwacht gestopt bij deze invoer; meld dit met het invoerbestand.",
+  'kernel.issue.invalid_request_shape': "Het verzoek heeft niet de verwachte vorm; controleer het veld op het aangegeven pad.",
+  'kernel.issue.not_found': "Deze API-route bestaat niet; zie /v1/openapi.json voor de beschikbare routes.",
+  'kernel.issue.method_not_allowed': "Deze HTTP-methode is voor deze route niet toegestaan.",
+  'kernel.issue.missing_request_member': "Het verzoek mist een verplicht onderdeel, zoals project of survey.",
+  'kernel.issue.invalid_project_shape': "Het project heeft niet de verwachte vorm; controleer het veld op het aangegeven pad.",
+  'kernel.issue.calculation_unavailable': "Deze berekening is via deze route niet beschikbaar; gebruik de projectberekening.",
+  'kernel.issue.invalid_maatwerkadvies_shape': "Het maatwerkadvies heeft niet de verwachte vorm; controleer het veld op het aangegeven pad.",
   'kernel.issue.import_log_invalid': "Een regel in het importlogboek heeft geen hulpmiddel; open het project opnieuw of herstel het logboek (BRL 9501 §4.3.1).",
   'kernel.issue.absent_bacs_has_classes': "GBS: er zijn klassen opgegeven terwijl een GBS-systeem ontbreekt; zet GBS aanwezig of verwijder de klassen.",
   'kernel.issue.active_cooling_system_inconsistent': "Het bewijs voor actieve koeling hoort niet bij het opgegeven koelsysteem; controleer het systeemtype (§5.7.1).",
@@ -769,6 +778,15 @@ export const kernelCodeLabelsNl: Record<string, string> = {
 
 /** English labels. */
 export const kernelCodeLabelsEn: Record<string, string> = {
+  'kernel.issue.unknown_tool': "MCP: the requested tool does not exist; request the list with tools/list.",
+  'kernel.issue.kernel_panic': "The calculation kernel stopped unexpectedly on this input; report it with the input file.",
+  'kernel.issue.invalid_request_shape': "The request does not have the expected shape; check the field at the given path.",
+  'kernel.issue.not_found': "This API route does not exist; see /v1/openapi.json for the available routes.",
+  'kernel.issue.method_not_allowed': "This HTTP method is not allowed on this route.",
+  'kernel.issue.missing_request_member': "The request lacks a required member, such as project or survey.",
+  'kernel.issue.invalid_project_shape': "The project does not have the expected shape; check the field at the given path.",
+  'kernel.issue.calculation_unavailable': "This calculation is not available on this route; use the project calculation.",
+  'kernel.issue.invalid_maatwerkadvies_shape': "The maatwerkadvies input does not have the expected shape; check the field at the given path.",
   'kernel.issue.import_log_invalid': "An entry of the import log names no tool; reopen the project or repair the log (BRL 9501 §4.3.1).",
   'kernel.issue.absent_bacs_has_classes': "BACS: classes are given while no BACS is present; mark BACS present or remove the classes.",
   'kernel.issue.active_cooling_system_inconsistent': "The active-cooling evidence does not match the cooling system; check the system type (§5.7.1).",
