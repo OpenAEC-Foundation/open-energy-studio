@@ -32,6 +32,8 @@ De optionele bronrepositorycontrole verifieert daarnaast dat commit `62a4a29` aa
 
 De [schone frontendbouw met bijgewerkte afhankelijkheden](nta8800-afhankelijkheden-2026-10-05.md) slaagde op de bronstand `bb7c1bd` met 505 UI-tests en een Vite-productiebundel. De lokale npm-audit gaf op het controlemoment 0 meldingen. Deze onderhoudsstap wijzigt geen NTA-reken-, referentie- of attestkolom.
 
+De Tauri-desktopbouw vond vervolgens een minorversieverschil tussen npm- en Cargo-pakketten. De drie betrokken npm-pakketten zijn exact op de versies uit het Cargo-lockbestand vastgezet; een nieuwe desktopbouw is de resterende technische controle. Dit verandert de normatieve dekking niet.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
