@@ -1745,11 +1745,31 @@ fn convert_heat_pump(
         "designSupplyTemperatureC": if *air_sink { Value::Null } else { json!(design.supply_c()) },
         "sourceCorrectionFactor": correction,
         "sourceCorrectionReference": correction_reference,
-        "collectiveBuildingInstallation": collective,
     });
-    if let Some(capacity) = capacity {
-        forfait["thermalCapacityKw"] = json!(capacity);
-        forfait["capacitySourceReference"] = json!(reference);
+    match capacity {
+        Some(capacity) => {
+            forfait["thermalCapacityKw"] = json!(capacity);
+            forfait["capacitySourceReference"] = json!(reference);
+            forfait["collectiveBuildingInstallation"] = json!(collective);
+        }
+        // Table 9.29 (collective installations, p. 337) needs the capacity
+        // for its auxiliary energy; the survey must state it.
+        None if collective => {
+            recorder.issue(
+                "heat_pump_capacity_required",
+                "heating.generator.capacityKw",
+            );
+            forfait["collectiveBuildingInstallation"] = json!(true);
+        }
+        // ISSO 82.1 table 9.6 (p. 110) asks no capacity for an individual
+        // heat pump; NTA table 9.27 is the dwelling table up to 25 kW, so an
+        // unknown capacity keeps that table without a capacity check.
+        None => recorder.record(
+            "heat_pump_capacity_unknown_table_9_27",
+            "heating.generator.capacityKw",
+            "≤ 25 kW (individual dwelling heat pump)".into(),
+            "ISSO 82.1 p. 110 (table 9.6); NTA 8800 table 9.27",
+        ),
     }
     if let Some(evidence) = high_efficiency_evidence {
         forfait["rowVariant"] = json!("table_9_28_high_efficiency");

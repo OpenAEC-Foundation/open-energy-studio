@@ -2,6 +2,14 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — woningopname na de vergelijking met de RVO-voorbeeldwoningen
+
+- **Bouwjaar naar de rekenkern.** De woning- en utiliteitsopname geven het bouwjaar nu door. Opnames krijgen daardoor de Standaard voor woningisolatie (§5.3.2) en de waarschuwing `standard_insulation_construction_year_missing` verdwijnt. De labelgegevens krijgen het bouwjaar ook. Andere uitkomsten veranderen niet.
+- **Warmtepomp zonder vermogen.** Een individuele warmtepomp zonder opgegeven vermogen rekent nu met NTA-tabel 9.27 (woningen tot en met 25 kW), vastgelegd als `heat_pump_capacity_unknown_table_9_27` (ISSO 82.1 tabel 9.6, p. 110). Zo'n opname liep eerder vast. Een collectieve warmtepomp zonder vermogen geeft `heat_pump_capacity_required` op `heating.generator.capacityKw`.
+- **Geweigerde opnames tonen de reden.** Weigert de kern de afgeleide invoer, dan staan de meldingen van de kern bij de opname, onder `derivedInput.…`. Een weigering zonder melding geeft `derived_input_rejected_without_reason`.
+- **Bronvermelding koudebrugtoeslag.** ΔU_for verwijst naar NTA 8800 §8.2.1, formule 8.3.
+- **Vergelijkingstest.** Zes RVO-voorbeeldwoningen staan als fixtures in `training-data/nta8800-rvo-voorbeeldwoningen-*.json`; zie `docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md`. Dit is geen officiële referentietoets.
+
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 
 De applicatie was gebouwd tegen de concepten van BRL 9500-W/U en BRL 9501 van 14-10-2025 en tegen BRL 9500-MWA-W/U van 19-06-2024. Inmiddels zijn de aangewezen versies openbaar.
