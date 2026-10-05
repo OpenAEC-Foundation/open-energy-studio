@@ -1,6 +1,0 @@
-.main-view {
-  flex: 1;
-  overflow-y: auto;
-  background: var(--bg-dark);
-  padding: 16px;
-}

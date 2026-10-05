@@ -236,3 +236,6 @@
 .theme-row.active .theme-row-name {
   color: var(--accent);
 }
+
+.settings-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--fg-1); cursor: pointer; }
+.settings-hint { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--fg-3); }

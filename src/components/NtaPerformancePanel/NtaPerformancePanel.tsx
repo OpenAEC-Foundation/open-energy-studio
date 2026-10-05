@@ -4,7 +4,8 @@ import { useEnergy } from '../../context/EnergyContext';
 import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
 import type { NtaCalculationInput } from '../../core/nta/KernelClient';
-import { useProjectPerformance, type ProjectPerformanceQuery } from '../../core/nta/useProjectPerformance';
+import { type ProjectPerformanceQuery } from '../../core/nta/useProjectPerformance';
+import { useKernelQuery } from '../../context/KernelProvider';
 import { formatNumber } from '../../i18n/format';
 import { KernelCode, KernelDetail } from '../KernelCode/KernelCode';
 import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTemplate';
@@ -28,7 +29,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
   const { state, dispatch } = useEnergy();
   const { t, locale } = useI18n();
   const project: IProject = state.project;
-  const ownQuery = useProjectPerformance(project, suppliedQuery === undefined);
+  const ownQuery = useKernelQuery(project, suppliedQuery === undefined);
   const kwh = (value: number | null | undefined) => formatNumber(value, locale);
   const [editing, setEditing] = useState(false);
   const [formOpen, setFormOpen] = useState(false);

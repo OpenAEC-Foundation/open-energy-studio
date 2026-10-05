@@ -34,9 +34,14 @@ const LANGUAGES: { code: Locale; region: string }[] = [
 
 interface SettingsDialogProps {
   onClose: () => void;
+  /**
+   * The live preview run of the active document (the inspector's Voorbeeld,
+   * formerly the ribbon Preview toggle); absent without an open document.
+   */
+  previewSetting?: { enabled: boolean; onChange: (enabled: boolean) => void };
 }
 
-export function SettingsDialog({ onClose }: SettingsDialogProps) {
+export function SettingsDialog({ onClose, previewSetting }: SettingsDialogProps) {
   const { t, locale, setLocale } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
@@ -45,6 +50,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const originalTheme = useRef(document.documentElement.dataset.theme || 'dark');
   const [draftLocale, setDraftLocale] = useState<Locale>(locale);
   const [draftTheme, setDraftTheme] = useState<Theme>(storedTheme);
+  const [draftPreview, setDraftPreview] = useState(previewSetting?.enabled ?? true);
 
   const resolveTheme = (theme: Theme) =>
     theme === 'system'
@@ -61,6 +67,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
     setLocale(draftLocale);
     localStorage.setItem('energy-theme', draftTheme);
     localStorage.setItem('energy-locale', draftLocale);
+    if (previewSetting && draftPreview !== previewSetting.enabled) previewSetting.onChange(draftPreview);
     onClose();
   };
 
@@ -127,7 +134,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       </div>
 
       <div className="settings-content">
-        {activeTab === 'general' && (
+        {activeTab === 'general' && (<>
           <div className="settings-section">
             <h3 className="settings-section-title">{t('settings.general.theme')}</h3>
             <div className="theme-table">
@@ -147,7 +154,17 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
               ))}
             </div>
           </div>
-        )}
+          {previewSetting && (
+            <div className="settings-section">
+              <h3 className="settings-section-title">{t('settings.inspector.title')}</h3>
+              <label className="settings-check">
+                <input type="checkbox" checked={draftPreview} onChange={(event) => setDraftPreview(event.target.checked)} />
+                <span>{t('settings.inspector.preview')}</span>
+              </label>
+              <p className="settings-hint">{t('settings.inspector.previewHint')}</p>
+            </div>
+          )}
+        </>)}
 
         {activeTab === 'language' && (
           <div className="settings-section">

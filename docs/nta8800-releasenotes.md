@@ -2,6 +2,28 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — UI-herontwerp, fase F3 en F4: werkstroom in plaats van ribbon (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd.
+- **Geen ribbon meer.** Links staat een genummerde werkstroom: Project → Gebouw → Installaties → Controle → Resultaten → Basisopname → Maatwerkadvies → Herlabelen → Rapport & dossier → Registratie. Elke stap toont zijn status uit de kerncontrole: compleet, aantal fouten, aantal aandachtspunten of nog te doen. Bij nieuwbouw (oplevering of Bbl-toets) zijn de stappen voor bestaande bouw gedimd.
+- **Alle ribbonacties blijven bereikbaar:**
+  - toevoegen bij de stap waar ze horen (Gebouw, Installaties);
+  - exports bij Rapport & dossier;
+  - importeren op het projectoverzicht;
+  - de rekenhulpen, UNIEC3/VABI en IFC 3D in het menu Gereedschap onderaan de navigatie;
+  - Nieuw/Openen/Opslaan als in het menu Bestand;
+  - alles ook in het opdrachtpalet (Ctrl K).
+- **Bovenbalk.** Documenttabbladen, zoeken (Ctrl K), Bestand, Opslaan, Herberekenen (Ctrl ↵) en het contextpaneel (Ctrl .).
+- **Contextpaneel.** Eén paneel rechts vervangt Eigenschappen en Live preview. Het live voorbeeld staat ook in Instellingen (Ctrl ,).
+- **Statusbalk.** Toont of het resultaat actueel of verouderd is, de kernversie, BENG 1–3, TO<sub>juli</sub>, het indicatieve label en "onverifieerd · geen attest".
+- **Eén kernberekening per document.** Navigatie, statusbalk, resultaten, rapport en afdrukvoorbeeld lezen dezelfde uitkomst, zodat "verouderd" en "bezig" overal gelijk zijn.
+- **Ga naar.** Een kernmelding met pad opent de juiste stap, selecteert het element en zet de focus op de rij.
+- **Sneltoetsen.** Alt ↑/↓ wisselt van stap, Alt ←/→ van subpagina. Ctrl N/O/S/Shift S/W werken zoals voorheen. De URL-hash volgt de stap (`#/gebouw`).
+- **Toegankelijkheid.** Een skiplink "Naar inhoud" en de landmarks banner, navigatie, main, contextpaneel en statusbalk. De actieve stap heeft `aria-current="page"`. Na navigatie gaat de focus naar de paginatitel.
+- **Rapport.**
+  - De inhoudsopgave en de hoofdstuktitels tonen subscripts (H<sub>D</sub>, H<sub>g</sub>, H<sub>U</sub> en H<sub>tr</sub>) in plaats van liggende streepjes.
+  - De noot onder tabel 3 noemt de gebruiksfunctie in het Nederlands, bijvoorbeeld "woonfunctie (niet in een woongebouw)", in plaats van `other_residential`.
+
 ## 5 oktober 2026 — HTTP-API en MCP-server
 
 Rekenuitkomsten veranderen niet. Wat wel verandert voor clients van de API of de MCP-server:

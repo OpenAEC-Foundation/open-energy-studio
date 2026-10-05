@@ -22,6 +22,7 @@ import {
   IDialogState,
 } from '../core/energy/types';
 import { deleteSurfaceFromProject, deleteWindowFromProject, deleteZoneFromProject } from '../core/energy/projectDelete';
+import { normalizeRoute, routeForViewMode, viewModeForRoute, type Route } from '../core/navigation/routes';
 
 // ============================================================
 // State
@@ -37,6 +38,8 @@ export interface EnergyState {
   selectedItemType: string | null;
   isDirty: boolean;
   previewVisible: boolean;
+  /** Workflow route of the app shell (ontwerp §3.5); `viewMode` mirrors it for older code. */
+  route: Route;
 }
 
 // ============================================================
@@ -107,6 +110,7 @@ export type EnergyAction =
   | { type: 'SET_RESULT'; payload: IBENGResult | null }
   // UI state
   | { type: 'SET_VIEW_MODE'; payload: ViewMode }
+  | { type: 'NAVIGATE'; payload: Route }
   | { type: 'SET_RIBBON_TAB'; payload: RibbonTab }
   | { type: 'OPEN_DIALOG'; payload: { type: DialogType; editId?: string | null } }
   | { type: 'CLOSE_DIALOG' }
@@ -274,6 +278,7 @@ function createDocumentState(project: IProject): EnergyState {
     selectedItemType: null,
     isDirty: false,
     previewVisible: true,
+    route: { step: 'project' },
   };
 }
 
@@ -939,7 +944,13 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
     // ----------------------------------------------------------
 
     case 'SET_VIEW_MODE':
-      return { ...state, viewMode: action.payload };
+      // Alias of NAVIGATE for code of the ribbon era.
+      return { ...state, viewMode: action.payload, route: normalizeRoute(routeForViewMode(action.payload)) };
+
+    case 'NAVIGATE': {
+      const route = normalizeRoute(action.payload);
+      return { ...state, route, viewMode: viewModeForRoute(route) };
+    }
 
     case 'SET_RIBBON_TAB':
       return { ...state, activeRibbonTab: action.payload };
@@ -979,6 +990,7 @@ export function projectAfterAction(project: IProject, action: EnergyAction): IPr
   const state: EnergyState = {
     project, result: null, viewMode: 'project', activeRibbonTab: 'start',
     dialog: { type: null, editId: null }, selectedItemId: null, selectedItemType: null, isDirty: false, previewVisible: false,
+    route: { step: 'project' },
   };
   return applyEnergyAction(state, action).project;
 }

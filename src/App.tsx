@@ -1,13 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EnergyProvider, useEnergy, useDocumentManager, useHasActiveDocument } from './context/EnergyContext';
+import { KernelProvider, useKernel } from './context/KernelProvider';
 import { I18nProvider } from './i18n/I18nProvider';
-import { TitleBar } from './components/TitleBar/TitleBar';
-import { DocumentTabs } from './components/DocumentTabs/DocumentTabs';
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen';
-import { Ribbon } from './components/Ribbon/Ribbon';
-import { ProjectBrowser } from './components/ProjectBrowser/ProjectBrowser';
-import { PropertiesPanel } from './components/PropertiesPanel/PropertiesPanel';
-import { MainView } from './components/MainView/MainView';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { ProjectInfoDialog } from './components/dialogs/ProjectInfoDialog/ProjectInfoDialog';
 import { ZoneEditorDialog } from './components/dialogs/ZoneEditorDialog/ZoneEditorDialog';
@@ -24,10 +19,17 @@ import { HotWaterSystemDialog } from './components/dialogs/HotWaterSystemDialog/
 import { SolarPVDialog } from './components/dialogs/SolarPVDialog/SolarPVDialog';
 import { SolarThermalDialog } from './components/dialogs/SolarThermalDialog/SolarThermalDialog';
 import { PrintPreviewDialog } from './components/dialogs/PrintPreviewDialog/PrintPreviewDialog';
+import { FeedbackDialog } from './components/dialogs/FeedbackDialog/FeedbackDialog';
+import { SettingsDialog } from './components/SettingsDialog/SettingsDialog';
+import { TopBar, type TopBarProps } from './components/shell/TopBar';
+import { WorkflowNav } from './components/shell/WorkflowNav';
+import { Inspector } from './components/shell/Inspector';
+import { StepRouter } from './components/shell/StepRouter';
+import { CommandPalette, buildPaletteEntries } from './components/shell/CommandPalette';
+import { ShellActionsProvider, type ShellActions } from './components/shell/ShellActions';
 import { calculateBENGMonthly } from './core/energy/BENGCalculatorMonthly';
 import { hasUnmodelledHeatPumpDetails, legacyHeatPumpInputIssue, validProjectFloorArea } from './core/energy/ProjectArea';
 import { useI18n } from './i18n/i18n';
-import { PreviewPanel } from './components/PreviewPanel/PreviewPanel';
 import { downloadReportHTML } from './core/report/ReportGenerator';
 import { bengIfcModel, downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
 import { calculateProjectPerformanceShared } from './core/nta/useProjectPerformance';
@@ -38,9 +40,15 @@ import { withImportRecord } from './core/io/importLog';
 import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
 import { migrateLegacyRelabel, relabelNoticeKey } from './core/nta/Registration';
 import { normalizeProject } from './core/energy/normalizeProject';
+import { stepStatuses } from './core/nta/stepStatus';
+import { adjacentStep, routeFromHash, routeToHash, stepDefinition, type Route } from './core/navigation/routes';
+import { selectionForPath } from './core/navigation/projectPaths';
 import { isTauri } from '@tauri-apps/api/core';
-import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { ConfirmProvider, ToastProvider, useConfirm, useToast } from './components/ui';
+import { stampProject } from './core/io/KernelStampClient';
+import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
+import type { DialogType, IProject } from './core/energy/types';
+import './components/shell/shell.css';
 
 /** Whether the relabel migration notice for this key was shown already (per browser profile). */
 function relabelNoticeShown(key: string): boolean {
@@ -52,45 +60,77 @@ function relabelNoticeShown(key: string): boolean {
   }
   return false;
 }
-import { stampProject } from './core/io/KernelStampClient';
-import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
-import { AppMenu } from './components/AppMenu/AppMenu';
-import type { DialogType, IProject } from './core/energy/types';
 
-// ── Active document workspace (only rendered when a document is open) ──
+const INSPECTOR_KEY = 'oes.inspector.open';
 
-function ActiveDocumentContent({
-  onNewProject,
-  onOpenProject,
-  onSaveProject,
-  onSaveAsProject,
-  onCloseTab,
-}: {
+function initialInspectorOpen(): boolean {
+  try {
+    const stored = localStorage.getItem(INSPECTOR_KEY);
+    if (stored != null) return stored === '1';
+  } catch { /* storage unavailable */ }
+  return typeof window === 'undefined' || window.innerWidth >= 1360;
+}
+
+/** Keys typed into these never trigger step navigation or recalculation. */
+function isTextEntry(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
+}
+
+/** Commands that do not need an open document; shared by the welcome screen and the shell. */
+interface FileCommands {
   onNewProject: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
   onSaveAsProject: () => void;
+  onImportUNIEC3: () => void;
+  onImportVABI: () => void;
   onCloseTab: (id: string) => void;
+  onCloseActiveTab: () => void;
+  onOpenSettings: () => void;
+  onOpenFeedback: () => void;
+}
+
+// ── Active document: the shell with navigation, work area, inspector and status bar ──
+
+function ActiveDocumentShell({ files, paletteOpen, setPaletteOpen }: {
+  files: FileCommands;
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
 }) {
   const { state, dispatch } = useEnergy();
+  const kernel = useKernel();
   const { t, locale } = useI18n();
-  const toast = useToast();
-  const { dialog, project, result } = state;
-  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const { dialog, project, result, route } = state;
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(initialInspectorOpen);
 
   useEffect(() => { setCalculationError(null); }, [project]);
 
-  const openDialog = useCallback((type: string) => {
-    dispatch({ type: 'OPEN_DIALOG', payload: { type: type as DialogType } });
+  const toggleInspector = useCallback(() => {
+    setInspectorOpen((open) => {
+      try { localStorage.setItem(INSPECTOR_KEY, open ? '0' : '1'); } catch { /* storage unavailable */ }
+      return !open;
+    });
+  }, []);
+
+  const openDialog = useCallback((type: DialogType) => {
+    dispatch({ type: 'OPEN_DIALOG', payload: { type } });
   }, [dispatch]);
 
   const closeDialog = useCallback(() => {
     dispatch({ type: 'CLOSE_DIALOG' });
   }, [dispatch]);
 
+  const navigate = useCallback((target: Route) => {
+    dispatch({ type: 'NAVIGATE', payload: target });
+    // "Ga naar" on an item path also selects the item, so the inspector shows it.
+    const selection = target.focusPath ? selectionForPath(project, target.focusPath) : null;
+    if (selection) dispatch({ type: 'SELECT_ITEM', payload: selection });
+  }, [dispatch, project]);
+
   const handleCalculate = useCallback(() => {
+    kernel?.refresh();
     if (project.ntaHeatPumps?.length) {
       dispatch({ type: 'SET_RESULT', payload: null });
       setCalculationError(t('calculation.standaloneHeatPumps'));
@@ -116,27 +156,18 @@ function ActiveDocumentContent({
     try {
       const bengResult = calculateBENGMonthly(project);
       dispatch({ type: 'SET_RESULT', payload: bengResult });
-      dispatch({ type: 'SET_VIEW_MODE', payload: 'results' });
-      dispatch({ type: 'SET_RIBBON_TAB', payload: 'results' });
+      dispatch({ type: 'NAVIGATE', payload: { step: 'results' } });
       setCalculationError(null);
     } catch (error) {
       dispatch({ type: 'SET_RESULT', payload: null });
       setCalculationError(error instanceof Error ? error.message : String(error));
     }
-  }, [project, dispatch, t]);
-
-  const handleTogglePreview = useCallback(() => {
-    dispatch({ type: 'TOGGLE_PREVIEW' });
-  }, [dispatch]);
+  }, [project, dispatch, t, kernel]);
 
   const handleExportReport = useCallback(() => {
     downloadReportHTML(project, result, locale).catch((error: unknown) =>
       setCalculationError(error instanceof Error ? error.message : String(error)));
   }, [project, result, locale]);
-
-  const handlePrintReport = useCallback(() => {
-    setPrintPreviewOpen(true);
-  }, []);
 
   // The BENG IFC export follows the shared rule (KernelVerdict): kernel figures when calculated,
   // nothing when the kernel refused the input, the indicative result only without a verdict.
@@ -153,83 +184,109 @@ function ActiveDocumentContent({
       });
   }, [project, result, t]);
 
-  const handleExportModelIFC = useCallback(() => {
-    downloadModelIFC(project);
-  }, [project]);
+  const actions = useMemo<ShellActions>(() => ({
+    newProject: files.onNewProject,
+    openProject: files.onOpenProject,
+    saveProject: files.onSaveProject,
+    saveAsProject: files.onSaveAsProject,
+    calculate: handleCalculate,
+    openDialog,
+    navigate,
+    exportReport: handleExportReport,
+    printReport: () => setPrintPreviewOpen(true),
+    exportIFC: handleExportIFC,
+    exportModelIFC: () => downloadModelIFC(project),
+    exportUNIEC3: () => downloadUNIEC3(project),
+    importUNIEC3: files.onImportUNIEC3,
+    exportVABI: () => downloadVABI(project),
+    importVABI: files.onImportVABI,
+    openSettings: files.onOpenSettings,
+    openFeedback: files.onOpenFeedback,
+    openPalette: () => setPaletteOpen(true),
+    toggleInspector,
+    togglePreview: () => {
+      if (!inspectorOpen) toggleInspector();
+      dispatch({ type: 'TOGGLE_PREVIEW' });
+    },
+  }), [files, handleCalculate, openDialog, navigate, handleExportReport, handleExportIFC, project, setPaletteOpen,
+    toggleInspector, inspectorOpen, dispatch]);
 
-  const handleExportUNIEC3 = useCallback(() => {
-    downloadUNIEC3(project);
-  }, [project]);
+  const statuses = useMemo(() => stepStatuses(project, kernel?.settled), [project, kernel?.settled]);
 
-  const { docDispatch } = useDocumentManager();
-
-  const handleImportUNIEC3 = useCallback(async () => {
-    try {
-      const loaded = withImportRecord(await openUNIEC3FileDialog(), 'UNIEC3');
-      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
-    } catch (err) {
-      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'UNIEC3' }), message: (err as Error).message });
+  // The URL hash mirrors the route (`#/installaties`); an opened link or edited hash navigates.
+  const hashApplied = useRef(false);
+  useEffect(() => {
+    if (!hashApplied.current) {
+      hashApplied.current = true;
+      const fromHash = routeFromHash(window.location.hash);
+      if (fromHash) { dispatch({ type: 'NAVIGATE', payload: fromHash }); return; }
     }
-  }, [docDispatch, toast, t]);
-
-  const handleExportVABI = useCallback(() => {
-    downloadVABI(project);
-  }, [project]);
-
-  const handleImportVABI = useCallback(async () => {
-    try {
-      const loaded = withImportRecord(await openVABIFileDialog(), 'VABI');
-      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
-    } catch (err) {
-      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'VABI' }), message: (err as Error).message });
+    const hash = routeToHash(route);
+    if (window.location.hash !== hash) {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}${hash}`);
     }
-  }, [docDispatch, toast, t]);
+  }, [route, dispatch]);
+  useEffect(() => {
+    const onHashChange = () => {
+      const fromHash = routeFromHash(window.location.hash);
+      if (fromHash) dispatch({ type: 'NAVIGATE', payload: fromHash });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [dispatch]);
+
+  useEffect(() => {
+    document.title = `${state.isDirty ? '• ' : ''}${project.name || t('app.untitledProject')} — ${t('app.title')}`;
+  }, [project.name, state.isDirty, t]);
+
+  // Shell shortcuts: Ctrl ↵ recalculates, Ctrl . toggles the inspector, Alt ↑/↓ steps, Alt ←/→ sub pages.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (document.querySelector('.dialog-overlay, .palette-backdrop')) return;
+      const ctrl = event.ctrlKey || event.metaKey;
+      if (ctrl && event.key === 'Enter' && !isTextEntry(event.target)) {
+        event.preventDefault();
+        handleCalculate();
+      } else if (ctrl && event.key === '.') {
+        event.preventDefault();
+        toggleInspector();
+      } else if (event.altKey && !ctrl && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !isTextEntry(event.target)) {
+        event.preventDefault();
+        navigate({ step: adjacentStep(route.step, event.key === 'ArrowDown' ? 1 : -1) });
+      } else if (event.altKey && !ctrl && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTextEntry(event.target)) {
+        const subs = stepDefinition(route.step).subs;
+        const index = subs.findIndex((sub) => sub.id === route.sub);
+        if (subs.length < 2 || index < 0) return;
+        event.preventDefault();
+        const next = subs[(index + (event.key === 'ArrowRight' ? 1 : -1) + subs.length) % subs.length];
+        navigate({ step: route.step, sub: next.id });
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleCalculate, toggleInspector, navigate, route]);
+
+  const paletteEntries = useMemo(() => (paletteOpen
+    ? buildPaletteEntries(t, project, actions, (item) => {
+      actions.navigate(item.route);
+      dispatch({ type: 'SELECT_ITEM', payload: { id: item.id, itemType: item.itemType } });
+    })
+    : []), [paletteOpen, t, project, actions, dispatch]);
+
+  const showInspector = inspectorOpen && route.step !== 'project';
+  const floorArea = kernel?.settled?.geometry?.usableFloorAreaM2
+    ?? (project.zones.length ? project.zones.reduce((sum, zone) => sum + zone.floorArea, 0) : null);
 
   return (
-    <>
-      <Ribbon
-        onOpenDialog={openDialog}
-        onCalculate={handleCalculate}
-        onNewProject={onNewProject}
-        onSaveProject={onSaveProject}
-        onOpenProject={onOpenProject}
-        onExportReport={handleExportReport}
-        onExportIFC={handleExportIFC}
-        onExportModelIFC={handleExportModelIFC}
-        onPrintReport={handlePrintReport}
-        onTogglePreview={handleTogglePreview}
-        onExportUNIEC3={handleExportUNIEC3}
-        onImportUNIEC3={handleImportUNIEC3}
-        onExportVABI={handleExportVABI}
-        onImportVABI={handleImportVABI}
-        onOpenAppMenu={() => setAppMenuOpen(true)}
-      />
-      <DocumentTabs onCloseTab={onCloseTab} onNewProject={onNewProject} onOpenProject={onOpenProject} />
-      {calculationError && <div className="calculation-input-error" role="alert">{calculationError}</div>}
-      {appMenuOpen && (
-        <AppMenu
-          isOpen={appMenuOpen}
-          onClose={() => setAppMenuOpen(false)}
-          onNewProject={onNewProject}
-          onOpenProject={onOpenProject}
-          onSaveProject={onSaveProject}
-          onSaveAsProject={onSaveAsProject}
-          onExportReport={handleExportReport}
-          onExportIFC={handleExportIFC}
-          onExportModelIFC={handleExportModelIFC}
-          onPrintReport={handlePrintReport}
-          onExportUNIEC3={handleExportUNIEC3}
-          onImportUNIEC3={handleImportUNIEC3}
-          onExportVABI={handleExportVABI}
-          onImportVABI={handleImportVABI}
-          onOpenDialog={openDialog}
-        />
-      )}
-      <div className="main-content">
-        <ErrorBoundary resetKey={state.project}><ProjectBrowser /></ErrorBoundary>
-        <ErrorBoundary resetKey={state.project}><MainView /></ErrorBoundary>
-        <ErrorBoundary resetKey={state.project}>{state.previewVisible ? <PreviewPanel /> : <PropertiesPanel />}</ErrorBoundary>
-      </div>
+    <ShellActionsProvider value={actions}>
+      <TopBar hasDocument {...files} onOpenPalette={actions.openPalette} onRecalculate={handleCalculate}
+        onToggleInspector={toggleInspector} inspectorOpen={showInspector} />
+      <WorkflowNav project={project} route={route} statuses={statuses} floorAreaM2={floorArea} actions={actions} />
+      <main id="main-content" className="shell-main" tabIndex={-1} aria-labelledby="page-title">
+        {calculationError && <div className="calculation-input-error" role="alert">{calculationError}</div>}
+        <StepRouter project={project} route={route} statuses={statuses} actions={actions} />
+      </main>
+      {showInspector && <Inspector onClose={toggleInspector} />}
       <StatusBar />
 
       {/* Dialogs */}
@@ -278,7 +335,18 @@ function ActiveDocumentContent({
       {printPreviewOpen && (
         <PrintPreviewDialog onClose={() => setPrintPreviewOpen(false)} />
       )}
-    </>
+      {paletteOpen && <CommandPalette entries={paletteEntries} onClose={() => setPaletteOpen(false)} />}
+    </ShellActionsProvider>
+  );
+}
+
+/** One kernel run per open document, shared by every view of the shell. */
+function ActiveDocumentContent(props: { files: FileCommands; paletteOpen: boolean; setPaletteOpen: (open: boolean) => void }) {
+  const { state } = useEnergy();
+  return (
+    <KernelProvider project={state.project}>
+      <ActiveDocumentShell {...props} />
+    </KernelProvider>
   );
 }
 
@@ -287,12 +355,11 @@ function ActiveDocumentContent({
 function EmptyStatusBar() {
   const { t } = useI18n();
   return (
-    <div className="status-bar">
-      <div className="status-section">
+    <footer className="status-bar">
+      <div className="status-section" role="status">
         <span className="status-hint">{t('status.ready')}</span>
       </div>
-      <div className="status-section" />
-    </div>
+    </footer>
   );
 }
 
@@ -305,6 +372,9 @@ function AppContent() {
   const toast = useToast();
   const confirmChoice = useConfirm();
   const untitledCounter = useRef(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const createEmptyProject = useCallback((): IProject => {
     untitledCounter.current += 1;
@@ -461,6 +531,25 @@ function AppContent() {
     }
   }, [openProjectText, t, toast]);
 
+  // ── Import (UNIEC3 / VABI): each opens as a new document ──
+  const handleImportUNIEC3 = useCallback(async () => {
+    try {
+      const loaded = withImportRecord(await openUNIEC3FileDialog(), 'UNIEC3');
+      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
+    } catch (err) {
+      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'UNIEC3' }), message: (err as Error).message });
+    }
+  }, [docDispatch, toast, t]);
+
+  const handleImportVABI = useCallback(async () => {
+    try {
+      const loaded = withImportRecord(await openVABIFileDialog(), 'VABI');
+      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
+    } catch (err) {
+      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'VABI' }), message: (err as Error).message });
+    }
+  }, [docDispatch, toast, t]);
+
   // ── Save (Ctrl+S) — save to existing path, or prompt Save As if new ──
   const handleSaveProject = useCallback(async () => {
     const activeDoc = docState.documents.find(d => d.id === docState.activeDocumentId);
@@ -512,7 +601,11 @@ function AppContent() {
     docDispatch({ type: 'DOC_CLOSE', payload: id });
   }, [docState.documents, docDispatch, writeProjectToDisk, confirmChoice, t]);
 
-  // ── Keyboard shortcuts ──
+  const handleCloseActiveTab = useCallback(() => {
+    if (docState.activeDocumentId) void handleCloseTab(docState.activeDocumentId);
+  }, [docState.activeDocumentId, handleCloseTab]);
+
+  // ── Keyboard shortcuts (all screens) ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
@@ -537,41 +630,88 @@ function AppContent() {
           break;
         case 'w':
           e.preventDefault();
-          if (docState.activeDocumentId) {
-            handleCloseTab(docState.activeDocumentId);
-          }
+          handleCloseActiveTab();
+          break;
+        case 'k':
+          e.preventDefault();
+          setPaletteOpen(true);
+          break;
+        case ',':
+          e.preventDefault();
+          setSettingsOpen(true);
           break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleNewProject, handleOpenProject, handleSaveProject, handleSaveAsProject, handleCloseTab, docState.activeDocumentId]);
+  }, [handleNewProject, handleOpenProject, handleSaveProject, handleSaveAsProject, handleCloseActiveTab]);
+
+  const files = useMemo<FileCommands>(() => ({
+    onNewProject: handleNewProject,
+    onOpenProject: handleOpenProject,
+    onSaveProject: handleSaveProject,
+    onSaveAsProject: handleSaveAsProject,
+    onImportUNIEC3: handleImportUNIEC3,
+    onImportVABI: handleImportVABI,
+    onCloseTab: handleCloseTab,
+    onCloseActiveTab: handleCloseActiveTab,
+    onOpenSettings: () => setSettingsOpen(true),
+    onOpenFeedback: () => setFeedbackOpen(true),
+  }), [handleNewProject, handleOpenProject, handleSaveProject, handleSaveAsProject, handleImportUNIEC3, handleImportVABI,
+    handleCloseTab, handleCloseActiveTab]);
+
+  // The live preview of the inspector is a per-document setting, offered in Instellingen.
+  const activeDoc = docState.documents.find((doc) => doc.id === docState.activeDocumentId);
+  const previewSetting = activeDoc ? {
+    enabled: activeDoc.state.previewVisible,
+    onChange: (enabled: boolean) => {
+      if (enabled !== activeDoc.state.previewVisible) {
+        docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'TOGGLE_PREVIEW' } } });
+      }
+    },
+  } : undefined;
+
+  const welcomeTopBar: TopBarProps = { hasDocument: false, ...files, onOpenPalette: () => setPaletteOpen(true) };
+  const welcomePalette = useMemo(() => {
+    if (hasActiveDoc || !paletteOpen) return [];
+    const none = () => undefined;
+    const actions: ShellActions = {
+      newProject: handleNewProject, openProject: handleOpenProject, saveProject: none, saveAsProject: none, calculate: none,
+      openDialog: none, navigate: none, exportReport: none, printReport: none, exportIFC: none, exportModelIFC: none,
+      exportUNIEC3: none, importUNIEC3: handleImportUNIEC3, exportVABI: none, importVABI: handleImportVABI,
+      openSettings: () => setSettingsOpen(true), openFeedback: () => setFeedbackOpen(true), openPalette: none,
+      toggleInspector: none, togglePreview: none,
+    };
+    const allowed = new Set(['cmd:new', 'cmd:open', 'cmd:import-uniec3', 'cmd:import-vabi', 'cmd:settings', 'cmd:feedback']);
+    return buildPaletteEntries(t, null, actions, none).filter((entry) => allowed.has(entry.id));
+  }, [hasActiveDoc, paletteOpen, t, handleNewProject, handleOpenProject, handleImportUNIEC3, handleImportVABI]);
+
+  useEffect(() => {
+    if (!hasActiveDoc) document.title = t('app.title');
+  }, [hasActiveDoc, t]);
 
   return (
-    <div className="app">
-      <TitleBar
-        onNewProject={handleNewProject}
-        onOpenProject={handleOpenProject}
-        onSaveProject={handleSaveProject}
-      />
+    <div className={hasActiveDoc ? 'app-shell' : 'app-shell app-shell--empty'}>
+      <a className="skip-link" href="#main-content"
+        onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('nav.skip')}</a>
       {hasActiveDoc ? (
-        <ActiveDocumentContent
-          onNewProject={handleNewProject}
-          onOpenProject={handleOpenProject}
-          onSaveProject={handleSaveProject}
-          onSaveAsProject={handleSaveAsProject}
-          onCloseTab={handleCloseTab}
-        />
+        <ActiveDocumentContent files={files} paletteOpen={paletteOpen} setPaletteOpen={setPaletteOpen} />
       ) : (
         <>
-          <WelcomeScreen
-            onNewProject={handleNewProject}
-            onOpenProject={handleOpenProject}
-            onOpenExample={handleOpenExample}
-          />
+          <TopBar {...welcomeTopBar} />
+          <main id="main-content" className="shell-main" tabIndex={-1}>
+            <WelcomeScreen
+              onNewProject={handleNewProject}
+              onOpenProject={handleOpenProject}
+              onOpenExample={handleOpenExample}
+            />
+          </main>
           <EmptyStatusBar />
+          {paletteOpen && <CommandPalette entries={welcomePalette} onClose={() => setPaletteOpen(false)} />}
         </>
       )}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} previewSetting={previewSetting} />}
+      {feedbackOpen && <FeedbackDialog onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import { kernelCodeLabelsEn } from './kernelCodeLabels';
 import { toolLabelsEn } from './toolLabels';
 import { kernelDetailLabelsEn } from './kernelDetailLabels';
+import { shellLabelsEn } from './shellLabels';
 
 export const en: Record<string, string> = {
   // Generated kernel and survey code labels; specific keys below take precedence.
   ...kernelCodeLabelsEn,
   ...toolLabelsEn,
   ...kernelDetailLabelsEn,
+  ...shellLabelsEn,
   // App
   'app.title': 'Open Energy Studio',
   'app.untitledProject': 'Untitled Project',

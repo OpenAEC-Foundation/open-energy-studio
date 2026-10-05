@@ -16,17 +16,19 @@ function readCSS(componentPath: string): string {
   return readFileSync(resolve(__dirname, '..', componentPath), 'utf-8');
 }
 
-// ── TitleBar ──
+// ── TopBar (UI redesign F4; replaces TitleBar) ──
 
-describe('TitleBar', () => {
-  const css = readCSS('components/TitleBar/TitleBar.css');
+describe('TopBar', () => {
+  const css = readCSS('components/shell/shell.css');
+  const tokens = readCSS('styles/tokens.css');
 
-  it('uses Space Grotesk for app name', () => {
-    expect(css).toMatch(/\.title-bar-app-name[^}]*font-family:\s*'Space Grotesk'/s);
+  it('uses the display font (Space Grotesk) for the app name', () => {
+    expect(css).toMatch(/\.top-bar-app-name[^}]*font-family:\s*var\(--font-display\)/s);
+    expect(tokens).toMatch(/--font-display:\s*'Space Grotesk'/);
   });
 
   it('uses font-weight 700 for app name', () => {
-    expect(css).toMatch(/\.title-bar-app-name[^}]*font-weight:\s*700/s);
+    expect(css).toMatch(/\.top-bar-app-name[^}]*font-weight:\s*700/s);
   });
 });
 
@@ -64,25 +66,23 @@ describe('WelcomeScreen', () => {
   });
 });
 
-// ── ProjectBrowser ──
+// ── WorkflowNav (UI redesign F4; replaces ProjectBrowser) ──
 
-describe('ProjectBrowser', () => {
-  const css = readCSS('components/ProjectBrowser/ProjectBrowser.css');
+describe('WorkflowNav', () => {
+  const css = readCSS('components/shell/shell.css');
 
-  it('uses JetBrains Mono for header (section label style)', () => {
-    expect(css).toMatch(/\.project-browser-header[^}]*font-family:\s*'JetBrains Mono'/s);
+  it('uses the section label style for step groups (uppercase, spaced, muted)', () => {
+    expect(css).toMatch(/\.nav-group[^}]*text-transform:\s*uppercase/s);
+    expect(css).toMatch(/\.nav-group[^}]*letter-spacing:\s*\.08em/s);
+    expect(css).toMatch(/\.nav-group[^}]*color:\s*var\(--fg-3\)/s);
   });
 
-  it('uses amber color for header', () => {
-    expect(css).toMatch(/\.project-browser-header[^}]*color:\s*var\(--accent\)/s);
+  it('marks the active step with the amber accent bar', () => {
+    expect(css).toMatch(/\.nav-step\[aria-current="page"\]::before[^}]*background:\s*var\(--accent\)/s);
   });
 
-  it('uses uppercase text-transform', () => {
-    expect(css).toMatch(/\.project-browser-header[^}]*text-transform:\s*uppercase/s);
-  });
-
-  it('uses 0.1em letter-spacing', () => {
-    expect(css).toMatch(/\.project-browser-header[^}]*letter-spacing:\s*0\.1em/s);
+  it('uses the neutral chrome surface', () => {
+    expect(css).toMatch(/\.workflow-nav[^}]*background:\s*var\(--surface-chrome\)/s);
   });
 });
 
@@ -198,27 +198,28 @@ describe('EnvelopeView', () => {
   });
 });
 
-// ── ProjectView ──
+// ── Page head (UI redesign F4; replaces the ProjectView header) ──
 
-describe('ProjectView', () => {
-  const css = readCSS('components/ProjectView/ProjectView.css');
+describe('PageHeader', () => {
+  const css = readCSS('components/shell/shell.css');
 
-  it('uses Space Grotesk for h2', () => {
-    expect(css).toMatch(/\.project-view-header h2[^}]*font-family:\s*'Space Grotesk'/s);
+  it('uses Space Grotesk for the page title', () => {
+    expect(css).toMatch(/\.page-title[^}]*font-family:\s*'Space Grotesk'/s);
+  });
+
+  it('uses font-weight 700 for the page title', () => {
+    expect(css).toMatch(/\.page-title[^}]*font-weight:\s*700/s);
   });
 });
 
-// ── AppMenu ──
+// ── Shell menus (UI redesign F4; replace the AppMenu backstage) ──
 
-describe('AppMenu', () => {
-  const css = readCSS('components/AppMenu/AppMenu.css');
+describe('Shell menus', () => {
+  const css = readCSS('components/shell/shell.css');
 
-  it('uses Space Grotesk for panel title', () => {
-    expect(css).toMatch(/\.app-menu-panel-title[^}]*font-family:\s*'Space Grotesk'/s);
-  });
-
-  it('uses font-weight 700 for panel title', () => {
-    expect(css).toMatch(/\.app-menu-panel-title[^}]*font-weight:\s*700/s);
+  it('float on the raised surface with the strongest shadow', () => {
+    expect(css).toMatch(/\.shell-menu \{[^}]*background:\s*var\(--surface-raised\)/s);
+    expect(css).toMatch(/\.shell-menu \{[^}]*box-shadow:\s*var\(--shadow-3\)/s);
   });
 });
 
@@ -241,16 +242,13 @@ describe('SettingsDialog', () => {
   });
 });
 
-// ── Ribbon ──
+// ── No ribbon (UI redesign F4: "Beperk aantal tabbladen op ribbon") ──
 
-describe('Ribbon', () => {
-  const css = readCSS('components/Ribbon/Ribbon.css');
+describe('App shell without ribbon', () => {
+  const app = readCSS('App.tsx');
 
-  it('uses gradient background', () => {
-    expect(css).toMatch(/\.ribbon-container[^}]*background:\s*linear-gradient/s);
-  });
-
-  it('defines group label style', () => {
-    expect(css).toMatch(/\.ribbon-group-label[^}]*text-transform:\s*uppercase/s);
+  it('renders no ribbon or tool tab strip', () => {
+    expect(app).not.toMatch(/Ribbon/);
+    expect(app).toMatch(/<WorkflowNav/);
   });
 });
