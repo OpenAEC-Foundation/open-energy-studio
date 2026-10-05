@@ -506,7 +506,8 @@
         "electricPowerKw": 0.059,
         "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
       },
-      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)",
+      "unheatedPipeLengthM": 0.0
     },
     "generator": {
       "kind": "heat_pump_forfait",
@@ -603,9 +604,35 @@
       },
       "combustionAppliances": [],
       "fans": {
-        "method": "forfait",
-        "current": "dc",
-        "manufactureYear": 2021
+        "method": "declared",
+        "fans": [
+          {
+            "id": "f1",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 8.5
+            }
+          }
+        ],
+        "control": {
+          "method": "declared",
+          "monthly": [
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147
+          ],
+          "sourceReference": "report: product fan data"
+        },
+        "sourceReference": "report: product fan data"
       },
       "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
     },
@@ -655,7 +682,8 @@
           "energyEfficiencyIndex": 0.23,
           "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
         },
-        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)",
+        "unconditionedPipeLengthM": 0.0
       },
       "generators": [
         {

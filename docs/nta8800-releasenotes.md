@@ -2,6 +2,14 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — f_prac bij gedeclareerde warmtepomprendementen en reconciliatie met openbare rapporten
+
+Uitkomsten veranderen voor projecten met een kwaliteitsverklaring van een warmtepomp:
+- **Ruimteverwarming.** Een gedeclareerde COP (`qualityDeclaration` bij de forfaitaire warmtepomp) rekent nu met f_prac 0,95 volgens 9.63 (p. 340), in plaats van 1. Een kwaliteitsverklaring voor verwarming is opgesteld volgens bijlage Q (p. 615). Het warmtepompdeel van de elektriciteit stijgt met 1/0,95 (+5,3 %); de bijverwarming bij een energiefractie onder 1 verandert niet.
+- **Warm tapwater.** Een gedeclareerd warmtepomprendement (§13.8.4.7.2) rekent nu met f_prac 0,95 volgens 13.152 (p. 616–617), in plaats van 1,0. Alleen de forfaitaire waarden houden 1,0.
+- **Vergelijkingsfixtures.** `training-data/nta8800-public-comparison-{a,b,c}.json` zijn gecorrigeerd naar de rapportinvoer: productwaarden voor de ventilatoren (A: 8,5 W, f 0,147; B: 4 units van 21,7 W, f 0,364), de gedeclareerde hulpenergie van 146 kWh bij B, en geen leidingen buiten de verwarmde of gekoelde zone. Vastgelegde uitkomsten: A 94,00 / 35,15 / 74,9; B 52,96 / 28,84 / 62,6; C 64,70 / 31,54 / 69,0.
+- **Documentatie.** De regel-voor-regel-reconciliatie staat in `docs/nta8800-vergelijking-openbare-rapporten.md`. Vragen over 10.15, 10.87 en f_prac staan in `docs/nta8800-vragen-nen.md`.
+
 ## 5 oktober 2026 — HTTP-API en MCP-server
 
 Rekenuitkomsten veranderen niet. Wat wel verandert voor clients van de API of de MCP-server:
