@@ -11,8 +11,8 @@
 //!   door U of table 8.16/8.17 (p. 95); an undeterminable insulation is
 //!   taken as uninsulated (conservative choice, p. 28).
 //! - Panels: tables 8.18–8.21 (p. 97) via annex I.
-//! - Thermal bridges: forfait route for the whole building (p. 79, NTA
-//!   8.2/8.3 with table 8.1); floors on ground get 0,5·P (8.37).
+//! - Thermal bridges: forfait route for the whole building (NTA §8.2.1,
+//!   formula 8.3 with table 8.1); floors on ground get 0,5·P (8.37).
 //! - Adjacent unheated spaces: H_ue = 5·A_T;iu (NTA I.8, basic survey) with
 //!   b_U = H_ue/(H_ue + H_iu) (8.53 with H_V;iu = 0).
 //! - Obstruction: the advisor determines the situation per window (tables
@@ -1215,7 +1215,7 @@ pub fn derive_envelope_zone(
         "thermal_bridges_forfait_delta_u",
         "envelope",
         format!("ΔU_for {delta_u:.3} W/(m²K)"),
-        "ISSO 82.1 p. 79; NTA 8.2/8.3",
+        "NTA 8800 §8.2.1, formula 8.3 (table 8.1)",
     );
 
     let mut direct_elements = Vec::new();

@@ -812,6 +812,13 @@ pub fn derive_residential_input(
         "demandUsesFixedC1Ventilation": false,
         "batteryStoragePresent": storage_present,
     });
+    // §5.3.2 (Standaard voor woningisolatie) and the label data need the
+    // construction year; the survey records it, so it is passed on.
+    if let Ok(year) = u32::try_from(survey.construction_year) {
+        if year > 0 {
+            input["constructionYear"] = json!(year);
+        }
+    }
     if let Some(storage) = storage {
         input["storage"] = storage;
     }
@@ -866,6 +873,7 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
         Some(_) => "derived_input_rejected",
         None => "invalid",
     };
+    surface_rejection(status, performance.as_ref(), &mut recorder.issues);
     apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
     refuse_non_finite(OpnameAssessment {
         status,
@@ -878,6 +886,33 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
         performance,
         reference_verified: false,
     })
+}
+
+/// A survey whose derived input the kernel refuses must say why: when the
+/// survey itself recorded no issue, the kernel's own issues are surfaced
+/// (prefixed with `derivedInput.`), and a refusal without any reason gets
+/// `derived_input_rejected_without_reason`. A `derived_input_rejected`
+/// status never comes with an empty issue list.
+pub(crate) fn surface_rejection(
+    status: &str,
+    performance: Option<&crate::building_performance::BuildingPerformanceAssessment>,
+    issues: &mut Vec<OpnameIssue>,
+) {
+    if status != "derived_input_rejected" || !issues.is_empty() {
+        return;
+    }
+    if let Some(performance) = performance {
+        issues.extend(performance.issues.iter().map(|issue| OpnameIssue {
+            code: issue.code,
+            path: format!("derivedInput.{}", issue.path),
+        }));
+        if issues.is_empty() {
+            issues.push(OpnameIssue {
+                code: "derived_input_rejected_without_reason",
+                path: performance.status.to_string(),
+            });
+        }
+    }
 }
 
 /// Safety net: a survey result with a non-finite number (NaN, ±∞) is never
@@ -1934,5 +1969,174 @@ mod tests {
         assert!(applied.contains(&"pipe_insulation_year_unknown_construction_year"));
         assert!(applied.contains(&"pipe_fittings_unknown_uninsulated"));
         assert!(applied.contains(&"renovated_one_pipe_as_two_pipe"));
+    }
+
+    /// RVO Voorbeeldwoningen 2022 (pakket "huidig"), see
+    /// docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md. Not an official
+    /// reference test: the survey route must reproduce RVO's Standaard voor
+    /// woningisolatie (§5.3.2), and RVO's typification (U values, ΔU_for 0)
+    /// must stay within the documented ±6 % of RVO's Q_H,nd.
+    #[test]
+    fn rvo_voorbeeldwoningen_stay_within_the_documented_band() {
+        let fixtures = [
+            include_str!(
+                "../../../../training-data/nta8800-rvo-voorbeeldwoningen-tussenwoning-1965-1974.json"
+            ),
+            include_str!(
+                "../../../../training-data/nta8800-rvo-voorbeeldwoningen-hoekwoning-1946-1964.json"
+            ),
+            include_str!(
+                "../../../../training-data/nta8800-rvo-voorbeeldwoningen-vrijstaand-1975-1991.json"
+            ),
+            include_str!(
+                "../../../../training-data/nta8800-rvo-voorbeeldwoningen-twee-onder-een-kap-1992-2005.json"
+            ),
+            include_str!(
+                "../../../../training-data/nta8800-rvo-voorbeeldwoningen-portiekwoning-1965-1974.json"
+            ),
+            include_str!(
+                "../../../../training-data/nta8800-rvo-voorbeeldwoningen-galerijwoning-1975-1991.json"
+            ),
+        ];
+        for raw in fixtures {
+            let doc: Value = serde_json::from_str(raw).unwrap();
+            let title = doc["title"].as_str().unwrap();
+            let number = |value: &Value| value.as_f64().unwrap();
+            let rvo_need = number(&doc["rvo"]["heatingNeedKwhPerM2"]);
+            let rvo_standard = number(&doc["rvo"]["standardInsulationKwhPerM2"]);
+
+            let survey: ResidentialSurvey = serde_json::from_value(doc["survey"].clone()).unwrap();
+            let result = assess_residential_survey(&survey);
+            assert_eq!(
+                result.status, "calculated_unverified",
+                "{title}: {:?}",
+                result.issues
+            );
+            let performance = result.performance.as_ref().unwrap();
+            assert!(
+                !performance
+                    .warnings
+                    .iter()
+                    .any(|item| item.code == "standard_insulation_construction_year_missing"),
+                "{title}"
+            );
+            let chapter5 = performance.chapter5.as_ref().unwrap();
+            let standard = chapter5.standard_insulation_kwh_per_m2.unwrap();
+            assert!(
+                (standard - rvo_standard).abs() <= 0.5,
+                "{title}: {standard} vs {rvo_standard}"
+            );
+            let survey_need = number(&doc["regression"]["surveyHeatingNeedKwhPerM2"]);
+            assert!(
+                (chapter5.heating_need_kwh_per_m2 - survey_need).abs() <= 0.005 * survey_need,
+                "{title}: survey {} vs recorded {survey_need}",
+                chapter5.heating_need_kwh_per_m2
+            );
+
+            let input: BuildingPerformanceInput =
+                serde_json::from_value(doc["performanceInput"].clone()).unwrap();
+            let typified = assess_building_performance(&input);
+            assert_eq!(typified.status, "calculated_unverified", "{title}");
+            let need = typified.chapter5.as_ref().unwrap().heating_need_kwh_per_m2;
+            assert!(
+                (need - rvo_need).abs() <= 0.06 * rvo_need,
+                "{title}: {need} vs RVO {rvo_need}"
+            );
+            let recorded = number(&doc["regression"]["performanceInputHeatingNeedKwhPerM2"]);
+            assert!(
+                (need - recorded).abs() <= 0.005 * recorded,
+                "{title}: {need} vs {recorded}"
+            );
+        }
+    }
+
+    #[test]
+    fn survey_passes_the_construction_year_to_the_kernel() {
+        for name in ["1930", "1975", "2015"] {
+            let survey = fixture(name);
+            let mut recorder = Recorder::default();
+            let input = derive_residential_input(&survey, &mut recorder).unwrap();
+            assert_eq!(
+                input["constructionYear"].as_u64(),
+                u64::try_from(survey.construction_year).ok(),
+                "{name}"
+            );
+            let result = assess_residential_survey(&survey);
+            assert!(!result
+                .performance
+                .as_ref()
+                .unwrap()
+                .warnings
+                .iter()
+                .any(|item| item.code == "standard_insulation_construction_year_missing"));
+        }
+    }
+
+    fn without_heat_pump_capacity(survey: &mut ResidentialSurvey) {
+        if let heating::HeatingGenerator::HeatPump { capacity_kw, .. } =
+            &mut survey.heating.generator
+        {
+            *capacity_kw = None;
+        } else {
+            panic!("fixture has no heat pump");
+        }
+        survey.heating.nominal_power_kw = None;
+    }
+
+    #[test]
+    fn individual_heat_pump_without_capacity_uses_table_9_27() {
+        let mut survey = fixture("2015");
+        without_heat_pump_capacity(&mut survey);
+        let result = assess_residential_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!(rules(&result).contains(&"heat_pump_capacity_unknown_table_9_27"));
+    }
+
+    #[test]
+    fn collective_heat_pump_without_capacity_names_the_field() {
+        let mut survey = fixture("2015");
+        without_heat_pump_capacity(&mut survey);
+        survey.heating.collective = Some(heating::CollectiveHeating {
+            connected_usable_area_m2: None,
+            connected_dwellings: Some(20),
+            connected_storeys: Some(4),
+            heat_meters_present: Some(true),
+        });
+        let result = assess_residential_survey(&survey);
+        assert_ne!(result.status, "calculated_unverified");
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "heat_pump_capacity_required"
+                && item.path == "heating.generator.capacityKw"));
+    }
+
+    #[test]
+    fn a_rejected_derived_input_always_carries_a_reason() {
+        let survey = fixture("1930");
+        let mut recorder = Recorder::default();
+        let mut input = derive_residential_input(&survey, &mut recorder).unwrap();
+        input["bacsFactor"] = json!(-1.0);
+        let input: BuildingPerformanceInput = serde_json::from_value(input).unwrap();
+        let performance = assess_building_performance(&input);
+        assert_ne!(performance.status, "calculated_unverified");
+        let mut issues = Vec::new();
+        surface_rejection("derived_input_rejected", Some(&performance), &mut issues);
+        assert!(!issues.is_empty());
+        assert!(issues
+            .iter()
+            .all(|item| item.path.starts_with("derivedInput.")
+                || item.code == "derived_input_rejected_without_reason"));
+        // A survey that already explains itself keeps its own issues.
+        let mut own = vec![OpnameIssue {
+            code: "own",
+            path: "x".into(),
+        }];
+        surface_rejection("derived_input_rejected", Some(&performance), &mut own);
+        assert_eq!(own.len(), 1);
     }
 }

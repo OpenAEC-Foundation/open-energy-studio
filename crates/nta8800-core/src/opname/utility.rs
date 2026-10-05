@@ -840,7 +840,7 @@ fn utility_source(rule: &str) -> Option<&'static str> {
         "cavity_width_unknown_table_8_26" => "ISSO 75.1 p. 88",
         "opaque_rc_forfait_annex_i" => "ISSO 75.1 p. 88–93 (tables 8.9–8.11), NTA annex I",
         "crawlspace_bottom" | "crawlspace_wall_from_facade" => "ISSO 75.1 p. 95",
-        "thermal_bridges_forfait_delta_u" => "ISSO 75.1 p. 83–84; NTA 8.2/8.3",
+        "thermal_bridges_forfait_delta_u" => "ISSO 75.1 p. 83–84; NTA 8800 §8.2.1, formula 8.3",
         "frame_fraction_forfait" => "NTA 7.6.6.2 method B; ISSO 75.1 p. 48",
         "unheated_space_basic_survey_h_ue" => "NTA I.8 (I.2.4) and 8.53; ISSO 75.1 basisopname",
         "no_generator_conventional_boiler" => "ISSO 75.1 p. 109",
@@ -4482,6 +4482,11 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
         "demandUsesFixedC1Ventilation": false,
         "batteryStoragePresent": storage_present,
     });
+    if let Ok(year) = u32::try_from(survey.construction_year) {
+        if year > 0 {
+            input["constructionYear"] = json!(year);
+        }
+    }
     if let Some(storage) = storage {
         input["storage"] = storage;
     }
@@ -4563,6 +4568,7 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
         Some(_) => "derived_input_rejected",
         None => "invalid",
     };
+    super::surface_rejection(status, performance.as_ref(), &mut recorder.issues);
     super::refuse_non_finite(OpnameAssessment {
         status,
         scope: "isso_75_1_basisopname_utility_unverified",

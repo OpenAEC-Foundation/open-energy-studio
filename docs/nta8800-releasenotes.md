@@ -33,6 +33,13 @@ Rekenuitkomsten veranderen niet. Wat wel verandert voor clients van de API of de
   - **Tool-uitkomsten:** dezelfde JSON-body als de route, ook als `structuredContent`.
   - **`isError`:** dit staat waar de route 4xx/5xx geeft. De oude tools gaven bij een vormfout eigen codes (`invalid_*_shape`); die zijn nu `invalid_request_shape` met pad, behalve `invalid_project_shape` en `invalid_maatwerkadvies_shape`.
 - **Documentatie:** [nta8800-api.md](nta8800-api.md), [nta8800-mcp.md](nta8800-mcp.md) en hoofdstuk 9 van de handleiding.
+## 5 oktober 2026 — woningopname na de vergelijking met de RVO-voorbeeldwoningen
+
+- **Bouwjaar naar de rekenkern.** De woning- en utiliteitsopname geven het bouwjaar nu door. Opnames krijgen daardoor de Standaard voor woningisolatie (§5.3.2) en de waarschuwing `standard_insulation_construction_year_missing` verdwijnt. De labelgegevens krijgen het bouwjaar ook. Andere uitkomsten veranderen niet.
+- **Warmtepomp zonder vermogen.** Een individuele warmtepomp zonder opgegeven vermogen rekent nu met NTA-tabel 9.27 (woningen tot en met 25 kW), vastgelegd als `heat_pump_capacity_unknown_table_9_27` (ISSO 82.1 tabel 9.6, p. 110). Zo'n opname liep eerder vast. Een collectieve warmtepomp zonder vermogen geeft `heat_pump_capacity_required` op `heating.generator.capacityKw`.
+- **Geweigerde opnames tonen de reden.** Weigert de kern de afgeleide invoer, dan staan de meldingen van de kern bij de opname, onder `derivedInput.…`. Een weigering zonder melding geeft `derived_input_rejected_without_reason`.
+- **Bronvermelding koudebrugtoeslag.** ΔU_for verwijst naar NTA 8800 §8.2.1, formule 8.3.
+- **Vergelijkingstest.** Zes RVO-voorbeeldwoningen staan als fixtures in `training-data/nta8800-rvo-voorbeeldwoningen-*.json`; zie `docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md`. Dit is geen officiële referentietoets.
 
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 
