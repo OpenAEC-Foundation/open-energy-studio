@@ -2,6 +2,12 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — Rapportage Energieprestatie met detailniveaus
+
+- **Nieuw rapport:** "Rapportage Energieprestatie (NTA 8800)" op het tabblad Rapport, met de niveaus samenvatting, standaard en gedetailleerd. Bij gedetailleerd kies je per hoofdstuk welke berekeningen tot op maandniveau worden getoond, met formulenummers en uitgewerkte rekenstappen. Export als HTML (desktop: opslagvenster) en afdrukken of opslaan als PDF, opgemaakt voor A4.
+- **Kernuitvoer uitgebreid (alleen extra velden):** elke maand van de warmtebehoefte bevat nu `windowSolarByWindow` (zonnewinst per raam, verwarming en koeling; samen gelijk aan `windowSolarGainsKwh`) en `sunroomGainsKwh`/`sunroomCoolingGainsKwh` (7.30b). Bestaande velden en uitkomsten veranderen niet.
+- **Testfixtures:** de kernuitvoer van beide voorbeeldprojecten staat in `training-data/nta8800-example-*.kernel-output.json`; de rapporttests gebruiken die.
+
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 
 De applicatie was gebouwd tegen de concepten van BRL 9500-W/U en BRL 9501 van 14-10-2025 en tegen BRL 9500-MWA-W/U van 19-06-2024. Inmiddels zijn de aangewezen versies openbaar.

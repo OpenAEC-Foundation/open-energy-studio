@@ -13,6 +13,7 @@ import { useProjectPerformance } from '../../core/nta/useProjectPerformance';
 import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
 import { kernelWithheld } from '../../core/nta/KernelVerdict';
 import { formatNumber } from '../../i18n/format';
+import { ReportBuilder } from './ReportBuilder';
 import './ReportView.css';
 
 /** Month name in the UI language. */
@@ -114,6 +115,7 @@ export function ReportView() {
             : withheld ? t(kernelAssessment?.status === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')
             : indicativeShown ? t('results.indicativeDescription') : t('report.inputDossierScope')}</p>
         </div>
+        <ReportBuilder project={project} assessment={kernelAssessment} pending={kernelPending} />
         <div className="report-input-dossier">
           <button type="button" onClick={() => downloadNtaInputDossierHTML(project)}>{t('report.exportInputDossier')}</button>
           <p>{t('report.inputDossierScope')}</p>

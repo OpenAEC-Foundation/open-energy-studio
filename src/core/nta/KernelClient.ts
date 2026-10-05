@@ -722,6 +722,11 @@ export interface MonthlyDemandAssessment {
     windowSolarGainsKwh: number;
     windowSolarCoolingKwh: number;
     opaqueSolarGainsKwh: number;
+    /** 7.30b sunroom gains on the heating and cooling balance (report trace; older kernels omit it). */
+    sunroomGainsKwh?: number;
+    sunroomCoolingGainsKwh?: number;
+    /** Window solar gains per window (7.40 with §17.3); report trace, older kernels omit it. */
+    windowSolarByWindow?: Array<{ id: string; orientation: string; heatingKwh: number; coolingKwh: number }>;
     groundConductanceWPerK: number;
     heating: MonthlyDemandBalanceTerms;
     cooling: MonthlyDemandBalanceTerms;
