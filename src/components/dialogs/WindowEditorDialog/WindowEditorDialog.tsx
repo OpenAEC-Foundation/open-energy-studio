@@ -96,7 +96,7 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.window.title')}
       onClose={onClose}
       onSubmit={handleSave}

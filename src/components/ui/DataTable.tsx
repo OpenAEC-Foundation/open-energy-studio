@@ -30,6 +30,8 @@ export interface DataTableProps<Row> {
   onActivate?: (row: Row) => void;
   empty?: ReactNode;
   className?: string;
+  /** Extra row attributes, e.g. `data-path` for "Ga naar" or a class for child rows. */
+  rowProps?: (row: Row) => { className?: string; 'data-path'?: string; 'aria-label'?: string };
 }
 
 /**
@@ -37,7 +39,7 @@ export interface DataTableProps<Row> {
  * and selection. ↑/↓ move between rows, Enter activates.
  */
 export function DataTable<Row>({
-  columns, rows, rowKey, caption, groupBy, selectedKey, onSelect, onActivate, empty, className,
+  columns, rows, rowKey, caption, groupBy, selectedKey, onSelect, onActivate, empty, className, rowProps,
 }: DataTableProps<Row>) {
   const body = useRef<HTMLTableSectionElement>(null);
 
@@ -79,11 +81,14 @@ export function DataTable<Row>({
             }
             lastGroup = group;
             const selected = selectedKey === key;
+            const extra = rowProps?.(row) ?? {};
             out.push(
               <tr
                 key={key}
                 data-row=""
-                className={cx(selected && 'ui-table__row--selected', interactive && 'ui-table__row--interactive')}
+                data-path={extra['data-path']}
+                aria-label={extra['aria-label']}
+                className={cx(selected && 'ui-table__row--selected', selected && 'selected', interactive && 'ui-table__row--interactive', extra.className)}
                 tabIndex={interactive ? 0 : undefined}
                 aria-selected={onSelect ? selected : undefined}
                 onClick={onSelect ? () => onSelect(row) : undefined}

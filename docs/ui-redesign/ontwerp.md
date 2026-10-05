@@ -919,3 +919,40 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - editors als zijlade in de inspector;
   - NTA-secties per stap;
   - het concept-voorbeeld.
+
+### Uitgevoerd in F5 (5 oktober 2026)
+
+- Routes (`src/core/navigation/routes.ts`):
+  - Gebouw: `envelope` (blijft standaard), `zones`, `constructions`, `thermalBridges`, `airTightness`, `unheated` en `model3d`;
+  - Installaties: `systems` (overzicht), `heating`, `hotWater`, `ventilation`, `cooling`, `humidification`, `generation`, `heatPumps` en `bacs`;
+  - `reference` is vervallen: de gaswarmtepomp-referentie is een inklapbare diagnose onder `heatPumps`.
+- `GAP_ROUTES` en `projectItems` verwijzen naar die subpagina's, bijvoorbeeld:
+  - `zones.*.thermalBridges` → Koudebruggen;
+  - `constructions` → Constructies;
+  - `solarPV` → Opwekking.
+  - NTA-paden blijven naar Controle › NTA-invoer gaan; F6 verfijnt dat.
+- `src/components/shell/pages/BuildingPages.tsx`:
+  - pagina's: `EnvelopePage` (`DataTable` met groepering, filter, ramen als kindregels en `data-path` per rij), `ZonesPage`, `ConstructionsPage`, `ThermalBridgesPage` en `AirTightnessPage` (inline q<sub>v;10</sub>);
+  - kaarten: H<sub>T</sub>-aandeel en controles schil.
+  - Afwijking van §F5: de pagina's staan in één bestand onder `components/shell/pages/`, net als de F4-pagina's, en niet in `src/pages/building/`. `UnheatedPage` en `ModelPage` zijn niet als aparte bestanden gemaakt: `UnheatedSpacesPanel` en `Building3DView` (nu met `EmptyState`/`ErrorState`) renderen direct.
+- `EnvelopeView` is een samenstelling van die pagina's, voor de editortests en voor gebruik buiten de shell.
+- `src/components/shell/ElementInspector.tsx`:
+  - de inline-editor van het geselecteerde vlak, raam, de zone of de koudebrug, met `NumberInput`/`Select`;
+  - `UPDATE_*` voegt samen, dus ids blijven stabiel;
+  - een leeg verplicht getal wordt niet weggeschreven.
+- `Inspector`: het element krijgt de inline-editor. Op Installaties, zonder systeemselectie, toont het paneel `ServiceEnergyPanel` (energie per dienst).
+- `src/components/shell/pages/InstallationsPage.tsx`:
+  - `SERVICES` (lijsten, NTA-blokken en padprefixen per dienst);
+  - `InstallationsOverview` met ketenkaarten en status uit de kernmeldingen;
+  - `ServicePage` per dienst, met de systeemtabel, open punten en NTA-blokken met link naar Controle › NTA-invoer.
+- De 13 editordialogen renderen als zijlade (`DialogShell variant="sheet"`). `DataTable` kreeg `rowProps` (`data-path`, klasse) en `ItemActions` kreeg `compact` (icoonknoppen, dezelfde toegankelijke namen).
+- Labels staan in `src/i18n/buildingInstallLabels.ts` (NL/EN).
+- Tests:
+  - nieuw: `building-installations-pages.test.tsx`;
+  - aangepast: `workflow-nav` (toevoegen per subpagina, dienstpagina, overzicht) en `gap-routes`;
+  - `envelope-edit` en `point-thermal-bridges` zijn ongewijzigd groen.
+- Schermafdrukken: `~/oes-shots/f5/`.
+- Nog open:
+  - de ketenfasen (opwekking › distributie › afgifte › regeling) per dienst uit de NTA-invoer; nu toont de kaart de systemen en de ingevulde NTA-blokken;
+  - "Bron & bewijs" per vlak;
+  - een type-wissel (wand/dak/vloer) in het inline-paneel.

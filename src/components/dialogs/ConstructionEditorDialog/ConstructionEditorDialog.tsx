@@ -102,7 +102,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.construction.title')}
       onClose={onClose}
       onSubmit={handleSave}
