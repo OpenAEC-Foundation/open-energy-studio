@@ -153,7 +153,8 @@
   letter-spacing: 0.05em;
 }
 
-.preview-beng-badge { background: var(--bg-tertiary); color: var(--text-secondary); }
+/* F1: "onverifieerd" has its own violet status colour, not a warning (ontwerp.md §5.1). */
+.preview-beng-badge { background: var(--unverified-subtle); color: var(--unverified); }
 
 .preview-beng-value {
   font-size: 18px;

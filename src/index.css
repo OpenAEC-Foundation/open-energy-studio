@@ -32,7 +32,7 @@ input, textarea, [contenteditable="true"] {
   --bg-hover: rgba(217, 119, 6, 0.08);
   --text-primary: #FAFAF9;
   --text-secondary: #A1A1AA;
-  --text-muted: #71717A;
+  --text-muted: #A1A1AA; /* F1: 4,7:1 (was #71717A, 2,5:1) */
   --accent: #D97706;
   --accent-hover: #EA580C;
   --accent-subtle: rgba(217, 119, 6, 0.15);
@@ -101,7 +101,7 @@ input, textarea, [contenteditable="true"] {
   --bg-hover: rgba(0, 0, 0, 0.04);
   --text-primary: #36363E;
   --text-secondary: #57534E;
-  --text-muted: #A1A1AA;
+  --text-muted: #6B6560; /* F1: 5,0:1 (was #A1A1AA, 2,5:1) */
   --accent: #D97706;
   --accent-hover: #EA580C;
   --accent-subtle: rgba(217, 119, 6, 0.10);

@@ -45,6 +45,13 @@ Rekenuitkomsten veranderen niet. Wat wel verandert voor clients van de API of de
 - **Nieuw rapport:** "Rapportage Energieprestatie (NTA 8800)" op het tabblad Rapport, met de niveaus samenvatting, standaard en gedetailleerd. Bij gedetailleerd kies je per hoofdstuk welke berekeningen tot op maandniveau worden getoond, met formulenummers en uitgewerkte rekenstappen. Export als HTML (desktop: opslagvenster) en afdrukken of opslaan als PDF, opgemaakt voor A4.
 - **Kernuitvoer uitgebreid (alleen extra velden):** elke maand van de warmtebehoefte bevat nu `windowSolarByWindow` (zonnewinst per raam, verwarming en koeling; samen gelijk aan `windowSolarGainsKwh`) en `sunroomGainsKwh`/`sunroomCoolingGainsKwh` (7.30b). Bestaande velden en uitkomsten veranderen niet.
 - **Testfixtures:** de kernuitvoer van beide voorbeeldprojecten staat in `training-data/nta8800-example-*.kernel-output.json`; de rapporttests gebruiken die.
+## 5 oktober 2026 — UI-herontwerp, fase F1 en F2 (geen rekenwijziging)
+
+Eerste fasen van het UI-herontwerp (`docs/ui-redesign/ontwerp.md`). Rekenkern, invoer en uitkomsten zijn ongewijzigd.
+- **Huisstijl en leesbaarheid:** nieuwe designtokens; Inter, Space Grotesk en JetBrains Mono worden met de app meegeleverd, dus ook offline in de desktopversie. Gedempte tekst haalt nu WCAG AA (4,7 : 1 donker, 5,0 : 1 licht). De statusbalk is neutraal in plaats van amber; de scrollbalk volgt het thema; "Onverifieerd" heeft een eigen violette kleur in plaats van de waarschuwingskleur.
+- **Meldingen:** foutmeldingen bij openen en importeren verschijnen als melding rechtsonder in plaats van een browservenster. Sluiten van een tabblad met niet-opgeslagen wijzigingen vraagt in de app-taal "Opslaan · Niet opslaan · Annuleren", ook in de browserversie.
+- **Taal:** de feedbackknop en het feedbackformulier zijn Nederlands; bestandskeuzes tonen "Bestand kiezen…" in plaats van de Engelse browsertekst; de teksten van het 3D-model ontbraken en zijn toegevoegd.
+- **Bouwstenen:** knoppen, invoervelden met eenheid (komma en punt worden beide geaccepteerd), keuzeknoppen, kaarten, tabellen, statuslabels, dialogen en zijpanelen voor de volgende fasen.
 
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 

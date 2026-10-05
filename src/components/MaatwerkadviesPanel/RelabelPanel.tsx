@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GitCompare } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
+import { FileButton } from '../ui';
 import { assessRelabelWithRust, type NtaRelabelComparison } from '../../core/nta/KernelClient';
 import { deserializeProject } from '../../core/io/ProjectSerializer';
 import { sha256Hex } from '../../core/nta/Evidence';
@@ -75,11 +76,11 @@ export function RelabelPanel() {
   return (
     <section className="nta-performance relabel-panel" aria-label={t('relabel.title')}>
       <div className="nta-performance-title"><GitCompare size={18} /><div><h3>{t('relabel.title')}</h3><p>{t('relabel.intro')}</p></div></div>
-      <label className="nta-performance-actions">
-        {t('relabel.choose')}{' '}
-        <input ref={fileInput} type="file" accept=".json,.oes,application/json" disabled={busy}
+      <div className="nta-performance-actions">
+        <label htmlFor="relabel-original-file">{t('relabel.choose')}</label>{' '}
+        <FileButton id="relabel-original-file" inputRef={fileInput} accept=".json,.oes,application/json" disabled={busy}
           onChange={(event) => { const file = event.target.files?.[0]; if (file) void compare(file); }} />
-      </label>
+      </div>
       {error && <p role="alert">{error}</p>}
       {result && stored && (
         <>

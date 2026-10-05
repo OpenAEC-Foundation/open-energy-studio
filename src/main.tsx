@@ -1,7 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './styles/fonts.css';
+import './styles/tokens.css';
+import './styles/base.css';
 import './index.css';
+import './components/ui/ui.css';
 
 // Apply stored theme before first render to prevent flash
 {

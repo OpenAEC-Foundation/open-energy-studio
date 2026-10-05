@@ -879,3 +879,18 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
 2. **De vereenvoudigde invoer** (`heatingSystems`, `solarPV`, … via dialogen) naast de NTA-invoer. Het ontwerp toont beide in dezelfde stap: de systeemketen-kaart vat samen, de NTA-stap is de diepte. Op termijn kan de vereenvoudigde invoer volledig uit de NTA-invoer worden afgeleid. Dat is buiten scope van deze UI-fasen.
 3. **Foto's in de basisopname.** Er is opslag nodig in het projectbestand of als losse bestanden naast het project in het dossier-ZIP. Dat raakt `ProjectSerializer` en is een aparte beslissing.
 4. **Concept-preview in de controle-inspector.** Dat is een extra kernrun per wijziging. Prima lokaal, maar uitschakelbaar in Instellingen.
+
+### Besluiten (5 oktober 2026, bij fase F1/F2)
+
+1. **Bestaande bouw bij nieuwbouw:** de stappen Basisopname, Maatwerkadvies en Herlabelen blijven zichtbaar, maar gedimd (lagere opaciteit, label "niet van toepassing bij nieuwbouw"). Ze worden niet verborgen.
+2. **Vereenvoudigd model:** blijft de bron voor de geometrie (zones, vlakken, ramen, constructies). De NTA-invoer blijft de bron voor de berekening. Er komt nu geen samenvoeging.
+3. **Foto's in de basisopname:** worden later opgeslagen via het bewijsregister. Buiten scope van de UI-fasen.
+4. **Concept-preview:** staat standaard uit en is een instelling.
+
+### Uitgevoerd in F1/F2
+
+- `src/styles/tokens.css`, `src/styles/base.css` en `src/styles/fonts.css`; lettertypen lokaal in `src/assets/fonts` (latin en latin-ext, OFL). De Google-link in `index.html` blijft als browserfallback.
+- Contrast: `--text-muted` is #A1A1AA (donker, 4,7 : 1) en #6B6560 (licht, 5,0 : 1). De statusbalk is neutraal. De scrollbalk volgt het thema. "Onverifieerd" is violet.
+- `src/components/ui/`: alle bouwstenen uit §5.2 behalve `CommandPalette`, `KpiTile`, `BulletMeter`, `LabelBadge` en `LabelScale` (F3/F7). Extra: `FileButton` voor de vertaalde bestandskeuze.
+- `formatQuantity`, `QUANTITIES` en `parseDecimal` in `src/i18n/format.ts`; `parseKernelPath` in `src/core/nta/pathUtil.ts`.
+- Geen `alert()`/`confirm()`/Tauri-`ask` meer in `App.tsx`: meldingen zijn toasts, sluiten met wijzigingen gebruikt `ConfirmDialog` (Opslaan · Niet opslaan · Annuleren).
