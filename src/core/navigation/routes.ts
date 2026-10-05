@@ -69,7 +69,15 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
       { id: 'input', labelKey: 'nav.sub.check.input' },
     ],
   },
-  { id: 'results', number: 5, group: 'calculation', labelKey: 'nav.step.results', slug: 'resultaten', subs: [] },
+  {
+    id: 'results', number: 5, group: 'calculation', labelKey: 'nav.step.results', slug: 'resultaten', subs: [
+      { id: 'overview', labelKey: 'nav.sub.results.overview' },
+      { id: 'services', labelKey: 'nav.sub.results.services' },
+      { id: 'zones', labelKey: 'nav.sub.results.zones' },
+      { id: 'monthly', labelKey: 'nav.sub.results.monthly' },
+      { id: 'provenance', labelKey: 'nav.sub.results.provenance' },
+    ],
+  },
   { id: 'survey', number: 6, group: 'existing', labelKey: 'nav.step.survey', slug: 'basisopname', subs: [] },
   { id: 'advice', number: 7, group: 'existing', labelKey: 'nav.step.advice', slug: 'maatwerkadvies', subs: [] },
   { id: 'relabel', number: 8, group: 'existing', labelKey: 'nav.step.relabel', slug: 'herlabelen', subs: [] },

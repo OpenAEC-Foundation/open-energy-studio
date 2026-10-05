@@ -203,7 +203,9 @@ describe('Step pages keep the ribbon actions', () => {
     expect(screen.getByRole('row', { name: /Woonfunctie/ })).toHaveAttribute('data-path', 'zones[0]');
     unmount();
     renderWithProviders(<Shell actions={makeActions()} route={{ step: 'building', sub: 'constructions' }} />);
-    expect(screen.getByRole('heading', { name: 'Constructions' })).toBeInTheDocument();
+    // The page title names the sub page (F7 fix), the section keeps its own heading.
+    expect(screen.getByRole('heading', { name: 'Constructions', level: 1 })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: 'Constructions' })).toHaveLength(2);
   });
 
   it('Report: export, print, IFC and exchange exports', async () => {
