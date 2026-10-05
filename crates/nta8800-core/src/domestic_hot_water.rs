@@ -1388,6 +1388,13 @@ impl DeclaredGeneratorShare {
 pub struct DeliverySets {
     pub count: u32,
     pub source_reference: String,
+    /// The same sets also serve space heating. Their standby electronics
+    /// (13.46, 10 W) are then already counted in the heating chain
+    /// (electrically connected devices, 9.4.x), so this route counts only the
+    /// 13.24 standby loss. The EDR tests EPWReal B05–B07 (ISSO 54) confirm
+    /// that the electronics are counted once.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shared_with_heating: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -4055,6 +4062,12 @@ pub fn assess_hot_water_with(
 
     // Delivery sets (13.24/13.24a, 13.46).
     let sets = system.delivery_sets.as_ref().map_or(0, |item| item.count);
+    // 13.46 electronics only for sets that do not also serve space heating.
+    let electronic_sets = system
+        .delivery_sets
+        .as_ref()
+        .filter(|item| !item.shared_with_heating)
+        .map_or(0, |item| item.count);
     let recoverable_counts = storage_and_generator_losses_recoverable(system, area, building_area);
 
     let mut months = Vec::with_capacity(12);
@@ -4088,7 +4101,7 @@ pub fn assess_hot_water_with(
             conversion_loss_kwh: conversion,
             distribution_efficiency: eta_dis,
             auxiliary_electricity_kwh: pump[index]
-                + f64::from(sets) * STANDBY_ELECTRONICS_W * MONTH_HOURS[index] / 1000.0,
+                + f64::from(electronic_sets) * STANDBY_ELECTRONICS_W * MONTH_HOURS[index] / 1000.0,
             ..HotWaterMonth::default()
         });
     }
@@ -5425,6 +5438,38 @@ mod tests {
     }
 
     #[test]
+    fn residential_delivery_set_counts_standby_loss_and_electronics_once() {
+        let ctx = HotWaterContext {
+            levelled_setpoint_c: None,
+            need_fraction: None,
+            standard_setpoint_c: None,
+            residential: true,
+            usable_floor_area_m2: 47.2,
+            heated_ambient_c: 21.0,
+            space_heating: None,
+        };
+        let mut own = system(HotWaterGenerator::ExternalHeat);
+        own.delivery_sets = Some(DeliverySets {
+            count: 1,
+            source_reference: "survey".into(),
+            shared_with_heating: false,
+        });
+        let mut shared = own.clone();
+        shared.delivery_sets.as_mut().unwrap().shared_with_heating = true;
+        let own = assess_hot_water(&own, ctx).unwrap();
+        let shared = assess_hot_water(&shared, ctx).unwrap();
+        let jan_hours = MONTH_HOURS[0];
+        // 13.24: 30 W standby loss on the heat side in both cases.
+        assert!((own.months[0].conversion_loss_kwh - 30.0 * jan_hours / 1000.0).abs() < 1e-9);
+        assert!((shared.months[0].conversion_loss_kwh - 30.0 * jan_hours / 1000.0).abs() < 1e-9);
+        // 13.46: 10 W electronics only when the set is not already in the
+        // heating chain (EDR EPWReal B05–B07: 262,8 kWh heat, 0 kWh extra
+        // electricity for the shared set).
+        assert!((own.months[0].auxiliary_electricity_kwh - 10.0 * jan_hours / 1000.0).abs() < 1e-9);
+        assert!(shared.months[0].auxiliary_electricity_kwh.abs() < 1e-9);
+    }
+
+    #[test]
     fn utility_need_storage_label_and_delivery_sets() {
         let ctx = HotWaterContext {
             levelled_setpoint_c: None,
@@ -5456,6 +5501,7 @@ mod tests {
         input.delivery_sets = Some(DeliverySets {
             count: 2,
             source_reference: "plan".into(),
+            shared_with_heating: false,
         });
         assert!(validate_hot_water(&input, ctx, "dhw").is_empty());
         let result = assess_hot_water(&input, ctx).unwrap();

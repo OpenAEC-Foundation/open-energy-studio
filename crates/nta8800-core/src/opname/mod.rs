@@ -626,6 +626,17 @@ fn survey_hot_water(
     );
     if matches!(
         hot.generator,
+        hot_water::HotWaterGeneratorAnswer::DistrictHeat
+    ) && matches!(
+        survey.heating.generator,
+        heating::HeatingGenerator::DistrictHeat
+    ) {
+        // The same delivery set serves heating and hot water: its 13.46
+        // electronics are already in the heating chain.
+        system["deliverySets"]["sharedWithHeating"] = json!(true);
+    }
+    if matches!(
+        hot.generator,
         hot_water::HotWaterGeneratorAnswer::ElectricBoiler
     ) {
         if let Some(vessel) = hot_water::boiler_storage(

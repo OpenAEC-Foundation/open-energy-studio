@@ -684,7 +684,19 @@ pub(crate) fn convert_generator(
         HotWaterGeneratorAnswer::HeatPump { exhaust_air_source } => {
             json!({"kind": "heat_pump", "exhaustAirSource": exhaust_air_source})
         }
-        HotWaterGeneratorAnswer::DistrictHeat => json!({"kind": "external_heat"}),
+        HotWaterGeneratorAnswer::DistrictHeat => {
+            // ISSO 82.1 records external heat for hot water through one
+            // individual delivery set per dwelling; NTA 13.24 adds its
+            // standby loss (30 W) and 13.46 its electronics. Without the set
+            // the EDR tests EPWReal B05–B07 come out 262,8 kWh/yr too low.
+            recorder.record(
+                "district_heat_hot_water_one_delivery_set",
+                path,
+                "1 individual delivery set (13.24)".into(),
+                "ISSO 82.1 §13 (warmtelevering derden: 1 afleverset); NTA 8800 §13.4.2, 13.24",
+            );
+            json!({"kind": "external_heat"})
+        }
         HotWaterGeneratorAnswer::CollectiveUnknown => {
             recorder.record(
                 "collective_generator_unknown_direct_storage",
@@ -742,6 +754,14 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
         "generator": generator,
         "equipmentReference": reference,
     });
+    if matches!(survey.generator, HotWaterGeneratorAnswer::DistrictHeat) {
+        // One individual delivery set per dwelling (13.24/13.46); the
+        // default is recorded in `convert_generator`.
+        system["deliverySets"] = json!({
+            "count": 1,
+            "sourceReference": "basisopname: one delivery set per dwelling (ISSO 82.1)",
+        });
+    }
     if let Some(unit) = unit {
         let mut showers = vec![json!({"unit": unit})];
         for _ in 1..survey.showers.max(1) {
@@ -793,6 +813,22 @@ mod tests {
         assert_eq!(vessel["connectionFactor"], 2);
         assert!(boiler_storage(None, 1975, "survey", &mut recorder).is_none());
         assert_eq!(recorder.issues[0].code, "boiler_volume_required");
+    }
+
+    #[test]
+    fn district_heat_hot_water_gets_one_delivery_set() {
+        let mut recorder = Recorder::default();
+        let system = derive_hot_water(
+            &survey(HotWaterGeneratorAnswer::DistrictHeat),
+            &mut recorder,
+        );
+        assert_eq!(system["generator"]["kind"], "external_heat");
+        assert_eq!(system["deliverySets"]["count"], 1);
+        assert!(system["generator"].get("deliverySets").is_none());
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "district_heat_hot_water_one_delivery_set"));
     }
 
     #[test]

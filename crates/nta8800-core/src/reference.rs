@@ -11,12 +11,62 @@ use std::collections::HashSet;
 pub struct ReferenceCase {
     pub case_id: String,
     pub norm_version: String,
+    /// Full `.oes` project input; `null` when the case is a survey.
+    #[serde(default, skip_serializing_if = "Value::is_null")]
     pub project: Value,
+    /// ISSO basic survey input (EDR "Real B" tests) instead of a project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub survey: Option<ReferenceSurvey>,
     pub source: ReferenceSource,
     pub expected: Vec<ExpectedMetric>,
     /// Optional comparison of the calculated, unregistered label class.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_label_class: Option<String>,
+}
+
+/// A basisopname as the calculation input of a reference case. The opname
+/// layer derives the kernel input; the comparison runs on its performance.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReferenceSurvey {
+    pub kind: ReferenceSurveyKind,
+    pub input: Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReferenceSurveyKind {
+    /// ISSO 82.1 dwelling survey (`opname/residential`).
+    Residential,
+    /// ISSO 75.1 utility survey (`opname/utility`).
+    Utility,
+}
+
+/// Runs the survey through the opname layer and returns the performance when
+/// the opname is complete.
+fn survey_performance(
+    survey: &ReferenceSurvey,
+) -> Result<
+    (
+        String,
+        Option<crate::building_performance::BuildingPerformanceAssessment>,
+    ),
+    &'static str,
+> {
+    match survey.kind {
+        ReferenceSurveyKind::Residential => {
+            let input: crate::opname::ResidentialSurvey =
+                serde_json::from_value(survey.input.clone()).map_err(|_| "survey_shape_invalid")?;
+            let assessment = crate::opname::assess_residential_survey(&input);
+            Ok((assessment.status.to_string(), assessment.performance))
+        }
+        ReferenceSurveyKind::Utility => {
+            let input: crate::opname::utility::UtilitySurvey =
+                serde_json::from_value(survey.input.clone()).map_err(|_| "survey_shape_invalid")?;
+            let assessment = crate::opname::utility::assess_utility_survey(&input);
+            Ok((assessment.status.to_string(), assessment.performance))
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -103,7 +153,9 @@ pub struct MetricComparison {
 /// supplied in the same case manifest. A missing row is not assumed to be zero.
 fn metric_unit(path: &str) -> Option<&'static str> {
     match path {
-        "beng1" | "beng2" | "labelPrimaryFossil" => return Some("kWh/m2.year"),
+        "beng1" | "beng2" | "labelPrimaryFossil" | "heatingNeedPerM2" | "finalEnergyPerM2" => {
+            return Some("kWh/m2.year")
+        }
         "beng3" | "labelRenewableShare" => return Some("%"),
         "tojuliMax" => return Some("K"),
         "annualPrimaryFossil" | "annualRenewablePrimary" => return Some("kWh"),
@@ -181,6 +233,19 @@ fn actual_metric(
             return result.label_primary_fossil_indicator_kwh_per_m2_year;
         }
         "labelRenewableShare" => return result.label_renewable_share_percent,
+        // ISSO 54 posts QH;nd;net and EweFinal (chapter 5 per m²).
+        "heatingNeedPerM2" => {
+            return result
+                .chapter5
+                .as_ref()
+                .map(|chapter| chapter.heating_need_kwh_per_m2)
+        }
+        "finalEnergyPerM2" => {
+            return result
+                .chapter5
+                .as_ref()
+                .map(|chapter| chapter.final_energy_kwh_per_m2)
+        }
         "tojuliMax" => return result.tojuli_max_k,
         "annualPrimaryFossil" => return result.annual_primary_fossil_kwh,
         "annualRenewablePrimary" => return result.annual_renewable_primary_kwh,
@@ -312,18 +377,34 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     if !result.issues.is_empty() {
         return result;
     }
-    let assessment = crate::project_performance::assess_project_performance(&case.project);
-    result.input_fingerprint = Some(assessment.input_fingerprint);
-    if assessment.status != "calculated_unverified" {
-        result.status = "calculation_unavailable";
-        result.issues.push(issue(
-            "project_calculation_unavailable",
-            "project",
-            "Project does not yield a complete unverified Rust calculation",
-        ));
-        return result;
-    }
-    let Some(performance) = assessment.performance else {
+    let performance = if let Some(survey) = &case.survey {
+        match survey_performance(survey) {
+            Ok((status, performance)) if status == "calculated_unverified" => performance,
+            Ok(_) | Err(_) => {
+                result.status = "calculation_unavailable";
+                result.issues.push(issue(
+                    "survey_calculation_unavailable",
+                    "survey",
+                    "Survey does not yield a complete unverified Rust calculation",
+                ));
+                return result;
+            }
+        }
+    } else {
+        let assessment = crate::project_performance::assess_project_performance(&case.project);
+        result.input_fingerprint = Some(assessment.input_fingerprint);
+        if assessment.status != "calculated_unverified" {
+            result.status = "calculation_unavailable";
+            result.issues.push(issue(
+                "project_calculation_unavailable",
+                "project",
+                "Project does not yield a complete unverified Rust calculation",
+            ));
+            return result;
+        }
+        assessment.performance
+    };
+    let Some(performance) = performance else {
         result.status = "calculation_unavailable";
         return result;
     };
@@ -486,25 +567,53 @@ pub fn audit_reference_case(case: ReferenceCase) -> ReferenceAudit {
             ));
         }
     }
-    let input_fingerprint = match assess_json(case.project) {
-        Ok(assessment) => {
-            if assessment.status == "invalid" {
-                issues.push(issue(
-                    "project_input_invalid",
-                    "project",
-                    "Reference project fails structural validation",
-                ));
-            }
-            Some(assessment.input_fingerprint)
-        }
-        Err(_) => {
+    let input_fingerprint = match (&case.survey, case.project.is_null()) {
+        (Some(_), false) => {
             issues.push(issue(
-                "project_shape_invalid",
-                "project",
-                "Reference project shape cannot be parsed",
+                "calculation_input_ambiguous",
+                "survey",
+                "A reference case carries either a project or a survey, not both",
             ));
             None
         }
+        (Some(survey), true) => {
+            if survey_performance(survey).is_err() {
+                issues.push(issue(
+                    "survey_shape_invalid",
+                    "survey.input",
+                    "Reference survey shape cannot be parsed",
+                ));
+            }
+            Some(input_fingerprint(&survey.input))
+        }
+        (None, true) => {
+            issues.push(issue(
+                "calculation_input_required",
+                "project",
+                "A reference case needs a project or a survey as calculation input",
+            ));
+            None
+        }
+        (None, false) => match assess_json(case.project) {
+            Ok(assessment) => {
+                if assessment.status == "invalid" {
+                    issues.push(issue(
+                        "project_input_invalid",
+                        "project",
+                        "Reference project fails structural validation",
+                    ));
+                }
+                Some(assessment.input_fingerprint)
+            }
+            Err(_) => {
+                issues.push(issue(
+                    "project_shape_invalid",
+                    "project",
+                    "Reference project shape cannot be parsed",
+                ));
+                None
+            }
+        },
     };
     ReferenceAudit {
         case_id: case.case_id,
@@ -534,6 +643,7 @@ mod tests {
             case_id: "synthetic-comparison".into(),
             norm_version: TARGET_NORM_VERSION.into(),
             project,
+            survey: None,
             source: ReferenceSource {
                 publisher: "synthetic internal test".into(),
                 document_id: "internal-1".into(),
@@ -904,5 +1014,66 @@ mod tests {
         let changed = audit_reference_case(serde_json::from_value(source_changed).unwrap());
         assert_eq!(changed.input_fingerprint, project_fingerprint);
         assert_ne!(changed.manifest_fingerprint, manifest_fingerprint);
+    }
+
+    fn survey_case(path: &str, value: f64, unit: &str) -> ReferenceCase {
+        let input: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-opname-1930-terraced.json"
+        ))
+        .unwrap();
+        serde_json::from_value(json!({
+            "caseId":"synthetic-survey", "normVersion":TARGET_NORM_VERSION,
+            "survey":{"kind":"residential", "input":input},
+            "source":{"publisher":"synthetic", "documentId":"internal-1", "edition":"test",
+                "usePermission":"internal", "independentReviewer":"test"},
+            "expected":[{"path":path, "value":value, "unit":unit,
+                "normReference":"internal test", "absoluteTolerance":0.5}]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn survey_case_runs_the_opname_layer_and_compares_chapter_5_posts() {
+        let audit = audit_reference_case(survey_case("heatingNeedPerM2", 1.0, "kWh/m2.year"));
+        assert!(audit.manifest_complete, "{:?}", audit.issues);
+        assert!(audit.input_fingerprint.is_some());
+        let comparison =
+            compare_reference_case(survey_case("heatingNeedPerM2", 1.0, "kWh/m2.year"));
+        assert_eq!(comparison.status, "compared_fail");
+        assert!(comparison.calculation_available);
+        assert!(!comparison.reference_verified);
+        let actual = comparison.metrics[0].actual;
+        assert!(actual > 50.0, "1930 terraced house heating need {actual}");
+        let matched =
+            compare_reference_case(survey_case("heatingNeedPerM2", actual, "kWh/m2.year"));
+        assert_eq!(matched.status, "compared_pass");
+        let final_energy =
+            compare_reference_case(survey_case("finalEnergyPerM2", 0.0, "kWh/m2.year"));
+        assert!(final_energy.metrics[0].actual > 0.0);
+    }
+
+    #[test]
+    fn survey_and_project_are_mutually_exclusive_and_one_is_required() {
+        let mut both = survey_case("beng2", 1.0, "kWh/m2.year");
+        both.project = project();
+        let audit = audit_reference_case(both);
+        assert!(audit
+            .issues
+            .iter()
+            .any(|item| item.code == "calculation_input_ambiguous"));
+        let mut neither = survey_case("beng2", 1.0, "kWh/m2.year");
+        neither.survey = None;
+        let audit = audit_reference_case(neither);
+        assert!(audit
+            .issues
+            .iter()
+            .any(|item| item.code == "calculation_input_required"));
+        let mut broken = survey_case("beng2", 1.0, "kWh/m2.year");
+        broken.survey.as_mut().unwrap().input = json!({"id": "x"});
+        let audit = audit_reference_case(broken);
+        assert!(audit
+            .issues
+            .iter()
+            .any(|item| item.code == "survey_shape_invalid"));
     }
 }
