@@ -1,0 +1,93 @@
+/* ── Delivery steps: Rapport & dossier and Registratie (UI redesign F9) ── */
+
+/* Dossier check summary */
+.delivery-meter {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.delivery-meter__value { font-size: var(--fs-sm); color: var(--fg-2); }
+.delivery-meter__value strong { font-family: var(--font-display); font-size: var(--fs-2xl); color: var(--fg-1); }
+.delivery-meter__bar { height: 8px; border-radius: var(--radius-pill); background: var(--surface-sunken); overflow: hidden; }
+.delivery-meter__bar span { display: block; height: 100%; background: var(--ok); border-radius: inherit; }
+.delivery-meter__counts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.delivery-meter__counts li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.delivery-note { margin: var(--space-3) 0 0; font-size: var(--fs-sm); color: var(--fg-2); line-height: var(--leading-normal); }
+.delivery-dossier-summary .ui-banner { margin-top: var(--space-3); }
+
+/* Checklist, evidence and EP-Online tables */
+.delivery-checklist { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.delivery-checklist th {
+  text-align: start;
+  font-weight: var(--weight-medium);
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.delivery-checklist td { padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line-subtle); vertical-align: top; }
+.delivery-checklist tr:last-child td { border-bottom: 0; }
+.delivery-checklist td:first-child { width: 1%; white-space: nowrap; }
+.delivery-checklist__detail { color: var(--fg-2); }
+.delivery-checklist tr[data-status='missing'] td:nth-child(2) { color: var(--fg-1); font-weight: var(--weight-medium); }
+.delivery-ep-online__missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+/* Exports */
+.delivery-exports { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
+.delivery-export__title { display: inline-flex; align-items: center; gap: var(--space-2); }
+.delivery-export__title svg { width: 18px; height: 18px; color: var(--accent-text); }
+.delivery-export .delivery-note { margin-top: 0; }
+.delivery-export__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* Registratie: readiness and program */
+.registration-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-4); }
+.registration-readiness__verdict { display: flex; align-items: flex-start; gap: var(--space-3); margin-bottom: var(--space-3); }
+.registration-readiness__verdict > svg { flex: none; width: 24px; height: 24px; color: var(--warn); }
+.registration-readiness__verdict[data-ready='true'] > svg { color: var(--ok); }
+.registration-reasons { margin: var(--space-2) 0 0; padding-inline-start: var(--space-5); color: var(--fg-2); font-size: var(--fs-sm); }
+.registration-reasons li + li { margin-top: var(--space-1); }
+
+/* Registratie: the form */
+.registration-form { display: grid; gap: var(--space-4); }
+.registration-form .dialog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3) var(--space-4); }
+.registration-form .dialog-field { margin: 0; }
+.registration-form .dialog-field input,
+.registration-form .dialog-field select,
+.registration-form .dialog-field textarea { width: 100%; box-sizing: border-box; }
+.registration-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-2) var(--space-4); }
+.registration-software { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); }
+.registration-form-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+}
+.registration-form-dirty { margin-inline-end: auto; font-size: var(--fs-sm); color: var(--warn-text); }
+.registration-pending { margin: 0; font-size: var(--fs-sm); color: var(--fg-2); }

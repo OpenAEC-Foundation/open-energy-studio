@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { isTauri } from '@tauri-apps/api/core';
-import { createDefaultProject, useEnergy } from '../context/EnergyContext';
+import { createDefaultProject } from '../context/EnergyContext';
 import { calculateBENGMonthly } from '../core/energy/BENGCalculatorMonthly';
 import { generateReportHTML, reportLanguage } from '../core/report/ReportTemplate';
 import { kernelReportModel } from '../core/report/KernelReportModel';
@@ -14,6 +14,7 @@ import { ResultRow } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel
 import { defaultValueLabel } from '../components/BasisopnamePanel/BasisopnamePanel';
 import { setpointChecks, setpointWriteBack, TABLE_713_SOURCE } from '../components/NtaPerformancePanel/NtaCalculationForm';
 import { ProjectInfoDialog } from '../components/dialogs/ProjectInfoDialog/ProjectInfoDialog';
+import { RegistrationForm } from '../components/shell/pages/RegistrationForm';
 import { ReportView } from '../components/ReportView/ReportView';
 import type { BuildingPerformanceAssessment, MwaVariantResult, ProjectPerformanceAssessment } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
@@ -178,23 +179,16 @@ describe('Dutch records and translated values', () => {
 });
 
 describe('project information dialog', () => {
-  function Harness() {
-    const { state } = useEnergy();
-    return <>
-      <ProjectInfoDialog onClose={() => undefined} />
-      <output data-testid="registration">{JSON.stringify(state.project.registration ?? null)}</output>
-    </>;
-  }
-
-  it('is a labelled dialog whose relabel fields appear only for a relabel', async () => {
+  it('is a labelled dialog; the relabel fields live on the Registratie step', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Harness />);
+    renderWithProviders(<ProjectInfoDialog onClose={() => undefined} />);
     expect(screen.getByRole('dialog', { name: 'Project Information' })).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByRole('textbox', { name: 'Project Name' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    renderWithProviders(<RegistrationForm />);
     expect(screen.queryByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).not.toBeInTheDocument();
     await user.selectOptions(screen.getByRole('combobox', { name: 'Message type (BRL 9500 §4.2.5)' }), 'relabel');
     expect(screen.getByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   }, 60000);
 });
 

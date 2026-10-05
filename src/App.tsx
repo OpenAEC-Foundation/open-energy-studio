@@ -3,7 +3,7 @@ import { EnergyProvider, useEnergy, useDocumentManager, useHasActiveDocument } f
 import { KernelProvider, useKernel } from './context/KernelProvider';
 import { NtaDraftProvider } from './context/NtaDraftProvider';
 import { I18nProvider } from './i18n/I18nProvider';
-import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen';
+import { WelcomeScreen, type NewProjectKind } from './components/WelcomeScreen/WelcomeScreen';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { ProjectInfoDialog } from './components/dialogs/ProjectInfoDialog/ProjectInfoDialog';
 import { ZoneEditorDialog } from './components/dialogs/ZoneEditorDialog/ZoneEditorDialog';
@@ -47,6 +47,7 @@ import { selectionForPath } from './core/navigation/projectPaths';
 import { isTauri } from '@tauri-apps/api/core';
 import { ConfirmProvider, ToastProvider, useConfirm, useToast } from './components/ui';
 import { stampProject } from './core/io/KernelStampClient';
+import { forgetRecentProject, readRecentProjects, recordRecentProject } from './core/io/recentProjects';
 import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
 import type { DialogType, IProject } from './core/energy/types';
 import './components/shell/shell.css';
@@ -379,13 +380,13 @@ function AppContent() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  const createEmptyProject = useCallback((): IProject => {
+  const createEmptyProject = useCallback((buildingFunction: IProject['buildingFunction'] = 'residential'): IProject => {
     untitledCounter.current += 1;
     return {
       id: crypto.randomUUID(),
       name: `Untitled ${untitledCounter.current}`,
       description: '',
-      buildingFunction: 'residential',
+      buildingFunction,
       address: '',
       city: '',
       zones: [],
@@ -448,6 +449,18 @@ function AppContent() {
     docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: createEmptyProject() } });
   }, [docDispatch, createEmptyProject]);
 
+  // Welcome screen: a new dwelling or utility building (office; the function can be changed in Projectgegevens).
+  const handleNewProjectOf = useCallback((kind: NewProjectKind) => {
+    const project = createEmptyProject(kind === 'utility' ? 'office' : 'residential');
+    docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project } });
+  }, [docDispatch, createEmptyProject]);
+
+  // Recently opened or saved project files (desktop only: browser documents have no path).
+  const [recentProjects, setRecentProjects] = useState(readRecentProjects);
+  const rememberRecent = useCallback((filePath: string, project: IProject) => {
+    setRecentProjects(recordRecentProject({ path: filePath, name: project.name, buildingFunction: project.buildingFunction }));
+  }, []);
+
   const handleOpenExample = useCallback((kind: ExampleKind) => {
     docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: exampleProject(kind) } });
   }, [docDispatch]);
@@ -470,6 +483,7 @@ function AppContent() {
       const opened = normalizeProject(rawProject);
       const { project: loaded, missing, markedForReview } = migrateLegacyRelabel(opened);
       docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath } });
+      if (filePath) rememberRecent(filePath, loaded);
       // Marked invoices are always reported; a notice with only open
       // fields is shown once per project.
       if (markedForReview > 0
@@ -501,7 +515,21 @@ function AppContent() {
         message: t('project.openFailed', { message: (err as Error).message ?? String(err) }),
       });
     }
-  }, [docDispatch, t, toast]);
+  }, [docDispatch, t, toast, rememberRecent]);
+
+  const handleOpenRecent = useCallback(async (filePath: string) => {
+    try {
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
+      await openProjectText(await readTextFile(filePath), filePath, filePath);
+    } catch (err) {
+      setRecentProjects(forgetRecentProject(filePath));
+      toast.show({
+        tone: 'error',
+        title: t('app.toast.openFailed'),
+        message: t('project.openFailed', { message: (err as Error).message ?? String(err) }),
+      });
+    }
+  }, [openProjectText, t, toast]);
 
   const handleOpenProject = useCallback(async () => {
     if (!isTauri()) {
@@ -564,8 +592,9 @@ function AppContent() {
     if (savedPath !== 'browser-download' && savedPath !== activeDoc.filePath) {
       docDispatch({ type: 'DOC_SET_FILE_PATH', payload: { id: activeDoc.id, filePath: savedPath } });
     }
+    if (savedPath !== 'browser-download') rememberRecent(savedPath, activeDoc.state.project);
     docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'SET_DIRTY', payload: false } } });
-  }, [docState, docDispatch, writeProjectToDisk]);
+  }, [docState, docDispatch, writeProjectToDisk, rememberRecent]);
 
   // ── Save As (always prompts for new path) ──
   const handleSaveAsProject = useCallback(async () => {
@@ -577,9 +606,10 @@ function AppContent() {
 
     if (savedPath !== 'browser-download') {
       docDispatch({ type: 'DOC_SET_FILE_PATH', payload: { id: activeDoc.id, filePath: savedPath } });
+      rememberRecent(savedPath, activeDoc.state.project);
     }
     docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'SET_DIRTY', payload: false } } });
-  }, [docState, docDispatch, writeProjectToDisk]);
+  }, [docState, docDispatch, writeProjectToDisk, rememberRecent]);
 
   // ── Close tab (with unsaved-changes check) ──
   const handleCloseTab = useCallback(async (id: string) => {
@@ -704,9 +734,14 @@ function AppContent() {
           <TopBar {...welcomeTopBar} />
           <main id="main-content" className="shell-main" tabIndex={-1}>
             <WelcomeScreen
-              onNewProject={handleNewProject}
+              onNewProject={handleNewProjectOf}
               onOpenProject={handleOpenProject}
               onOpenExample={handleOpenExample}
+              onImportUNIEC3={handleImportUNIEC3}
+              onImportVABI={handleImportVABI}
+              recent={recentProjects}
+              onOpenRecent={handleOpenRecent}
+              onForgetRecent={(path) => setRecentProjects(forgetRecentProject(path))}
             />
           </main>
           <EmptyStatusBar />

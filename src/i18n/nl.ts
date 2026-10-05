@@ -5,6 +5,7 @@ import { shellLabelsNl } from './shellLabels';
 import { buildingInstallLabelsNl } from './buildingInstallLabels';
 import { resultsLabelsNl } from './resultsLabels';
 import { ntaStepLabelsNl } from './ntaStepLabels';
+import { deliveryLabelsNl } from './deliveryLabels';
 
 export const nl: Record<string, string> = {
   // Generated kernel and survey code labels; specific keys below take precedence.
@@ -15,6 +16,7 @@ export const nl: Record<string, string> = {
   ...buildingInstallLabelsNl,
   ...resultsLabelsNl,
   ...ntaStepLabelsNl,
+  ...deliveryLabelsNl,
   // App
   'app.title': 'Open Energy Studio',
   'app.untitledProject': 'Naamloos Project',

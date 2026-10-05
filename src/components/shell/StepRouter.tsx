@@ -24,7 +24,6 @@ import { ResultsDashboard } from './pages/results/ResultsDashboard';
 import { BasisopnamePanel } from '../BasisopnamePanel/BasisopnamePanel';
 import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
-import { ReportView } from '../ReportView/ReportView';
 import { UValueCalculator } from '../UValueCalculator/UValueCalculator';
 import { ThermalBridgeCalculator } from '../ThermalBridgeCalculator/ThermalBridgeCalculator';
 import { HeatPumpSizingCalculator } from '../HeatPumpSizingCalculator/HeatPumpSizingCalculator';
@@ -34,7 +33,8 @@ import { InstallationAddBar, InstallationsOverview, ServicePage, type ServiceId 
 import {
   AirTightnessPage, BuildingAddBar, BuildingLead, ConstructionsPage, EnvelopePage, ThermalBridgesPage, ZonesPage,
 } from './pages/BuildingPages';
-import { RegistrationEditButton, RegistrationPage } from './pages/RegistrationPage';
+import { RegistrationPage } from './pages/RegistrationPage';
+import { DossierPage, ExportsPage, InputDossierPage, ReportPage } from './pages/DeliveryPages';
 import { ShellActionsProvider, type ShellActions } from './ShellActions';
 import { focusPathIn } from './focusPath';
 import { NtaApplyBar, NtaDraftNotice, NtaStepSections } from './NtaStepPage';
@@ -176,17 +176,23 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
           actions: <>
             <Button icon={<FileDown aria-hidden="true" />} onClick={actions.exportReport}>{t('report.export')}</Button>
             <Button icon={<Printer aria-hidden="true" />} onClick={actions.printReport}>{t('report.print')}</Button>
-            <Button icon={<Download aria-hidden="true" />} onClick={actions.exportIFC}>{t('report.page.ifc')}</Button>
-            <Button icon={<Download aria-hidden="true" />} onClick={actions.exportUNIEC3}>{t('ribbon.exportUNIEC3Draft')}</Button>
-            <Button icon={<Download aria-hidden="true" />} onClick={actions.exportVABI}>{t('ribbon.exportVABI')}</Button>
+            {route.sub !== 'exports' && (
+              <Button variant="ghost" icon={<Download aria-hidden="true" />}
+                onClick={() => actions.navigate({ step: 'report', sub: 'exports' })}>{t('report.page.exports')}</Button>
+            )}
           </>,
         })}
-        <div className="page-body"><ReportView /></div>
+        <div className="page-body page-body--delivery">
+          {(route.sub === 'report' || !route.sub) && <ReportPage />}
+          {route.sub === 'input' && <InputDossierPage />}
+          {route.sub === 'checklist' && <DossierPage actions={actions} />}
+          {route.sub === 'exports' && <ExportsPage actions={actions} />}
+        </div>
       </>;
       break;
     case 'registration':
       page = <>
-        {header({ actions: <RegistrationEditButton onOpen={() => actions.openDialog('project-info')} /> })}
+        {header()}
         <div className="page-body"><RegistrationPage project={project} actions={actions} /></div>
       </>;
       break;

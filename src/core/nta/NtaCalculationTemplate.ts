@@ -1,4 +1,6 @@
 import type { IProject } from '../energy/types';
+import { DEFAULT_NORM_VERSION } from './KernelClient';
+import { readDefaultEdition } from './defaultEdition';
 
 /**
  * Starting point for the `ntaCalculation` block. Numbers the norm fixes for
@@ -12,7 +14,10 @@ export function buildNtaCalculationTemplate(project: IProject): Record<string, u
   const heating = project.heatingSystems[0];
   const heatPump = heating?.type === 'heat_pump_air' || heating?.type === 'heat_pump_ground';
   const savedForfait = heating?.ntaHeatPump?.forfaitHeatPumpDraft;
+  // Settings › Berekening: an older default edition is written explicitly.
+  const edition = readDefaultEdition();
   return {
+    ...(edition !== DEFAULT_NORM_VERSION ? { normVersion: edition } : {}),
     calculationScope: residential ? 'residential' : 'utility',
     areaSourceReference: '',
     // Tables 7.13–7.15 follow the usage function; 7.78 needs the dwelling type.

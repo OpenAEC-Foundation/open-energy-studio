@@ -28,11 +28,18 @@ export interface PaletteEntry {
 
 const GROUP_ORDER: Group[] = ['steps', 'commands', 'fields', 'items'];
 
-/** Project data fields; they live in the project-info dialog for now. */
+/** Project data fields (the project-info dialog). */
 const FIELD_KEYS = [
   'dialog.projectInfo.name', 'dialog.projectInfo.description', 'dialog.projectInfo.function', 'dialog.projectInfo.address',
-  'dialog.projectInfo.city', 'reg.purpose', 'reg.constructionYear', 'reg.messageType', 'reg.surveyType', 'reg.advisorName',
-  'reg.wlcGwp', 'evidence.title',
+  'dialog.projectInfo.city',
+];
+
+/** Registration fields (step 10 Registratie since UI redesign F9), with the path "Ga naar" focuses. */
+const REGISTRATION_FIELDS: Array<[string, string]> = [
+  ['reg.purpose', 'registration.purpose'], ['reg.constructionYear', 'registration.constructionYear'],
+  ['reg.messageType', 'registration.messageType'], ['reg.surveyType', 'registration.surveyType'],
+  ['reg.advisorName', 'registration.surveyingAdvisor'], ['reg.wlcGwp', 'registration.wlcGwp.valueKgCo2EqPerM2Year'],
+  ['reg.bagObjectId', 'registration.bagObjectId'], ['evidence.title', 'registration.evidence'],
 ];
 
 export function buildPaletteEntries(
@@ -65,6 +72,12 @@ export function buildPaletteEntries(
       entries.push({
         id: `field:${key}`, group: 'fields', label: t(key), where: t('dialog.projectInfo.title'),
         run: () => actions.openDialog('project-info'),
+      });
+    }
+    for (const [key, path] of REGISTRATION_FIELDS) {
+      entries.push({
+        id: `field:${key}`, group: 'fields', label: t(key), where: t('nav.step.registration'),
+        run: () => actions.navigate({ step: 'registration', focusPath: path }),
       });
     }
     for (const item of projectItems(project)) {
