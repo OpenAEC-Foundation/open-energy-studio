@@ -108,39 +108,35 @@ describe('OpenAEC Color Tokens', () => {
   });
 });
 
-// ── Ribbon Tokens ──
+// ── Shell tokens (F10: ribbon and title bar were replaced by the workflow shell) ──
 
-describe('Ribbon Tokens', () => {
-  it('defines amber file tab background', () => {
-    expect(css).toMatch(/--ribbon-file-tab-bg:\s*#D97706/i);
+function loadTokens(): string {
+  return readFileSync(resolve(__dirname, '../styles/tokens.css'), 'utf-8');
+}
+
+describe('Shell tokens (tokens.css)', () => {
+  it('keeps Construction Amber as the accent in dark and light', () => {
+    const tokens = loadTokens();
+    expect(tokens).toMatch(/--amber-600:\s*#D97706/i);
+    expect(tokens).toMatch(/--accent:\s*var\(--amber-600\)/);
   });
 
-  it('defines amber group border with opacity', () => {
-    expect(css).toMatch(/--ribbon-group-border:\s*rgba\(217,\s*119,\s*6/i);
+  it('uses an amber-tinted selection and accent-subtle', () => {
+    const tokens = loadTokens();
+    expect(tokens).toMatch(/--surface-selected:\s*rgba\(217,\s*119,\s*6/i);
+    expect(tokens).toMatch(/--accent-subtle:\s*rgba\(217,\s*119,\s*6/i);
   });
 
-  it('defines amber tab active border', () => {
-    expect(css).toMatch(/--ribbon-tab-active-border:\s*#D97706/i);
+  it('draws the focus ring in amber', () => {
+    expect(loadTokens()).toMatch(/--focus-ring:[^;]*var\(--amber-5\d\d\)/);
   });
 
-  it('defines amber-tinted button hover', () => {
-    expect(css).toMatch(/--ribbon-btn-hover:\s*rgba\(217,\s*119,\s*6/i);
-  });
-});
-
-// ── Titlebar Tokens ──
-
-describe('Titlebar Tokens', () => {
-  it('defines amber-tinted border', () => {
-    expect(css).toMatch(/--titlebar-border:\s*rgba\(217,\s*119,\s*6/i);
-  });
-
-  it('defines amber-tinted button hover', () => {
-    expect(css).toMatch(/--titlebar-btn-hover:\s*rgba\(217,\s*119,\s*6/i);
+  it('no longer defines ribbon or title-bar variables in index.css', () => {
+    expect(css).not.toMatch(/--ribbon-/);
+    expect(css).not.toMatch(/--titlebar-/);
   });
 });
 
-// ── Typography ──
 
 describe('OpenAEC Typography', () => {
   it('sets Inter as the body font', () => {
@@ -188,7 +184,8 @@ describe('Dialog Styles', () => {
   });
 
   it('defines amber focus ring on inputs', () => {
-    expect(css).toMatch(/box-shadow:\s*0 0 0 3px rgba\(217,\s*119,\s*6,\s*0\.15\)/);
+    // F10: the faint 3px amber shadow became the shared focus ring (amber, checked under Shell tokens).
+    expect(css).toMatch(/\.dialog-field input:focus[^{]*\{[^}]*border-color:\s*var\(--accent\);[^}]*box-shadow:\s*var\(--focus-ring\)/s);
   });
 
   it('defines Space Grotesk for dialog header title', () => {

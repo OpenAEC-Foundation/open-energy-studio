@@ -133,6 +133,7 @@
 .hp-input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .hp-select {
@@ -149,6 +150,7 @@
 .hp-select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .hp-checkbox-group {
@@ -189,7 +191,7 @@
 }
 
 .hp-table tr:hover td {
-  background: rgba(128, 128, 128, 0.05);
+  background: var(--surface-hover);
 }
 
 .hp-td-mono {
@@ -245,7 +247,7 @@
 
 .hp-summary-item.hp-summary-highlight .hp-summary-label,
 .hp-summary-item.hp-summary-highlight .hp-summary-value {
-  color: #fff;
+  color: var(--fg-on-accent);
 }
 
 /* ---- Zone section ---- */

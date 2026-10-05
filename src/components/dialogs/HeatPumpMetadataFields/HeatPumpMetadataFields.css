@@ -17,5 +17,5 @@
 .heat-pump-point > div { display: flex; gap: 6px; }
 .heat-pump-point-editor { border: 1px solid var(--border); border-radius: 6px; margin-top: 9px; padding: 10px; }
 .heat-pump-point-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-.heat-pump-point-error { color: var(--danger, #b42318) !important; margin: 8px 0 0 !important; }
+.heat-pump-point-error { color: var(--error-text) !important; margin: 8px 0 0 !important; }
 @media (max-width: 600px) { .heat-pump-points-heading, .heat-pump-point { flex-direction: column; } }

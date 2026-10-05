@@ -114,6 +114,7 @@
 .pref-row select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 /* ── Language table ── */
@@ -226,7 +227,7 @@
   width: 12px;
   height: 12px;
   border-radius: 2px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
+  border: 1px solid var(--line-strong);
 }
 
 .theme-row-name {

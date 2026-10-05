@@ -27,7 +27,7 @@ import {
 import { routeLabel } from '../../PageHeader';
 import { MonthlyChart } from './MonthlyChart';
 import {
-  energySeries, gauges, isResidential, keyFigures, LABEL_CLASSES, labelColor, monthlyNeed, monthlyPv,
+  energySeries, gauges, isResidential, keyFigures, LABEL_CLASSES, labelColor, labelTextColor, monthlyNeed, monthlyPv,
   zoneDemands, type ChartMode, type Gauge,
 } from './resultsData';
 import './results.css';
@@ -118,8 +118,8 @@ function Overview({ assessment, onNavigate }: { assessment: ProjectPerformanceAs
       <Figure label={t('results.dash.figure.primaryFossil')} value={formatNumber(figures.primaryFossilKwh, locale, 0)} unit="kWh/jr" />
       <Figure label={t('results.dash.figure.renewable')} value={formatNumber(figures.renewableKwh, locale, 0)} unit="kWh/jr" />
       <Figure label={t('results.dash.figure.final')} value={formatNumber(figures.finalEnergyKwh, locale, 0)} unit="kWh/jr" />
-      <Figure label={t('results.dash.figure.co2')} value={formatNumber(figures.co2KgPerM2, locale, 1)} unit="kg/m²·jr" />
-      <Figure label={t('results.dash.figure.zeb')} value={formatNumber(figures.zebKwhPerM2, locale, 2)} unit="kWh/m²·jr" />
+      <Figure label={t('results.dash.figure.co2')} value={formatNumber(figures.co2KgPerM2, locale, 1)} unit={t('unit.kgPerM2Year')} />
+      <Figure label={t('results.dash.figure.zeb')} value={formatNumber(figures.zebKwhPerM2, locale, 2)} unit={t('unit.kwhPerM2Year')} />
     </div>
   </>;
 }
@@ -139,10 +139,11 @@ function LabelCard({ assessment }: { assessment: ProjectPerformanceAssessment })
   return <Card className="results-gauge results-label" title={t('results.dash.label')}
     actions={<StatusPill tone="unv">{t('results.dash.indicative')}</StatusPill>}>
     <div className="results-label__row">
-      <span className="results-label__badge" style={{ background: labelClass ? labelColor(labelClass) : undefined }}
+      <span className="results-label__badge"
+        style={labelClass ? { background: labelColor(labelClass), color: labelTextColor(labelColor(labelClass)) } : undefined}
         data-testid="results-label-class">{labelClass ?? '–'}</span>
       <span className="results-label__ep">
-        <b>{formatNumber(ep2, locale, 2)}</b> kWh/m²·jr
+        <b>{formatNumber(ep2, locale, 2)}</b> {t('unit.kwhPerM2Year')}
         <small>EP<sub>2</sub> {t('results.dash.labelBasis')}</small>
       </span>
     </div>
@@ -162,7 +163,7 @@ const GAUGE_TITLE: Record<Gauge['key'], string> = {
 
 export function GaugeCard({ gauge }: { gauge: Gauge }) {
   const { t, locale } = useI18n();
-  const unit = gauge.key === 'beng3' ? '%' : gauge.key === 'tojuli' ? 'K' : 'kWh/m²·jr';
+  const unit = gauge.key === 'beng3' ? '%' : gauge.key === 'tojuli' ? 'K' : t('unit.kwhPerM2Year');
   const scaleMax = Math.max(gauge.value ?? 0, gauge.limit ?? 0) * 1.35 || 1;
   const fill = gauge.value == null ? 0 : Math.min(100, Math.max(0, (gauge.value / scaleMax) * 100));
   const marker = gauge.limit == null ? null : Math.min(100, (gauge.limit / scaleMax) * 100);

@@ -655,7 +655,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
 
   if (!stored) {
     return <section className="nta-performance opname-panel" aria-label={t('opname.title')}>
-      <h3>{t('opname.title')}</h3>
+      <h2>{t('opname.title')}</h2>
       <p className="nta-form-note">{t('opname.intro')}</p>
       <div className="opname-actions">
         <button type="button" className="btn btn-primary" onClick={() => save(surveyTemplate('residential'))}>{t('opname.startResidential')}</button>
@@ -740,7 +740,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       </ol>
     </nav>}
     <div className="opname-main">
-    <h3>{t('opname.title')} — {t(`opname.kind.${kind}`)}</h3>
+    <h2>{t('opname.title')} — {t(`opname.kind.${kind}`)}</h2>
     <p className="nta-form-note">{t('opname.scope')}</p>
 
     <FieldPathPrefixProvider value="basisopname">
@@ -1108,7 +1108,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
     {wizard && section === 'result' && !result && <p className="nta-form-note">{t('opname.progress.notCalculated')}</p>}
 
     {result && show('result') && <div className="opname-result" aria-label={t('opname.result')}>
-      <h4 className="opname-result-heading">{t('opname.resultHeading')}</h4>
+      <h3 className="opname-result-heading">{t('opname.resultHeading')}</h3>
       <p className="nta-form-note">{t('opname.resultNote')}</p>
       <p><strong>{t('opname.status')}:</strong> {t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
       {performance && <ul className="opname-indicators">
@@ -1162,7 +1162,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         <div className="opname-aside-label">
           <span className="opname-aside-class" style={{ background: performance?.indicativeLabelClass ? labelColor(performance.indicativeLabelClass) : undefined }}>
             {performance?.indicativeLabelClass ?? '—'}</span>
-          <span><strong>{formatNumber(performance?.primaryFossilIndicatorKwhPerM2Year, locale, 1)}</strong> kWh/m²·jr EP₂
+          <span><strong>{formatNumber(performance?.primaryFossilIndicatorKwhPerM2Year, locale, 1)}</strong> {t('unit.kwhPerM2Year')} EP₂
             <small>{t('opname.resultCard.separate')}</small></span>
         </div>
         <p className="opname-aside-status">{t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>

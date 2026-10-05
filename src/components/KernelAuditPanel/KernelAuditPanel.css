@@ -19,9 +19,9 @@
 .kernel-audit-state { padding: 12px 0 0; color: var(--text-secondary); font-size: 12px; }
 .kernel-audit-status { margin-top: 15px; padding: 10px 12px; border-radius: 7px; font-size: 12px; }
 .kernel-audit-status strong { margin-left: auto; font-size: 11px; white-space: nowrap; }
-.kernel-audit-status.is-checked { background: rgba(34, 197, 94, .1); color: var(--energy-green, #22c55e); }
-.kernel-audit-status.has-errors { background: rgba(239, 68, 68, .1); color: var(--energy-red, #ef4444); }
-.kernel-audit-unavailable { align-items: flex-start; margin-top: 15px; padding: 10px 12px; border-radius: 7px; background: rgba(245, 158, 11, .1); color: var(--text-primary); font-size: 12px; }
+.kernel-audit-status.is-checked { background: var(--ok-subtle); color: var(--ok-text); }
+.kernel-audit-status.has-errors { background: var(--error-subtle); color: var(--error-text); }
+.kernel-audit-unavailable { align-items: flex-start; margin-top: 15px; padding: 10px 12px; border-radius: 7px; background: var(--warn-subtle); color: var(--text-primary); font-size: 12px; }
 .kernel-audit-unavailable svg { flex: none; }
 .kernel-audit-unavailable small { display: block; margin-top: 3px; color: var(--text-secondary); }
 .kernel-audit-metrics { display: flex; flex-wrap: wrap; gap: 14px; margin: 13px 0; color: var(--text-secondary); font-size: 11px; }
@@ -35,8 +35,8 @@
 .kernel-audit-geometry-total { font-weight: 700; }
 .kernel-audit-issues { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; max-height: 200px; overflow: auto; }
 .kernel-audit-issue { display: grid; grid-template-columns: minmax(120px, 210px) 1fr; gap: 10px; padding: 8px 10px; border-left: 3px solid var(--border); border-radius: 4px; background: var(--bg-primary); font-size: 11px; }
-.kernel-audit-issue.error { border-left-color: var(--energy-red, #ef4444); }
-.kernel-audit-issue.warning { border-left-color: #f59e0b; }
+.kernel-audit-issue.error { border-left-color: var(--error); }
+.kernel-audit-issue.warning { border-left-color: var(--warn); }
 .kernel-audit-path { font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); overflow-wrap: anywhere; }
 .kernel-audit-detail { grid-column: 2; color: var(--text-secondary); overflow-wrap: anywhere; font-family: 'JetBrains Mono', monospace; }
 .kernel-audit-scope { margin-top: 13px; }

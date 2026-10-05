@@ -10,6 +10,6 @@
 .heat-pump-forfait-monthly td input { min-width: 110px; }
 .heat-pump-forfait-monthly button { padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; }
 .heat-pump-forfait-monthly button:disabled { cursor: wait; opacity: .6; }
-.heat-pump-forfait-monthly-error { color: #b91c1c !important; }
+.heat-pump-forfait-monthly-error { color: var(--error-text) !important; }
 .heat-pump-forfait-monthly-result { margin-top: 12px; padding: 12px; border-left: 3px solid var(--accent); background: var(--bg-secondary); }
 .heat-pump-forfait-monthly-result code { overflow-wrap: anywhere; }

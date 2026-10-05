@@ -102,7 +102,7 @@
 }
 
 .preview-beng-card { border-inline-start-color: var(--accent); }
-.preview-beng-card.fails { border-inline-start-color: var(--energy-red, #ef4444); }
+.preview-beng-card.fails { border-inline-start-color: var(--error); }
 
 .preview-kernel-label {
   display: flex;
@@ -285,11 +285,11 @@
 }
 
 .preview-chart-bar.heat {
-  background: #ef4444;
+  background: var(--viz-heating);
 }
 
 .preview-chart-bar.cool {
-  background: #3b82f6;
+  background: var(--viz-cooling);
 }
 
 .preview-chart-label {
@@ -320,11 +320,11 @@
 }
 
 .preview-legend-dot.heat {
-  background: #ef4444;
+  background: var(--viz-heating);
 }
 
 .preview-legend-dot.cool {
-  background: #3b82f6;
+  background: var(--viz-cooling);
 }
 
 /* Empty state */

@@ -65,6 +65,7 @@
 .pp-select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .pp-select option,

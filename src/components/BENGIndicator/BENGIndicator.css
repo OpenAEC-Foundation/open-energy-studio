@@ -33,7 +33,7 @@
 }
 
 .beng-indicator-badge.indicative { background: var(--bg-tertiary); color: var(--text-secondary); }
-.beng-indicator-badge.kernel { background: var(--accent); color: #fff; }
+.beng-indicator-badge.kernel { background: var(--accent); color: var(--fg-on-accent); }
 .beng-indicator.beng-kernel { border-color: var(--accent); }
 
 .beng-indicator-subtitle {

@@ -19,7 +19,7 @@
   min-width: 0;
   white-space: normal;
   font-size: 12px;
-  color: var(--color-warning, #b45309);
+  color: var(--warn-text);
 }
 
 /* Compact variant for table rows (UI redesign F5): quiet icon buttons. */
@@ -27,9 +27,9 @@
 .item-actions__icon {
   display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
   border: 1px solid transparent; border-radius: var(--radius-sm, 4px); background: transparent;
-  color: var(--fg-3, #888); cursor: pointer;
+  color: var(--fg-3); cursor: pointer;
 }
 .item-actions__icon svg { width: 14px; height: 14px; }
-.item-actions__icon:hover { background: var(--surface-hover, rgba(127, 127, 127, .12)); color: var(--fg-1, inherit); }
-.item-actions__icon--danger:hover { color: var(--error-text, #dc2626); }
-.item-actions__icon:focus-visible { outline: none; box-shadow: var(--focus-ring, 0 0 0 2px #f59e0b); }
+.item-actions__icon:hover { background: var(--surface-hover); color: var(--fg-1); }
+.item-actions__icon--danger:hover { color: var(--error-text); }
+.item-actions__icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }

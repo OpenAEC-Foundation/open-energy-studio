@@ -112,7 +112,7 @@ export function HeatPumpInventoryPanel() {
   return <section className="heat-pump-inventory" aria-label={t('kernel.inventory.title')}>
     <div className="heat-pump-inventory-header">
       <div>
-        <h3>{t('kernel.inventory.title')}</h3>
+        <h2>{t('kernel.inventory.title')}</h2>
         <p>{t('kernel.inventory.scope')}</p>
       </div>
       <button type="button" onClick={startNew}><Plus size={15} />{t('kernel.inventory.add')}</button>

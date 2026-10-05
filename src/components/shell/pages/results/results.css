@@ -20,6 +20,12 @@
 @container (max-width: 1250px) {
   .results-gauges { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .results-gauges > .results-label { grid-row: span 2; }
+  /* F10: the label card spans two rows; centre its content instead of leaving the lower half empty. */
+  .results-gauges > .results-label { display: flex; flex-direction: column; }
+  .results-gauges > .results-label > .ui-card__body { flex: 1; justify-content: center; gap: var(--space-4); }
+  .results-gauges > .results-label .results-label__badge { font-size: var(--fs-3xl); padding: var(--space-3) var(--space-4); }
+  .results-gauges > .results-label .results-label__scale li { height: 14px; }
+  .results-gauges > .results-label .results-label__scale li[aria-current='true'] { height: 18px; }
 }
 @container (max-width: 700px) {
   .results-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -80,12 +86,11 @@
   min-width: 64px;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  color: #fff;
+  color: var(--fg-1);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--fs-2xl);
   text-align: center;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 .results-label__ep { display: flex; flex-direction: column; font-size: var(--fs-xs); color: var(--fg-3); }
 .results-label__ep b { font-size: var(--fs-lg); color: var(--fg-1); font-variant-numeric: tabular-nums; }
@@ -157,7 +162,7 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-3);
   font-size: var(--fs-xs);
   color: var(--fg-2);
   pointer-events: none;

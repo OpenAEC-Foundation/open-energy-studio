@@ -152,6 +152,7 @@
 .tb-field input[type="number"]:focus,
 .tb-field select:focus {
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .tb-field-checkbox {
@@ -205,7 +206,7 @@
   width: 12px;
   height: 12px;
   border-radius: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
 }
 
 /* --- Results Panel --- */
@@ -256,11 +257,11 @@
 }
 
 .tb-result-good {
-  color: var(--energy-green, #22c55e);
+  color: var(--ok-text);
 }
 
 .tb-result-bad {
-  color: var(--energy-red, #ef4444);
+  color: var(--error-text);
 }
 
 .tb-result-note {
@@ -308,9 +309,9 @@
 }
 
 .tb-comparison-bar-calc {
-  background: linear-gradient(90deg, var(--accent), var(--energy-green, #22c55e));
+  background: linear-gradient(90deg, var(--accent), var(--ok));
 }
 
 .tb-comparison-bar-forfait {
-  background: rgba(239, 68, 68, 0.5);
+  background: var(--error);
 }
