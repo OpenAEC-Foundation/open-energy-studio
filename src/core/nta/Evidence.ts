@@ -18,8 +18,11 @@ export const EVIDENCE_REFERENCE_PREFIX = 'evidence:';
 const sessionFiles = new Map<string, Uint8Array>();
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const copy = new Uint8Array(bytes);
-  const digest = await crypto.subtle.digest('SHA-256', copy.buffer as ArrayBuffer);
+  // Copy into a buffer of this realm: under jsdom on Node 20 a view that came
+  // from another realm (TextEncoder, FileReader) is rejected by WebCrypto.
+  const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+  copy.set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', copy);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
