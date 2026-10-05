@@ -2,8 +2,10 @@ import { useRef, useState } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import {
-  CheckField, NumberField, read, Section, SelectField, TextField, TriStateField, write, type Draft, type Path,
+  CheckField, FieldPathPrefixProvider, NumberField, read, Section, SelectField, TextField, TriStateField, write, type Draft, type Path,
 } from '../NtaPerformancePanel/NtaFormFields';
+import { Pill } from '../ui';
+import { labelColor } from '../shell/pages/results/resultsData';
 import {
   assessResidentialSurveyWithRust, assessUtilitySurveyWithRust, type OpnameAssessment,
 } from '../../core/nta/KernelClient';
@@ -16,6 +18,7 @@ import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
+import '../shell/pages/existing/existing.css';
 
 // ISSO 82.1 (dwellings) and 75.1 (utility) basisopname: structured fields for
 // the main survey sections, a JSON view for the rest, and the kernel route
@@ -604,7 +607,33 @@ function list(draft: Draft, path: Path): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
 }
 
-export function BasisopnamePanel() {
+/** Survey wizard sections (UI redesign F8); the order of the progress list. */
+export const SURVEY_SECTIONS = ['general', 'zones', 'envelope', 'heating', 'hotWater', 'ventilation', 'cooling', 'pv', 'result'] as const;
+export type SurveySection = typeof SURVEY_SECTIONS[number];
+
+/** The wizard section of a survey path (`envelope.surfaces[0]…`, with or without `basisopname.`/`derivedInput.`). */
+export function surveySectionForPath(path: string | null | undefined): SurveySection {
+  const head = (path ?? '').replace(/^basisopname\./, '').split(/[.[]/)[0];
+  switch (head) {
+    case 'zones': case 'lighting': return 'zones';
+    case 'envelope': return 'envelope';
+    case 'heating': return 'heating';
+    case 'hotWater': case 'additionalHotWaterSystems': return 'hotWater';
+    case 'ventilation': return 'ventilation';
+    case 'cooling': case 'coolingPresent': case 'coolingCollective': return 'cooling';
+    case 'pv': return 'pv';
+    case 'derivedInput': case '': return 'result';
+    default: return 'general';
+  }
+}
+
+interface BasisopnamePanelProps {
+  /** Wizard mode (shell step): only this section, with the progress list and result card. */
+  section?: SurveySection;
+  onSection?: (section: SurveySection, focusPath?: string) => void;
+}
+
+export function BasisopnamePanel({ section: requested, onSection }: BasisopnamePanelProps = {}) {
   const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
   const stored = state.project.basisopname as StoredSurvey | undefined;
@@ -662,6 +691,10 @@ export function BasisopnamePanel() {
       const assessment = kind === 'residential'
         ? await assessResidentialSurveyWithRust(asResidential(stored))
         : await assessUtilitySurveyWithRust(asUtility(stored));
+      // A survey the kernel cannot read (e.g. a cleared required field) comes back as
+      // `{ error, message }` without issues; show it as an error, not as a result.
+      const refused = assessment as Partial<OpnameAssessment> & { error?: string; message?: string };
+      if (!Array.isArray(refused.issues)) throw new Error(refused.message ?? refused.error ?? 'invalid response');
       if (requestId.current === current) setResult(assessment);
     } catch (failure) {
       if (requestId.current === current) setError(failure instanceof Error ? failure.message : String(failure));
@@ -671,12 +704,48 @@ export function BasisopnamePanel() {
   };
 
   const performance = result?.performance;
-  return <section className="nta-performance opname-panel" aria-label={t('opname.title')}>
+  const wizard = requested != null;
+  const sections = SURVEY_SECTIONS.filter((name) => name !== 'zones' || kind === 'utility');
+  // Rekenzones only exist in the utility survey; a residential survey opens Algemeen instead.
+  const section = requested && sections.includes(requested) ? requested : wizard ? sections[0] : undefined;
+  const show = (name: SurveySection) => !wizard || section === name;
+  const issueCount = (name: SurveySection) => result?.issues.filter((item) => surveySectionForPath(item.path) === name).length ?? 0;
+  const goTo = (path: string) => onSection?.(surveySectionForPath(path), `basisopname.${path.replace(/^basisopname\./, '')}`);
+  const position = section ? sections.indexOf(section) : -1;
+  const done = result ? sections.filter((name) => name !== 'result' && issueCount(name) === 0).length : 0;
+
+  return <section className={`nta-performance opname-panel${wizard ? ' opname-wizard' : ''}`} aria-label={t('opname.title')}>
+    {wizard && <nav className="opname-progress" aria-label={t('opname.progress')}>
+      <p className="opname-progress-title">{t('opname.progress')}</p>
+      <div className="opname-progress-bar" role="progressbar" aria-label={t('opname.progress')}
+        aria-valuemin={0} aria-valuemax={sections.length - 1} aria-valuenow={done}>
+        <span style={{ width: `${Math.round(100 * done / Math.max(1, sections.length - 1))}%` }} />
+      </div>
+      <p className="opname-progress-note">{result
+        ? t('opname.progress.summary', { done, total: sections.length - 1, defaults: result.appliedDefaults.length })
+        : t('opname.progress.notCalculated')}</p>
+      <ol className="opname-steps">
+        {sections.map((name) => {
+          const errors = issueCount(name);
+          const state = name === 'result' ? (result ? 'done' : 'todo') : !result ? 'todo' : errors > 0 ? 'errors' : 'done';
+          return <li key={name}>
+            <button type="button" className={`opname-step opname-step--${state}`} aria-current={section === name ? 'step' : undefined}
+              onClick={() => onSection?.(name)}>
+              <span className="opname-step-dot" aria-hidden="true">{state === 'done' ? '✓' : state === 'errors' ? errors : ''}</span>
+              <span className="opname-step-label">{t(`opname.section.${name}`)}</span>
+              {state === 'errors' && <span className="visually-hidden">{t('opname.section.errors', { count: errors })}</span>}
+            </button>
+          </li>;
+        })}
+      </ol>
+    </nav>}
+    <div className="opname-main">
     <h3>{t('opname.title')} — {t(`opname.kind.${kind}`)}</h3>
     <p className="nta-form-note">{t('opname.scope')}</p>
 
+    <FieldPathPrefixProvider value="basisopname">
     <div className="nta-form">
-    <Section title={t('opname.general')}>
+    {show('general') && <><Section title={t('opname.general')}>
       <TextField {...field} path={['id']} label={t('opname.id')} />
       <NumberField {...field} path={['constructionYear']} label={t('opname.constructionYear')} step="1" />
       {kind === 'residential' && <NumberField {...field} path={['usableFloorAreaM2']} label={t('opname.usableFloorArea')} />}
@@ -707,13 +776,13 @@ export function BasisopnamePanel() {
           onChange={(event) => change(['verticalPipes'], Array.from({ length: Math.max(1, Number(event.target.value) || 1) },
             (_, index) => (verticalPipes as unknown[])[index] ?? { insulated: false }))} />
       </label>}
-    </Section>
+    </Section></>}
 
-    {kind === 'utility' && <Section title={t('opname.zones')}>
+    {show('zones') && <>{kind === 'utility' && <Section title={t('opname.zones')}>
       <CalculationZoneFields draft={draft} change={change} replace={(next) => save({ kind, survey: next })} t={t} />
-    </Section>}
+    </Section>}</>}
 
-    <Section title={t('opname.envelope')}>
+    {show('envelope') && <><Section title={t('opname.envelope')}>
       {kind === 'residential' && <label>{t('opname.buildingKind')}
         <select value={typeof buildingKind === 'string' ? buildingKind : 'regular'}
           onChange={(event) => change(['envelope', 'buildingKind'], event.target.value === 'regular' ? null
@@ -813,9 +882,9 @@ export function BasisopnamePanel() {
           surfaceId: String(surfaces.find((surface) => surface.element === 'roof')?.id ?? ''),
           areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '',
         }])} />
-    </Section>
+    </Section></>}
 
-    <Section title={t('opname.heating')}>
+    {show('heating') && <><Section title={t('opname.heating')}>
       <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} />
       <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
       <EmitterFields draft={draft} change={change} t={t} />
@@ -842,9 +911,9 @@ export function BasisopnamePanel() {
       </div>)}
       <ListControls label={t('opname.addGenerator')}
         onAdd={() => change(['heating', 'additionalGenerators'], [...heatingExtras, { generator: heatingGeneratorTemplate('boiler'), nominalPowerKw: 20 }])} />
-    </Section>
+    </Section></>}
 
-    <Section title={t('opname.hotWater')}>
+    {show('hotWater') && <><Section title={t('opname.hotWater')}>
       <HotWaterGeneratorFields draft={draft} path={['hotWater', 'generator']} kind={kind} change={change} t={t} />
       <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
       {kind === 'residential' && <>
@@ -914,9 +983,9 @@ export function BasisopnamePanel() {
           generator: hotWaterGeneratorTemplate('electric_instantaneous'), showerHeatRecovery: 'none',
           servedAreas: [{ function: String(read(draft, ['functions', 0, 'function']) ?? 'office'), areaM2: 0 }], sourceReference: '',
         }])} />}
-    </Section>
+    </Section></>}
 
-    {kind === 'utility' && ahu != null && <Section title={t('opname.ahu')}>
+    {show('ventilation') && <>{kind === 'utility' && ahu != null && <Section title={t('opname.ahu')}>
       <CheckField {...field} path={['ventilation', 'ahu', 'heatingConnected']} label={t('opname.ahu.heatingConnected')} />
       <CheckField {...field} path={['ventilation', 'ahu', 'coolingConnected']} label={t('opname.ahu.coolingConnected')} />
     </Section>}
@@ -931,9 +1000,9 @@ export function BasisopnamePanel() {
 
     <Section title={t('opname.passiveCooling')}>
       <PassiveCoolingFields draft={draft} change={change} t={t} />
-    </Section>
+    </Section></>}
 
-    <Section title={t('opname.cooling')}>
+    {show('cooling') && <><Section title={t('opname.cooling')}>
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, ['cooling']) != null}
           onChange={(event) => {
@@ -975,9 +1044,9 @@ export function BasisopnamePanel() {
         {kind === 'utility' && <UtilityCoolingFields draft={draft} change={change} t={t} />}
         <TextField {...field} path={['cooling', 'sourceReference']} label={t('opname.sourceReference')} />
       </>}
-    </Section>
+    </Section></>}
 
-    <Section title={t('opname.pv')}>
+    {show('pv') && <><Section title={t('opname.pv')}>
       {pv.map((_, index) => {
         const base: Path = ['pv', index];
         const method = read(draft, [...base, 'shading', 'method']);
@@ -1003,11 +1072,19 @@ export function BasisopnamePanel() {
         </div>;
       })}
       <ListControls label={t('opname.addPv')} onAdd={() => change(['pv'], [...pv, pvTemplate(pv.length)])} />
-    </Section>
+    </Section></>}
 
     </div>
+    </FieldPathPrefixProvider>
 
-    <details className="opname-json">
+    {wizard && section !== 'result' && <div className="opname-wizard-nav">
+      <button type="button" className="btn" disabled={position <= 0}
+        onClick={() => onSection?.(sections[position - 1])}>{t('opname.wizard.previous')}</button>
+      <button type="button" className="btn btn-primary" disabled={position < 0 || position >= sections.length - 1}
+        onClick={() => onSection?.(sections[position + 1])}>{t('opname.wizard.next')}</button>
+    </div>}
+
+    {show('result') && <details className="opname-json">
       <summary>{t('opname.json')}</summary>
       <textarea aria-label={t('opname.json')} rows={14} value={json ?? JSON.stringify(draft, null, 2)}
         onChange={(event) => setJson(event.target.value)} />
@@ -1021,15 +1098,16 @@ export function BasisopnamePanel() {
           }
         }}>{t('opname.jsonApply')}</button>
       </div>
-    </details>
+    </details>}
 
-    <div className="opname-actions">
+    {!wizard && <div className="opname-actions">
       <button type="button" className="btn btn-primary" disabled={busy} onClick={() => { void run(); }}>{t('opname.calculate')}</button>
       <button type="button" className="btn" onClick={() => save(undefined)}>{t('opname.discard')}</button>
-    </div>
+    </div>}
     {error && <p className="opname-error" role="alert">{error}</p>}
+    {wizard && section === 'result' && !result && <p className="nta-form-note">{t('opname.progress.notCalculated')}</p>}
 
-    {result && <div className="opname-result" aria-label={t('opname.result')}>
+    {result && show('result') && <div className="opname-result" aria-label={t('opname.result')}>
       <h4 className="opname-result-heading">{t('opname.resultHeading')}</h4>
       <p className="nta-form-note">{t('opname.resultNote')}</p>
       <p><strong>{t('opname.status')}:</strong> {t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
@@ -1043,7 +1121,10 @@ export function BasisopnamePanel() {
         {result.issues.map((item, index) => {
           const hint = t(`opname.issueHint.${item.code}`, { defaultValue: '' });
           return <li key={index}><KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} />
-            {' '}<code>{item.path}</code>{hint && <small> {hint}</small>}</li>;
+            {' '}<code>{item.path}</code>{hint && <small> {hint}</small>}
+            {wizard && surveySectionForPath(item.path) !== 'result' && <>{' '}
+              <button type="button" className="btn btn-sm opname-goto" onClick={() => goTo(item.path)}>
+                {t('opname.goTo', { section: t(`opname.section.${surveySectionForPath(item.path)}`) })}</button></>}</li>;
         })}
       </ul>}
       {result.warnings.length > 0 && <ul className="opname-warnings">
@@ -1070,5 +1151,31 @@ export function BasisopnamePanel() {
         </tbody>
       </table>}
     </div>}
+    </div>
+
+    {wizard && <aside className="opname-aside" aria-label={t('opname.resultCard')}>
+      <div className="opname-aside-head">
+        <strong>{t('opname.resultCard')}</strong>
+        <Pill tone="unv">{t('opname.resultCard.indicative')}</Pill>
+      </div>
+      {result ? <>
+        <div className="opname-aside-label">
+          <span className="opname-aside-class" style={{ background: performance?.indicativeLabelClass ? labelColor(performance.indicativeLabelClass) : undefined }}>
+            {performance?.indicativeLabelClass ?? '—'}</span>
+          <span><strong>{formatNumber(performance?.primaryFossilIndicatorKwhPerM2Year, locale, 1)}</strong> kWh/m²·jr EP₂
+            <small>{t('opname.resultCard.separate')}</small></span>
+        </div>
+        <p className="opname-aside-status">{t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
+        {result.issues.length > 0 && <p className="opname-aside-issues" role="status">
+          {t('opname.resultCard.issues', { count: result.issues.length })}</p>}
+        {result.appliedDefaults.length > 0 && <p className="opname-aside-defaults">
+          {t('opname.resultCard.defaults', { count: result.appliedDefaults.length })}</p>}
+        <button type="button" className="btn btn-sm" onClick={() => onSection?.('result')}>{t('opname.resultCard.details')}</button>
+      </> : <p className="nta-form-note">{t('opname.progress.notCalculated')}</p>}
+      <div className="opname-actions">
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => { void run(); }}>{t('opname.calculate')}</button>
+        <button type="button" className="btn" onClick={() => save(undefined)}>{t('opname.discard')}</button>
+      </div>
+    </aside>}
   </section>;
 }

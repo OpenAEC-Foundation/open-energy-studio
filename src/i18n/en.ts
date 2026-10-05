@@ -6,6 +6,7 @@ import { buildingInstallLabelsEn } from './buildingInstallLabels';
 import { resultsLabelsEn } from './resultsLabels';
 import { ntaStepLabelsEn } from './ntaStepLabels';
 import { deliveryLabelsEn } from './deliveryLabels';
+import { existingLabelsEn } from './existingLabels';
 
 export const en: Record<string, string> = {
   // Generated kernel and survey code labels; specific keys below take precedence.
@@ -17,6 +18,7 @@ export const en: Record<string, string> = {
   ...resultsLabelsEn,
   ...ntaStepLabelsEn,
   ...deliveryLabelsEn,
+  ...existingLabelsEn,
   // App
   'app.title': 'Open Energy Studio',
   'app.untitledProject': 'Untitled Project',

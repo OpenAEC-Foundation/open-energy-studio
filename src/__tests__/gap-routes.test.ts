@@ -45,8 +45,13 @@ describe('routeForPath', () => {
     ['ntaCalculation.someFutureBlock', 'check', 'input'],
     ['registration.client', 'registration', undefined],
     ['registration.relabelComparison.original', 'relabel', undefined],
-    ['basisopname.zones[0].area', 'survey', undefined],
-    ['maatwerkadvies.measures[3]', 'advice', undefined],
+    ['basisopname.zones[0].area', 'survey', 'zones'],
+    ['basisopname.envelope.surfaces[1].insulation', 'survey', 'envelope'],
+    ['basisopname.additionalHotWaterSystems[0]', 'survey', 'hotWater'],
+    ['basisopname.id', 'survey', 'general'],
+    ['maatwerkadvies.measures[3]', 'advice', 'measures'],
+    ['maatwerkadvies.tariffs.gasEurPerM3', 'advice', 'use'],
+    ['maatwerkadvies.renovationPassport.demandPackageId', 'advice', 'passport'],
     ['derivedInput.zones[0].floorAreaM2', 'building', 'zones'],
   ])('routes %s to %s › %s', (path, step, sub) => {
     const route = routeForPath(path);

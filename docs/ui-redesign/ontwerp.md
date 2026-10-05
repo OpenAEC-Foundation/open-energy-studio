@@ -957,6 +957,36 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - "Bron & bewijs" per vlak;
   - een type-wissel (wand/dak/vloer) in het inline-paneel.
 
+### Uitgevoerd in F8 (5 oktober 2026)
+
+- Routes: Basisopname heeft per onderdeel een subpagina (`general`, `zones`, `envelope`, `heating`, `hotWater`, `ventilation`, `cooling`, `pv`, `result`). Maatwerkadvies heeft de subpagina's `measures`, `use`, `passport` en `advice`. `GAP_ROUTES` stuurt `basisopname.<onderdeel>…` en `maatwerkadvies.<blok>…` naar die subpagina's.
+- `BasisopnamePanel` heeft de props `section` en `onSection`:
+  - zonder `section` blijft het de bestaande lange kolom, zodat de bestaande tests en het gedrag ongewijzigd blijven;
+  - met `section` is het de wizard uit `07`: voortgang en onderdelen links (fouten per onderdeel uit de laatste doorrekening), het onderdeel in het midden met Vorige/Volgende, en rechts de kaart *Uitkomst opname*. De kaart toont `Indicatief`, label, EP₂, fouten, forfaitaire waarden, Doorrekenen en Verwijderen;
+  - de velden krijgen `data-path` `basisopname.…`. Ga naar bij een fout (`surveySectionForPath`) opent het onderdeel en focust het veld;
+  - de kernuitkomst blijft bewaard bij het wisselen van onderdeel;
+  - een antwoord zonder `issues` (serde-weigering) wordt een foutmelding;
+  - de woning heeft geen Rekenzones: die subpagina valt terug op Algemeen.
+- `MaatwerkadviesPanel` heeft de prop `tab`. Zonder `tab` blijft de oude kolom staan (de tests `maatwerkadvies-ui` en `mwa-*` zijn ongewijzigd). Met `tab`:
+  - de blokken worden `Card`'s;
+  - nieuw in `src/components/shell/pages/existing/MwaViews.tsx`: `LabelPathChart` (SVG, `labelPathBars`), `PackageComparison` (`Segmented` NCW/TVT/invoer met `orderResults`), `MeasureCard` (sjabloonkeuze, compleet/onvolledig uit `buildTemplatePatch`, pakketchips 1/2/3) en `PackageInspector`;
+  - `MeasureEditor` (met `MwaTemplateEditor`) opent in een `SideSheet`.
+  - Bij het doorrekenen worden de sjabloonpatches nog steeds opnieuw opgebouwd. Verwijderen haalt de maatregel ook uit de pakketten.
+- `RelabelPanel` is herschreven als stepper (`Stepper` met status per stap):
+  - eigen bestandsknop (`FileButton`), bestandsnaam, datum en SHA-256;
+  - het oordeel als `StatusPill` en de verouderd-melding als `Banner`;
+  - de wijzigingentabel met filter 6a/6b/te beoordelen, cluster, leesbare namen (`relabelElementName`), pad en Ga naar;
+  - de bewijsrollen geteld uit `registration.evidence[].relabelProof`, met een melding voor `review`-facturen;
+  - de gereedheid uit `useKernel().settled.registration`: de hercontrole `relabelAssessment`, gereed voor registratie, en de `relabel_*`-punten.
+  - Opslag, hashes, het weggooien van een lopende vergelijking na een wijziging, en Verwijderen werken zoals voorheen.
+- Afwijking van §11 F8: de onderdelen staan in de bestaande componenten (props) en in `shell/pages/existing/`, niet in `src/pages/existing/`. Locatie-modus, fotovakken en "Overnemen in projectmodel" uit `07` zijn niet gebouwd; het bestaande gedrag kende ze niet.
+- Labels: `src/i18n/existingLabels.ts` (NL/EN). Stijl: `shell/pages/existing/existing.css` (alleen tokens en de labelkleuren uit `resultsData`).
+- Tests:
+  - nieuw: `existing-building-pages.test.tsx` (wizard, Ga naar, uitkomstkaart, labelpad, maatregelkaarten, zijpaneel, pakketchips, sorteren, inspector, relabelstepper, filter, bewijsrollen);
+  - aangepast: `gap-routes` (subpagina's voor basisopname en maatwerkadvies);
+  - ongewijzigd groen: `basisopname-ui`, `maatwerkadvies-ui`, `mwa-*`, `relabel-panel` en `relabel-migration`.
+- Schermafdrukken: `~/oes-shots/f8/` (donker en licht, NL; EN licht; utiliteit), met een volledige herlabelronde tegen een gewijzigd origineel.
+
 ### Uitgevoerd in F7 (5 oktober 2026)
 
 - Routes: Resultaten heeft de subpagina's `overview` (standaard), `services`, `zones`, `monthly` en `provenance`.

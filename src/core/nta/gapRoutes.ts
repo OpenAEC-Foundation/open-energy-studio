@@ -135,8 +135,28 @@ export const GAP_ROUTES: GapRoute[] = [
   // NTA input: the step page that edits the section (F6, see NtaSections).
   ...ntaRoutes(),
   // Existing buildings and delivery.
-  { prefix: 'basisopname', step: 'survey' },
-  { prefix: 'maatwerkadvies', step: 'advice' },
+  // The survey and advice pages are split into sub pages (F8).
+  { prefix: 'basisopname', step: 'survey', sub: 'general' },
+  { prefix: 'basisopname.zones', step: 'survey', sub: 'zones' },
+  { prefix: 'basisopname.lighting', step: 'survey', sub: 'zones' },
+  { prefix: 'basisopname.envelope', step: 'survey', sub: 'envelope' },
+  { prefix: 'basisopname.heating', step: 'survey', sub: 'heating' },
+  { prefix: 'basisopname.hotWater', step: 'survey', sub: 'hotWater' },
+  { prefix: 'basisopname.additionalHotWaterSystems', step: 'survey', sub: 'hotWater' },
+  { prefix: 'basisopname.ventilation', step: 'survey', sub: 'ventilation' },
+  { prefix: 'basisopname.cooling', step: 'survey', sub: 'cooling' },
+  { prefix: 'basisopname.coolingPresent', step: 'survey', sub: 'cooling' },
+  { prefix: 'basisopname.coolingCollective', step: 'survey', sub: 'cooling' },
+  { prefix: 'basisopname.pv', step: 'survey', sub: 'pv' },
+  { prefix: 'basisopname.derivedInput', step: 'survey', sub: 'result' },
+  { prefix: 'basisopname.inklapRedenen', step: 'survey', sub: 'result' },
+  { prefix: 'maatwerkadvies', step: 'advice', sub: 'measures' },
+  { prefix: 'maatwerkadvies.currentUse', step: 'advice', sub: 'use' },
+  { prefix: 'maatwerkadvies.measured', step: 'advice', sub: 'use' },
+  { prefix: 'maatwerkadvies.tariffs', step: 'advice', sub: 'use' },
+  { prefix: 'maatwerkadvies.economics', step: 'advice', sub: 'use' },
+  { prefix: 'maatwerkadvies.renovationPassport', step: 'advice', sub: 'passport' },
+  { prefix: 'maatwerkadvies.advisedPackageId', step: 'advice', sub: 'advice' },
 ];
 
 const compiled = GAP_ROUTES.map((route) => ({ ...route, segments: parseKernelPath(route.prefix) }));
