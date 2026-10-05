@@ -70,6 +70,7 @@ pub const OMITTED_TERMS: &[&str] = &[
     "§9.1 (p. 285): a heat-pump quality declaration (kwaliteitsverklaring, e.g. BCRG) replaces the table 9.27/9.29 COP, rounded down to 0,05; c_source of footnote a still applies; the value is read from the declaration for this system's design supply temperature and demand by the user (linear interpolation allowed)",
     "§9.1: a declared energy fraction F_H;gen;gpref below 1 is completed by the appliance's integrated electric backup heater at η = 1 (the assumption under which such declarations are drawn up); in a set of several generators it is refused, because 9.6.1 shares the load there",
     "§9.1: a declared annual W_H;aux replaces the 9.85 forfait and is spread over the months by the heat-pump output",
+    "f_prac with a declared heat-pump COP: 9.62 (table route, p. 337) has f_prac 1 and 9.63 (data per NEN-EN 14511/14825 via annex Q, p. 340) has 0,95. A heat-pump quality declaration for space heating is drawn up per annex Q (p. 615 speaks of a 'kwaliteitsverklaring voor het opwekkingsrendement voor verwarming volgens bijlage Q'), so the declared COP is taken with f_prac 0,95. For hot water 13.152 (p. 616–617) gives 1,0 only to the forfait values of 13.8.4.5–13.8.4.7; a declared value takes 0,95 ('alle overige gevallen'). Both readings agree with the electricity printed in three public reports of attested software",
     "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
     "7.82: ϑ_ztu of the unheated space follows from distributionSystem.unheatedReductionFactor (b_U); without it and without entered values 13 °C is used",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
@@ -4464,9 +4465,19 @@ fn generate(
                     .iter()
                     .map(|item| issue(item.code, format!("generator.{}", item.path))),
             );
-            generation_efficiency = result.corrected_cop;
+            // A heat-pump quality declaration for space heating is drawn up
+            // according to annex Q (p. 615 ties the heating declaration to
+            // annex Q), so the declared COP enters 9.63 with f_prac 0,95
+            // (p. 340) instead of the table route 9.62 with f_prac 1 (p. 337).
+            let practice_factor = if declaration.is_some() {
+                ANNEX_Q_PRACTICE_FACTOR
+            } else {
+                1.0
+            };
+            generation_efficiency = result.corrected_cop.map(|cop| cop * practice_factor);
             for ((row, pump), total) in monthly.iter_mut().zip(&result.monthly).zip(outputs) {
                 row.generator_electricity_kwh = pump.generator_input_electricity_kwh
+                    / practice_factor
                     + total.energy_kwh * (1.0 - declared_fraction);
                 row.collective_source_heat_kwh = pump.collective_source_heat_kwh;
                 row.heat_pump_output_kwh = pump.generator_output_kwh;
@@ -5120,7 +5131,8 @@ mod tests {
 
     /// §9.1 (p. 285): a quality declaration sets the COP, the energy
     /// fraction (the rest by the integrated electric backup at η = 1) and the
-    /// annual auxiliary energy.
+    /// annual auxiliary energy; the declared COP enters 9.63 with f_prac
+    /// 0,95 (p. 340, declaration per annex Q, p. 615).
     #[test]
     fn declared_heat_pump_sets_cop_fraction_and_auxiliary() {
         let mut forfait = heat_pump();
@@ -5146,10 +5158,10 @@ mod tests {
             "{:?}",
             result.issues
         );
-        assert!((result.generation_efficiency.unwrap() - 4.35).abs() < 1e-9);
+        assert!((result.generation_efficiency.unwrap() - 4.35 * 0.95).abs() < 1e-9);
         let mut auxiliary = 0.0;
         for row in &result.monthly {
-            let expected = row.generator_output_kwh * (0.9 / 4.35 + 0.1);
+            let expected = row.generator_output_kwh * (0.9 / (4.35 * 0.95) + 0.1);
             assert!((row.generator_electricity_kwh - expected).abs() < 1e-6);
             assert!((row.heat_pump_output_kwh - 0.9 * row.generator_output_kwh).abs() < 1e-6);
             auxiliary += row.auxiliary_electricity_kwh.unwrap_or(0.0);

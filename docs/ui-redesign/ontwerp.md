@@ -894,3 +894,28 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
 - `src/components/ui/`: alle bouwstenen uit §5.2 behalve `CommandPalette`, `KpiTile`, `BulletMeter`, `LabelBadge` en `LabelScale` (F3/F7). Extra: `FileButton` voor de vertaalde bestandskeuze.
 - `formatQuantity`, `QUANTITIES` en `parseDecimal` in `src/i18n/format.ts`; `parseKernelPath` in `src/core/nta/pathUtil.ts`.
 - Geen `alert()`/`confirm()`/Tauri-`ask` meer in `App.tsx`: meldingen zijn toasts, sluiten met wijzigingen gebruikt `ConfirmDialog` (Opslaan · Niet opslaan · Annuleren).
+
+### Uitgevoerd in F3/F4
+
+- `src/context/KernelProvider.tsx`: één `useProjectPerformance` per actief document. `useKernel()` geeft de vorige geslaagde uitkomst (`settled`), de fase (`loading`/`current`/`stale`/`error`) en `refresh()`. `useKernelQuery()` deelt die run met `ResultsView`, `ReportView`, `PrintPreviewDialog` en `NtaPerformancePanel`; buiten de provider draaien ze een eigen query. `PreviewPanel` gebruikt nog `calculateProjectPerformanceShared`; dat is dezelfde run, want die wordt per projectobject gedeeld.
+- `src/core/nta/gapRoutes.ts` (`GAP_ROUTES`, `routeForPath`) en `src/core/nta/stepStatus.ts` (`stepStatuses`).
+  - Er zijn nog geen NTA-substappen. NTA-paden gaan daarom naar Controle › NTA-invoer; F6 verfijnt dat.
+  - `src/core/navigation/projectPaths.ts` selecteert bij "Ga naar" het element van het pad.
+- `src/core/navigation/routes.ts`: `route` in `EnergyContext` met de actie `NAVIGATE`. `SET_VIEW_MODE` blijft een alias. De hash wordt gesynchroniseerd.
+- `src/components/shell/`:
+  - `TopBar`, `WorkflowNav` (met het menu Gereedschap), `Inspector`, `CommandPalette` en `StepRouter` (vervangt `MainView`);
+  - `commands.ts`: de inventaris van de ribbonacties, elk met een `ribbonSource` en een nieuwe plek;
+  - de pagina's `ProjectOverview`, `InstallationsPage` en `RegistrationPage`.
+- Verwijderd:
+  - `Ribbon` (`ThemePicker.tsx` blijft voor de themaconfiguratie), `ProjectBrowser`, `TitleBar`, `MainView`, `ProjectView` en `AppMenu`;
+  - `PropertiesPanel` en `PreviewPanel` blijven, als inhoud van de inspector (`embedded`).
+- Tests:
+  - `ribbon.test.tsx` is nu `workflow-nav.test.tsx`;
+  - `titlebar.test.tsx` is nu `top-bar.test.tsx`;
+  - `project-browser.test.tsx` is opgegaan in de lijsttests van `workflow-nav.test.tsx` en `envelope-edit.test.tsx`;
+  - nieuw: `gap-routes`, `step-status`, `command-palette` en `report-titles`.
+- Nog open voor F5–F9:
+  - subpagina's per onderdeel (Verwarming, Ventilatie …);
+  - editors als zijlade in de inspector;
+  - NTA-secties per stap;
+  - het concept-voorbeeld.

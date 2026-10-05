@@ -1,0 +1,220 @@
+/**
+ * The work area of the shell: one page per workflow step (formerly MainView).
+ * During F4 the steps show the existing views and panels (ontwerp §F4
+ * "Tussenstand"); F5–F9 replace them page by page.
+ */
+import { useEffect, useRef } from 'react';
+import { Box, Download, FileDown, Plus, Printer } from 'lucide-react';
+import { useI18n } from '../../i18n/i18n';
+import { useEnergy } from '../../context/EnergyContext';
+import { useKernel } from '../../context/KernelProvider';
+import { isPathWithin } from '../../core/nta/pathUtil';
+import { routeForPath } from '../../core/nta/gapRoutes';
+import { kernelIssues, type StepStatus } from '../../core/nta/stepStatus';
+import type { Route, StepId } from '../../core/navigation/routes';
+import type { DialogType, IProject } from '../../core/energy/types';
+import { Banner, Button, Card, IssueList } from '../ui';
+import { ErrorBoundary } from '../ErrorBoundary/ErrorBoundary';
+import { EnvelopeView } from '../EnvelopeView/EnvelopeView';
+import { UnheatedSpacesPanel } from '../UnheatedSpacesPanel/UnheatedSpacesPanel';
+import { Building3DView } from '../Building3DView/Building3DView';
+import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInventoryPanel';
+import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainReferencePanel';
+import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
+import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
+import { ResultsView } from '../ResultsView/ResultsView';
+import { BasisopnamePanel } from '../BasisopnamePanel/BasisopnamePanel';
+import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
+import { ReportView } from '../ReportView/ReportView';
+import { UValueCalculator } from '../UValueCalculator/UValueCalculator';
+import { ThermalBridgeCalculator } from '../ThermalBridgeCalculator/ThermalBridgeCalculator';
+import { HeatPumpSizingCalculator } from '../HeatPumpSizingCalculator/HeatPumpSizingCalculator';
+import { PageHeader, SubTabs, routeLabel } from './PageHeader';
+import { ProjectOverview } from './pages/ProjectOverview';
+import { InstallationAddBar, InstallationsPage } from './pages/InstallationsPage';
+import { RegistrationEditButton, RegistrationPage } from './pages/RegistrationPage';
+import type { ShellActions } from './ShellActions';
+
+export const BUILDING_ADD: Array<{ dialog: DialogType; labelKey: string }> = [
+  { dialog: 'zone-editor', labelKey: 'ribbon.addZone' },
+  { dialog: 'construction-editor', labelKey: 'ribbon.addConstruction' },
+  { dialog: 'surface-editor', labelKey: 'ribbon.addSurface' },
+  { dialog: 'window-editor', labelKey: 'ribbon.addWindow' },
+  { dialog: 'thermal-bridge', labelKey: 'ribbon.addThermalBridge' },
+  { dialog: 'point-bridge', labelKey: 'kernel.pointBridge.add' },
+  { dialog: 'air-tightness', labelKey: 'ribbon.airTightness' },
+];
+
+const FLASH_MS = 1200;
+
+/** Scroll to and focus the element of a kernel path ("Ga naar"); the deepest `[data-path]` that contains it wins. */
+export function focusPathIn(container: HTMLElement, path: string): HTMLElement | null {
+  let best: HTMLElement | null = null;
+  let bestLength = -1;
+  for (const element of Array.from(container.querySelectorAll<HTMLElement>('[data-path]'))) {
+    const candidate = element.dataset.path ?? '';
+    if (candidate && isPathWithin(path, candidate) && candidate.length > bestLength) {
+      best = element;
+      bestLength = candidate.length;
+    }
+  }
+  if (!best) return null;
+  best.scrollIntoView?.({ block: 'center' });
+  if (!best.hasAttribute('tabindex') && !/^(INPUT|SELECT|TEXTAREA|BUTTON|A)$/.test(best.tagName)) best.tabIndex = -1;
+  best.focus({ preventScroll: true });
+  best.classList.add('focus-flash');
+  window.setTimeout(() => best?.classList.remove('focus-flash'), FLASH_MS);
+  return best;
+}
+
+interface StepRouterProps {
+  project: IProject;
+  route: Route;
+  statuses: Record<StepId, StepStatus>;
+  actions: ShellActions;
+}
+
+export function StepRouter({ project, route, statuses, actions }: StepRouterProps) {
+  const { t } = useI18n();
+  const { state } = useEnergy();
+  const kernel = useKernel();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const status = statuses[route.step];
+
+  // Focus after navigation: the field of "Ga naar", else the page title (unless the
+  // user is moving through the navigation itself).
+  useEffect(() => {
+    const container = bodyRef.current;
+    if (!container) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (route.focusPath && focusPathIn(container, route.focusPath)) return;
+      const active = document.activeElement;
+      if (active && active.closest('.workflow-nav, .page-subtabs, [role="dialog"]')) return;
+      if (route.focusPath || active === document.body || active == null || !container.contains(active)) {
+        container.querySelector<HTMLElement>('#page-title')?.focus({ preventScroll: true });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [route]);
+
+  const navigateSub = (sub: string) => actions.navigate({ step: route.step, sub });
+  const header = (extra?: { title?: React.ReactNode; actions?: React.ReactNode; lead?: React.ReactNode }) => <>
+    <PageHeader route={route} title={extra?.title} lead={extra?.lead ?? t(`page.${route.step}.lead`)} actions={extra?.actions} />
+    <SubTabs route={route} onSelect={navigateSub} />
+  </>;
+  const dimmedBanner = status?.dimmed ? <Banner tone="info">{t('page.notApplicable')}</Banner> : null;
+
+  let page: React.ReactNode;
+  switch (route.step) {
+    case 'project':
+      page = <ProjectOverview project={project} statuses={statuses} actions={actions} />;
+      break;
+    case 'building':
+      page = <>
+        {header({
+          actions: route.sub === 'model3d'
+            ? <Button icon={<Box aria-hidden="true" />} onClick={actions.exportModelIFC}>{t('ribbon.exportModelIFC')}</Button>
+            : undefined,
+        })}
+        <div className={route.sub === 'model3d' ? 'page-body page-body--flush' : 'page-body'}>
+          {route.sub === 'envelope' && <>
+            <div className="add-bar" role="group" aria-label={t('building.add')}>
+              {BUILDING_ADD.map((entry) => (
+                <Button key={entry.dialog} size="sm" icon={<Plus aria-hidden="true" />} title={t(entry.labelKey)}
+                  onClick={() => actions.openDialog(entry.dialog)}>{t(entry.labelKey)}</Button>
+              ))}
+            </div>
+            <EnvelopeView />
+          </>}
+          {route.sub === 'unheated' && <UnheatedSpacesPanel />}
+          {route.sub === 'model3d' && <Building3DView />}
+        </div>
+      </>;
+      break;
+    case 'installations':
+      page = <>
+        {header({ actions: route.sub === 'systems' ? <InstallationAddBar onOpenDialog={actions.openDialog} /> : undefined })}
+        <div className="page-body">
+          {route.sub === 'systems' && <InstallationsPage />}
+          {route.sub === 'heatPumps' && <HeatPumpInventoryPanel />}
+          {route.sub === 'reference' && <GasChainReferencePanel />}
+        </div>
+      </>;
+      break;
+    case 'check': {
+      const issues = kernelIssues(kernel?.settled);
+      page = <>
+        {header()}
+        <div className="page-body">
+          {route.sub === 'overview' && <>
+            <Card title={t('overview.openPoints')} subtitle={t('overview.openPointsHint')} level={2} flush>
+              <IssueList empty={t('overview.noIssues')}
+                issues={issues.map((issue) => ({
+                  code: issue.code, severity: issue.kind, path: issue.path, detail: issue.detail,
+                  location: routeLabel(t, routeForPath(issue.path)),
+                }))}
+                onGoTo={(issue) => actions.navigate(routeForPath(issue.path))} />
+            </Card>
+            <KernelAuditPanel project={project} />
+          </>}
+          {route.sub === 'input' && <NtaPerformancePanel />}
+        </div>
+      </>;
+      break;
+    }
+    case 'results':
+      page = <>
+        {header()}
+        <div className="page-body"><ResultsView workflowPanels={false} /></div>
+      </>;
+      break;
+    case 'survey':
+      page = <>{header()}<div className="page-body">{dimmedBanner}<BasisopnamePanel /></div></>;
+      break;
+    case 'advice':
+      page = <>{header()}<div className="page-body">{dimmedBanner}<MaatwerkadviesPanel /></div></>;
+      break;
+    case 'relabel':
+      page = <>{header()}<div className="page-body">{dimmedBanner}<RelabelPanel /></div></>;
+      break;
+    case 'report':
+      page = <>
+        {header({
+          actions: <>
+            <Button icon={<FileDown aria-hidden="true" />} onClick={actions.exportReport}>{t('report.export')}</Button>
+            <Button icon={<Printer aria-hidden="true" />} onClick={actions.printReport}>{t('report.print')}</Button>
+            <Button icon={<Download aria-hidden="true" />} onClick={actions.exportIFC}>{t('report.page.ifc')}</Button>
+            <Button icon={<Download aria-hidden="true" />} onClick={actions.exportUNIEC3}>{t('ribbon.exportUNIEC3Draft')}</Button>
+            <Button icon={<Download aria-hidden="true" />} onClick={actions.exportVABI}>{t('ribbon.exportVABI')}</Button>
+          </>,
+        })}
+        <div className="page-body"><ReportView /></div>
+      </>;
+      break;
+    case 'registration':
+      page = <>
+        {header({ actions: <RegistrationEditButton onOpen={() => actions.openDialog('project-info')} /> })}
+        <div className="page-body"><RegistrationPage project={project} actions={actions} /></div>
+      </>;
+      break;
+    case 'tool':
+      page = <>
+        {header({ lead: t('page.tool.lead') })}
+        <div className="page-body">
+          {route.sub === 'uvalue' && <UValueCalculator />}
+          {route.sub === 'thermal-bridge' && <ThermalBridgeCalculator />}
+          {route.sub === 'heat-pump-sizing' && <HeatPumpSizingCalculator />}
+        </div>
+      </>;
+      break;
+    default:
+      page = null;
+  }
+
+  return (
+    <div className="step-page" ref={bodyRef} data-step={route.step} style={{ display: 'contents' }}>
+      <ErrorBoundary resetKey={state.project}>{page}</ErrorBoundary>
+    </div>
+  );
+}

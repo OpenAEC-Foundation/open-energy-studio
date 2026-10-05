@@ -753,7 +753,8 @@
         "electricPowerKw": 0.078,
         "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
       },
-      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2",
+      "unheatedPipeLengthM": 0.0
     },
     "generator": {
       "kind": "heat_pump_forfait",
@@ -770,7 +771,8 @@
         "qualityDeclaration": {
           "declarationReference": "BCRG-kwaliteitsverklaring lucht/water-warmtepomp (fictief voorbeeld)",
           "generationEfficiency": 4.05,
-          "energyFraction": 1.0
+          "energyFraction": 1.0,
+          "auxiliaryKwhPerYear": 146
         }
       },
       "sourceSystem": "individual",
@@ -837,7 +839,8 @@
           "energyEfficiencyIndex": 0.23,
           "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
         },
-        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2",
+        "unconditionedPipeLengthM": 0.0
       },
       "generators": [
         {
@@ -913,6 +916,27 @@
               "method": "nominal",
               "nominalPowerW": 21.7
             }
+          },
+          {
+            "id": "f2",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 21.7
+            }
+          },
+          {
+            "id": "f3",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 21.7
+            }
+          },
+          {
+            "id": "f4",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 21.7
+            }
           }
         ],
         "control": {
@@ -931,9 +955,9 @@
             0.364,
             0.364
           ],
-          "sourceReference": "BCRG f 0,364"
+          "sourceReference": "report: product fan data"
         },
-        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+        "sourceReference": "report: product fan data"
       },
       "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
     },

@@ -2773,11 +2773,14 @@ fn generation(
                 )
                 .ok_or("hot_water_heat_pump_class_exceeded")?
             };
-            let base = match declared {
-                Some(item) => round_down(item.value, 0.05),
-                None => 1.4 * source_correction.unwrap_or(1.0),
+            // 13.152 (p. 616–617): f_prac;gi = 1,0 only for the forfait
+            // values of 13.8.4.5–13.8.4.7; a declared value is not a forfait
+            // value, so "alle overige gevallen" (0,95) applies.
+            let (base, practical) = match declared {
+                Some(item) => (round_down(item.value, 0.05), 0.95),
+                None => (1.4 * source_correction.unwrap_or(1.0), 1.0),
             };
-            Ok((base * correction, 1.0))
+            Ok((base * correction, practical))
         }
         HotWaterGenerator::HeatPumpEn16147 {
             profile,
@@ -6125,8 +6128,10 @@ mod tests {
                 source_reference: "BCRG 0000/01".into(),
             }),
         };
-        let (plain, _) = generation(&declared(None), 2067.0).unwrap();
+        let (plain, practical) = generation(&declared(None), 2067.0).unwrap();
         assert!((plain - 1.30).abs() < 1e-9);
+        // 13.152: a declared value is not a forfait value, so f_prac 0,95.
+        assert!((practical - 0.95).abs() < 1e-12);
         let (classed, _) = generation(&declared(Some(ApplicationClass::Class4)), 2067.0).unwrap();
         assert!(classed < plain);
     }

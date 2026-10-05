@@ -9,7 +9,7 @@ import {
   downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML, downloadProjectDossier,
 } from '../../core/report/ReportGenerator';
 import { checkDossierCompleteness, openDossierItems, type DossierItem } from '../../core/report/ProjectDossier';
-import { useProjectPerformance } from '../../core/nta/useProjectPerformance';
+import { useKernelQuery } from '../../context/KernelProvider';
 import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
 import { kernelWithheld } from '../../core/nta/KernelVerdict';
 import { formatNumber } from '../../i18n/format';
@@ -48,7 +48,7 @@ export function ReportView() {
   const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project, result } = state;
-  const kernelQuery = useProjectPerformance(project);
+  const kernelQuery = useKernelQuery(project);
   const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
   const kernelAssessment = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
   const model = kernelReportModel(kernelAssessment);

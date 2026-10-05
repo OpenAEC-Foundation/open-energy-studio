@@ -30,6 +30,12 @@ Een afzonderlijke manifestlezer kan deze vier bestanden, groottes, hashes en deb
 
 De optionele bronrepositorycontrole verifieert daarnaast dat commit `62a4a29` aanwezig is en de in het manifest genoemde locks en versies bevat. Een gemanipuleerde lockhash en onbekende commit falen. Hiermee is de buildherkomst nog niet onafhankelijk bevestigd en veranderen de normatieve dekkingskolommen niet.
 
+De [schone frontendbouw met bijgewerkte afhankelijkheden](nta8800-afhankelijkheden-2026-10-05.md) slaagde op de bronstand `bb7c1bd` met 505 UI-tests en een Vite-productiebundel. De lokale npm-audit gaf op het controlemoment 0 meldingen. Deze onderhoudsstap wijzigt geen NTA-reken-, referentie- of attestkolom.
+
+De Tauri-desktopbouw vond vervolgens een minorversieverschil tussen npm- en Cargo-pakketten. De betrokken npm-pakketten zijn exact op compatibele minorversies vastgezet; daarna volgde een afzonderlijke nieuwe desktopbouw. Dit verandert de normatieve dekking niet.
+
+De [herstelde desktopbouw op `dc1b917`](nta8800-build-verificatie-2026-10-05-dc1b917.md) slaagde en is met de manifestlezer opnieuw gecontroleerd. De pakketversies sluiten op minorversie aan, het lockbestand is met `npm ci` geïnstalleerd en de live devserver reageerde met HTTP 200. De NTA-reken-, referentie- en attestkolommen blijven ongewijzigd.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.

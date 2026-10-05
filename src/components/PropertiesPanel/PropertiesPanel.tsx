@@ -62,7 +62,8 @@ function PropertyRow({ label, value }: { label: string; value: string | number }
   );
 }
 
-export function PropertiesPanel() {
+/** `embedded`: rendered inside the shell inspector, which owns the frame, header and width. */
+export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useI18n();
   const { state } = useEnergy();
   const { item, type } = findItem(state);
@@ -94,7 +95,7 @@ export function PropertiesPanel() {
     };
   }, []);
 
-  if (collapsed) {
+  if (collapsed && !embedded) {
     return (
       <div className="properties-panel collapsed" onClick={() => setCollapsed(false)}>
         <div className="panel-collapsed-label-right">
@@ -105,12 +106,14 @@ export function PropertiesPanel() {
   }
 
   return (
-    <div className="properties-panel" style={{ width }}>
-      <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
-      <div className="properties-panel-header">
-        <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
-        <span>{t('properties.title')}</span>
-      </div>
+    <div className={embedded ? 'properties-panel embedded' : 'properties-panel'} style={embedded ? undefined : { width }}>
+      {!embedded && <>
+        <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
+        <div className="properties-panel-header">
+          <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
+          <span>{t('properties.title')}</span>
+        </div>
+      </>}
       <div className="properties-panel-content">
         {!item && (
           <div className="properties-empty">{t('properties.noSelection')}</div>

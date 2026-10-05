@@ -10,13 +10,19 @@ import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
-import { useProjectPerformance, calculatedAssessment } from '../../core/nta/useProjectPerformance';
+import { calculatedAssessment } from '../../core/nta/useProjectPerformance';
+import { useKernelQuery } from '../../context/KernelProvider';
 import { kernelEnergyBreakdown } from '../../core/nta/KernelBreakdown';
 import { kernelVerdict, type KernelVerdict } from '../../core/nta/KernelVerdict';
 import type { IBENGResult, IBENGResultMonthly } from '../../core/energy/types';
 import './ResultsView.css';
 
-export function ResultsView() {
+/**
+ * `workflowPanels`: the kernel audit, maatwerkadvies and relabel panels. In the
+ * app shell they have their own steps (Controle, Maatwerkadvies, Herlabelen);
+ * standalone the view keeps them.
+ */
+export function ResultsView({ workflowPanels = true }: { workflowPanels?: boolean } = {}) {
   const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
   const { result, project } = state;
@@ -30,7 +36,7 @@ export function ResultsView() {
   const stale = result == null && shown != null;
 
   // One kernel run feeds both the NTA panel and the cards, so they cannot disagree.
-  const kernelQuery = useProjectPerformance(project);
+  const kernelQuery = useKernelQuery(project);
   const kernel = calculatedAssessment(kernelQuery);
   const performance = kernel?.performance ?? null;
   const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
@@ -72,8 +78,7 @@ export function ResultsView() {
           type="button"
           className="results-review-button"
           onClick={() => {
-            dispatch({ type: 'SET_VIEW_MODE', payload: 'project' });
-            dispatch({ type: 'SET_RIBBON_TAB', payload: 'start' });
+            dispatch({ type: 'NAVIGATE', payload: { step: 'check', sub: 'input' } });
           }}
         >
           {t('results.reviewInput')}
@@ -94,10 +99,10 @@ export function ResultsView() {
       </div>}
 
       <CalculationNotice />
-      <KernelAuditPanel project={project} />
+      {workflowPanels && <KernelAuditPanel project={project} />}
       <NtaPerformancePanel query={kernelQuery} />
-      <MaatwerkadviesPanel />
-      <RelabelPanel />
+      {workflowPanels && <MaatwerkadviesPanel />}
+      {workflowPanels && <RelabelPanel />}
 
       {performance && <div className="beng-cards" data-testid="beng-cards-kernel">
         {performance.needIndicatorKwhPerM2Year != null && <BENGIndicator

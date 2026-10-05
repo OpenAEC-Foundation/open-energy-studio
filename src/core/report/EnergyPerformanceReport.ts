@@ -68,6 +68,24 @@ const FUNCTION: Record<string, string> = {
   healthcare: 'gezondheidszorgfunctie', sport: 'sportfunctie', lodging: 'logiesfunctie', assembly: 'bijeenkomstfunctie',
   cell: 'celfunctie', industrial: 'industriefunctie', other: 'overige gebruiksfunctie',
 };
+/** Bbl table 4.148A use functions (Dutch names of the kernel's `NtaBblFunction` values). */
+const BBL_FUNCTION: Record<string, string> = {
+  residential_building: 'woongebouw', other_residential: 'woonfunctie (niet in een woongebouw)', caravan: 'woonwagen',
+  floating_building_after2018_berth: 'drijvend bouwwerk (ligplaats na 2018)', floating_building_other_berth: 'drijvend bouwwerk (andere ligplaats)',
+  assembly_child_care: 'bijeenkomstfunctie voor kinderopvang', other_assembly: 'andere bijeenkomstfunctie', cell: 'celfunctie',
+  healthcare_with_beds: 'gezondheidszorgfunctie met bedgebied', other_healthcare: 'andere gezondheidszorgfunctie', office: 'kantoorfunctie',
+  lodging_in_lodging_building: 'logiesfunctie in een logiesgebouw', other_lodging: 'andere logiesfunctie', education: 'onderwijsfunctie',
+  sport: 'sportfunctie', retail: 'winkelfunctie',
+};
+
+/**
+ * Escaped title text with symbol subscripts: `H_D`, `H_tr` and `Q_H;nd` become H<sub>D</sub> …,
+ * so headings and the table of contents read like the tables (review finding).
+ */
+export function titleHtml(title: string): string {
+  return escapeHtml(title).replace(/\b([A-Za-z])_([A-Za-z0-9;]+)/g, '$1<sub>$2</sub>');
+}
+
 const STATUS: Record<string, string> = {
   calculated_unverified: 'berekend (onverifieerd)', calculated_legacy_edition: 'berekend in oudere uitgave (niet voor registratie)',
   incomplete: 'onvolledig', invalid: 'ongeldig',
@@ -93,7 +111,7 @@ class ReportDocument {
     if (!body.trim()) return '';
     this.chapters.push({ id, title, detail });
     const number = this.chapters.length;
-    return `<section class="chapter" id="${id}"><h2>${number}. ${escapeHtml(title)}</h2>${body}</section>`;
+    return `<section class="chapter" id="${id}"><h2>${number}. ${titleHtml(title)}</h2>${body}</section>`;
   }
 
   table(caption: string, head: string, body: string, note = ''): string {
@@ -189,7 +207,7 @@ function results(doc: ReportDocument, project: IProject, assessment: ProjectPerf
       <td class="n">${n(model.tojuli.value, 2)}</td>${td('K')}${td(meets(model.tojuli.meets))}</tr>` : '');
   const resultTable = doc.table('Eisen en resultaten (Bbl art. 4.149 en 4.149b, tabel 4.148A)',
     '<tr><th>Indicator</th><th>Eis</th><th>Resultaat</th><th>Eenheid</th><th>Oordeel</th></tr>', rows,
-    bbl ? `Gebruiksfunctie ${escapeHtml(bbl.function)}, A<sub>ls</sub>/A<sub>g</sub> = ${n(bbl.lossAreaRatio, 2)}${bbl.limits.lightConstructionAllowanceApplied ? '; toeslag lichte bouw (lid 4) toegepast' : ''}. De eis en het resultaat staan met dezelfde nauwkeurigheid; de kern toetst onafgeronde waarden.` : '');
+    bbl ? `Gebruiksfunctie ${escapeHtml(BBL_FUNCTION[bbl.function] ?? bbl.function)}, A<sub>ls</sub>/A<sub>g</sub> = ${n(bbl.lossAreaRatio, 2)}${bbl.limits.lightConstructionAllowanceApplied ? '; toeslag lichte bouw (lid 4) toegepast' : ''}. De eis en het resultaat staan met dezelfde nauwkeurigheid; de kern toetst onafgeronde waarden.` : '');
   const elements = assessment.labelData?.indicators?.elements as unknown as Loose | undefined;
   const labelRows = `<tr><th>Indicatieve labelklasse</th>${td(performance.indicativeLabelClass ?? '—')}<th>Labelbron</th>${td(performance.labelSource)}</tr>
     <tr><th>Primair fossiel (label)</th><td class="n">${n(performance.labelPrimaryFossilIndicatorKwhPerM2Year ?? performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td>
@@ -789,7 +807,7 @@ export function generateEnergyPerformanceReportHTML(project: IProject, assessmen
       interpretationsSection(options.interpretations).replace(/<h2>[^<]*<\/h2>/, ''));
   }
   const toc = `<nav class="toc"><h2>Inhoud</h2><ol>${doc.chapters.map((chapter) =>
-    `<li${chapter.detail ? ' class="detail"' : ''}><a href="#${chapter.id}">${escapeHtml(chapter.title)}</a></li>`).join('')}</ol></nav>`;
+    `<li${chapter.detail ? ' class="detail"' : ''}><a href="#${chapter.id}">${titleHtml(chapter.title)}</a></li>`).join('')}</ol></nav>`;
   return `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>Rapportage Energieprestatie (NTA 8800) — ${escapeHtml(project.name || 'project')}</title><style>${STYLE}</style></head>
     <body><div class="page">${runHeader}${cover}${toc}${chapters}</div></body></html>`;

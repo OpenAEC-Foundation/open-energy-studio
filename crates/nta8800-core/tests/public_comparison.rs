@@ -1,6 +1,8 @@
 //! Regression on fictionalised rebuilds of three public BENG reports
 //! (docs/nta8800-vergelijking-openbare-rapporten.md). The asserted values
-//! are this kernel's own results, recorded on 2026-10-05; the published
+//! are this kernel's own results, recorded on 2026-10-05 after the input
+//! corrections of the line-by-line reconciliation and f_prac 0,95 on declared
+//! heat-pump efficiencies; the published
 //! values come from older NTA 8800 editions and are listed for context only.
 //! This is not an official reference test.
 
@@ -20,22 +22,22 @@ const CASES: [Case; 3] = [
         json: include_str!("../../../training-data/nta8800-public-comparison-a.json"),
         name: "A (published 92,99 / 25,19 / 80,4)",
         beng1: 94.0,
-        beng2: 33.84,
-        beng3: 76.0,
+        beng2: 35.15,
+        beng3: 74.9,
     },
     Case {
         json: include_str!("../../../training-data/nta8800-public-comparison-b.json"),
         name: "B (published 54,61 / 27,10 / 64,8)",
         beng1: 52.96,
-        beng2: 24.1,
-        beng3: 67.3,
+        beng2: 28.84,
+        beng3: 62.6,
     },
     Case {
         json: include_str!("../../../training-data/nta8800-public-comparison-c.json"),
         name: "C (published 64,47 / 28,70 / 70,9)",
         beng1: 64.7,
-        beng2: 31.44,
-        beng3: 69.1,
+        beng2: 31.54,
+        beng3: 69.0,
     },
 ];
 
