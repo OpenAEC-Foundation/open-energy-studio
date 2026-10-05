@@ -4631,7 +4631,10 @@ export interface MwaMeasuredUse {
   sourceReference?: string;
 }
 
-/** ISSO 82.2 §1.10.2 / §4.4: the three stacked steps of a renovation passport. */
+/**
+ * ISSO 82.2 §1.10.2 / §4.4: the three stacked steps of a renovation passport,
+ * with the requirements of BRL 9500-MWA-W/U (24-03-2026) §3.2 (p. 14).
+ */
 export interface MwaRenovationPassportInput {
   demandPackageId: string;
   systemsPackageId: string;
@@ -4642,6 +4645,14 @@ export interface MwaRenovationPassportInput {
   insulationStandardMaxNeedKwhPerM2?: number;
   overheatingMeasureIds?: string[];
   storageConsidered?: boolean;
+  /** Dwellings: motivation when a natural-gas-free main heating is not realistically possible (MWA-W §3.2 item 2). */
+  gasFreeNotRealisticMotivation?: string;
+  /** Utility: insulation allows low-temperature heating and high-temperature cooling (MWA-U §3.2 item 1a). */
+  lowTemperatureReady?: boolean;
+  /** Utility: motivation when façade insulation is technically impossible (MWA-U §3.2 item 1b). */
+  facadeInsulationImpossibleMotivation?: string;
+  /** Utility: step 1 measures that limit the cooling demand (MWA-U §3.2 item 1c). */
+  coolingMeasureIds?: string[];
 }
 
 /** The maatwerkadvies definition stored with a project (the base is the project itself). */
@@ -4702,6 +4713,11 @@ export interface MwaVariantResult {
     primaryFossilIndicatorKwhPerM2: number | null;
     renewableSharePercent: number | null;
     tojuliMaxK: number | null;
+    /** NTA 8800 §5.3.2 net heat need and Standaard voor Woningisolatie (dwellings). */
+    heatingNeedKwhPerM2?: number | null;
+    standardInsulationKwhPerM2?: number | null;
+    /** Table 5.7 renovation standard EP2 (utility). */
+    renovationStandardKwhPerM2?: number | null;
   };
   actualUse: MwaEnergyUse | null;
   savings: {
@@ -4785,11 +4801,16 @@ export interface MaatwerkadviesAssessment {
     notes: string[];
   } | null;
   renovationPassport: {
+    /** `W` (BRL 9500-MWA-W §3.2) or `U` (BRL 9500-MWA-U §3.2). */
+    scheme?: 'W' | 'U';
+    source?: string;
     steps: MwaVariantResult[];
     requirements: Array<{ code: string; met: boolean | null; detail: string | null }>;
     eligible: boolean | null;
     requiredStatements: string[];
   } | null;
+  /** BRL 9500-MWA-W/U §4.2.8 (p. 23): plain advice, or advice with an eligible renovation passport. */
+  registrationType?: 'maatwerkadvies' | 'maatwerkadvies_met_renovatiepaspoort';
   interpretations: string[];
   issues: MwaIssue[];
 }
@@ -4850,6 +4871,12 @@ export interface RegistrationAssessment {
    * stored verdict. Null without a relabel or a readable original.
    */
   relabelAssessment?: RelabelAssessment | null;
+  /**
+   * BRL 9501 (29-05-2026) §4.3.1 opmerking (p. 8): whether, and with which
+   * tools, the adviser read data into the program (from the project's
+   * `importLog`). Null when the block is checked on its own.
+   */
+  dataImport?: { source: string; dataImported: boolean; tools: string[] } | null;
 }
 
 export interface NtaBacsEvidence {

@@ -16,6 +16,8 @@ De registratiegegevens staan in **Projectgegevens** → *Registratie (BRL 9500)*
 - **WLC-GWP:** voor nieuwe gebouwen boven 1000 m² bij een toets Bbl vanaf 1-1-2028 en de oplevering daarna (BRL 9500-W p. 18, 21, 62).
 - **Vorige labelklasse:** alleen voor de plausibiliteitscontrole.
 
+**Ingelezen gegevens.** Bij registratie moet blijken of de adviseur gegevens met een ander hulpmiddel in het programma heeft ingelezen, en met welk hulpmiddel (BRL 9501 van 29-05-2026, §4.3.1, opmerking, p. 8). Automatisch inlezen mag niet: elke import in dit programma start de adviseur zelf. De UNIEC3- en VABI-import schrijven daarom een regel in het importlogboek van het project (`importLog`, met hulpmiddel, bestandsnaam en tijdstip). De registratiecontrole en het rekenrapport tonen het resultaat in de regel *Gegevens ingelezen*: "nee", of "ja, met …". Het importlogboek telt niet mee als labelinvoer bij herlabelen.
+
 Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, versie, kernversie en attestnummer (Regeling art. 5 lid 1 onder b, p. 6). Bij een herlabeling is dat anders: dan blijft de opgeslagen identiteit van de oorspronkelijke berekening staan en schrijft de app niet de huidige (BRL 9500-W §4.2.4, p. 24).
 
 **Controles van de kern**

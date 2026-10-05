@@ -1,7 +1,8 @@
 //! Registration data of an energy performance report and the deadline
 //! checks an EP adviser works under.
 //!
-//! Sources (page numbers only, no text): BRL 9500-W draft 14-10-2025
+//! Sources (page numbers only, no text): BRL 9500-W 29-05-2026 (the
+//! designated version; its text and pages equal the 14-10-2025 draft)
 //! §4.2.3 (improvements within 24 months, p. 23), §4.2.4 (relabelling with
 //! the original software version and survey date, p. 23–24), §4.2.5
 //! (registration within three months, six for serial projects; names and
@@ -38,7 +39,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
-pub const REGISTRATION_SOURCE: &str = "BRL 9500-W/U (14-10-2025) §4.2.3–4.2.5; Besluit energieprestatie gebouwen art. 2.1 lid 7; Regeling energieprestatie gebouwen art. 4–5";
+pub const REGISTRATION_SOURCE: &str = "BRL 9500-W/U (29-05-2026) §4.2.3–4.2.5; Besluit energieprestatie gebouwen art. 2.1 lid 7; Regeling energieprestatie gebouwen art. 4–5";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -462,6 +463,63 @@ pub struct RegistrationAssessment {
     /// the dossier is built from this, never from the stored verdict.
     /// `None` when there is no relabel or the original could not be read.
     pub relabel_assessment: Option<Value>,
+    /// BRL 9501 (29-05-2026) §4.3.1 opmerking (p. 8): the registration
+    /// states whether, and with which tool, the adviser read data into the
+    /// program. Filled from the project's `importLog` on the project route;
+    /// `None` when the block is checked on its own.
+    pub data_import: Option<DataImportDeclaration>,
+}
+
+pub const DATA_IMPORT_SOURCE: &str = "BRL 9501 (29-05-2026) §4.3.1 opmerking, p. 8";
+
+/// Whether, and with which tools, data was read into the program by the
+/// adviser. Automatic reading is not allowed; every import in this program
+/// is started by the adviser.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataImportDeclaration {
+    pub source: &'static str,
+    pub data_imported: bool,
+    /// Distinct tools in import order.
+    pub tools: Vec<String>,
+}
+
+/// Reads `importLog` (entries `{tool, fileName?, importedAt?}`) of the
+/// project; malformed entries are reported.
+pub fn data_import_declaration(
+    project: &Value,
+    issues: &mut Vec<RegistrationIssue>,
+) -> DataImportDeclaration {
+    let mut tools: Vec<String> = Vec::new();
+    match project.get("importLog") {
+        None | Some(Value::Null) => {}
+        Some(Value::Array(entries)) => {
+            for (index, entry) in entries.iter().enumerate() {
+                match entry.get("tool").and_then(Value::as_str).map(str::trim) {
+                    Some(tool) if !tool.is_empty() => {
+                        if !tools.iter().any(|known| known == tool) {
+                            tools.push(tool.to_string());
+                        }
+                    }
+                    _ => issues.push(RegistrationIssue {
+                        code: "import_log_invalid",
+                        path: format!("importLog[{index}].tool"),
+                        severity: "missing",
+                    }),
+                }
+            }
+        }
+        Some(_) => issues.push(RegistrationIssue {
+            code: "import_log_invalid",
+            path: "importLog".into(),
+            severity: "missing",
+        }),
+    }
+    DataImportDeclaration {
+        source: DATA_IMPORT_SOURCE,
+        data_imported: !tools.is_empty(),
+        tools,
+    }
 }
 
 /// Calculation results the registration checks need; filled by the
@@ -1150,6 +1208,7 @@ pub fn assess_registration_with(
         issues,
         plausibility,
         relabel_assessment: None,
+        data_import: None,
     }
 }
 
@@ -1598,6 +1657,7 @@ pub fn assess_project_registration(
     result
         .issues
         .extend(check_evidence_links(project, registration));
+    result.data_import = Some(data_import_declaration(project, &mut result.issues));
     result.dossier_complete = result.issues.is_empty();
     result.ready_for_registration = result.dossier_complete && result.software_attested;
     result
@@ -2369,5 +2429,32 @@ mod tests {
             .iter()
             .any(|item| item.code == "evidence_link_path_unknown"));
         assert!(!result.ready_for_registration);
+    }
+
+    #[test]
+    fn data_import_declaration_lists_the_tools_from_the_import_log() {
+        let mut issues = Vec::new();
+        let none = data_import_declaration(&serde_json::json!({}), &mut issues);
+        assert!(!none.data_imported && none.tools.is_empty());
+        assert!(issues.is_empty());
+        let project = serde_json::json!({"importLog": [
+            {"tool": "UNIEC3", "fileName": "a.uniec3", "importedAt": "2026-10-05"},
+            {"tool": "VABI"},
+            {"tool": "UNIEC3"},
+            {"fileName": "b.xml"}
+        ]});
+        let declared = data_import_declaration(&project, &mut issues);
+        assert!(declared.data_imported);
+        assert_eq!(
+            declared.tools,
+            vec!["UNIEC3".to_string(), "VABI".to_string()]
+        );
+        assert_eq!(declared.source, DATA_IMPORT_SOURCE);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].code, "import_log_invalid");
+        assert_eq!(issues[0].path, "importLog[3].tool");
+        let mut issues = Vec::new();
+        data_import_declaration(&serde_json::json!({"importLog": "x"}), &mut issues);
+        assert_eq!(issues[0].path, "importLog");
     }
 }

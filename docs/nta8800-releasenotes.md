@@ -2,6 +2,29 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
+
+De applicatie was gebouwd tegen de concepten van BRL 9500-W/U en BRL 9501 van 14-10-2025 en tegen BRL 9500-MWA-W/U van 19-06-2024. Inmiddels zijn de aangewezen versies openbaar.
+- **BRL 9500-W/U van 29-05-2026:** tekst en paginering zijn gelijk aan de concepten; alleen de datum en de verwijzing naar NTA 8800:2025+C1:2026 verschillen. De registratie- en herlabelregels blijven ongewijzigd; alleen de bronvermelding is bijgewerkt.
+- **BRL 9501 van 29-05-2026:** tekst en paginering zijn gelijk aan het concept, op de datum, de NTA-verwijzing en de deelgebieden na. Het derde deelgebied, financiële kengetallen, wordt alleen nog beoogd (§2.1, p. 2). De testset is ISSO-publicatie 54 versie 5.0:2026 (§11, p. 18).
+- **BRL 9500-MWA-W/U van 24-03-2026** (in werking per 29-05-2026): voegt het renovatiepaspoort toe (§3.2, p. 14) en de registratie als maatwerkadvies met of zonder paspoort (§4.2.8, p. 23).
+
+### Resultaten die veranderen
+
+- **Renovatiepaspoort utiliteit:** het paspoort volgt BRL 9500-MWA-U §3.2. De woningeisen (Standaard voor Woningisolatie, aardgasvrij, opslag) gelden niet meer voor utiliteitsgebouwen. Daarvoor in de plaats komen: isolatie geschikt voor LTV en HTK (`lowTemperatureReady`), motivatie bij onmogelijke gevelisolatie, maatregelen tegen de koelvraag (`coolingMeasureIds`) en een EP2 van stap 3 op of onder de renovatiestandaard (`renovation_standard_ep2`). Een bewaard utiliteitspaspoort krijgt daardoor andere eisen en vaak het oordeel "onbeslist" tot de nieuwe velden zijn ingevuld.
+- **Renovatiepaspoort woningen, stap 1:** zonder verklaring van de adviseur vergelijkt de kern nu zelf de warmtebehoefte van stap 1 met de Standaard voor Woningisolatie (NTA 8800 §5.3.2). Eerder bleef de eis dan onbeslist.
+- **Renovatiepaspoort woningen, stap 2:** aardgasvrij geldt "waar realistisch mogelijk". Een motivatie (`gasFreeNotRealisticMotivation`) voldoet aan stap 2.
+
+### Nieuw
+
+- **Registratietype maatwerkadvies:** `registrationType` in de uitvoer van het maatwerkadvies: `maatwerkadvies`, of `maatwerkadvies_met_renovatiepaspoort` als het paspoort aan alle eisen voldoet. Paneel en adviesrapport tonen het.
+- **Ingelezen gegevens:** BRL 9501 §4.3.1, opmerking (p. 8), vraagt te vermelden of, en met welk hulpmiddel, de adviseur gegevens heeft ingelezen.
+  - De UNIEC3- en VABI-import schrijven een regel in `importLog` van het project.
+  - De registratiecontrole geeft `dataImport` (`dataImported`, `tools`), en het rekenrapport toont de regel *Gegevens ingelezen*.
+  - Een regel zonder hulpmiddel geeft `import_log_invalid`.
+  - `importLog` telt niet mee in de labelinvoer voor herlabelen, in de kern en in de app.
+- **Versiebeleid:** het versiebeleid volgens BRL 9501 §4.3 (p. 7) staat in [`docs/nta8800-versiebeheer.md`](nta8800-versiebeheer.md). Het omvat de registratie van de rekenkernversie bij RVO (§5.2) en het bewaren van een oude rekenversie minstens drie jaar na een normwijziging (§5.3, p. 9).
+
 ## 4 oktober 2026 — achtergehouden resultaten overal, volledige codelijst, luchtdichtheid bij openen
 
 Geen rekenwijziging in de kern.

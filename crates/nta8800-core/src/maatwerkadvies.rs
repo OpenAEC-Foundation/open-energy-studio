@@ -1,7 +1,9 @@
 //! Maatwerkadvies (BRL 9500-MWA-W/U) on top of the NTA 8800 calculation.
 //!
 //! Method books: ISSO 82.2 3e druk (dwellings) and ISSO 75.2 3e druk
-//! (utility buildings); requirements: BRL 9500-MWA-W/U §3.1 and §4.2.5.
+//! (utility buildings); requirements: BRL 9500-MWA-W/U (24-03-2026, in
+//! force 29-05-2026) §3.1 (p. 13), §3.2 renovation passport (p. 14), §4.2.5
+//! (p. 21) and §4.2.8 registration (p. 23).
 //!
 //! - Current-use layer (ISSO 82.2/75.2 §2.5, table 2.2): standard user
 //!   profiles (82.2 tables 2.3–2.6, p. 36–38; 75.2 tables 2.3–2.5, p. 42–43)
@@ -360,8 +362,9 @@ pub struct MaatwerkadviesInput {
     pub renovation_passport: Option<RenovationPassportInput>,
 }
 
-/// ISSO 82.2 §1.10.2 and §4.4.2 (p. 22–23, 75–77).
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// ISSO 82.2 §1.10.2 and §4.4.2 (p. 22–23, 75–77); BRL 9500-MWA-W/U
+/// (24-03-2026) §3.2 (p. 14).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RenovationPassportInput {
     /// Step 1: limit the heat and cold demand (insulation, airtightness,
@@ -394,6 +397,23 @@ pub struct RenovationPassportInput {
     /// step 3).
     #[serde(default)]
     pub storage_considered: bool,
+    /// Dwellings: step 2 asks for a natural-gas-free main heating "where
+    /// realistically possible" (BRL 9500-MWA-W 2026 §3.2 item 2, p. 14); the
+    /// adviser's motivation when that is not realistic.
+    #[serde(default)]
+    pub gas_free_not_realistic_motivation: Option<String>,
+    /// Utility: the insulation level allows low-temperature heating and
+    /// high-temperature cooling (BRL 9500-MWA-U 2026 §3.2 item 1a, p. 14).
+    #[serde(default)]
+    pub low_temperature_ready: Option<bool>,
+    /// Utility: motivation when façade insulation is technically impossible
+    /// (§3.2 item 1b).
+    #[serde(default)]
+    pub facade_insulation_impossible_motivation: Option<String>,
+    /// Utility: measures in step 1 that limit the cooling demand (§3.2
+    /// item 1c).
+    #[serde(default)]
+    pub cooling_measure_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -446,6 +466,12 @@ pub struct LabelResult {
     pub primary_fossil_indicator_kwh_per_m2: Option<f64>,
     pub renewable_share_percent: Option<f64>,
     pub tojuli_max_k: Option<f64>,
+    /// §5.3.2: net heat need against the Standaard voor Woningisolatie
+    /// (dwellings), kWh/m²·yr.
+    pub heating_need_kwh_per_m2: Option<f64>,
+    pub standard_insulation_kwh_per_m2: Option<f64>,
+    /// §5.3.1.2 table 5.7: renovation standard EP2 (utility), kWh/m²·yr.
+    pub renovation_standard_kwh_per_m2: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -636,6 +662,10 @@ pub struct PassportRequirement {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenovationPassport {
+    /// `W` (dwellings, BRL 9500-MWA-W §3.2) or `U` (utility, BRL
+    /// 9500-MWA-U §3.2).
+    pub scheme: &'static str,
+    pub source: &'static str,
     pub steps: Vec<VariantResult>,
     pub requirements: Vec<PassportRequirement>,
     /// All requirements met; `None` while a statement is missing.
@@ -659,6 +689,10 @@ pub struct MaatwerkadviesAssessment {
     pub fit_check: Option<FitCheck>,
     pub advice: Option<Advice>,
     pub renovation_passport: Option<RenovationPassport>,
+    /// BRL 9500-MWA-W/U 2026 §4.2.8 (p. 23): the registration states whether
+    /// it is a maatwerkadvies or a maatwerkadvies with a renovation
+    /// passport. A passport only counts when all its requirements are met.
+    pub registration_type: &'static str,
     pub interpretations: Vec<&'static str>,
     pub issues: Vec<MwaIssue>,
 }
@@ -1082,10 +1116,25 @@ fn label_result(result: &BuildingPerformanceAssessment) -> LabelResult {
         primary_fossil_indicator_kwh_per_m2: result.label_primary_fossil_indicator_kwh_per_m2_year,
         renewable_share_percent: result.label_renewable_share_percent,
         tojuli_max_k: result.tojuli_max_k,
+        heating_need_kwh_per_m2: result
+            .chapter5
+            .as_ref()
+            .map(|item| item.heating_need_kwh_per_m2),
+        standard_insulation_kwh_per_m2: result
+            .chapter5
+            .as_ref()
+            .and_then(|item| item.standard_insulation_kwh_per_m2),
+        renovation_standard_kwh_per_m2: result
+            .chapter5
+            .as_ref()
+            .and_then(|item| item.renovation_standard_kwh_per_m2),
     }
 }
 
 struct RunOutcome {
+    /// The building input is a residential calculation (W) rather than a
+    /// utility one (U).
+    residential: bool,
     label: LabelResult,
     actual: Option<EnergyUse>,
     system_checks: Vec<SystemPerformanceCheck>,
@@ -1336,14 +1385,17 @@ fn run_variant(
     let mut issues = Vec::new();
     let Some(building) = variant_input(&input.base, measures, &mut issues) else {
         return RunOutcome {
+            residential: true,
             label: LabelResult::default(),
             actual: None,
             system_checks: Vec::new(),
             issues,
         };
     };
+    let residential = matches!(building.calculation_scope, CalculationScope::Residential);
     if !issues.is_empty() {
         return RunOutcome {
+            residential,
             label: LabelResult::default(),
             actual: None,
             system_checks: Vec::new(),
@@ -1361,6 +1413,7 @@ fn run_variant(
             });
         }
         return RunOutcome {
+            residential,
             label: LabelResult::default(),
             actual: None,
             system_checks: Vec::new(),
@@ -1385,6 +1438,7 @@ fn run_variant(
                     });
                 }
                 return RunOutcome {
+                    residential,
                     label,
                     actual: None,
                     system_checks,
@@ -1395,6 +1449,7 @@ fn run_variant(
         }
     };
     RunOutcome {
+        residential,
         label,
         actual: Some(actual),
         system_checks,
@@ -1634,6 +1689,23 @@ fn fit_criteria(check: &FitCheck, measured: Option<&MeasuredUse>) -> FitCriteria
 
 // ------------------------------------------------------ renovation passport
 
+/// BRL 9500-MWA-W/U (24-03-2026, in force 29-05-2026) §4.2.8, p. 23.
+pub const REGISTRATION_TYPE_PLAIN: &str = "maatwerkadvies";
+pub const REGISTRATION_TYPE_WITH_PASSPORT: &str = "maatwerkadvies_met_renovatiepaspoort";
+pub const PASSPORT_SOURCE_W: &str =
+    "BRL 9500-MWA-W (24-03-2026) §3.2 (p. 14) and §4.2.8 (p. 23); ISSO 82.2 §1.10.2/§4.4";
+pub const PASSPORT_SOURCE_U: &str =
+    "BRL 9500-MWA-U (24-03-2026) §3.2 (p. 14) and §4.2.8 (p. 23); ISSO 75.2";
+
+/// The registration type follows the passport only when every requirement
+/// is met; the adviser decides whether a passport meets the scheme (§4.2.8).
+fn registration_type(passport: Option<&RenovationPassport>) -> &'static str {
+    match passport {
+        Some(passport) if passport.eligible == Some(true) => REGISTRATION_TYPE_WITH_PASSPORT,
+        _ => REGISTRATION_TYPE_PLAIN,
+    }
+}
+
 /// §1.10.2: statements the advice must contain (paraphrased).
 const PASSPORT_STATEMENTS: &[&str] = &[
     "TO-juli, GTO and ATG only indicate the overheating risk and are limited for existing buildings",
@@ -1647,6 +1719,7 @@ fn renovation_passport(
     input: &MaatwerkadviesInput,
     passport: &RenovationPassportInput,
     current: &EnergyUse,
+    residential: bool,
 ) -> RenovationPassport {
     let package = |id: &str| input.packages.iter().find(|item| item.id == id);
     let measures_of = |ids: &[&str]| -> Vec<&Measure> {
@@ -1691,6 +1764,7 @@ fn renovation_passport(
     let mut require = |code: &'static str, met: Option<bool>, detail: Option<String>| {
         requirements.push(PassportRequirement { code, met, detail })
     };
+    let filled = |text: &Option<String>| text.as_ref().is_some_and(|text| !text.trim().is_empty());
     let missing: Vec<&str> = ids
         .iter()
         .copied()
@@ -1701,76 +1775,14 @@ fn renovation_passport(
         Some(missing.is_empty() && steps.iter().all(|step| step.valid)),
         (!missing.is_empty()).then(|| format!("unknown packages: {}", missing.join(", "))),
     );
-    // Step 1: insulation standard (post-1945, or pre-war with motivation).
-    let insulation = match passport.insulation_standard_max_need_kwh_per_m2 {
-        Some(limit) => steps[0]
-            .label
-            .need_indicator_kwh_per_m2
-            .map(|need| need <= limit + 1e-9),
-        None => passport.insulation_standard_met,
-    };
-    require(
-        "insulation_standard",
-        insulation,
-        passport
-            .insulation_standard_max_need_kwh_per_m2
-            .map(|limit| {
-                format!(
-                    "step 1 net heat need {:?} kWh/m2 against {limit} kWh/m2",
-                    steps[0].label.need_indicator_kwh_per_m2
-                )
-            }),
-    );
-    if passport.prewar_standard {
-        require(
-            "prewar_standard_motivated",
-            Some(
-                passport
-                    .prewar_motivation
-                    .as_ref()
-                    .is_some_and(|text| !text.trim().is_empty()),
-            ),
-            None,
-        );
-    }
     let step_one = package(&passport.demand_package_id);
-    let overheating = !passport.overheating_measure_ids.is_empty()
-        && passport
-            .overheating_measure_ids
-            .iter()
-            .all(|id| step_one.is_some_and(|item| item.measure_ids.iter().any(|m| m == id)));
-    require("overheating_measures", Some(overheating), None);
-    // Step 2/3: no combustion of natural gas or oil on site (biomass and
-    // biogas excepted); a hybrid heat pump is allowed with the pre-war
-    // standard.
-    let fossil = |step: &VariantResult| {
-        step.actual_use
-            .as_ref()
-            .map(|use_| use_.gas_kwh > 1e-6 || use_.oil_kwh > 1e-6)
+    let in_step_one = |measure_ids: &[String]| {
+        !measure_ids.is_empty()
+            && measure_ids
+                .iter()
+                .all(|id| step_one.is_some_and(|item| item.measure_ids.iter().any(|m| m == id)))
     };
-    require(
-        "natural_gas_free_main_heating",
-        if passport.prewar_standard {
-            Some(true)
-        } else {
-            fossil(&steps[1]).map(|uses| !uses)
-        },
-        passport
-            .prewar_standard
-            .then(|| "pre-war standard: hybrid heat pump allowed".to_string()),
-    );
-    require(
-        "emission_free_result",
-        if passport.prewar_standard {
-            None
-        } else {
-            fossil(&steps[2]).map(|uses| !uses)
-        },
-        passport
-            .prewar_standard
-            .then(|| "pre-war standard: hybrid allowed; adviser judgement".to_string()),
-    );
-    // Step 3: renewable production added and storage considered.
+    // Step 3: other renewable energy is proposed (MWA-W and MWA-U §3.2 item 3).
     let production = match (&steps[1].actual_use, &steps[2].actual_use) {
         (Some(before), Some(after)) => {
             let solar = measures_of(&ids[2..]).iter().any(|measure| {
@@ -1783,12 +1795,129 @@ fn renovation_passport(
         }
         _ => None,
     };
-    require("renewable_production", production, None);
-    require(
-        "storage_considered",
-        Some(passport.storage_considered),
-        None,
-    );
+    if residential {
+        // Step 1: at least the Standaard voor Woningisolatie (MWA-W §3.2 item
+        // 1); pre-war standard with motivation when façade insulation is
+        // technically impossible (1a); overheating measures (1b).
+        let label = &steps[0].label;
+        let (insulation, detail) = match passport.insulation_standard_max_need_kwh_per_m2 {
+            Some(limit) => (
+                label.need_indicator_kwh_per_m2.map(|need| need <= limit + 1e-9),
+                Some(format!(
+                    "step 1 net heat need {:?} kWh/m2 against {limit} kWh/m2",
+                    label.need_indicator_kwh_per_m2
+                )),
+            ),
+            None => match (
+                passport.insulation_standard_met,
+                label.heating_need_kwh_per_m2,
+                label.standard_insulation_kwh_per_m2,
+            ) {
+                (Some(met), _, _) => (Some(met), None),
+                // §5.3.2: the kernel's own comparison when no statement is given.
+                (None, Some(need), Some(standard)) => (
+                    Some(need <= standard + 1e-9),
+                    Some(format!(
+                        "step 1 heat need {need} kWh/m2 against the standard {standard} kWh/m2 (NTA 8800 §5.3.2)"
+                    )),
+                ),
+                _ => (None, None),
+            },
+        };
+        require("insulation_standard", insulation, detail);
+        if passport.prewar_standard {
+            require(
+                "prewar_standard_motivated",
+                Some(filled(&passport.prewar_motivation)),
+                None,
+            );
+        }
+        require(
+            "overheating_measures",
+            Some(in_step_one(&passport.overheating_measure_ids)),
+            None,
+        );
+        // Step 2: natural-gas-free main heating where realistically possible
+        // (item 2); a hybrid heat pump is allowed with the pre-war standard.
+        let fossil = |step: &VariantResult| {
+            step.actual_use
+                .as_ref()
+                .map(|use_| use_.gas_kwh > 1e-6 || use_.oil_kwh > 1e-6)
+        };
+        let not_realistic = filled(&passport.gas_free_not_realistic_motivation);
+        require(
+            "natural_gas_free_main_heating",
+            if passport.prewar_standard || not_realistic {
+                Some(true)
+            } else {
+                fossil(&steps[1]).map(|uses| !uses)
+            },
+            if passport.prewar_standard {
+                Some("pre-war standard: hybrid heat pump allowed".to_string())
+            } else if not_realistic {
+                Some("not realistically possible; motivated by the adviser".to_string())
+            } else {
+                None
+            },
+        );
+        require(
+            "emission_free_result",
+            if passport.prewar_standard || not_realistic {
+                None
+            } else {
+                fossil(&steps[2]).map(|uses| !uses)
+            },
+            (passport.prewar_standard || not_realistic)
+                .then(|| "gas use kept by the motivated exception; adviser judgement".to_string()),
+        );
+        require("renewable_production", production, None);
+        require(
+            "storage_considered",
+            Some(passport.storage_considered),
+            None,
+        );
+    } else {
+        // MWA-U §3.2 item 1: insulation good enough for low-temperature
+        // heating and high-temperature cooling (1a), motivation when façade
+        // insulation is impossible (1b), cooling-demand measures (1c).
+        require(
+            "low_temperature_ready",
+            passport.low_temperature_ready,
+            None,
+        );
+        if let Some(motivation) = &passport.facade_insulation_impossible_motivation {
+            require(
+                "facade_insulation_motivated",
+                Some(!motivation.trim().is_empty()),
+                None,
+            );
+        }
+        require(
+            "cooling_demand_measures",
+            Some(in_step_one(&passport.cooling_measure_ids)),
+            None,
+        );
+        // Item 2: the end result at or below the EP2 of the renovation
+        // standard (NTA 8800 table 5.7 via ISSO 75.2).
+        let label = &steps[2].label;
+        require(
+            "renovation_standard_ep2",
+            match (
+                label.primary_fossil_indicator_kwh_per_m2,
+                label.renovation_standard_kwh_per_m2,
+            ) {
+                (Some(ep2), Some(limit)) => Some(ep2 <= limit + 1e-9),
+                _ => None,
+            },
+            label.renovation_standard_kwh_per_m2.map(|limit| {
+                format!(
+                    "step 3 EP2 {:?} kWh/m2 against the renovation standard {limit} kWh/m2",
+                    label.primary_fossil_indicator_kwh_per_m2
+                )
+            }),
+        );
+        require("renewable_production", production, None);
+    }
     let eligible = if requirements.iter().any(|item| item.met == Some(false)) {
         Some(false)
     } else if requirements.iter().all(|item| item.met.is_some()) {
@@ -1797,6 +1926,12 @@ fn renovation_passport(
         None
     };
     RenovationPassport {
+        scheme: if residential { "W" } else { "U" },
+        source: if residential {
+            PASSPORT_SOURCE_W
+        } else {
+            PASSPORT_SOURCE_U
+        },
         steps,
         requirements,
         eligible,
@@ -2058,6 +2193,7 @@ pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAsses
             fit_check: None,
             advice: None,
             renovation_passport: None,
+            registration_type: REGISTRATION_TYPE_PLAIN,
             issues: vec![MwaIssue {
                 code: "non_finite_result",
                 path,
@@ -2086,6 +2222,7 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
         fit_check: None,
         advice: None,
         renovation_passport: None,
+        registration_type: REGISTRATION_TYPE_PLAIN,
         interpretations: INTERPRETATIONS.to_vec(),
         issues,
     };
@@ -2269,10 +2406,9 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
                 .any(|demand| demand.ventilation.is_none())
         })
     };
-    let renovation_passport = input
-        .renovation_passport
-        .as_ref()
-        .map(|passport| renovation_passport(input, passport, &current_use));
+    let renovation_passport = input.renovation_passport.as_ref().map(|passport| {
+        renovation_passport(input, passport, &current_use, current_outcome.residential)
+    });
 
     let fit_check = fit_check.map(|mut check| {
         check.criteria = fit_criteria(&check, input.measured.as_ref());
@@ -2391,6 +2527,7 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
         packages: package_results,
         fit_check,
         advice: Some(advice),
+        registration_type: registration_type(renovation_passport.as_ref()),
         renovation_passport,
         interpretations: INTERPRETATIONS.to_vec(),
         issues,
@@ -3017,9 +3154,12 @@ mod tests {
             insulation_standard_max_need_kwh_per_m2: None,
             overheating_measure_ids: vec!["zonwering".into()],
             storage_considered: true,
+            ..Default::default()
         });
         let result = assess_maatwerkadvies(&input);
+        assert_eq!(result.registration_type, REGISTRATION_TYPE_PLAIN);
         let passport = result.renovation_passport.unwrap();
+        assert_eq!(passport.scheme, "W");
         assert_eq!(passport.steps.len(), 3);
         // Stacked: step 3 contains the measures of steps 1 and 2.
         assert_eq!(passport.steps[2].measure_ids.len(), 4);
@@ -3037,6 +3177,136 @@ mod tests {
         // The no-op "heat pump" leaves the gas boiler in place.
         assert_eq!(met("natural_gas_free_main_heating"), Some(false));
         assert_eq!(passport.eligible, Some(false));
+
+        // MWA-W 2026 §3.2 item 2: gas-free "where realistically possible";
+        // a motivated exception meets the step.
+        let mut motivated = input.clone();
+        motivated
+            .renovation_passport
+            .as_mut()
+            .unwrap()
+            .gas_free_not_realistic_motivation = Some("monument, geen ruimte".into());
+        let passport = assess_maatwerkadvies(&motivated)
+            .renovation_passport
+            .unwrap();
+        let met = |code: &str| {
+            passport
+                .requirements
+                .iter()
+                .find(|item| item.code == code)
+                .unwrap()
+                .met
+        };
+        assert_eq!(met("natural_gas_free_main_heating"), Some(true));
+        assert_eq!(met("emission_free_result"), None);
+    }
+
+    #[test]
+    fn utility_renovation_passport_follows_mwa_u_section_3_2() {
+        let mut building = building();
+        building["calculationScope"] = json!("utility");
+        let mut input = mwa(building);
+        let noop = |id: &str, category: MeasureCategory| Measure {
+            id: id.into(),
+            name: id.into(),
+            category,
+            target: PatchTarget::Building,
+            patch: vec![PatchOperation::Replace {
+                path: "/areaSourceReference".into(),
+                value: json!(id),
+            }],
+            investment_eur: 100.0,
+            cost_source: "offerte".into(),
+            lifetime_years: 20.0,
+            maintenance_eur_per_year: 0.0,
+            phase_year: None,
+            specialist_note: None,
+            template: None,
+            incomplete: Vec::new(),
+        };
+        input.measures = vec![
+            noop("isolatie", MeasureCategory::Insulation),
+            noop("zonwering", MeasureCategory::Other),
+            noop("wp", MeasureCategory::HeatPump),
+            noop("pv", MeasureCategory::Pv),
+        ];
+        let package = |id: &str, measures: &[&str]| Package {
+            id: id.into(),
+            name: id.into(),
+            measure_ids: measures.iter().map(|m| m.to_string()).collect(),
+            partial_execution_warning: None,
+        };
+        input.packages = vec![
+            package("stap1", &["isolatie", "zonwering"]),
+            package("stap2", &["wp"]),
+            package("stap3", &["pv"]),
+        ];
+        input.renovation_passport = Some(RenovationPassportInput {
+            demand_package_id: "stap1".into(),
+            systems_package_id: "stap2".into(),
+            production_package_id: "stap3".into(),
+            low_temperature_ready: Some(true),
+            cooling_measure_ids: vec!["zonwering".into()],
+            facade_insulation_impossible_motivation: Some(" ".into()),
+            ..Default::default()
+        });
+        let passport = assess_maatwerkadvies(&input).renovation_passport.unwrap();
+        assert_eq!(passport.scheme, "U");
+        let codes: Vec<&str> = passport.requirements.iter().map(|item| item.code).collect();
+        // No dwelling requirements (insulation standard, gas-free, storage).
+        assert!(
+            !codes.contains(&"natural_gas_free_main_heating"),
+            "{codes:?}"
+        );
+        assert!(!codes.contains(&"insulation_standard"), "{codes:?}");
+        for code in [
+            "three_steps_present",
+            "low_temperature_ready",
+            "facade_insulation_motivated",
+            "cooling_demand_measures",
+            "renovation_standard_ep2",
+            "renewable_production",
+        ] {
+            assert!(codes.contains(&code), "{code} in {codes:?}");
+        }
+        let met = |code: &str| {
+            passport
+                .requirements
+                .iter()
+                .find(|item| item.code == code)
+                .unwrap()
+                .met
+        };
+        assert_eq!(met("low_temperature_ready"), Some(true));
+        assert_eq!(met("cooling_demand_measures"), Some(true));
+        // An empty motivation for impossible façade insulation fails 1b.
+        assert_eq!(met("facade_insulation_motivated"), Some(false));
+        assert_eq!(passport.eligible, Some(false));
+    }
+
+    #[test]
+    fn registration_type_needs_an_eligible_passport() {
+        let passport = |eligible: Option<bool>| RenovationPassport {
+            scheme: "W",
+            source: PASSPORT_SOURCE_W,
+            steps: Vec::new(),
+            requirements: Vec::new(),
+            eligible,
+            required_statements: Vec::new(),
+        };
+        assert_eq!(registration_type(None), REGISTRATION_TYPE_PLAIN);
+        assert_eq!(
+            registration_type(Some(&passport(None))),
+            REGISTRATION_TYPE_PLAIN
+        );
+        assert_eq!(
+            registration_type(Some(&passport(Some(false)))),
+            REGISTRATION_TYPE_PLAIN
+        );
+        assert_eq!(
+            registration_type(Some(&passport(Some(true)))),
+            REGISTRATION_TYPE_WITH_PASSPORT
+        );
     }
 
     #[test]

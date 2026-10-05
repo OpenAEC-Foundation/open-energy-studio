@@ -24,7 +24,7 @@
 - Het rapport, de export en het paneel tonen uitsluitend kernwaarden.
 
 **Openstaand, externe gegevens of besluiten.**
-- officiële referentiegevallen (BRL 9501-toetsset);
+- officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026 met hun verwachte uitkomsten (BRL 9501 van 29-05-2026, §4.2 en §11). Openbaar is alleen versie 2.0 van 2022, voor NTA 8800:2022, zonder de uitkomsten;
 - het EP-Online-uitwisselschema (XSD);
 - het uurklimaat van 17.3.8;
 - ISO 6946 tabel 8 (spouwen kleiner dan 20 mm);

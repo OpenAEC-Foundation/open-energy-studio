@@ -26,7 +26,7 @@ Daarnaast bevat het programma:
 - **Basisopname:** voor bestaande woningen volgens ISSO 82.1 (7e druk, met erratum) en voor utiliteitsgebouwen volgens ISSO 75.1 (7e druk). Zie [hoofdstuk 2](02-basisopname.md).
 - **Labelgegevens en labelklasse:** volgens de Regeling energieprestatie gebouwen, bijlagen I/Ia.
 - **Bbl-toets:** de BENG-grenswaarden, ook voor gemengde functies.
-- **Maatwerkadvies:** volgens BRL 9500-MWA en ISSO 82.2/75.2. Zie [hoofdstuk 6](06-maatwerkadvies.md).
+- **Maatwerkadvies:** volgens BRL 9500-MWA en ISSO 82.2/75.2, met het renovatiepaspoort voor woningen en utiliteit. Zie [hoofdstuk 6](06-maatwerkadvies.md).
 - **Registratie, herlabelen en dossier:** registratiegegevens, herlabelen (BRL 9500 bijlagen 6a/6b) en een projectdossier met manifest. Zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md).
 
 ## Wat het programma niet doet
@@ -42,7 +42,7 @@ Daarnaast bevat het programma:
 - NEN-EN-ISO 6946 tabel 8, voor luchtspouwen dunner dan 20 mm. Geef zo'n laag op als R-waarde.
 - De kostenmodelbeschrijving van ISSO (rapport 110293) en een locatieklimaat voor het maatwerkadvies.
 - Het uitwisselformaat (XSD) van EP-Online voor registratie. Het programma registreert niet zelf.
-- Officiële referentiegevallen, zoals een BRL 9501-toetsset of de resultaten van ISSO 54.
+- Officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026, de testset waar BRL 9501 naar verwijst, met hun verwachte uitkomsten.
 
 ## Attesteringsstatus
 

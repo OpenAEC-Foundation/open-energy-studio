@@ -34,6 +34,7 @@ import { calculateProjectPerformanceShared } from './core/nta/useProjectPerforma
 import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
+import { withImportRecord } from './core/io/importLog';
 import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
 import { migrateLegacyRelabel, relabelNoticeKey } from './core/nta/Registration';
 import { normalizeProject } from './core/energy/normalizeProject';
@@ -162,7 +163,7 @@ function ActiveDocumentContent({
 
   const handleImportUNIEC3 = useCallback(async () => {
     try {
-      const loaded = await openUNIEC3FileDialog();
+      const loaded = withImportRecord(await openUNIEC3FileDialog(), 'UNIEC3');
       docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
       alert('UNIEC3 import mislukt: ' + (err as Error).message);
@@ -175,7 +176,7 @@ function ActiveDocumentContent({
 
   const handleImportVABI = useCallback(async () => {
     try {
-      const loaded = await openVABIFileDialog();
+      const loaded = withImportRecord(await openVABIFileDialog(), 'VABI');
       docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
       alert('VABI import mislukt: ' + (err as Error).message);
