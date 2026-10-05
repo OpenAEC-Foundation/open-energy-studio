@@ -68,7 +68,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "Regeling art. 2 lid 3 and art. 3 lid 3 (p. 4–5): with area measures (EMG) a dwelling label uses the forfait scenario (EMGforf), a utility label the quality declarations; BENG 2/3 and the Bbl check use the declaration scenario",
     "5.3: when EPTot + EPrenTot ≤ 0 the renewable share is undefined (null) while EP2 stays defined; a negative EPTot giving RER > 100 % is kept literally with a warning",
     "§5.3.1 (p. 70): residential (Bbl 1a–1e) and utility functions are never area-weighted together, so a mixed bblFunctions list is refused; function lists must sum to A_g;tot within 0,5 % (or 0,5 m²)",
-    "Bbl table 4.148A values are transcribed from the consolidated Bbl text of 2026-01-01 (not among the licensed sources); the education BENG 1 base 190 is to be verified against BWBR0041297",
+    "Bbl table 4.148A values are transcribed from the consolidated Bbl text (BWBR0041297, not among the licensed sources); every row, including the education BENG 1 base 190, matches the official versions 2026-01-01 and 2026-09-24",
 ];
 
 /// Table 5.2 `f_P;del` / `f_P;pr;us` / `f_P;exp` for electricity.

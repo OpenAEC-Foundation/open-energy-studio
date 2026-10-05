@@ -1,6 +1,8 @@
 //! BENG requirements of the Besluit bouwwerken leefomgeving, article 4.149
 //! with table 4.148A (consolidated version 2026-01-01, BWBR0041297,
-//! retrieved 2026-10-01).
+//! retrieved 2026-10-01). Every row was checked on 2026-10-05 against the
+//! official XML of the versions 2026-01-01 and 2026-09-24; table 4.148A and
+//! articles 4.149–4.149b are unchanged between them.
 //!
 //! Limits: energy need (BENG 1) depending on `A_ls/A_g`, primary fossil
 //! energy (BENG 2) and minimum renewable share (BENG 3). Paragraph 4 raises

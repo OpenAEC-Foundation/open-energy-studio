@@ -42,7 +42,6 @@ Daarnaast bevat het programma:
 - NEN-EN-ISO 6946 tabel 8, voor luchtspouwen dunner dan 20 mm. Geef zo'n laag op als R-waarde.
 - De kostenmodelbeschrijving van ISSO (rapport 110293) en een locatieklimaat voor het maatwerkadvies.
 - Het uitwisselformaat (XSD) van EP-Online voor registratie. Het programma registreert niet zelf.
-- De Bbl-tekst voor één grenswaarde: de basis 190 van BENG 1 voor onderwijs moet nog tegen BWBR0041297 worden gecontroleerd.
 - Officiële referentiegevallen, zoals een BRL 9501-toetsset of de resultaten van ISSO 54.
 
 ## Attesteringsstatus
