@@ -115,7 +115,50 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
     {kind === 'forfait_heater' && <ForfaitHeaterFields draft={draft} change={change} base={base} />}
     {heatPumpNote && (kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
     {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
+    {kind === 'heat_pump_forfait' && <HeatPumpDeclarationFields draft={draft} change={change} base={at('forfait', 'qualityDeclaration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
+  </>;
+}
+
+/** §9.1 (p. 285): quality-declaration values (e.g. BCRG) replacing the table 9.27/9.29 COP. */
+export function HeatPumpDeclarationFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const present = read(draft, base) != null;
+  return <>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present}
+        onChange={(event) => change(base, event.target.checked
+          ? { declarationReference: '', generationEfficiency: null, energyFraction: 1, auxiliaryKwhPerYear: null }
+          : undefined)} />
+      {t('nta.form.hpDeclaration')}
+    </label>
+    {present && <div className="nta-form-subsection">
+      <TextField {...field} path={[...base, 'declarationReference']} label={t('nta.form.hpDeclaration.reference')} />
+      <NumberField {...field} path={[...base, 'generationEfficiency']} label={t('nta.form.hpDeclaration.cop')} step="0.001" />
+      <NumberField {...field} path={[...base, 'energyFraction']} label={t('nta.form.hpDeclaration.fraction')} step="0.001" />
+      <NumberField {...field} path={[...base, 'auxiliaryKwhPerYear']} label={t('nta.form.hpDeclaration.auxiliary')} />
+      <p className="nta-form-note">{t('nta.form.hpDeclaration.note')}</p>
+    </div>}
+  </>;
+}
+
+/** §13.8.4.7.2 (p. 640): a declared hot-water efficiency replacing the table value. */
+function HotWaterDeclaredFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const present = read(draft, base) != null;
+  return <>
+    <label className="nta-form-check">
+      <input type="checkbox" checked={present}
+        onChange={(event) => change(base, event.target.checked ? { value: null, sourceReference: '' } : undefined)} />
+      {t('nta.form.dhwDeclared')}
+    </label>
+    {present && <div className="nta-form-subsection">
+      <NumberField {...field} path={[...base, 'value']} label={t('nta.form.dhwDeclared.value')} step="0.001" />
+      <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.hpDeclaration.reference')} />
+      <p className="nta-form-note">{t('nta.form.dhwDeclared.note')}</p>
+    </div>}
   </>;
 }
 
@@ -468,6 +511,7 @@ export function HotWaterGeneratorFields({ draft, change, base }: SectionProps & 
       <CheckField {...field} path={[...base, 'exhaustAirSource']} label={t('nta.form.dhwExhaustAir')} />
       <SelectField {...field} path={[...base, 'measuredClass']} label={t('nta.form.dhwClass')} options={classes} />
       <CheckField {...field} path={[...base, 'sameGroundSource']} label={t('nta.form.dhwSameGroundSource')} />
+      <HotWaterDeclaredFields draft={draft} change={change} base={[...base, 'declared']} />
     </>}
     {kind === 'indirect_boiler' && <SelectField {...field} path={[...base, 'boiler']} label={t('nta.form.dhwBoiler')} options={[
       ['hr107', 'HR 107'], ['hr100_or104', 'HR 100/104'], ['vr', 'VR'], ['conventional_or_unknown', t('nta.form.dhwGas.unknown')]]} />}

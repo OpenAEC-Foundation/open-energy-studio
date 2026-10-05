@@ -608,6 +608,11 @@ pub enum HotWaterGenerator {
         /// denominator and it takes that c_source.
         #[serde(default, rename = "sameGroundSource", skip_serializing_if = "is_false")]
         same_ground_source: bool,
+        /// A quality declaration replacing `1,4·c_source` of table 13.25
+        /// (§13.8.4.7.2, p. 640): rounded down to a multiple of 0,05; the
+        /// `c_W;gen` class correction applies for its measured class.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        declared: Option<DeclaredEfficiency>,
     },
     /// 13.160b: EN 16147 test at one European tapping profile.
     HeatPumpEn16147 {
@@ -2473,8 +2478,29 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
             outdoor_air_fraction,
             exhaust_air_source,
             same_ground_source,
+            declared,
             ..
         } => {
+            if let Some(item) = declared {
+                if !positive(item.value) || item.value > 10.0 {
+                    issues.push((
+                        "hot_water_efficiency_invalid",
+                        format!("{prefix}.declared.value"),
+                    ));
+                }
+                if item.source_reference.trim().is_empty() {
+                    issues.push((
+                        "source_required",
+                        format!("{prefix}.declared.sourceReference"),
+                    ));
+                }
+                if source_correction.is_some() {
+                    issues.push((
+                        "hot_water_efficiency_declared_twice",
+                        format!("{prefix}.sourceCorrection"),
+                    ));
+                }
+            }
             // Tables V.1/V.3: c_source is 1,00, 1,02 or 1,04.
             if source_correction.is_some_and(|value| {
                 ![1.00, 1.02, 1.04]
@@ -2729,14 +2755,29 @@ fn generation(
         HotWaterGenerator::HeatPump {
             source_correction,
             measured_class,
+            declared,
             ..
         } => {
-            let correction = heat_pump_class_correction(
-                measured_class.unwrap_or(ApplicationClass::Class4),
-                annual_output_kwh,
-            )
-            .ok_or("hot_water_heat_pump_class_exceeded")?;
-            Ok((1.4 * source_correction.unwrap_or(1.0) * correction, 1.0))
+            // §13.8.4.7.2 (p. 640): a declared value replaces the table
+            // value, rounded down to a multiple of 0,05 (electric). A value
+            // declared for one tapping class takes c_W;gen for that class;
+            // without a class it is the declaration's value interpolated
+            // for this system's demand (allowed before rounding), so no
+            // class correction applies.
+            let correction = if declared.is_some() && measured_class.is_none() {
+                1.0
+            } else {
+                heat_pump_class_correction(
+                    measured_class.unwrap_or(ApplicationClass::Class4),
+                    annual_output_kwh,
+                )
+                .ok_or("hot_water_heat_pump_class_exceeded")?
+            };
+            let base = match declared {
+                Some(item) => round_down(item.value, 0.05),
+                None => 1.4 * source_correction.unwrap_or(1.0),
+            };
+            Ok((base * correction, 1.0))
         }
         HotWaterGenerator::HeatPumpEn16147 {
             profile,
@@ -4463,6 +4504,7 @@ mod tests {
     #[test]
     fn single_exhaust_air_heat_pump_follows_13_144a() {
         let mut input = system(HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
@@ -4856,6 +4898,7 @@ mod tests {
         ctx.levelled_setpoint_c = Some([17.0; 12]);
         let base = system(HotWaterGenerator::ElectricBoiler);
         let mut exhaust = system(HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
@@ -5133,6 +5176,7 @@ mod tests {
             (0.9, false),
         ] {
             let input = system(HotWaterGenerator::HeatPump {
+                declared: None,
                 exhaust_air_source: false,
                 source_correction: Some(value),
                 measured_class: None,
@@ -5217,6 +5261,7 @@ mod tests {
     #[test]
     fn heat_pump_classes_and_ambient_heat() {
         let mut input = system(HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: false,
             source_correction: None,
@@ -5235,6 +5280,7 @@ mod tests {
         }
         // A class-1 measurement cannot serve a larger demand.
         input.generator = HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: false,
             source_correction: None,
@@ -5845,6 +5891,7 @@ mod tests {
         // An individual exhaust-air heat pump (category a, 1,0 kW default)
         // first, then the gas combi for the rest.
         let mut input = system(HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
@@ -6061,5 +6108,26 @@ mod tests {
         collective.collective = None;
         let individual = assess_hot_water(&collective, part).unwrap();
         assert!(individual.months[0].recoverable_loss_kwh > 0.0);
+    }
+
+    /// §13.8.4.7.2 (p. 640): a declared heat-pump value replaces 1,4·c_source,
+    /// rounded down to 0,05; without a class no c_W;gen correction applies.
+    #[test]
+    fn declared_heat_pump_efficiency_replaces_the_table_value() {
+        let declared = |class: Option<ApplicationClass>| HotWaterGenerator::HeatPump {
+            exhaust_air_source: false,
+            source_correction: None,
+            measured_class: class,
+            outdoor_air_fraction: None,
+            same_ground_source: false,
+            declared: Some(DeclaredEfficiency {
+                value: 1.32,
+                source_reference: "BCRG 0000/01".into(),
+            }),
+        };
+        let (plain, _) = generation(&declared(None), 2067.0).unwrap();
+        assert!((plain - 1.30).abs() < 1e-9);
+        let (classed, _) = generation(&declared(Some(ApplicationClass::Class4)), 2067.0).unwrap();
+        assert!(classed < plain);
     }
 }

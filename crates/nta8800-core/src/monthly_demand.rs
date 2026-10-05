@@ -52,6 +52,7 @@ pub const F_MOD_T: f64 = 0.8;
 pub const H_INT_SPEC: f64 = 2.0;
 
 pub const OMITTED_CORRECTIONS: &[&str] = &[
+    "6.2b (p. 160): in a residential project with several calculation zones each zone takes N_woon;zi = A_g;zi / Σ A_g;zi × N_woon (the dwellingCount is N_woon of the building, 6.6.6) unless internalGains.dwellingShare states the share",
     "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl = 0 is prescribed by 10.4/10.43",
     "8.5: H_A = 0 for adjacent heated spaces is prescribed by the norm",
     "§17.3.8 extended obstruction method (hourly NEN 5060) enters as declared factors",
@@ -447,8 +448,18 @@ impl ThermalMass {
 pub enum InternalGains {
     /// 7.21–7.24 for the residential function.
     Residential {
+        /// N_woon of the building (6.6.6).
         #[serde(rename = "dwellingCount")]
         dwelling_count: u32,
+        /// 6.2b (p. 160): `A_g;zi / Σ A_g;zi` when the building or a single
+        /// dwelling is split over several calculation zones, so that
+        /// N_woon;zi = share × N_woon. Omitted means 1 (6.2a / one zone).
+        #[serde(
+            default,
+            rename = "dwellingShare",
+            skip_serializing_if = "Option::is_none"
+        )]
+        dwelling_share: Option<f64>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
@@ -1516,12 +1527,20 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
     match &input.internal_gains {
         InternalGains::Residential {
             dwelling_count,
+            dwelling_share,
             source_reference,
         } => {
             if *dwelling_count == 0 || *dwelling_count > MAX_DWELLINGS {
                 issues.push(issue(
                     "dwelling_count_invalid",
                     "internalGains.dwellingCount",
+                ));
+            }
+            if dwelling_share.is_some_and(|share| !share.is_finite() || share <= 0.0 || share > 1.0)
+            {
+                issues.push(issue(
+                    "dwelling_share_invalid",
+                    "internalGains.dwellingShare",
                 ));
             }
             check_reference(
@@ -2196,13 +2215,31 @@ pub fn occupancy_time_and_appliances(input: &MonthlyDemandInput) -> (f64, f64) {
         })
 }
 
+impl InternalGains {
+    /// N_woon;zi (6.2a/6.2b, p. 160) of residential gains; `None` otherwise.
+    pub fn zone_dwellings(&self) -> Option<f64> {
+        match self {
+            InternalGains::Residential {
+                dwelling_count,
+                dwelling_share,
+                ..
+            } => Some(f64::from(*dwelling_count) * dwelling_share.unwrap_or(1.0)),
+            _ => None,
+        }
+    }
+}
+
 /// Monthly internal gains Q_int (7.21–7.29), kWh; `month_index` 0–11.
 pub fn internal_gains_kwh(input: &MonthlyDemandInput, month_index: usize) -> f64 {
     let area = input.usable_floor_area_m2;
     let hours = MONTH_HOURS[month_index];
     match &input.internal_gains {
-        InternalGains::Residential { dwelling_count, .. } => {
-            let dwellings = f64::from(*dwelling_count);
+        InternalGains::Residential { .. } => {
+            // 7.21–7.24 with N_woon;zi of 6.2a/6.2b (p. 160, 177).
+            let dwellings = input
+                .internal_gains
+                .zone_dwellings()
+                .expect("residential gains");
             let fit = input.usage_fit.as_ref();
             let occupants = fit
                 .and_then(|fit| fit.occupants)

@@ -398,7 +398,10 @@ pub fn assess_annex_aa(
     }
 
     // AA.1–AA.3.
-    let dwellings = f64::from(*dwelling_count);
+    let dwellings = input
+        .internal_gains
+        .zone_dwellings()
+        .unwrap_or(f64::from(*dwelling_count));
     let internal = HEAT_PER_OCCUPANT_W
         * dwellings
         * occupants_per_dwelling(input.usable_floor_area_m2 / dwellings);

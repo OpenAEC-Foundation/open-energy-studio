@@ -573,15 +573,14 @@ pub struct ChapterFiveIndicators {
 
 /// Σ N_woon over the zones, `None` without residential internal gains.
 fn dwelling_count(input: &BuildingPerformanceInput) -> Option<u32> {
-    let mut total = None;
+    // Σ N_woon;zi (6.2b gives fractions that add up to N_woon).
+    let mut total: Option<f64> = None;
     for zone in input.zone_inputs().into_iter() {
-        if let crate::monthly_demand::InternalGains::Residential { dwelling_count, .. } =
-            &zone.internal_gains
-        {
-            total = Some(total.unwrap_or(0) + *dwelling_count);
+        if let Some(dwellings) = zone.internal_gains.zone_dwellings() {
+            total = Some(total.unwrap_or(0.0) + dwellings);
         }
     }
-    total
+    total.map(|value| value.round().max(0.0) as u32)
 }
 
 /// §5.3.2: Standaard voor woningisolatie, kWh/m² per year.
@@ -5036,6 +5035,7 @@ mod tests {
             source_temperature_c: None,
             source_temperature_evidence_reference: None,
             source_quality_declaration_reference: None,
+            quality_declaration: None,
         };
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,
@@ -5111,6 +5111,7 @@ mod tests {
             source_temperature_c: None,
             source_temperature_evidence_reference: None,
             source_quality_declaration_reference: None,
+            quality_declaration: None,
         };
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,
@@ -5971,6 +5972,7 @@ mod tests {
         use crate::domestic_hot_water::HotWaterGenerator;
         let mut sample = input();
         sample.hot_water = Some(hot_water_system(HotWaterGenerator::HeatPump {
+            declared: None,
             exhaust_air_source: false,
             source_correction: None,
             measured_class: None,
@@ -6058,6 +6060,7 @@ mod tests {
             source_temperature_c: None,
             source_temperature_evidence_reference: None,
             source_quality_declaration_reference: None,
+            quality_declaration: None,
         };
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: Some(crate::annex_v::RegenerationInput {
@@ -6072,6 +6075,7 @@ mod tests {
             auxiliary: None,
         });
         sample.hot_water = Some(hot_water_system(HotWaterGenerator::HeatPump {
+            declared: None,
             exhaust_air_source: false,
             source_correction: None,
             measured_class: None,
@@ -6502,6 +6506,7 @@ mod tests {
                 source_temperature_c: None,
                 source_temperature_evidence_reference: None,
                 source_quality_declaration_reference: None,
+                quality_declaration: None,
             },
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
@@ -6645,6 +6650,7 @@ mod tests {
         demand.ventilation = Some(ventilation.clone());
         let area = demand.usable_floor_area_m2;
         let mut system = hot_water_system(HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
@@ -6718,6 +6724,7 @@ mod tests {
         demand.ventilation_flows.clear();
         demand.ventilation = Some(ventilation);
         let mut system = hot_water_system(HotWaterGenerator::HeatPump {
+            declared: None,
             same_ground_source: false,
             exhaust_air_source: true,
             source_correction: None,
@@ -7209,6 +7216,7 @@ mod tests {
                 source_temperature_c: None,
                 source_temperature_evidence_reference: None,
                 source_quality_declaration_reference: None,
+                quality_declaration: None,
             },
             source_system: SourceSystem::Individual,
             source_system_reference: "own unit".into(),
@@ -7270,6 +7278,7 @@ mod tests {
             source_temperature_c: None,
             source_temperature_evidence_reference: None,
             source_quality_declaration_reference: None,
+            quality_declaration: None,
         };
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,

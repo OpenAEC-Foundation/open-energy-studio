@@ -1436,7 +1436,8 @@ pub const COOLING_INTERPRETATIONS: &[&str] = &[
     "absorption method 2: f_prpr 0,60 only for an air-cooled absorber (direct condensation, principle 2), 0,9 otherwise or when the heat rejection is not given",
     "10.61/10.73: ϑ_C;gen;req;out is ϑ_C;dis;flw;set of table 10.8 (design supply − Δϑ_int;inc, the 6/12 column without distribution) for chillers and ϑ_C;int;inc of 10.10 for evaporation in the room (closing part of §10.3.4, p. 379), unless declared",
     "10.23c: ϑ_C;mean is the mean of ϑ_in and ϑ_out of table 10.8 (both minus Δϑ_int;inc); the printed second line (ϑ_C,out = ϑ_C;dis;in;flw;req) is read as a misprint",
-    "10.15: the literal result is kept near ϑ_C;int;inc = ϑ_e;comb; a loss above 3× the need is reported as cooling_emission_loss_singular",
+    "10.15: the literal result is kept near ϑ_C;int;inc = ϑ_e;comb; a loss above 3× the need is reported as cooling_emission_loss_singular, a loss above the need (once per system) as cooling_emission_loss_exceeds_need",
+    "10.87 (p. 425): the control energy of 0,010 kW counts in every month the cooling generator is present ('altijd in bedrijf'), also for a reversible heat pump, giving 87,6 kWh/year",
     "10.55: months without bins in table 10.18 (January, December) use the 14 °C bin",
     "10.56/10.58: f_C;PL above 100 % is not capped (the norm gives no limit), so the cubic of 10.63 is extrapolated; this is reported as cooling_part_load_above_full_load",
     "10.63/10.64: the fifth point must have the part load of C and the condenser inlet of A (±0,5); without it 10.64 with Δϑ_corr = 0 needs equal evaporator outlets at A and C",
@@ -2276,6 +2277,17 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                         code: "cooling_emission_loss_singular",
                         path,
                     });
+                } else if ratio > 1.0
+                    && !warnings
+                        .iter()
+                        .any(|item| item.code == "cooling_emission_loss_exceeds_need")
+                {
+                    // Softer note, once per system: the loss of 10.15 as
+                    // printed exceeds the cooling need in this month.
+                    warnings.push(CoolingIssue {
+                        code: "cooling_emission_loss_exceeds_need",
+                        path,
+                    });
                 }
             }
             // 10.21 only for zones with a cooling need.
@@ -2644,12 +2656,20 @@ mod tests {
         let october = &result.months[9];
         let ratio = 2.15 / (22.40 - 21.85);
         assert!((october.emission_loss_kwh - 10.0 * ratio).abs() < 1e-9);
-        assert_eq!(result.warnings.len(), 1);
-        assert_eq!(result.warnings[0].code, "cooling_emission_loss_singular");
-        assert_eq!(result.warnings[0].path, "months[9]");
-        // Residential (+8 K) stays far from the singularity.
+        let singular: Vec<_> = result
+            .warnings
+            .iter()
+            .filter(|item| item.code == "cooling_emission_loss_singular")
+            .collect();
+        assert_eq!(singular.len(), 1);
+        assert_eq!(singular[0].path, "months[9]");
+        // Residential (+8 K) stays far from the singularity; at most the
+        // softer "loss above the need" note remains.
         context.residential = true;
-        assert!(assess_cooling(&input, context).warnings.is_empty());
+        assert!(assess_cooling(&input, context)
+            .warnings
+            .iter()
+            .all(|item| item.code == "cooling_emission_loss_exceeds_need"));
     }
 
     #[test]
