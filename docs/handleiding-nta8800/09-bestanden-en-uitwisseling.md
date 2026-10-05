@@ -43,6 +43,22 @@ Wat het **niet** bevat of garandeert:
 
 Het BENG-rapport exporteer je met **Exporteer rapport** in het lint of het menu (zie [hoofdstuk 4](04-uitvoer.md)).
 
+## API en MCP-server
+
+Andere programma's kunnen de rekenkern zonder de app gebruiken:
+- de **HTTP-API** (binary `api`, standaard op `http://127.0.0.1:3007`, met een OpenAPI-document op `/v1/openapi.json`);
+- de **MCP-server** (binary `mcp`, voor AI-assistenten zoals Claude Code en Claude Desktop).
+
+Beide bieden dezelfde bewerkingen met dezelfde namen en uitkomsten als de app:
+- de projectberekening, en daaruit los de energie per functie, de labelgegevens en de registratiestatus;
+- de basisopnames;
+- het maatwerkadvies, met maatregelen als JSON-patch;
+- herlabelen;
+- de interpretatielijst;
+- de losse diagnoseroutes.
+
+Zie [nta8800-api.md](../nta8800-api.md) en [nta8800-mcp.md](../nta8800-mcp.md) voor starten, registreren, foutcodes en voorbeelden. Ook hier geldt: de uitkomsten zijn onverifieerd zolang het programma geen BRL 9501-attest heeft.
+
 ## EP-Online
 
 Registreren in EP-Online gebeurt met een registratiebestand dat alleen een geattesteerd rekenprogramma maakt (Omgevingsregeling art. 5.11/5.12 lid 2 en 3). Het formaat daarvan is niet openbaar en wordt na attestering via RVO verkregen; deze app maakt het dus niet. Het projectdossier bevat wel `ep-online-gegevensoverzicht.json`: dezelfde gegevens met de veldnamen van het openbare exportschema `EpbdExportTypesV4`, om het geregistreerde label achteraf te controleren (zie hoofdstuk 7).

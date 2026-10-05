@@ -15,7 +15,9 @@ cargo run --manifest-path crates/nta8800-service/Cargo.toml --bin api
 cargo run --manifest-path crates/nta8800-service/Cargo.toml --bin mcp
 ```
 
-The API binds to `127.0.0.1:3007` by default. `OES_API_PORT` changes the port. It is intended for local development only.
+The API binds to `127.0.0.1:3007` by default. Run `api --help` for the options (`--bind`, `--port`, `--cors-origin`, `--body-limit-mb`, `--log`/`--no-log`, also as `OES_API_*` environment variables). It has no authentication and is intended for local use.
+
+Every route and MCP tool comes from one registry, `src/operations.rs`; the HTTP adapter is `src/http.rs`. The full route and tool table, the error envelope and examples are in [`docs/nta8800-api.md`](../../docs/nta8800-api.md); MCP registration and resources are in [`docs/nta8800-mcp.md`](../../docs/nta8800-mcp.md). `GET /v1/openapi.json` serves the OpenAPI 3.1 document.
 
 To compare a batch of separately obtained reference-case manifests without running the HTTP server:
 
