@@ -48,6 +48,8 @@ De gedeelde HTTP/MCP-operatielaag weigert een niet-serialiseerbaar kernresultaat
 
 De [desktopdevbuild en servicebinaries van `413e932`](nta8800-build-verificatie-2026-10-05-413e932.md) zijn gebouwd en met het manifest opnieuw gecontroleerd. Dit is technisch artefactbewijs; de normatieve referentie- en attestkolommen blijven ongewijzigd.
 
+De publiek gedocumenteerde RVO-XSD beschrijft het opvragen van het EP-Online-totaalbestand. Het registratie-uitwisselcontract blijft ontbreken; zie het [bronnenregister](nta8800-bronnenregister.md). Er is daarmee geen EP-Online-aanlevering vrijgegeven en de attestkolommen veranderen niet.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
