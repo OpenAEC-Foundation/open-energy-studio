@@ -1,0 +1,155 @@
+.nta-performance { margin: 18px 0; padding: 17px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-secondary); font-size: 12px; }
+.nta-performance-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
+.nta-performance-title { display: flex; gap: 10px; align-items: start; }
+.nta-performance h3 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
+.nta-performance p, .nta-performance small { color: var(--text-secondary); }
+.nta-performance-title p { margin: 5px 0 0; max-width: 70ch; }
+.nta-performance-badge { padding: 3px 8px; border: 1px solid var(--unverified); border-radius: 999px; background: var(--unverified-subtle); color: var(--unverified); font-weight: 600; white-space: nowrap; }
+.nta-performance-unavailable { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.nta-performance-gaps { margin-top: 12px; }
+.nta-performance-gaps > p { display: flex; gap: 6px; align-items: center; color: var(--text-primary); font-weight: 600; }
+.nta-performance-gaps ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.nta-performance-gaps li { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.nta-performance-gaps code { color: var(--text-secondary); }
+.nta-performance-indicators { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+.nta-performance-indicators > div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary); }
+.nta-performance-indicators span { font-weight: 600; color: var(--text-secondary); }
+.nta-performance-indicators strong { font: 700 22px 'Space Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.nta-performance-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px 16px; margin: 12px 0 0; }
+.nta-performance-totals div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border); padding: 4px 0; }
+.nta-performance-totals dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.nta-performance details { margin-top: 12px; }
+.nta-performance summary { cursor: pointer; font-weight: 600; }
+.nta-performance-table { overflow-x: auto; }
+.nta-performance table { border-collapse: collapse; margin-top: 8px; min-width: 100%; font-variant-numeric: tabular-nums; }
+.nta-performance th, .nta-performance td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: right; }
+.nta-performance th[scope="row"], .nta-performance thead th:first-child { text-align: left; }
+.nta-performance-limits ul { margin: 8px 0; padding-left: 18px; }
+.nta-performance-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+.nta-performance button { cursor: pointer; }
+.nta-performance-editor { display: grid; gap: 8px; margin-top: 12px; }
+.nta-performance-editor label { display: grid; gap: 4px; font-weight: 600; }
+.nta-performance-editor textarea { width: 100%; font: 12px/1.4 ui-monospace, monospace; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); resize: vertical; }
+.nta-performance-editor [role="alert"] { color: var(--error-text); }
+.nta-performance-editor > div { display: flex; gap: 8px; }
+.nta-performance-bbl { display: grid; gap: 4px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.nta-performance-bbl ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.nta-performance-bbl li { display: flex; justify-content: space-between; gap: 12px; }
+.nta-performance-bbl em { font-style: normal; font-weight: 600; }
+.nta-form { display: grid; gap: 12px; margin-top: 12px; }
+.nta-form-section { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.nta-form-section legend { font-weight: 700; padding: 0 4px; }
+.nta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; align-items: start; }
+.nta-form-row { display: contents; }
+.nta-form label { display: grid; gap: 3px; }
+.nta-form input:not([type="checkbox"]), .nta-form select { padding: 6px; border: 1px solid var(--line-control); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-width: 0; }
+.nta-form-check { display: flex !important; gap: 6px; align-items: center; }
+.nta-form-note { grid-column: 1 / -1; margin: 0; }
+.nta-form-actions { display: flex; gap: 8px; }
+.nta-performance-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.nta-form-error { color: var(--error-text); font-size: 12px; }
+
+/* Sub-blocks (generators, annex P routes, vessels, dynamic windows): full width, own grid. */
+.nta-form-subsection,
+.nta-form-group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  min-width: 0;
+}
+.nta-form-subsection .nta-form-subsection,
+.nta-form-subsection .nta-form-group,
+.nta-form-group .nta-form-subsection { background: var(--bg-primary); }
+.nta-form-subsection > strong,
+.nta-form-subsection > p,
+.nta-form-group > legend,
+.nta-form-group > p { grid-column: 1 / -1; }
+.nta-form-group > legend { font-weight: 700; padding: 0 4px; }
+/* Repeated entries (points, segments, vessels, windows) take a full row with their own grid. */
+.nta-form-grid > div:not([class]),
+.nta-form-subsection > div:not([class]),
+.nta-form-group > div:not([class]) {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-size: 12px; padding: 4px 0 0; }
+.nta-form-months {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px 8px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.nta-form-months > legend { font-weight: 600; font-size: 12px; padding: 0 4px; }
+
+/* Native buttons inside the form get the secondary button look. */
+.nta-form button:not(.btn),
+.nta-form-remove {
+  justify-self: start;
+  align-self: end;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nta-form button:not(.btn):hover,
+.nta-form-remove:hover { border-color: var(--accent); color: var(--accent); }
+.nta-form-remove { color: var(--error-text); }
+.nta-form-remove:hover { border-color: var(--error-text); color: var(--error-text); }
+.nta-form button:focus-visible,
+.nta-form-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Save / cancel stay reachable at the bottom of long forms. */
+.nta-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 0 -2px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-2);
+}
+
+/* Totals: long values (fingerprints, ventilation details) wrap inside their cell. */
+.nta-performance-totals > div { min-width: 0; }
+.nta-performance-totals dd { min-width: 0; overflow-wrap: anywhere; }
+.nta-performance-fingerprint {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.nta-performance-totals .nta-performance-wide { grid-column: 1 / -1; flex-direction: column; justify-content: flex-start; }
+.nta-performance-totals .nta-performance-wide dd { font-weight: 400; }
+/* Selects with long option texts take two columns so the chosen text stays readable. */
+.nta-form-wide { grid-column: span 2; }
+@media (max-width: 720px) { .nta-form-wide { grid-column: auto; } }
+.nta-form select { text-overflow: ellipsis; }
+
+.nta-performance-legacy { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 8px 12px; border-left: 4px solid var(--unverified); background: var(--unverified-subtle); }

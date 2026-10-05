@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISolarPV, Orientation } from '../../../core/energy/types';
@@ -12,6 +12,7 @@ interface SolarPVDialogProps {
 const orientations: Orientation[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'horizontal'];
 
 export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -47,7 +48,7 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.solarPV.title')}
       onClose={onClose}
       onSubmit={handleSave}
@@ -56,8 +57,8 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
     >
 
         <div className="dialog-field">
-          <label>{t('dialog.solarPV.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.solarPV.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -65,8 +66,8 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarPV.peakPower')}</label>
-          <input
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.solarPV.peakPower')}</label>
+          <input id={`${fieldId}-2`}
             type="number"
             min={0}
             step={0.1}
@@ -76,8 +77,8 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarPV.orientation')}</label>
-          <select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.solarPV.orientation')}</label>
+          <select id={`${fieldId}-3`} value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
             {orientations.map((o) => (
               <option key={o} value={o}>
                 {t(`orientation.${o}`)}
@@ -87,8 +88,8 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarPV.tilt')}</label>
-          <input
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.solarPV.tilt')}</label>
+          <input id={`${fieldId}-4`}
             type="number"
             min={0}
             max={90}
@@ -99,8 +100,8 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.solarPV.area')}</label>
-          <input
+          <label htmlFor={`${fieldId}-5`}>{t('dialog.solarPV.area')}</label>
+          <input id={`${fieldId}-5`}
             type="number"
             min={0}
             step={0.1}

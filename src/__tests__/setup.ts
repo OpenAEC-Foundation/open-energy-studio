@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 // Mock Tauri APIs that components may import
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+  isTauri: vi.fn(() => false),
 }));
 
 vi.mock('@tauri-apps/api/window', () => ({

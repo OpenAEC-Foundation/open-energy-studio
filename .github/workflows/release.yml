@@ -12,7 +12,50 @@ on:
         default: 'v2026.2.0'
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Frontend type check, tests and build
+        run: |
+          npx tsc --noEmit
+          npm test -- --run --maxWorkers=2
+          npm run build
+
+      - name: Install Rust stable with Clippy and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust formatting
+        run: |
+          cargo fmt --manifest-path crates/nta8800-core/Cargo.toml --check
+          cargo fmt --manifest-path crates/nta8800-service/Cargo.toml --check
+
+      - name: Rust tests and Clippy
+        run: |
+          cargo test --manifest-path crates/nta8800-core/Cargo.toml
+          cargo test --manifest-path crates/nta8800-service/Cargo.toml
+          cargo clippy --manifest-path crates/nta8800-core/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/nta8800-service/Cargo.toml --all-targets -- -D warnings
+
+      - name: Core minimum Rust version
+        run: |
+          rustup toolchain install 1.77.2 --profile minimal
+          CARGO_TARGET_DIR=target/msrv-core cargo +1.77.2 test --manifest-path crates/nta8800-core/Cargo.toml
+
   create-release:
+    needs: verify
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -43,9 +86,9 @@ jobs:
               repo: context.repo.repo,
               tag_name: version,
               name: `Open Energy Studio ${version}`,
-              body: `## What's New in ${version}\n\nBENG calculator for building energy performance according to NTA 8800.\n\n### Downloads\n- **Windows**: Download the \`.exe\` setup file\n- **macOS**: Download the \`.dmg\` file (universal - supports Intel and Apple Silicon)\n- **Linux**: Download the \`.deb\` package or \`.AppImage\``,
+              body: `## What's New in ${version}\n\nEnergy performance workspace with an experimental NTA 8800 input audit. BENG and energy-label outputs are indicative; the Rust calculation kernel is not yet verified or attested.\n\n### Downloads\n- **Windows**: Download the \`.exe\` setup file\n- **macOS**: Download the \`.dmg\` file (universal - supports Intel and Apple Silicon)\n- **Linux**: Download the \`.deb\` package or \`.AppImage\``,
               draft: true,
-              prerelease: false
+              prerelease: true
             });
             return data.id;
 
@@ -177,5 +220,5 @@ jobs:
               repo: context.repo.repo,
               release_id: process.env.release_id,
               draft: false,
-              prerelease: false
+              prerelease: true
             });

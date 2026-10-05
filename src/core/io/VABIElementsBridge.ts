@@ -21,6 +21,7 @@ import type {
   Orientation, SurfaceType, HeatingSystemType, VentilationType,
   CoolingSystemType, HotWaterSystemType, SolarThermalType, BuildingFunction,
 } from '../energy/types';
+import { SURFACE_RESISTANCE } from '../energy/Constants';
 
 // ============================================================
 // VABI EPA enum mappings (based on real file analysis)
@@ -530,15 +531,19 @@ function importFromVABIXml(xmlString: string): IProject {
           // Opaque construction
           const rc = getNum(dvEl, 'RcWaarde');
           if (rc > 0 || dvName) {
-            // Find or create construction
-            let existing = constructions.find(c => c.name === dvName && Math.abs(c.rcValue - rc) < 0.01);
+            // NTA 8800 table C.2: R_si by heat-flow direction (wall 0,13, roof
+            // 0,10, floor 0,17) plus R_se 0,04, which every project U carries.
+            const uValue = rc > 0 ? 1 / (rc + SURFACE_RESISTANCE[surfaceType].rsi + SURFACE_RESISTANCE[surfaceType].rse) : 0;
+            // Find or create construction; one name on a wall and a roof gives two.
+            let existing = constructions.find(c => c.name === dvName && Math.abs(c.rcValue - rc) < 0.01
+              && Math.abs(c.uValue - uValue) < 1e-9);
             if (!existing && dvName) {
               existing = {
                 id: crypto.randomUUID(),
                 name: dvName,
                 layers: [],
                 rcValue: rc,
-                uValue: rc > 0 ? 1 / (rc + 0.17 + 0.04) : 0,
+                uValue,
               };
               constructions.push(existing);
             }

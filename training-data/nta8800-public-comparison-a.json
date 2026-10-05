@@ -1,0 +1,707 @@
+{
+  "id": "public-comparison-a",
+  "name": "Vergelijking openbaar rapport A (vrijstaand, plat dak)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.0, NTA 8800:2020); niet de echte woning.",
+  "buildingFunction": "residential",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "woning",
+      "floorArea": 76.32,
+      "volume": 206.064,
+      "height": 2.7,
+      "surfaces": [
+        {
+          "id": "VG",
+          "name": "VG",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 20.42,
+          "orientation": "SE",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "VG-Adeur",
+              "name": "VG-Adeur",
+              "area": 1.35,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "SE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-Aglas",
+              "name": "VG-Aglas",
+              "area": 1.1,
+              "uValue": 0.95,
+              "gValue": 0.5,
+              "orientation": "SE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-B1",
+              "name": "VG-B1",
+              "area": 0.27,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "SE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-C",
+              "name": "VG-C",
+              "area": 1.5,
+              "uValue": 0.97,
+              "gValue": 0.5,
+              "orientation": "SE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-B2",
+              "name": "VG-B2",
+              "area": 0.27,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "SE",
+              "surfaceId": "VG"
+            }
+          ]
+        },
+        {
+          "id": "LZG",
+          "name": "LZG",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 28.52,
+          "orientation": "SW",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "LZG-C",
+              "name": "LZG-C",
+              "area": 1.5,
+              "uValue": 0.97,
+              "gValue": 0.5,
+              "orientation": "SW",
+              "surfaceId": "LZG"
+            },
+            {
+              "id": "LZG-E",
+              "name": "LZG-E",
+              "area": 6.45,
+              "uValue": 0.91,
+              "gValue": 0.5,
+              "orientation": "SW",
+              "surfaceId": "LZG"
+            },
+            {
+              "id": "LZG-D",
+              "name": "LZG-D",
+              "area": 1.5,
+              "uValue": 0.98,
+              "gValue": 0.5,
+              "orientation": "SW",
+              "surfaceId": "LZG"
+            }
+          ]
+        },
+        {
+          "id": "AG",
+          "name": "AG",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 20.42,
+          "orientation": "NW",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "AG-E1",
+              "name": "AG-E1",
+              "area": 6.45,
+              "uValue": 0.91,
+              "gValue": 0.5,
+              "orientation": "NW",
+              "surfaceId": "AG"
+            },
+            {
+              "id": "AG-E2",
+              "name": "AG-E2",
+              "area": 6.45,
+              "uValue": 0.91,
+              "gValue": 0.5,
+              "orientation": "NW",
+              "surfaceId": "AG"
+            }
+          ]
+        },
+        {
+          "id": "RZG",
+          "name": "RZG",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 28.52,
+          "orientation": "NE",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "RZG-F",
+              "name": "RZG-F",
+              "area": 0.99,
+              "uValue": 0.98,
+              "gValue": 0.5,
+              "orientation": "NE",
+              "surfaceId": "RZG"
+            },
+            {
+              "id": "RZG-B",
+              "name": "RZG-B",
+              "area": 0.27,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "NE",
+              "surfaceId": "RZG"
+            },
+            {
+              "id": "RZG-G",
+              "name": "RZG-G",
+              "area": 2.15,
+              "uValue": 0.94,
+              "gValue": 0.5,
+              "orientation": "NE",
+              "surfaceId": "RZG"
+            }
+          ]
+        },
+        {
+          "id": "PD",
+          "name": "Plat dak",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 76.32,
+          "orientation": "horizontal",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "BG",
+          "name": "Begane grond",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 76.32,
+          "orientation": "horizontal",
+          "constructionId": "c-floor",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb1",
+          "name": "VG psi 0.15",
+          "psiValue": 0.15,
+          "length": 0.45,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb2",
+          "name": "VG psi 0.09",
+          "psiValue": 0.09,
+          "length": 14.6,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb3",
+          "name": "VG psi 0.1",
+          "psiValue": 0.1,
+          "length": 2.93,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb4",
+          "name": "VG psi 0.14",
+          "psiValue": 0.14,
+          "length": 8.04,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb5",
+          "name": "VG psi 0.0",
+          "psiValue": 0.0,
+          "length": 5.36,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb6",
+          "name": "LZG psi 0.09",
+          "psiValue": 0.09,
+          "length": 12.9,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb7",
+          "name": "LZG psi 0.1",
+          "psiValue": 0.1,
+          "length": 4.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb8",
+          "name": "LZG psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.68,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb9",
+          "name": "AG psi 0.09",
+          "psiValue": 0.09,
+          "length": 8.6,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb10",
+          "name": "AG psi 0.1",
+          "psiValue": 0.1,
+          "length": 6.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb11",
+          "name": "AG psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.68,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb12",
+          "name": "RZG psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.68,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb13",
+          "name": "RZG psi 0.15",
+          "psiValue": 0.15,
+          "length": 1.35,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb14",
+          "name": "RZG psi 0.09",
+          "psiValue": 0.09,
+          "length": 7.7,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb15",
+          "name": "RZG psi 0.1",
+          "psiValue": 0.1,
+          "length": 2.35,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb-dakrand",
+          "name": "dakrand plat dak",
+          "psiValue": 0.16,
+          "length": 36.52,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        }
+      ],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {}
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-wall",
+      "name": "c-wall",
+      "layers": [],
+      "rcValue": 4.98,
+      "uValue": 0.1942
+    },
+    {
+      "id": "c-roof",
+      "name": "dak",
+      "layers": [],
+      "rcValue": 6.55,
+      "uValue": 0.1495
+    },
+    {
+      "id": "c-floor",
+      "name": "vloer",
+      "layers": [],
+      "rcValue": 5.56,
+      "uValue": 0.1695
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "residential",
+    "constructionYear": 2021,
+    "areaSourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats) Ag 76,32",
+    "usageFunction": "residential",
+    "dwellingType": "other",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13"
+    },
+    "thermalMass": {
+      "floor": "light",
+      "wall": "light",
+      "ceiling": "open_or_none",
+      "sourceReference": "sfb with hsb/sfb floors (report rekenzone)"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "one dwelling"
+    },
+    "surfaceTilts": [],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "sourceReference": "default; report minimal obstruction (overhang on NW E-windows and side obstruction on door glass not modelled)",
+      "obstruction": {
+        "method": "minimal"
+      }
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "BG",
+        "exposedPerimeterM": 36.52,
+        "constructionResistanceM2kPerW": 5.7299999999999995,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 22.64,
+              "psiWPerMk": 0.45,
+              "sourceReference": "I.1 nr 02"
+            },
+            {
+              "lengthM": 13.88,
+              "psiWPerMk": 0.27,
+              "sourceReference": "I.1 nr 01"
+            }
+          ]
+        },
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.98,
+          "wallUValueWPerM2k": 0.1942,
+          "ventilationOpeningM2PerM": 0.0012
+        },
+        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "main_room_thermostat",
+      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "35_30",
+      "installation": "individual",
+      "usageFunction": "residential",
+      "connectedStoreys": 1,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "uninsulated"
+        }
+      },
+      "valvesInsulated": false,
+      "actualPipeLengthM": 48.84,
+      "pump": {
+        "method": "calculated",
+        "heatMeterPresent": false,
+        "energyEfficiencyIndex": 0.23,
+        "electricPowerKw": 0.059,
+        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+      },
+      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)",
+      "unheatedPipeLengthM": 0.0
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "hp",
+        "classificationSourceReference": "Nefit EnviLine 5.0 (report used product COP 4,35; forfait here)",
+        "scope": "residential_at_most25_kw",
+        "source": "outdoor_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 35,
+        "thermalCapacityKw": 5.0,
+        "capacitySourceReference": "product name 5.0",
+        "collectiveBuildingInstallation": false,
+        "qualityDeclaration": {
+          "declarationReference": "BCRG-kwaliteitsverklaring lucht/water-warmtepomp (fictief voorbeeld)",
+          "generationEfficiency": 4.35,
+          "energyFraction": 1.0,
+          "auxiliaryKwhPerYear": 30
+        }
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "outdoor unit"
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "residential no BACS",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "panels",
+          "panelPeakPowerW": 325.0,
+          "panelCount": 9
+        },
+        "azimuthDeg": 180.0,
+        "tiltDeg": 15.0,
+        "mounting": "strongly_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+      }
+    ],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential",
+    "verticalPipes": [
+      {
+        "id": "vp",
+        "storeys": 1,
+        "insulated": false,
+        "sourceReference": "report: unknown -> fictitious uninsulated pipe (7.3.3)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 76.32,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 76.32,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 3.4,
+      "constructionYear": 2021,
+      "floorAboveCrawlspace": true,
+      "heatingSetpointC": 20.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "c4c",
+          "ducts": "unknown",
+          "equipmentReference": "Itho CVE/CVD ECO Optima Plus GG + zr-roosters (product f_ctrl 0,50 in report)"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "reference",
+        "buildingType": "flat_roof_detached"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "declared",
+        "fans": [
+          {
+            "id": "f1",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 8.5
+            }
+          }
+        ],
+        "control": {
+          "method": "declared",
+          "monthly": [
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147,
+            0.147
+          ],
+          "sourceReference": "report: product fan data"
+        },
+        "sourceReference": "report: product fan data"
+      },
+      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "one dwelling"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "kitchen_and_bathroom",
+        "kitchenLengthM": 7.0,
+        "bathroomLengthM": 3.0,
+        "sourceReference": "report 6-8 m / 2-4 m"
+      },
+      "generator": {
+        "kind": "heat_pump",
+        "exhaustAirSource": false,
+        "declared": {
+          "value": 1.3,
+          "sourceReference": "BCRG-kwaliteitsverklaring tapwater (fictief voorbeeld)"
+        }
+      },
+      "equipmentReference": "Nefit EnviLine (report product COP 1,30)"
+    },
+    "cooling": {
+      "emission": {
+        "emitter": "floor_cooling",
+        "balancing": "none_or_unknown",
+        "control": "standalone_per_room",
+        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+      },
+      "distribution": {
+        "designTemperature": "t17_to21",
+        "pipe": {
+          "kind": "insulated_from1995"
+        },
+        "fittingsInsulated": true,
+        "pipeLengthM": 48.84,
+        "pump": {
+          "hydraulicallyBalanced": false,
+          "floorCount": 1,
+          "heatMeter": false,
+          "individualDwellingInstallation": true,
+          "labelPowerKw": 0.033,
+          "energyEfficiencyIndex": 0.23,
+          "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+        },
+        "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)",
+        "unconditionedPipeLengthM": 0.0
+      },
+      "generators": [
+        {
+          "id": "cool",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "forfait compression EER 3,0"
+        }
+      ]
+    },
+    "activeCooling": {
+      "system": "heat_pump_with_cooling_emitter",
+      "capacity": {
+        "method": "dynamic_cooling_load",
+        "sourceReference": "report: actieve koeling, TOjuli 0"
+      },
+      "sourceReference": "openbare bron Uniec 3.0.16 printout (leverancier testplaats)"
+    }
+  }
+}

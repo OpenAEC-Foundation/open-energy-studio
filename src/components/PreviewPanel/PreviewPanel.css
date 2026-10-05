@@ -48,6 +48,13 @@
   padding: 12px 0 8px;
 }
 
+.preview-label-unavailable {
+  margin: 10px 2px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .preview-energy-label-arrow {
   display: inline-flex;
   align-items: center;
@@ -94,13 +101,35 @@
   border-inline-start: 3px solid var(--border);
 }
 
-.preview-beng-card.pass {
-  border-inline-start-color: var(--energy-green, #22c55e);
+.preview-beng-card { border-inline-start-color: var(--accent); }
+.preview-beng-card.fails { border-inline-start-color: var(--error); }
+
+.preview-kernel-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
-.preview-beng-card.fail {
-  border-inline-start-color: var(--energy-red, #ef4444);
+.preview-kernel-label strong {
+  font-size: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
 }
+
+.preview-kernel-status {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 8px 2px;
+}
+
+.preview-kernel-empty { text-align: start; line-height: 1.5; }
 
 .preview-beng-header {
   display: flex;
@@ -124,15 +153,8 @@
   letter-spacing: 0.05em;
 }
 
-.preview-beng-badge.pass {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--energy-green, #22c55e);
-}
-
-.preview-beng-badge.fail {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--energy-red, #ef4444);
-}
+/* F1: "onverifieerd" has its own violet status colour, not a warning (ontwerp.md §5.1). */
+.preview-beng-badge { background: var(--unverified-subtle); color: var(--unverified); }
 
 .preview-beng-value {
   font-size: 18px;
@@ -164,13 +186,7 @@
   border-inline-start: 3px solid var(--border);
 }
 
-.preview-to-juli.pass {
-  border-inline-start-color: var(--energy-green, #22c55e);
-}
-
-.preview-to-juli.fail {
-  border-inline-start-color: var(--energy-red, #ef4444);
-}
+.preview-to-juli.indicative { border-inline-start-color: var(--accent); }
 
 .preview-to-juli-header {
   display: flex;
@@ -269,11 +285,11 @@
 }
 
 .preview-chart-bar.heat {
-  background: #ef4444;
+  background: var(--viz-heating);
 }
 
 .preview-chart-bar.cool {
-  background: #3b82f6;
+  background: var(--viz-cooling);
 }
 
 .preview-chart-label {
@@ -304,11 +320,11 @@
 }
 
 .preview-legend-dot.heat {
-  background: #ef4444;
+  background: var(--viz-heating);
 }
 
 .preview-legend-dot.cool {
-  background: #3b82f6;
+  background: var(--viz-cooling);
 }
 
 /* Empty state */
@@ -317,4 +333,13 @@
   font-size: 11px;
   text-align: center;
   padding: 24px 12px;
+}
+
+/* Inside the shell inspector: the inspector draws the frame. */
+.preview-panel.embedded {
+  width: auto;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: transparent;
 }

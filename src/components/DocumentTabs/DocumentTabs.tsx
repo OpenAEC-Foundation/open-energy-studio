@@ -76,14 +76,17 @@ export function DocumentTabs({ onCloseTab, onNewProject, onOpenProject }: Docume
           onClick={() => handleTabClick(doc.id)}
           onMouseDown={(e) => handleMiddleClick(e, doc.id)}
         >
-          <span className="document-tab-label">
+          {/* A real button so the tab is reachable by keyboard; the click bubbles to the tab. */}
+          <button type="button" className="document-tab-label" aria-current={doc.id === docState.activeDocumentId ? 'page' : undefined}>
             {doc.state.isDirty && <span className="document-tab-dirty">*</span>}
             {getTabLabel(doc)}
-          </span>
+          </button>
           <button
+            type="button"
             className="document-tab-close"
             onClick={(e) => { e.stopPropagation(); onCloseTab(doc.id); }}
-            title="Close"
+            title={t('shell.tab.close')}
+            aria-label={`${t('shell.tab.close')}: ${getTabLabel(doc)}`}
           >
             &times;
           </button>

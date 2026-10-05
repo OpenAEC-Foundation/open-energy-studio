@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { generateReportHTML } from '../../../core/report/ReportTemplate';
+import { useKernelQuery } from '../../../context/KernelProvider';
 import { DialogShell } from '../DialogShell';
 import './PrintPreviewDialog.css';
 
@@ -81,9 +82,12 @@ function findMatchingPageSize(widthMm: number, heightMm: number): string | null 
 }
 
 export function PrintPreviewDialog({ onClose }: PrintPreviewDialogProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project, result } = state;
+  const kernelQuery = useKernelQuery(project);
+  const kernel = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
+  const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
   const measureRef = useRef<HTMLIFrameElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(75);
@@ -113,7 +117,8 @@ export function PrintPreviewDialog({ onClose }: PrintPreviewDialogProps) {
       .catch(() => setPrinters([]));
   }, []);
 
-  const reportHTML = result ? generateReportHTML(project, result) : '';
+  // The kernel figures once its run settles; the simplified result only without a kernel result.
+  const reportHTML = kernelPending ? '' : (kernel || result ? generateReportHTML(project, result, { kernel, locale }) : '');
 
   // Measure content and compute intelligent page breaks
   useEffect(() => {
@@ -467,6 +472,8 @@ body{margin:0!important;padding:0!important}
           ref={measureRef}
           style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', height: '99999px' }}
           title="Measurement"
+          aria-hidden="true"
+          tabIndex={-1}
         />
         <div className="pp-pages-wrapper" style={{ zoom: zoom / 100 }}>
           {Array.from({ length: totalPages }, (_, i) => (

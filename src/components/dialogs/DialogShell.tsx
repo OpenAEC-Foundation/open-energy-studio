@@ -1,4 +1,47 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useId, useState } from 'react';
+import i18next from 'i18next';
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), '
+  + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Visible, enabled focusable elements inside the dialog, in tab order. */
+function focusableIn(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
+    .filter((element) => !element.closest('[hidden], [inert]') && element.getAttribute('aria-hidden') !== 'true');
+}
+
+/**
+ * Open dialogs, innermost last. Keyboard handling and the focus trap act
+ * only for the topmost one, so a nested dialog owns Tab and Escape.
+ */
+const dialogStack: HTMLElement[] = [];
+
+/**
+ * The last dialog pushed, but a dialog nested in the DOM of another always
+ * wins over its parent. React runs a child's effects before its parent's,
+ * so when both mount in one commit the parent is pushed last.
+ */
+function topmostDialog(): HTMLElement | undefined {
+  let current = dialogStack[dialogStack.length - 1];
+  if (!current) return undefined;
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const other of dialogStack) {
+      if (other !== current && current.contains(other)) { current = other; changed = true; break; }
+    }
+  }
+  return current;
+}
+
+function isTopmost(dialog: HTMLElement): boolean {
+  return topmostDialog() === dialog;
+}
+
+function focusFirst(dialog: HTMLElement) {
+  const items = focusableIn(dialog);
+  const first = items.find((element) => !element.classList.contains('dialog-close-btn')) ?? items[0];
+  (first ?? dialog).focus();
+}
 
 interface DialogShellProps {
   title: string;
@@ -11,6 +54,11 @@ interface DialogShellProps {
   bodyClassName?: string;
   style?: React.CSSProperties;
   footer?: React.ReactNode;
+  /**
+   * `modal` (default): a centred, draggable dialog. `sheet`: a side sheet docked
+   * right (the inspector variant of the redesign, ontwerp.md §5.2).
+   */
+  variant?: 'modal' | 'sheet';
 }
 
 export function DialogShell({
@@ -24,13 +72,17 @@ export function DialogShell({
   bodyClassName,
   style,
   footer,
+  variant = 'modal',
 }: DialogShellProps) {
+  const sheet = variant === 'sheet';
+  const titleId = useId();
   // ── Drag support ──
   const dialogRef = useRef<HTMLDivElement>(null);
   const dragState = useRef({ isDragging: false, offsetX: 0, offsetY: 0 });
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
 
   const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    if (sheet) return; // a docked side sheet does not move
     if ((e.target as HTMLElement).closest('.dialog-close-btn')) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -44,7 +96,7 @@ export function DialogShell({
       setPosition({ x: rect.left, y: rect.top });
     }
     e.preventDefault();
-  }, [position]);
+  }, [position, sheet]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -62,6 +114,54 @@ export function DialogShell({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // ── Keyboard: focus into the dialog, trap Tab, Escape closes, focus returns to the trigger ──
+  // The key handler sits on the document, so Tab and Escape still work when
+  // the focused field unmounts (focus falls to <body>); only the topmost
+  // open dialog reacts. Focus is not pulled back on `focusin`: the overlay
+  // already blocks the page, and panels shown beside a dialog keep focus.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogStack.push(dialog);
+    // A parent mounted in the same commit as a nested dialog must not take
+    // the focus the nested one already moved into itself.
+    if (isTopmost(dialog)) focusFirst(dialog);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTopmost(dialog) || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusableIn(dialog);
+      if (items.length === 0) { event.preventDefault(); dialog.focus(); return; }
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      const active = document.activeElement;
+      const inside = active instanceof Node && dialog.contains(active);
+      if (event.shiftKey && (active === firstItem || active === dialog || !inside)) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && (active === lastItem || !inside)) {
+        event.preventDefault();
+        firstItem.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      const index = dialogStack.lastIndexOf(dialog);
+      if (index >= 0) dialogStack.splice(index, 1);
+      if (trigger && trigger.isConnected) trigger.focus();
     };
   }, []);
 
@@ -111,15 +211,20 @@ export function DialogShell({
     : undefined;
 
   return (
-    <div className="dialog-overlay" onClick={handleOverlayClick} onMouseDown={blockEvent} onDoubleClick={blockEvent}>
+    <div className={sheet ? 'dialog-overlay dialog-overlay--sheet' : 'dialog-overlay'}
+      onClick={handleOverlayClick} onMouseDown={blockEvent} onDoubleClick={blockEvent}>
       <div
         ref={dialogRef}
-        className={`${className ? `dialog ${className}` : 'dialog'}${shake ? ' dialog-shake' : ''}`}
+        className={`${className ? `dialog ${className}` : 'dialog'}${sheet ? ' dialog--sheet' : ''}${shake ? ' dialog-shake' : ''}`}
         style={{ ...style, ...positionStyle }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
       >
         <div className="dialog-header" onMouseDown={handleHeaderMouseDown}>
-          <span className="dialog-header-title">{title}</span>
-          <button className="dialog-close-btn" onClick={onClose}>&times;</button>
+          <span className="dialog-header-title" id={titleId}>{title}</span>
+          <button type="button" className="dialog-close-btn" onClick={onClose} aria-label={i18next.t('dialog.close')}>&times;</button>
         </div>
         <div className={bodyClassName ?? 'dialog-body'}>
           {children}
@@ -127,11 +232,11 @@ export function DialogShell({
         {footer !== undefined ? footer : (
           <div className="dialog-footer">
             <button className="btn" onClick={onClose}>
-              {cancelLabel ?? 'Cancel'}
+              {cancelLabel ?? i18next.t('dialog.cancel')}
             </button>
             {onSubmit && (
               <button className="btn btn-primary" onClick={onSubmit}>
-                {submitLabel ?? 'Save'}
+                {submitLabel ?? i18next.t('dialog.save')}
               </button>
             )}
           </div>

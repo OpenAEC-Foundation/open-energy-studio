@@ -151,11 +151,17 @@ export interface SurfaceResistance {
   rse: number; // exterior surface resistance
 }
 
+/**
+ * NTA 8800 table C.2 (p. 778). A construction U-value always carries
+ * R_se = 0,04 (C.10, p. 777), also for an `internal` surface: towards an
+ * unheated space the kernel swaps R_se for the space-side R_si itself
+ * (8.4.2.1, p. 266), so a U with R_si on both sides would be corrected twice.
+ */
 export const SURFACE_RESISTANCE: Record<SurfaceType, SurfaceResistance> = {
   wall:     { rsi: 0.13, rse: 0.04 },
   roof:     { rsi: 0.10, rse: 0.04 },
   floor:    { rsi: 0.17, rse: 0.04 },
-  internal: { rsi: 0.13, rse: 0.13 },
+  internal: { rsi: 0.13, rse: 0.04 },
 };
 
 // ------------------------------------------------------------

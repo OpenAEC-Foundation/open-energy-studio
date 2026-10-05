@@ -1,0 +1,62 @@
+{
+  "id": "synthetisch-1985-kantoor",
+  "constructionYear": 1985,
+  "buildingType": {"kind": "multi_layer_whole"},
+  "functions": [
+    {"function": "office", "areaM2": 1200.0},
+    {"function": "assembly_without_day_care", "areaM2": 100.0}
+  ],
+  "areaSourceReference": "synthetic: NEN 2580 measurement from drawings",
+  "buildingHeightM": 7.5,
+  "storeys": 2,
+  "construction": {"floor": "heavy", "wall": "heavy", "lighterCeiling": false, "sourceReference": "synthetic: concrete floors, masonry"},
+  "envelope": {
+    "surfaces": [
+      {"id": "gevel-zuid", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 182.0, "orientation": "south", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 50.0}, "sourceReference": "synthetic survey: drawing"},
+      {"id": "gevel-noord", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 182.0, "orientation": "north", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 50.0}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-oost", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 175.0, "orientation": "east", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 50.0}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-west", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 175.0, "orientation": "west", "cavity": true, "insulation": {"kind": "thickness", "thicknessMm": 50.0}, "sourceReference": "synthetic survey"},
+      {"id": "dak", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 650.0, "cavity": false, "insulation": {"kind": "thickness", "thicknessMm": 60.0}, "sourceReference": "synthetic survey: roof core sample"},
+      {"id": "begane-grondvloer", "element": "floor", "boundary": {"kind": "ground"}, "grossAreaM2": 650.0, "cavity": false, "insulation": {"kind": "none_or_unknown"}, "exposedPerimeterM": 102.0, "sourceReference": "synthetic survey"}
+    ],
+    "windows": [
+      {"id": "ramen-zuid", "surfaceId": "gevel-zuid", "areaM2": 70.0, "glass": "double", "frame": "metal_with_thermal_break", "sourceReference": "synthetic survey"},
+      {"id": "ramen-noord", "surfaceId": "gevel-noord", "areaM2": 60.0, "glass": "double", "frame": "metal_with_thermal_break", "sourceReference": "synthetic survey"},
+      {"id": "ramen-oost", "surfaceId": "gevel-oost", "areaM2": 50.0, "glass": "double", "frame": "metal_with_thermal_break", "sourceReference": "synthetic survey"},
+      {"id": "ramen-west", "surfaceId": "gevel-west", "areaM2": 50.0, "glass": "double", "frame": "metal_with_thermal_break", "sourceReference": "synthetic survey"}
+    ],
+    "doors": [
+      {"id": "entree", "surfaceId": "gevel-zuid", "areaM2": 4.0, "insulated": false, "frame": "metal", "sourceReference": "synthetic survey"}
+    ]
+  },
+  "heating": {
+    "generator": {"kind": "boiler", "boilerType": "hr104", "pilotFlame": false, "insideThermalBoundary": true, "installationYear": 2004},
+    "emitters": "radiators",
+    "balanced": false,
+    "control": "central_with_radiator_valves",
+    "storeys": 2,
+    "sourceReference": "synthetic survey: type plate boiler room"
+  },
+  "heatingInstallation": {"collective": true, "capacityKw": 150.0},
+  "ventilation": {
+    "principle": "balanced",
+    "heatRecovery": "cross_flow",
+    "installationYear": 1985,
+    "ahu": {"ductsOutsideThermalZone": false},
+    "recirculation": "present_percent_unknown",
+    "sourceReference": "synthetic survey: AHU on the roof"
+  },
+  "hotWater": {
+    "generator": {"kind": "electric_boiler"},
+    "circulation": false,
+    "showerHeatRecovery": "none",
+    "storage": [{"id": "pantry-boilers", "volumeL": 30.0, "inHeatedZone": true, "sourceReference": "synthetic survey: two 15 l close-in boilers"}],
+    "sourceReference": "synthetic survey: pantry boilers"
+  },
+  "lighting": [
+    {"id": "kantoren", "areaM2": 1100.0, "power": {"method": "lamps", "lamps": [{"count": 900, "lampPowerW": 36.0, "lampType": "t8_conventional"}]}, "presence": "room_switch", "largeOfficeGroup": true, "sourceReference": "synthetic survey: lamp count"},
+    {"id": "verkeer-kantine", "areaM2": 200.0, "power": {"method": "luminaires", "luminaires": [{"count": 60, "powerW": 46.0}]}, "presence": "none_or_central_on", "sourceReference": "synthetic survey"}
+  ],
+  "bacs": {"systemPowerKw": 150.0},
+  "sourceReference": "synthetic fixture, not a real building"
+}

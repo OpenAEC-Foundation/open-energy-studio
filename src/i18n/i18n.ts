@@ -2,23 +2,37 @@ import i18next from 'i18next';
 import { initReactI18next, useTranslation } from 'react-i18next';
 import { en } from './en';
 import { nl } from './nl';
-import { fr } from './fr';
-import { es } from './es';
-import { zh } from './zh';
-import { it } from './it';
-import { de } from './de';
-import { pt } from './pt';
-import { pl } from './pl';
-import { tr } from './tr';
-import { ja } from './ja';
-import { ko } from './ko';
-import { ar } from './ar';
-import { fa } from './fa';
 
 export type Locale = 'en' | 'nl' | 'fr' | 'es' | 'zh' | 'it' | 'de' | 'pt' | 'pl' | 'tr' | 'ja' | 'ko' | 'ar' | 'fa';
 
 const VALID_LOCALES: Locale[] = ['en', 'nl', 'fr', 'es', 'zh', 'it', 'de', 'pt', 'pl', 'tr', 'ja', 'ko', 'ar', 'fa'];
 const RTL_LOCALES: Locale[] = ['ar', 'fa'];
+
+/**
+ * Dutch and English are always bundled (English is the fallback); the other
+ * languages are loaded on first use so they stay out of the start-up bundle (F10).
+ */
+const LOADERS: Partial<Record<Locale, () => Promise<Record<string, string>>>> = {
+  fr: () => import('./fr').then((m) => m.fr),
+  es: () => import('./es').then((m) => m.es),
+  zh: () => import('./zh').then((m) => m.zh),
+  it: () => import('./it').then((m) => m.it),
+  de: () => import('./de').then((m) => m.de),
+  pt: () => import('./pt').then((m) => m.pt),
+  pl: () => import('./pl').then((m) => m.pl),
+  tr: () => import('./tr').then((m) => m.tr),
+  ja: () => import('./ja').then((m) => m.ja),
+  ko: () => import('./ko').then((m) => m.ko),
+  ar: () => import('./ar').then((m) => m.ar),
+  fa: () => import('./fa').then((m) => m.fa),
+};
+
+/** Make sure the translations of `locale` are registered before switching to it. */
+async function ensureLocale(locale: Locale): Promise<void> {
+  const load = LOADERS[locale];
+  if (!load || i18next.hasResourceBundle(locale, 'translation')) return;
+  i18next.addResourceBundle(locale, 'translation', await load());
+}
 
 function applyDirection(locale: Locale) {
   document.documentElement.dir = RTL_LOCALES.includes(locale) ? 'rtl' : 'ltr';
@@ -44,18 +58,6 @@ i18next.use(initReactI18next).init({
   resources: {
     en: { translation: en },
     nl: { translation: nl },
-    fr: { translation: fr },
-    es: { translation: es },
-    zh: { translation: zh },
-    it: { translation: it },
-    de: { translation: de },
-    pt: { translation: pt },
-    pl: { translation: pl },
-    tr: { translation: tr },
-    ja: { translation: ja },
-    ko: { translation: ko },
-    ar: { translation: ar },
-    fa: { translation: fa },
   },
   lng: getStoredLocale(),
   fallbackLng: 'en',
@@ -69,19 +71,23 @@ i18next.use(initReactI18next).init({
 
 // Set initial text direction based on stored locale
 applyDirection(getStoredLocale());
+// A stored locale other than nl/en: load it and re-render once it arrives (English meanwhile).
+if (LOADERS[getStoredLocale()]) {
+  void ensureLocale(getStoredLocale()).then(() => i18next.changeLanguage(getStoredLocale()));
+}
 
 /** Drop-in replacement hook — same API as before */
 export function useI18n() {
   const { t, i18n } = useTranslation();
 
   const setLocale = (newLocale: Locale) => {
-    i18n.changeLanguage(newLocale);
     localStorage.setItem('energy-locale', newLocale);
     applyDirection(newLocale);
+    void ensureLocale(newLocale).then(() => i18n.changeLanguage(newLocale));
   };
 
   return {
-    t: t as (key: string) => string,
+    t: t as (key: string, options?: Record<string, unknown>) => string,
     locale: i18n.language as Locale,
     setLocale,
   };

@@ -1,0 +1,45 @@
+{
+  "id": "bcrg-20260143gg-wpu18-wpv90-example",
+  "source": "groundwater",
+  "sink": "combined_hydronic_and_hot_water",
+  "drive": "electric_compression",
+  "reversible": false,
+  "hybrid": false,
+  "booster": false,
+  "performanceEvidence": {
+    "kind": "controlled_quality_declaration",
+    "reference": "BCRG 20260143GG, WPU 6G WPU18 + WPV 90L, groundwater source option",
+    "registryRecord": {
+      "registrationNumber": "20260143GG",
+      "productName": "WPU 6G WPU18 + WPV 90L",
+      "manufacturer": "Itho Daalderop",
+      "sourceUrl": "https://mijn.bcrg.nl/media/documents/2026/GG/20260143GG.pdf"
+    }
+  },
+  "dhwTestPoints": [
+    {
+      "id": "M",
+      "tapProfile": "M",
+      "usefulEnergyKwhPerDay": 5.876,
+      "inputEnergyKwhPerDay": 1.644,
+      "nominalCapacityKw": 2.1,
+      "practiceFactor": 0.95,
+      "testSetpointC": 56.8,
+      "designSetpointC": 55,
+      "declarationNormVersion": "NTA 8800:2025",
+      "sourceReference": "BCRG 20260143GG, p. 17, WPV 90L / WPU18, tap profile M"
+    },
+    {
+      "id": "L",
+      "tapProfile": "L",
+      "usefulEnergyKwhPerDay": 11.702,
+      "inputEnergyKwhPerDay": 3.029,
+      "nominalCapacityKw": 2.1,
+      "practiceFactor": 0.95,
+      "testSetpointC": 56.5,
+      "designSetpointC": 55,
+      "declarationNormVersion": "NTA 8800:2025",
+      "sourceReference": "BCRG 20260143GG, p. 17, WPV 90L / WPU18, tap profile L"
+    }
+  ]
+}

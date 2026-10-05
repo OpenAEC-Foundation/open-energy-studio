@@ -1,86 +1,207 @@
+import { useRef } from 'react';
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import { useEnergy } from '../../context/EnergyContext';
 import { BENGIndicator } from '../BENGIndicator/BENGIndicator';
 import { EnergyBreakdownChart } from '../EnergyBreakdownChart/EnergyBreakdownChart';
 import { MonthlyBreakdownChart } from '../MonthlyBreakdownChart/MonthlyBreakdownChart';
-import type { IBENGResultMonthly } from '../../core/energy/types';
+import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
+import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
+import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
+import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
+import { calculatedAssessment } from '../../core/nta/useProjectPerformance';
+import { useKernelQuery } from '../../context/KernelProvider';
+import { kernelEnergyBreakdown } from '../../core/nta/KernelBreakdown';
+import { kernelVerdict, type KernelVerdict } from '../../core/nta/KernelVerdict';
+import type { IBENGResult, IBENGResultMonthly } from '../../core/energy/types';
 import './ResultsView.css';
 
-export function ResultsView() {
-  const { t } = useI18n();
-  const { state } = useEnergy();
-  const { result } = state;
+/**
+ * `workflowPanels`: the kernel audit, maatwerkadvies and relabel panels. In the
+ * app shell they have their own steps (Controle, Maatwerkadvies, Herlabelen);
+ * standalone the view keeps them.
+ */
+export function ResultsView({ workflowPanels = true }: { workflowPanels?: boolean } = {}) {
+  const { t, locale } = useI18n();
+  const { state, dispatch } = useEnergy();
+  const { result, project } = state;
 
-  if (!result) {
-    return (
-      <div className="results-view">
-        <div className="results-empty">
-          <h2>{t('results.title')}</h2>
-          <p>{t('results.noResults')}</p>
-        </div>
-      </div>
-    );
+  // A project edit clears `result`; the last result of this project stays visible,
+  // marked stale, so the panels below keep their place (and their own state).
+  const lastResult = useRef<{ projectId: string; result: IBENGResult } | null>(null);
+  if (result) lastResult.current = { projectId: project.id, result };
+  else if (lastResult.current?.projectId !== project.id) lastResult.current = null;
+  const shown = result ?? lastResult.current?.result ?? null;
+  const stale = result == null && shown != null;
+
+  // One kernel run feeds both the NTA panel and the cards, so they cannot disagree.
+  const kernelQuery = useKernelQuery(project);
+  const kernel = calculatedAssessment(kernelQuery);
+  const performance = kernel?.performance ?? null;
+  const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
+
+  const monthlyResult = shown && 'monthly' in shown ? shown as IBENGResultMonthly : null;
+  const surfaceCount = project.zones.reduce((count, zone) => count + zone.surfaces.length, 0);
+  const systemCount = project.heatingSystems.length + project.ventilationSystems.length
+    + project.coolingSystems.length + project.hotWaterSystems.length;
+  const kernelFloorArea = kernel?.geometry?.usableFloorAreaM2 ?? null;
+  const floorArea = kernelFloorArea ?? shown?.totalFloorArea ?? null;
+  // Output of the simplified engine follows one shared rule (`kernelVerdict`): a kernel that
+  // refused the input withholds every number; only without any NTA input yet, or without a
+  // settled kernel answer, may the indicative estimate show (marked stale after an edit).
+  const kernelDone = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
+  // The last settled kernel answer of this project. While the next (debounced) run is pending its
+  // verdict holds: a withheld result stays withheld (no flash of simplified numbers), and the
+  // simplified output stays only when the kernel had no verdict against it before either.
+  const settled = useRef<{ projectId: string; verdict: KernelVerdict; status: string | null } | null>(null);
+  if (kernelQuery && kernelQuery.kind !== 'loading') {
+    settled.current = { projectId: project.id, verdict: kernelVerdict(kernelDone), status: kernelDone?.status ?? null };
   }
-
-  // Check if result has monthly data (IBENGResultMonthly)
-  const monthlyResult = 'monthly' in result ? result as IBENGResultMonthly : null;
+  const last = settled.current?.projectId === project.id ? settled.current : null;
+  const withheld = last?.verdict === 'withheld';
+  const kernelStatus = last?.status ?? null;
+  const kernelHadNoResult = last != null && last.verdict !== 'calculated' && last.verdict !== 'withheld';
+  const indicative = !withheld && !performance && shown != null && (!kernelPending || kernelHadNoResult);
+  const bbl = performance?.bblCheck ?? null;
+  const utility = kernel?.derivedInput?.calculationScope === 'utility';
 
   return (
     <div className="results-view">
-      <h2>{t('results.title')}</h2>
-
-      <div className="beng-cards">
-        <BENGIndicator
-          title={t('results.beng1.title')}
-          subtitle={t('results.beng1.subtitle')}
-          value={result.beng1}
-          limit={result.beng1Limit}
-          unit={t('results.beng1.unit')}
-          pass={result.beng1Pass}
-        />
-        <BENGIndicator
-          title={t('results.beng2.title')}
-          subtitle={t('results.beng2.subtitle')}
-          value={result.beng2}
-          limit={result.beng2Limit}
-          unit={t('results.beng2.unit')}
-          pass={result.beng2Pass}
-        />
-        <BENGIndicator
-          title={t('results.beng3.title')}
-          subtitle={t('results.beng3.subtitle')}
-          value={result.beng3}
-          limit={result.beng3Limit}
-          unit={t('results.beng3.unit')}
-          pass={result.beng3Pass}
-          higherIsBetter
-        />
+      <div className="results-heading">
+        <div>
+          <span className="results-eyebrow">{t('results.calculationOverview')}</span>
+          <h2>{project.name || t('results.title')}</h2>
+          <p>{t('results.inputSummary')}</p>
+        </div>
+        <button
+          type="button"
+          className="results-review-button"
+          onClick={() => {
+            dispatch({ type: 'NAVIGATE', payload: { step: 'check', sub: 'input' } });
+          }}
+        >
+          {t('results.reviewInput')}
+        </button>
       </div>
 
-      {/* TO-juli indicator */}
-      {monthlyResult && (
-        <div className={`to-juli-card ${monthlyResult.toJuli.pass ? 'to-juli-pass' : 'to-juli-fail'}`}>
+      <div className="results-input-summary" aria-label={t('results.inputSummary')}>
+        <div><strong>{project.zones.length}</strong><span>{t('results.zones')}</span></div>
+        <div><strong>{surfaceCount}</strong><span>{t('results.surfaces')}</span></div>
+        <div><strong>{systemCount}</strong><span>{t('results.systems')}</span></div>
+        <div className={kernelFloorArea == null && stale ? 'results-stale-value' : undefined}
+          title={kernelFloorArea == null && stale ? t('results.staleShort') : undefined}>
+          <strong>{formatNumber(floorArea, locale, 1)}</strong><span>m² {t('results.floorArea')}</span></div>
+      </div>
+
+      {!shown && !performance && <div className="results-empty">
+        <p>{t('results.noResults')}</p>
+      </div>}
+
+      <CalculationNotice />
+      {workflowPanels && <KernelAuditPanel project={project} />}
+      <NtaPerformancePanel query={kernelQuery} />
+      {workflowPanels && <MaatwerkadviesPanel />}
+      {workflowPanels && <RelabelPanel />}
+
+      {performance && <div className="beng-cards" data-testid="beng-cards-kernel">
+        {performance.needIndicatorKwhPerM2Year != null && <BENGIndicator
+          title={t('results.beng1.title')}
+          subtitle={t('results.beng1.subtitle')}
+          value={performance.needIndicatorKwhPerM2Year}
+          limit={bbl?.limits.energyNeedMaxKwhPerM2 ?? null}
+          unit={t('results.beng1.unit')}
+          source="kernel"
+          digits={2}
+        />}
+        {performance.primaryFossilIndicatorKwhPerM2Year != null && <BENGIndicator
+          title={t('results.beng2.title')}
+          subtitle={t('results.beng2.subtitle')}
+          value={performance.primaryFossilIndicatorKwhPerM2Year}
+          limit={bbl?.limits.primaryFossilMaxKwhPerM2 ?? null}
+          unit={t('results.beng2.unit')}
+          source="kernel"
+          digits={2}
+        />}
+        {performance.renewableSharePercent != null && <BENGIndicator
+          title={t('results.beng3.title')}
+          subtitle={t('results.beng3.subtitle')}
+          value={performance.renewableSharePercent}
+          limit={bbl?.limits.renewableShareMinPercent ?? null}
+          unit={t('results.beng3.unit')}
+          higherIsBetter
+          source="kernel"
+        />}
+      </div>}
+
+      {/* TO-juli: the kernel value (dwellings only), otherwise the indicative GTO. */}
+      {performance && !utility && performance.tojuliMaxK != null && (
+        <div className="to-juli-card" data-testid="to-juli-kernel">
           <div className="to-juli-header">
             <h3>{t('results.toJuli')}</h3>
-            <span className={`to-juli-badge ${monthlyResult.toJuli.pass ? 'pass' : 'fail'}`}>
-              {monthlyResult.toJuli.pass ? t('results.pass') : t('results.fail')}
-            </span>
+            <span className="to-juli-badge">{t('results.kernelBadge')}</span>
           </div>
           <div className="to-juli-value">
-            GTO: {monthlyResult.toJuli.gto.toFixed(2)}
+            TO<sub>juli</sub>: {formatNumber(performance.tojuliMaxK, locale, 2)} K
             <span className="to-juli-limit">
-              {' '}/ {t('results.limit')}: {'\u2264'} {monthlyResult.toJuli.limit}
+              {' '}/ {t('results.limit')}: {'≤'} {formatNumber(1.2, locale, 2)} K
             </span>
           </div>
         </div>
       )}
+      {performance && <EnergyBreakdownChart breakdown={kernelEnergyBreakdown(performance)} source="kernel" />}
 
-      <EnergyBreakdownChart breakdown={result.breakdown} />
+      {withheld && <div className="results-withheld" role="status" data-testid="results-withheld">
+        <strong>{t('results.withheld.title')}</strong>
+        <p>{t(kernelStatus === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')}</p>
+      </div>}
 
-      {/* Monthly breakdown chart */}
-      {monthlyResult && (
-        <MonthlyBreakdownChart monthly={monthlyResult.monthly} />
-      )}
+      {/* The simplified engine only when the kernel has no result; never next to kernel values. */}
+      {indicative && shown && <div className={stale ? 'results-indicative results-stale-block' : 'results-indicative'}
+        data-testid="results-indicative">
+        {stale && <p className="results-stale" role="status" data-testid="results-stale">{t('results.stale')}</p>}
+        <p className="results-indicative-note">{t('results.indicativeNote')}</p>
+        <div className="beng-cards" data-testid="beng-cards-indicative">
+          <BENGIndicator
+            title={t('results.beng1.title')}
+            subtitle={t('results.beng1.subtitle')}
+            value={shown.beng1}
+            limit={shown.beng1Limit}
+            unit={t('results.beng1.unit')}
+          />
+          <BENGIndicator
+            title={t('results.beng2.title')}
+            subtitle={t('results.beng2.subtitle')}
+            value={shown.beng2}
+            limit={shown.beng2Limit}
+            unit={t('results.beng2.unit')}
+          />
+          <BENGIndicator
+            title={t('results.beng3.title')}
+            subtitle={t('results.beng3.subtitle')}
+            value={shown.beng3}
+            limit={shown.beng3Limit}
+            unit={t('results.beng3.unit')}
+            higherIsBetter
+          />
+        </div>
+        {monthlyResult && (
+          <div className="to-juli-card to-juli-indicative">
+            <div className="to-juli-header">
+              <h3>{t('results.toJuli')}</h3>
+              <span className="to-juli-badge indicative">{t('results.indicativeBadge')}</span>
+            </div>
+            <div className="to-juli-value">
+              GTO: {formatNumber(monthlyResult.toJuli.gto, locale, 2)}
+              <span className="to-juli-limit">
+                {' '}/ {t('results.limit')}: {'≤'} {formatNumber(monthlyResult.toJuli.limit, locale, 2)}
+              </span>
+            </div>
+          </div>
+        )}
+        <EnergyBreakdownChart breakdown={shown.breakdown} />
+        {monthlyResult && <MonthlyBreakdownChart monthly={monthlyResult.monthly} />}
+      </div>}
     </div>
   );
 }

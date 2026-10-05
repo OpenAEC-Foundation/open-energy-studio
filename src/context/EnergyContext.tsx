@@ -5,12 +5,14 @@ import {
   ISurface,
   IWindow,
   IThermalBridge,
+  IPointThermalBridge,
   IAirTightness,
   IConstruction,
   IHeatingSystem,
   IVentilationSystem,
   ICoolingSystem,
   IHotWaterSystem,
+  INtaHeatPumpInput,
   ISolarPV,
   ISolarThermal,
   IBENGResult,
@@ -19,6 +21,8 @@ import {
   DialogType,
   IDialogState,
 } from '../core/energy/types';
+import { deleteSurfaceFromProject, deleteWindowFromProject, deleteZoneFromProject } from '../core/energy/projectDelete';
+import { normalizeRoute, routeForViewMode, viewModeForRoute, type Route } from '../core/navigation/routes';
 
 // ============================================================
 // State
@@ -34,6 +38,8 @@ export interface EnergyState {
   selectedItemType: string | null;
   isDirty: boolean;
   previewVisible: boolean;
+  /** Workflow route of the app shell (ontwerp §3.5); `viewMode` mirrors it for older code. */
+  route: Route;
 }
 
 // ============================================================
@@ -43,7 +49,11 @@ export interface EnergyState {
 export type EnergyAction =
   // Project-level
   | { type: 'SET_PROJECT'; payload: IProject }
-  | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city'>> }
+  | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city' | 'registration'>> }
+  | { type: 'SET_UNHEATED_SPACES'; payload: NonNullable<IProject['unheatedSpaces']> }
+  | { type: 'SET_NTA_CALCULATION'; payload: IProject['ntaCalculation'] }
+  | { type: 'SET_MAATWERKADVIES'; payload: IProject['maatwerkadvies'] }
+  | { type: 'SET_BASISOPNAME'; payload: IProject['basisopname'] }
   // Zones
   | { type: 'ADD_ZONE'; payload: IZone }
   | { type: 'UPDATE_ZONE'; payload: { id: string; data: Partial<IZone> } }
@@ -60,6 +70,9 @@ export type EnergyAction =
   | { type: 'ADD_THERMAL_BRIDGE'; payload: { zoneId: string; bridge: IThermalBridge } }
   | { type: 'UPDATE_THERMAL_BRIDGE'; payload: { zoneId: string; bridgeId: string; data: Partial<IThermalBridge> } }
   | { type: 'DELETE_THERMAL_BRIDGE'; payload: { zoneId: string; bridgeId: string } }
+  | { type: 'ADD_POINT_BRIDGE'; payload: { zoneId: string; bridge: IPointThermalBridge } }
+  | { type: 'UPDATE_POINT_BRIDGE'; payload: { zoneId: string; bridgeId: string; data: Partial<IPointThermalBridge> } }
+  | { type: 'DELETE_POINT_BRIDGE'; payload: { zoneId: string; bridgeId: string } }
   // Air tightness (per zone)
   | { type: 'UPDATE_AIR_TIGHTNESS'; payload: { zoneId: string; airTightness: IAirTightness } }
   // Constructions
@@ -82,6 +95,9 @@ export type EnergyAction =
   | { type: 'ADD_HOT_WATER_SYSTEM'; payload: IHotWaterSystem }
   | { type: 'UPDATE_HOT_WATER_SYSTEM'; payload: { id: string; data: Partial<IHotWaterSystem> } }
   | { type: 'DELETE_HOT_WATER_SYSTEM'; payload: string }
+  | { type: 'ADD_NTA_HEAT_PUMP'; payload: INtaHeatPumpInput }
+  | { type: 'UPDATE_NTA_HEAT_PUMP'; payload: INtaHeatPumpInput }
+  | { type: 'DELETE_NTA_HEAT_PUMP'; payload: string }
   // Solar PV
   | { type: 'ADD_SOLAR_PV'; payload: ISolarPV }
   | { type: 'UPDATE_SOLAR_PV'; payload: { id: string; data: Partial<ISolarPV> } }
@@ -94,6 +110,7 @@ export type EnergyAction =
   | { type: 'SET_RESULT'; payload: IBENGResult | null }
   // UI state
   | { type: 'SET_VIEW_MODE'; payload: ViewMode }
+  | { type: 'NAVIGATE'; payload: Route }
   | { type: 'SET_RIBBON_TAB'; payload: RibbonTab }
   | { type: 'OPEN_DIALOG'; payload: { type: DialogType; editId?: string | null } }
   | { type: 'CLOSE_DIALOG' }
@@ -215,6 +232,8 @@ export function createDefaultProject(): IProject {
           { id: 'tb-2', name: 'Gevel-dak', psiValue: 0.05, length: 34, zoneId: 'zone-main' },
           { id: 'tb-3', name: 'Raamkozijnen', psiValue: 0.03, length: 65, zoneId: 'zone-main' },
         ],
+        pointThermalBridges: [],
+        pointBridgeInventoryComplete: false,
         airTightness: { qv10: 0.98 },
       },
     ],
@@ -230,6 +249,7 @@ export function createDefaultProject(): IProject {
     hotWaterSystems: [
       { id: 'hw-1', name: 'Warmtepompboiler', type: 'heat_pump', efficiency: 1.40, hasSolarBoiler: false, solarBoilerFraction: 0 },
     ],
+    ntaHeatPumps: [],
     solarPV: [
       { id: 'pv-west', name: 'PV West (18 panelen)', peakPower: 7.2, orientation: 'W', tilt: 30, area: 30.6 },
       { id: 'pv-east', name: 'PV Oost (3 panelen)', peakPower: 1.2, orientation: 'E', tilt: 30, area: 5.1 },
@@ -258,6 +278,7 @@ function createDocumentState(project: IProject): EnergyState {
     selectedItemType: null,
     isDirty: false,
     previewVisible: true,
+    route: { step: 'project' },
   };
 }
 
@@ -278,13 +299,13 @@ export interface DocumentManagerState {
 
 export type DocumentManagerAction =
   | { type: 'DOC_NEW'; payload: { id: string; project: IProject } }
-  | { type: 'DOC_OPEN'; payload: { id: string; project: IProject; filePath: string } }
+  | { type: 'DOC_OPEN'; payload: { id: string; project: IProject; filePath: string | null } }
   | { type: 'DOC_CLOSE'; payload: string }
   | { type: 'DOC_SET_ACTIVE'; payload: string }
   | { type: 'DOC_SET_FILE_PATH'; payload: { id: string; filePath: string } }
   | { type: 'DOC_DISPATCH'; payload: { id: string; action: EnergyAction } };
 
-function documentManagerReducer(
+export function documentManagerReducer(
   state: DocumentManagerState,
   action: DocumentManagerAction,
 ): DocumentManagerState {
@@ -301,7 +322,10 @@ function documentManagerReducer(
       };
     }
     case 'DOC_OPEN': {
-      const existing = state.documents.find(d => d.filePath === action.payload.filePath);
+      // Only a saved location identifies an open document; a browser open has none.
+      const existing = action.payload.filePath != null
+        ? state.documents.find(d => d.filePath === action.payload.filePath)
+        : undefined;
       if (existing) {
         return { ...state, activeDocumentId: existing.id };
       }
@@ -372,6 +396,11 @@ function mapZone(zones: IZone[], zoneId: string, updater: (zone: IZone) => IZone
 }
 
 /** Return a new surfaces array with the surface matching `surfaceId` replaced by `updater(surface)`. */
+/** The object without keys whose value is `undefined`, so an editor round trip adds no empty keys. */
+function withoutUndefined<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 function mapSurface(surfaces: ISurface[], surfaceId: string, updater: (s: ISurface) => ISurface): ISurface[] {
   return surfaces.map(s => (s.id === surfaceId ? updater(s) : s));
 }
@@ -380,7 +409,7 @@ function mapSurface(surfaces: ISurface[], surfaceId: string, updater: (s: ISurfa
 // Reducer
 // ============================================================
 
-function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
+function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyState {
   switch (action.type) {
 
     // ----------------------------------------------------------
@@ -396,6 +425,18 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         project: { ...state.project, ...action.payload },
         isDirty: true,
       };
+
+    case 'SET_UNHEATED_SPACES':
+      return { ...state, project: { ...state.project, unheatedSpaces: action.payload }, isDirty: true };
+
+    case 'SET_NTA_CALCULATION':
+      return { ...state, project: { ...state.project, ntaCalculation: action.payload }, isDirty: true };
+
+    case 'SET_MAATWERKADVIES':
+      return { ...state, project: { ...state.project, maatwerkadvies: action.payload }, isDirty: true };
+
+    case 'SET_BASISOPNAME':
+      return { ...state, project: { ...state.project, basisopname: action.payload }, isDirty: true };
 
     // ----------------------------------------------------------
     // Zones
@@ -414,21 +455,14 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          zones: mapZone(state.project.zones, id, z => ({ ...z, ...data })),
+          zones: mapZone(state.project.zones, id, z => withoutUndefined({ ...z, ...data })),
         },
         isDirty: true,
       };
     }
 
     case 'DELETE_ZONE':
-      return {
-        ...state,
-        project: {
-          ...state.project,
-          zones: state.project.zones.filter(z => z.id !== action.payload),
-        },
-        isDirty: true,
-      };
+      return { ...state, project: deleteZoneFromProject(state.project, action.payload).project, isDirty: true };
 
     // ----------------------------------------------------------
     // Surfaces (nested in zone)
@@ -457,7 +491,8 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
           ...state.project,
           zones: mapZone(state.project.zones, zoneId, z => ({
             ...z,
-            surfaces: mapSurface(z.surfaces, surfaceId, s => ({ ...s, ...data })),
+            // An `undefined` field in the update removes it (a cleared boundary), and is not stored as a key.
+            surfaces: mapSurface(z.surfaces, surfaceId, s => withoutUndefined({ ...s, ...data })),
           })),
         },
         isDirty: true,
@@ -466,17 +501,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
 
     case 'DELETE_SURFACE': {
       const { zoneId, surfaceId } = action.payload;
-      return {
-        ...state,
-        project: {
-          ...state.project,
-          zones: mapZone(state.project.zones, zoneId, z => ({
-            ...z,
-            surfaces: z.surfaces.filter(s => s.id !== surfaceId),
-          })),
-        },
-        isDirty: true,
-      };
+      return { ...state, project: deleteSurfaceFromProject(state.project, zoneId, surfaceId).project, isDirty: true };
     }
 
     // ----------------------------------------------------------
@@ -511,7 +536,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
             ...z,
             surfaces: mapSurface(z.surfaces, surfaceId, s => ({
               ...s,
-              windows: s.windows.map(w => (w.id === windowId ? { ...w, ...data } : w)),
+              windows: s.windows.map(w => (w.id === windowId ? withoutUndefined({ ...w, ...data }) : w)),
             })),
           })),
         },
@@ -521,20 +546,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
 
     case 'DELETE_WINDOW': {
       const { zoneId, surfaceId, windowId } = action.payload;
-      return {
-        ...state,
-        project: {
-          ...state.project,
-          zones: mapZone(state.project.zones, zoneId, z => ({
-            ...z,
-            surfaces: mapSurface(z.surfaces, surfaceId, s => ({
-              ...s,
-              windows: s.windows.filter(w => w.id !== windowId),
-            })),
-          })),
-        },
-        isDirty: true,
-      };
+      return { ...state, project: deleteWindowFromProject(state.project, zoneId, surfaceId, windowId).project, isDirty: true };
     }
 
     // ----------------------------------------------------------
@@ -564,7 +576,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
           ...state.project,
           zones: mapZone(state.project.zones, zoneId, z => ({
             ...z,
-            thermalBridges: z.thermalBridges.map(b => (b.id === bridgeId ? { ...b, ...data } : b)),
+            thermalBridges: z.thermalBridges.map(b => (b.id === bridgeId ? withoutUndefined({ ...b, ...data }) : b)),
           })),
         },
         isDirty: true,
@@ -584,6 +596,35 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         },
         isDirty: true,
       };
+    }
+
+    case 'ADD_POINT_BRIDGE': {
+      const { zoneId, bridge } = action.payload;
+      return { ...state, project: { ...state.project,
+        zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
+          pointThermalBridges: [...(z.pointThermalBridges ?? []), bridge],
+          pointBridgeInventoryComplete: false,
+        })),
+      }, isDirty: true };
+    }
+
+    case 'UPDATE_POINT_BRIDGE': {
+      const { zoneId, bridgeId, data } = action.payload;
+      return { ...state, project: { ...state.project,
+        zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
+          pointThermalBridges: (z.pointThermalBridges ?? []).map(b => b.id === bridgeId ? withoutUndefined({ ...b, ...data }) : b),
+        })),
+      }, isDirty: true };
+    }
+
+    case 'DELETE_POINT_BRIDGE': {
+      const { zoneId, bridgeId } = action.payload;
+      return { ...state, project: { ...state.project,
+        zones: mapZone(state.project.zones, zoneId, z => ({ ...z,
+          pointThermalBridges: (z.pointThermalBridges ?? []).filter(b => b.id !== bridgeId),
+          pointBridgeInventoryComplete: false,
+        })),
+      }, isDirty: true };
     }
 
     // ----------------------------------------------------------
@@ -625,7 +666,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          constructions: state.project.constructions.map(c => (c.id === id ? { ...c, ...data } : c)),
+          constructions: state.project.constructions.map(c => (c.id === id ? withoutUndefined({ ...c, ...data }) : c)),
         },
         isDirty: true,
       };
@@ -661,7 +702,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          heatingSystems: state.project.heatingSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          heatingSystems: state.project.heatingSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -697,7 +738,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          ventilationSystems: state.project.ventilationSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          ventilationSystems: state.project.ventilationSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -733,7 +774,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          coolingSystems: state.project.coolingSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          coolingSystems: state.project.coolingSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -769,7 +810,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          hotWaterSystems: state.project.hotWaterSystems.map(s => (s.id === id ? { ...s, ...data } : s)),
+          hotWaterSystems: state.project.hotWaterSystems.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -782,6 +823,40 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
           ...state.project,
           hotWaterSystems: state.project.hotWaterSystems.filter(s => s.id !== action.payload),
         },
+        isDirty: true,
+      };
+
+    case 'ADD_NTA_HEAT_PUMP':
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          ntaHeatPumps: [...(state.project.ntaHeatPumps ?? []), action.payload],
+        },
+        result: null,
+        isDirty: true,
+      };
+
+    case 'UPDATE_NTA_HEAT_PUMP':
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          ntaHeatPumps: (state.project.ntaHeatPumps ?? []).map((pump) =>
+            pump.id === action.payload.id ? action.payload : pump),
+        },
+        result: null,
+        isDirty: true,
+      };
+
+    case 'DELETE_NTA_HEAT_PUMP':
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          ntaHeatPumps: (state.project.ntaHeatPumps ?? []).filter((pump) => pump.id !== action.payload),
+        },
+        result: null,
         isDirty: true,
       };
 
@@ -805,7 +880,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          solarPV: state.project.solarPV.map(s => (s.id === id ? { ...s, ...data } : s)),
+          solarPV: state.project.solarPV.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -841,7 +916,7 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
         ...state,
         project: {
           ...state.project,
-          solarThermal: state.project.solarThermal.map(s => (s.id === id ? { ...s, ...data } : s)),
+          solarThermal: state.project.solarThermal.map(s => (s.id === id ? withoutUndefined({ ...s, ...data }) : s)),
         },
         isDirty: true,
       };
@@ -869,7 +944,13 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
     // ----------------------------------------------------------
 
     case 'SET_VIEW_MODE':
-      return { ...state, viewMode: action.payload };
+      // Alias of NAVIGATE for code of the ribbon era.
+      return { ...state, viewMode: action.payload, route: normalizeRoute(routeForViewMode(action.payload)) };
+
+    case 'NAVIGATE': {
+      const route = normalizeRoute(action.payload);
+      return { ...state, route, viewMode: viewModeForRoute(route) };
+    }
 
     case 'SET_RIBBON_TAB':
       return { ...state, activeRibbonTab: action.payload };
@@ -902,6 +983,23 @@ function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
     default:
       return state;
   }
+}
+
+/** The project after an action, without touching UI state; used to preview a delete. */
+export function projectAfterAction(project: IProject, action: EnergyAction): IProject {
+  const state: EnergyState = {
+    project, result: null, viewMode: 'project', activeRibbonTab: 'start',
+    dialog: { type: null, editId: null }, selectedItemId: null, selectedItemType: null, isDirty: false, previewVisible: false,
+    route: { step: 'project' },
+  };
+  return applyEnergyAction(state, action).project;
+}
+
+function energyReducer(state: EnergyState, action: EnergyAction): EnergyState {
+  const next = applyEnergyAction(state, action);
+  return next.project !== state.project && next.result !== null
+    ? { ...next, result: null }
+    : next;
 }
 
 // ============================================================

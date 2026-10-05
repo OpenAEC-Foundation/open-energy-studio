@@ -22,16 +22,49 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Type check
-        run: npx tsc --noEmit || true
+        run: npx tsc --noEmit
+
+      - name: UI tests
+        run: npm test -- --run --maxWorkers=2
 
       - name: Build frontend
         run: npm run build
 
+  nta-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust stable with Clippy and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust formatting
+        run: |
+          cargo fmt --manifest-path crates/nta8800-core/Cargo.toml --check
+          cargo fmt --manifest-path crates/nta8800-service/Cargo.toml --check
+
+      - name: Core and service tests
+        run: |
+          cargo test --manifest-path crates/nta8800-core/Cargo.toml
+          cargo test --manifest-path crates/nta8800-service/Cargo.toml
+
+      - name: Clippy
+        run: |
+          cargo clippy --manifest-path crates/nta8800-core/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/nta8800-service/Cargo.toml --all-targets -- -D warnings
+
+      - name: Core minimum Rust version
+        run: |
+          rustup toolchain install 1.77.2 --profile minimal
+          CARGO_TARGET_DIR=target/msrv-core cargo +1.77.2 test --manifest-path crates/nta8800-core/Cargo.toml
+
   build:
-    needs: [test]
+    needs: [test, nta-kernel]
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +109,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Tauri app
         env:
@@ -130,7 +163,7 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    needs: [test, build]
+    needs: [test, nta-kernel, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 

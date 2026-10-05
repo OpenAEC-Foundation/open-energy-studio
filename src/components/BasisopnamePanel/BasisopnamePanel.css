@@ -1,0 +1,108 @@
+.opname-panel .opname-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.opname-panel .opname-item {
+  display: contents;
+}
+
+.opname-panel .opname-item > strong {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.opname-panel .opname-list-controls {
+  grid-column: 1 / -1;
+}
+
+.opname-panel .opname-remove {
+  align-self: end;
+  justify-self: start;
+}
+
+.opname-panel .opname-json textarea {
+  width: 100%;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.opname-panel .opname-error {
+  color: var(--error-text);
+}
+
+.opname-panel .opname-defaults {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.opname-panel .opname-defaults caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 8px 0;
+}
+
+.opname-panel .opname-defaults th,
+.opname-panel .opname-defaults td {
+  border-bottom: 1px solid var(--line);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.opname-panel .opname-defaults input {
+  width: 100%;
+}
+
+.opname-panel .opname-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+}
+
+.opname-panel .opname-zone {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.opname-panel .opname-zone-heading {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.opname-panel .opname-defaults input.opname-reason {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.opname-panel .opname-result-heading {
+  margin: 16px 0 4px;
+  font-size: 14px;
+}
+
+/* F10: headings one level up for a correct outline; same look as before. */
+.opname-panel > h2 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
+.opname-panel h3.opname-result-heading { font-weight: 500; letter-spacing: -0.01em; }

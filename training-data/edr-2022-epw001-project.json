@@ -1,0 +1,169 @@
+{
+  "id": "edr-2022-epw001",
+  "name": "EDR EP-W001 referentiewoning (ISSO 54 v2.0, 2022)",
+  "description": "Invoer uit ISSO 54 v2.0 (vastgesteld CCvD InstallQ 12-05-2022), EP-W001, p. 4-6; rekent volgens NTA 8800 (januari 2022). Verwachte uitkomsten staan in bijlage 2 (Excel), niet in bezit; alleen Ag en Als zijn in de pdf-tekst gepubliceerd.",
+  "buildingFunction": "residential",
+  "address": "",
+  "city": "",
+  "zones": [
+    {
+      "id": "epw001-zone",
+      "name": "Rekenzone 1 (2 bouwlagen)",
+      "floorArea": 96.0,
+      "volume": 259.2,
+      "height": 5.4,
+      "surfaces": [
+        {
+          "id": "dak",
+          "name": "Dak (plat)",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 48.0,
+          "orientation": "horizontal",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "bg-vloer",
+          "name": "Begane-grondvloer op grond",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 48.0,
+          "orientation": "horizontal",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "gevel-zuid",
+          "name": "Gevel zuid",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 43.2,
+          "orientation": "S",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "id": "gevel-noord",
+          "name": "Gevel noord",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 43.2,
+          "orientation": "N",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "gevel-oost",
+          "name": "Gevel oost",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 32.4,
+          "orientation": "E",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "gevel-west",
+          "name": "Gevel west",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 32.4,
+          "orientation": "W",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.7
+      }
+    }
+  ],
+  "heatingSystems": [
+    {
+      "id": "hr107",
+      "name": "HR107-combiketel",
+      "type": "hr_combi",
+      "cop": 0.95,
+      "coverageFraction": 1.0
+    }
+  ],
+  "ventilationSystems": [
+    {
+      "id": "d2",
+      "name": "D2 met WTW",
+      "type": "type_d",
+      "heatRecoveryEfficiency": 0.0,
+      "sfp": 0.0
+    }
+  ],
+  "coolingSystems": [],
+  "hotWaterSystems": [
+    {
+      "id": "cw5",
+      "name": "HR107-combi CW5",
+      "type": "hr_combi",
+      "efficiency": 0.0,
+      "hasSolarBoiler": false,
+      "solarBoilerFraction": 0
+    }
+  ],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-rc6",
+      "name": "Dichte constructie Rc 6,0 (tabel 1, p. 5)",
+      "layers": [],
+      "rcValue": 6.0,
+      "uValue": 0.162
+    }
+  ]
+}

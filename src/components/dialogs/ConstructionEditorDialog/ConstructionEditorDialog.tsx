@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IConstruction, IConstructionLayer } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { NtaConstructionSection, type NtaConstructionResult } from './NtaConstructionSection';
 
 interface ConstructionEditorDialogProps {
   editId?: string | null;
@@ -10,6 +11,7 @@ interface ConstructionEditorDialogProps {
 }
 
 export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditorDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -21,6 +23,13 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   const [layers, setLayers] = useState<IConstructionLayer[]>(
     existing?.layers ?? [{ material: '', thickness: 0.1, lambda: 0.04 }]
   );
+
+  // Kernel result applied by the user; replaces the simple Σd/λ values below.
+  const [ntaResult, setNtaResult] = useState<NtaConstructionResult | null>(null);
+  // An existing construction keeps its stored Rc/U (and R_se basis) until the
+  // user changes a layer or applies a kernel result; many constructions carry
+  // an Rc without layers, which Σd/λ would turn into 0.
+  const [layersEdited, setLayersEdited] = useState(!existing);
 
   // Rsi + Rse for walls (NTA 8800 default)
   const rSurface = 0.13 + 0.04; // 0.17
@@ -39,7 +48,13 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
     return rTotal > 0 ? 1 / rTotal : 0;
   }, [rcValue]);
 
+  const keepStored = existing != null && !layersEdited && !ntaResult;
+  const shownRc = keepStored ? existing.rcValue : rcValue;
+  const shownU = keepStored ? existing.uValue : uValue;
+
   const handleLayerChange = (index: number, field: keyof IConstructionLayer, value: string | number) => {
+    setNtaResult(null);
+    setLayersEdited(true);
     setLayers((prev) =>
       prev.map((layer, i) =>
         i === index ? { ...layer, [field]: value } : layer
@@ -48,35 +63,46 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   };
 
   const addLayer = () => {
+    setNtaResult(null);
+    setLayersEdited(true);
     setLayers((prev) => [...prev, { material: '', thickness: 0.1, lambda: 0.04 }]);
   };
 
   const removeLayer = (index: number) => {
+    setNtaResult(null);
+    setLayersEdited(true);
     setLayers((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = () => {
-    const construction: IConstruction = {
-      id: existing?.id ?? crypto.randomUUID(),
-      name,
-      layers,
-      rcValue: Math.round(rcValue * 100) / 100,
-      uValue: Math.round(uValue * 1000) / 1000,
-    };
+    const rc = keepStored ? existing.rcValue : ntaResult?.rc ?? Math.round(rcValue * 100) / 100;
+    const u = keepStored ? existing.uValue : ntaResult?.u ?? Math.round(uValue * 1000) / 1000;
+    // Only stored when it differs from the R_se = 0,04 the kernel assumes (C.10).
+    const rse = keepStored
+      ? existing.exteriorSurfaceResistance
+      : ntaResult && Math.abs(ntaResult.rse - 0.04) > 1e-9 ? ntaResult.rse : undefined;
 
     if (existing) {
       dispatch({
         type: 'UPDATE_CONSTRUCTION',
-        payload: { id: existing.id, data: { name, layers, rcValue: construction.rcValue, uValue: construction.uValue } },
+        payload: { id: existing.id, data: { name, layers, rcValue: rc, uValue: u, exteriorSurfaceResistance: rse } },
       });
     } else {
+      const construction: IConstruction = {
+        id: crypto.randomUUID(),
+        name,
+        layers,
+        rcValue: rc,
+        uValue: u,
+        exteriorSurfaceResistance: rse,
+      };
       dispatch({ type: 'ADD_CONSTRUCTION', payload: construction });
     }
     onClose();
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.construction.title')}
       onClose={onClose}
       onSubmit={handleSave}
@@ -86,8 +112,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
     >
 
         <div className="dialog-field">
-          <label>{t('dialog.construction.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.construction.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -95,8 +121,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.construction.layers')}</label>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}>
+          <span className="dialog-field-label" id={`${fieldId}-layers`}>{t('dialog.construction.layers')}</span>
+          <table aria-labelledby={`${fieldId}-layers`} style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: 'left', fontSize: 12, color: 'var(--text-secondary)', padding: '4px 8px' }}>
@@ -117,6 +143,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                   <td style={{ padding: '2px 4px' }}>
                     <input
                       type="text"
+                      aria-label={`${t('dialog.construction.material')} ${i + 1}`}
                       value={layer.material}
                       onChange={(e) => handleLayerChange(i, 'material', e.target.value)}
                       style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13 }}
@@ -127,6 +154,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                       type="number"
                       min={0}
                       step={0.001}
+                      aria-label={`${t('dialog.construction.thickness')} ${i + 1}`}
                       value={layer.thickness}
                       onChange={(e) => handleLayerChange(i, 'thickness', parseFloat(e.target.value) || 0)}
                       style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
@@ -137,6 +165,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                       type="number"
                       min={0.001}
                       step={0.001}
+                      aria-label={`${t('dialog.construction.lambda')} ${i + 1}`}
                       value={layer.lambda}
                       onChange={(e) => handleLayerChange(i, 'lambda', parseFloat(e.target.value) || 0)}
                       style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
@@ -146,6 +175,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                     {layers.length > 1 && (
                       <button
                         className="btn btn-sm"
+                        type="button"
+                        aria-label={`${t('dialog.delete')} ${i + 1}`}
                         onClick={() => removeLayer(i)}
                         style={{ padding: '2px 6px', color: 'var(--danger)' }}
                       >
@@ -164,14 +195,20 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
 
         <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
           <div className="dialog-field" style={{ flex: 1 }}>
-            <label>{t('dialog.construction.rcValue')}</label>
-            <input type="text" readOnly value={rcValue.toFixed(2)} />
+            <label htmlFor={`${fieldId}-2`}>{t('dialog.construction.rcValue')}</label>
+            <input id={`${fieldId}-2`} type="text" readOnly value={shownRc.toFixed(2)} />
           </div>
           <div className="dialog-field" style={{ flex: 1 }}>
-            <label>{t('dialog.construction.uValue')}</label>
-            <input type="text" readOnly value={uValue.toFixed(3)} />
+            <label htmlFor={`${fieldId}-3`}>{t('dialog.construction.uValue')}</label>
+            <input id={`${fieldId}-3`} type="text" readOnly value={shownU.toFixed(3)} />
           </div>
         </div>
+        {ntaResult && <p role="status" style={{ fontSize: 12 }}>
+          {t('nta.construction.applied')}: U = {ntaResult.u.toFixed(2)} W/m²K
+          {ntaResult.rc != null && <> · R<sub>c</sub> = {ntaResult.rc.toFixed(2)} m²K/W</>}
+          {' '}<button type="button" className="btn btn-sm" onClick={() => setNtaResult(null)}>{t('nta.construction.undo')}</button>
+        </p>}
+        <NtaConstructionSection layers={layers} onApply={setNtaResult} />
 
     </DialogShell>
   );

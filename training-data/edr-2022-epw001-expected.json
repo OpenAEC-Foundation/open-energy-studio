@@ -1,0 +1,39 @@
+{
+  "case": "edr-2022-epw001",
+  "document": "ISSO 54 - Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie, versie 2.0 (CCvD InstallQ, 12-05-2022)",
+  "normVersionOfTestSet": "NTA 8800 (januari 2022)",
+  "tolerancePercent": 1.0,
+  "toleranceSource": "ISSO 54 p. 67: afkeuring bij meer dan 1,0 % afwijking",
+  "published": {
+    "usableFloorAreaM2": {
+      "value": 96.0,
+      "source": "p. 5"
+    },
+    "envelopeAreaM2": {
+      "value": 247.2,
+      "source": "p. 5 (omhullend oppervlak Ao, ongewogen)"
+    }
+  },
+  "blocked": {
+    "reason": "Verwachte uitkomsten staan in bijlage 2 (apart Excel-document), niet in bezit",
+    "quantities": [
+      "EP1",
+      "EP2",
+      "EP3",
+      "QH;nd;net",
+      "TOjuli;max",
+      "EH;ci",
+      "EV;ci",
+      "EC;ci",
+      "EW;ci",
+      "Waux;tot"
+    ]
+  },
+  "transcriptionSource": "open-heatloss-studio/docs/2026-07-12-f3d5-edr-testset-analyse.md en tests/verification/beng_edr_epw/epw001",
+  "derived": {
+    "lossAreaM2": {
+      "value": 232.8,
+      "rule": "NTA 8800 6.7.3: f_ls = 1 buitenlucht, 0,7 grond: 199,2 + 0,7 x 48"
+    }
+  }
+}

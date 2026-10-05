@@ -1,0 +1,32 @@
+.mwa-grid, .mwa-measure { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; margin: 10px 0; }
+.mwa-measure { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.mwa-measure legend { padding: 0 4px; font-weight: 600; }
+.mwa-grid label, .mwa-measure label, .mwa-advised { display: grid; gap: 4px; font-weight: 600; }
+.mwa-wide { grid-column: 1 / -1; }
+.mwa-panel input, .mwa-panel select, .mwa-panel textarea { padding: 5px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.mwa-panel textarea { font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
+.mwa-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.mwa-check { display: flex !important; align-items: center; gap: 6px; font-weight: 400 !important; }
+.mwa-actions { display: flex; gap: 8px; }
+.mwa-panel [role="alert"] { color: var(--error-text); }
+.relabel-panel table td, .relabel-panel table th { text-align: left; }
+.relabel-allowed { color: var(--ok-text); }
+.relabel-not_allowed { color: var(--error-text); }
+.relabel-review { color: var(--warn-text); }
+.mwa-patch { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
+.mwa-patch-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.mwa-patch-row label { display: flex; flex-direction: column; flex: 1 1 140px; }
+.mwa-variant-issues td { background: var(--warn-subtle); font-size: 12px; }
+.mwa-variant-issues ul { margin: 0; padding-left: 18px; }
+.mwa-template { display: grid; gap: 8px; }
+.mwa-measure-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
+.mwa-measure-fields > label { display: grid; gap: 4px; font-weight: 600; }
+.mwa-template-draft { grid-column: 1 / -1; }
+.mwa-template-problems { margin: 0; }
+.mwa-template-preview ol { margin: 4px 0 0; padding-left: 20px; font-size: 12px; overflow-wrap: anywhere; }
+.mwa-template-preview code { font-size: 11px; }
+/* The measure type names are long ("Warmtepomp (of andere opwekker) voor ruimteverwarming"). */
+.mwa-measure-kind { grid-column: span 2; }
+.mwa-measure-kind select { width: 100%; text-overflow: ellipsis; }
+@media (max-width: 720px) { .mwa-measure-kind { grid-column: 1 / -1; } }
+.mwa-template-warnings { margin: 0; padding: 6px 10px 6px 26px; border-left: 3px solid var(--warn-text); background: rgba(245, 158, 11, 0.08); }

@@ -1,10 +1,21 @@
-import { useState, useRef } from 'react';
+/**
+ * Settings (UI redesign F9): Algemeen (theme, language), Berekening (the
+ * live preview run of the open document and the edition new calculations
+ * start in) and Over (program identity and attest status). Nothing is
+ * committed before OK; the theme previews live and Cancel reverts it.
+ */
+import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Calculator, Info, SlidersHorizontal } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import type { Locale } from '../../i18n/i18n';
+import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS, type NormVersion } from '../../core/nta/KernelClient';
+import { readDefaultEdition, writeDefaultEdition } from '../../core/nta/defaultEdition';
+import { softwareIdentity } from '../../core/nta/Registration';
 import { DialogShell } from '../dialogs/DialogShell';
+import { Pill, Select, Switch } from '../ui';
 import './SettingsDialog.css';
 
-type SettingsTab = 'general' | 'language';
+type SettingsTab = 'general' | 'calculation' | 'about';
 
 type Theme = 'system' | 'light' | 'dark' | 'highContrast';
 
@@ -34,17 +45,62 @@ const LANGUAGES: { code: Locale; region: string }[] = [
 
 interface SettingsDialogProps {
   onClose: () => void;
+  /**
+   * The live preview run of the active document (the inspector's Voorbeeld,
+   * formerly the ribbon Preview toggle); absent without an open document.
+   */
+  previewSetting?: { enabled: boolean; onChange: (enabled: boolean) => void };
 }
 
-export function SettingsDialog({ onClose }: SettingsDialogProps) {
+/** Radio group of option rows (theme, language); arrow keys move the choice. */
+function OptionRows<T extends string>({ label, className, rowClassName, options, value, onChange }: {
+  label: string;
+  className: string;
+  rowClassName: string;
+  options: { value: T; content: ReactNode }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1
+      : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = options[(index + step + options.length) % options.length];
+    onChange(next.value);
+    refs.current[next.value]?.focus();
+  };
+  return (
+    <div className={className} role="radiogroup" aria-label={label}>
+      {options.map((option, index) => {
+        const checked = option.value === value;
+        return (
+          <button key={option.value} type="button" role="radio" aria-checked={checked} tabIndex={checked ? 0 : -1}
+            ref={(element) => { refs.current[option.value] = element; }}
+            className={`${rowClassName}${checked ? ' active' : ''}`}
+            onClick={() => onChange(option.value)} onKeyDown={(event) => onKeyDown(event, index)}>
+            {option.content}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function SettingsDialog({ onClose, previewSetting }: SettingsDialogProps) {
   const { t, locale, setLocale } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const prefix = useId();
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Draft state — only committed on OK
   const storedTheme = (localStorage.getItem('energy-theme') || 'dark') as Theme;
   const originalTheme = useRef(document.documentElement.dataset.theme || 'dark');
   const [draftLocale, setDraftLocale] = useState<Locale>(locale);
   const [draftTheme, setDraftTheme] = useState<Theme>(storedTheme);
+  const [draftPreview, setDraftPreview] = useState(previewSetting?.enabled ?? true);
+  const [draftEdition, setDraftEdition] = useState<NormVersion>(readDefaultEdition);
 
   const resolveTheme = (theme: Theme) =>
     theme === 'system'
@@ -57,10 +113,12 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   };
 
   const handleOk = () => {
-    // Commit: apply language and persist both
+    // Commit: apply language and persist all
     setLocale(draftLocale);
     localStorage.setItem('energy-theme', draftTheme);
     localStorage.setItem('energy-locale', draftLocale);
+    writeDefaultEdition(draftEdition);
+    if (previewSetting && draftPreview !== previewSetting.enabled) previewSetting.onChange(draftPreview);
     onClose();
   };
 
@@ -70,36 +128,29 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
     onClose();
   };
 
-  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    {
-      id: 'general',
-      label: t('settings.general'),
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'language',
-      label: t('settings.language'),
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      ),
-    },
+  const tabs: { id: SettingsTab; label: string; icon: ReactNode }[] = [
+    { id: 'general', label: t('settings.general'), icon: <SlidersHorizontal aria-hidden="true" /> },
+    { id: 'calculation', label: t('settings.calculation'), icon: <Calculator aria-hidden="true" /> },
+    { id: 'about', label: t('settings.about'), icon: <Info aria-hidden="true" /> },
   ];
+
+  const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = tabs[(index + step + tabs.length) % tabs.length];
+    setActiveTab(next.id);
+    tabRefs.current[next.id]?.focus();
+  };
+
+  const software = softwareIdentity();
 
   const settingsFooter = (
     <div className="dialog-footer">
-      <button className="btn" onClick={handleCancel}>
+      <button type="button" className="btn" onClick={handleCancel}>
         {t('dialog.cancel')}
       </button>
-      <button className="btn btn-primary" onClick={handleOk}>
+      <button type="button" className="btn btn-primary" onClick={handleOk}>
         OK
       </button>
     </div>
@@ -113,12 +164,20 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       bodyClassName="settings-body"
       footer={settingsFooter}
     >
-      <div className="settings-sidebar">
-        {tabs.map(tab => (
+      <div className="settings-sidebar" role="tablist" aria-orientation="vertical" aria-label={t('settings.title')}>
+        {tabs.map((tab, index) => (
           <button
             key={tab.id}
+            ref={(element) => { tabRefs.current[tab.id] = element; }}
+            type="button"
+            role="tab"
+            id={`${prefix}-tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            aria-controls={`${prefix}-panel`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             className={`settings-tab${activeTab === tab.id ? ' active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
+            onKeyDown={(event) => onTabKey(event, index)}
           >
             {tab.icon}
             <span>{tab.label}</span>
@@ -126,48 +185,70 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
         ))}
       </div>
 
-      <div className="settings-content">
-        {activeTab === 'general' && (
+      <div className="settings-content" role="tabpanel" id={`${prefix}-panel`} aria-labelledby={`${prefix}-tab-${activeTab}`}>
+        {activeTab === 'general' && (<>
           <div className="settings-section">
             <h3 className="settings-section-title">{t('settings.general.theme')}</h3>
-            <div className="theme-table">
-              {THEMES.map(theme => (
-                <button
-                  key={theme.value}
-                  className={`theme-row${draftTheme === theme.value ? ' active' : ''}`}
-                  onClick={() => handleThemeChange(theme.value)}
-                >
-                  <span className="theme-row-swatches">
+            <OptionRows label={t('settings.general.theme')} className="theme-table" rowClassName="theme-row"
+              value={draftTheme} onChange={handleThemeChange}
+              options={THEMES.map((theme) => ({
+                value: theme.value,
+                content: <>
+                  <span className="theme-row-swatches" aria-hidden="true">
                     {theme.swatches.map((color, i) => (
                       <span key={i} className="theme-row-swatch" style={{ background: color }} />
                     ))}
                   </span>
                   <span className="theme-row-name">{t(theme.labelKey)}</span>
-                </button>
-              ))}
-            </div>
+                </>,
+              }))} />
           </div>
-        )}
-
-        {activeTab === 'language' && (
           <div className="settings-section">
             <h3 className="settings-section-title">{t('settings.language.select')}</h3>
-            <div className="language-table">
-              <div className="language-table-header">
-                <span className="language-col-code">{t('properties.type')}</span>
-                <span className="language-col-name">{t('settings.language')}</span>
-              </div>
-              {LANGUAGES.map(lang => (
-                <button
-                  key={lang.code}
-                  className={`language-row${draftLocale === lang.code ? ' active' : ''}`}
-                  onClick={() => setDraftLocale(lang.code)}
-                >
+            <OptionRows label={t('settings.language.select')} className="language-table" rowClassName="language-row"
+              value={draftLocale} onChange={setDraftLocale}
+              options={LANGUAGES.map((lang) => ({
+                value: lang.code,
+                content: <>
                   <span className="language-col-code">{lang.code.toUpperCase()}</span>
                   <span className="language-col-name">{t(`language.${lang.code}`)}</span>
-                </button>
-              ))}
-            </div>
+                </>,
+              }))} />
+            <p className="settings-hint">{t('settings.language.hint')}</p>
+          </div>
+        </>)}
+
+        {activeTab === 'calculation' && (<>
+          <div className="settings-section">
+            <h3 className="settings-section-title">{t('settings.inspector.title')}</h3>
+            <Switch label={t('settings.inspector.preview')} checked={draftPreview}
+              disabled={!previewSetting} onChange={setDraftPreview} />
+            <p className="settings-hint">{previewSetting ? t('settings.inspector.previewHint') : t('settings.inspector.previewNoDocument')}</p>
+          </div>
+          <div className="settings-section">
+            <h3 className="settings-section-title" id={`${prefix}-edition`}>{t('settings.edition.title')}</h3>
+            <Select aria-labelledby={`${prefix}-edition`} value={draftEdition}
+              onChange={(value) => setDraftEdition(value as NormVersion)}
+              options={IMPLEMENTED_NORM_VERSIONS.map((edition) => ({ value: edition, label: t(`nta.edition.${edition}`) }))} />
+            <p className="settings-hint">{t('settings.edition.hint')}</p>
+            {draftEdition !== DEFAULT_NORM_VERSION && (
+              <p className="settings-warning" role="note">{t('nta.form.normVersionLegacy')}</p>
+            )}
+          </div>
+        </>)}
+
+        {activeTab === 'about' && (
+          <div className="settings-section">
+            <h3 className="settings-section-title">{t('settings.about')}</h3>
+            <table className="kv-table settings-about">
+              <tbody>
+                <tr><td>{t('registration.page.program')}</td><td>{software.name} {software.version}</td></tr>
+                <tr><td>{t('registration.page.attestNumber')}</td>
+                  <td>{software.attestNumber ?? <Pill tone="unv">{t('status.unattested')}</Pill>}</td></tr>
+                <tr><td>{t('settings.edition.current')}</td><td>{t(`nta.edition.${DEFAULT_NORM_VERSION}`)}</td></tr>
+              </tbody>
+            </table>
+            <p className="settings-hint">{t('settings.about.hint')}</p>
           </div>
         )}
       </div>

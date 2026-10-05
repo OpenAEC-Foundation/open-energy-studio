@@ -1,37 +1,46 @@
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import type { IEnergyBreakdown } from '../../core/energy/types';
 import './EnergyBreakdownChart.css';
 
 interface EnergyBreakdownChartProps {
   breakdown: IEnergyBreakdown;
+  /** The balance comes from the NTA kernel; infiltration is then part of the ventilation term. */
+  source?: 'kernel' | 'indicative';
 }
 
-export function EnergyBreakdownChart({ breakdown }: EnergyBreakdownChartProps) {
-  const { t } = useI18n();
+export function EnergyBreakdownChart({ breakdown, source = 'indicative' }: EnergyBreakdownChartProps) {
+  const { t, locale } = useI18n();
 
   const losses = [
-    { key: 'transmissionLoss', label: t('results.transmissionLoss'), value: breakdown.transmissionLoss, color: '#ef4444' },
-    { key: 'ventilationLoss', label: t('results.ventilationLoss'), value: breakdown.ventilationLoss, color: '#f97316' },
-    { key: 'infiltrationLoss', label: t('results.infiltrationLoss'), value: breakdown.infiltrationLoss, color: '#f59e0b' },
+    { key: 'transmissionLoss', label: t('results.transmissionLoss'), value: breakdown.transmissionLoss, color: 'var(--viz-heating)' },
+    { key: 'ventilationLoss', label: source === 'kernel' ? t('results.ventilationInfiltrationLoss') : t('results.ventilationLoss'),
+      value: breakdown.ventilationLoss, color: 'var(--viz-fans)' },
+    ...(source === 'kernel' ? [] : [
+      { key: 'infiltrationLoss', label: t('results.infiltrationLoss'), value: breakdown.infiltrationLoss, color: 'var(--viz-humid)' },
+    ]),
   ];
 
   const gains = [
-    { key: 'solarGain', label: t('results.solarGain'), value: breakdown.solarGain, color: '#eab308' },
-    { key: 'internalGain', label: t('results.internalGain'), value: breakdown.internalGain, color: '#84cc16' },
+    { key: 'solarGain', label: t('results.solarGain'), value: breakdown.solarGain, color: 'var(--viz-pv)' },
+    { key: 'internalGain', label: t('results.internalGain'), value: breakdown.internalGain, color: 'var(--viz-aux)' },
+    ...(breakdown.otherGain ? [
+      { key: 'otherGain', label: t('results.otherGain'), value: breakdown.otherGain, color: 'var(--fg-disabled)' },
+    ] : []),
   ];
 
   const delivered = [
-    { key: 'heatingEnergy', label: t('results.heatingEnergy'), value: breakdown.heatingEnergy, color: '#ef4444' },
-    { key: 'coolingEnergy', label: t('results.coolingEnergy'), value: breakdown.coolingEnergy, color: '#3b82f6' },
-    { key: 'ventilationEnergy', label: t('results.ventilationEnergy'), value: breakdown.ventilationEnergy, color: '#8b5cf6' },
-    { key: 'hotWaterEnergy', label: t('results.hotWaterEnergy'), value: breakdown.hotWaterEnergy, color: '#06b6d4' },
-    { key: 'lightingEnergy', label: t('results.lightingEnergy'), value: breakdown.lightingEnergy, color: '#f59e0b' },
-    { key: 'auxiliaryEnergy', label: t('results.auxiliaryEnergy'), value: breakdown.auxiliaryEnergy, color: '#a855f7' },
+    { key: 'heatingEnergy', label: t('results.heatingEnergy'), value: breakdown.heatingEnergy, color: 'var(--viz-heating)' },
+    { key: 'coolingEnergy', label: t('results.coolingEnergy'), value: breakdown.coolingEnergy, color: 'var(--viz-cooling)' },
+    { key: 'ventilationEnergy', label: t('results.ventilationEnergy'), value: breakdown.ventilationEnergy, color: 'var(--viz-fans)' },
+    { key: 'hotWaterEnergy', label: t('results.hotWaterEnergy'), value: breakdown.hotWaterEnergy, color: 'var(--viz-dhw)' },
+    { key: 'lightingEnergy', label: t('results.lightingEnergy'), value: breakdown.lightingEnergy, color: 'var(--viz-lighting)' },
+    { key: 'auxiliaryEnergy', label: t('results.auxiliaryEnergy'), value: breakdown.auxiliaryEnergy, color: 'var(--viz-aux)' },
   ];
 
   const production = [
-    { key: 'pvProduction', label: t('results.pvProduction'), value: breakdown.pvProduction, color: '#22c55e' },
-    { key: 'solarThermal', label: t('results.solarThermalProduction'), value: breakdown.solarThermalProduction, color: '#10b981' },
+    { key: 'pvProduction', label: t('results.pvProduction'), value: breakdown.pvProduction, color: 'var(--viz-pv)' },
+    { key: 'solarThermal', label: t('results.solarThermalProduction'), value: breakdown.solarThermalProduction, color: 'var(--viz-dhw)' },
   ];
 
   const allValues = [...losses, ...gains, ...delivered, ...production].map(d => d.value);
@@ -49,31 +58,36 @@ export function EnergyBreakdownChart({ breakdown }: EnergyBreakdownChartProps) {
           }}
         />
       </div>
-      <span className="breakdown-bar-value">{item.value.toFixed(0)} kWh</span>
+      <span className="breakdown-bar-value">{formatNumber(item.value, locale)} kWh</span>
     </div>
   );
 
   return (
     <div className="energy-breakdown-chart">
       <h3>{t('results.breakdown')}</h3>
+      <p className="breakdown-source" data-testid="breakdown-source">
+        {source === 'kernel' ? t('results.breakdownSourceKernel') : t('results.breakdownSourceIndicative')}
+      </p>
 
       <div className="breakdown-section">
-        <h4>Verliezen</h4>
+        <h4>{t('results.breakdownLosses')}</h4>
         {losses.map(renderBar)}
       </div>
 
       <div className="breakdown-section">
-        <h4>Winsten</h4>
+        <h4>{t('results.breakdownGains')}</h4>
         {gains.map(renderBar)}
       </div>
 
       <div className="breakdown-section">
-        <h4>Geleverde energie</h4>
-        {delivered.map(renderBar)}
+        <h4>{t('results.breakdownDelivered')}</h4>
+        {breakdown.deliveredUnavailable
+          ? <p className="breakdown-source" role="status" data-testid="breakdown-delivered-unavailable">{t('results.breakdownDeliveredUnavailable')}</p>
+          : delivered.map(renderBar)}
       </div>
 
       <div className="breakdown-section">
-        <h4>Opwek</h4>
+        <h4>{t('results.breakdownProduction')}</h4>
         {production.map(renderBar)}
       </div>
     </div>

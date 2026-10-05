@@ -1,0 +1,61 @@
+{
+  "id": "synthetisch-1970-winkel-onbekend",
+  "constructionYear": 1970,
+  "buildingType": {"kind": "single_layer", "position": "terraced", "roof": "flat"},
+  "functions": [{"function": "retail", "areaM2": 3000.0}],
+  "areaSourceReference": "synthetic: NEN 2580 measurement on site",
+  "buildingHeightM": 6.0,
+  "construction": {"floor": "heavy", "wall": "heavy", "lighterCeiling": true, "sourceReference": "synthetic: concrete floor, suspended ceiling"},
+  "envelope": {
+    "surfaces": [
+      {"id": "pui-zuid", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 300.0, "orientation": "south", "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "gevel-noord", "element": "facade", "boundary": {"kind": "outdoor"}, "grossAreaM2": 300.0, "orientation": "north", "cavity": true, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "bouwmuur-oost", "element": "facade", "boundary": {"kind": "adjacent_heated"}, "grossAreaM2": 360.0, "orientation": "east", "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "bouwmuur-west", "element": "facade", "boundary": {"kind": "adjacent_heated"}, "grossAreaM2": 360.0, "orientation": "west", "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "dak", "element": "roof", "boundary": {"kind": "outdoor"}, "grossAreaM2": 3000.0, "cavity": false, "insulation": {"kind": "none_or_unknown"}, "sourceReference": "synthetic survey"},
+      {"id": "vloer", "element": "floor", "boundary": {"kind": "ground"}, "grossAreaM2": 3000.0, "cavity": false, "insulation": {"kind": "none_or_unknown"}, "exposedPerimeterM": 100.0, "sourceReference": "synthetic survey"}
+    ],
+    "windows": [
+      {"id": "etalage", "surfaceId": "pui-zuid", "areaM2": 150.0, "glass": "double", "frame": "metal", "sourceReference": "synthetic survey: visible sun-control film"},
+      {"id": "ramen-noord", "surfaceId": "gevel-noord", "areaM2": 20.0, "glass": "single", "frame": "metal", "sourceReference": "synthetic survey"}
+    ],
+    "doors": [
+      {"id": "laaddeur", "surfaceId": "gevel-noord", "areaM2": 12.0, "insulated": false, "frame": "metal", "sourceReference": "synthetic survey"}
+    ]
+  },
+  "solarControlWindowIds": ["etalage"],
+  "heating": {
+    "generator": {"kind": "boiler", "boilerType": "conventional", "insideThermalBoundary": true},
+    "emitters": "radiators",
+    "control": "unknown",
+    "sourceReference": "synthetic survey: no type plate readable"
+  },
+  "heatingInstallation": {"collective": true, "capacityKw": 350.0},
+  "cooling": {
+    "generator": "compression",
+    "emitter": "fan_coil_on_ceiling",
+    "fanCoilCount": 40,
+    "waterBased": true,
+    "sourceReference": "synthetic survey: chiller on the roof"
+  },
+  "ventilation": {
+    "principle": "balanced",
+    "heatRecovery": "unknown",
+    "ahu": {},
+    "recirculation": "unknown",
+    "flowControl": {"method": "speed_control"},
+    "sourceReference": "synthetic survey: AHU in plant room"
+  },
+  "humidification": {"humidifier": "electric_steam", "sourceReference": "synthetic survey: steam lance in AHU"},
+  "hotWater": {
+    "generator": {"kind": "collective_unknown"},
+    "circulation": true,
+    "showerHeatRecovery": "none",
+    "sourceReference": "synthetic survey: storage vessel, no plate"
+  },
+  "lighting": [
+    {"id": "winkelvloer", "areaM2": 3000.0, "power": {"method": "unknown"}, "presence": "none_or_central_on", "sourceReference": "synthetic survey: power not determinable"}
+  ],
+  "bacs": {"servedAreaM2": 3000.0},
+  "sourceReference": "synthetic fixture, not a real building"
+}

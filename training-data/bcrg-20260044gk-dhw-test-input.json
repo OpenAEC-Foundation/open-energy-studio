@@ -1,0 +1,51 @@
+{
+  "id": "bcrg-20260044gk-historical-edition-example",
+  "source": "exhaust_air",
+  "sink": "domestic_hot_water",
+  "drive": "electric_compression",
+  "reversible": false,
+  "hybrid": false,
+  "booster": false,
+  "performanceEvidence": {
+    "kind": "controlled_quality_declaration",
+    "reference": "BCRG 20260044GK, Qvantum QE-6",
+    "registryRecord": {
+      "registrationNumber": "20260044GK",
+      "productName": "QE-6",
+      "manufacturer": "Qvantum Energi AB",
+      "sourceUrl": "https://mijn.bcrg.nl/media/documents/2026/GK/20260044GK.pdf"
+    }
+  },
+  "dhwTestPoints": [
+    {
+      "id": "M",
+      "tapProfile": "M",
+      "usefulEnergyKwhPerDay": 6.13,
+      "inputEnergyKwhPerDay": 2.269,
+      "nominalCapacityKw": 6,
+      "practiceFactor": 0.9,
+      "testSetpointC": 44,
+      "designSetpointC": 55,
+      "sourceAirFlowM3PerHour": 159,
+      "sourceAirDryBulbC": 20,
+      "sourceAirWetBulbC": 12,
+      "declarationNormVersion": "NTA 8800:2024",
+      "sourceReference": "BCRG 20260044GK, p. 2, profile M"
+    },
+    {
+      "id": "XL",
+      "tapProfile": "XL",
+      "usefulEnergyKwhPerDay": 19.48,
+      "inputEnergyKwhPerDay": 6.31,
+      "nominalCapacityKw": 6,
+      "practiceFactor": 0.9,
+      "testSetpointC": 54.9,
+      "designSetpointC": 55,
+      "sourceAirFlowM3PerHour": 230,
+      "sourceAirDryBulbC": 20,
+      "sourceAirWetBulbC": 12,
+      "declarationNormVersion": "NTA 8800:2024",
+      "sourceReference": "BCRG 20260044GK, p. 2, profile XL"
+    }
+  ]
+}

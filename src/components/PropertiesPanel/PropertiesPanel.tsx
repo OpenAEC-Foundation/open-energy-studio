@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { PanelRightClose } from 'lucide-react';
-import type { IZone, ISurface, IWindow, IThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
+import type { IZone, ISurface, IWindow, IThermalBridge, IPointThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
+import { ItemActions } from '../ItemActions/ItemActions';
 import './PropertiesPanel.css';
 
 function findItem(state: ReturnType<typeof useEnergy>['state']): { item: unknown; type: string | null } {
@@ -27,6 +28,11 @@ function findItem(state: ReturnType<typeof useEnergy>['state']): { item: unknown
       for (const z of project.zones)
         for (const tb of z.thermalBridges)
           if (tb.id === selectedItemId) return { item: tb, type: 'thermalBridge' };
+      return { item: null, type: null };
+    case 'pointBridge':
+      for (const z of project.zones)
+        for (const bridge of z.pointThermalBridges ?? [])
+          if (bridge.id === selectedItemId) return { item: bridge, type: 'pointBridge' };
       return { item: null, type: null };
     case 'construction':
       return { item: project.constructions.find(c => c.id === selectedItemId), type: 'construction' };
@@ -56,7 +62,8 @@ function PropertyRow({ label, value }: { label: string; value: string | number }
   );
 }
 
-export function PropertiesPanel() {
+/** `embedded`: rendered inside the shell inspector, which owns the frame, header and width. */
+export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useI18n();
   const { state } = useEnergy();
   const { item, type } = findItem(state);
@@ -88,7 +95,7 @@ export function PropertiesPanel() {
     };
   }, []);
 
-  if (collapsed) {
+  if (collapsed && !embedded) {
     return (
       <div className="properties-panel collapsed" onClick={() => setCollapsed(false)}>
         <div className="panel-collapsed-label-right">
@@ -99,15 +106,24 @@ export function PropertiesPanel() {
   }
 
   return (
-    <div className="properties-panel" style={{ width }}>
-      <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
-      <div className="properties-panel-header">
-        <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
-        <span>{t('properties.title')}</span>
-      </div>
+    <div className={embedded ? 'properties-panel embedded' : 'properties-panel'} style={embedded ? undefined : { width }}>
+      {!embedded && <>
+        <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
+        <div className="properties-panel-header">
+          <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
+          <span>{t('properties.title')}</span>
+        </div>
+      </>}
       <div className="properties-panel-content">
         {!item && (
           <div className="properties-empty">{t('properties.noSelection')}</div>
+        )}
+
+        {Boolean(item) && type && state.selectedItemId && (
+          <div className="properties-actions">
+            <ItemActions itemType={type} id={state.selectedItemId}
+              name={(item as { name?: string }).name ?? state.selectedItemId} />
+          </div>
         )}
 
         {type === 'zone' && (() => {
@@ -156,6 +172,15 @@ export function PropertiesPanel() {
               <PropertyRow label={t('properties.length')} value={`${tb.length} m`} />
             </>
           );
+        })()}
+
+        {type === 'pointBridge' && (() => {
+          const bridge = item as IPointThermalBridge;
+          return <>
+            <PropertyRow label={t('properties.name')} value={bridge.name} />
+            <PropertyRow label={t('kernel.pointBridge.chi')} value={`${bridge.chiValue} W/K`} />
+            <PropertyRow label={t('kernel.pointBridge.source')} value={bridge.sourceReference} />
+          </>;
         })()}
 
         {type === 'construction' && (() => {

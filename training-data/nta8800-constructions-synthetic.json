@@ -1,0 +1,239 @@
+{
+  "elements": [
+    {
+      "id": "spouwmuur",
+      "projectedAreaM2": 84.0,
+      "inForfaitSupplement": true,
+      "element": {
+        "kind": "opaque",
+        "construction": {
+          "heatFlow": "horizontal",
+          "build": {
+            "kind": "homogeneous",
+            "layers": [
+              {
+                "kind": "material",
+                "thicknessM": 0.1,
+                "conductivity": {
+                  "method": "masonry_table",
+                  "kind": "calcium_silicate",
+                  "densityKgM3": 1750,
+                  "environment": "dry_indoor",
+                  "joints": "glued"
+                }
+              },
+              {
+                "kind": "material",
+                "thicknessM": 0.15,
+                "conductivity": {
+                  "method": "declared_insulation",
+                  "lambdaDeclared": 0.032,
+                  "moisture": "regular",
+                  "ageing": { "kind": "factory_made" },
+                  "sourceReference": "synthetic: DoP mineral wool"
+                }
+              },
+              {
+                "kind": "air_cavity",
+                "thicknessMm": 40,
+                "ventilation": { "kind": "weakly" }
+              },
+              {
+                "kind": "material",
+                "thicknessM": 0.1,
+                "conductivity": {
+                  "method": "masonry_table",
+                  "kind": "brick",
+                  "densityKgM3": 1800,
+                  "environment": "other",
+                  "joints": "mortar"
+                }
+              }
+            ]
+          },
+          "corrections": {
+            "airVoids": { "level": "none", "insulationLayer": 1 },
+            "fasteners": {
+              "fasteners": {
+                "method": "formula",
+                "countPerM2": 4,
+                "lambdaWPerMK": 17,
+                "crossSectionM2": 0.0000126,
+                "penetrationDepthM": 0.15,
+                "insulationThicknessM": 0.15
+              },
+              "insulationLayer": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "hsb-gevel",
+      "projectedAreaM2": 20.0,
+      "inForfaitSupplement": true,
+      "element": {
+        "kind": "opaque",
+        "construction": {
+          "heatFlow": "horizontal",
+          "build": {
+            "kind": "composite",
+            "interruption": "woody_unshielded",
+            "sections": [
+              {
+                "id": "isolatie",
+                "area": 0.85,
+                "layers": [
+                  { "kind": "material", "thicknessM": 0.012, "conductivity": { "method": "calculated", "lambdaCalc": 0.17, "sourceReference": "synthetic: plaster board" } },
+                  { "kind": "material", "thicknessM": 0.17, "conductivity": { "method": "forfait_insulation", "material": "glass_wool", "moisture": "regular", "ageing": { "kind": "factory_made" } } },
+                  { "kind": "material", "thicknessM": 0.012, "conductivity": { "method": "calculated", "lambdaCalc": 0.13, "sourceReference": "synthetic: OSB" } }
+                ]
+              },
+              {
+                "id": "stijl",
+                "area": 0.15,
+                "layers": [
+                  { "kind": "material", "thicknessM": 0.012, "conductivity": { "method": "calculated", "lambdaCalc": 0.17, "sourceReference": "synthetic: plaster board" } },
+                  { "kind": "material", "thicknessM": 0.17, "conductivity": { "method": "window_material", "material": "softwood" } },
+                  { "kind": "material", "thicknessM": 0.012, "conductivity": { "method": "calculated", "lambdaCalc": 0.13, "sourceReference": "synthetic: OSB" } }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "omgekeerd-dak",
+      "projectedAreaM2": 60.0,
+      "inForfaitSupplement": true,
+      "element": {
+        "kind": "opaque",
+        "construction": {
+          "heatFlow": "upward",
+          "build": {
+            "kind": "homogeneous",
+            "layers": [
+              { "kind": "material", "thicknessM": 0.2, "conductivity": { "method": "calculated", "lambdaCalc": 2.0, "sourceReference": "synthetic: reinforced concrete" } },
+              {
+                "kind": "material",
+                "thicknessM": 0.2,
+                "conductivity": {
+                  "method": "declared_insulation",
+                  "lambdaDeclared": 0.034,
+                  "moisture": "inverted_roof_xps_slope_above_1_percent",
+                  "ageing": { "kind": "factory_made" },
+                  "sourceReference": "synthetic: XPS DoP"
+                }
+              }
+            ]
+          },
+          "corrections": {
+            "invertedRoof": { "drainage": "xps_rebated_edges", "insulationLayer": 1 }
+          }
+        }
+      }
+    },
+    {
+      "id": "afschotdak",
+      "element": {
+        "kind": "tapered_roof",
+        "roof": {
+          "baseLayers": [
+            { "kind": "material", "thicknessM": 0.18, "conductivity": { "method": "calculated", "lambdaCalc": 2.0, "sourceReference": "synthetic: concrete" } },
+            { "kind": "material", "thicknessM": 0.12, "conductivity": { "method": "forfait_insulation", "material": "pur_pir_board", "moisture": "regular", "ageing": { "kind": "factory_made" } } }
+          ],
+          "taperConductivity": { "method": "forfait_insulation", "material": "eps_board", "moisture": "regular", "ageing": { "kind": "factory_made" } },
+          "parts": [
+            { "shape": "rectangular", "areaM2": 40.0, "maxThicknessM": 0.1 },
+            { "shape": "triangle_varying", "areaM2": 10.0, "intermediateThicknessM": 0.05, "maxThicknessM": 0.1 }
+          ],
+          "slopePercent": 1.5
+        }
+      }
+    },
+    {
+      "id": "raam-woonkamer",
+      "element": {
+        "kind": "window",
+        "window": {
+          "method": {
+            "method": "detailed",
+            "glazing": [
+              {
+                "areaM2": 1.6,
+                "glazing": { "method": "table_g1", "layers": "triple", "coating": "at_most_0_05", "gapMm": 12, "gas": "argon" },
+                "perimeterM": 5.2,
+                "edge": { "method": "table", "frame": "wood_or_plastic", "spacer": "thermally_improved", "lowE": true, "spacerSourceReference": "synthetic spacer declaration (L.1)" }
+              }
+            ],
+            "frameAreaM2": 0.6,
+            "frameUWPerM2K": 1.3,
+            "frameSourceReference": "synthetic: frame calculation per NEN-EN-ISO 10077-2"
+          },
+          "shutter": {
+            "deltaR": { "method": "declared", "deltaRM2KPerW": 0.15, "sourceReference": "synthetic: NEN-EN 13125 roller shutter" },
+            "conditionsEvidence": "synthetic: dwelling-operated roller shutter covering window and frame"
+          }
+        }
+      }
+    },
+    {
+      "id": "raam-tabel",
+      "element": {
+        "kind": "window",
+        "window": { "method": { "method": "frame_table", "glazing": { "method": "single" }, "frame": "a" } }
+      }
+    },
+    {
+      "id": "voordeur",
+      "element": { "kind": "window", "window": { "method": { "method": "door_default", "door": "thermally_insulating" } } }
+    },
+    {
+      "id": "bestaande-gevel",
+      "projectedAreaM2": 30.0,
+      "inForfaitSupplement": true,
+      "element": {
+        "kind": "forfait_opaque",
+        "element": {
+          "element": "facade",
+          "building": { "kind": "regular" },
+          "constructionYear": 1978,
+          "insulation": { "kind": "known_thickness", "thicknessMm": 40 },
+          "cavity": true
+        }
+      }
+    },
+    {
+      "id": "bestaand-raam",
+      "element": { "kind": "forfait_window", "glass": "hr_plus_plus", "frame": "wood_or_plastic", "exterior": true }
+    },
+    {
+      "id": "achterdeur",
+      "element": { "kind": "forfait_door", "insulated": false, "exterior": true, "glassFraction": 0.3, "glass": "double_uncoated", "frame": "wood_or_plastic" }
+    },
+    {
+      "id": "borstwering",
+      "element": { "kind": "forfait_panel", "insulation": { "kind": "known_thickness", "thicknessMm": 60 }, "cavity": false, "frame": "metal_with_thermal_break", "exterior": true }
+    },
+    {
+      "id": "lichtkoepel",
+      "projectedAreaM2": 1.2,
+      "element": { "kind": "rooflight", "uRcWPerM2K": 1.6, "areaWithUpstandM2": 1.8, "sourceReference": "synthetic: NEN-EN 1873 declaration" }
+    },
+    {
+      "id": "suskast",
+      "element": { "kind": "ventilation_grille" }
+    },
+    {
+      "id": "prefab-element",
+      "element": { "kind": "numerical", "couplingWPerK": 2.4, "constructionAreaM2": 12.0, "sourceReference": "synthetic: 3D calculation per 8.6" }
+    }
+  ],
+  "forfaitBridges": [
+    { "id": "kozijn-onder", "position": 5, "column": "a", "lengthM": 8.4, "description": "synthetic: sill, conditions met" },
+    { "id": "dakvoet", "position": 13, "column": "b", "lengthM": 6.0, "description": "synthetic: eaves" },
+    { "id": "woningscheidend", "position": 8, "column": "a", "lengthM": 9.0, "shared": true, "description": "synthetic: party wall at facade" },
+    { "id": "kilgoot", "column": "b", "lengthM": 3.0, "description": "synthetic: valley without table position" }
+  ]
+}

@@ -8,6 +8,13 @@ export default defineConfig({
     port: 3006,
     open: false,
     strictPort: false,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3007',
+        changeOrigin: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
     watch: {
       ignored: ['**/src-tauri/**'],
     },

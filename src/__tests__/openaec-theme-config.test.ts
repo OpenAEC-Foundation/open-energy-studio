@@ -14,8 +14,8 @@ function readSource(relativePath: string): string {
 
 // ── ThemePicker ──
 
-describe('ThemePicker theme options', () => {
-  const src = readSource('components/Ribbon/ThemePicker.tsx');
+describe('Theme options (SettingsDialog; ThemePicker removed with the ribbon)', () => {
+  const src = readSource('components/SettingsDialog/SettingsDialog.tsx');
 
   it('exports Theme type without "blue"', () => {
     expect(src).toMatch(/type Theme\s*=\s*'system'\s*\|\s*'light'\s*\|\s*'dark'\s*\|\s*'highContrast'/);

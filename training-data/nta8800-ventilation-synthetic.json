@@ -1,0 +1,67 @@
+{
+  "zoneId": "woning",
+  "usableFloorAreaM2": 124.0,
+  "category": "residential",
+  "functions": [{ "function": "residential", "areaM2": 124.0 }],
+  "dwellingCount": 1,
+  "buildingHeightM": 9.6,
+  "constructionYear": 2024,
+  "heatingSetpointC": 20.0,
+  "coolingSetpointC": 24.0,
+  "system": {
+    "kind": "single",
+    "unit": {
+      "variant": "d5c",
+      "heatRecovery": {
+        "efficiency": {
+          "method": "declared",
+          "value": 0.9,
+          "standard": "en13141_7",
+          "sourceReference": "synthetic: product sheet WTW unit"
+        },
+        "bypass": { "kind": "full" },
+        "layout": "central",
+        "constantVolumeControl": true,
+        "supplyDuctLengthM": 3.0,
+        "supplyDuctInsulation": { "kind": "insulated" },
+        "manufactureYear": 2024,
+        "equipmentReference": "synthetic: WTW unit"
+      },
+      "ducts": "luka_a_b_c",
+      "equipmentReference": "synthetic: ventilation design"
+    }
+  },
+  "infiltration": {
+    "method": "reference",
+    "buildingType": "pitched_roof_end_or_corner"
+  },
+  "ventilativeCooling": {
+    "openings": [
+      {
+        "id": "dakraam",
+        "area": { "method": "opening_angle", "maxNetAreaM2": 0.6, "maxAngleDeg": 30.0 },
+        "centreHeightM": 7.8,
+        "openingHeightM": 0.9,
+        "azimuthDeg": 180.0,
+        "tiltDeg": 45.0
+      },
+      {
+        "id": "achtergevel",
+        "area": { "method": "declared", "netAreaM2": 0.4 },
+        "centreHeightM": 1.8,
+        "openingHeightM": 1.2,
+        "azimuthDeg": 0.0,
+        "tiltDeg": 90.0
+      }
+    ],
+    "operation": "manual",
+    "conditionsEvidence": "synthetic: burglary, insect and rain resistance documented"
+  },
+  "fans": {
+    "method": "declared",
+    "fans": [{ "id": "wtw", "power": { "method": "nominal", "nominalPowerW": 70.0 } }],
+    "control": { "method": "residential_table" },
+    "sourceReference": "synthetic: type plate"
+  },
+  "sourceReference": "synthetic fixture, not a real building"
+}

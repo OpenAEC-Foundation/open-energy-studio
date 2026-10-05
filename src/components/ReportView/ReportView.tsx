@@ -1,21 +1,119 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { IBENGResultMonthly } from '../../core/energy/types';
+import { useState } from 'react';
+import { downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML } from '../../core/report/ReportGenerator';
+import { useKernelQuery } from '../../context/KernelProvider';
+import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
+import { kernelWithheld } from '../../core/nta/KernelVerdict';
+import { formatNumber } from '../../i18n/format';
+import { ReportBuilder } from './ReportBuilder';
+import { useDossier } from './useDossier';
 import './ReportView.css';
 
-export function ReportView() {
-  const { t } = useI18n();
+/** Month name in the UI language. */
+function monthName(index: number, locale: string): string {
+  return new Date(2026, index, 1).toLocaleDateString(locale, { month: 'short' });
+}
+
+/** Energy-balance rows of the kernel report; a null delivered value means the per-service energy is missing. */
+function balanceRows(model: KernelReportModel): Array<[string, number | null]> {
+  const bd = model.breakdown;
+  const delivered = (value: number) => (bd.deliveredUnavailable ? null : value);
+  return [
+    ['results.transmissionLoss', bd.transmissionLoss],
+    ['results.ventilationInfiltrationLoss', bd.ventilationLoss],
+    ['results.solarGain', bd.solarGain],
+    ['results.internalGain', bd.internalGain],
+    ...(bd.otherGain ? [['results.otherGain', bd.otherGain] as [string, number]] : []),
+    ['results.heatingDemand', bd.heatingDemand],
+    ['results.coolingDemand', bd.coolingDemand],
+    ['results.heatingEnergy', delivered(bd.heatingEnergy)],
+    ['results.coolingEnergy', delivered(bd.coolingEnergy)],
+    ['results.ventilationEnergy', delivered(bd.ventilationEnergy)],
+    ['results.hotWaterEnergy', delivered(bd.hotWaterEnergy)],
+    ['results.lightingEnergy', delivered(bd.lightingEnergy)],
+    ['results.auxiliaryEnergy', delivered(bd.auxiliaryEnergy)],
+    ['results.pvProduction', bd.pvProduction],
+    ['results.solarThermalProduction', bd.solarThermalProduction],
+  ];
+}
+
+/**
+ * `all` is the complete view (tests and the print path); the Rapport & dossier
+ * step shows `report` (notice and report builder) and `input` (the input
+ * summary) on their own sub pages (UI redesign F9).
+ */
+export type ReportViewSection = 'all' | 'report' | 'input';
+
+export function ReportView({ section = 'all' }: { section?: ReportViewSection }) {
+  const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project, result } = state;
+  const kernelQuery = useKernelQuery(project);
+  const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
+  const kernelAssessment = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
+  const model = kernelReportModel(kernelAssessment);
+  // Shared rule (KernelVerdict): a refused kernel result withholds every BENG number.
+  const withheld = !kernelPending && kernelWithheld(kernelAssessment);
+  const indicativeShown = !model && !kernelPending && result != null && !withheld;
+  const meetsText = (meets: boolean | null) =>
+    t(meets == null ? 'report.notTestable' : meets ? 'report.meetsUnverified' : 'report.fails');
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+  const exportCalculation = () => {
+    setCalculationError(null);
+    downloadNtaCalculationReportHTML(project).catch((reason: unknown) =>
+      setCalculationError(reason instanceof Error ? reason.message : String(reason)));
+  };
+  const dossier = useDossier(project, kernelAssessment, kernelPending);
+  const { checklist, open } = dossier;
+  const showReport = section === 'all' || section === 'report';
+  const showInput = section === 'all' || section === 'input';
 
   return (
     <div className="report-view">
       <div className="report-content">
-        <div className="report-header">
-          <h1>{t('report.title')}</h1>
-          <p className="report-date">{new Date().toLocaleDateString('nl-NL')}</p>
-        </div>
+        {section === 'all' && (
+          <div className="report-header">
+            <h1>{t('report.title')}</h1>
+            <p className="report-date">{new Date().toLocaleDateString(locale)}</p>
+          </div>
+        )}
+        {showReport && <div className="report-verification-notice" role="status">
+          <strong>{model ? t('report.kernelStatus') : withheld ? t('results.withheld.title') : indicativeShown ? t('results.indicative') : t('results.noResults')}</strong>
+          <p>{model ? t('report.kernelSource')
+            : withheld ? t(kernelAssessment?.status === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')
+            : indicativeShown ? t('results.indicativeDescription') : t('report.inputDossierScope')}</p>
+        </div>}
+        {showReport && <ReportBuilder project={project} assessment={kernelAssessment} pending={kernelPending} />}
+        {section === 'all' && <div className="report-input-dossier">
+          <button type="button" onClick={() => downloadNtaInputDossierHTML(project)}>{t('report.exportInputDossier')}</button>
+          <p>{t('report.inputDossierScope')}</p>
+          <button type="button" onClick={exportCalculation}>{t('report.exportNtaCalculation')}</button>
+          <p>{t('report.ntaCalculationScope')}</p>
+          <button type="button" onClick={dossier.exportDossier} disabled={dossier.busy}>{t('report.exportProjectDossier')}</button>
+          <p>{t('report.projectDossierScope')}</p>
+          {(calculationError ?? dossier.error) && <p role="alert">{calculationError ?? dossier.error}</p>}
+          {(dossier.missingEvidence ?? 0) > 0 && (
+            <p role="status">{t('report.dossierMissingEvidence', { count: dossier.missingEvidence ?? 0 })}</p>
+          )}
+          <details className="report-dossier-checklist">
+            <summary>{t('report.dossierChecklist', { open: open.length, total: checklist.length })}</summary>
+            <table className="report-table">
+              <tbody>
+                {checklist.map((item) => (
+                  <tr key={item.id} data-status={item.status}>
+                    <td>{t(`report.dossierStatus.${item.status}`)}</td>
+                    <td>{item.label}</td>
+                    <td>{item.detail ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </div>}
 
+        {showInput && <>
         {/* Project info */}
         <div className="report-section">
           <h2>{t('report.projectInfo')}</h2>
@@ -34,7 +132,7 @@ export function ReportView() {
           <h2>{t('report.buildingEnvelope')}</h2>
           {project.zones.map(zone => (
             <div key={zone.id} className="report-subsection">
-              <h3>{zone.name} — {zone.floorArea} m², {zone.volume} m³</h3>
+              <h3>{zone.name} — {formatNumber(zone.floorArea, locale, 1)} m², {formatNumber(zone.volume, locale, 1)} m³</h3>
               {zone.surfaces.length > 0 && (
                 <table className="report-table">
                   <thead>
@@ -50,7 +148,7 @@ export function ReportView() {
                       <tr key={s.id}>
                         <td>{s.name}</td>
                         <td>{t(`surfaceType.${s.type}`)}</td>
-                        <td>{s.area} m²</td>
+                        <td>{formatNumber(s.area, locale, 1)} m²</td>
                         <td>{t(`orientation.${s.orientation}`)}</td>
                       </tr>
                     ))}
@@ -68,7 +166,8 @@ export function ReportView() {
             <div className="report-subsection">
               <h3>{t('browser.heating')}</h3>
               {project.heatingSystems.map(h => (
-                <p key={h.id}>{h.name} — {h.type}, COP: {h.cop}</p>
+                <p key={h.id}>{h.name} — {t(`report.heatingType.${h.type}`, { defaultValue: h.type })}, {h.type.startsWith('heat_pump')
+                  ? `COP ${formatNumber(h.cop, locale, 2)}` : `η ${formatNumber(h.cop, locale, 3)}`}</p>
               ))}
             </div>
           )}
@@ -76,7 +175,7 @@ export function ReportView() {
             <div className="report-subsection">
               <h3>{t('browser.ventilation')}</h3>
               {project.ventilationSystems.map(v => (
-                <p key={v.id}>{v.name} — {v.type}, WTW: {(v.heatRecoveryEfficiency * 100).toFixed(0)}%</p>
+                <p key={v.id}>{v.name} — {t(`report.ventilationType.${v.type}`, { defaultValue: v.type })}, {t('report.heatRecovery')}: {formatNumber(v.heatRecoveryEfficiency * 100, locale)}%</p>
               ))}
             </div>
           )}
@@ -85,6 +184,9 @@ export function ReportView() {
         {/* Renewables */}
         <div className="report-section">
           <h2>{t('report.renewableEnergy')}</h2>
+          {model?.pvSystems.map((pv) => (
+            <p key={`kernel-${pv.id}`}>{pv.id} — {formatNumber(pv.annualKwh, locale)} kWh/{t('report.year')} ({t('report.kernelPv')})</p>
+          ))}
           {project.solarPV.map(pv => (
             <p key={pv.id}>{pv.name} — {pv.peakPower} kWp, {t(`orientation.${pv.orientation}`)}, {pv.tilt}°</p>
           ))}
@@ -93,68 +195,131 @@ export function ReportView() {
           ))}
         </div>
 
-        {/* BENG Results */}
-        {result && (() => {
-          const monthlyResult = 'monthly' in result ? result as IBENGResultMonthly : null;
-          const monthKeys = [
-            'month.jan', 'month.feb', 'month.mar', 'month.apr',
-            'month.may', 'month.jun', 'month.jul', 'month.aug',
-            'month.sep', 'month.oct', 'month.nov', 'month.dec',
-          ];
+        {/* BENG results: the NTA kernel, the simplified engine only without a kernel result. */}
+        {model && (
+          <>
+            <div className="report-section" data-testid="report-beng-kernel">
+              <h2>{t('report.bengResults')}</h2>
+              <p className="report-source">{t('report.kernelSource')}</p>
+              <table className="report-table report-table-results">
+                <thead>
+                  <tr>
+                    <th>{t('report.indicator')}</th>
+                    <th>{t('report.value')}</th>
+                    <th>{t('results.limit')}</th>
+                    <th>{t('report.status')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {model.indicators.map((row) => (
+                    <tr key={row.key}>
+                      <td>{t(`results.${row.key}.title`)} — {t(`results.${row.key}.subtitle`)}</td>
+                      <td>{formatNumber(row.value, locale, indicatorDecimals(row.key))} {t(`results.${row.key}.unit`)}</td>
+                      <td>{row.limit == null ? '–' : `${row.higherIsBetter ? '≥' : '≤'} ${formatNumber(row.limit, locale, indicatorDecimals(row.key))}`}</td>
+                      <td>{meetsText(row.meets)}</td>
+                    </tr>
+                  ))}
+                  {model.tojuli && (
+                    <tr>
+                      <td>{t('results.toJuli')}</td>
+                      <td>{formatNumber(model.tojuli.value, locale, indicatorDecimals('tojuli'))} K</td>
+                      <td>{'≤'} {formatNumber(1.2, locale, indicatorDecimals('tojuli'))} K</td>
+                      <td>{meetsText(model.tojuli.meets)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td>{t('report.labelClass')}</td>
+                    <td>{model.labelClass ?? '–'}</td>
+                    <td></td>
+                    <td>{t('report.notRegistered')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="report-section">
+              <h2>{t('report.monthlyOverview')}</h2>
+              <table className="report-table report-table-results">
+                <thead>
+                  <tr>
+                    <th>{t('preview.month')}</th>
+                    <th>{t('results.heatingDemand')}</th>
+                    <th>{t('results.coolingDemand')}</th>
+                    <th>{t('results.solarGain')}</th>
+                    <th>{t('results.transmissionLoss')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {model.monthly.map((m) => (
+                    <tr key={m.month}>
+                      <td>{monthName(m.month - 1, locale)}</td>
+                      <td>{formatNumber(m.heatingNeedKwh, locale)} kWh</td>
+                      <td>{formatNumber(m.coolingNeedKwh, locale)} kWh</td>
+                      <td>{formatNumber(m.solarGainKwh, locale)} kWh</td>
+                      <td>{formatNumber(m.transmissionKwh, locale)} kWh</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="report-section">
+              <h2>{t('results.breakdown')}</h2>
+              <table className="report-table">
+                <tbody>
+                  {balanceRows(model).map(([key, value]) => (
+                    <tr key={key}><td>{t(key)}</td><td>{value == null ? t('results.breakdownDeliveredUnavailable') : `${formatNumber(value, locale)} kWh`}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
+        {indicativeShown && result && (() => {
+          const monthlyResult = 'monthly' in result ? result as IBENGResultMonthly : null;
           return (
             <>
-              <div className="report-section">
+              <div className="report-section" data-testid="report-beng-indicative">
                 <h2>{t('report.bengResults')}</h2>
+                <p className="report-indicative-note">{t('report.indicativeNotNta')}</p>
                 <table className="report-table report-table-results">
                   <thead>
                     <tr>
-                      <th>Indicator</th>
+                      <th>{t('report.indicator')}</th>
                       <th>{t('report.value')}</th>
                       <th>{t('results.limit')}</th>
-                      <th>Status</th>
+                      <th>{t('report.status')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
                       <td>{t('results.beng1.title')} — {t('results.beng1.subtitle')}</td>
-                      <td>{result.beng1.toFixed(1)} {t('results.beng1.unit')}</td>
-                      <td>{'\u2264'} {result.beng1Limit}</td>
-                      <td className={result.beng1Pass ? 'report-pass' : 'report-fail'}>
-                        {result.beng1Pass ? t('results.pass') : t('results.fail')}
-                      </td>
+                      <td>{formatNumber(result.beng1, locale, 1)} {t('results.beng1.unit')}</td>
+                      <td>{'≤'} {formatNumber(result.beng1Limit, locale)}</td>
+                      <td className="report-indicative">{t('results.indicativeBadge')}</td>
                     </tr>
                     <tr>
                       <td>{t('results.beng2.title')} — {t('results.beng2.subtitle')}</td>
-                      <td>{result.beng2.toFixed(1)} {t('results.beng2.unit')}</td>
-                      <td>{'\u2264'} {result.beng2Limit}</td>
-                      <td className={result.beng2Pass ? 'report-pass' : 'report-fail'}>
-                        {result.beng2Pass ? t('results.pass') : t('results.fail')}
-                      </td>
+                      <td>{formatNumber(result.beng2, locale, 1)} {t('results.beng2.unit')}</td>
+                      <td>{'≤'} {formatNumber(result.beng2Limit, locale)}</td>
+                      <td className="report-indicative">{t('results.indicativeBadge')}</td>
                     </tr>
                     <tr>
                       <td>{t('results.beng3.title')} — {t('results.beng3.subtitle')}</td>
-                      <td>{result.beng3.toFixed(1)} {t('results.beng3.unit')}</td>
-                      <td>{'\u2265'} {result.beng3Limit}%</td>
-                      <td className={result.beng3Pass ? 'report-pass' : 'report-fail'}>
-                        {result.beng3Pass ? t('results.pass') : t('results.fail')}
-                      </td>
+                      <td>{formatNumber(result.beng3, locale, 1)} {t('results.beng3.unit')}</td>
+                      <td>{'≥'} {formatNumber(result.beng3Limit, locale)}%</td>
+                      <td className="report-indicative">{t('results.indicativeBadge')}</td>
                     </tr>
                     {monthlyResult && (
                       <tr>
                         <td>{t('results.toJuli')} — GTO</td>
-                        <td>{monthlyResult.toJuli.gto.toFixed(2)}</td>
-                        <td>{'\u2264'} {monthlyResult.toJuli.limit}</td>
-                        <td className={monthlyResult.toJuli.pass ? 'report-pass' : 'report-fail'}>
-                          {monthlyResult.toJuli.pass ? t('results.pass') : t('results.fail')}
-                        </td>
+                        <td>{formatNumber(monthlyResult.toJuli.gto, locale, 2)}</td>
+                        <td>{'≤'} {formatNumber(monthlyResult.toJuli.limit, locale)}</td>
+                        <td className="report-indicative">{t('results.indicativeBadge')}</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-
-              {/* Monthly overview */}
               {monthlyResult && (
                 <div className="report-section">
                   <h2>{t('report.monthlyOverview')}</h2>
@@ -171,11 +336,11 @@ export function ReportView() {
                     <tbody>
                       {monthlyResult.monthly.map((m, i) => (
                         <tr key={i}>
-                          <td>{t(monthKeys[i])}</td>
-                          <td>{m.heatingDemand.toFixed(0)} kWh</td>
-                          <td>{m.coolingDemand.toFixed(0)} kWh</td>
-                          <td>{m.solarGain.toFixed(0)} kWh</td>
-                          <td>{m.transmissionLoss.toFixed(0)} kWh</td>
+                          <td>{monthName(i, locale)}</td>
+                          <td>{formatNumber(m.heatingDemand, locale)} kWh</td>
+                          <td>{formatNumber(m.coolingDemand, locale)} kWh</td>
+                          <td>{formatNumber(m.solarGain, locale)} kWh</td>
+                          <td>{formatNumber(m.transmissionLoss, locale)} kWh</td>
                         </tr>
                       ))}
                     </tbody>
@@ -185,6 +350,7 @@ export function ReportView() {
             </>
           );
         })()}
+        </>}
       </div>
     </div>
   );

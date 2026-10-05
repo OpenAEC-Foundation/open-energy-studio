@@ -1,0 +1,35 @@
+.item-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-actions-cascade {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  max-height: 8em;
+  overflow-y: auto;
+}
+
+.item-actions-confirm,
+.item-actions-blocked {
+  /* On its own line below the buttons, so a header row is not squeezed. */
+  flex: 1 1 100%;
+  min-width: 0;
+  white-space: normal;
+  font-size: 12px;
+  color: var(--warn-text);
+}
+
+/* Compact variant for table rows (UI redesign F5): quiet icon buttons. */
+.item-actions--compact { flex-wrap: wrap; justify-content: flex-end; gap: 2px; min-width: 56px; }
+.item-actions__icon {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
+  border: 1px solid transparent; border-radius: var(--radius-sm, 4px); background: transparent;
+  color: var(--fg-3); cursor: pointer;
+}
+.item-actions__icon svg { width: 14px; height: 14px; }
+.item-actions__icon:hover { background: var(--surface-hover); color: var(--fg-1); }
+.item-actions__icon--danger:hover { color: var(--error-text); }
+.item-actions__icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }

@@ -7,6 +7,7 @@ import type {
   IBENGResult,
   IEnergyBreakdown,
 } from '../energy/types';
+import { assertLegacyHeatPumpInputs, hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, validProjectFloorArea } from './ProjectArea';
 import {
   BENG_LIMITS,
   HOT_WATER_DEMAND,
@@ -98,9 +99,19 @@ function calculateHeatPumpRenewable(project: IProject, heatingDemand: number): n
  * @returns Full BENG calculation result with pass/fail per indicator
  */
 export function calculateBENG(project: IProject): IBENGResult {
+  if (hasUnmodelledUnheatedTransmission(project)) {
+    throw new Error('Unheated space transmission is not included in the legacy indicative calculator.');
+  }
+  if (project.ntaHeatPumps?.length) {
+    throw new Error('Standalone NTA heat pumps are not included in the legacy indicative calculator.');
+  }
+  if (hasUnmodelledHeatPumpDetails(project)) {
+    throw new Error('Classified heat pump details are not included in the legacy indicative calculator.');
+  }
+  assertLegacyHeatPumpInputs(project);
   // --- Total floor area ---
-  const totalFloorArea = project.zones.reduce((sum, z) => sum + z.floorArea, 0);
-  const safeFloorArea = Math.max(totalFloorArea, 1); // prevent division by zero
+  const totalFloorArea = validProjectFloorArea(project);
+  if (totalFloorArea === null) throw new Error('Every calculation zone needs a finite floor area greater than zero.');
 
   // --- Transmission loss ---
   const transmissionLoss = calculateTransmissionLoss(project.zones, project.constructions);
@@ -173,8 +184,8 @@ export function calculateBENG(project: IProject): IBENGResult {
   const totalRenewableEnergy = pvProduction + solarThermalProduction + heatPumpRenewable;
 
   // --- BENG indicators ---
-  const beng1 = (heatingDemand + coolingDemand) / safeFloorArea;
-  const beng2 = primaryResult.totalPrimaryEnergy / safeFloorArea;
+  const beng1 = (heatingDemand + coolingDemand) / totalFloorArea;
+  const beng2 = primaryResult.totalPrimaryEnergy / totalFloorArea;
   const beng3 = renewableShare;
 
   // --- Limits ---

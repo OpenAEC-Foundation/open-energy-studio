@@ -9,6 +9,7 @@ import type {
   IMonthlyBreakdown,
   MonthlyValues,
 } from './types';
+import { assertLegacyHeatPumpInputs, hasUnmodelledHeatPumpDetails, hasUnmodelledUnheatedTransmission, validProjectFloorArea } from './ProjectArea';
 import {
   BENG_LIMITS,
   getHotWaterDemand,
@@ -85,9 +86,19 @@ function calculateHeatPumpRenewable(project: IProject, heatingDemand: number): n
  * @returns Full monthly BENG result with pass/fail, monthly breakdown, and TO-juli
  */
 export function calculateBENGMonthly(project: IProject): IBENGResultMonthly {
+  if (hasUnmodelledUnheatedTransmission(project)) {
+    throw new Error('Unheated space transmission is not included in the legacy indicative calculator.');
+  }
+  if (project.ntaHeatPumps?.length) {
+    throw new Error('Standalone NTA heat pumps are not included in the legacy indicative calculator.');
+  }
+  if (hasUnmodelledHeatPumpDetails(project)) {
+    throw new Error('Classified heat pump details are not included in the legacy indicative calculator.');
+  }
+  assertLegacyHeatPumpInputs(project);
   // --- Total floor area ---
-  const totalFloorArea = project.zones.reduce((sum, z) => sum + z.floorArea, 0);
-  const safeFloorArea = Math.max(totalFloorArea, 1);
+  const totalFloorArea = validProjectFloorArea(project);
+  if (totalFloorArea === null) throw new Error('Every calculation zone needs a finite floor area greater than zero.');
 
   // --- Monthly calculations ---
   const monthlyTransmissionLoss = calculateMonthlyTransmissionLoss(
@@ -213,13 +224,13 @@ export function calculateBENGMonthly(project: IProject): IBENGResultMonthly {
   const totalRenewableEnergy = pvProduction + solarThermalProduction + heatPumpRenewable;
 
   // --- BENG indicators ---
-  const beng1 = (heatingDemand + coolingDemand) / safeFloorArea;
+  const beng1 = (heatingDemand + coolingDemand) / totalFloorArea;
 
   // BENG2: net fossil primary = gross primary - PV credit (in primary energy terms)
   // NTA 8800 §16.3: Full PV production is credited (no self-consumption cap).
   const pvPrimaryCredit = pvProduction * 1.45; // PRIMARY_ENERGY_FACTOR_ELECTRICITY_FOSSIL
   const netPrimaryEnergy = grossPrimaryEnergy - pvPrimaryCredit;
-  const beng2 = Math.max(0, netPrimaryEnergy) / safeFloorArea;
+  const beng2 = Math.max(0, netPrimaryEnergy) / totalFloorArea;
 
   // BENG3: renewable share uses NET fossil primary (after PV credit)
   // NTA 8800: E_P;ren;tot / (E_P;ren;tot + E_P;nren;tot)

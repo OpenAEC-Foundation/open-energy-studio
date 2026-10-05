@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IWindow, Orientation } from '../../../core/energy/types';
@@ -12,6 +12,7 @@ interface WindowEditorDialogProps {
 const orientations: Orientation[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'horizontal'];
 
 export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
   const { project } = state;
@@ -95,7 +96,7 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.window.title')}
       onClose={onClose}
       onSubmit={handleSave}
@@ -103,8 +104,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.window.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.window.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: '' })); }}
@@ -114,8 +115,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.window.area')}</label>
-          <input
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.window.area')}</label>
+          <input id={`${fieldId}-2`}
             type="number"
             min={0}
             step={0.01}
@@ -125,8 +126,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.window.uValue')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.window.uValue')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             step={0.01}
@@ -136,8 +137,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.window.gValue')}</label>
-          <input
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.window.gValue')}</label>
+          <input id={`${fieldId}-4`}
             type="number"
             min={0}
             max={1}
@@ -148,8 +149,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.window.orientation')}</label>
-          <select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+          <label htmlFor={`${fieldId}-5`}>{t('dialog.window.orientation')}</label>
+          <select id={`${fieldId}-5`} value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
             {orientations.map((o) => (
               <option key={o} value={o}>
                 {t(`orientation.${o}`)}
@@ -159,8 +160,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.surface.zone')}</label>
-          <select
+          <label htmlFor={`${fieldId}-6`}>{t('dialog.surface.zone')}</label>
+          <select id={`${fieldId}-6`}
             value={zoneId}
             onChange={(e) => { handleZoneChange(e.target.value); setErrors(prev => ({ ...prev, zoneId: '' })); }}
             disabled={!!existingWindow}
@@ -177,8 +178,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.window.surface')}</label>
-          <select
+          <label htmlFor={`${fieldId}-7`}>{t('dialog.window.surface')}</label>
+          <select id={`${fieldId}-7`}
             value={surfaceId}
             onChange={(e) => { setSurfaceId(e.target.value); setErrors(prev => ({ ...prev, surfaceId: '' })); }}
             disabled={!!existingWindow}

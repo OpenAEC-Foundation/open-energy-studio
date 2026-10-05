@@ -1,0 +1,28 @@
+{
+  "id": "edr-2022-epw001-geometry",
+  "name": "EP-W001 (2022) geometry input only",
+  "buildingFunction": "residential",
+  "zones": [
+    {
+      "id": "epw001-zone",
+      "floorArea": 96.0,
+      "volume": 259.2,
+      "surfaces": [
+        { "id": "roof", "area": 48.0, "zoneId": "epw001-zone", "windows": [] },
+        { "id": "ground-floor", "area": 48.0, "zoneId": "epw001-zone", "windows": [] },
+        {
+          "id": "south-wall", "area": 43.2, "zoneId": "epw001-zone",
+          "windows": [
+            { "id": "south-window-1", "area": 6.0, "surfaceId": "south-wall", "uValue": 1.8, "gValue": 0.7 },
+            { "id": "south-window-2", "area": 6.0, "surfaceId": "south-wall", "uValue": 1.8, "gValue": 0.7 },
+            { "id": "south-window-3", "area": 6.0, "surfaceId": "south-wall", "uValue": 1.8, "gValue": 0.7 },
+            { "id": "south-window-4", "area": 6.0, "surfaceId": "south-wall", "uValue": 1.8, "gValue": 0.7 }
+          ]
+        },
+        { "id": "north-wall", "area": 43.2, "zoneId": "epw001-zone", "windows": [] },
+        { "id": "east-wall", "area": 32.4, "zoneId": "epw001-zone", "windows": [] },
+        { "id": "west-wall", "area": 32.4, "zoneId": "epw001-zone", "windows": [] }
+      ]
+    }
+  ]
+}

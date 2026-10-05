@@ -4,6 +4,9 @@
  */
 
 import type { IProject, IBENGResult } from '../energy/types';
+import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
+import { kernelVerdict } from '../nta/KernelVerdict';
+import { kernelReportModel, type KernelReportModel } from '../report/KernelReportModel';
 
 // ============================================================
 // IFC Model types (same pattern as Open-FEM2D-Studio)
@@ -161,7 +164,12 @@ function addTextProperty(model: IFCModel, name: string, value: string): IFCEntit
 // Main export function
 // ============================================================
 
-export function exportBENGToIFC(project: IProject, result: IBENGResult): IFCModel {
+/**
+ * Builds the IFC model. With a kernel model the BENG property set carries the NTA kernel
+ * figures (not attested); otherwise the simplified result, marked indicative.
+ */
+export function exportBENGToIFC(project: IProject, result: IBENGResult | null, kernel: KernelReportModel | null = null): IFCModel {
+  if (!kernel && !result) throw new Error('exportBENGToIFC needs a kernel model or a simplified result');
   const model = createIFCModel(project.name || 'BENG-Project');
 
   // === Base IFC infrastructure ===
@@ -216,7 +224,7 @@ export function exportBENGToIFC(project: IProject, result: IBENGResult): IFCMode
   // Pset_BuildingCommon — standard IFC property set
   // ==========================================================
 
-  const totalFloorArea = result.totalFloorArea;
+  const totalFloorArea = kernel?.usableFloorAreaM2 ?? result?.totalFloorArea ?? 0;
   const totalVolume = project.zones.reduce((sum, z) => sum + z.volume, 0);
 
   const buildingCommonProps = [
@@ -240,24 +248,42 @@ export function exportBENGToIFC(project: IProject, result: IBENGResult): IFCMode
   // Pset_BuildingEnergyPerformance — BENG results
   // ==========================================================
 
-  const bengProps = [
-    addRealProperty(model, 'BENG1_EnergyDemand', result.beng1, 'kWh/m2.year'),
-    addRealProperty(model, 'BENG1_Limit', result.beng1Limit, 'kWh/m2.year'),
-    addTextProperty(model, 'BENG1_Status', result.beng1Pass ? 'PASS' : 'FAIL'),
-    addRealProperty(model, 'BENG2_PrimaryFossilEnergy', result.beng2, 'kWh/m2.year'),
-    addRealProperty(model, 'BENG2_Limit', result.beng2Limit, 'kWh/m2.year'),
-    addTextProperty(model, 'BENG2_Status', result.beng2Pass ? 'PASS' : 'FAIL'),
-    addRealProperty(model, 'BENG3_RenewableShare', result.beng3, '%'),
-    addRealProperty(model, 'BENG3_Limit', result.beng3Limit, '%'),
-    addTextProperty(model, 'BENG3_Status', result.beng3Pass ? 'PASS' : 'FAIL'),
-    addTextProperty(model, 'CalculationMethod', 'NTA 8800'),
-    addTextProperty(model, 'CalculationTool', 'Open-Energy-Studio'),
-    addTextProperty(model, 'CalculationDate', new Date().toISOString().split('T')[0]),
-  ];
+  const date = new Date().toISOString().split('T')[0];
+  const names = { beng1: ['BENG1_EnergyDemand', 'kWh/m2.year'], beng2: ['BENG2_PrimaryFossilEnergy', 'kWh/m2.year'], beng3: ['BENG3_RenewableShare', '%'] } as const;
+  const bengProps = kernel
+    ? [
+      ...kernel.indicators.flatMap((row) => {
+        const [name, unit] = names[row.key];
+        const props = [];
+        if (row.value != null && Number.isFinite(row.value)) props.push(addRealProperty(model, name, row.value, unit));
+        if (row.limit != null && Number.isFinite(row.limit)) props.push(addRealProperty(model, `${row.key.toUpperCase()}_Limit`, row.limit, unit));
+        props.push(addTextProperty(model, `${row.key.toUpperCase()}_Status`, row.meets == null ? 'NOT_TESTABLE' : row.meets ? 'MEETS' : 'DOES_NOT_MEET'));
+        return props;
+      }),
+      addTextProperty(model, 'VerificationStatus', 'UNVERIFIED'),
+      addTextProperty(model, 'CalculationMethod', 'NTA 8800:2025+C1:2026 kernel; program not attested (BRL 9501)'),
+      addTextProperty(model, 'CalculationTool', 'Open-Energy-Studio'),
+      addTextProperty(model, 'CalculationDate', date),
+    ]
+    : [
+      addRealProperty(model, 'BENG1_EnergyDemand', result!.beng1, 'kWh/m2.year'),
+      addRealProperty(model, 'BENG1_Limit', result!.beng1Limit, 'kWh/m2.year'),
+      addTextProperty(model, 'BENG1_Status', 'INDICATIVE'),
+      addRealProperty(model, 'BENG2_PrimaryFossilEnergy', result!.beng2, 'kWh/m2.year'),
+      addRealProperty(model, 'BENG2_Limit', result!.beng2Limit, 'kWh/m2.year'),
+      addTextProperty(model, 'BENG2_Status', 'INDICATIVE'),
+      addRealProperty(model, 'BENG3_RenewableShare', result!.beng3, '%'),
+      addRealProperty(model, 'BENG3_Limit', result!.beng3Limit, '%'),
+      addTextProperty(model, 'BENG3_Status', 'INDICATIVE'),
+      addTextProperty(model, 'VerificationStatus', 'UNVERIFIED'),
+      addTextProperty(model, 'CalculationMethod', 'Legacy simplified monthly model; not attested NTA 8800'),
+      addTextProperty(model, 'CalculationTool', 'Open-Energy-Studio'),
+      addTextProperty(model, 'CalculationDate', date),
+    ];
 
   const psetBENG = addEntity(model, 'IFCPROPERTYSET', [
     generateGUID(), ownerHistory, 'Pset_BuildingEnergyPerformance',
-    'BENG calculation results according to NTA 8800', bengProps,
+    kernel ? 'NTA 8800 kernel results; program not attested' : 'Indicative energy estimates; not a verified NTA 8800 calculation', bengProps,
   ], 'Pset_BuildingEnergyPerformance');
 
   addEntity(model, 'IFCRELDEFINESBYPROPERTIES', [
@@ -268,7 +294,7 @@ export function exportBENGToIFC(project: IProject, result: IBENGResult): IFCMode
   // Pset_EnergyBreakdown — detailed energy balance
   // ==========================================================
 
-  const bd = result.breakdown;
+  const bd = kernel?.breakdown ?? result!.breakdown;
   const breakdownProps = [
     addRealProperty(model, 'TransmissionLoss', bd.transmissionLoss, 'kWh/year'),
     addRealProperty(model, 'VentilationLoss', bd.ventilationLoss, 'kWh/year'),
@@ -410,8 +436,24 @@ export function exportBENGToIFC(project: IProject, result: IBENGResult): IFCMode
 // Public API: download IFC file
 // ============================================================
 
-export function downloadBENGIFC(project: IProject, result: IBENGResult): void {
-  const model = exportBENGToIFC(project, result);
+/**
+ * The IFC model for the BENG export under the shared rule (KernelVerdict): the kernel figures
+ * when the kernel calculated the project, `'withheld'` when it refused the input (no simplified
+ * numbers then), the indicative result only without a kernel verdict, otherwise null.
+ */
+export function bengIfcModel(
+  project: IProject,
+  result: IBENGResult | null,
+  assessment: ProjectPerformanceAssessment | null,
+): IFCModel | 'withheld' | null {
+  const verdict = kernelVerdict(assessment);
+  if (verdict === 'withheld') return 'withheld';
+  const kernel = verdict === 'calculated' ? kernelReportModel(assessment) : null;
+  if (kernel) return exportBENGToIFC(project, result, kernel);
+  return result ? exportBENGToIFC(project, result) : null;
+}
+
+export function downloadBENGIFC(project: IProject, model: IFCModel): void {
   const stepString = generateIFCString(model);
   const blob = new Blob([stepString], { type: 'application/x-step' });
   const url = URL.createObjectURL(blob);
@@ -420,4 +462,9 @@ export function downloadBENGIFC(project: IProject, result: IBENGResult): void {
   a.download = `BENG-${project.name || 'project'}.ifc`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** IFC text of a model (exposed for tests). */
+export function ifcText(model: IFCModel): string {
+  return generateIFCString(model);
 }

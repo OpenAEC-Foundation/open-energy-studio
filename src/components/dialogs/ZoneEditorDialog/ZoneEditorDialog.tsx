@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IZone } from '../../../core/energy/types';
@@ -10,6 +10,7 @@ interface ZoneEditorDialogProps {
 }
 
 export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
 
@@ -37,6 +38,8 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
         height,
         surfaces: [],
         thermalBridges: [],
+        pointThermalBridges: [],
+        pointBridgeInventoryComplete: false,
         airTightness: { qv10: 0.4 },
       };
       dispatch({ type: 'ADD_ZONE', payload: newZone });
@@ -45,7 +48,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.zone.title')}
       onClose={onClose}
       onSubmit={handleSave}
@@ -53,8 +56,8 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.zone.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-1`}>{t('dialog.zone.name')}</label>
+          <input id={`${fieldId}-1`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -62,8 +65,8 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.zone.floorArea')}</label>
-          <input
+          <label htmlFor={`${fieldId}-2`}>{t('dialog.zone.floorArea')}</label>
+          <input id={`${fieldId}-2`}
             type="number"
             min={0}
             step={0.1}
@@ -73,8 +76,8 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.zone.volume')}</label>
-          <input
+          <label htmlFor={`${fieldId}-3`}>{t('dialog.zone.volume')}</label>
+          <input id={`${fieldId}-3`}
             type="number"
             min={0}
             step={0.1}
@@ -84,8 +87,8 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.zone.height')}</label>
-          <input
+          <label htmlFor={`${fieldId}-4`}>{t('dialog.zone.height')}</label>
+          <input id={`${fieldId}-4`}
             type="number"
             min={0}
             step={0.01}

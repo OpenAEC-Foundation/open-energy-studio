@@ -1,0 +1,97 @@
+<!doctype html><html lang="nl" data-theme="dark"><head><meta charset="utf-8"><title>Maatwerkadvies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="mock.css">
+<style>html,body{width:1600px;height:1000px;overflow:hidden}</style></head><body><div class="app" >
+<header class="topbar">
+  <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v11h14V9"/><path d="M13 10.5l-3 4h4l-3 4"/></svg></div><div class="brand-name">Open Energy Studio<small>NTA 8800 · v0.2</small></div></div>
+  <div class="doc-tabs"><div class="doc-tab ">Voorbeeld tussenwoning<span class="x"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></span></div><div class="doc-tab active">Rijwoning 1965<span class="x"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></span></div><div class="doc-tab"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></div></div>
+  <div class="cmd"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Zoek veld, stap of opdracht…<kbd>Ctrl K</kbd></div>
+  <div class="top-actions">
+    <button class="btn"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>Opslaan</button>
+    <button class="btn primary"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Herbereken<span class="kbd">Ctrl ↵</span></button>
+    <span class="iconbtn" title="Contextpaneel"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></span>
+  </div>
+  <div class="winctl"><span><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></span><span><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></span><span><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></span></div>
+</header>
+<nav class="nav" aria-label="Werkstappen">
+  <div class="proj"><div class="proj-name">Rijwoning 1965</div><div class="proj-meta">Gouda · 112,0 m² A<sub>g</sub> · 1965</div><div class="proj-tags"><span class="tag">WONING</span><span class="tag">BESTAAND</span><span class="tag">MWA</span></div></div>
+  <ul class="steps">
+    <li class="grp">Invoer</li>
+    <li class="step "><span class="no done"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lbl">Project</span></li>
+    <li class="step "><span class="no done"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lbl">Gebouw</span></li>
+    <li class="step "><span class="no warn">3</span><span class="lbl">Installaties</span><span class="cnt ok"></span></li>
+    <li class="grp">Berekening</li>
+    <li class="step "><span class="no warn">4</span><span class="lbl">Controle</span><span class="cnt ok"></span></li>
+    <li class="step "><span class="no done"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lbl">Resultaten</span></li>
+    <li class="grp">Bestaande bouw</li>
+    <li class="step "><span class="no todo">6</span><span class="lbl">Basisopname</span></li>
+    <li class="step active"><span class="no cur">7</span><span class="lbl">Maatwerkadvies</span></li>
+    <li class="step "><span class="no todo">8</span><span class="lbl">Herlabelen</span></li>
+    <li class="grp">Oplevering</li>
+    <li class="step "><span class="no todo">9</span><span class="lbl">Rapport &amp; dossier</span><span class="cnt ok">9/29</span></li>
+    <li class="step "><span class="no todo">10</span><span class="lbl">Registratie</span></li>
+  </ul>
+  <div class="nav-foot">
+    <div class="step"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span class="lbl">Gereedschap</span><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+    <div class="step"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg><span class="lbl">Instellingen</span><kbd>Ctrl ,</kbd></div>
+  </div>
+</nav>
+<main class="main">
+  <div class="pagehead"><div><div class="crumbs">Bestaande bouw <svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg> <b>Maatwerkadvies</b></div><h1>Maatwerkadvies</h1><div class="lead">BRL 9500-MWA · werkelijk gebruik (2 bewoners, 19,5 °C) · ISSO 82.2 / 75.2 · prijzen 2026</div></div>
+    <div class="actions"><button class="btn"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>Uitgangspunten</button><button class="btn primary"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Doorrekenen</button></div></div>
+  <div class="tabs"><a class="active">Maatregelen &amp; pakketten</a><a>Gemeten verbruik</a><a>Woningpas</a><a>Advies &amp; rapport</a></div>
+  <div class="content" style="grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px">
+    <section class="card"><div class="card-head"><h3>Labelpad</h3><span class="sub-t">EP<sub>2</sub> kWh/m²·jr per variant</span><div class="end"><span class="iconbtn"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/></svg></span></div></div>
+      <div class="card-body" style="display:flex;justify-content:space-around;align-items:end;border-bottom:1px solid var(--line-subtle)"><div style="display:grid;gap:6px;justify-items:center;align-content:end;height:250px">
+      <span class="label-badge lbl-e" style="height:24px;font-size:13px;padding:0 12px 0 8px">E</span>
+      <div class="num" style="font-size:var(--fs-sm);font-weight:600">268</div>
+      <div style="width:52px;height:169.73333333333332px;border-radius:4px 4px 0 0;background:var(--fg-3);opacity:0.55"></div>
+      <div style="font-size:var(--fs-xs);color:var(--fg-2);text-align:center;width:96px;font-weight:400">Huidig</div></div><div style="display:grid;gap:6px;justify-items:center;align-content:end;height:250px">
+      <span class="label-badge lbl-b" style="height:24px;font-size:13px;padding:0 12px 0 8px">B</span>
+      <div class="num" style="font-size:var(--fs-sm);font-weight:600">176</div>
+      <div style="width:52px;height:111.46666666666667px;border-radius:4px 4px 0 0;background:var(--fg-3);opacity:0.55"></div>
+      <div style="font-size:var(--fs-xs);color:var(--fg-2);text-align:center;width:96px;font-weight:400">1 · Schil</div></div><div style="display:grid;gap:6px;justify-items:center;align-content:end;height:250px">
+      <span class="label-badge lbl-a" style="height:24px;font-size:13px;padding:0 12px 0 8px">A</span>
+      <div class="num" style="font-size:var(--fs-sm);font-weight:600">118</div>
+      <div style="width:52px;height:74.73333333333333px;border-radius:4px 4px 0 0;background:var(--accent);opacity:1"></div>
+      <div style="font-size:var(--fs-xs);color:var(--fg-1);text-align:center;width:96px;font-weight:600">2 · Schil + hybride WP</div></div><div style="display:grid;gap:6px;justify-items:center;align-content:end;height:250px">
+      <span class="label-badge lbl-app3" style="height:24px;font-size:13px;padding:0 12px 0 8px">A+++</span>
+      <div class="num" style="font-size:var(--fs-sm);font-weight:600">46</div>
+      <div style="width:52px;height:29.133333333333333px;border-radius:4px 4px 0 0;background:var(--fg-3);opacity:0.55"></div>
+      <div style="font-size:var(--fs-xs);color:var(--fg-2);text-align:center;width:96px;font-weight:400">3 · All-electric</div></div></div></section>
+    <section class="card"><div class="card-head"><h3>Pakketvergelijking</h3><div class="end"><div class="seg" style="height:26px"><span class="on">NCW</span><span>Terugverdientijd</span><span>Invoervolgorde</span></div></div></div>
+      <table><thead><tr><th>Variant</th><th class="n">Investering</th><th class="n">TVT</th><th class="n">NCW 30 jr</th></tr></thead><tbody>
+        <tr><td>1 · Schil</td><td class="n num">€ 18.900</td><td class="n num">18,5 jr</td><td class="n num" style="color:var(--ok-text)">€ 2.300</td></tr>
+        <tr class="sel"><td><b>2 · Schil + hybride WP</b> <span class="pill accent" style="margin-left:6px">advies</span></td><td class="n num">€ 26.400</td><td class="n num">16,1 jr</td><td class="n num" style="color:var(--ok-text)">€ 7.850</td></tr>
+        <tr><td>3 · All-electric</td><td class="n num">€ 41.200</td><td class="n num">19,2 jr</td><td class="n num" style="color:var(--ok-text)">€ 4.100</td></tr>
+      </tbody></table>
+      <div class="card-body" style="display:grid;gap:8px"><div class="banner info" style="padding:8px 10px"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Besparing op werkelijk gebruik; het label blijft de NTA 8800-berekening van het pakket.</span></div></div></section>
+    <section class="card" style="grid-column:1 / -1"><div class="card-head"><h3>Maatregelen</h3><span class="sub-t">7 maatregelen · kosten uit Prijzenboekje 2026 tenzij anders vermeld</span><div class="end"><button class="btn sm"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Uit sjabloon</button><button class="btn sm"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Maatregel</button></div></div>
+      <table><thead><tr><th style="width:36px"></th><th>Maatregel</th><th>Categorie</th><th class="n">Investering</th><th class="n">Gas m³/jr</th><th class="n">Elek. kWh/jr</th><th class="n">TVT</th><th class="n">NCW</th><th>In pakket</th></tr></thead><tbody>
+        <tr class=""><td><span class="check"><i class="on"></i></span></td><td>Spouwmuurisolatie R<sub>c</sub> 1,7</td><td class="sec">Schil</td><td class="n num">€ 2.100</td><td class="n num">−410</td><td class="n num">0</td><td class="n num">4,1 jr</td><td class="n num" style="color:var(--ok-text)">€ 9.800</td><td><span class="tag" style="margin-right:3px;">1</span><span class="tag" style="margin-right:3px;background:var(--accent-subtle);color:var(--accent-text);border-color:transparent">2</span><span class="tag" style="margin-right:3px;">3</span></td></tr>
+        <tr class=""><td><span class="check"><i class="on"></i></span></td><td>Dakisolatie binnenzijde R<sub>c</sub> 6,0</td><td class="sec">Schil</td><td class="n num">€ 7.800</td><td class="n num">−380</td><td class="n num">0</td><td class="n num">16,6 jr</td><td class="n num" style="color:var(--ok-text)">€ 1.900</td><td><span class="tag" style="margin-right:3px;">1</span><span class="tag" style="margin-right:3px;background:var(--accent-subtle);color:var(--accent-text);border-color:transparent">2</span><span class="tag" style="margin-right:3px;">3</span></td></tr>
+        <tr class=""><td><span class="check"><i class="on"></i></span></td><td>HR++-glas → triple (U<sub>w</sub> 0,8)</td><td class="sec">Schil</td><td class="n num">€ 9.000</td><td class="n num">−150</td><td class="n num">0</td><td class="n num">48,0 jr</td><td class="n num" style="color:var(--error-text)">€ −4.700</td><td><span class="tag" style="margin-right:3px;">1</span><span class="tag" style="margin-right:3px;background:var(--accent-subtle);color:var(--accent-text);border-color:transparent">2</span><span class="tag" style="margin-right:3px;">3</span></td></tr>
+        <tr class=""><td><span class="check"><i class="on"></i></span></td><td>Hybride warmtepomp 5 kW</td><td class="sec">Installatie</td><td class="n num">€ 7.500</td><td class="n num">−520</td><td class="n num">+1.450</td><td class="n num">13,2 jr</td><td class="n num" style="color:var(--ok-text)">€ 5.550</td><td><span class="tag" style="margin-right:3px;opacity:.25">1</span><span class="tag" style="margin-right:3px;background:var(--accent-subtle);color:var(--accent-text);border-color:transparent">2</span><span class="tag" style="margin-right:3px;opacity:.25">3</span></td></tr>
+        <tr class=""><td><span class="check"><i class=""></i></span></td><td>Lucht/water-WP 8 kW + boiler</td><td class="sec">Installatie</td><td class="n num">€ 17.800</td><td class="n num">−1.140</td><td class="n num">+3.900</td><td class="n num">21,0 jr</td><td class="n num" style="color:var(--error-text)">€ −1.600</td><td><span class="tag" style="margin-right:3px;opacity:.25">1</span><span class="tag" style="margin-right:3px;opacity:.25">2</span><span class="tag" style="margin-right:3px;">3</span></td></tr>
+        <tr class=""><td><span class="check"><i class=""></i></span></td><td>PV 10 × 430 Wp</td><td class="sec">Opwekking</td><td class="n num">€ 5.200</td><td class="n num">0</td><td class="n num">−3.800</td><td class="n num">6,4 jr</td><td class="n num" style="color:var(--ok-text)">€ 6.900</td><td><span class="tag" style="margin-right:3px;opacity:.25">1</span><span class="tag" style="margin-right:3px;opacity:.25">2</span><span class="tag" style="margin-right:3px;">3</span></td></tr>
+      </tbody></table></section>
+  </div></main>
+<aside class="insp" aria-label="Contextpaneel"><div class="insp-head"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg><h3>Pakket 2</h3><span class="pill accent">advies</span></div>
+  <div class="insp-body">
+    <div style="display:flex;gap:10px;align-items:center"><span class="label-badge lbl-e" style="height:32px;font-size:18px">E</span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span class="label-badge lbl-a" style="height:32px;font-size:18px">A</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="card" style="padding:8px 10px"><div class="muted" style="font-size:var(--fs-xs)">Investering</div><b class="num">€ 26.400</b></div><div class="card" style="padding:8px 10px"><div class="muted" style="font-size:var(--fs-xs)">Besparing</div><b class="num">€ 1.640/jr</b></div><div class="card" style="padding:8px 10px"><div class="muted" style="font-size:var(--fs-xs)">Terugverdientijd</div><b class="num">16,1 jr</b></div><div class="card" style="padding:8px 10px"><div class="muted" style="font-size:var(--fs-xs)">CO<sub>2</sub></div><b class="num">−2,6 t/jr</b></div><div class="card" style="padding:8px 10px"><div class="muted" style="font-size:var(--fs-xs)">Gas</div><b class="num">−1.460 m³</b></div><div class="card" style="padding:8px 10px"><div class="muted" style="font-size:var(--fs-xs)">Elektriciteit</div><b class="num">+1.450 kWh</b></div>
+    </div>
+    <div class="field"><label>Fasering</label><div class="seg" style="width:100%"><span style="flex:1;justify-content:center">Ineens</span><span class="on" style="flex:1;justify-content:center">2026 + 2029</span></div></div>
+    <div class="field"><label>Motivatie adviseur</label><div class="input" style="height:64px;align-items:flex-start;padding-top:7px"><span class="v" style="white-space:normal;color:var(--fg-2)">Schil eerst; hybride WP sluit aan op bestaande radiatoren (θ 55 °C haalbaar na isolatie)…</span></div></div>
+    <div class="banner warn" style="padding:8px 10px"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>Woningpas: ‘laagtemperatuurgereed’ nog niet beoordeeld.</span></div>
+  </div></aside>
+<footer class="status" role="status">
+  <span class="chip"><span class="pill ok" style="height:18px"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Resultaat actueel</span></span>
+  <span class="chip">Rust-kern <b>0.1.0</b> · NTA 8800:2025+C1:2026</span>
+  <span class="sep"></span>
+  <span class="chip">Label <b>E</b> huidig</span><span class="chip">Pakket 2 → <b>A</b></span>
+  
+  <span class="right"><span class="pill unv" style="height:18px">Onverifieerd · geen attest</span><span>Opgeslagen 14:32</span><span>NL</span></span>
+</footer>
+</div></body></html>

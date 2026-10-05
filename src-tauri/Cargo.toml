@@ -1,7 +1,7 @@
 [package]
 name = "open-energy-studio"
 version = "0.1.6-alpha"
-description = "BENG calculator for building energy performance according to NTA 8800"
+description = "Energy performance workspace with an experimental NTA 8800 input audit"
 authors = ["Open Energy Studio Contributors"]
 license = "LGPL-3.0-or-later"
 repository = "https://github.com/OpenAEC-Foundation/open-energy-studio"
@@ -23,6 +23,7 @@ tauri = { version = "2.10.3", features = ["image-png"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-log = "2"
+nta8800-core = { path = "../crates/nta8800-core" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [

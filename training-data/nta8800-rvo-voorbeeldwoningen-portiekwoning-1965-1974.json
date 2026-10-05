@@ -1,0 +1,585 @@
+{
+ "title": "RVO Voorbeeldwoningen 2022: Portiekwoning tussen/midden, bouwjaar 1965–1974, pakket \"huidig\"",
+ "source": "RVO, Voorbeeldwoningen 2022 bestaande bouw (Excel met data per type, rekenresultaten met de validatietool NTA 8800:2022); https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+ "note": "Geen officiële referentietoets. RVO rekende zonder forfaitaire koudebrugtoeslag (ΔU_for = 0); performanceInput volgt die typering (U-waarden van RVO, ΔU_for 0). survey is de basisopname met ISSO 82.1-standaardwaarden (met ΔU_for). Thermische massa, vloeromtrek en tapleidingen zijn aannames.",
+ "rvo": {
+  "heatingNeedKwhPerM2": 90.73,
+  "standardInsulationKwhPerM2": 45.0,
+  "lossAreaRatio": 0.5187
+ },
+ "regression": {
+  "surveyHeatingNeedKwhPerM2": 94.72,
+  "performanceInputHeatingNeedKwhPerM2": 93.88,
+  "standardInsulationKwhPerM2": 45.0
+ },
+ "survey": {
+  "id": "rvo-voorbeeldwoning-portiekwoning-1965-1974",
+  "constructionYear": 1969,
+  "dwelling": {
+   "kind": "apartment",
+   "floor": "ground_or_intermediate",
+   "side": "middle"
+  },
+  "usableFloorAreaM2": 74.67,
+  "areaSourceReference": "RVO Voorbeeldwoningen 2022",
+  "buildingHeightM": 12.0,
+  "construction": {
+   "floor": "heavy",
+   "wall": "heavy",
+   "sourceReference": "assumed"
+  },
+  "storeys": 1,
+  "envelope": {
+   "surfaces": [
+    {
+     "id": "gevel1",
+     "element": "facade",
+     "boundary": {
+      "kind": "outdoor"
+     },
+     "grossAreaM2": 23.2925,
+     "orientation": "east",
+     "cavity": true,
+     "insulation": {
+      "kind": "none_or_unknown"
+     },
+     "sourceReference": "RVO voorbeeldwoning"
+    },
+    {
+     "id": "gevel2",
+     "element": "facade",
+     "boundary": {
+      "kind": "outdoor"
+     },
+     "grossAreaM2": 15.4375,
+     "orientation": "west",
+     "cavity": true,
+     "insulation": {
+      "kind": "none_or_unknown"
+     },
+     "sourceReference": "RVO voorbeeldwoning"
+    }
+   ],
+   "windows": [
+    {
+     "id": "raam1",
+     "surfaceId": "gevel1",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam2",
+     "surfaceId": "gevel1",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam3",
+     "surfaceId": "gevel1",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam4",
+     "surfaceId": "gevel2",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam5",
+     "surfaceId": "gevel1",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam6",
+     "surfaceId": "gevel1",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam7",
+     "surfaceId": "gevel1",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "raam8",
+     "surfaceId": "gevel2",
+     "areaM2": 1.96375,
+     "glass": "double",
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    }
+   ],
+   "doors": [
+    {
+     "id": "deur1",
+     "surfaceId": "gevel1",
+     "areaM2": 2.7,
+     "insulated": false,
+     "glassFraction": 0.0,
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    },
+    {
+     "id": "deur2",
+     "surfaceId": "gevel2",
+     "areaM2": 2.7,
+     "insulated": false,
+     "glassFraction": 0.0,
+     "frame": "wood_or_plastic",
+     "sourceReference": "RVO"
+    }
+   ]
+  },
+  "heating": {
+   "generator": {
+    "kind": "boiler",
+    "boilerType": "hr107",
+    "insideThermalBoundary": true
+   },
+   "emitters": "radiators",
+   "designClass": "c90_70",
+   "control": "room_thermostat",
+   "storeys": 1,
+   "sourceReference": "RVO"
+  },
+  "hotWater": {
+   "generator": {
+    "kind": "gas_appliance",
+    "applianceType": "combi",
+    "gaskeur": "gaskeur_hr_cw",
+    "cwClass": "cw3"
+   },
+   "served": "kitchen_and_bathroom",
+   "kitchenLengthM": 2.0,
+   "bathroomLengthM": 3.0,
+   "showerHeatRecovery": "none",
+   "sourceReference": "RVO"
+  },
+  "ventilation": {
+   "principle": "mechanical_extract",
+   "declaredVariant": "c1",
+   "sourceReference": "RVO"
+  },
+  "sourceReference": "RVO Voorbeeldwoningen 2022"
+ },
+ "performanceInput": {
+  "activeCooling": null,
+  "areaSourceReference": "RVO Voorbeeldwoningen 2022",
+  "bacsFactor": 1.0,
+  "bacsSourceReference": "residential: f_BACS 1,0 (§5.5.8)",
+  "batteryStoragePresent": false,
+  "bblFunction": null,
+  "calculationScope": "residential",
+  "cooling": null,
+  "declaredRenewableHeat": [],
+  "declaredUses": [],
+  "demandUsesFixedC1Ventilation": false,
+  "externalSupply": {
+   "areaElectricity": [],
+   "collectiveHeatPumpSource": null,
+   "cooling": null,
+   "heating": null,
+   "hotWater": null
+  },
+  "heatPumpRenewable": null,
+  "hotWater": {
+   "boilingWaterTap": false,
+   "circulation": null,
+   "collective": null,
+   "deliverySets": null,
+   "emission": {
+    "bathroomLengthM": 3.0,
+    "kitchenLengthM": 2.0,
+    "method": "residential",
+    "served": "kitchen_and_bathroom",
+    "sourceReference": "RVO; tap lengths per ISSO 82.1 p. 178"
+   },
+   "equipmentReference": "RVO",
+   "generator": {
+    "appliance": "combi_gaskeur_hr_cw",
+    "declared": null,
+    "kind": "gas_appliance",
+    "kitchenOnly": false,
+    "measuredClass": "class3"
+   },
+   "need": {
+    "dwellingCount": 1,
+    "method": "residential",
+    "sourceReference": "RVO"
+   },
+   "showerHeatRecovery": null,
+   "storage": []
+  },
+  "labelFunction": null,
+  "lighting": [],
+  "lossAreaM2": 38.730000000000004,
+  "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+  "onSiteProduction": [],
+  "permitApplicationAfter20260529": false,
+  "productionInventoryComplete": true,
+  "pvSystems": [],
+  "spaceHeating": {
+   "demand": {
+    "areaSourceReference": "RVO Voorbeeldwoningen 2022",
+    "dwellingType": "apartment_building",
+    "internalGains": {
+     "dwellingCount": 1,
+     "method": "residential",
+     "sourceReference": "one dwelling"
+    },
+    "opaqueElements": [
+     {
+      "areaM2": 2.7,
+      "id": "deur1",
+      "orientation": "east",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 3.4
+     },
+     {
+      "areaM2": 8.809999999999999,
+      "id": "gevel1",
+      "orientation": "east",
+      "sourceReference": "RVO voorbeeldwoning; basisopname R_c 0.43 (I.2.1.3)",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 1.6666666666666667
+     },
+     {
+      "areaM2": 2.7,
+      "id": "deur2",
+      "orientation": "west",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 3.4
+     },
+     {
+      "areaM2": 8.809999999999999,
+      "id": "gevel2",
+      "orientation": "west",
+      "sourceReference": "RVO voorbeeldwoning; basisopname R_c 0.43 (I.2.1.3)",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 1.6666666666666667
+     }
+    ],
+    "opaqueInventoryComplete": true,
+    "setpoints": {
+     "coolingC": 24.0,
+     "heatingC": 20.0,
+     "sourceReference": "NTA 8800 table 7.13 residential"
+    },
+    "thermalMass": {
+     "ceiling": "open_or_none",
+     "floor": "heavy",
+     "sourceReference": "assumed; ISSO 82.1 tables 7.5/7.6",
+     "wall": "heavy"
+    },
+    "transmission": {
+     "direct": {
+      "elements": [
+       {
+        "areaM2": 2.7,
+        "id": "deur1",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 3.4
+       },
+       {
+        "areaM2": 8.809999999999999,
+        "id": "gevel1",
+        "sourceReference": "RVO voorbeeldwoning; basisopname R_c 0.43 (I.2.1.3)",
+        "uValueWPerM2k": 1.6666666666666667
+       },
+       {
+        "areaM2": 2.7,
+        "id": "deur2",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 3.4
+       },
+       {
+        "areaM2": 8.809999999999999,
+        "id": "gevel2",
+        "sourceReference": "RVO voorbeeldwoning; basisopname R_c 0.43 (I.2.1.3)",
+        "uValueWPerM2k": 1.6666666666666667
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam1",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam2",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam3",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam5",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam6",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam7",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam4",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       },
+       {
+        "areaM2": 1.96375,
+        "id": "raam8",
+        "sourceReference": "RVO",
+        "uValueWPerM2k": 2.9
+       }
+      ],
+      "linearBridges": [],
+      "pointBridges": []
+     },
+     "groundFloors": [],
+     "groundInventoryConfirmed": true,
+     "method": "components",
+     "unheated": null,
+     "verticalPipes": [
+      {
+       "id": "leiding-1",
+       "insulated": false,
+       "sharedZones": 1,
+       "sourceReference": "RVO Voorbeeldwoningen 2022; basisopname §7.2.4",
+       "storeys": 1
+      }
+     ]
+    },
+    "usableFloorAreaM2": 74.67,
+    "usageFunction": "residential",
+    "ventilation": {
+     "apartmentBuilding": true,
+     "buildingHeightM": 12.0,
+     "category": "residential",
+     "combustionAppliances": [],
+     "constructionYear": 1969,
+     "coolingSetpointC": 24.0,
+     "dwellingCount": 1,
+     "fans": {
+      "current": "ac",
+      "manufactureYear": 1969,
+      "method": "forfait"
+     },
+     "floorAboveCrawlspace": false,
+     "flowReduction": {
+      "collective": false,
+      "evidenceReference": null,
+      "flowControlPercent": null,
+      "recirculationPercent": null
+     },
+     "functions": [
+      {
+       "areaM2": 74.67,
+       "function": "residential",
+       "swimmingPool": false
+      }
+     ],
+     "grillePreheating": null,
+     "heatingSetpointC": 20.0,
+     "infiltration": {
+      "buildingType": "storey_middle_lower_or_intermediate",
+      "method": "reference",
+      "renovationYear": null
+     },
+     "installedCapacity": null,
+     "maximumCapacityForCooling": null,
+     "overventilation": null,
+     "sourceReference": "RVO; basisopname",
+     "system": {
+      "kind": "single",
+      "unit": {
+       "airHandlingUnit": null,
+       "ducts": "unknown",
+       "equipmentReference": "RVO",
+       "heatRecovery": null,
+       "variant": "c1"
+      }
+     },
+     "usableFloorAreaM2": 74.67,
+     "ventilativeCooling": null,
+     "wholeDwellingAreaM2": null,
+     "zoneId": "woning"
+    },
+    "ventilationFlows": [],
+    "windowInventoryComplete": true,
+    "windows": [
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam1",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "north",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam2",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "east",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam3",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "south",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam5",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "north",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam6",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "east",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam7",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "south",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam4",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "west",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     },
+     {
+      "areaM2": 1.96375,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.75,
+      "id": "raam8",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "west",
+      "sourceReference": "RVO",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 2.9
+     }
+    ],
+    "zoneId": "woning"
+   },
+   "distribution": {
+    "method": "heated_zone_only_space_heating",
+    "sourceReference": "RVO Voorbeeldwoningen 2022; basisopname: pipes in the heated zone"
+   },
+   "emission": {
+    "balancing": "none_or_unknown",
+    "control": "main_room_thermostat",
+    "sourceReference": "RVO; basisopname",
+    "system": "radiators_or_convectors"
+   },
+   "generator": {
+    "boiler": {
+     "averageDesignEmissionTemperatureC": 80.0,
+     "emissionCircuit": "direct",
+     "equipmentReference": "RVO",
+     "fuel": "natural_gas",
+     "generatorId": "opwekker-1",
+     "installationYear": 1969,
+     "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+     "kind": "hr107",
+     "location": "inside_thermal_boundary",
+     "locationReference": "RVO",
+     "pilotFlamePresent": true,
+     "role": "individual_main",
+     "temperatureAndCircuitReference": "RVO; table 9.9 class 90/70"
+    },
+    "kind": "gas_boiler"
+   }
+  },
+  "storage": null,
+  "totalUsableFloorAreaM2": 74.67,
+  "useInventoryComplete": true,
+  "constructionYear": 1969
+ }
+}

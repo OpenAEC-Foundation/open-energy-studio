@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import {
   calculatePsiValue,
   createDefaultInput,
@@ -13,7 +14,8 @@ import {
 import './ThermalBridgeCalculator.css';
 
 export function ThermalBridgeCalculator() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const n = (value: number, digits: number) => formatNumber(value, locale, digits);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [input, setInput] = useState<ThermalBridgeInput>(createDefaultInput);
   const [result, setResult] = useState<ThermalBridgeResult | null>(null);
@@ -38,8 +40,8 @@ export function ThermalBridgeCalculator() {
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    drawDetail(ctx, rect.width, rect.height, input, result);
-  }, [input, result]);
+    drawDetail(ctx, rect.width, rect.height, input, result, locale);
+  }, [input, result, locale]);
 
   const meta = DETAIL_TYPE_META.find(m => m.id === input.detailType)!;
 
@@ -191,7 +193,7 @@ export function ThermalBridgeCalculator() {
               <div className="tb-result-card tb-result-main">
                 <div className="tb-result-label">{t('tb.psiCalculated')}</div>
                 <div className="tb-result-value">
-                  {result.psiCalculated.toFixed(3)}
+                  {n(result.psiCalculated, 3)}
                   <span className="tb-result-unit">W/(mK)</span>
                 </div>
               </div>
@@ -199,7 +201,7 @@ export function ThermalBridgeCalculator() {
               <div className="tb-result-card">
                 <div className="tb-result-label">{t('tb.psiForfait')}</div>
                 <div className="tb-result-value tb-result-forfait">
-                  {result.psiForfait.toFixed(3)}
+                  {n(result.psiForfait, 3)}
                   <span className="tb-result-unit">W/(mK)</span>
                 </div>
               </div>
@@ -207,14 +209,14 @@ export function ThermalBridgeCalculator() {
               <div className="tb-result-card">
                 <div className="tb-result-label">{t('tb.percentForfait')}</div>
                 <div className={`tb-result-value ${result.percentOfForfait <= 100 ? 'tb-result-good' : 'tb-result-bad'}`}>
-                  {result.percentOfForfait}%
+                  {n(result.percentOfForfait, 0)}%
                 </div>
               </div>
 
               <div className="tb-result-card">
                 <div className="tb-result-label">{t('tb.heatLoss')}</div>
                 <div className="tb-result-value">
-                  {result.heatLossPerMeter.toFixed(3)}
+                  {n(result.heatLossPerMeter, 3)}
                   <span className="tb-result-unit">W/m</span>
                 </div>
                 <div className="tb-result-note">{t('tb.heatLossNote')}</div>
@@ -275,7 +277,8 @@ function drawDetail(
   w: number,
   h: number,
   input: ThermalBridgeInput,
-  result: ThermalBridgeResult | null
+  result: ThermalBridgeResult | null,
+  locale: string,
 ) {
   // Clear
   ctx.clearRect(0, 0, w, h);
@@ -325,7 +328,7 @@ function drawDetail(
 
   // Draw psi annotation
   if (result) {
-    drawPsiAnnotation(ctx, w, h, result);
+    drawPsiAnnotation(ctx, w, h, result, locale);
   }
 }
 
@@ -860,7 +863,7 @@ function drawHeatFlowArrows(
 
 // ---- Psi annotation ----
 
-function drawPsiAnnotation(ctx: CanvasRenderingContext2D, w: number, _h: number, result: ThermalBridgeResult) {
+function drawPsiAnnotation(ctx: CanvasRenderingContext2D, w: number, _h: number, result: ThermalBridgeResult, locale: string) {
   const padding = 10;
   const boxW = 140;
   const boxH = 28;
@@ -876,5 +879,5 @@ function drawPsiAnnotation(ctx: CanvasRenderingContext2D, w: number, _h: number,
   ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`\u03C8 = ${result.psiCalculated.toFixed(3)} W/(mK)`, x + 8, y + boxH / 2);
+  ctx.fillText(`\u03C8 = ${formatNumber(result.psiCalculated, locale, 3)} W/(mK)`, x + 8, y + boxH / 2);
 }

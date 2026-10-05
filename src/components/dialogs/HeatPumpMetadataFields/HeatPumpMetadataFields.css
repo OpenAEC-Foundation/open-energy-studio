@@ -1,0 +1,21 @@
+.heat-pump-metadata { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0 0; padding: 12px; }
+.heat-pump-metadata legend { padding: 0 5px; color: var(--text-primary); font-size: 13px; font-weight: 700; }
+.heat-pump-metadata p { margin: 0 0 12px; color: var(--text-secondary); font-size: 11px; }
+.heat-pump-metadata-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+.heat-pump-metadata-options { display: flex; flex-wrap: wrap; gap: 9px 16px; margin-top: 7px; font-size: 12px; }
+.heat-pump-metadata-options label { display: inline-flex; align-items: center; gap: 6px; }
+.heat-pump-registry { margin-top: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
+.heat-pump-registry > label { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; }
+.heat-pump-registry > p { margin: 5px 0 10px; }
+@media (max-width: 600px) { .heat-pump-metadata-grid { grid-template-columns: 1fr; } }
+.heat-pump-points { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.heat-pump-points-heading, .heat-pump-point { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.heat-pump-points-heading strong { font-size: 12px; }
+.heat-pump-points-heading p { margin: 3px 0 8px; }
+.heat-pump-points button { cursor: pointer; }
+.heat-pump-point { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 6px; font-size: 11px; }
+.heat-pump-point > div { display: flex; gap: 6px; }
+.heat-pump-point-editor { border: 1px solid var(--border); border-radius: 6px; margin-top: 9px; padding: 10px; }
+.heat-pump-point-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.heat-pump-point-error { color: var(--error-text) !important; margin: 8px 0 0 !important; }
+@media (max-width: 600px) { .heat-pump-points-heading, .heat-pump-point { flex-direction: column; } }

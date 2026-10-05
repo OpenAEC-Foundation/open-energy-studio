@@ -1,44 +1,37 @@
-import type { IMonthlyBreakdown } from '../../core/energy/types';
+import { useI18n } from '../../i18n/i18n';
 
 interface MonthlyBarChartProps {
-  monthly: IMonthlyBreakdown[];
+  /** Monthly heating need Q_H;nd, kWh (January first). */
+  heating: number[];
+  /** Monthly cooling need Q_C;nd, kWh (January first). */
+  cooling: number[];
 }
 
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
-export function MonthlyBarChart({ monthly }: MonthlyBarChartProps) {
-  // Find max value for scaling
-  const maxVal = Math.max(
-    ...monthly.map(m => Math.max(m.heatingDemand, m.coolingDemand)),
-    1
-  );
+export function MonthlyBarChart({ heating, cooling }: MonthlyBarChartProps) {
+  const { t } = useI18n();
+  const maxVal = Math.max(...heating, ...cooling, 1);
 
   return (
     <div className="preview-monthly-chart">
       <div className="preview-chart-bars">
-        {monthly.map((m, i) => {
-          const heatHeight = (m.heatingDemand / maxVal) * 100;
-          const coolHeight = (m.coolingDemand / maxVal) * 100;
-
+        {MONTH_LABELS.map((label, i) => {
+          const heat = heating[i] ?? 0;
+          const cool = cooling[i] ?? 0;
           return (
             <div key={i} className="preview-chart-column">
               <div className="preview-chart-bar-container">
-                {m.heatingDemand > 0 && (
-                  <div
-                    className="preview-chart-bar heat"
-                    style={{ height: `${heatHeight}%` }}
-                    title={`${m.heatingDemand.toFixed(0)} kWh`}
-                  />
+                {heat > 0 && (
+                  <div className="preview-chart-bar heat" style={{ height: `${(heat / maxVal) * 100}%` }}
+                    title={`${heat.toFixed(0)} kWh`} />
                 )}
-                {m.coolingDemand > 0 && (
-                  <div
-                    className="preview-chart-bar cool"
-                    style={{ height: `${coolHeight}%` }}
-                    title={`${m.coolingDemand.toFixed(0)} kWh`}
-                  />
+                {cool > 0 && (
+                  <div className="preview-chart-bar cool" style={{ height: `${(cool / maxVal) * 100}%` }}
+                    title={`${cool.toFixed(0)} kWh`} />
                 )}
               </div>
-              <span className="preview-chart-label">{MONTH_LABELS[i]}</span>
+              <span className="preview-chart-label">{label}</span>
             </div>
           );
         })}
@@ -46,11 +39,11 @@ export function MonthlyBarChart({ monthly }: MonthlyBarChartProps) {
       <div className="preview-chart-legend">
         <span className="preview-legend-item">
           <span className="preview-legend-dot heat" />
-          Verwarming
+          {t('preview.heating')}
         </span>
         <span className="preview-legend-item">
           <span className="preview-legend-dot cool" />
-          Koeling
+          {t('preview.cooling')}
         </span>
       </div>
     </div>

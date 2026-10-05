@@ -1,0 +1,84 @@
+/* ============================================================
+   Base styles for the UI redesign (docs/ui-redesign/ontwerp.md, F1).
+   Loaded after tokens.css and before index.css. Keeps the old
+   component styles intact; only adds behaviour every screen needs.
+   ============================================================ */
+
+html {
+  /* Native controls and scrollbars follow the active theme (the white strip
+     next to scroll areas in the dark theme came from the missing scheme). */
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-3);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* One visible focus treatment for keyboard users, in every theme. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Numbers that line up in tables and KPI rows. */
+.tabular-nums,
+.ui-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-mono {
+  font-family: var(--font-mono);
+}
+
+.ui-display {
+  font-family: var(--font-display);
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

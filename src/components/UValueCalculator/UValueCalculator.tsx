@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import { Plus, Trash2, Copy, Check, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import './UValueCalculator.css';
 
@@ -66,7 +67,8 @@ function newLayerId(): string {
 // ============================================================
 
 export function UValueCalculator() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const n = (value: number, digits: number) => formatNumber(value, locale, digits);
 
   const [surfacePosition, setSurfacePosition] = useState<SurfacePosition>('wall');
   const [layers, setLayers] = useState<CalculatorLayer[]>([
@@ -132,12 +134,12 @@ export function UValueCalculator() {
   }, [t, updateLayer]);
 
   const copyResult = useCallback(() => {
-    const text = `Rc = ${totalRc.toFixed(2)} m\u00b2\u00b7K/W | U = ${uValue.toFixed(3)} W/(m\u00b2\u00b7K)`;
+    const text = `Rc = ${n(totalRc, 2)} m\u00b2\u00b7K/W | U = ${n(uValue, 3)} W/(m\u00b2\u00b7K)`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, [totalRc, uValue]);
+  }, [totalRc, uValue, locale]);
 
   // ----------------------------------------------------------
   // Render
@@ -162,7 +164,7 @@ export function UValueCalculator() {
             >
               {t(`uvalue.surface.${pos}`)}
               <span className="uvalue-surface-rsi-rse">
-                Rsi={RSI_RSE[pos].rsi} / Rse={RSI_RSE[pos].rse}
+                Rsi={n(RSI_RSE[pos].rsi, 2)} / Rse={n(RSI_RSE[pos].rse, 2)}
               </span>
             </button>
           ))}
@@ -173,17 +175,17 @@ export function UValueCalculator() {
       <div className="uvalue-results-bar">
         <div className="uvalue-result-item">
           <span className="uvalue-result-label">Rc</span>
-          <span className="uvalue-result-value">{totalRc.toFixed(2)}</span>
+          <span className="uvalue-result-value">{n(totalRc, 2)}</span>
           <span className="uvalue-result-unit">m{'\u00b2'}{'\u00b7'}K/W</span>
         </div>
         <div className="uvalue-result-item uvalue-result-highlight">
           <span className="uvalue-result-label">U</span>
-          <span className="uvalue-result-value">{uValue.toFixed(3)}</span>
+          <span className="uvalue-result-value">{n(uValue, 3)}</span>
           <span className="uvalue-result-unit">W/(m{'\u00b2'}{'\u00b7'}K)</span>
         </div>
         <div className="uvalue-result-item">
           <span className="uvalue-result-label">{t('uvalue.totalThickness')}</span>
-          <span className="uvalue-result-value">{(totalThickness * 1000).toFixed(0)}</span>
+          <span className="uvalue-result-value">{n(totalThickness * 1000, 0)}</span>
           <span className="uvalue-result-unit">mm</span>
         </div>
         <button className="uvalue-copy-btn" onClick={copyResult} title={t('uvalue.copyResult')}>
@@ -199,7 +201,7 @@ export function UValueCalculator() {
         </div>
         <div className="uvalue-cross-section">
           {/* Rsi */}
-          <div className="uvalue-cs-boundary" title={`Rsi = ${rsi}`}>
+          <div className="uvalue-cs-boundary" title={`Rsi = ${n(rsi, 2)}`}>
             <span className="uvalue-cs-label">Rsi</span>
           </div>
           {layers.map((layer) => {
@@ -213,16 +215,16 @@ export function UValueCalculator() {
                 key={layer.id}
                 className="uvalue-cs-layer"
                 style={{ flex: `${pct} 0 0%`, backgroundColor: color }}
-                title={`${layer.material}: ${(layer.thickness * 1000).toFixed(0)} mm`}
+                title={`${layer.material}: ${n(layer.thickness * 1000, 0)} mm`}
               >
                 <span className="uvalue-cs-layer-label">
-                  {(layer.thickness * 1000).toFixed(0)}
+                  {n(layer.thickness * 1000, 0)}
                 </span>
               </div>
             );
           })}
           {/* Rse */}
-          <div className="uvalue-cs-boundary" title={`Rse = ${rse}`}>
+          <div className="uvalue-cs-boundary" title={`Rse = ${n(rse, 2)}`}>
             <span className="uvalue-cs-label">Rse</span>
           </div>
         </div>
@@ -256,7 +258,7 @@ export function UValueCalculator() {
               <td></td>
               <td colSpan={3}>{t('uvalue.innerSurface')} (Rsi)</td>
               <td></td>
-              <td className="uvalue-td-mono">{rsi.toFixed(2)}</td>
+              <td className="uvalue-td-mono">{n(rsi, 2)}</td>
               <td></td>
             </tr>
 
@@ -286,6 +288,7 @@ export function UValueCalculator() {
                 <td>
                   <input
                     className="uvalue-input"
+                    aria-label={`${t('uvalue.material')} ${index + 1}`}
                     type="text"
                     value={layer.material}
                     onChange={e => updateLayer(layer.id, { material: e.target.value })}
@@ -295,6 +298,7 @@ export function UValueCalculator() {
                 <td>
                   <select
                     className="uvalue-select"
+                    aria-label={`${t('uvalue.library')} ${index + 1}`}
                     value=""
                     onChange={e => {
                       const idx = parseInt(e.target.value, 10);
@@ -304,7 +308,7 @@ export function UValueCalculator() {
                     <option value="">{t('uvalue.selectMaterial')}</option>
                     {MATERIALS_LIBRARY.map((m, i) => (
                       <option key={i} value={i}>
-                        {t(m.nameKey)} ({m.fixedRc !== null ? `Rc=${m.fixedRc}` : `\u03bb=${m.lambda}`})
+                        {t(m.nameKey)} ({m.fixedRc !== null ? `Rc=${n(m.fixedRc, 2)}` : `\u03bb=${n(m.lambda, 3)}`})
                       </option>
                     ))}
                   </select>
@@ -312,6 +316,7 @@ export function UValueCalculator() {
                 <td>
                   <input
                     className="uvalue-input uvalue-input-num"
+                    aria-label={`${t('uvalue.thickness')} (mm) ${index + 1}`}
                     type="number"
                     min={0}
                     step={1}
@@ -325,11 +330,12 @@ export function UValueCalculator() {
                 <td>
                   {layer.fixedRc !== null ? (
                     <span className="uvalue-td-mono uvalue-fixed-label">
-                      Rc={layer.fixedRc}
+                      Rc={n(layer.fixedRc, 2)}
                     </span>
                   ) : (
                     <input
                       className="uvalue-input uvalue-input-num"
+                      aria-label={`λ (W/mK) ${index + 1}`}
                       type="number"
                       min={0.001}
                       step={0.001}
@@ -342,7 +348,7 @@ export function UValueCalculator() {
                   )}
                 </td>
                 <td className="uvalue-td-mono">
-                  {layerRcs[index] !== undefined ? layerRcs[index].toFixed(3) : '-'}
+                  {layerRcs[index] !== undefined ? n(layerRcs[index], 3) : '-'}
                 </td>
                 <td>
                   <button
@@ -361,7 +367,7 @@ export function UValueCalculator() {
               <td></td>
               <td colSpan={3}>{t('uvalue.outerSurface')} (Rse)</td>
               <td></td>
-              <td className="uvalue-td-mono">{rse.toFixed(2)}</td>
+              <td className="uvalue-td-mono">{n(rse, 2)}</td>
               <td></td>
             </tr>
 
@@ -369,8 +375,8 @@ export function UValueCalculator() {
             <tr className="uvalue-total-row">
               <td></td>
               <td colSpan={3}><strong>{t('uvalue.total')}</strong></td>
-              <td className="uvalue-td-mono"><strong>{(totalThickness * 1000).toFixed(0)} mm</strong></td>
-              <td className="uvalue-td-mono"><strong>{totalRc.toFixed(3)}</strong></td>
+              <td className="uvalue-td-mono"><strong>{n(totalThickness * 1000, 0)} mm</strong></td>
+              <td className="uvalue-td-mono"><strong>{n(totalRc, 3)}</strong></td>
               <td></td>
             </tr>
           </tbody>

@@ -1,0 +1,15 @@
+.heat-pump-forfait-monthly { margin: 12px 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary); }
+.heat-pump-forfait-monthly h4 { margin: 0; font-size: 14px; }
+.heat-pump-forfait-monthly p { color: var(--text-secondary); font-size: 12px; }
+.heat-pump-forfait-monthly label { display: grid; gap: 4px; font-size: 11px; }
+.heat-pump-forfait-monthly input, .heat-pump-forfait-monthly select { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-secondary); color: var(--text-primary); }
+.heat-pump-forfait-monthly-references { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 9px 12px; margin: 10px 0; }
+.heat-pump-forfait-monthly-table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; margin: 10px 0; }
+.heat-pump-forfait-monthly table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.heat-pump-forfait-monthly th, .heat-pump-forfait-monthly td { padding: 5px 8px; border: 1px solid var(--border); text-align: left; }
+.heat-pump-forfait-monthly td input { min-width: 110px; }
+.heat-pump-forfait-monthly button { padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; }
+.heat-pump-forfait-monthly button:disabled { cursor: wait; opacity: .6; }
+.heat-pump-forfait-monthly-error { color: var(--error-text) !important; }
+.heat-pump-forfait-monthly-result { margin-top: 12px; padding: 12px; border-left: 3px solid var(--accent); background: var(--bg-secondary); }
+.heat-pump-forfait-monthly-result code { overflow-wrap: anywhere; }

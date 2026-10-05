@@ -60,11 +60,11 @@ export function MonthlyBreakdownChart({ monthly }: MonthlyBreakdownChartProps) {
       {/* Legend */}
       <div className="monthly-chart-legend">
         <span className="monthly-legend-item">
-          <span className="monthly-legend-dot" style={{ background: '#ef4444' }} />
+          <span className="monthly-legend-dot" style={{ background: 'var(--viz-heating)' }} />
           {t('results.heatingDemand')}
         </span>
         <span className="monthly-legend-item">
-          <span className="monthly-legend-dot" style={{ background: '#3b82f6' }} />
+          <span className="monthly-legend-dot" style={{ background: 'var(--viz-cooling)' }} />
           {t('results.coolingDemand')}
         </span>
       </div>

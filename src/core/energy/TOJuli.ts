@@ -34,7 +34,9 @@ export function calculateTOJuli(
   solarGain: MonthlyValues,
   totalFloorArea: number
 ): ITOJuliResult {
-  const safeArea = Math.max(totalFloorArea, 1);
+  if (!Number.isFinite(totalFloorArea) || totalFloorArea <= 0) {
+    throw new Error('TO-juli input needs a finite floor area greater than zero.');
+  }
   const monthlyRisk = new Array(12).fill(0);
 
   // Summer months (May-Sep, indices 4-8) are most relevant
@@ -50,7 +52,7 @@ export function calculateTOJuli(
     const solarPower = (solarGain[m] * 1000) / hours; // W
     // Temperature rise due to solar = power / (effective thermal capacity)
     // Simplified: assume ~50 W/K effective dissipation capacity per 100m²
-    const thermalCapacity = safeArea * 0.5; // W/K (simplified)
+    const thermalCapacity = totalFloorArea * 0.5; // W/K (simplified)
     const solarTempRise = thermalCapacity > 0 ? solarPower / thermalCapacity : 0;
 
     // Estimated indoor temperature
