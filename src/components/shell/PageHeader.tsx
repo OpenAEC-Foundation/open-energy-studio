@@ -23,7 +23,7 @@ export function PageHeader({ route, title, lead, actions }: { route: Route; titl
           <b>{t(definition.labelKey)}</b>
           {sub && definition.subs.length > 1 && <><span aria-hidden="true">›</span><span>{t(sub.labelKey)}</span></>}
         </div>
-        <h1 className="page-title" id="page-title" tabIndex={-1}>{title ?? t((sub && route.step === 'tool') ? sub.labelKey : definition.labelKey)}</h1>
+        <h1 className="page-title" id="page-title" tabIndex={-1}>{title ?? t(sub && (route.step === 'tool' || sub.id !== definition.subs[0]?.id) ? sub.labelKey : definition.labelKey)}</h1>
         {lead && <p className="page-lead">{lead}</p>}
       </div>
       {actions && <div className="page-actions">{actions}</div>}

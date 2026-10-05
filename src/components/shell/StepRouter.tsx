@@ -21,7 +21,7 @@ import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInvent
 import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainReferencePanel';
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
-import { ResultsView } from '../ResultsView/ResultsView';
+import { ResultsDashboard } from './pages/results/ResultsDashboard';
 import { BasisopnamePanel } from '../BasisopnamePanel/BasisopnamePanel';
 import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
@@ -168,7 +168,7 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
     case 'results':
       page = <>
         {header()}
-        <div className="page-body"><ResultsView workflowPanels={false} /></div>
+        <div className="page-body"><ResultsDashboard sub={route.sub} onNavigate={actions.navigate} /></div>
       </>;
       break;
     case 'survey':

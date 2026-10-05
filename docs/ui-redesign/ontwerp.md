@@ -956,3 +956,19 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - de ketenfasen (opwekking › distributie › afgifte › regeling) per dienst uit de NTA-invoer; nu toont de kaart de systemen en de ingevulde NTA-blokken;
   - "Bron & bewijs" per vlak;
   - een type-wissel (wand/dak/vloer) in het inline-paneel.
+
+### Uitgevoerd in F7 (5 oktober 2026)
+
+- Routes: Resultaten heeft de subpagina's `overview` (standaard), `services`, `zones`, `monthly` en `provenance`.
+- `src/components/shell/pages/results/`:
+  - `resultsData.ts`: zuivere mapping van de kernuitkomst naar maandreeksen per dienst, per drager of primair fossiel. PV en de exportcredit staan als negatieve, gearceerde reeks onder de nullijn. De reeksen sommeren per constructie tot de kerntotalen (EP<sub>tot</sub> volgens §5.5.3, geleverd per drager, PV-opwek, netto behoefte). Verder: meters tegen de Bbl-eisen uit `bblCheck`, en TO<sub>juli</sub> alleen voor woonfuncties;
+  - `MonthlyChart.tsx`: handgeschreven SVG, gestapeld of gegroepeerd, zonder bibliotheek. Kleuren komen uit de `--viz-*`-tokens; de dienstvolgorde is gevalideerd op kleurenblindheid. Elke maand is een focusbare groep (←/→) met een tooltip bij hover en focus. De legenda toont jaartotalen. De tabelweergave is een `<table>` met caption en jaartotaal;
+  - `ResultsDashboard.tsx`: labelkaart met klasseschaal, BENG 1/2/3 en TO<sub>juli</sub> met oordeel en marge tot de eis, de energiegrafiek (gebruik / primair fossiel / per drager), de netto behoefte (warmte en koude), aandachtspunten met Ga naar (Bbl-tekorten en kernmeldingen) en de kerngetallen (primair fossiel, hernieuwbaar, finaal, CO₂, ZEB). De tabbladen Per dienst, Per zone, Maandwaarden en Herkomst tonen kernversie, normversie, status, vingerafdruk, bronnen en interpretaties.
+- Alleen de verdict `calculated` toont het dashboard. Andere verdicts vallen terug op `ResultsView`, dus ingehouden en indicatief gedrag blijft ongewijzigd. Een verouderde uitkomst krijgt de `StaleBanner`, een gedimde inhoud en `aria-busy`.
+- De lay-out reageert op de breedte van de inhoud (container query) en niet op het venster, zodat een open contextpaneel de kaarten niet samenperst.
+- `PageHeader`: de titel toont de subpagina, behalve op de eerste subpagina van een stap (F5-restpunt).
+- Labels staan in `src/i18n/resultsLabels.ts`.
+- Tests:
+  - nieuw: `results-dashboard.test.tsx` (sommen tegen de kerntotalen voor beide voorbeelden, meters, tabbladen, verouderd, ingehouden);
+  - aangepast: `workflow-nav` (paginatitel Constructies).
+- Schermafdrukken: `~/oes-shots/f7/`.

@@ -22,6 +22,22 @@ Uitkomsten veranderen voor projecten met een kwaliteitsverklaring van een warmte
 - **Warm tapwater.** Een gedeclareerd warmtepomprendement (§13.8.4.7.2) rekent nu met f_prac 0,95 volgens 13.152 (p. 616–617), in plaats van 1,0. Alleen de forfaitaire waarden houden 1,0.
 - **Vergelijkingsfixtures.** `training-data/nta8800-public-comparison-{a,b,c}.json` zijn gecorrigeerd naar de rapportinvoer: productwaarden voor de ventilatoren (A: 8,5 W, f 0,147; B: 4 units van 21,7 W, f 0,364), de gedeclareerde hulpenergie van 146 kWh bij B, en geen leidingen buiten de verwarmde of gekoelde zone. Vastgelegde uitkomsten: A 94,00 / 35,15 / 74,9; B 52,96 / 28,84 / 62,6; C 64,70 / 31,54 / 69,0.
 - **Documentatie.** De regel-voor-regel-reconciliatie staat in `docs/nta8800-vergelijking-openbare-rapporten.md`. Vragen over 10.15, 10.87 en f_prac staan in `docs/nta8800-vragen-nen.md`.
+
+## 5 oktober 2026 — UI-herontwerp, fase F7: resultatendashboard (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Resultaten toont de kernuitkomst nu als dashboard met de tabbladen Overzicht, Per dienst, Per zone, Maandwaarden en Herkomst.
+- **Overzicht:**
+  - de labelklasse met schaal;
+  - BENG 1/2/3 en TO<sub>juli</sub> als meter tegen de Bbl-eis, met oordeel en marge. TO<sub>juli</sub> staat alleen bij woonfuncties;
+  - de maandelijkse energie gestapeld per dienst, per drager of als primair fossiel, met PV en exportcredit onder de nullijn;
+  - de netto warmte- en koudebehoefte per maand;
+  - aandachtspunten met Ga naar;
+  - de kerngetallen (primair fossiel, hernieuwbaar, finaal, CO₂, ZEB).
+- **Grafieken.** Elke grafiek heeft een tabelweergave en focusbare maanden met een tooltip. De grafiektotalen zijn gelijk aan de kerntotalen.
+- **Herkomst** toont kernversie, normversie, status, attest, vingerafdruk, bronnen van label en Bbl-eisen, en de interpretaties van de kern.
+- **Ingehouden en indicatief.** Een ingehouden of indicatieve uitkomst toont het dashboard niet; daar blijft het bestaande gedrag gelden.
+- **Paginatitel.** De titel noemt nu de subpagina, bijvoorbeeld Constructies of Per dienst.
+
 ## 5 oktober 2026 — UI-herontwerp, fase F5: Gebouw en Installaties per onderdeel (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd; ids van zones, vlakken, ramen en systemen blijven gelijk.
