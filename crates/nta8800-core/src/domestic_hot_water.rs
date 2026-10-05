@@ -1854,7 +1854,17 @@ pub fn european_profile_correction(profile: TappingProfile, annual_kwh: f64) -> 
     if annual_kwh > last + 1e-9 {
         return None;
     }
-    Some(interpolate(points, annual_kwh))
+    match crate::norm_versions::profile().table_13_18 {
+        crate::norm_versions::Table1318Lookup::Interpolate => Some(interpolate(points, annual_kwh)),
+        // NTA 8800:2024 table 13.18 (p. 614) gives no interpolation rule:
+        // the column of the largest quantity not above the demand.
+        crate::norm_versions::Table1318Lookup::LowerColumn => points
+            .iter()
+            .rev()
+            .find(|(quantity, _)| *quantity <= annual_kwh + 1e-9)
+            .or(points.first())
+            .map(|(_, value)| *value),
+    }
 }
 
 fn positive(value: f64) -> bool {
@@ -3025,6 +3035,14 @@ fn book_generator(
     annual_total: f64,
 ) -> Result<Booking, &'static str> {
     let mut booking = Booking::default();
+    // (13.157)/(13.160): f_gebouw;si;W in the daily heat and the auxiliary
+    // energy from 2025+C1 (p. 627–628); NTA 8800:2024 divides by 365 and
+    // leaves the auxiliary energy unweighted (p. 611–612).
+    let f_daily = if crate::norm_versions::profile().hot_water_building_share {
+        f_building
+    } else {
+        1.0
+    };
     // 13.8.4.9.3: the space-heating system supplies the output (13.185);
     // hot water keeps no carrier, auxiliary energy or recoverable loss.
     if matches!(generator, HotWaterGenerator::HeatingSystem) {
@@ -3036,7 +3054,7 @@ fn book_generator(
     let mut monthly_two_profile: Option<[f64; 12]> = None;
     let (base, practical) = match generator {
         HotWaterGenerator::MeasuredTwoProfiles(test) => {
-            let daily = outputs.iter().sum::<f64>() / (365.0 * f_building);
+            let daily = outputs.iter().sum::<f64>() / (365.0 * f_daily);
             if daily > 0.0 {
                 let pfhrd = test.pfhrd_daily(extras);
                 let mut monthly = [0.0; 12];
@@ -3346,13 +3364,13 @@ fn book_generator(
     }
     // 13.159/13.160 and 13.160a.
     if let HotWaterGenerator::MeasuredTwoProfiles(test) = generator {
-        let daily = outputs.iter().sum::<f64>() / (365.0 * f_building);
+        let daily = outputs.iter().sum::<f64>() / (365.0 * f_daily);
         let year: f64 = MONTH_HOURS.iter().sum();
         let auxiliary = test.daily_auxiliary(daily);
         let recoverable = test.daily_recoverable();
         for (index, hours) in MONTH_HOURS.iter().enumerate() {
             let days = 365.0 * hours / year;
-            booking.auxiliary[index] += auxiliary * days * f_building;
+            booking.auxiliary[index] += auxiliary * days * f_daily;
             // 13.160a: × A_g;zi,si / A_g;si;W summed over the zones.
             if recoverable_counts {
                 booking.recoverable[index] += recoverable * days * f_building;
@@ -4569,6 +4587,37 @@ mod tests {
             pfhrd: None,
             source_reference: "test report".into(),
         }
+    }
+
+    #[test]
+    fn building_share_in_13_157_and_13_160_is_new_in_2025() {
+        let test = two_profile(TwoProfileStandard::En13203Gas);
+        let single = system(HotWaterGenerator::MeasuredTwoProfiles(Box::new(test)));
+        let mut shared = single.clone();
+        shared.collective = Some(CollectiveHotWater {
+            building_usable_floor_area_m2: 4.0 * context().usable_floor_area_m2,
+            source_reference: "drawings".into(),
+        });
+        let current = assess_hot_water(&shared, context()).unwrap();
+        let legacy =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                assess_hot_water(&shared, context()).unwrap()
+            });
+        let reference = assess_hot_water(&single, context()).unwrap();
+        // 2024 (p. 611–612): Q_W;b;d = Q/365 and W_W;aux unweighted, as for
+        // one dwelling. 2025+C1 (p. 627–628) divides by 365 · f_gebouw;si;W
+        // and weights the auxiliary energy with it.
+        let jan = |result: &HotWaterAssessment| {
+            (
+                result.months[0].natural_gas_kwh,
+                result.months[0].auxiliary_electricity_kwh,
+            )
+        };
+        let (gas_old, aux_old) = jan(&legacy);
+        let (gas_ref, aux_ref) = jan(&reference);
+        assert!((gas_old - gas_ref).abs() < 1e-9);
+        assert!((aux_old - aux_ref).abs() < 1e-9);
+        assert!((jan(&current).1 - aux_ref).abs() > 1e-6);
     }
 
     #[test]

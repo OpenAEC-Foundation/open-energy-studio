@@ -125,7 +125,9 @@ pub fn assess_gas_heat_pump_monthly_draft(
         issues.push(issue("months_incomplete", "generatorOutputKwh"));
     }
     let collective = input.source_system != SourceSystem::Individual;
+    // (9.62) f_cor.bron.col: 2025+C1 only (2024 p. 314–315 has none).
     let factor = match input.source_system {
+        _ if !crate::norm_versions::profile().collective_source_correction => 0.0,
         SourceSystem::Individual => 0.0,
         SourceSystem::CollectiveGround => 0.009,
         SourceSystem::CollectiveGroundwaterSurfaceOrAtLeast15C => 0.022,

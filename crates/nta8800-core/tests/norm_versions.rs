@@ -136,3 +136,56 @@ fn unknown_edition_is_an_input_gap() {
         result.gaps
     );
 }
+
+/// The example projects have no input on the routes that differ, so only
+/// the CO2 factors of table 5.3 (2024 p. 94–95 against 2025+C1 p. 96–98)
+/// and the indicators new in 2025+C1 change between the editions.
+#[test]
+fn example_projects_differ_only_where_the_editions_differ() {
+    const EXPECTED: [&str; 7] = [
+        "annualCo2Kg",
+        "co2KgPerM2",
+        "annualFinalEnergyKwh",
+        "annualFinalEnergyEedKwh",
+        "annualZebPrimaryTotalKwh",
+        "zebPrimaryTotalIndicatorKwhPerM2",
+        "annualZebCo2Kg",
+    ];
+    for json in [DWELLING, OFFICE] {
+        let current = assess_project_performance(&project(json, None));
+        let legacy = assess_project_performance(&project(json, Some("2024")));
+        let current = serde_json::to_value(current.performance.as_ref().unwrap()).unwrap();
+        let legacy = serde_json::to_value(legacy.performance.as_ref().unwrap()).unwrap();
+        let (Value::Object(current), Value::Object(legacy)) = (current, legacy) else {
+            panic!("performance is an object");
+        };
+        let changed: Vec<&str> = current
+            .iter()
+            .filter(|(key, value)| {
+                !matches!(
+                    key.as_str(),
+                    "inputFingerprint"
+                        | "targetNormVersion"
+                        | "normVersion"
+                        | "registrationEligible"
+                ) && (value.is_number() || value.is_string() || value.is_boolean())
+                    && legacy.get(key.as_str()) != Some(value)
+            })
+            .map(|(key, _)| key.as_str())
+            .collect();
+        assert!(
+            changed.iter().all(|key| EXPECTED.contains(key)),
+            "{changed:?}"
+        );
+        assert!(changed.contains(&"annualCo2Kg"));
+        // BENG 1–3 and the label are the same.
+        for key in [
+            "needIndicatorKwhPerM2Year",
+            "primaryFossilIndicatorKwhPerM2Year",
+            "renewableSharePercent",
+            "indicativeLabelClass",
+        ] {
+            assert_eq!(current.get(key), legacy.get(key), "{key}");
+        }
+    }
+}

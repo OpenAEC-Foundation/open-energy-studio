@@ -3358,6 +3358,8 @@ export interface NtaExternalSupply {
     temperatureClass: 'below20_c' | 'at_least20_c_or_surface_water_or_unknown';
     supplierReference: string;
     annexP?: NtaAnnexPRoute | null;
+    /** NTA 8800:2024 only: source realised or permitted from 2013 (EER 23, else 16). */
+    realisedFrom2013?: boolean | null;
   } | null;
   /** P.7/P.71: electricity produced in the area with a direct physical connection. */
   areaElectricity?: Array<
@@ -3602,11 +3604,17 @@ export interface NtaAnnexAaInput {
     opaqueInnerAreaM2: number;
     windows?: Array<{ windowId: string; uWithShutterWPerM2k?: number | null }>;
     installedCapacityKw: number;
+    /** NTA 8800:2024 only: roof area A_r for the large-roof rule of step 2. */
+    roofAreaM2?: number | null;
   }>;
+  /** NTA 8800:2024 only: SWM of step 1, 50–100 kg/m². */
+  effectiveMassKgPerM2?: number | null;
 }
 
 interface NtaAnnexAaLoads {
   peakHour: number;
+  /** NTA 8800:2024: t_max of table AA.2, possibly between whole hours. */
+  peakTimeH?: number;
   internalW: number;
   outdoorAirW: number;
   opaqueW: number;

@@ -118,3 +118,140 @@ fn profile_values_per_edition() {
     assert_eq!(p25.version, NormVersion::V2025C1);
     assert_eq!(p24.version, NormVersion::V2024);
 }
+
+mod switch_points {
+    use crate::norm_versions::{with_version, NormVersion};
+
+    fn legacy<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2024, body)
+    }
+
+    #[test]
+    fn table_5_3_and_5_6_co2_factors() {
+        use crate::annex_p::{cold_forfait, heat_forfait, k_co2_el, SystemCarrier};
+        // 2025+C1 p. 96–98 and 125.
+        assert_eq!(k_co2_el(), 0.268);
+        assert_eq!(heat_forfait().co2_kg_per_kwh, 0.09);
+        assert_eq!(SystemCarrier::NaturalGas.co2(), 0.218);
+        assert_eq!(SystemCarrier::WasteIncineration.co2(), 0.138);
+        // 2024 p. 94–95 and 117.
+        legacy(|| {
+            assert_eq!(k_co2_el(), 0.34);
+            assert_eq!(heat_forfait().co2_kg_per_kwh, 0.17);
+            assert_eq!(heat_forfait().primary_factor, 0.9);
+            assert!((cold_forfait().co2_kg_per_kwh - 0.34 / 3.0).abs() < 1e-12);
+            assert_eq!(SystemCarrier::NaturalGas.co2(), 0.183);
+            assert_eq!(SystemCarrier::Oil.co2(), 0.260);
+            assert_eq!(SystemCarrier::WasteIncineration.co2(), 0.113);
+        });
+    }
+
+    #[test]
+    fn table_9_16_combined_collective_pipes() {
+        use crate::heating_distribution::{PipeInsulation, PipeTransmittance};
+        let pipe = PipeTransmittance::Forfait {
+            insulation: PipeInsulation::Unknown,
+        };
+        // 2025+C1 p. 310: 1,0 up to 500 m²; 2024 p. 292: 2,0.
+        assert_eq!(pipe.value(300.0, true), Some(1.0));
+        assert_eq!(legacy(|| pipe.value(300.0, true)), Some(2.0));
+        // Above 500 m² and other rows are equal.
+        assert_eq!(legacy(|| pipe.value(800.0, true)), pipe.value(800.0, true));
+        assert_eq!(
+            legacy(|| pipe.value(300.0, false)),
+            pipe.value(300.0, false)
+        );
+    }
+
+    #[test]
+    fn collective_source_factors_2024() {
+        use crate::annex_p::{source_factors, CollectiveHeatPumpSource, SourceTemperatureClass};
+        let source = CollectiveHeatPumpSource {
+            temperature_class: SourceTemperatureClass::Below20C,
+            supplier_reference: "invoice".into(),
+            annex_p: None,
+            realised_from_2013: None,
+        };
+        // 2025+C1 9.6.8.1.1.2.3 (p. 362–363): f_P;el/23, f_Pren 0,95.
+        let (current, _) = source_factors(&source, "s").unwrap();
+        assert!((current.declared.primary_factor - 1.45 / 23.0).abs() < 1e-12);
+        assert_eq!(current.declared.renewable_factor, 0.95);
+        // 2024 9.6.3.1.3 (p. 323): table 5.2 external heat, 0,9 (p. 93).
+        let (old, _) = legacy(|| source_factors(&source, "s")).unwrap();
+        assert_eq!(old.declared.primary_factor, 0.9);
+        assert_eq!(old.declared.renewable_factor, 0.0);
+        assert_eq!(old.declared.co2_kg_per_kwh, 0.17);
+        assert_eq!(old.forfait, old.declared);
+    }
+
+    #[test]
+    fn roof_edge_obstruction_is_2025_only() {
+        use crate::climate::Orientation;
+        use crate::solar_shading::{collector_obstruction_factor, CollectorObstruction};
+        let edge = CollectorObstruction::RoofEdge {
+            height_m: 2.0,
+            distance_m: 1.0,
+        };
+        // 17.3.2 f) (2025+C1 p. 702); 2024 has no situation f (p. 678–687).
+        assert!(collector_obstruction_factor(&edge, Orientation::South, 30.0, 6).is_some());
+        assert!(
+            legacy(|| collector_obstruction_factor(&edge, Orientation::South, 30.0, 6)).is_none()
+        );
+    }
+
+    #[test]
+    fn bio_based_lambda_and_ageing_2024() {
+        use crate::materials::{ForfaitMaterial, InSituProduct};
+        // Table E.11 (2025+C1 p. 810) against 2024 p. 791.
+        assert_eq!(ForfaitMaterial::HempBoard.lambda(), 0.045);
+        assert_eq!(legacy(|| ForfaitMaterial::HempBoard.lambda()), 0.100);
+        assert_eq!(legacy(|| ForfaitMaterial::Straw.lambda()), 0.060);
+        assert_eq!(legacy(|| ForfaitMaterial::FlaxBoard.lambda()), 0.050);
+        assert_eq!(legacy(|| ForfaitMaterial::Coconut.lambda()), 0.055);
+        // Reed: insulation at 0,100 in 2025+C1, table E.12 0,200 in 2024.
+        assert!(ForfaitMaterial::Reed.is_insulation());
+        assert!(!legacy(|| ForfaitMaterial::Reed.is_insulation()));
+        // Unchanged rows.
+        assert_eq!(legacy(|| ForfaitMaterial::WoodFibre.lambda()), 0.045);
+        assert_eq!(legacy(|| ForfaitMaterial::GlassWool.lambda()), 0.040);
+        // Table E.5 (2025+C1 p. 803; 2024 p. 783): cellulose 1,00 → overig 1,30.
+        assert_eq!(
+            ForfaitMaterial::CelluloseLoose.in_situ_product(),
+            Some(InSituProduct::FibresAndFlakes)
+        );
+        assert_eq!(
+            legacy(|| ForfaitMaterial::CelluloseLoose.in_situ_product()),
+            Some(InSituProduct::Other)
+        );
+        assert_eq!(
+            legacy(|| ForfaitMaterial::MineralWoolFlakes.in_situ_product()),
+            Some(InSituProduct::FibresAndFlakes)
+        );
+    }
+
+    #[test]
+    fn table_13_18_column_or_interpolation() {
+        use crate::domestic_hot_water::{european_profile_correction, TappingProfile};
+        // 2025+C1 p. 630–631: linear between 765 (0,43) and 2 130 kWh (0,74).
+        let interpolated = european_profile_correction(TappingProfile::L, 1500.0).unwrap();
+        let expected = 0.43 + (1500.0 - 765.0) / (2130.0 - 765.0) * (0.74 - 0.43);
+        assert!((interpolated - expected).abs() < 1e-12);
+        // 2024 p. 614: no interpolation rule, the lower column.
+        assert_eq!(
+            legacy(|| european_profile_correction(TappingProfile::L, 1500.0)),
+            Some(0.43)
+        );
+        assert_eq!(
+            legacy(|| european_profile_correction(TappingProfile::L, 500.0)),
+            Some(0.43)
+        );
+        assert_eq!(
+            legacy(|| european_profile_correction(TappingProfile::L, 4250.0)),
+            Some(1.0)
+        );
+        assert_eq!(
+            legacy(|| european_profile_correction(TappingProfile::L, 5000.0)),
+            None
+        );
+    }
+}

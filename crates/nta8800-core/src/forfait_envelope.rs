@@ -553,7 +553,9 @@ impl ForfaitOpaque {
                 }
                 if let Some(reed) = reed_thickness_m {
                     let d = ((reed / 0.05) + 1e-9).floor() * 0.05;
-                    r += d / 0.105;
+                    // (I.3): d/0,105 in 2025+C1 (p. 833), d/0,2 in 2024
+                    // (p. 814).
+                    r += d / crate::norm_versions::profile().reed_thatch_divisor;
                 }
                 if *thermal_cushions {
                     r += 1.8;
@@ -956,6 +958,29 @@ mod tests {
         )
         .calculate();
         assert!((thin.r_c - (0.02 / 0.05 + 0.36 + 0.16)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn reed_thatch_divisor_follows_the_edition() {
+        let mut roof = element(
+            1950,
+            InsulationState::KnownThickness {
+                thickness_mm: 0.0,
+                thickness_proven: true,
+                known_lambda_equivalent: None,
+                reed_thickness_m: Some(0.30),
+                thermal_cushions: false,
+            },
+        );
+        roof.element = ElementType::Roof;
+        roof.cavity = false;
+        // (I.3): d/0,105 in 2025+C1 (p. 833), d/0,2 in 2024 (p. 814).
+        assert!((roof.calculate().r_c - (0.22 + 0.30 / 0.105)).abs() < 1e-12);
+        let legacy =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                roof.calculate().r_c
+            });
+        assert!((legacy - (0.22 + 0.30 / 0.2)).abs() < 1e-12);
     }
 
     #[test]

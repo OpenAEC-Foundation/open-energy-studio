@@ -8,6 +8,14 @@
 //! need AA.8/AA.9 and the capacity criteria AA.10–AA.13 with the fixed
 //! 35 W/m² deduction. Used as capacity evidence for active cooling in
 //! §5.7.1 (TOjuli).
+//!
+//! NTA 8800:2024 annex AA (pp. 1115–1127) differs in steps 1–2 and AA.7:
+//! the time of the peak load follows table AA.2 (orientation of the
+//! governing façade and the specific effective mass SWM of step 1) instead
+//! of the hourly irradiance, and P_sol uses the July monthly irradiance of
+//! 17.2. The required capacity has no lower bound of 0 kW. The optional
+//! correction of the generator requirement (AA.3.2.3, p. 1125) is not
+//! applied, which leaves the requirement on the safe side.
 
 use serde::{Deserialize, Serialize};
 
@@ -200,6 +208,10 @@ pub struct AnnexAaRoom {
     pub windows: Vec<AnnexAaWindow>,
     /// B_C;inst;zi,j of the emitter (or single-room generator), kW.
     pub installed_capacity_kw: f64,
+    /// NTA 8800:2024 AA.2 step 2 (p. 1117): roof area A_r of the room for
+    /// the large-roof rule. Only in the 2024 edition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roof_area_m2: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -214,6 +226,10 @@ pub struct AnnexAaInput {
     #[serde(default)]
     pub generator_capacity_kw: Option<f64>,
     pub rooms: Vec<AnnexAaRoom>,
+    /// NTA 8800:2024 AA.2 step 1 (p. 1116): SWM;zi from table AA.1 or
+    /// (AA.1), 50–100 kg/m². Only in the 2024 edition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_mass_kg_per_m2: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -227,6 +243,9 @@ pub struct AnnexAaIssue {
 pub struct AnnexAaRoomResult {
     pub id: String,
     pub peak_hour: usize,
+    /// NTA 8800:2024: t_max of table AA.2, possibly between whole hours.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_time_h: Option<f64>,
     pub internal_w: f64,
     pub outdoor_air_w: f64,
     pub opaque_w: f64,
@@ -244,6 +263,9 @@ pub struct AnnexAaRoomResult {
 #[serde(rename_all = "camelCase")]
 pub struct AnnexAaResult {
     pub peak_hour: usize,
+    /// NTA 8800:2024: t_max of table AA.2, possibly between whole hours.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_time_h: Option<f64>,
     pub internal_w: f64,
     pub outdoor_air_w: f64,
     pub opaque_w: f64,
@@ -289,6 +311,103 @@ fn window_solar_w(window: &Window, hour: usize) -> f64 {
         * irradiance_at_hour(window.orientation, window.tilt_deg, hour)
 }
 
+/// NTA 8800:2024 table AA.3 (p. 1120, the same values as 2025 table
+/// AA.1), linear between whole hours.
+fn outdoor_temperature_at_time(time_h: f64) -> f64 {
+    let last = (FIRST_HOUR + OUTDOOR_AT_HOUR_C.len() - 1) as f64;
+    let time = time_h.clamp(FIRST_HOUR as f64, last);
+    let low = time.floor() as usize;
+    let high = (low + 1).min(FIRST_HOUR + OUTDOOR_AT_HOUR_C.len() - 1);
+    let share = time - low as f64;
+    outdoor_temperature_at_hour(low)
+        + share * (outdoor_temperature_at_hour(high) - outdoor_temperature_at_hour(low))
+}
+
+/// NTA 8800:2024 table AA.2 (p. 1117): t_max for one surface; `None` for
+/// north (315°–45°), which carries no cooling load. Roof surfaces below
+/// 15° are horizontal; orientations between the columns interpolate.
+fn table_aa2_time(window: &Window, effective_mass: f64) -> Option<f64> {
+    let (east, south, west, flat) = if effective_mass > 50.0 + 1e-9 {
+        (11.0, 15.0, 18.0, 16.0)
+    } else {
+        (9.0, 13.0, 17.0, 13.0)
+    };
+    if window.tilt_deg < 15.0 {
+        return Some(flat);
+    }
+    let azimuth = window.orientation.azimuth_deg();
+    match azimuth {
+        a if !(45.0..=315.0).contains(&a) => None,
+        a if a <= 90.0 => Some(east),
+        a if a < 180.0 => Some(east + (a - 90.0) / 90.0 * (south - east)),
+        a if a < 270.0 => Some(south + (a - 180.0) / 90.0 * (west - south)),
+        _ => Some(west),
+    }
+}
+
+/// NTA 8800:2024 AA.2 step 2 (p. 1117) for a room or zone: the façade or
+/// roof with the largest glass area (north excluded) governs; equal largest
+/// areas interpolate (here: their mean); a large roof (A_r > 3 × 0,75 × the
+/// glass area of the governing façade) with SWM < 65 kg/m² and a room with
+/// only north glazing take "horizontal".
+fn governing_time_2024(windows: &[&Window], roof_area_m2: Option<f64>, effective_mass: f64) -> f64 {
+    let flat = if effective_mass > 50.0 + 1e-9 {
+        16.0
+    } else {
+        13.0
+    };
+    // Surfaces: horizontal (tilt < 15°) or one orientation.
+    let mut surfaces: Vec<(Option<Orientation>, f64, Option<f64>)> = Vec::new();
+    for window in windows {
+        let key = (window.tilt_deg >= 15.0).then_some(window.orientation);
+        match surfaces.iter_mut().find(|(k, _, _)| *k == key) {
+            Some(surface) => surface.1 += window.area_m2,
+            None => surfaces.push((key, window.area_m2, table_aa2_time(window, effective_mass))),
+        }
+    }
+    let largest = surfaces
+        .iter()
+        .filter(|(_, _, time)| time.is_some())
+        .map(|(_, area, _)| *area)
+        .fold(0.0_f64, f64::max);
+    if largest <= 0.0 {
+        return flat;
+    }
+    if roof_area_m2.is_some_and(|roof| roof > 3.0 * GLASS_RATIO * largest) && effective_mass < 65.0
+    {
+        return flat;
+    }
+    let tied: Vec<f64> = surfaces
+        .iter()
+        .filter(|(_, area, _)| (*area - largest).abs() <= 1e-9)
+        .filter_map(|(_, _, time)| *time)
+        .collect();
+    tied.iter().sum::<f64>() / tied.len() as f64
+}
+
+/// NTA 8800:2024 (AA.7), p. 1121: one window with the July monthly
+/// irradiance of 17.2.
+fn window_solar_july_w(window: &Window) -> f64 {
+    let obstruction = obstruction_factor(
+        &window.obstruction,
+        window.orientation,
+        window.tilt_deg,
+        7,
+        Balance::Cooling,
+    )
+    .unwrap_or(1.0);
+    let shading = window
+        .movable_shading
+        .as_ref()
+        .map_or(1.0, |item| item.reduction_factor_for(window.orientation));
+    GLASS_RATIO
+        * window.area_m2
+        * window.g_gl(6, 1.0)
+        * obstruction
+        * shading
+        * crate::climate::irradiance_w_per_m2(window.orientation, window.tilt_deg, 7).unwrap_or(0.0)
+}
+
 fn peak<'a>(windows: impl Iterator<Item = &'a Window> + Clone) -> (usize, f64) {
     (FIRST_HOUR..FIRST_HOUR + HOURS)
         .map(|hour| {
@@ -317,6 +436,8 @@ pub fn assess_annex_aa(
     path: &str,
 ) -> Result<AnnexAaResult, Vec<AnnexAaIssue>> {
     let mut issues = Vec::new();
+    let variant_2024 = crate::norm_versions::profile().annex_aa
+        == crate::norm_versions::AnnexAaVariant::Monthly2024;
     let InternalGains::Residential { dwelling_count, .. } = &input.internal_gains else {
         return Err(vec![issue(
             "annex_aa_residential_only",
@@ -325,6 +446,22 @@ pub fn assess_annex_aa(
     };
     if aa.rooms.is_empty() {
         issues.push(issue("annex_aa_room_required", format!("{path}.rooms")));
+    }
+    // SWM (step 1) and A_r (step 2) exist in the 2024 method only.
+    match (variant_2024, aa.effective_mass_kg_per_m2) {
+        (true, None) => issues.push(issue(
+            "annex_aa_effective_mass_required",
+            format!("{path}.effectiveMassKgPerM2"),
+        )),
+        (true, Some(mass)) if !(50.0..=100.0).contains(&mass) => issues.push(issue(
+            "annex_aa_effective_mass_invalid",
+            format!("{path}.effectiveMassKgPerM2"),
+        )),
+        (false, Some(_)) => issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.effectiveMassKgPerM2"),
+        )),
+        _ => {}
     }
     if let Some(capacity) = aa.generator_capacity_kw {
         if !capacity.is_finite() || capacity < 0.0 {
@@ -355,6 +492,17 @@ pub fn assess_annex_aa(
                 "annex_aa_capacity_invalid",
                 format!("{room_path}.installedCapacityKw"),
             ));
+        }
+        match room.roof_area_m2 {
+            Some(_) if !variant_2024 => issues.push(issue(
+                "route_not_in_edition",
+                format!("{room_path}.roofAreaM2"),
+            )),
+            Some(roof) if !(roof.is_finite() && roof >= 0.0) => issues.push(issue(
+                "annex_aa_area_invalid",
+                format!("{room_path}.roofAreaM2"),
+            )),
+            _ => {}
         }
         let mut windows = Vec::new();
         for (w, item) in room.windows.iter().enumerate() {
@@ -420,12 +568,38 @@ pub fn assess_annex_aa(
     let q_int = internal / (2.0 * living + other);
     let total_area = living + other;
 
-    // Step 1: peak hour of the zone.
+    // Step 1: peak hour of the zone (2024: step 2 with table AA.2 over the
+    // zone's glazing and roofs).
     let all_windows = rooms
         .iter()
         .flat_map(|(_, windows)| windows.iter().map(|(w, _)| *w));
-    let (zone_hour, _) = peak(all_windows);
-    let zone_outdoor = outdoor_temperature_at_hour(zone_hour);
+    let effective_mass = aa.effective_mass_kg_per_m2.unwrap_or(0.0);
+    let zone_time = variant_2024.then(|| {
+        let windows: Vec<&Window> = all_windows.clone().collect();
+        let roofs = aa
+            .rooms
+            .iter()
+            .filter_map(|room| room.roof_area_m2)
+            .reduce(|a, b| a + b);
+        governing_time_2024(&windows, roofs, effective_mass)
+    });
+    let zone_hour = match zone_time {
+        Some(time) => time.round() as usize,
+        None => peak(all_windows).0,
+    };
+    let zone_outdoor = zone_time.map_or_else(
+        || outdoor_temperature_at_hour(zone_hour),
+        outdoor_temperature_at_time,
+    );
+    // AA.3.2.3/AA.3.2.4: B_C;req;TO ≥ 0 from 2025+C1 (p. 1146–1147); 2024
+    // has no lower bound (p. 1125–1126).
+    let floor = |required: f64| {
+        if crate::norm_versions::profile().annex_aa_requirement_floor {
+            required.max(0.0)
+        } else {
+            required
+        }
+    };
 
     // AA.4: July cooling-balance inflow.
     let factor = AIR_HEAT_CAPACITY / 3600.0;
@@ -455,12 +629,21 @@ pub fn assess_annex_aa(
     let mut opaque_total = 0.0;
     let mut glazing_zone = 0.0;
     for (room, windows) in &rooms {
-        let (hour, solar) = if windows.is_empty() {
-            (zone_hour, 0.0)
+        let (hour, time, solar) = if variant_2024 {
+            let own: Vec<&Window> = windows.iter().map(|(w, _)| *w).collect();
+            let time = governing_time_2024(&own, room.roof_area_m2, effective_mass);
+            let solar = own.iter().map(|window| window_solar_july_w(window)).sum();
+            (time.round() as usize, Some(time), solar)
+        } else if windows.is_empty() {
+            (zone_hour, None, 0.0)
         } else {
-            peak(windows.iter().map(|(w, _)| *w))
+            let (hour, solar) = peak(windows.iter().map(|(w, _)| *w));
+            (hour, None, solar)
         };
-        let outdoor = outdoor_temperature_at_hour(hour);
+        let outdoor = time.map_or_else(
+            || outdoor_temperature_at_hour(hour),
+            outdoor_temperature_at_time,
+        );
         let ua: f64 = windows.iter().map(|(w, u)| w.area_m2 * u).sum();
         let glazing = ua * (outdoor - INDOOR_C);
         glazing_zone += ua * (zone_outdoor - INDOOR_C);
@@ -470,10 +653,11 @@ pub fn assess_annex_aa(
         solar_total += solar;
         opaque_total += opaque;
         let need = (internal_room + air_room + opaque + solar + glazing) / room.area_m2;
-        let required = ((need - FIXED_DEDUCTION_W_PER_M2) / 1000.0 * room.area_m2).max(0.0);
+        let required = floor((need - FIXED_DEDUCTION_W_PER_M2) / 1000.0 * room.area_m2);
         room_results.push(AnnexAaRoomResult {
             id: room.id.clone(),
             peak_hour: hour,
+            peak_time_h: time,
             internal_w: internal_room,
             outdoor_air_w: air_room,
             opaque_w: opaque,
@@ -487,13 +671,14 @@ pub fn assess_annex_aa(
     }
     // AA.8: the internal load of all rooms sums to P_int.
     let need = (internal + outdoor_air + opaque_total + solar_total + glazing_zone) / total_area;
-    let required = ((need - FIXED_DEDUCTION_W_PER_M2) / 1000.0 * total_area).max(0.0);
+    let required = floor((need - FIXED_DEDUCTION_W_PER_M2) / 1000.0 * total_area);
     let generator_ok = aa
         .generator_capacity_kw
         .map_or(true, |capacity| capacity + 1e-12 >= required);
     let sufficient = generator_ok && room_results.iter().all(|room| room.sufficient);
     Ok(AnnexAaResult {
         peak_hour: zone_hour,
+        peak_time_h: zone_time,
         internal_w: internal,
         outdoor_air_w: outdoor_air,
         opaque_w: opaque_total,
@@ -561,6 +746,7 @@ mod tests {
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(1.5),
+            effective_mass_kg_per_m2: None,
             rooms: vec![
                 AnnexAaRoom {
                     id: "living".into(),
@@ -572,6 +758,7 @@ mod tests {
                         u_with_shutter_w_per_m2k: None,
                     }],
                     installed_capacity_kw: living_kw,
+                    roof_area_m2: None,
                 },
                 AnnexAaRoom {
                     id: "bedroom".into(),
@@ -580,9 +767,76 @@ mod tests {
                     opaque_inner_area_m2: 10.0,
                     windows: Vec::new(),
                     installed_capacity_kw: 0.5,
+                    roof_area_m2: None,
                 },
             ],
         }
+    }
+
+    #[test]
+    fn edition_2024_uses_table_aa2_and_the_july_irradiance() {
+        let (input, demand) = zone();
+        let mut aa = rooms(1.0);
+        // AA.2 step 1 (2024 p. 1116): SWM is required.
+        let missing =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                assess_annex_aa(&aa, &input, &demand, "aa")
+            })
+            .unwrap_err();
+        assert!(missing
+            .iter()
+            .any(|item| item.code == "annex_aa_effective_mass_required"));
+        aa.effective_mass_kg_per_m2 = Some(85.0);
+        // ... and does not exist in 2025+C1 (p. 1136).
+        let refused = assess_annex_aa(&aa, &input, &demand, "aa").unwrap_err();
+        assert!(refused
+            .iter()
+            .any(|item| item.code == "route_not_in_edition"));
+        let legacy =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                assess_annex_aa(&aa, &input, &demand, "aa")
+            })
+            .unwrap();
+        // Table AA.2 (p. 1117): south with SWM > 50 at 15 h; a room without
+        // glazing takes "horizontal", 16 h.
+        assert_eq!(legacy.peak_time_h, Some(15.0));
+        assert_eq!(legacy.rooms[0].peak_time_h, Some(15.0));
+        assert_eq!(legacy.rooms[1].peak_time_h, Some(16.0));
+        // (AA.7), p. 1121: the July monthly irradiance of 17.2.
+        let window = &input.windows[0];
+        let july = crate::climate::irradiance_w_per_m2(Orientation::South, 90.0, 7).unwrap();
+        let expected = GLASS_RATIO * window.area_m2 * window.g_gl(6, 1.0) * july;
+        assert!((legacy.rooms[0].solar_w - expected).abs() < 1e-9);
+        // (AA.14), p. 1126: no lower bound of 0 kW (2025+C1 p. 1147 has one).
+        assert!(legacy.rooms[1].required_kw < 0.0);
+        aa.effective_mass_kg_per_m2 = None;
+        let current = assess_annex_aa(&aa, &input, &demand, "aa").unwrap();
+        assert_eq!(current.rooms[1].required_kw, 0.0);
+        assert!(current.peak_time_h.is_none());
+        // SWM = 50 kg/m²: south at 13 h, θe 29,7 °C (table AA.3, p. 1120).
+        aa.effective_mass_kg_per_m2 = Some(50.0);
+        let light =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                assess_annex_aa(&aa, &input, &demand, "aa")
+            })
+            .unwrap();
+        assert_eq!(light.peak_time_h, Some(13.0));
+    }
+
+    #[test]
+    fn table_aa2_interpolates_between_orientations() {
+        let (input, _) = zone();
+        let mut window = input.windows[0].clone();
+        window.orientation = Orientation::SouthEast;
+        // Between east (11 h) and south (15 h) at SWM > 50.
+        assert_eq!(table_aa2_time(&window, 85.0), Some(13.0));
+        window.orientation = Orientation::SouthWest;
+        assert_eq!(table_aa2_time(&window, 85.0), Some(16.5));
+        window.orientation = Orientation::North;
+        assert_eq!(table_aa2_time(&window, 85.0), None);
+        window.tilt_deg = 10.0;
+        assert_eq!(table_aa2_time(&window, 50.0), Some(13.0));
+        assert!((outdoor_temperature_at_time(16.5) - (30.4 + 0.5 * (30.6 - 30.4))).abs() < 1e-12);
     }
 
     #[test]

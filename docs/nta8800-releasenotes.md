@@ -12,6 +12,8 @@ Rekenuitkomsten van bestaande projecten veranderen niet: zonder `ntaCalculation.
   - `route_not_in_edition`: invoer voor een route die de gekozen uitgave niet kent.
 - **Indicatoren** die pas in 2025+C1 bestaan, zijn in een oudere uitgave `null`.
 - **API:** `GET /v1/version` geeft `supportedNormVersions`.
+- **NTA 8800:2024 met INT-V1:2024** is geïmplementeerd met 18 schakelpunten. Daarvan veranderen in de voorbeeldprojecten alleen de CO2-uitkomsten en de 2025-indicatoren. Nieuwe invoer, alleen in 2024: `effectiveMassKgPerM2` en `roofAreaM2` (bijlage AA), en `externalSupply.collectiveHeatPumpSource.realisedFrom2013`. Nieuwe codes: `annex_aa_effective_mass_required` en `annex_aa_effective_mass_invalid`.
+- **Uitleg:** [nta8800-normversies.md](nta8800-normversies.md) beschrijft de uitgaven, de schakelpunten (met paginanummers in beide uitgaven), de interpretaties en waarom de uitgave als thread-local wordt gekozen.
 
 ## 5 oktober 2026 — f_prac bij gedeclareerde warmtepomprendementen en reconciliatie met openbare rapporten
 

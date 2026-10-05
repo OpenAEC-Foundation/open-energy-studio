@@ -853,6 +853,7 @@ mod tests {
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(capacity),
+            effective_mass_kg_per_m2: None,
             rooms: vec![crate::annex_aa::AnnexAaRoom {
                 id: "living".into(),
                 area_m2: 40.0,
@@ -863,6 +864,7 @@ mod tests {
                     u_with_shutter_w_per_m2k: None,
                 }],
                 installed_capacity_kw: capacity,
+                roof_area_m2: None,
             }],
         };
         aa.capacity = CoolingCapacityEvidence::AnnexAa {

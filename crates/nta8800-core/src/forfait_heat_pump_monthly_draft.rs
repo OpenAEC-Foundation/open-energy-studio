@@ -19,7 +19,12 @@ pub enum SourceSystem {
 }
 
 impl SourceSystem {
+    /// (9.62) `f_cor.bron.col` (2025+C1 p. 331–332); NTA 8800:2024 (9.62)
+    /// has no such term (p. 314–315).
     fn correction_factor(self) -> f64 {
+        if !crate::norm_versions::profile().collective_source_correction {
+            return 0.0;
+        }
         match self {
             Self::Individual => 0.0,
             Self::CollectiveGround => 0.009,
@@ -301,6 +306,24 @@ mod tests {
                 .abs()
                 < 1e-9
         );
+    }
+
+    #[test]
+    fn collective_source_correction_is_absent_in_2024() {
+        let mut input = sample("ground", SourceSystem::Individual);
+        input.forfait.source_correction_factor = Some(1.0);
+        input.forfait.source_correction_reference = Some("no regeneration".into());
+        input.source_system = SourceSystem::CollectiveGround;
+        // (9.62) f_cor.bron.col 0,009 in 2025+C1 (p. 331–332).
+        let current = assess_forfait_heat_pump_monthly_draft(&input);
+        assert_eq!(current.collective_source_correction_factor, Some(0.009));
+        // NTA 8800:2024 (9.62), p. 314–315: no correction term.
+        let legacy =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                assess_forfait_heat_pump_monthly_draft(&input)
+            });
+        assert_eq!(legacy.collective_source_correction_factor, Some(0.0));
+        assert_eq!(legacy.monthly[0].collective_source_correction_kwh, 0.0);
     }
 
     #[test]

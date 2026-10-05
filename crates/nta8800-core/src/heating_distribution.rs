@@ -304,8 +304,10 @@ impl PipeTransmittance {
         match *self {
             Self::Forfait { insulation } => {
                 let uninsulated = if shared_with_hot_water {
+                    // Table 9.16: 1,0 up to 500 m² in 2025+C1 (p. 310),
+                    // 2,0 in 2024 (p. 292).
                     if connected_area_m2 <= 500.0 {
-                        1.0
+                        crate::norm_versions::profile().psi_collective_combined_small
                     } else {
                         2.0
                     }

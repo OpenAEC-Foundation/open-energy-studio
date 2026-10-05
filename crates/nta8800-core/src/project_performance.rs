@@ -1428,6 +1428,14 @@ fn tojuli_evidence_gaps(tojuli: &[crate::tojuli::TojuliAssessment]) -> Vec<Input
 }
 
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
+    // The whole project route (derived constructions, materials, annexes)
+    // runs in the chosen edition, not only the building calculation.
+    crate::norm_versions::with_version(project_norm_version(project_value), || {
+        assess_project_in_edition(project_value)
+    })
+}
+
+fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessment {
     // The maatwerkadvies definition (measures, tariffs) and the kept
     // basisopname survey do not change the energy performance of the
     // project route and stay out of the fingerprint.
