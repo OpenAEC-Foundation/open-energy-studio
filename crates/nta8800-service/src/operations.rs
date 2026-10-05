@@ -62,8 +62,8 @@ impl StatusRule {
 /// 200 is a success. 422 is a kernel assessment that refuses or cannot complete
 /// the input; the body is then the assessment itself, with its `status`,
 /// `gaps` and `issues`. 400 is a malformed request and 500 a withheld
-/// non-finite result; both use the [`error_body`] envelope, as do the HTTP
-/// adapter's own 404, 405, 413 and 415 answers.
+/// non-finite or unserializable result; both use the [`error_body`] envelope,
+/// as do the HTTP adapter's own 404, 405, 413 and 415 answers.
 #[derive(Debug, Clone)]
 pub struct Outcome {
     pub status: u16,
@@ -107,11 +107,19 @@ pub fn error_body(
     })
 }
 
-/// Serializes a kernel result, withholding it (500, `non_finite_result`) when
-/// it holds NaN or infinity: `serde_json` would otherwise write `null`.
+/// Serializes a kernel result, withholding it if it contains a non-finite
+/// number or cannot be represented as JSON.
 pub fn finite_value<T: Serialize + ?Sized>(value: &T) -> Result<Value, Outcome> {
     match nta8800_core::finite::first_non_finite(value) {
-        None => Ok(serde_json::to_value(value).unwrap_or(Value::Null)),
+        None => serde_json::to_value(value).map_err(|_| Outcome {
+            status: 500,
+            body: error_body(
+                "serialization_failed",
+                "The kernel result could not be serialized as JSON; the result is withheld",
+                None,
+                Value::Null,
+            ),
+        }),
         Some(path) => Err(Outcome {
             status: 500,
             body: error_body(

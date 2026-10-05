@@ -62,6 +62,17 @@ mod tests {
         assert_eq!(body["months"][0], 2.5);
     }
 
+    #[test]
+    fn unserializable_kernel_results_are_withheld() {
+        use std::collections::BTreeMap;
+
+        let result = BTreeMap::from([((1_u8, 2_u8), 3_u8)]);
+        let (status, Json(body)) = finite_json(StatusCode::OK, &result);
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["error"], "serialization_failed");
+        assert!(body["path"].is_null());
+    }
+
     #[tokio::test]
     async fn interpretations_route_lists_the_kernel_groups() {
         let response = app()

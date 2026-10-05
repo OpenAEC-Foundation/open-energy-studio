@@ -304,7 +304,7 @@ pub fn openapi_document() -> Value {
             responses.insert("413".into(), json!({ "description": "Request body larger than the configured limit", "content": { "application/json": { "schema": error } } }));
             responses.insert("415".into(), json!({ "description": "Content-Type is not application/json", "content": { "application/json": { "schema": error } } }));
             responses.insert("422".into(), json!({ "description": "The kernel refuses or cannot complete the input; the body is the assessment with its status, gaps and issues", "content": { "application/json": { "schema": { "type": "object" } } } }));
-            responses.insert("500".into(), json!({ "description": "Result withheld (non_finite_result) or kernel failure", "content": { "application/json": { "schema": error } } }));
+            responses.insert("500".into(), json!({ "description": "Result withheld (non_finite_result or serialization_failed) or kernel failure", "content": { "application/json": { "schema": error } } }));
         }
         if op.name == "calculate_beng" {
             responses.insert("501".into(), json!({ "description": "Legacy endpoint, calculation unavailable", "content": { "application/json": { "schema": error } } }));
@@ -348,7 +348,7 @@ pub fn openapi_document() -> Value {
             "required": ["error", "code", "message"],
             "properties": {
                 "error": { "type": "string", "description": "Machine code (same as code; kept for older clients)" },
-                "code": { "type": "string", "description": "Machine code, e.g. invalid_json, invalid_request_shape, missing_request_member, invalid_project_shape, payload_too_large, unsupported_media_type, not_found, method_not_allowed, non_finite_result, kernel_panic, calculation_unavailable" },
+                "code": { "type": "string", "description": "Machine code, e.g. invalid_json, invalid_request_shape, missing_request_member, invalid_project_shape, payload_too_large, unsupported_media_type, not_found, method_not_allowed, non_finite_result, serialization_failed, kernel_panic, calculation_unavailable" },
                 "message": { "type": "string" },
                 "path": { "type": ["string", "null"], "description": "JSON path of the offending input or result value" },
                 "details": { "description": "Optional extra data" }
