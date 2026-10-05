@@ -75,7 +75,7 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.thermalBridge.title')}
       onClose={onClose}
       onSubmit={handleSave}

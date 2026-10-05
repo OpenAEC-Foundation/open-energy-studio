@@ -9,6 +9,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
 import { downloadModelIFC } from '../../core/ifc/IFCModelExporter';
 import type { IProject, ISurface } from '../../core/energy/types';
+import { EmptyState, ErrorState } from '../ui';
 import './Building3DView.css';
 
 // ============================================================
@@ -81,7 +82,7 @@ const COLORS = {
   frame: '#94A3B8',
 };
 
-function buildModel(project: IProject): Face[] {
+function buildModel(project: IProject, t: (key: string) => string): Face[] {
   const faces: Face[] = [];
   if (project.zones.length === 0) return faces;
 
@@ -121,7 +122,7 @@ function buildModel(project: IProject): Face[] {
     ],
     color: COLORS.floor,
     alpha: 0.7,
-    label: floors.length > 0 ? floors[0].surface.name : 'Vloer',
+    label: floors.length > 0 ? floors[0].surface.name : t('surfaceType.floor'),
     type: 'floor',
     depth: 0,
   });
@@ -241,7 +242,7 @@ function buildModel(project: IProject): Face[] {
         ],
         color: COLORS.roof,
         alpha: 0.7,
-        label: roofs.find(r => r.surface.orientation === 'E')?.surface.name ?? 'Dak Oost',
+        label: roofs.find(r => r.surface.orientation === 'E')?.surface.name ?? `${t('surfaceType.roof')} ${t('orientation.E')}`,
         type: 'roof',
         depth: 0,
       });
@@ -256,7 +257,7 @@ function buildModel(project: IProject): Face[] {
         ],
         color: COLORS.roof,
         alpha: 0.7,
-        label: roofs.find(r => r.surface.orientation === 'W')?.surface.name ?? 'Dak West',
+        label: roofs.find(r => r.surface.orientation === 'W')?.surface.name ?? `${t('surfaceType.roof')} ${t('orientation.W')}`,
         type: 'roof',
         depth: 0,
       });
@@ -344,7 +345,7 @@ function buildModel(project: IProject): Face[] {
         ],
         color: COLORS.roof,
         alpha: 0.7,
-        label: 'Dak',
+        label: t('surfaceType.roof'),
         type: 'roof',
         depth: 0,
       });
@@ -535,10 +536,18 @@ export function Building3DView() {
 
   const project = state.project;
 
-  // Rebuild model when project changes
+  const [modelError, setModelError] = useState<string | null>(null);
+
+  // Rebuild model when project changes; a geometry the drawing cannot handle shows an error state.
   useEffect(() => {
-    facesRef.current = buildModel(project);
-  }, [project]);
+    try {
+      facesRef.current = buildModel(project, t);
+      setModelError(null);
+    } catch (error) {
+      facesRef.current = [];
+      setModelError(error instanceof Error ? error.message : String(error));
+    }
+  }, [project, t]);
 
   // Render loop
   useEffect(() => {
@@ -642,7 +651,14 @@ export function Building3DView() {
   if (project.zones.length === 0) {
     return (
       <div className="building-3d-view">
-        <div className="building-3d-empty">{t('model3d.noData')}</div>
+        <EmptyState title={t('model3d.noData')} className="building-3d-empty" />
+      </div>
+    );
+  }
+  if (modelError) {
+    return (
+      <div className="building-3d-view">
+        <ErrorState title={t('model3d.error')}>{modelError}</ErrorState>
       </div>
     );
   }
@@ -650,9 +666,9 @@ export function Building3DView() {
   return (
     <div className="building-3d-view">
       <div className="building-3d-toolbar">
-        <button onClick={handleReset}>{t('model3d.resetView')}</button>
+        <button type="button" onClick={handleReset}>{t('model3d.resetView')}</button>
         <div className="toolbar-separator" />
-        <button onClick={handleExportIFC}>{t('model3d.exportIFC')}</button>
+        <button type="button" onClick={handleExportIFC}>{t('model3d.exportIFC')}</button>
       </div>
 
       <div className="building-3d-canvas-container" ref={containerRef}>

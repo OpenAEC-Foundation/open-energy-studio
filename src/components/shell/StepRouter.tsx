@@ -4,7 +4,7 @@
  * "Tussenstand"); F5–F9 replace them page by page.
  */
 import { useEffect, useRef } from 'react';
-import { Box, Download, FileDown, Plus, Printer } from 'lucide-react';
+import { Box, Download, FileDown, Printer } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { useKernel } from '../../context/KernelProvider';
@@ -12,10 +12,9 @@ import { isPathWithin } from '../../core/nta/pathUtil';
 import { routeForPath } from '../../core/nta/gapRoutes';
 import { kernelIssues, type StepStatus } from '../../core/nta/stepStatus';
 import type { Route, StepId } from '../../core/navigation/routes';
-import type { DialogType, IProject } from '../../core/energy/types';
+import type { IProject } from '../../core/energy/types';
 import { Banner, Button, Card, IssueList } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary/ErrorBoundary';
-import { EnvelopeView } from '../EnvelopeView/EnvelopeView';
 import { UnheatedSpacesPanel } from '../UnheatedSpacesPanel/UnheatedSpacesPanel';
 import { Building3DView } from '../Building3DView/Building3DView';
 import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInventoryPanel';
@@ -32,19 +31,12 @@ import { ThermalBridgeCalculator } from '../ThermalBridgeCalculator/ThermalBridg
 import { HeatPumpSizingCalculator } from '../HeatPumpSizingCalculator/HeatPumpSizingCalculator';
 import { PageHeader, SubTabs, routeLabel } from './PageHeader';
 import { ProjectOverview } from './pages/ProjectOverview';
-import { InstallationAddBar, InstallationsPage } from './pages/InstallationsPage';
+import { InstallationAddBar, InstallationsOverview, ServicePage, type ServiceId } from './pages/InstallationsPage';
+import {
+  AirTightnessPage, BuildingAddBar, BuildingLead, ConstructionsPage, EnvelopePage, ThermalBridgesPage, ZonesPage,
+} from './pages/BuildingPages';
 import { RegistrationEditButton, RegistrationPage } from './pages/RegistrationPage';
-import type { ShellActions } from './ShellActions';
-
-export const BUILDING_ADD: Array<{ dialog: DialogType; labelKey: string }> = [
-  { dialog: 'zone-editor', labelKey: 'ribbon.addZone' },
-  { dialog: 'construction-editor', labelKey: 'ribbon.addConstruction' },
-  { dialog: 'surface-editor', labelKey: 'ribbon.addSurface' },
-  { dialog: 'window-editor', labelKey: 'ribbon.addWindow' },
-  { dialog: 'thermal-bridge', labelKey: 'ribbon.addThermalBridge' },
-  { dialog: 'point-bridge', labelKey: 'kernel.pointBridge.add' },
-  { dialog: 'air-tightness', labelKey: 'ribbon.airTightness' },
-];
+import { ShellActionsProvider, type ShellActions } from './ShellActions';
 
 const FLASH_MS = 1200;
 
@@ -113,20 +105,21 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
     case 'building':
       page = <>
         {header({
+          lead: <BuildingLead sub={route.sub} />,
           actions: route.sub === 'model3d'
             ? <Button icon={<Box aria-hidden="true" />} onClick={actions.exportModelIFC}>{t('ribbon.exportModelIFC')}</Button>
-            : undefined,
+            : <>
+              <Button size="sm" variant="ghost" icon={<Box aria-hidden="true" />}
+                onClick={() => actions.navigate({ step: 'building', sub: 'model3d' })}>{t('building.open3d')}</Button>
+              <BuildingAddBar sub={route.sub} />
+            </>,
         })}
         <div className={route.sub === 'model3d' ? 'page-body page-body--flush' : 'page-body'}>
-          {route.sub === 'envelope' && <>
-            <div className="add-bar" role="group" aria-label={t('building.add')}>
-              {BUILDING_ADD.map((entry) => (
-                <Button key={entry.dialog} size="sm" icon={<Plus aria-hidden="true" />} title={t(entry.labelKey)}
-                  onClick={() => actions.openDialog(entry.dialog)}>{t(entry.labelKey)}</Button>
-              ))}
-            </div>
-            <EnvelopeView />
-          </>}
+          {route.sub === 'envelope' && <EnvelopePage />}
+          {route.sub === 'zones' && <ZonesPage />}
+          {route.sub === 'constructions' && <ConstructionsPage />}
+          {route.sub === 'thermalBridges' && <ThermalBridgesPage />}
+          {route.sub === 'airTightness' && <AirTightnessPage />}
           {route.sub === 'unheated' && <UnheatedSpacesPanel />}
           {route.sub === 'model3d' && <Building3DView />}
         </div>
@@ -134,11 +127,20 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       break;
     case 'installations':
       page = <>
-        {header({ actions: route.sub === 'systems' ? <InstallationAddBar onOpenDialog={actions.openDialog} /> : undefined })}
+        {header({
+          lead: route.sub && route.sub !== 'systems' ? t(`lead.installations.${route.sub}`) : t('page.installations.lead'),
+          actions: route.sub && route.sub !== 'systems' ? <InstallationAddBar sub={route.sub} /> : undefined,
+        })}
         <div className="page-body">
-          {route.sub === 'systems' && <InstallationsPage />}
-          {route.sub === 'heatPumps' && <HeatPumpInventoryPanel />}
-          {route.sub === 'reference' && <GasChainReferencePanel />}
+          {(route.sub === 'systems' || !route.sub) && <InstallationsOverview />}
+          {route.sub && route.sub !== 'systems' && route.sub !== 'heatPumps' && <ServicePage key={route.sub} sub={route.sub as ServiceId} />}
+          {route.sub === 'heatPumps' && <ServicePage sub="heatPumps" extra={<>
+            <HeatPumpInventoryPanel />
+            <details className="diagnostic-card">
+              <summary>{t('installations.gasReference')}</summary>
+              <GasChainReferencePanel />
+            </details>
+          </>} />}
         </div>
       </>;
       break;
@@ -214,7 +216,7 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
 
   return (
     <div className="step-page" ref={bodyRef} data-step={route.step} style={{ display: 'contents' }}>
-      <ErrorBoundary resetKey={state.project}>{page}</ErrorBoundary>
+      <ShellActionsProvider value={actions}><ErrorBoundary resetKey={state.project}>{page}</ErrorBoundary></ShellActionsProvider>
     </div>
   );
 }

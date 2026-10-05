@@ -58,7 +58,7 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.ventilation.title')}
       onClose={onClose}
       onSubmit={handleSave}

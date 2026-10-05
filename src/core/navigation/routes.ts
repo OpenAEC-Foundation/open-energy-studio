@@ -42,6 +42,10 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
   {
     id: 'building', number: 2, group: 'input', labelKey: 'nav.step.building', slug: 'gebouw', subs: [
       { id: 'envelope', labelKey: 'nav.sub.building.envelope' },
+      { id: 'zones', labelKey: 'nav.sub.building.zones' },
+      { id: 'constructions', labelKey: 'nav.sub.building.constructions' },
+      { id: 'thermalBridges', labelKey: 'nav.sub.building.thermalBridges' },
+      { id: 'airTightness', labelKey: 'nav.sub.building.airTightness' },
       { id: 'unheated', labelKey: 'nav.sub.building.unheated' },
       { id: 'model3d', labelKey: 'nav.sub.building.model3d' },
     ],
@@ -49,8 +53,14 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
   {
     id: 'installations', number: 3, group: 'input', labelKey: 'nav.step.installations', slug: 'installaties', subs: [
       { id: 'systems', labelKey: 'nav.sub.installations.systems' },
+      { id: 'heating', labelKey: 'nav.sub.installations.heating' },
+      { id: 'hotWater', labelKey: 'nav.sub.installations.hotWater' },
+      { id: 'ventilation', labelKey: 'nav.sub.installations.ventilation' },
+      { id: 'cooling', labelKey: 'nav.sub.installations.cooling' },
+      { id: 'humidification', labelKey: 'nav.sub.installations.humidification' },
+      { id: 'generation', labelKey: 'nav.sub.installations.generation' },
       { id: 'heatPumps', labelKey: 'nav.sub.installations.heatPumps' },
-      { id: 'reference', labelKey: 'nav.sub.installations.reference' },
+      { id: 'bacs', labelKey: 'nav.sub.installations.bacs' },
     ],
   },
   {

@@ -48,7 +48,7 @@ export function AirTightnessDialog({ editId, onClose }: AirTightnessDialogProps)
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.airTightness.title')}
       onClose={onClose}
       onSubmit={handleSave}

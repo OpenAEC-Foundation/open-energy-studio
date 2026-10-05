@@ -55,7 +55,7 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.solarThermal.title')}
       onClose={onClose}
       onSubmit={handleSave}

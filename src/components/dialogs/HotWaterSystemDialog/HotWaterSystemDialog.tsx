@@ -95,7 +95,7 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.hotWater.title')}
       onClose={onClose}
       onSubmit={handleSave}

@@ -51,7 +51,7 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.cooling.title')}
       onClose={onClose}
       onSubmit={handleSave}

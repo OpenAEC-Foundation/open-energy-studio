@@ -22,6 +22,24 @@ Uitkomsten veranderen voor projecten met een kwaliteitsverklaring van een warmte
 - **Warm tapwater.** Een gedeclareerd warmtepomprendement (§13.8.4.7.2) rekent nu met f_prac 0,95 volgens 13.152 (p. 616–617), in plaats van 1,0. Alleen de forfaitaire waarden houden 1,0.
 - **Vergelijkingsfixtures.** `training-data/nta8800-public-comparison-{a,b,c}.json` zijn gecorrigeerd naar de rapportinvoer: productwaarden voor de ventilatoren (A: 8,5 W, f 0,147; B: 4 units van 21,7 W, f 0,364), de gedeclareerde hulpenergie van 146 kWh bij B, en geen leidingen buiten de verwarmde of gekoelde zone. Vastgelegde uitkomsten: A 94,00 / 35,15 / 74,9; B 52,96 / 28,84 / 62,6; C 64,70 / 31,54 / 69,0.
 - **Documentatie.** De regel-voor-regel-reconciliatie staat in `docs/nta8800-vergelijking-openbare-rapporten.md`. Vragen over 10.15, 10.87 en f_prac staan in `docs/nta8800-vragen-nen.md`.
+## 5 oktober 2026 — UI-herontwerp, fase F5: Gebouw en Installaties per onderdeel (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd; ids van zones, vlakken, ramen en systemen blijven gelijk.
+- **Gebouw** heeft subpagina's: Schil & ramen, Rekenzones, Constructies, Koudebruggen, Luchtdichtheid, Onverwarmde ruimten en 3D-model.
+  - Schil & ramen is één tabel met de ramen als onderliggende regels. Filteren kan op type (alle/gevels/daken/vloeren) en op naam of constructie. Groeperen kan op oriëntatie, type of constructie. De kolommen zijn grenst aan, helling (uit de NTA-invoer, anders 90° voor wanden en 0° voor vloeren), bruto A, constructie, U en het aantal ramen.
+  - Onder de tabel staan het indicatieve aandeel in H<sub>T</sub> per elementtype (U·A en ψ·l) en de controles van de schil: thermische begrenzing, vlakken zonder constructie, forfaitaire koudebruggen en de kernmeldingen van de stap met Ga naar.
+  - De luchtdoorlatendheid q<sub>v;10</sub> is direct op de pagina te wijzigen.
+- **Contextpaneel bij een geselecteerd element.** Het paneel bewerkt een vlak, raam, rekenzone of koudebrug direct met eenheidsvelden. Voor een vlak zijn dat bruto oppervlak, oriëntatie, toegewezen constructie en thermische grens. Netto oppervlak, helling, U, R<sub>c</sub> en H<sub>T</sub> zijn afgeleid. Het paneel toont ook de ramen in het vlak en linkt naar de U-waardecalculator. Een leeg verplicht veld wordt niet weggeschreven.
+- **Editors als zijlade.** Bewerken en toevoegen openen de bestaande editors rechts als zijlade in plaats van als venster. Velden, controles en opslaan blijven gelijk.
+- **Installaties** heeft subpagina's:
+  - Overzicht;
+  - Verwarming, Warm tapwater, Ventilatie, Koeling, Bevochtiging, Opwekking (PV), Warmtepompen en Gebouwautomatisering.
+  - Het overzicht toont per aanwezige dienst een ketenkaart met de systemen en hun kerngetallen, de ingevulde NTA-blokken en de status uit de kernmeldingen. Afwezige diensten staan samen in één gestippelde kaart. Zonder selectie toont het contextpaneel de energie per dienst uit de laatste kernberekening.
+  - Elke dienstpagina toont de systemen van het projectmodel in een tabel, de open punten van die dienst en welke NTA-invoerblokken ingevuld zijn. Een link opent ze in Controle › NTA-invoer; de NTA-invoer zelf wordt in F6 opgesplitst.
+  - De gaswarmtepomp-referentie staat als inklapbare diagnose onder Warmtepompen.
+- **Ga naar** kiest nu de juiste subpagina. Voorbeelden: koudebruggen bij Koudebruggen, `constructions` bij Constructies, `solarPV` bij Opwekking (PV).
+- **3D-model.** Een lege of niet-tekenbare geometrie toont een leeg- of foutstatus. De vlaknamen zonder eigen naam zijn vertaald.
+
 ## 5 oktober 2026 — UI-herontwerp, fase F3 en F4: werkstroom in plaats van ribbon (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd.
