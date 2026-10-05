@@ -1,6 +1,6 @@
 # 6. Maatwerkadvies
 
-Het paneel **Maatwerkadvies** staat op het tabblad Resultaten. Het werkt volgens BRL 9500-MWA-W/U van 24-03-2026, in werking per 29-05-2026 (§3.1, p. 13; §3.2 renovatiepaspoort, p. 14; §4.2.5, p. 21; §4.2.8 registratie, p. 23), en ISSO 82.2 (woningen) of ISSO 75.2 (utiliteit), beide 3e druk. De volledige technische beschrijving staat in [`docs/nta8800-maatwerkadvies.md`](../nta8800-maatwerkadvies.md).
+Het maatwerkadvies is stap 7 **Maatwerkadvies**, met de tabbladen Maatregelen & pakketten, Gemeten verbruik, Woningpas en Advies & rapport. Het werkt volgens BRL 9500-MWA-W/U van 24-03-2026, in werking per 29-05-2026 (§3.1, p. 13; §3.2 renovatiepaspoort, p. 14; §4.2.5, p. 21; §4.2.8 registratie, p. 23), en ISSO 82.2 (woningen) of ISSO 75.2 (utiliteit), beide 3e druk. De volledige technische beschrijving staat in [`docs/nta8800-maatwerkadvies.md`](../nta8800-maatwerkadvies.md).
 
 ## Werkwijze
 

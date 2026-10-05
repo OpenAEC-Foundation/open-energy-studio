@@ -472,6 +472,8 @@ body{margin:0!important;padding:0!important}
           ref={measureRef}
           style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', height: '99999px' }}
           title="Measurement"
+          aria-hidden="true"
+          tabIndex={-1}
         />
         <div className="pp-pages-wrapper" style={{ zoom: zoom / 100 }}>
           {Array.from({ length: totalPages }, (_, i) => (

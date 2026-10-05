@@ -201,6 +201,20 @@ export function labelColor(labelClass: string): string {
   return palette[index] ?? 'var(--surface-raised)';
 }
 
+/** White or near-black text on a label colour, whichever contrasts more (F10 contrast audit). */
+export function labelTextColor(background: string): string {
+  const hex = /^#([0-9a-f]{6})$/i.exec(background);
+  if (!hex) return 'var(--fg-1)';
+  const channel = (offset: number) => {
+    const value = parseInt(hex[1].slice(offset, offset + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+  const onWhite = 1.05 / (luminance + 0.05);
+  const onDark = (luminance + 0.05) / (0.0137 + 0.05); // #1d1d1d
+  return onWhite >= onDark ? '#ffffff' : '#1d1d1d';
+}
+
 /** Month numbers 1..12 for the axis labels. */
 export const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 

@@ -114,6 +114,7 @@ export function HeatPumpSizingCalculator() {
               <input
                 type="number"
                 className="hp-input"
+                aria-label={t('hp.outdoorTemp')}
                 value={designOutdoorTemp}
                 onChange={e => setDesignOutdoorTemp(Number(e.target.value))}
                 step={1}
@@ -124,6 +125,7 @@ export function HeatPumpSizingCalculator() {
               <input
                 type="number"
                 className="hp-input"
+                aria-label={t('hp.indoorTemp')}
                 value={customIndoorTemp ?? params.thetaInt}
                 onChange={e => {
                   const v = Number(e.target.value);
@@ -137,6 +139,7 @@ export function HeatPumpSizingCalculator() {
               <input
                 type="number"
                 className="hp-input"
+                aria-label={t('hp.safetyMargin')}
                 value={safetyMargin}
                 onChange={e => setSafetyMargin(Number(e.target.value))}
                 min={0}

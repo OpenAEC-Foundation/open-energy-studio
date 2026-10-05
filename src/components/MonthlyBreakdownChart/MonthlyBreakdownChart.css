@@ -44,13 +44,13 @@
   transition: height 0.3s ease;
 }
 
-.monthly-chart-stack-bar.transmission { background: #ef4444; }
-.monthly-chart-stack-bar.ventilation { background: #f97316; }
-.monthly-chart-stack-bar.infiltration { background: #f59e0b; }
-.monthly-chart-stack-bar.solar-gain { background: #eab308; }
-.monthly-chart-stack-bar.internal-gain { background: #84cc16; }
-.monthly-chart-stack-bar.heating { background: #ef4444; }
-.monthly-chart-stack-bar.cooling { background: #3b82f6; }
+.monthly-chart-stack-bar.transmission { background: var(--viz-heating); }
+.monthly-chart-stack-bar.ventilation { background: var(--viz-fans); }
+.monthly-chart-stack-bar.infiltration { background: var(--viz-humid); }
+.monthly-chart-stack-bar.solar-gain { background: var(--viz-pv); }
+.monthly-chart-stack-bar.internal-gain { background: var(--viz-aux); }
+.monthly-chart-stack-bar.heating { background: var(--viz-heating); }
+.monthly-chart-stack-bar.cooling { background: var(--viz-cooling); }
 
 .monthly-chart-month-label {
   font-size: 10px;

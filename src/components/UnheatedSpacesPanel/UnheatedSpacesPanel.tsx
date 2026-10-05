@@ -34,7 +34,7 @@ export function UnheatedSpacesPanel() {
   };
   return <section className="unheated-spaces" aria-label={t('kernel.unheated.title')}>
     <div className="unheated-spaces-head">
-      <div><h3>{t('kernel.unheated.title')}</h3><p>{t('kernel.unheated.scope')}</p></div>
+      <div><h2>{t('kernel.unheated.title')}</h2><p>{t('kernel.unheated.scope')}</p></div>
       <button type="button" className="btn btn-primary" onClick={() => edit(null)}>{t('kernel.unheated.add')}</button>
     </div>
     {spaces.length === 0 && <p>{t('kernel.unheated.empty')}</p>}

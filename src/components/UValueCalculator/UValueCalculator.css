@@ -79,7 +79,7 @@
 .uvalue-surface-btn.active {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--fg-on-accent);
 }
 
 .uvalue-surface-rsi-rse {
@@ -228,7 +228,7 @@
 }
 
 .uvalue-layer-row:hover td {
-  background: rgba(128, 128, 128, 0.05);
+  background: var(--surface-hover);
 }
 
 .uvalue-boundary-row td {
@@ -269,6 +269,7 @@
 .uvalue-input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .uvalue-input-num {
@@ -292,6 +293,7 @@
 .uvalue-select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 /* ---- Buttons ---- */
@@ -313,7 +315,7 @@
 
 .uvalue-add-btn:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--fg-on-accent);
 }
 
 .uvalue-delete-btn {
@@ -330,8 +332,8 @@
 }
 
 .uvalue-delete-btn:hover {
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.1);
+  color: var(--error-text);
+  background: var(--error-subtle);
 }
 
 /* ---- Order buttons ---- */

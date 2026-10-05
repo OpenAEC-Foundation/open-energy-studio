@@ -5,7 +5,7 @@
  * `{ step, sub?, focusPath? }`; the old `viewMode` values stay available as an
  * alias so existing code that dispatches `SET_VIEW_MODE` keeps working.
  */
-import type { ViewMode } from '../energy/types';
+import type { IProject, ViewMode } from '../energy/types';
 
 export type StepId =
   | 'project' | 'building' | 'installations' | 'check' | 'results'
@@ -131,6 +131,12 @@ export const STEP_GROUPS: Array<{ id: StepGroup; labelKey: string }> = [
 
 export function stepDefinition(step: StepId): StepDefinition {
   return step === 'tool' ? TOOL_STEP : WORKFLOW_STEPS.find((definition) => definition.id === step) ?? WORKFLOW_STEPS[0];
+}
+
+/** The sub pages shown for a project: the survey's Rekenzones only exist in a utility survey. */
+export function visibleSubs(definition: StepDefinition, project: IProject | null | undefined): SubPage[] {
+  if (definition.id !== 'survey') return definition.subs;
+  return definition.subs.filter((sub) => sub.id !== 'zones' || project?.basisopname?.kind === 'utility');
 }
 
 /** The default sub page of a step (its first), or undefined for steps without sub pages. */

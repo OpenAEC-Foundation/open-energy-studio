@@ -196,10 +196,13 @@
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);
 }
 .label-badge.lbl-app4 { background: #00843F; } .label-badge.lbl-app3 { background: #00963F; } .label-badge.lbl-app2 { background: #1AA64A; }
-.label-badge.lbl-app { background: #1AA64A; } .label-badge.lbl-ap { background: #4DB848; } .label-badge.lbl-a { background: #8CC63F; }
+.label-badge.lbl-app { background: #1AA64A; } .label-badge.lbl-ap { background: #4DB848; color: #1d1d1d; } .label-badge.lbl-a { background: #8CC63F; color: #1d1d1d; }
 .label-badge.lbl-b { background: #C8D92B; color: #1d1d1d; } .label-badge.lbl-c { background: #FFF200; color: #1d1d1d; }
-.label-badge.lbl-d { background: #FDB913; color: #1d1d1d; } .label-badge.lbl-e { background: #F37021; }
+.label-badge.lbl-d { background: #FDB913; color: #1d1d1d; } .label-badge.lbl-e { background: #F37021; color: #1d1d1d; }
 .label-badge.lbl-f { background: #ED1C24; } .label-badge.lbl-g { background: #B2151B; }
+/* Small badge (recent projects): normal-size text needs 4.5:1, so dark text except on the darkest colours. */
+.label-badge--sm { height: 20px; padding: 0 12px 0 6px; margin-right: 8px; font-size: 12px; vertical-align: middle; clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%); color: #1d1d1d; }
+.label-badge--sm.lbl-app4, .label-badge--sm.lbl-g { color: var(--white); }
 .beng-bullets { display: grid; gap: 10px; }
 .beng-bullet-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) 110px; gap: 10px; align-items: center; font-size: var(--fs-sm); }
 .beng-bullet-row .name { color: var(--fg-2); }
@@ -329,6 +332,17 @@
 .chain-stage:hover { background: var(--surface-hover); }
 .chain-stage:focus-visible { box-shadow: var(--focus-ring); }
 .chain-stages li.selected .chain-stage { border-color: var(--accent); background: var(--surface-selected); }
+/* Heating chain phases (F10, mockup 03): opwekking › distributie › afgifte › regeling. */
+.chain-phases { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.chain-phases li { position: relative; }
+.chain-phases li + li::before { content: '›'; position: absolute; left: -12px; top: 50%; transform: translateY(-50%); color: var(--fg-3); }
+.chain-phase { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--radius-pill);
+  border: 1px solid var(--line-control); color: var(--fg-2); font-size: var(--fs-xs); cursor: pointer; }
+.chain-phase:hover { background: var(--surface-hover); color: var(--fg-1); }
+.chain-phase:focus-visible { box-shadow: var(--focus-ring); }
+.chain-phase__dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--fg-3); }
+.chain-phase--filled { color: var(--fg-1); }
+.chain-phase--filled .chain-phase__dot { background: var(--ok); border-color: var(--ok); }
 .chain-stage__kicker { font-size: var(--fs-2xs); letter-spacing: .07em; text-transform: uppercase; color: var(--fg-3); }
 .chain-stage__name { font-weight: var(--weight-semibold); font-size: var(--fs-sm); color: var(--fg-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chain-figs { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: var(--fs-xs); color: var(--fg-2); }
@@ -390,3 +404,11 @@
 .chain-toolbar { display: flex; justify-content: flex-end; }
 .chain-toolbar .add-bar { flex-wrap: wrap; justify-content: flex-end; }
 .ui-nocase { text-transform: none; }
+
+/* Skeleton while a lazily loaded page chunk arrives (F10). */
+.lazy-page-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-4, 16px);
+}

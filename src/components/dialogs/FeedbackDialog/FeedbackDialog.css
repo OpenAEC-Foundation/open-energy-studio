@@ -17,12 +17,12 @@
 }
 
 .feedback-required {
-  color: var(--danger, #DC2626);
+  color: var(--danger);
 }
 
 .feedback-hint {
   font-size: 10px;
-  color: var(--text-muted, #71717A);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -50,7 +50,7 @@
 
 .feedback-category-btn.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--fg-on-accent);
   border-color: var(--accent);
 }
 
@@ -64,12 +64,12 @@
 .feedback-char-count {
   text-align: right;
   font-size: 10px;
-  color: var(--text-muted, #71717A);
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
 .feedback-char-count.warning {
-  color: var(--danger, #DC2626);
+  color: var(--danger);
 }
 
 /* ── Image attachments ── */
@@ -101,7 +101,7 @@
   right: -1px;
   width: 18px;
   height: 18px;
-  background: var(--danger, #DC2626);
+  background: var(--danger);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -157,7 +157,7 @@
 
 .feedback-sentiment-btn.active {
   border-color: var(--accent);
-  background: var(--accent-subtle, rgba(217, 119, 6, 0.15));
+  background: var(--accent-subtle);
 }
 
 /* ── Submit button ── */
@@ -197,7 +197,7 @@
 
 /* ── Error message ── */
 .feedback-error {
-  color: var(--danger, #DC2626);
+  color: var(--danger);
   font-size: 11px;
   margin-top: 8px;
   text-align: center;

@@ -12,7 +12,7 @@ import { useKernelQuery } from '../../../context/KernelProvider';
 import { downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML } from '../../../core/report/ReportGenerator';
 import type { DossierItem, DossierStatus } from '../../../core/report/ProjectDossier';
 import { buildEpOnlineOverview, EP_ONLINE_FIELDS, type EpOnlineValue } from '../../../core/report/EpOnlineOverview';
-import { ReportView } from '../../ReportView/ReportView';
+import { LazyPage, ReportView } from '../lazyPages';
 import { useDossier } from '../../ReportView/useDossier';
 import { Banner, Button, Card, EmptyState, Pill, StatusPill } from '../../ui';
 import type { ShellActions } from '../ShellActions';
@@ -42,7 +42,7 @@ function useDeliveryContext() {
 
 /** Rekenrapport: verification notice and the report builder (level, language, chapters, preview). */
 export function ReportPage() {
-  return <ReportView section="report" />;
+  return <LazyPage><ReportView section="report" /></LazyPage>;
 }
 
 /** Invoerdossier: export of the NTA input dossier plus the input summary. */
@@ -53,7 +53,7 @@ export function InputDossierPage() {
     <Card title={t('delivery.input.title')} subtitle={t('report.inputDossierScope')} level={2}
       actions={<Button icon={<FileDown aria-hidden="true" />} onClick={() => downloadNtaInputDossierHTML(state.project)}>
         {t('report.exportInputDossier')}</Button>} />
-    <ReportView section="input" />
+    <LazyPage><ReportView section="input" /></LazyPage>
   </>;
 }
 

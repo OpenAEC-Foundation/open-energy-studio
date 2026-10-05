@@ -1,6 +1,6 @@
 .unheated-spaces { margin: 18px 0; padding: 17px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-secondary); font-size: 12px; }
 .unheated-spaces-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-.unheated-spaces h3 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
+.unheated-spaces h2 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
 .unheated-spaces p, .unheated-spaces small { color: var(--text-secondary); }
 .unheated-spaces p { margin: 5px 0 10px; }
 .unheated-spaces button { cursor: pointer; }
@@ -12,4 +12,4 @@
 .unheated-spaces-form label { display: grid; gap: 4px; }
 .unheated-spaces-form input { max-width: 400px; padding: 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); }
 .unheated-spaces-form > div { display: flex; gap: 8px; }
-.unheated-spaces-form p { color: var(--energy-red, #ef4444); }
+.unheated-spaces-form p { color: var(--error-text); }

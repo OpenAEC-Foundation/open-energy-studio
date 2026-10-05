@@ -1,6 +1,6 @@
 # Open Energy Studio — UI-herontwerp
 
-*Status: ontwerpvoorstel, 5 oktober 2026 · branch `nta8800-kernel` · geen code gewijzigd*
+*Status: uitgevoerd (F1–F10 afgerond op 5 oktober 2026) · branch `nta8800-kernel`. Het voorstel hieronder is ongewijzigd gebleven; wat er per fase is gebouwd en wat bewust open blijft, staat in de secties "Uitgevoerd in …" aan het eind.*
 
 Dit document is een volledig herontwerp van de gebruikersinterface. Het gaat niet om een opfrisbeurt. Het is geschreven voor een bouwer die het fase voor fase kan uitvoeren.
 
@@ -1058,3 +1058,62 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - de ConfirmDialog bij het sluiten van een document met een niet-toegepast concept;
   - een preview-run op het concept ("effect op uitkomst").
 
+### Uitgevoerd in F10 (5 oktober 2026) — herontwerp afgerond
+
+- **Thema's en kleur.**
+  - De lint- en titelbalkvariabelen (`--ribbon-*`, `--titlebar-*`, `--window-btn-*`) zijn uit `index.css` verwijderd. `DocumentTabs` gebruikt de shelltokens. De ongebruikte `ThemePicker` (map `Ribbon/`) is weg; de themakeuze zit in de instellingen.
+  - Vaste status- en grafiekkleuren in ruim twintig oudere panelen zijn tokens geworden (`--error-text`, `--ok`, `--warn-subtle`, `--viz-*`, `--shadow-*` …). Bewust vast blijven: de officiële labelkleuren, het witte rapportpapier, overlays en de materiaalstalen in de U-waardecalculator.
+  - Nieuw token `--line-control` voor randen van invoervelden (3:1 in elk thema). Bijgesteld: donker `--fg-3`, `--error`, `--unverified`, `--bg-secondary`; licht `--accent-text`, `--ok`, `--ok-text`, `--warn`, `--warn-text`.
+  - Tekst op een labelkleur kiest wit of bijna-zwart naar het hoogste contrast (`labelTextColor`; voorheen wit op A, A+ en E, onder 3:1).
+- **Contrastaudit** als test (`theme-contrast.test.ts`). Per thema (donker, licht, hoog contrast) worden de tokens met `var()`-verwijzingen en alfa-menging over het canvas opgelost. Getoetst wordt:
+  - tekst op elk vlak ≥ 4,5:1;
+  - statustekst op zijn eigen achtergrond ≥ 4,5:1;
+  - tekst op amber ≥ 4,5:1;
+  - statusmarkeringen en invoerranden ≥ 3:1;
+  - de oude tekstvariabelen ≥ 4,5:1.
+
+  Alle 15 controles slagen. De merkkleur amber als vlak is uitgezonderd: er staat altijd `--fg-on-accent` op, en voor amberkleurige tekst is er `--accent-text`.
+- **Toegankelijkheid.** axe-core is geen afhankelijkheid, dus `a11y-pages.test.tsx` doet gerichte controles op alle 47 stap- en subpagina's (donker met de tussenwoning, licht met het kantoor). Getoetst worden:
+  - een toegankelijke naam op elke knop, link en elk invoerveld;
+  - unieke id's en aria-verwijzingen die bestaan;
+  - één h1 en geen overgeslagen kopniveaus;
+  - geen positieve tabindex en niets focusbaars binnen `aria-hidden`.
+
+  Gevonden en opgelost:
+  - koppen h3 → h2 in Onverwarmde ruimten, NTA-warmtepompen en de basisopname;
+  - ontbrekende namen voor de invoervelden van de U-waardecalculator en de warmtepompdimensionering;
+  - de vensterknoppen en het sluitkruisje van projecttabbladen hadden Engelse vaste tekst;
+  - een projecttabblad was niet met het toetsenbord bereikbaar; het label is nu een knop met `aria-current`;
+  - het meetframe van het afdrukvoorbeeld staat nu op `aria-hidden`.
+
+  Daarnaast:
+  - oudere invoervelden (dialogen, calculators, instellingen, afdrukvoorbeeld) krijgen bij focus de gedeelde `--focus-ring` in plaats van alleen een amberkleurige rand;
+  - `aria-live` stond al op de kernstatus in de statusbalk en op de pop-upberichten (fouten als `alert`). Minder beweging stond al in `base.css`.
+- **i18n.** `i18n-coverage.test.ts` controleert:
+  - dat elke letterlijke `t('…')`-sleutel in `src` in het Nederlands en het Engels bestaat, en elk sjabloonvoorvoegsel (`t(\`a.${x}\`)`) ook;
+  - dat nl en en dezelfde sleutels hebben;
+  - een heuristiek op onvertaalde Nederlandse waarden in en;
+  - vaste woorden in JSX van `shell/` en `ui/`.
+
+  Vaste Nederlandse eenheden (`kWh/m²·jr`, `kg/m²·jr`) in het resultatendashboard en de basisopname gebruiken nu `unit.*`.
+- **Restpunten uit F5–F9.**
+  - Sluiten van een document met een niet-toegepast NTA-concept vraagt eerst "Sluiten zonder toepassen". De rapportage loopt via `DocumentReporter` in `App.tsx`.
+  - De verwarmingskaart op Installaties › Overzicht toont de keten opwekking › distributie › afgifte › regeling. Elke fase is ingevuld of leeg (`heatingPartFilled`) en opent dat deel van de stepper.
+  - De subpagina Rekenzones van de basisopname staat in de navigatie en het palet alleen bij een utiliteitsopname (`visibleSubs`).
+  - De labelkaart op Resultaten vult bij twee rijen hoogte de kaart in plaats van de onderste helft leeg te laten.
+  - Recente projecten tonen de labelklasse van de laatste doorrekening bij het opslaan (`RecentProject.labelClass`; bij openen blijft het eerdere label staan).
+- **Prestaties.**
+  - `React.lazy` (`shell/lazyPages.tsx`) voor het 3D-model, de rapportopbouw (`ReportView`), het afdrukvoorbeeld en de drie rekenhulpen, met een skeleton als laadstatus.
+  - De talen naast nl en en worden pas geladen als je ze kiest.
+  - Startbundel: JS 2.352 → 2.105 kB (gzip 610 → 556 kB), CSS 167 → 147 kB. Er komen 19 losse chunks bij.
+  - Weergave in Firefox (1600 px, tussenwoning): navigeren naar een pagina kost 140–740 ms tot alles is getekend, het eerste frame daarna 2–90 ms. De grootste formulieren (Installaties › Overzicht, Controle › NTA-invoer, Checklist) hebben 240–490 elementen.
+- **Documentatie.**
+  - De handleiding heeft een nieuw hoofdstuk 0 *Werken met het programma* met acht schermafdrukken in `docs/handleiding-nta8800/img/`;
+  - verwijzingen naar het lint en de oude tabbladen in de hoofdstukken 3, 4, 6, 7 en 9 zijn bijgewerkt.
+- **Schermafdrukken:** `~/oes-shots/f10/`. Alle 37 routes plus het welkomstscherm zijn vastgelegd in donker, licht en hoog contrast, op 1600 en 1280 px, en EN licht met het kantoor. Geen paginafouten, geen horizontale overloop en één h1 per pagina.
+- **Bewust open** (buiten de UI-fasen):
+  - paginaminiaturen naast het rapportvoorbeeld en de dossiercheck als zijkolom;
+  - een preview-run op het concept;
+  - "Geavanceerd" per veld;
+  - een paperclip-upload bij Bron & bewijs;
+  - foto's in de basisopname (§12).

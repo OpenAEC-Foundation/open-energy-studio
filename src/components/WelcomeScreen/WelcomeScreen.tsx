@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/i18n';
 import { EXAMPLE_KINDS, type ExampleKind } from '../../core/nta/ExampleProjects';
 import type { RecentProject } from '../../core/io/recentProjects';
 import { IconButton } from '../ui';
+import { labelClassName } from '../shell/labelClass';
 import './WelcomeScreen.css';
 
 export type NewProjectKind = 'residential' | 'utility';
@@ -104,7 +105,11 @@ export function WelcomeScreen({
                   <li key={entry.path} className="welcome-recent__item">
                     <button type="button" className="welcome-recent__open" title={entry.path}
                       onClick={() => onOpenRecent?.(entry.path)}>
-                      <span className="welcome-recent__name">{entry.name || fileName(entry.path)}</span>
+                      <span className="welcome-recent__name">
+                        {entry.labelClass && <span className={`label-badge label-badge--sm ${labelClassName(entry.labelClass)}`}
+                          title={t('overview.labelClass')}>{entry.labelClass}</span>}
+                        {entry.name || fileName(entry.path)}
+                      </span>
                       <span className="welcome-recent__meta">
                         {entry.buildingFunction && <span>{t(`function.${entry.buildingFunction}`)}</span>}
                         <span>{date(entry.at)}</span>

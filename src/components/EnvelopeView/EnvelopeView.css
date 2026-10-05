@@ -107,7 +107,7 @@
 }
 
 .envelope-table tr:hover td {
-  background: rgba(128, 128, 128, 0.05);
+  background: var(--surface-hover);
 }
 
 .envelope-table tr.selected td {

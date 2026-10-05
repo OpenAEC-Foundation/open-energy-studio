@@ -180,10 +180,10 @@ export function TopBar(props: TopBarProps) {
       </div>
 
       <div className="top-bar-winctl">
-        <button type="button" title="Minimize" aria-label="Minimize" onClick={() => void minimizeWindow()}><Minus aria-hidden="true" /></button>
-        <button type="button" title={maximized ? 'Restore' : 'Maximize'} aria-label={maximized ? 'Restore' : 'Maximize'}
+        <button type="button" title={t('shell.window.minimize')} aria-label={t('shell.window.minimize')} onClick={() => void minimizeWindow()}><Minus aria-hidden="true" /></button>
+        <button type="button" title={t(maximized ? 'shell.window.restore' : 'shell.window.maximize')} aria-label={t(maximized ? 'shell.window.restore' : 'shell.window.maximize')}
           onClick={() => void toggleMaximize()}>{maximized ? <Copy aria-hidden="true" /> : <Square aria-hidden="true" />}</button>
-        <button type="button" className="close" title="Close" aria-label="Close" onClick={() => void closeWindow()}><X aria-hidden="true" /></button>
+        <button type="button" className="close" title={t('shell.window.close')} aria-label={t('shell.window.close')} onClick={() => void closeWindow()}><X aria-hidden="true" /></button>
       </div>
     </header>
   );

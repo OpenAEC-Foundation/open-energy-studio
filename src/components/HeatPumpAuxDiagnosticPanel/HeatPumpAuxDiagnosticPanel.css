@@ -9,7 +9,7 @@
 .heat-pump-aux-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .heat-pump-aux-draft button { padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; }
 .heat-pump-aux-draft button:disabled { cursor: wait; opacity: .6; }
-.heat-pump-aux-draft-error { color: #b91c1c !important; }
+.heat-pump-aux-draft-error { color: var(--error-text) !important; }
 .heat-pump-aux-draft-result { margin-top: 12px; padding: 12px; border-left: 3px solid var(--accent); background: var(--bg-secondary); font-size: 12px; }
 .heat-pump-aux-draft-result dl { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr; gap: 5px 10px; }
 .heat-pump-aux-draft-result dd { margin: 0; font-weight: 600; }

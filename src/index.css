@@ -26,7 +26,7 @@ input, textarea, [contenteditable="true"] {
   /* Core palette */
   --bg-dark: #2A2A32;
   --bg-primary: #36363E;
-  --bg-secondary: #3E3E46;
+  --bg-secondary: #38383F; /* F10: Scaffold Gray haalt 4,5:1 (op #3E3E46 4,1:1) */
   --bg-tertiary: #4A4A52;
   --bg-elevated: #52525A;
   --bg-hover: rgba(217, 119, 6, 0.08);
@@ -47,46 +47,6 @@ input, textarea, [contenteditable="true"] {
   --energy-orange: #F59E0B;
   --energy-red: #DC2626;
 
-  /* Ribbon */
-  --ribbon-bg-start: #36363E;
-  --ribbon-bg-end: #2A2A32;
-  --ribbon-border: rgba(217, 119, 6, 0.25);
-  --ribbon-tabs-bg-start: #36363E;
-  --ribbon-tabs-bg-end: #323238;
-  --ribbon-content-bg: #36363E;
-  --ribbon-text: #A1A1AA;
-  --ribbon-text-hover: #FAFAF9;
-  --ribbon-tab-hover: rgba(217, 119, 6, 0.1);
-  --ribbon-tab-active-bg: #36363E;
-  --ribbon-tab-active-border: #D97706;
-  --ribbon-btn-hover: rgba(217, 119, 6, 0.15);
-  --ribbon-btn-hover-border: rgba(217, 119, 6, 0.30);
-  --ribbon-btn-active-bg: rgba(217, 119, 6, 0.20);
-  --ribbon-btn-active-border: rgba(217, 119, 6, 0.40);
-  --ribbon-btn-active-text: #D97706;
-  --ribbon-icon-stroke: #A1A1AA;
-  --ribbon-group-label: rgba(217, 119, 6, 0.8);
-  --ribbon-group-border: rgba(217, 119, 6, 0.25);
-  --ribbon-input-bg: #2A2A32;
-  --ribbon-input-border: rgba(217, 119, 6, 0.25);
-  --ribbon-input-text: #FAFAF9;
-  --ribbon-dropdown-arrow: #A1A1AA;
-  --ribbon-file-tab-bg: #D97706;
-  --ribbon-file-tab-hover: #B45309;
-  --ribbon-file-tab-text: #36363E;
-
-  /* Title bar */
-  --titlebar-bg-start: #36363E;
-  --titlebar-bg-end: #2A2A32;
-  --titlebar-border: rgba(217, 119, 6, 0.25);
-  --titlebar-text: #FAFAF9;
-  --titlebar-text-secondary: #A1A1AA;
-  --titlebar-btn-color: #FAFAF9;
-  --titlebar-btn-hover: rgba(217, 119, 6, 0.15);
-  --titlebar-btn-active: rgba(217, 119, 6, 0.25);
-  --titlebar-btn-disabled: #71717A;
-  --window-btn-color: #FAFAF9;
-  --window-btn-hover: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Light Theme ── */
@@ -116,46 +76,6 @@ input, textarea, [contenteditable="true"] {
   --energy-orange: #D97706;
   --energy-red: #DC2626;
 
-  /* Ribbon */
-  --ribbon-bg-start: #FAFAF9;
-  --ribbon-bg-end: #F5F5F4;
-  --ribbon-border: #E7E5E4;
-  --ribbon-tabs-bg-start: #F5F5F4;
-  --ribbon-tabs-bg-end: #EEEDE8;
-  --ribbon-content-bg: #FAFAF9;
-  --ribbon-text: #57534E;
-  --ribbon-text-hover: #36363E;
-  --ribbon-tab-hover: rgba(217, 119, 6, 0.08);
-  --ribbon-tab-active-bg: #FAFAF9;
-  --ribbon-tab-active-border: #D97706;
-  --ribbon-btn-hover: rgba(217, 119, 6, 0.10);
-  --ribbon-btn-hover-border: rgba(217, 119, 6, 0.25);
-  --ribbon-btn-active-bg: rgba(217, 119, 6, 0.15);
-  --ribbon-btn-active-border: rgba(217, 119, 6, 0.35);
-  --ribbon-btn-active-text: #B45309;
-  --ribbon-icon-stroke: #57534E;
-  --ribbon-group-label: #A1A1AA;
-  --ribbon-group-border: #E7E5E4;
-  --ribbon-input-bg: #FAFAF9;
-  --ribbon-input-border: #D6D3D1;
-  --ribbon-input-text: #36363E;
-  --ribbon-dropdown-arrow: #A1A1AA;
-  --ribbon-file-tab-bg: #D97706;
-  --ribbon-file-tab-hover: #B45309;
-  --ribbon-file-tab-text: #FAFAF9;
-
-  /* Title bar */
-  --titlebar-bg-start: #FAFAF9;
-  --titlebar-bg-end: #F5F5F4;
-  --titlebar-border: #E7E5E4;
-  --titlebar-text: #36363E;
-  --titlebar-text-secondary: #57534E;
-  --titlebar-btn-color: #36363E;
-  --titlebar-btn-hover: rgba(217, 119, 6, 0.10);
-  --titlebar-btn-active: rgba(217, 119, 6, 0.20);
-  --titlebar-btn-disabled: #A1A1AA;
-  --window-btn-color: #36363E;
-  --window-btn-hover: rgba(0, 0, 0, 0.06);
 }
 
 /* ── High Contrast Theme ── */
@@ -184,46 +104,6 @@ input, textarea, [contenteditable="true"] {
   --energy-orange: #ffaa00;
   --energy-red: #ff0000;
 
-  /* Ribbon */
-  --ribbon-bg-start: #111111;
-  --ribbon-bg-end: #0a0a0a;
-  --ribbon-border: #ffffff;
-  --ribbon-tabs-bg-start: #111111;
-  --ribbon-tabs-bg-end: #0a0a0a;
-  --ribbon-content-bg: #0a0a0a;
-  --ribbon-text: #cccccc;
-  --ribbon-text-hover: #ffffff;
-  --ribbon-tab-hover: #333333;
-  --ribbon-tab-active-bg: #0a0a0a;
-  --ribbon-tab-active-border: #ffffff;
-  --ribbon-btn-hover: #333333;
-  --ribbon-btn-hover-border: #ffffff;
-  --ribbon-btn-active-bg: #333300;
-  --ribbon-btn-active-border: #ffff00;
-  --ribbon-btn-active-text: #ffff00;
-  --ribbon-icon-stroke: #cccccc;
-  --ribbon-group-label: #999999;
-  --ribbon-group-border: #666666;
-  --ribbon-input-bg: #000000;
-  --ribbon-input-border: #ffffff;
-  --ribbon-input-text: #ffffff;
-  --ribbon-dropdown-arrow: #cccccc;
-  --ribbon-file-tab-bg: #ffff00;
-  --ribbon-file-tab-hover: #cccc00;
-  --ribbon-file-tab-text: #000000;
-
-  /* Title bar */
-  --titlebar-bg-start: #141414;
-  --titlebar-bg-end: #0a0a0a;
-  --titlebar-border: #ffffff;
-  --titlebar-text: #ffffff;
-  --titlebar-text-secondary: #cccccc;
-  --titlebar-btn-color: #ffffff;
-  --titlebar-btn-hover: #333333;
-  --titlebar-btn-active: #444444;
-  --titlebar-btn-disabled: #999999;
-  --window-btn-color: #ffffff;
-  --window-btn-hover: #333333;
 }
 
 /* ── Body & Global Styles ── */
@@ -432,7 +312,7 @@ body {
   width: 100%;
   padding: 6px 10px;
   background: var(--bg-secondary);
-  border: 1.5px solid var(--border-light);
+  border: 1.5px solid var(--line-control);
   border-radius: 4px;
   color: var(--text-primary);
   font-size: 12px;
@@ -445,7 +325,7 @@ body {
 .dialog-field select:focus,
 .dialog-field textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+  box-shadow: var(--focus-ring);
 }
 
 .dialog-field input[type="number"] {

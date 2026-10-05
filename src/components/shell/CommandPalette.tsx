@@ -9,7 +9,7 @@ import { useI18n } from '../../i18n/i18n';
 import { Kbd } from '../ui';
 import { SHELL_COMMANDS } from './commands';
 import type { ShellActions } from './ShellActions';
-import { TOOL_STEP, WORKFLOW_STEPS, type Route } from '../../core/navigation/routes';
+import { TOOL_STEP, WORKFLOW_STEPS, visibleSubs, type Route } from '../../core/navigation/routes';
 import { projectItems } from '../../core/navigation/projectPaths';
 import type { IProject } from '../../core/energy/types';
 
@@ -53,7 +53,7 @@ export function buildPaletteEntries(
     if (step.id !== 'tool') {
       entries.push({ id: `step:${step.id}`, group: 'steps', label: t(step.labelKey), where: `${step.number}`, run: () => actions.navigate({ step: step.id }) });
     }
-    for (const sub of step.subs) {
+    for (const sub of visibleSubs(step, project)) {
       entries.push({
         id: `step:${step.id}/${sub.id}`, group: 'steps', label: t(sub.labelKey), where: t(step.labelKey),
         run: () => actions.navigate({ step: step.id, sub: sub.id }),

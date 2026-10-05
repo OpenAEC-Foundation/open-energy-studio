@@ -30,7 +30,7 @@
 .nta-performance-editor { display: grid; gap: 8px; margin-top: 12px; }
 .nta-performance-editor label { display: grid; gap: 4px; font-weight: 600; }
 .nta-performance-editor textarea { width: 100%; font: 12px/1.4 ui-monospace, monospace; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); resize: vertical; }
-.nta-performance-editor [role="alert"] { color: var(--energy-red, #ef4444); }
+.nta-performance-editor [role="alert"] { color: var(--error-text); }
 .nta-performance-editor > div { display: flex; gap: 8px; }
 .nta-performance-bbl { display: grid; gap: 4px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .nta-performance-bbl ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
@@ -42,12 +42,12 @@
 .nta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; align-items: start; }
 .nta-form-row { display: contents; }
 .nta-form label { display: grid; gap: 3px; }
-.nta-form input:not([type="checkbox"]), .nta-form select { padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-width: 0; }
+.nta-form input:not([type="checkbox"]), .nta-form select { padding: 6px; border: 1px solid var(--line-control); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); min-width: 0; }
 .nta-form-check { display: flex !important; gap: 6px; align-items: center; }
 .nta-form-note { grid-column: 1 / -1; margin: 0; }
 .nta-form-actions { display: flex; gap: 8px; }
 .nta-performance-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.nta-form-error { color: #b42318; font-size: 12px; }
+.nta-form-error { color: var(--error-text); font-size: 12px; }
 
 /* Sub-blocks (generators, annex P routes, vessels, dynamic windows): full width, own grid. */
 .nta-form-subsection,
@@ -114,8 +114,8 @@ fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-siz
 }
 .nta-form button:not(.btn):hover,
 .nta-form-remove:hover { border-color: var(--accent); color: var(--accent); }
-.nta-form-remove { color: var(--energy-red, #b42318); }
-.nta-form-remove:hover { border-color: var(--energy-red, #b42318); color: var(--energy-red, #b42318); }
+.nta-form-remove { color: var(--error-text); }
+.nta-form-remove:hover { border-color: var(--error-text); color: var(--error-text); }
 .nta-form button:focus-visible,
 .nta-form-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -131,7 +131,7 @@ fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-siz
   margin: 0 -2px;
   border-top: 1px solid var(--border);
   background: var(--bg-primary);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-2);
 }
 
 /* Totals: long values (fingerprints, ventilation details) wrap inside their cell. */

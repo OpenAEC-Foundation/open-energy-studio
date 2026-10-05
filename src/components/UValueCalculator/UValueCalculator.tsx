@@ -288,6 +288,7 @@ export function UValueCalculator() {
                 <td>
                   <input
                     className="uvalue-input"
+                    aria-label={`${t('uvalue.material')} ${index + 1}`}
                     type="text"
                     value={layer.material}
                     onChange={e => updateLayer(layer.id, { material: e.target.value })}
@@ -297,6 +298,7 @@ export function UValueCalculator() {
                 <td>
                   <select
                     className="uvalue-select"
+                    aria-label={`${t('uvalue.library')} ${index + 1}`}
                     value=""
                     onChange={e => {
                       const idx = parseInt(e.target.value, 10);
@@ -314,6 +316,7 @@ export function UValueCalculator() {
                 <td>
                   <input
                     className="uvalue-input uvalue-input-num"
+                    aria-label={`${t('uvalue.thickness')} (mm) ${index + 1}`}
                     type="number"
                     min={0}
                     step={1}
@@ -332,6 +335,7 @@ export function UValueCalculator() {
                   ) : (
                     <input
                       className="uvalue-input uvalue-input-num"
+                      aria-label={`λ (W/mK) ${index + 1}`}
                       type="number"
                       min={0.001}
                       step={0.001}

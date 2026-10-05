@@ -1,8 +1,8 @@
 /* ── Document Tabs ── */
 .document-tabs-bar {
   display: flex;
-  background: linear-gradient(to bottom, var(--ribbon-tabs-bg-start) 0%, var(--ribbon-tabs-bg-end) 100%);
-  border-bottom: 1px solid var(--ribbon-border);
+  background: var(--surface-chrome);
+  border-bottom: 1px solid var(--line);
   height: 28px;
   align-items: flex-end;
   padding: 0 4px;
@@ -17,7 +17,7 @@
   gap: 6px;
   padding: 4px 8px 4px 12px;
   font-size: 11px;
-  color: var(--ribbon-text);
+  color: var(--fg-2);
   background: transparent;
   border: 1px solid transparent;
   border-bottom: none;
@@ -31,19 +31,28 @@
 }
 
 .document-tab:hover {
-  background: var(--ribbon-tab-hover);
-  color: var(--ribbon-text-hover);
+  background: var(--surface-hover);
+  color: var(--fg-1);
 }
 
 .document-tab.active {
-  background: var(--ribbon-tab-active-bg);
-  color: var(--ribbon-text-hover);
-  border-color: var(--ribbon-tab-active-border);
-  border-bottom: 1px solid var(--ribbon-tab-active-bg);
+  background: var(--surface-canvas);
+  color: var(--fg-1);
+  border-color: var(--line);
+  border-bottom: 1px solid var(--surface-canvas);
   margin-bottom: -1px;
 }
 
 .document-tab-label {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: inherit;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
@@ -92,7 +101,7 @@
   height: 22px;
   border: none;
   background: transparent;
-  color: var(--ribbon-text);
+  color: var(--fg-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,8 +116,8 @@
 }
 
 .document-tab-add:hover {
-  background: var(--ribbon-tab-hover);
-  color: var(--ribbon-text-hover);
+  background: var(--surface-hover);
+  color: var(--fg-1);
   opacity: 1;
 }
 
@@ -123,7 +132,7 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-3);
   padding: 4px;
   min-width: 160px;
   animation: doctab-menu-in 0.12s ease-out;
