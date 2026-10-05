@@ -22,7 +22,8 @@ type KernelState =
   | { kind: 'done'; project: IProject; summary: PreviewSummary };
 
 
-export function PreviewPanel() {
+/** `embedded`: rendered inside the shell inspector, which owns the frame, header and width. */
+export function PreviewPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, locale } = useI18n();
   const { state } = useEnergy();
   const kwh = (value: number | null) => (value == null ? '–' : `${formatNumber(value, locale)} kWh`);
@@ -89,7 +90,7 @@ export function PreviewPanel() {
     };
   }, []);
 
-  if (collapsed) {
+  if (collapsed && !embedded) {
     return (
       <div className="preview-panel collapsed" onClick={() => setCollapsed(false)}>
         <div className="panel-collapsed-label-right">
@@ -107,12 +108,14 @@ export function PreviewPanel() {
   const calculated = summary?.status === 'calculated_unverified';
 
   return (
-    <div className="preview-panel" style={{ width }}>
-      <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
-      <div className="preview-panel-header">
-        <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
-        <span>{t('preview.title')}</span>
-      </div>
+    <div className={embedded ? 'preview-panel embedded' : 'preview-panel'} style={embedded ? undefined : { width }}>
+      {!embedded && <>
+        <div className="panel-resize-handle panel-resize-handle-left" onMouseDown={onResizeStart} />
+        <div className="preview-panel-header">
+          <button className="panel-collapse-btn-right" onClick={() => setCollapsed(true)}><PanelRightClose size={14} /></button>
+          <span>{t('preview.title')}</span>
+        </div>
+      </>}
       <div className="preview-panel-content">
         {project.zones.length === 0 ? (
           <div className="preview-empty">{t('preview.noData')}</div>

@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { generateReportHTML } from '../../../core/report/ReportTemplate';
-import { useProjectPerformance } from '../../../core/nta/useProjectPerformance';
+import { useKernelQuery } from '../../../context/KernelProvider';
 import { DialogShell } from '../DialogShell';
 import './PrintPreviewDialog.css';
 
@@ -85,7 +85,7 @@ export function PrintPreviewDialog({ onClose }: PrintPreviewDialogProps) {
   const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project, result } = state;
-  const kernelQuery = useProjectPerformance(project);
+  const kernelQuery = useKernelQuery(project);
   const kernel = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
   const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
   const measureRef = useRef<HTMLIFrameElement>(null);

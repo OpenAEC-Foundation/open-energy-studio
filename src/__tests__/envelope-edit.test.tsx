@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { EnvelopeView } from '../components/EnvelopeView/EnvelopeView';
-import { ProjectBrowser } from '../components/ProjectBrowser/ProjectBrowser';
 import { PropertiesPanel } from '../components/PropertiesPanel/PropertiesPanel';
 import { WindowEditorDialog } from '../components/dialogs/WindowEditorDialog/WindowEditorDialog';
 import { SurfaceEditorDialog } from '../components/dialogs/SurfaceEditorDialog/SurfaceEditorDialog';
@@ -11,15 +10,14 @@ import { ZoneEditorDialog } from '../components/dialogs/ZoneEditorDialog/ZoneEdi
 import { deleteTarget } from '../core/energy/projectItems';
 import { renderWithProviders, userEvent } from './test-utils';
 
-function Harness({ browser = false, properties = false }: { browser?: boolean; properties?: boolean }) {
+function Harness({ properties = false }: { properties?: boolean }) {
   const { state, dispatch } = useEnergy();
   const close = () => dispatch({ type: 'CLOSE_DIALOG' });
   const { dialog, project } = state;
   return <>
     <button type="button">Trigger</button>
-    {browser && <ProjectBrowser />}
     <EnvelopeView />
-    {properties && <PropertiesPanel />}
+    {properties && <PropertiesPanel embedded />}
     {dialog.type === 'window-editor' && <WindowEditorDialog editId={dialog.editId} onClose={close} />}
     {dialog.type === 'surface-editor' && <SurfaceEditorDialog editId={dialog.editId} onClose={close} />}
     {dialog.type === 'construction-editor' && <ConstructionEditorDialog editId={dialog.editId} onClose={close} />}
@@ -83,16 +81,18 @@ describe('editing existing envelope elements', () => {
     expect(screen.getByTestId('constructions').textContent).toBe(constructions);
   }, 60000);
 
-  it('opens the window editor by double-click in the project tree and from the properties panel', async () => {
+  // The project tree is gone (UI redesign F4): the envelope list selects on click and edits on
+  // double-click; the inspector (embedded properties panel) offers edit and delete.
+  it('opens the window editor by double-click in the envelope list and from the inspector', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Harness browser properties />);
-    await user.click(screen.getByText('Surfaces'));
-    await user.click(screen.getAllByText('Gevel Zuid')[0]);
-    await user.dblClick(screen.getAllByText('Raam Zuid 2')[0]);
+    renderWithProviders(<Harness properties />);
+    const row = screen.getByRole('row', { name: /^Raam Zuid 2/ });
+    expect(row.getAttribute('data-path')).toMatch(/^zones\[0\]\.surfaces\[\d+\]\.windows\[1\]$/);
+    await user.dblClick(within(row).getByText('Raam Zuid 2'));
     expect(within(screen.getByRole('dialog')).getByLabelText('Name')).toHaveValue('Raam Zuid 2');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
-    // The single click selected the window; the properties panel offers edit and delete.
+    // The click selected the window; the inspector offers edit and delete.
     const panel = document.querySelector('.properties-panel') as HTMLElement;
     await user.click(within(panel).getByRole('button', { name: 'Edit: Raam Zuid 2' }));
     expect(within(screen.getByRole('dialog')).getByLabelText('Name')).toHaveValue('Raam Zuid 2');

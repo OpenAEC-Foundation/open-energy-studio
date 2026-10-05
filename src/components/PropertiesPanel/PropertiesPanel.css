@@ -104,3 +104,12 @@
   margin-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
+
+/* Inside the shell inspector: the inspector draws the frame. */
+.properties-panel.embedded {
+  width: auto;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+}

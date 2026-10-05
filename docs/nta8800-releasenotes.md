@@ -9,6 +9,27 @@ Uitkomsten veranderen voor projecten met een kwaliteitsverklaring van een warmte
 - **Warm tapwater.** Een gedeclareerd warmtepomprendement (§13.8.4.7.2) rekent nu met f_prac 0,95 volgens 13.152 (p. 616–617), in plaats van 1,0. Alleen de forfaitaire waarden houden 1,0.
 - **Vergelijkingsfixtures.** `training-data/nta8800-public-comparison-{a,b,c}.json` zijn gecorrigeerd naar de rapportinvoer: productwaarden voor de ventilatoren (A: 8,5 W, f 0,147; B: 4 units van 21,7 W, f 0,364), de gedeclareerde hulpenergie van 146 kWh bij B, en geen leidingen buiten de verwarmde of gekoelde zone. Vastgelegde uitkomsten: A 94,00 / 35,15 / 74,9; B 52,96 / 28,84 / 62,6; C 64,70 / 31,54 / 69,0.
 - **Documentatie.** De regel-voor-regel-reconciliatie staat in `docs/nta8800-vergelijking-openbare-rapporten.md`. Vragen over 10.15, 10.87 en f_prac staan in `docs/nta8800-vragen-nen.md`.
+## 5 oktober 2026 — UI-herontwerp, fase F3 en F4: werkstroom in plaats van ribbon (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd.
+- **Geen ribbon meer.** Links staat een genummerde werkstroom: Project → Gebouw → Installaties → Controle → Resultaten → Basisopname → Maatwerkadvies → Herlabelen → Rapport & dossier → Registratie. Elke stap toont zijn status uit de kerncontrole: compleet, aantal fouten, aantal aandachtspunten of nog te doen. Bij nieuwbouw (oplevering of Bbl-toets) zijn de stappen voor bestaande bouw gedimd.
+- **Alle ribbonacties blijven bereikbaar:**
+  - toevoegen bij de stap waar ze horen (Gebouw, Installaties);
+  - exports bij Rapport & dossier;
+  - importeren op het projectoverzicht;
+  - de rekenhulpen, UNIEC3/VABI en IFC 3D in het menu Gereedschap onderaan de navigatie;
+  - Nieuw/Openen/Opslaan als in het menu Bestand;
+  - alles ook in het opdrachtpalet (Ctrl K).
+- **Bovenbalk.** Documenttabbladen, zoeken (Ctrl K), Bestand, Opslaan, Herberekenen (Ctrl ↵) en het contextpaneel (Ctrl .).
+- **Contextpaneel.** Eén paneel rechts vervangt Eigenschappen en Live preview. Het live voorbeeld staat ook in Instellingen (Ctrl ,).
+- **Statusbalk.** Toont of het resultaat actueel of verouderd is, de kernversie, BENG 1–3, TO<sub>juli</sub>, het indicatieve label en "onverifieerd · geen attest".
+- **Eén kernberekening per document.** Navigatie, statusbalk, resultaten, rapport en afdrukvoorbeeld lezen dezelfde uitkomst, zodat "verouderd" en "bezig" overal gelijk zijn.
+- **Ga naar.** Een kernmelding met pad opent de juiste stap, selecteert het element en zet de focus op de rij.
+- **Sneltoetsen.** Alt ↑/↓ wisselt van stap, Alt ←/→ van subpagina. Ctrl N/O/S/Shift S/W werken zoals voorheen. De URL-hash volgt de stap (`#/gebouw`).
+- **Toegankelijkheid.** Een skiplink "Naar inhoud" en de landmarks banner, navigatie, main, contextpaneel en statusbalk. De actieve stap heeft `aria-current="page"`. Na navigatie gaat de focus naar de paginatitel.
+- **Rapport.**
+  - De inhoudsopgave en de hoofdstuktitels tonen subscripts (H<sub>D</sub>, H<sub>g</sub>, H<sub>U</sub> en H<sub>tr</sub>) in plaats van liggende streepjes.
+  - De noot onder tabel 3 noemt de gebruiksfunctie in het Nederlands, bijvoorbeeld "woonfunctie (niet in een woongebouw)", in plaats van `other_residential`.
 
 ## 5 oktober 2026 — HTTP-API en MCP-server
 

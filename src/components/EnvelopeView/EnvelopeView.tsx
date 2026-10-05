@@ -29,8 +29,8 @@ export function EnvelopeView() {
         </div>
       )}
 
-      {project.zones.map(zone => (
-        <div key={zone.id} className="envelope-zone-card">
+      {project.zones.map((zone, zi) => (
+        <div key={zone.id} className="envelope-zone-card" data-path={`zones[${zi}]`}>
           <div className="envelope-zone-header">
             <h3>{zone.name}</h3>
             <div className="envelope-zone-meta">
@@ -55,9 +55,10 @@ export function EnvelopeView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {zone.surfaces.map(surface => (
+                  {zone.surfaces.map((surface, si) => (
                     <tr
                       key={surface.id}
+                      data-path={`zones[${zi}].surfaces[${si}]`}
                       className={state.selectedItemId === surface.id ? 'selected' : ''}
                       onClick={() => select(surface.id, 'surface')}
                       onDoubleClick={() => openEdit('surface', surface.id)}
@@ -87,9 +88,10 @@ export function EnvelopeView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {zone.surfaces.flatMap(surface => surface.windows.map(win => (
+                  {zone.surfaces.flatMap((surface, si) => surface.windows.map((win, wi) => (
                     <tr
                       key={win.id}
+                      data-path={`zones[${zi}].surfaces[${si}].windows[${wi}]`}
                       className={state.selectedItemId === win.id ? 'selected' : ''}
                       onClick={() => select(win.id, 'window')}
                       onDoubleClick={() => openEdit('window', win.id)}
@@ -122,8 +124,8 @@ export function EnvelopeView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {zone.thermalBridges.map(tb => (
-                    <tr key={tb.id} onDoubleClick={() => openEdit('thermalBridge', tb.id)}>
+                  {zone.thermalBridges.map((tb, bi) => (
+                    <tr key={tb.id} data-path={`zones[${zi}].thermalBridges[${bi}]`} onDoubleClick={() => openEdit('thermalBridge', tb.id)}>
                       <td>{tb.name}</td>
                       <td>{num(tb.psiValue)}</td>
                       <td>{num(tb.length)} m</td>
@@ -149,7 +151,7 @@ export function EnvelopeView() {
             {(zone.pointThermalBridges?.length ?? 0) > 0 && <table className="envelope-table">
               <thead><tr><th>{t('properties.name')}</th><th>{t('kernel.pointBridge.chi')}</th>
                 <th>{t('kernel.boundary.label')}</th><th>{t('kernel.pointBridge.source')}</th><th>{t('kernel.pointBridge.actions')}</th></tr></thead>
-              <tbody>{zone.pointThermalBridges?.map((bridge) => <tr key={bridge.id}
+              <tbody>{zone.pointThermalBridges?.map((bridge, bi) => <tr key={bridge.id} data-path={`zones[${zi}].pointThermalBridges[${bi}]`}
                 onDoubleClick={() => openEdit('pointBridge', bridge.id)}>
                 <td>{bridge.name}</td><td>{num(bridge.chiValue)} W/K</td>
                 <td>{bridge.thermalBoundary ? t(`kernel.boundary.${bridge.thermalBoundary}`) : t('kernel.boundary.unknown')}</td>
@@ -184,8 +186,8 @@ export function EnvelopeView() {
               </tr>
             </thead>
             <tbody>
-              {project.constructions.map(c => (
-                <tr key={c.id}
+              {project.constructions.map((c, ci) => (
+                <tr key={c.id} data-path={`constructions[${ci}]`}
                   className={state.selectedItemId === c.id ? 'selected' : ''}
                   onClick={() => select(c.id, 'construction')}
                   onDoubleClick={() => openEdit('construction', c.id)}>

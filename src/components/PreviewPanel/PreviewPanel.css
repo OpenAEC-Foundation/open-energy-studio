@@ -334,3 +334,12 @@
   text-align: center;
   padding: 24px 12px;
 }
+
+/* Inside the shell inspector: the inspector draws the frame. */
+.preview-panel.embedded {
+  width: auto;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+}

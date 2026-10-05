@@ -29,9 +29,10 @@ export function calculateProjectPerformanceShared(project: IProject): Promise<Pr
 
 /**
  * Runs the Rust project route for `project` (debounced) and keeps the latest answer.
- * Pass `enabled = false` when a parent already supplies the query.
+ * Pass `enabled = false` when a parent already supplies the query; a changed
+ * `refreshKey` runs the kernel again for the same project.
  */
-export function useProjectPerformance(project: IProject, enabled = true): ProjectPerformanceQuery | null {
+export function useProjectPerformance(project: IProject, enabled = true, refreshKey = 0): ProjectPerformanceQuery | null {
   const [query, setQuery] = useState<ProjectPerformanceQuery | null>(null);
 
   useEffect(() => {
@@ -49,7 +50,8 @@ export function useProjectPerformance(project: IProject, enabled = true): Projec
       );
     }, runs.has(project) ? 0 : KERNEL_RUN_DEBOUNCE_MS);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [project, enabled]);
+    // `refreshKey` lets "Herberekenen" ask the kernel again for an unchanged project.
+  }, [project, enabled, refreshKey]);
 
   return enabled && query?.project === project ? query : null;
 }
