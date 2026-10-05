@@ -1,6 +1,6 @@
 # NTA 8800 dekkingsregister
 
-Bijgewerkt op 4 oktober 2026. De derde volledige dekkingsaudit vond op 3 oktober plaats.
+Bijgewerkt op 5 oktober 2026. De derde volledige dekkingsaudit vond op 3 oktober plaats.
 
 **Nieuwe begrensde deelroute:** de [collectieve gaswarmtepompbron-conceptdiagnose](nta8800-gaswarmtepomp-collectieve-bron-concept.md) rekent bronwarmte uit een geldige twaalfmaandsketen apart als `dh` door. Temperatuur- en verklaringbewijs zijn verplicht. De route levert alleen conceptbijdragen, zonder onafhankelijke actuele referentie, attest, gasdragerboeking of BENG.
 
@@ -35,6 +35,8 @@ De [schone frontendbouw met bijgewerkte afhankelijkheden](nta8800-afhankelijkhed
 De Tauri-desktopbouw vond vervolgens een minorversieverschil tussen npm- en Cargo-pakketten. De betrokken npm-pakketten zijn exact op compatibele minorversies vastgezet; daarna volgde een afzonderlijke nieuwe desktopbouw. Dit verandert de normatieve dekking niet.
 
 De [herstelde desktopbouw op `dc1b917`](nta8800-build-verificatie-2026-10-05-dc1b917.md) slaagde en is met de manifestlezer opnieuw gecontroleerd. De pakketversies sluiten op minorversie aan, het lockbestand is met `npm ci` geïnstalleerd en de live devserver reageerde met HTTP 200. De NTA-reken-, referentie- en attestkolommen blijven ongewijzigd.
+
+Na UI-fase F10 slaagde de [volledige technische gate en devbuild op `837eb02`](nta8800-build-verificatie-2026-10-05-837eb02.md) met 744 frontendtests, 797 kern- en 57 servicetests plus hun integratiegroepen, MSRV-controle, format, Clippy en TypeScript/Vite. Het debugpakket en drie servicebinaries hebben gecontroleerde hashes. De officiële referentiebatch ontbrak nog en geen van de normatieve referentie- of attestkolommen verandert hierdoor.
 
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 

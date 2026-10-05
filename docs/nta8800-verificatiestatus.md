@@ -1,6 +1,6 @@
-# NTA 8800 verificatiestatus — 4 oktober 2026
+# NTA 8800 verificatiestatus — 5 oktober 2026
 
-## Stand 4 oktober 2026
+## Stand 5 oktober 2026
 
 **Onafhankelijke herberekeningen.** Bijna elke route is opnieuw doorgerekend met eigen Python-code, rechtstreeks vanuit de normpagina's en zonder de Rust-formules te lezen. De kernuitkomsten zijn vergeleken per maand of per bin.
 - **Hoofdstukken:** 5 (indicatoren, labelklasse, Bbl, renovatiestandaard, standaard woningisolatie), 7, 8 (grond, onverwarmde ruimten, constructies), 9 met bijlagen M, N, Q en V (inclusief meerdere opwekkers, hybride en biomassa), 10 (methoden 1 en 2), 11 (utiliteit en woningen, inclusief BENG 1 en TOjuli), 12, 13, 14 en 16.
@@ -101,6 +101,8 @@ De gebouwde referentiegate-CLI accepteerde vervolgens een passend tijdelijk plan
 De eerste desktopbouw met die libraryset stopte op de ingebouwde Tauri-versiecontrole: npm had nieuwere JavaScript-minorversies gekozen dan de Rust-crates in `src-tauri/Cargo.lock`. API, dialog en fs zijn daarna exact op de bijbehorende minorversies vastgezet en apart opnieuw gebouwd; het eerdere frontendresultaat alleen bewees de desktopbouw niet.
 
 **Desktopbouw na Tauri-versiecorrectie (5 oktober).** De [debugbuild op `dc1b917`](nta8800-build-verificatie-2026-10-05-dc1b917.md) slaagde inclusief TypeScript/Vite, Rust-servicebinaries en Linux-debpakket. De artefacten, SHA-256 en bronmetadata zijn met de aparte manifestlezer gecontroleerd. Dit sluit de eerdere technische versiemismatch af; onafhankelijke normreferentie, visuele UI-acceptatie en attest blijven open.
+
+**Technische gate na UI-fase F10 (5 oktober).** Op de schone commit `837eb02` slaagde de [volledige lokale technische gate en desktopdevbuild](nta8800-build-verificatie-2026-10-05-837eb02.md): 797 kern- en 57 servicetests plus integratie-/CLI-groepen, 744 frontendtests in 87 bestanden, Rust 1.77.2, format, Clippy, Tauri-check, TypeScript/Vite en de Linux-debugbundel. Het bewaarde manifest en alle vier artefacthashes zijn opnieuw gecontroleerd. De officiële referentiebatch werd wegens ontbrekende actuele W/U-cases overgeslagen; visuele UI-acceptatie en externe attestering blijven open.
 
 **Aparte labelscenario-indicatoren in het harnas (4 oktober).** Naast BENG 2/3 zijn nu `labelPrimaryFossil` en `labelRenewableShare` numeriek vergelijkbaar. Zij lezen de bestaande Rust-uitvoer van het labelscenario, zodat bij een woning met EMG-maatregelen een forfaitaire labelwaarde niet met de declaratiegebaseerde BENG-waarde wordt verward. De gerichte vergelijkingstest en Clippy slaagden. De verwachting kwam uit een interne synthetische fixture; een onafhankelijke actuele EDR-labelvergelijking ontbreekt nog.
 
