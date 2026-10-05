@@ -733,10 +733,28 @@ pub struct MonthResult {
     /// Window solar gains on the cooling balance.
     pub window_solar_cooling_kwh: f64,
     pub opaque_solar_gains_kwh: f64,
+    /// 7.30b: indirect gains through adjacent unheated sunrooms, heating
+    /// and cooling balance (kWh). Report trace; already part of `gainsKwh`.
+    pub sunroom_gains_kwh: f64,
+    pub sunroom_cooling_gains_kwh: f64,
+    /// Report trace: the window solar gains of this month per window
+    /// (7.40 with §17.3); they sum to `windowSolarGainsKwh` and
+    /// `windowSolarCoolingKwh`.
+    pub window_solar_by_window: Vec<WindowSolarMonth>,
     /// Annex D.1 `H_g;an;mi`, W/K.
     pub ground_conductance_w_per_k: f64,
     pub heating: BalanceTerms,
     pub cooling: BalanceTerms,
+}
+
+/// One window's solar gains in one month (report trace).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowSolarMonth {
+    pub id: String,
+    pub orientation: Orientation,
+    pub heating_kwh: f64,
+    pub cooling_kwh: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2519,16 +2537,18 @@ fn compute(
         let h_tr = h_tr + dynamic_window_correction_w_per_k(input, index);
 
         let internal = internal_gains_kwh(input, index);
-        let window_solar: f64 = input
+        let window_solar_by_window: Vec<WindowSolarMonth> = input
             .windows
             .iter()
-            .map(|window| window_solar_kwh(window, month, Balance::Heating))
-            .sum();
-        let window_solar_cooling: f64 = input
-            .windows
-            .iter()
-            .map(|window| window_solar_kwh(window, month, Balance::Cooling))
-            .sum();
+            .map(|window| WindowSolarMonth {
+                id: window.id.clone(),
+                orientation: window.orientation,
+                heating_kwh: window_solar_kwh(window, month, Balance::Heating),
+                cooling_kwh: window_solar_kwh(window, month, Balance::Cooling),
+            })
+            .collect();
+        let window_solar: f64 = window_solar_by_window.iter().map(|w| w.heating_kwh).sum();
+        let window_solar_cooling: f64 = window_solar_by_window.iter().map(|w| w.cooling_kwh).sum();
         let opaque_solar: f64 = input
             .opaque_elements
             .iter()
@@ -2536,14 +2556,10 @@ fn compute(
             .sum();
         // 7.12/7.13 with balance-specific window gains (§17.3, 7.42).
         // 7.30b: indirect gains through adjacent unheated sunrooms.
-        let gains = internal
-            + window_solar
-            + opaque_solar
-            + sunroom_gains_kwh(input, index, Balance::Heating);
-        let gains_cooling = internal
-            + window_solar_cooling
-            + opaque_solar
-            + sunroom_gains_kwh(input, index, Balance::Cooling);
+        let sunroom_heating = sunroom_gains_kwh(input, index, Balance::Heating);
+        let sunroom_cooling = sunroom_gains_kwh(input, index, Balance::Cooling);
+        let gains = internal + window_solar + opaque_solar + sunroom_heating;
+        let gains_cooling = internal + window_solar_cooling + opaque_solar + sunroom_cooling;
 
         // 7.19/7.20 and the time constants 7.57/7.58.
         let h_ve_heating = ventilation_conductance(input, month, Balance::Heating);
@@ -2639,6 +2655,10 @@ fn compute(
             window_solar_gains_kwh: window_solar,
             window_solar_cooling_kwh: window_solar_cooling,
             opaque_solar_gains_kwh: opaque_solar,
+            // `+ 0.0` turns a `-0.0` (no sunrooms) into 0 for the output.
+            sunroom_gains_kwh: sunroom_heating + 0.0,
+            sunroom_cooling_gains_kwh: sunroom_cooling + 0.0,
+            window_solar_by_window,
             ground_conductance_w_per_k: ground_monthly,
             heating: BalanceTerms {
                 setpoint_c: heating_setpoint,
@@ -3295,6 +3315,33 @@ mod tests {
         assert!((delta - 0.48 * 0.6 * 20.0 / 2.6).abs() < 1e-12);
         let apartment = levelling_reduction_k(DwellingType::ApartmentBuilding, 1.0, 20.0, 0.0);
         assert!((apartment - 0.4 * 0.5 * 20.0 / 2.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn report_trace_sums_to_the_monthly_and_annual_totals() {
+        let result = valid(&sample());
+        let mut annual_heating = 0.0;
+        for month in &result.monthly {
+            let heating: f64 = month
+                .window_solar_by_window
+                .iter()
+                .map(|w| w.heating_kwh)
+                .sum();
+            let cooling: f64 = month
+                .window_solar_by_window
+                .iter()
+                .map(|w| w.cooling_kwh)
+                .sum();
+            assert!((heating - month.window_solar_gains_kwh).abs() < 1e-9);
+            assert!((cooling - month.window_solar_cooling_kwh).abs() < 1e-9);
+            let gains = month.internal_gains_kwh
+                + month.window_solar_gains_kwh
+                + month.opaque_solar_gains_kwh
+                + month.sunroom_gains_kwh;
+            assert!((gains - month.heating.gains_kwh).abs() < 1e-9);
+            annual_heating += month.heating.need_kwh;
+        }
+        assert!((annual_heating - result.annual_heating_need_kwh.unwrap()).abs() < 1e-6);
     }
 
     #[test]

@@ -8,6 +8,7 @@ import { buildProjectDossier, zipProjectDossier } from './ProjectDossier';
 import { assessStoredSurvey } from '../nta/SurveyTemplates';
 import { assessMaatwerkadviesWithRust } from '../nta/KernelClient';
 import { generateMaatwerkadviesReportHTML } from './MaatwerkadviesReport';
+import { generateEnergyPerformanceReportHTML, type ReportOptions } from './EnergyPerformanceReport';
 
 /** Runs the maatwerkadvies of the project and downloads its report. */
 export async function downloadMaatwerkadviesReportHTML(project: IProject): Promise<void> {
@@ -96,6 +97,52 @@ export async function downloadProjectDossier(project: IProject) {
   link.click();
   URL.revokeObjectURL(url);
   return bundle.manifest;
+}
+
+/** Saves a text file: the desktop save dialog in Tauri, a browser download otherwise. */
+async function saveTextFile(fileName: string, text: string, extension: string, filterName: string): Promise<void> {
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
+    const path = await save({ defaultPath: fileName, filters: [{ name: filterName, extensions: [extension] }] });
+    if (path) {
+      await writeFile(path, new TextEncoder().encode(text));
+      return;
+    }
+    if (path === null) return;
+  } catch { /* browser fallback */ }
+  const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/** The "Rapportage Energieprestatie (NTA 8800)" HTML for the chosen level and detail chapters. */
+export async function buildEnergyPerformanceReport(project: IProject, options: ReportOptions): Promise<string> {
+  const assessment = await calculateProjectPerformanceShared(project);
+  return generateEnergyPerformanceReportHTML(project, assessment, { ...options, interpretations: options.interpretations ?? await interpretationsOrEmpty() });
+}
+
+/** Saves the "Rapportage Energieprestatie (NTA 8800)" as a printable HTML file. */
+export async function downloadEnergyPerformanceReportHTML(project: IProject, options: ReportOptions): Promise<void> {
+  const html = await buildEnergyPerformanceReport(project, options);
+  const name = (project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-');
+  await saveTextFile(`Rapportage-Energieprestatie-${name}.html`, html, 'html', 'HTML');
+}
+
+/** Opens the "Rapportage Energieprestatie (NTA 8800)" in a window and starts printing (or saving as PDF). */
+export async function printEnergyPerformanceReport(project: IProject, options: ReportOptions): Promise<void> {
+  const html = await buildEnergyPerformanceReport(project, options);
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  }
 }
 
 /** The kernel assessment for the BENG report, or null when the kernel is unavailable. */

@@ -25,7 +25,7 @@ const REPRESENTATION: Record<string, string> = { unique: 'uniek', reference: 're
 const CATEGORY: Record<string, string> = { facade: 'Gevel', roof: 'Dak', floor: 'Vloer', glazing: 'Beglazing' };
 
 /** NTA 8800 chapter 5 label and record indicators. */
-function chapterFiveSection(indicators: NtaChapterFiveIndicators | null | undefined): string {
+export function chapterFiveSection(indicators: NtaChapterFiveIndicators | null | undefined): string {
   if (!indicators) return '';
   const r = indicators.renewableByCarrier;
   const carbonFree = indicators.locallyCarbonFree == null ? 'niet beoordeeld' : indicators.locallyCarbonFree ? 'ja' : 'nee';
@@ -49,7 +49,7 @@ const SERVICE: Record<string, string> = {
 const CARRIER: Record<string, string> = { el: 'el', gas: 'gas', oil: 'olie', bm: 'biomassa', dh: 'warmte (dh)', dw: 'tapwater (dw)', dc: 'koude (dc)' };
 
 /** §5.5.3/5.20: energy per energy function and carrier. */
-function serviceEnergySection(performance: BuildingPerformanceAssessment): string {
+export function serviceEnergySection(performance: BuildingPerformanceAssessment): string {
   const summary = summarizeServiceEnergy(performance.energyByService);
   if (!summary) return '';
   const head = summary.carriers.map((carrier) => `<th>${escapeHtml(CARRIER[carrier] ?? carrier)}</th>`).join('');
@@ -68,7 +68,7 @@ function serviceEnergySection(performance: BuildingPerformanceAssessment): strin
 }
 
 /** Chapter 13: need, losses and generator. */
-function hotWaterSection(performance: BuildingPerformanceAssessment): string {
+export function hotWaterSection(performance: BuildingPerformanceAssessment): string {
   const hot = performance.hotWater;
   if (!hot) return '';
   const total = (field: keyof (typeof hot.months)[number]) =>
@@ -98,7 +98,7 @@ function coolingRows(result: NtaCoolingResult, label: string): string {
 }
 
 /** Chapter 10 per cooling system (§10.2). */
-function coolingSection(performance: BuildingPerformanceAssessment): string {
+export function coolingSection(performance: BuildingPerformanceAssessment): string {
   const cooling = performance.cooling;
   if (!cooling) return '';
   const systems = cooling.systems?.length
@@ -110,7 +110,7 @@ function coolingSection(performance: BuildingPerformanceAssessment): string {
 }
 
 /** Chapter 16 per PV system. */
-function pvSection(performance: BuildingPerformanceAssessment): string {
+export function pvSection(performance: BuildingPerformanceAssessment): string {
   const systems = performance.pvSystems ?? [];
   if (systems.length === 0) return '';
   const rows = systems.map((item) => `<tr>${cell(item.id)}<td class="n">${num(item.annualKwh)}</td>${item.monthlyKwh.map((value) => `<td class="n">${num(value)}</td>`).join('')}</tr>`).join('');
@@ -118,7 +118,7 @@ function pvSection(performance: BuildingPerformanceAssessment): string {
 }
 
 /** Annex AB (informative) ZEB indicator. */
-function zebSection(performance: BuildingPerformanceAssessment): string {
+export function zebSection(performance: BuildingPerformanceAssessment): string {
   if (performance.zebPrimaryTotalIndicatorKwhPerM2 == null && performance.annualZebPrimaryTotalKwh == null) return '';
   return `<h2>ZEB-indicator (bijlage AB, informatief)</h2><table><tbody>
     <tr><th>EweP,ZEB;Tot (AB.1)</th><td class="n">${num(performance.zebPrimaryTotalIndicatorKwhPerM2, 2)} kWh/m²·jr</td><th>E<sub>P,ZEB;Tot;an</sub></th><td class="n">${num(performance.annualZebPrimaryTotalKwh)} kWh</td></tr>
@@ -127,7 +127,7 @@ function zebSection(performance: BuildingPerformanceAssessment): string {
 }
 
 /** Appendix: the kernel's interpretation choices. */
-function interpretationsSection(groups: NtaInterpretationGroup[] | undefined): string {
+export function interpretationsSection(groups: NtaInterpretationGroup[] | undefined): string {
   if (!groups || groups.length === 0) return '';
   return `<h2>Bijlage: interpretaties van de rekenkern</h2>
     <p>Waar de normtekst meerdere lezingen toelaat of een formule als gedrukt een implausibele uitkomst geeft, legt de kern de gekozen lezing vast. Paginaverwijzingen gaan naar NTA 8800:2025+C1:2026.</p>
@@ -154,7 +154,7 @@ export function readinessText(assessment: RegistrationAssessment | null | undefi
 }
 
 /** Report header of BRL 9500 §4.2.5/§4.2.6: advisers, dates and validity. */
-function registrationSection(registration: NtaRegistration | undefined, assessment: RegistrationAssessment | null | undefined,
+export function registrationSection(registration: NtaRegistration | undefined, assessment: RegistrationAssessment | null | undefined,
   constructionYear?: number | null): string {
   if (!registration) {
     return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie).</p>';
@@ -191,7 +191,7 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
 }
 
 /** Label data of Omgevingsregeling art. 5.13. */
-function labelDataSection(labelData: LabelData | null | undefined): string {
+export function labelDataSection(labelData: LabelData | null | undefined): string {
   if (!labelData) return '';
   const envelope = labelData.envelope.map((item) => `<tr>${cell(CATEGORY[item.category] ?? item.category)}<td class="n">${num(item.areaM2, 1)}</td>
     <td class="n">${num(item.meanUWPerM2k, 2)}</td><td class="n">${num(item.minRcM2kPerW, 2)}</td><td class="n">${num(item.maxRcM2kPerW, 2)}</td></tr>`).join('');

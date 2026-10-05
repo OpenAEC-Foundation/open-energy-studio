@@ -87,10 +87,38 @@ Het rekenrapport heeft een bijlage met alle interpretaties van de kern. Dat zijn
 
 De lijst is in het Engels; het rapport vermeldt dat het de eigen tekst van de kern is.
 
+## Rapportage Energieprestatie (NTA 8800)
+
+Bovenaan het tabblad **Rapport** staat het onderdeel **Rapportage Energieprestatie (NTA 8800)**. Daarmee stel je het hoofdrapport samen.
+
+**Rapportniveau**
+- **Samenvatting:** projectgegevens, uitgangspunten (normversie, kernversie, invoervingerafdruk), eisen en resultaten (BENG 1/2/3 en TOjuli tegen de Bbl-grenzen, met oordeel), indicatieve labelklasse met de labelgegevens van Omgevingsregeling art. 5.11–5.13a, A0, meldingen en registratie.
+- **Standaard:** daarbij gebouw en rekenzones (A<sub>g</sub>, A<sub>ls</sub>, compactheid, D<sub>m</sub>), bouwkundige uitgangspunten per element (oppervlakte, U, g, A·U, grondvloeren, thermische bruggen, verticale leidingen), installatietechnische uitgangspunten per functie, energie per functie en drager en het volledige invoeroverzicht met het invoerpad per gegeven.
+- **Gedetailleerd:** daarbij de berekeningen die je aanvinkt, tot op maandniveau:
+  - transmissie (H<sub>D</sub> per element, H<sub>g</sub>, H<sub>U</sub>, H<sub>tr</sub>);
+  - ventilatie en infiltratie per maand;
+  - interne en zonnewinst per maand, ook per raam;
+  - warmte- en koudebalans per rekenzone (θ, Q<sub>ht</sub>, Q<sub>gn</sub>, γ, τ, a, η, Q<sub>nd</sub>), met een uitgewerkt rekenvoorbeeld voor januari en juli;
+  - verwarmingsketen, warm tapwater, koeling, verlichting en zonnestroom per maand;
+  - primaire energie per drager met BENG 2 en BENG 3 uitgewerkt;
+  - TOjuli per oriëntatie;
+  - BENG 1 met het vaste ventilatiesysteem C1.
+
+Elke berekeningsstap staat als "formule → waarden → uitkomst" met het formulenummer van NTA 8800. Alle getallen komen uit de uitvoer van de rekenkern; het rapport rekent alleen presentatiewaarden uit, zoals A·U per element of een jaarrendement als controle.
+
+**Voorbeeld, export en afdrukken**
+- Het voorbeeld onder de keuzes toont het rapport zoals het wordt geëxporteerd.
+- **Rapportage exporteren (HTML)** slaat het rapport op; in de desktop-app via het opslagvenster.
+- **Afdrukken of opslaan als PDF** opent het rapport in een venster en start het afdrukken. Het rapport is opgemaakt voor A4: inhoudsopgave, genummerde tabellen, elk hoofdstuk op een nieuwe pagina en een kopregel met project, datum en kernversie.
+- De app onthoudt je laatste keuze van niveau en hoofdstukken.
+
+Weigert de rekenkern de invoer (status ongeldig of onvolledig), dan bevat het rapport geen BENG-waarden of labelklasse maar de lijst met invoergaten.
+
 ## Rapporten
 
 | Rapport | Inhoud | Taal |
 |---|---|---|
+| Rapportage Energieprestatie (onderdeel bovenaan het tabblad Rapport) | samenvatting, standaard of gedetailleerd, zie hierboven | Nederlands (BRL 9500-document) |
 | BENG-rapport (tab Rapport; knop **Exporteer rapport** in het lint en het menu) | indicatoren, grenzen, maandoverzicht, energiebalans | volgt de taal van de interface |
 | NTA-rekenrapport (knop **NTA-rekenrapport exporteren** op het tabblad Rapport) | volledige uitkomst, labelgegevens, registratie, interpretaties | Nederlands (BRL 9500-document) |
 | NTA-invoerdossier (knop **NTA-invoerdossier exporteren** op het tabblad Rapport) | de ingevoerde toestellen en het bewijs, zonder BENG-uitkomst of label | Nederlands |
