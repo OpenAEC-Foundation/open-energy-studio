@@ -2,6 +2,25 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — UI-herontwerp, fase F8: basisopname, maatwerkadvies en herlabelen (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Opgeslagen opnames, maatwerkadviezen en herlabelvergelijkingen blijven zoals ze zijn.
+- **Basisopname** is een wizard met de onderdelen Algemeen, Rekenzones (alleen utiliteit), Thermische schil, Verwarming, Warm tapwater, Ventilatie, Koeling, Zonnestroom en Uitkomst & forfaitair.
+  - Links staat de voortgang: per onderdeel het aantal fouten uit de laatste doorrekening.
+  - Rechts staat de kaart *Uitkomst opname* (indicatief, los van de projectberekening): label, EP₂, status, fouten en forfaitaire waarden.
+  - Elke fout heeft Ga naar, dat het onderdeel opent en het veld focust.
+  - De tabel met forfaitaire waarden, bron en inklapreden staat onder Uitkomst & forfaitair.
+  - Een opname die de kern niet kan lezen (bijv. een leeg verplicht veld) geeft nu een foutmelding in plaats van een lege uitkomst.
+- **Maatwerkadvies** heeft de tabbladen Maatregelen & pakketten, Gemeten verbruik, Woningpas en Advies & rapport.
+  - Maatregelen staan op kaarten met sjabloonkeuze, de status compleet of onvolledig (met de open punten), en 1/2/3 voor de pakketdeelname. De volledige editor opent in een zijpaneel.
+  - Na het doorrekenen toont het tabblad het labelpad (EP₂ en label per variant, het geadviseerde pakket in amber) en de pakketvergelijking. Sorteren gaat op NCW, terugverdientijd of invoervolgorde.
+  - Advies & rapport toont de variantentabel, het advies, het gekozen pakket (label van → naar, zes kerncijfers, fasering) en de rapportexport.
+- **Herlabelen** is een stepper: oorspronkelijk bestand → vergelijking → wijzigingen → bewijsrollen → gereedheid.
+  - De wijzigingentabel filtert op 6a, 6b en te beoordelen, met leesbare onderdeelnamen en Ga naar.
+  - Facturen van vóór de herlabelrollen staan als melding bovenaan.
+  - De gereedheid toont de hercontrole van de rekenkern tegen het bewaarde origineel en de openstaande herlabelpunten.
+- **Navigatie.** De paden `basisopname.*` en `maatwerkadvies.*` openen nu het juiste onderdeel of tabblad (bijv. `basisopname.envelope…` → Thermische schil, `maatwerkadvies.tariffs…` → Gemeten verbruik).
+
 ## 5 oktober 2026 — keuze van de NTA 8800-uitgave
 
 Rekenuitkomsten van bestaande projecten veranderen niet: zonder `ntaCalculation.normVersion` rekent de kern zoals voorheen in NTA 8800:2025+C1:2026, met dezelfde invoervingerafdruk.

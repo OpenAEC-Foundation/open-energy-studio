@@ -79,8 +79,28 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
       { id: 'provenance', labelKey: 'nav.sub.results.provenance' },
     ],
   },
-  { id: 'survey', number: 6, group: 'existing', labelKey: 'nav.step.survey', slug: 'basisopname', subs: [] },
-  { id: 'advice', number: 7, group: 'existing', labelKey: 'nav.step.advice', slug: 'maatwerkadvies', subs: [] },
+  {
+    // The survey wizard (F8): one sub page per part of the survey, Rekenzones only for utility.
+    id: 'survey', number: 6, group: 'existing', labelKey: 'nav.step.survey', slug: 'basisopname', subs: [
+      { id: 'general', labelKey: 'opname.section.general' },
+      { id: 'zones', labelKey: 'opname.section.zones' },
+      { id: 'envelope', labelKey: 'opname.section.envelope' },
+      { id: 'heating', labelKey: 'opname.section.heating' },
+      { id: 'hotWater', labelKey: 'opname.section.hotWater' },
+      { id: 'ventilation', labelKey: 'opname.section.ventilation' },
+      { id: 'cooling', labelKey: 'opname.section.cooling' },
+      { id: 'pv', labelKey: 'opname.section.pv' },
+      { id: 'result', labelKey: 'opname.section.result' },
+    ],
+  },
+  {
+    id: 'advice', number: 7, group: 'existing', labelKey: 'nav.step.advice', slug: 'maatwerkadvies', subs: [
+      { id: 'measures', labelKey: 'nav.sub.advice.measures' },
+      { id: 'use', labelKey: 'nav.sub.advice.use' },
+      { id: 'passport', labelKey: 'nav.sub.advice.passport' },
+      { id: 'advice', labelKey: 'nav.sub.advice.advice' },
+    ],
+  },
   { id: 'relabel', number: 8, group: 'existing', labelKey: 'nav.step.relabel', slug: 'herlabelen', subs: [] },
   { id: 'report', number: 9, group: 'delivery', labelKey: 'nav.step.report', slug: 'rapport', subs: [] },
   { id: 'registration', number: 10, group: 'delivery', labelKey: 'nav.step.registration', slug: 'registratie', subs: [] },

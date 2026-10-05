@@ -21,8 +21,8 @@ import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainRefere
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import { ResultsDashboard } from './pages/results/ResultsDashboard';
-import { BasisopnamePanel } from '../BasisopnamePanel/BasisopnamePanel';
-import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
+import { BasisopnamePanel, type SurveySection } from '../BasisopnamePanel/BasisopnamePanel';
+import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import { ReportView } from '../ReportView/ReportView';
 import { UValueCalculator } from '../UValueCalculator/UValueCalculator';
@@ -162,10 +162,19 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       </>;
       break;
     case 'survey':
-      page = <>{header()}<div className="page-body">{dimmedBanner}<BasisopnamePanel /></div></>;
+      // The survey wizard shows its own progress list instead of sub tabs (mockup 07).
+      page = <>
+        <PageHeader route={route} lead={t('page.survey.lead')} />
+        <div className="page-body">{dimmedBanner}
+          <div className="survey-host">
+            <BasisopnamePanel section={route.sub as SurveySection | undefined}
+              onSection={(sub, focusPath) => actions.navigate({ step: 'survey', sub, ...(focusPath ? { focusPath } : {}) })} />
+          </div>
+        </div>
+      </>;
       break;
     case 'advice':
-      page = <>{header()}<div className="page-body">{dimmedBanner}<MaatwerkadviesPanel /></div></>;
+      page = <>{header()}<div className="page-body">{dimmedBanner}<MaatwerkadviesPanel tab={route.sub as MwaTab | undefined} /></div></>;
       break;
     case 'relabel':
       page = <>{header()}<div className="page-body">{dimmedBanner}<RelabelPanel /></div></>;
