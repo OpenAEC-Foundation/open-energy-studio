@@ -28,6 +28,8 @@ De [uitgevoerde bouw op `62a4a29`](nta8800-build-verificatie-2026-10-05-62a4a29.
 
 Een afzonderlijke manifestlezer kan deze vier bestanden, groottes, hashes en debmetadata later opnieuw toetsen. De positieve controle en negatieve proeven voor padmanipulatie en ontbrekend/gewijzigd artefact slaagden. De geclaimde broncommit en normatieve inhoud vereisen afzonderlijk bewijs; de dekkingskolommen blijven ongewijzigd.
 
+De optionele bronrepositorycontrole verifieert daarnaast dat commit `62a4a29` aanwezig is en de in het manifest genoemde locks en versies bevat. Een gemanipuleerde lockhash en onbekende commit falen. Hiermee is de buildherkomst nog niet onafhankelijk bevestigd en veranderen de normatieve dekkingskolommen niet.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.

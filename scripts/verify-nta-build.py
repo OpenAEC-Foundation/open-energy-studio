@@ -9,12 +9,19 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
 ARTIFACTS = {"desktop", "api", "mcp", "referenceGate"}
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 COMMIT = re.compile(r"[0-9a-f]{40}\Z")
+LOCKS = {
+    "packageLockSha256": "package-lock.json",
+    "coreCargoLockSha256": "crates/nta8800-core/Cargo.lock",
+    "serviceCargoLockSha256": "crates/nta8800-service/Cargo.lock",
+    "tauriCargoLockSha256": "src-tauri/Cargo.lock",
+}
 
 
 def digest(path: Path) -> str:
@@ -66,18 +73,52 @@ def verify(manifest_path: Path) -> dict:
     return manifest
 
 
+def verify_source(manifest: dict, repo: Path) -> None:
+    commit = manifest["sourceCommit"]
+
+    def source_bytes(path: str) -> bytes:
+        return subprocess.check_output(
+            ["git", "-C", str(repo), "show", f"{commit}:{path}"],
+            stderr=subprocess.DEVNULL,
+        )
+
+    locks = manifest.get("dependencyLocks")
+    if not isinstance(locks, dict) or set(locks) != set(LOCKS):
+        raise ValueError("Missing or unexpected source lockfile hashes")
+    for key, path in LOCKS.items():
+        actual = hashlib.sha256(source_bytes(path)).hexdigest()
+        if actual != locks[key]:
+            raise ValueError(f"Source lockfile differs from manifest: {path}")
+
+    package = json.loads(source_bytes("package.json"))
+    if package["name"] != manifest["desktopPackage"]["name"] or package["version"] != manifest["desktopPackage"]["version"]:
+        raise ValueError("Source package metadata differs from manifest")
+    core = tomllib.loads(source_bytes("crates/nta8800-core/Cargo.toml").decode("utf-8"))
+    if core["package"]["version"] != manifest.get("kernelVersion"):
+        raise ValueError("Source kernel version differs from manifest")
+    norm_source = source_bytes("crates/nta8800-core/src/lib.rs").decode("utf-8")
+    norm = re.search(r'pub const TARGET_NORM_VERSION: &str = "([^"]+)";', norm_source)
+    if norm is None or norm.group(1) != manifest.get("targetNormVersion"):
+        raise ValueError("Source target norm version differs from manifest")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
+    parser.add_argument("--source-repo", type=Path, help="Check the claimed commit and lockfiles against this Git repository")
     args = parser.parse_args()
     manifest = verify(args.manifest)
-    print(f"Build bytes verified; claimed source {manifest['sourceCommit']} is not authenticated. Normative reference and attest remain unverified.")
+    if args.source_repo is not None:
+        verify_source(manifest, args.source_repo)
+        print(f"Build bytes and source metadata match commit {manifest['sourceCommit']} in the supplied repository. Build provenance, normative reference and attest remain unverified.")
+    else:
+        print(f"Build bytes verified; claimed source {manifest['sourceCommit']} was not checked against a repository. Normative reference and attest remain unverified.")
     return 0
 
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
         print(f"NTA build verification failed: {error}", file=sys.stderr)
         sys.exit(1)
