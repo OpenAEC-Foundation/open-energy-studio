@@ -973,6 +973,35 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - aangepast: `workflow-nav` (paginatitel Constructies).
 - Schermafdrukken: `~/oes-shots/f7/`.
 
+### Uitgevoerd in F9 (5 oktober 2026)
+
+- Routes: Rapport & dossier heeft de subpagina's `report` (standaard, Rekenrapport), `input` (Invoerdossier), `checklist` (Checklist BRL 9500) en `exports`.
+- `src/components/shell/pages/DeliveryPages.tsx`:
+  - `ReportPage` is het frame rond `ReportBuilder` via `ReportView section="report"`. Niveau, taal, hoofdstukken, voorbeeld en export blijven van de rapportcomponent;
+  - `InputDossierPage` bevat de export van het invoerdossier en `ReportView section="input"`;
+  - `DossierPage` toont de voortgangsmeter, de dossierpunten per groep met `DossierStatusPill` (inclusief `pending`), het bewijsregister (alleen-lezen, met "Bewerken in Registratie") en het EP-Online-overzicht uit `buildEpOnlineOverview` met de ontbrekende verplichte velden;
+  - `ExportsPage` bundelt alle exports in kaarten.
+  - De kop houdt Exporteer rapport en Afdrukken. Onder Rekenrapport, Invoerdossier en Checklist staat daar ook een knop naar Exports.
+- `ReportView/useDossier.ts`: de live dossiercheck en de ZIP-export, gedeeld door `ReportView` en de pagina's. `ReportView` zonder `section` toont alles zoals voorheen.
+- Registratie:
+  - `RegistrationForm` bevat alle registratiesecties uit `ProjectInfoDialog`, met dezelfde veld-id's en labels en een `data-path` per veld. Er is een eigen concept met Verwerpen en Opslaan in een vaste balk;
+  - `RegistrationPage` toont de attestbanner, de gereedheid met de redenen (`readinessReasons`), het rekenprogramma en de openstaande punten en plausibiliteit met Ga naar (focus via `data-path`);
+  - `ProjectInfoDialog` houdt alleen de projectbasis. `CommandPalette` stuurt registratievelden naar de stap.
+- `WelcomeScreen`: kaarten Nieuwe woning en Nieuw utiliteitsgebouw (`office`), Openen, UNIEC3/VABI-import, recente projecten (`core/io/recentProjects.ts`, localStorage, alleen desktoppaden) en de voorbeelden.
+- `SettingsDialog`: tabbladen Algemeen, Berekening en Over als verticale tablist; thema en taal zijn radiogroepen. De editie voor nieuwe berekeningen staat in `core/nta/defaultEdition.ts`, en `buildNtaCalculationTemplate` neemt die over.
+  - Afwijking van §8: er is geen tabblad Kern (adres/poort), want de app heeft geen instelbare kernverbinding.
+- Labels staan in `src/i18n/deliveryLabels.ts` (NL/EN). Stijlen staan in `shell/pages/delivery.css`, `WelcomeScreen.css` en `SettingsDialog.css`, alleen met tokens.
+- Tests:
+  - `registration-dialog` → `registration-page` (dezelfde velden en beweringen; nu ook `readinessReasons`, Verwerpen, attestbanner en de projectbasisdialoog);
+  - `welcome-screen` (nieuwe knoppen, import, recente projecten en de opslag);
+  - nieuw: `settings-dialog` (tabbladen, vastleggen bij OK, standaardeditie in het sjabloon);
+  - aangepast: `workflow-nav` (rapportsubpagina's, exports, checklist) en `ui-walkthrough-2` (relabelvelden op het formulier).
+- Schermafdrukken: `~/oes-shots/f9/` (NL donker, EN licht).
+- Nog open:
+  - paginaminiaturen naast het rapportvoorbeeld;
+  - de dossiercheck als zijkolom naast het rekenrapport (§8). Nu staat die op een eigen subpagina;
+  - het labeltype in de recente projecten.
+
 ### Uitgevoerd in F6 (5 oktober 2026)
 
 - Sectieregister `src/components/NtaPerformancePanel/NtaSections.tsx` (`NTA_SECTIONS`): elke sectie van het oude formulier heeft een stap, een subpagina, voor Verwarming een stepperdeel, `paths`, `advanced`, `when` en een component. Velden en paden zijn ongewijzigd.

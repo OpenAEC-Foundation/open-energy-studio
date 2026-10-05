@@ -2,6 +2,19 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — UI-herontwerp, fase F9: oplevering, registratie, welkom en instellingen (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet; opgeslagen projecten openen ongewijzigd.
+- **Rapport & dossier** heeft vier subpagina's:
+  - *Rekenrapport*: de rapportopbouw (niveau, taal, hoofdstukken, voorbeeld, export en afdrukken);
+  - *Invoerdossier*: de export van het NTA-invoerdossier en het invoeroverzicht;
+  - *Checklist BRL 9500*: de dossiercheck per groep met de status compleet, ontbreekt, controleren, bezig (kernrun loopt nog) of n.v.t., het bewijsregister, het EP-Online-gegevensoverzicht en de export van het projectdossier (ZIP);
+  - *Exports*: BENG-rapport, NTA-rekenrapport, invoerdossier, projectdossier, UNIEC3, VABI en IFC.
+- **Registratie** is een eigen pagina. Bovenaan staan de gereedheid met de redenen (dossier niet compleet, geen attest), het rekenprogramma met attest-status en een banner zolang er geen BRL 9501-attest is. Daaronder staan de openstaande punten en de plausibiliteit, elk met Ga naar, en het formulier met berichttype, BAG met grootboekwaarschuwing, opname en adviseurs, WLC-GWP, opnametriggers en bewijs. Opslaan werkt zoals voorheen in de dialoog: `cleanRegistration`, het behoud van de programma-identiteit bij herlabelen en het BAG-grootboek zijn ongewijzigd.
+- **Projectgegevens** bevat alleen nog naam, omschrijving, gebruiksfunctie, adres en plaats. Het palet en Ga naar sturen registratievelden naar de stap Registratie.
+- **Welkomstscherm:** nieuwe woning of nieuw utiliteitsgebouw, Openen, UNIEC3- en VABI-import, recente projecten (desktop: bestanden die geopend of opgeslagen zijn) en de twee voorbeelden.
+- **Instellingen:** de tabbladen Algemeen (thema, taal), Berekening (live voorbeeld per project en de editie voor nieuwe berekeningen) en Over. Kiest de adviseur NTA 8800:2024 als editie, dan begint nieuwe NTA-invoer met `normVersion: "2024"`; bestaande projecten houden hun editie.
+
 ## 5 oktober 2026 — keuze van de NTA 8800-uitgave
 
 Rekenuitkomsten van bestaande projecten veranderen niet: zonder `ntaCalculation.normVersion` rekent de kern zoals voorheen in NTA 8800:2025+C1:2026, met dezelfde invoervingerafdruk.

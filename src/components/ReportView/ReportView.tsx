@@ -1,19 +1,14 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { IBENGResultMonthly } from '../../core/energy/types';
-import { useEffect, useMemo, useState } from 'react';
-import { labelInputSha256 } from '../../core/nta/Registration';
-import { assessStoredSurvey } from '../../core/nta/SurveyTemplates';
-import type { OpnameAssessment } from '../../core/nta/KernelClient';
-import {
-  downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML, downloadProjectDossier,
-} from '../../core/report/ReportGenerator';
-import { checkDossierCompleteness, openDossierItems, type DossierItem } from '../../core/report/ProjectDossier';
+import { useState } from 'react';
+import { downloadNtaCalculationReportHTML, downloadNtaInputDossierHTML } from '../../core/report/ReportGenerator';
 import { useKernelQuery } from '../../context/KernelProvider';
 import { indicatorDecimals, kernelReportModel, type KernelReportModel } from '../../core/report/KernelReportModel';
 import { kernelWithheld } from '../../core/nta/KernelVerdict';
 import { formatNumber } from '../../i18n/format';
 import { ReportBuilder } from './ReportBuilder';
+import { useDossier } from './useDossier';
 import './ReportView.css';
 
 /** Month name in the UI language. */
@@ -44,7 +39,14 @@ function balanceRows(model: KernelReportModel): Array<[string, number | null]> {
   ];
 }
 
-export function ReportView() {
+/**
+ * `all` is the complete view (tests and the print path); the Rapport & dossier
+ * step shows `report` (notice and report builder) and `input` (the input
+ * summary) on their own sub pages (UI redesign F9).
+ */
+export type ReportViewSection = 'all' | 'report' | 'input';
+
+export function ReportView({ section = 'all' }: { section?: ReportViewSection }) {
   const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project, result } = state;
@@ -58,74 +60,42 @@ export function ReportView() {
   const meetsText = (meets: boolean | null) =>
     t(meets == null ? 'report.notTestable' : meets ? 'report.meetsUnverified' : 'report.fails');
   const [calculationError, setCalculationError] = useState<string | null>(null);
-  const [exported, setExported] = useState<{ project: typeof project; checklist: DossierItem[]; missingEvidence: number } | null>(null);
-  const [dossierBusy, setDossierBusy] = useState(false);
   const exportCalculation = () => {
     setCalculationError(null);
     downloadNtaCalculationReportHTML(project).catch((reason: unknown) =>
       setCalculationError(reason instanceof Error ? reason.message : String(reason)));
   };
-  const exportDossier = () => {
-    setCalculationError(null);
-    setDossierBusy(true);
-    downloadProjectDossier(project)
-      .then((manifest) => setExported({ project, checklist: manifest.checklist, missingEvidence: manifest.missingEvidence.length }))
-      .catch((reason: unknown) => setCalculationError(reason instanceof Error ? reason.message : String(reason)))
-      .finally(() => setDossierBusy(false));
-  };
-  // The live check uses the same inputs as the dossier export: the kernel
-  // assessment (with its relabel re-run) and the canonical label-input hash.
-  const assessment = kernelQuery?.kind === 'done' ? kernelQuery.assessment : null;
-  const [labelSha, setLabelSha] = useState<{ project: typeof project; sha: string | null } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    labelInputSha256(project).then((sha) => { if (!cancelled) setLabelSha({ project, sha }); })
-      .catch(() => { if (!cancelled) setLabelSha({ project, sha: null }); });
-    return () => { cancelled = true; };
-  }, [project]);
-  const currentSha = labelSha?.project === project ? labelSha.sha : null;
-  // The survey assessment, as the export passes it, for the collapse reasons.
-  const survey = project.basisopname;
-  const [opname, setOpname] = useState<{ survey: typeof survey; result: OpnameAssessment | null } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    assessStoredSurvey(survey).then((result) => { if (!cancelled) setOpname({ survey, result }); });
-    return () => { cancelled = true; };
-  }, [survey]);
-  const opnameDone = opname?.survey === survey;
-  const checklist = useMemo(() => {
-    if (exported && exported.project === project) return exported.checklist;
-    return checkDossierCompleteness({
-      project, assessment, opname: opnameDone ? opname?.result ?? null : null, labelInputSha256: currentSha,
-      pending: kernelPending || !opnameDone,
-    });
-  }, [exported, project, assessment, currentSha, opname, opnameDone, kernelPending]);
-  const open = openDossierItems(checklist);
+  const dossier = useDossier(project, kernelAssessment, kernelPending);
+  const { checklist, open } = dossier;
+  const showReport = section === 'all' || section === 'report';
+  const showInput = section === 'all' || section === 'input';
 
   return (
     <div className="report-view">
       <div className="report-content">
-        <div className="report-header">
-          <h1>{t('report.title')}</h1>
-          <p className="report-date">{new Date().toLocaleDateString(locale)}</p>
-        </div>
-        <div className="report-verification-notice" role="status">
+        {section === 'all' && (
+          <div className="report-header">
+            <h1>{t('report.title')}</h1>
+            <p className="report-date">{new Date().toLocaleDateString(locale)}</p>
+          </div>
+        )}
+        {showReport && <div className="report-verification-notice" role="status">
           <strong>{model ? t('report.kernelStatus') : withheld ? t('results.withheld.title') : indicativeShown ? t('results.indicative') : t('results.noResults')}</strong>
           <p>{model ? t('report.kernelSource')
             : withheld ? t(kernelAssessment?.status === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')
             : indicativeShown ? t('results.indicativeDescription') : t('report.inputDossierScope')}</p>
-        </div>
-        <ReportBuilder project={project} assessment={kernelAssessment} pending={kernelPending} />
-        <div className="report-input-dossier">
+        </div>}
+        {showReport && <ReportBuilder project={project} assessment={kernelAssessment} pending={kernelPending} />}
+        {section === 'all' && <div className="report-input-dossier">
           <button type="button" onClick={() => downloadNtaInputDossierHTML(project)}>{t('report.exportInputDossier')}</button>
           <p>{t('report.inputDossierScope')}</p>
           <button type="button" onClick={exportCalculation}>{t('report.exportNtaCalculation')}</button>
           <p>{t('report.ntaCalculationScope')}</p>
-          <button type="button" onClick={exportDossier} disabled={dossierBusy}>{t('report.exportProjectDossier')}</button>
+          <button type="button" onClick={dossier.exportDossier} disabled={dossier.busy}>{t('report.exportProjectDossier')}</button>
           <p>{t('report.projectDossierScope')}</p>
-          {calculationError && <p role="alert">{calculationError}</p>}
-          {exported && exported.missingEvidence > 0 && (
-            <p role="status">{t('report.dossierMissingEvidence', { count: exported.missingEvidence })}</p>
+          {(calculationError ?? dossier.error) && <p role="alert">{calculationError ?? dossier.error}</p>}
+          {(dossier.missingEvidence ?? 0) > 0 && (
+            <p role="status">{t('report.dossierMissingEvidence', { count: dossier.missingEvidence ?? 0 })}</p>
           )}
           <details className="report-dossier-checklist">
             <summary>{t('report.dossierChecklist', { open: open.length, total: checklist.length })}</summary>
@@ -141,8 +111,9 @@ export function ReportView() {
               </tbody>
             </table>
           </details>
-        </div>
+        </div>}
 
+        {showInput && <>
         {/* Project info */}
         <div className="report-section">
           <h2>{t('report.projectInfo')}</h2>
@@ -379,6 +350,7 @@ export function ReportView() {
             </>
           );
         })()}
+        </>}
       </div>
     </div>
   );

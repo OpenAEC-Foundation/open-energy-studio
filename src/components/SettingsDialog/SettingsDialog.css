@@ -1,7 +1,7 @@
 /* ── Settings Dialog (overrides on .dialog) ── */
 .settings-dialog {
-  width: 560px;
-  height: 500px;
+  width: min(640px, calc(100vw - 32px));
+  height: min(540px, calc(100vh - 32px));
   overflow: hidden;
 }
 
@@ -15,13 +15,13 @@
 
 /* ── Sidebar tabs ── */
 .settings-sidebar {
-  width: 120px;
+  width: 150px;
   flex-shrink: 0;
-  background: linear-gradient(to right, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border-inline-end: 1px solid var(--border-light);
+  background: var(--surface-chrome);
+  border-inline-end: 1px solid var(--line-subtle);
   display: flex;
   flex-direction: column;
-  padding: 8px 0;
+  padding: var(--space-2);
   gap: 2px;
 }
 
@@ -32,11 +32,11 @@
   padding: 8px 12px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 11px;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border-inline-start: 3px solid transparent;
   transition: all 0.15s ease;
   text-align: start;
@@ -57,7 +57,7 @@
 /* ── Content area ── */
 .settings-content {
   flex: 1;
-  padding: 12px;
+  padding: var(--space-4);
   overflow-y: auto;
 }
 
@@ -239,3 +239,13 @@
 
 .settings-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--fg-1); cursor: pointer; }
 .settings-hint { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--fg-3); }
+
+.settings-tab svg { width: 16px; height: 16px; flex: none; }
+.settings-tab:focus-visible,
+.theme-row:focus-visible,
+.language-row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.language-table { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.language-table .language-row { border-inline-end: 1px solid var(--border-light); }
+.language-table .language-row:nth-last-child(2) { border-bottom: none; }
+.settings-warning { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--warn-text); }
+.settings-about td:first-child { color: var(--fg-2); padding-inline-end: var(--space-4); }

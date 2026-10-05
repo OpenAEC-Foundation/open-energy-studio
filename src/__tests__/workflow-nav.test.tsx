@@ -211,19 +211,45 @@ describe('Step pages keep the ribbon actions', () => {
   it('Report: export, print, IFC and exchange exports', async () => {
     const user = userEvent.setup();
     const actions = makeActions();
-    renderWithProviders(<Shell actions={actions} route={{ step: 'report' }} />);
+    const { unmount } = renderWithProviders(<Shell actions={actions} route={{ step: 'report' }} />);
+    const subtabs = screen.getByRole('navigation', { name: 'Report & dossier' });
+    expect(within(subtabs).getAllByRole('button').map((tab) => tab.textContent))
+      .toEqual(['Calculation report', 'Input dossier', 'BRL 9500 checklist', 'Exports']);
     const head = document.querySelector('.page-actions') as HTMLElement;
     await user.click(within(head).getByRole('button', { name: 'Export Report' }));
     expect(actions.exportReport).toHaveBeenCalledOnce();
     await user.click(within(head).getByRole('button', { name: 'Print' }));
     expect(actions.printReport).toHaveBeenCalledOnce();
-    await user.click(within(head).getByRole('button', { name: 'IFC (BENG)' }));
+    await user.click(within(head).getByRole('button', { name: 'Exports' }));
+    expect(actions.navigate).toHaveBeenCalledWith({ step: 'report', sub: 'exports' });
+    unmount();
+    // UI redesign F9: the exchange exports moved to the Exports sub page.
+    renderWithProviders(<Shell actions={actions} route={{ step: 'report', sub: 'exports' }} />);
+    const body = document.querySelector('.page-body') as HTMLElement;
+    await user.click(within(body).getByRole('button', { name: 'IFC (BENG)' }));
     expect(actions.exportIFC).toHaveBeenCalledOnce();
-    await user.click(within(head).getByRole('button', { name: 'UNIEC3 input draft' }));
+    await user.click(within(body).getByRole('button', { name: 'UNIEC3 input draft' }));
     expect(actions.exportUNIEC3).toHaveBeenCalledOnce();
-    await user.click(within(head).getByRole('button', { name: 'VABI Export' }));
+    await user.click(within(body).getByRole('button', { name: 'VABI Export' }));
     expect(actions.exportVABI).toHaveBeenCalledOnce();
-  });
+    await user.click(within(body).getByRole('button', { name: 'IFC 3D Model' }));
+    expect(actions.exportModelIFC).toHaveBeenCalledOnce();
+  }, 30000);
+
+  it('Report: the BRL 9500 checklist shows every status, the evidence and the EP-Online overview', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    renderWithProviders(<Shell actions={actions} route={{ step: 'report', sub: 'checklist' }} />);
+    expect(screen.getByRole('heading', { name: 'BRL 9500 checklist', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export project dossier (ZIP)' })).toBeInTheDocument();
+    const rows = document.querySelectorAll('.delivery-checklist tr[data-status]');
+    expect(rows.length).toBeGreaterThan(10);
+    const statuses = new Set(Array.from(rows, (row) => row.getAttribute('data-status')));
+    for (const status of statuses) expect(['ok', 'missing', 'check', 'not_applicable', 'pending']).toContain(status);
+    expect(screen.getByTestId('ep-online-overview')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit in Registration' }));
+    expect(actions.navigate).toHaveBeenCalledWith({ step: 'registration', focusPath: 'registration.evidence' });
+  }, 30000);
 
   it('3D model: exports the IFC model', async () => {
     const user = userEvent.setup();
