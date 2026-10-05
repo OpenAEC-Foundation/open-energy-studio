@@ -32,7 +32,9 @@ De optionele bronrepositorycontrole verifieert daarnaast dat commit `62a4a29` aa
 
 De [schone frontendbouw met bijgewerkte afhankelijkheden](nta8800-afhankelijkheden-2026-10-05.md) slaagde op de bronstand `bb7c1bd` met 505 UI-tests en een Vite-productiebundel. De lokale npm-audit gaf op het controlemoment 0 meldingen. Deze onderhoudsstap wijzigt geen NTA-reken-, referentie- of attestkolom.
 
-De Tauri-desktopbouw vond vervolgens een minorversieverschil tussen npm- en Cargo-pakketten. De drie betrokken npm-pakketten zijn exact op de versies uit het Cargo-lockbestand vastgezet; een nieuwe desktopbouw is de resterende technische controle. Dit verandert de normatieve dekking niet.
+De Tauri-desktopbouw vond vervolgens een minorversieverschil tussen npm- en Cargo-pakketten. De betrokken npm-pakketten zijn exact op compatibele minorversies vastgezet; daarna volgde een afzonderlijke nieuwe desktopbouw. Dit verandert de normatieve dekking niet.
+
+De [herstelde desktopbouw op `dc1b917`](nta8800-build-verificatie-2026-10-05-dc1b917.md) slaagde en is met de manifestlezer opnieuw gecontroleerd. De pakketversies sluiten op minorversie aan, het lockbestand is met `npm ci` geïnstalleerd en de live devserver reageerde met HTTP 200. De NTA-reken-, referentie- en attestkolommen blijven ongewijzigd.
 
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
