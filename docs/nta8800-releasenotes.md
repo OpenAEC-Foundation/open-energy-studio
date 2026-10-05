@@ -2,6 +2,38 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — HTTP-API en MCP-server
+
+Rekenuitkomsten veranderen niet. Wat wel verandert voor clients van de API of de MCP-server:
+- **Eén register.** Alle bewerkingen staan in `crates/nta8800-service/src/operations.rs`. Elke bewerking is een HTTP-route én een MCP-tool met dezelfde naam (45 in totaal) en staat in het OpenAPI 3.1-document (`GET /v1/openapi.json`).
+- **Nieuwe routes en tools:**
+  - `GET /v1/version` / `get_version`;
+  - `list_interpretations` (de route bestond al);
+  - `assess_maatwerkadvies` en `assess_relabel` als MCP-tool (de routes bestonden al);
+  - `POST /v1/nta8800/project/energy-by-service` / `get_energy_by_service`;
+  - `POST /v1/nta8800/label/data` / `get_label_data`;
+  - `POST /v1/nta8800/registration/assess` / `assess_registration`;
+  - `POST /v1/nta8800/relabel/label-input-hash` / `get_label_input_hash`.
+- **Foutmodel.** Fouten van client en server hebben één envelop: `error`, `code`, `message`, `path` en `details`. `error` en `message` blijven bestaan, zodat bestaande clients blijven werken.
+  - **Nieuw:** een verkeerde invoervorm gaf eerder 422 met platte tekst van axum. Nu is dat 400 met code `invalid_request_shape` en het JSON-pad van de fout.
+  - **Nieuwe codes:**
+    - ongeldige JSON geeft 400 `invalid_json`;
+    - een ontbrekend invoerlid geeft 400 `missing_request_member`;
+    - een verkeerde content-type geeft 415;
+    - een te grote body geeft 413;
+    - onbekende routes en methoden geven 404/405.
+  - **Ongewijzigd:** een weigering van de kern blijft 422 met de beoordeling als body.
+- **Server-opties:**
+  - `--bind`, `--port`, `--cors-origin`, `--body-limit-mb` en `--log`/`--no-log`, ook als omgevingsvariabelen `OES_API_*`;
+  - netjes stoppen bij SIGINT/SIGTERM;
+  - één logregel per verzoek;
+  - standaard alleen op loopback.
+- **MCP-server:**
+  - **Resources:** de voorbeeldprojecten, de opnamefixtures, de interpretatielijst, de handleiding en het OpenAPI-document.
+  - **Tool-uitkomsten:** dezelfde JSON-body als de route, ook als `structuredContent`.
+  - **`isError`:** dit staat waar de route 4xx/5xx geeft. De oude tools gaven bij een vormfout eigen codes (`invalid_*_shape`); die zijn nu `invalid_request_shape` met pad, behalve `invalid_project_shape` en `invalid_maatwerkadvies_shape`.
+- **Documentatie:** [nta8800-api.md](nta8800-api.md), [nta8800-mcp.md](nta8800-mcp.md) en hoofdstuk 9 van de handleiding.
+
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 
 De applicatie was gebouwd tegen de concepten van BRL 9500-W/U en BRL 9501 van 14-10-2025 en tegen BRL 9500-MWA-W/U van 19-06-2024. Inmiddels zijn de aangewezen versies openbaar.

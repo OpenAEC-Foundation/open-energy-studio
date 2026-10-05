@@ -638,10 +638,12 @@ name = "nta8800-service"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "libc",
  "nta8800-core",
  "rmcp",
  "serde",
  "serde_json",
+ "serde_path_to_error",
  "sha2",
  "tokio",
  "tower",
