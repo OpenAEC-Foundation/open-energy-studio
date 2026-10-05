@@ -1,9 +1,10 @@
 # 4. Uitvoer
 
-Na het opslaan van de NTA-invoer rekent de kern zelf. Dat gebeurt een korte tijd na de laatste wijziging. De uitkomsten verschijnen op drie plekken:
-- het paneel *NTA 8800-berekening (Rust-kern)*;
-- het tabblad Resultaten;
-- het tabblad Rapport.
+Na het toepassen van de NTA-invoer rekent de kern zelf. Dat gebeurt een korte tijd na de laatste wijziging; **Herberekenen** (Ctrl+Enter) start meteen een nieuwe run. De uitkomsten verschijnen op vier plekken:
+- de statusbalk en het tabblad *Voorbeeld* van het contextpaneel;
+- de stap Resultaten (dashboard met de subpagina's Per dienst, Per zone, Maandwaarden en Herkomst);
+- het paneel *NTA 8800-berekening (Rust-kern)* onder Controle › NTA-invoer;
+- de stap Rapport & dossier.
 
 Alle getoonde BENG-waarden komen uit de kern. De oude, vereenvoudigde berekening verschijnt alleen als er geen kernresultaat is. Dan draagt ze het label "Indicatief, niet volgens NTA 8800".
 
@@ -89,7 +90,7 @@ De lijst is in het Engels; het rapport vermeldt dat het de eigen tekst van de ke
 
 ## Rapportage Energieprestatie (NTA 8800)
 
-Bovenaan het tabblad **Rapport** staat het onderdeel **Rapportage Energieprestatie (NTA 8800)**. Daarmee stel je het hoofdrapport samen.
+De subpagina **Rapport & dossier › Rekenrapport** bevat het onderdeel **Rapportage Energieprestatie (NTA 8800)**. Daarmee stel je het hoofdrapport samen.
 
 **Rapportniveau**
 - **Samenvatting:** projectgegevens, uitgangspunten (normversie, kernversie, invoervingerafdruk), eisen en resultaten (BENG 1/2/3 en TOjuli tegen de Bbl-grenzen, met oordeel), indicatieve labelklasse met de labelgegevens van Omgevingsregeling art. 5.11–5.13a, A0, meldingen en registratie.
@@ -118,10 +119,10 @@ Weigert de rekenkern de invoer (status ongeldig of onvolledig), dan bevat het ra
 
 | Rapport | Inhoud | Taal |
 |---|---|---|
-| Rapportage Energieprestatie (onderdeel bovenaan het tabblad Rapport) | samenvatting, standaard of gedetailleerd, zie hierboven | Nederlands (BRL 9500-document) |
-| BENG-rapport (tab Rapport; knop **Exporteer rapport** in het lint en het menu) | indicatoren, grenzen, maandoverzicht, energiebalans | volgt de taal van de interface |
-| NTA-rekenrapport (knop **NTA-rekenrapport exporteren** op het tabblad Rapport) | volledige uitkomst, labelgegevens, registratie, interpretaties | Nederlands (BRL 9500-document) |
-| NTA-invoerdossier (knop **NTA-invoerdossier exporteren** op het tabblad Rapport) | de ingevoerde toestellen en het bewijs, zonder BENG-uitkomst of label | Nederlands |
+| Rapportage Energieprestatie (Rapport & dossier › Rekenrapport) | samenvatting, standaard of gedetailleerd, zie hierboven | Nederlands (BRL 9500-document) |
+| BENG-rapport (knop **Exporteer rapport** op Rekenrapport en Exports, en in het palet) | indicatoren, grenzen, maandoverzicht, energiebalans | volgt de taal van de interface |
+| NTA-rekenrapport (knop **NTA-rekenrapport exporteren** onder Exports) | volledige uitkomst, labelgegevens, registratie, interpretaties | Nederlands (BRL 9500-document) |
+| NTA-invoerdossier (knop **NTA-invoerdossier exporteren** onder Invoerdossier en Exports) | de ingevoerde toestellen en het bewijs, zonder BENG-uitkomst of label | Nederlands |
 | Adviesrapport maatwerkadvies | zie [hoofdstuk 6](06-maatwerkadvies.md) | Nederlands |
 
 **Opmaak in de Nederlandse documenten**

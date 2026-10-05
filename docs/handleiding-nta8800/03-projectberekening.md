@@ -31,9 +31,12 @@ Elke opgegeven waarde vraagt een bron, zoals een tekening, productblad, normtabe
 - Een constructie die nog in gebruik is, kan niet worden verwijderd.
 - Een verwijdering die de paden van een handmatige maatwerkadviesmaatregel zou verschuiven, wordt geweigerd.
 
-## Panelen op het tabblad Project
+## Hulppanelen
 
-Naast het paneel *NTA 8800-berekening (Rust-kern)* en de basisopname staan op het tabblad Project vier hulppanelen.
+Naast de NTA-invoer zijn er vier hulppanelen. Ze staan bij de stap waar ze inhoudelijk horen:
+- *Invoercontrole*: Controle › Overzicht;
+- *Onverwarmde ruimtes*: Gebouw › Onverwarmde ruimten;
+- *NTA-warmtepompen* en de *gaswarmtepomp-referentievergelijking* (uitklapbaar): Installaties › Warmtepompen.
 
 - **Invoercontrole.** Een structuurcontrole van het projectmodel door de rekenkern: fouten, aandachtspunten en de indeling van de warmtepompen. Het paneel toont ook de herkomst van de controle (doelnorm, kernelversie en invoervingerafdruk). Het is geen NTA 8800-berekening en geen energielabel.
 - **Onverwarmde ruimtes.** Hier leg je per onverwarmde ruimte een reductiefactor b (0 t/m 1) met een bron vast. Een afgeleide b_U (8.53–8.59) geef je op via de NTA-invoer. Het paneel toont ook een diagnose van de transmissie via deze ruimtes (A·U, L·Ψ en χ met de opgegeven b); die diagnose is geen geverifieerde uitkomst.
@@ -42,7 +45,7 @@ Naast het paneel *NTA 8800-berekening (Rust-kern)* en de basisopname staan op he
 
 ## Het NTA-invoerformulier
 
-Het formulier vraagt alleen wat het projectmodel nog niet heeft. Opslaan en Annuleren staan onderaan in een vaste balk. Lege velden staan na het formulier in de melding **Nog leeg (n): …**. Ze gaan niet mee naar de rekenkern; een verplicht veld verschijnt na de berekening als invoergat.
+Het formulier vraagt alleen wat het projectmodel nog niet heeft. De secties staan verdeeld over de werkstappen (zie [hoofdstuk 0](00-werken-met-het-programma.md#nta-invoer-in-de-stappen)); Controle › NTA-invoer toont de overige secties en het paneel *NTA 8800-berekening (Rust-kern)*. Wijzigingen gaan in één concept; **Toepassen** in de toepasbalk onderaan schrijft ze in het project, **Ongedaan maken** draait de laatste wijziging terug. Lege velden staan na het formulier in de melding **Nog leeg (n): …**. Ze gaan niet mee naar de rekenkern; een verplicht veld verschijnt na de berekening als invoergat.
 
 | Onderdeel | Inhoud | Normbasis |
 |---|---|---|

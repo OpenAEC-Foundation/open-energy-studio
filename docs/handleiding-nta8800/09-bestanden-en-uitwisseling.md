@@ -2,7 +2,7 @@
 
 ## Projectbestanden (`.oes.json`)
 
-**Opslaan.** Met **Opslaan** (Ctrl+S) of **Opslaan als** in het lint schrijft de app het project als `<projectnaam>.oes.json`.
+**Opslaan.** Met **Opslaan** (Ctrl+S) in de bovenbalk of **Opslaan als** (Ctrl+Shift+S) in het menu Bestand schrijft de app het project als `<projectnaam>.oes.json`.
 - In de desktopapp kies je de plaats in een opslagvenster; een project dat al een bestandspad heeft, wordt daar direct overschreven.
 - In de browser wordt het bestand gedownload.
 
@@ -20,7 +20,7 @@ De voorbeelden zijn fictieve oefenprojecten. BENG en labelklasse zijn indicatief
 
 ## UNIEC3-uitwisseling
 
-Het lint heeft een groep **UNIEC3** met twee knoppen.
+De UNIEC3-knoppen staan onder Rapport & dossier › Exports (export), op het welkomstscherm en in het menu Bestand (import), en in het palet (Ctrl+K).
 
 **UNIEC3 invoerconcept** exporteert het projectmodel als een zip-bestand `<projectnaam>.input-draft.uniec3`. De indeling is nagebouwd op basis van bestaande UNIEC3-bestanden van NTA 8800 v3.4. Het bestand bevat:
 - gebouw, rekenzones, begrenzingsvlakken, constructies, ramen, koudebruggen en de luchtdoorlatendheid (q_v10);
@@ -33,7 +33,7 @@ Wat het **niet** bevat of garandeert:
 
 **UNIEC3 import** leest een `.uniec3`-bestand en opent het als een nieuw project. Alleen het projectmodel komt mee: zones, vlakken, ramen, koudebruggen, constructies en installaties. De NTA-invoer, opname en registratie moet je daarna zelf invullen; tot dan geeft de rekenkern invoergaten.
 
-## Exports op het tabblad Rapport
+## Exports onder Rapport & dossier
 
 | Knop | Uitvoer |
 |---|---|
@@ -41,7 +41,7 @@ Wat het **niet** bevat of garandeert:
 | **NTA-rekenrapport exporteren** | het rapport van de rekenkern: indicatoren, labelklasse, Bbl-toets, TO-juli, maandwaarden, weggelaten correcties, bronnen en de bijlage Interpretaties |
 | **Projectdossier exporteren (ZIP)** | het dossier met projectbestand, kernuitvoer, rekenrapport, bewijs, checklist en manifest (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)) |
 
-Het BENG-rapport exporteer je met **Exporteer rapport** in het lint of het menu (zie [hoofdstuk 4](04-uitvoer.md)).
+Het BENG-rapport exporteer je met **Exporteer rapport** op Rekenrapport of Exports, of via het palet (zie [hoofdstuk 4](04-uitvoer.md)).
 
 ## API en MCP-server
 

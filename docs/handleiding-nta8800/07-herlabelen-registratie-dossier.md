@@ -57,7 +57,7 @@ Herlabelen kan alleen bij bestaande bouw. Het geldt voor verbeteringen die binne
    - eventueel de verwijzing naar het oorspronkelijke dossier;
    - bij gewijzigde PV of zonthermie het vinkje **PV of zonthermie exclusief en fysiek verbonden met dit gebouw (herlabelen)** (BRL 9500-W p. 23);
    - bij utiliteit het vinkje **Utiliteit: met opdrachtgever en stukken vastgesteld dat er geen 6b-wijzigingen zijn (herlabelen)** (BRL 9500-U p. 19).
-4. Kies in het paneel **Herlabelen (BRL 9500 bijlage 6a/6b)**, op het tabblad Resultaten, het oorspronkelijke projectbestand.
+4. Kies in stap 8 **Herlabelen** (BRL 9500 bijlage 6a/6b) het oorspronkelijke projectbestand. De stepper leidt daarna door vergelijking, wijzigingen, bewijsrollen en gereedheid.
 
 **De vergelijking.** Het paneel deelt elke wijziging in:
 - toegestaan (6a);
@@ -109,7 +109,7 @@ Kies **Rapport** → **Projectdossier exporteren (ZIP)**. De ZIP bevat:
 | `dossier-checklist.json` | de volledigheidscontrole (BRL 9500 bijlage 3, p. 61–63) |
 | `manifest.json` | moment, projectnaam, kernversie met normversie en invoervingerafdruk, attestatus, per bestand pad, SHA-256 en grootte, het aantal ontbrekende bewijsstukken (`missingEvidence`) en de checklist |
 
-**Checklist.** De checklist hangt af van het doel, het opnametype, de representativiteit en herlabelen. Bij een basisopname toetst ze de redenen voor de toegepaste standaardwaarden. Het tabblad Rapport toont dezelfde checklist als de export. Terwijl de berekening loopt, staan punten op "bezig"; in een export komt die status nooit voor.
+**Checklist.** De checklist hangt af van het doel, het opnametype, de representativiteit en herlabelen. Bij een basisopname toetst ze de redenen voor de toegepaste standaardwaarden. Rapport & dossier › Checklist BRL 9500 toont dezelfde checklist als de export. Terwijl de berekening loopt, staan punten op "bezig"; in een export komt die status nooit voor.
 
 **EP-Online.** De app kan een label niet zelf registreren. Het uploadformaat van EP-Online is niet openbaar en is alleen voor geattesteerde rekenprogramma's via RVO verkrijgbaar. Het gegevensoverzicht in de ZIP gebruikt de veldnamen van het openbare exportschema, zodat u na registratie kunt nagaan of EP-Online dezelfde waarden toont als de berekening. `missingRequired` noemt de velden die voor een registratie nog ontbreken, zoals de registratiedatum of het certificaathoudernummer.
 

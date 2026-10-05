@@ -2,6 +2,23 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — UI-herontwerp, fase F10: thema's, toegankelijkheid, vertaling en afronding (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet; opgeslagen projecten openen ongewijzigd. Het UI-herontwerp is hiermee afgerond.
+- **Contrast.** Elke tekst haalt in donker, licht en hoog contrast minstens 4,5:1. Invoerranden en statusmarkeringen halen minstens 3:1. Een paar kleuren zijn daarvoor bijgesteld: tekst op het lichte thema iets donkerder, de onverifieerd-kleur en secundaire tekst in het donkere thema iets lichter. Op lichte labelkleuren (A, A+, E) staat de letter nu donker in plaats van wit.
+- **Toetsenbord en schermlezer.**
+  - Projecttabbladen zijn met Tab bereikbaar.
+  - Alle invoervelden van de rekenhulpen hebben een naam.
+  - Oudere invoervelden tonen bij focus dezelfde amberkleurige focusrand als de rest van het programma.
+  - De koppen op enkele pagina's volgen nu een correcte volgorde.
+- **Vertaling.** De vensterknoppen en het sluitkruisje van een tabblad zijn vertaald. De eenheden op het resultatendashboard en de basisopname volgen de taal (`kWh/m²·yr` in het Engels). Talen naast Nederlands en Engels worden pas geladen als je ze kiest.
+- **Sluiten met een niet-toegepast concept.** Sluit je een projecttabblad terwijl de NTA-invoer wijzigingen heeft die nog niet zijn toegepast, dan vraagt het programma eerst of je wilt sluiten zonder toe te passen.
+- **Installaties › Overzicht** toont per verwarmingssysteem de keten opwekking › distributie › afgifte › regeling. Een groene stip betekent ingevuld; een klik opent dat deel van de NTA-invoer.
+- **Basisopname:** de subpagina Rekenzones staat alleen bij een utiliteitsopname in de navigatie en het palet.
+- **Recente projecten** tonen de indicatieve labelklasse van de laatste doorrekening bij het opslaan.
+- **Sneller starten.** Het 3D-model, de rapportopbouw, het afdrukvoorbeeld en de rekenhulpen laden pas bij eerste gebruik. De startbundel is ongeveer 10 % kleiner.
+- **Handleiding:** nieuw hoofdstuk 0 *Werken met het programma* (werkstappen, Ctrl+K, contextpaneel, Controle en Ga naar, Basis/Alle velden, toepasbalk, Gereedschap, uitgavekeuze, sneltoetsen), met schermafdrukken.
+
 ## 5 oktober 2026 — UI-herontwerp, fase F9: oplevering, registratie, welkom en instellingen (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet; opgeslagen projecten openen ongewijzigd.
