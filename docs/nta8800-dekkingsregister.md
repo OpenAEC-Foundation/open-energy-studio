@@ -42,6 +42,8 @@ De manifestlezer weigert nu symbolische links naar artefacten buiten de uitvoerm
 
 De lokale technische gate gebruikt nu `--locked` voor alle Cargo-routes. De volledige offline run slaagde met 797 kern-, 57 service- en 744 frontendtests plus integratiegroepen, MSRV, format, Clippy, Tauri en TypeScript/Vite. Omdat officiële actuele cases ontbreken, werd de geplande referentiebatch overgeslagen en blijven alle normatieve referentie- en attestkolommen ongewijzigd.
 
+De optionele broncontrole van het bouwmanifest accepteert alleen een Git-commitobject als `sourceCommit`, geen boom- of tagobject. De gerichte tests en hercontrole van het bewaarde F10-pakket slaagden; de normatieve referentie- en attestkolommen veranderen niet.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.

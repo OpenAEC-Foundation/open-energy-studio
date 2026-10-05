@@ -16,6 +16,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class BuildManifestTests(unittest.TestCase):
+    def test_source_object_must_be_a_commit(self):
+        with patch.object(MODULE.subprocess, "check_output", return_value="tree\n") as check:
+            with self.assertRaisesRegex(ValueError, "not a Git commit"):
+                MODULE.verify_source({"sourceCommit": "a" * 40}, Path("/unused"))
+            check.assert_called_once()
+
     def test_artifacts_must_be_files_in_manifest_directory(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
