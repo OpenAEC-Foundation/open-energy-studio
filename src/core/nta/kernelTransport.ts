@@ -24,6 +24,10 @@ let wasmKernel: Promise<WasmKernel | null> | null = null;
  * part of this build or fails to initialise, so the caller can fall back.
  */
 export function loadWasmKernel(): Promise<WasmKernel | null> {
+  // Under vitest the UI tests mock `fetch` for the development-server path;
+  // the module loader would consume those mocks. The wasm module itself is
+  // tested directly in kernel-wasm.test.ts.
+  if (import.meta.env.MODE === 'test') return Promise.resolve(null);
   if (!wasmKernel) {
     wasmKernel = (async () => {
       try {
@@ -73,9 +77,29 @@ export async function kernelCall<T>(command: string, route: string, payload: Rec
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return response.json() as Promise<T>;
+    return httpOutcome<T>(response);
   }
   throw new Error(UNAVAILABLE);
+}
+
+/** Same rules as `parseOutcome`, for a response of the development server. */
+async function httpOutcome<T>(response: Response): Promise<T> {
+  let parsed: unknown;
+  if (typeof response.text === 'function') {
+    const text = await response.text();
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error(`Rust API: HTTP ${response.status}: ${text}`);
+    }
+  } else {
+    parsed = await response.json();
+  }
+  const body = parsed as { status?: unknown; error?: string; message?: string } | null;
+  if (!response.ok && (!body || typeof body !== 'object' || !('status' in body))) {
+    throw new Error(body?.message ?? body?.error ?? `Rust API: HTTP ${response.status}`);
+  }
+  return parsed as T;
 }
 
 /** GET operation without a request body. */
