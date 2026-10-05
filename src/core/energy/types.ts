@@ -306,6 +306,15 @@ export interface ISolarThermal {
 // ------------------------------------------------------------
 // Project
 // ------------------------------------------------------------
+/** One import of data by the adviser (BRL 9501 §4.3.1 opmerking). */
+export interface ProjectImportRecord {
+  /** The tool or format the data came from, e.g. `UNIEC3` or `VABI`. */
+  tool: string;
+  fileName?: string;
+  /** ISO timestamp of the import. */
+  importedAt?: string;
+}
+
 export interface IProject {
   id: string;
   name: string;
@@ -343,6 +352,12 @@ export interface IProject {
   registration?: NtaRegistration;
   /** Maatwerkadvies definition (BRL 9500-MWA); not part of the label fingerprint. */
   maatwerkadvies?: NtaMaatwerkadvies;
+  /**
+   * Data the adviser read in with another tool (BRL 9501 §4.3.1 opmerking,
+   * p. 8): the registration states whether and with which tool. Not label
+   * input.
+   */
+  importLog?: ProjectImportRecord[];
   /** ISSO 82.1/75.1 basisopname (survey) kept with the project; not part of the label fingerprint. */
   basisopname?: { kind: 'residential' | 'utility'; survey: Record<string, unknown> };
 }

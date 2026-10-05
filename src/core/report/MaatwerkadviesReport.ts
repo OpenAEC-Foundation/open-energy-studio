@@ -46,6 +46,16 @@ const REQUIREMENT: Record<string, string> = {
   emission_free_result: 'Geen verbranding van fossiele brandstof op het perceel (stap 3)',
   renewable_production: 'Hernieuwbare opwekking toegevoegd (stap 3)',
   storage_considered: 'Opslagcapaciteit afgewogen (stap 3)',
+  low_temperature_ready: 'Isolatieniveau geschikt voor LTV en HTK (stap 1)',
+  facade_insulation_motivated: 'Onmogelijke gevelisolatie gemotiveerd',
+  cooling_demand_measures: 'Maatregelen die de koelvraag beperken in stap 1',
+  renovation_standard_ep2: 'EP2 op of onder de renovatiestandaard (stap 3)',
+};
+
+/** BRL 9500-MWA-W/U (24-03-2026) §4.2.8, p. 23. */
+const REGISTRATION_TYPE: Record<string, string> = {
+  maatwerkadvies: 'Maatwerkadvies',
+  maatwerkadvies_met_renovatiepaspoort: 'Maatwerkadvies met renovatiepaspoort',
 };
 
 function verdict(value: boolean | null | undefined): string {
@@ -156,7 +166,8 @@ export function generateMaatwerkadviesReportHTML(
     ${chosen.systemChecks.map((check) => `<tr>${cell(SYSTEM[check.system] ?? check.system)}${n(check.value, 2)}${n(check.limit, 2)}${cell(check.unit)}${cell(check.limit == null ? 'geen eis' : verdict(check.meets))}${cell(check.note ?? '')}</tr>`).join('')}
     </tbody></table>
     <p>De systeemeisen gelden wanneer de opwekker, de ventilatie-unit of een derde van de afgiftelichamen of armaturen wordt geïnstalleerd, vervangen of verbeterd.</p>` : ''}
-    ${passport ? `<h2>Renovatiepaspoort (ISSO 82.2 §1.10 en §4.4)</h2>
+    ${assessment.registrationType ? `<p><strong>Registratie (BRL 9500-MWA §4.2.8):</strong> ${escapeHtml(REGISTRATION_TYPE[assessment.registrationType] ?? assessment.registrationType)}</p>` : ''}
+    ${passport ? `<h2>Renovatiepaspoort (${passport.scheme === 'U' ? 'BRL 9500-MWA-U §3.2, ISSO 75.2' : 'BRL 9500-MWA-W §3.2, ISSO 82.2 §1.10 en §4.4'})</h2>
     <p><strong>Voldoet aan de eisen:</strong> ${escapeHtml(verdict(passport.eligible))}</p>
     <table><thead><tr><th>Stap</th><th>Label (NTA 8800)</th><th>EP2</th><th>Gas [m³]</th><th>Elektr. netto [kWh]</th><th>CO<sub>2</sub> [kg]</th><th>Energiekosten [€/jr]</th></tr></thead><tbody>
     ${passport.steps.map((step) => `<tr>${cell(step.name)}${cell(step.label.labelClass ?? '—')}${n(step.label.primaryFossilIndicatorKwhPerM2, 1)}${n(step.actualUse?.gasM3)}${n(step.actualUse ? step.actualUse.electricityImportKwh - step.actualUse.electricityExportKwh : null)}${n(step.actualUse?.co2Kg)}${n(step.actualUse?.energyCostEur)}</tr>`).join('')}

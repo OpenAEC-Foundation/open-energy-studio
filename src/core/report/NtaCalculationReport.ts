@@ -183,6 +183,7 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Dossier compleet</th>${cell(assessment ? ((assessment.dossierComplete ?? assessment.issues.length === 0) ? 'ja' : 'nee') : '—')}</tr>
     <tr><th>Gereed voor registratie</th>${cell(readinessText(assessment))}<th>Rekenprogramma geattesteerd</th>${cell(assessment?.softwareAttested ? 'ja' : 'nee')}</tr>
     <tr><th>Rekenprogramma (Regeling art. 5)</th>${cell(softwareText)}<th>WLC-GWP</th>${cell(wlcText)}</tr>
+    ${assessment?.dataImport ? `<tr><th>Gegevens ingelezen (BRL 9501 §4.3.1)</th>${cell(assessment.dataImport.dataImported ? `ja, met ${assessment.dataImport.tools.join(', ')}` : 'nee')}<th></th><td></td></tr>` : ''}
     ${messageType === 'replacement' ? `<tr><th>Vervangt label</th>${cell(registration.replacedEpOnlineNumber ?? '—')}<th>Uiterste vervangdatum</th>${cell(assessment?.replacementDeadline ?? '—')}</tr>` : ''}
   </tbody></table>
   ${issues ? `<table><thead><tr><th>Soort</th><th>Code</th><th>Pad</th></tr></thead><tbody>${issues}</tbody></table>` : ''}

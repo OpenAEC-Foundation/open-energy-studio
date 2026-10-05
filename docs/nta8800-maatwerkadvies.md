@@ -5,7 +5,7 @@
 Bronnen (alleen paginaverwijzingen, geen tekst overgenomen):
 
 - ISSO 82.2, 3e druk (woningen) en ISSO 75.2, 3e druk (utiliteitsgebouwen): de methode.
-- BRL 9500-MWA-W en -U (19-06-2024): de eisen aan het advies, §3.1 (p. 11) en §4.2.5 (p. 17).
+- BRL 9500-MWA-W en -U van 24-03-2026, in werking per 29-05-2026 (eerder: 19-06-2024): de eisen aan het advies, §3.1 (p. 13), het renovatiepaspoort §3.2 (p. 14), §4.2.5 (p. 21) en de registratie §4.2.8 (p. 23).
 
 ## Opbouw
 
@@ -278,3 +278,27 @@ Het rapport neemt de verplichte kanttekeningen over oververhitting op (§1.10.2)
 
 - **Fasering.** Met `economics.baseYear` begint de investering van een maatregel in zijn `phaseYear`. De besparing van een pakket begint in jaar 1.
 - **Onderhoud.** De onderhoudskosten stijgen jaarlijks met `maintenancePriceChange`.
+
+## Renovatiepaspoort volgens BRL 9500-MWA-W/U (24-03-2026)
+
+De MWA-versies van 24-03-2026 voegen het renovatiepaspoort toe als bijzondere vorm van het maatwerkadvies (EPBD IV). De eisen staan in §3.2 (p. 14) en verschillen voor woningen en utiliteit. De kern kiest het schema op basis van de rekenomvang van de gebouwinvoer: woningbouw geeft `W`, utiliteit `U`.
+
+| Eis | W (woningen) | U (utiliteit) | Code |
+| --- | --- | --- | --- |
+| Drie stappen aanwezig en doorgerekend | ja | ja | `three_steps_present` |
+| Stap 1: Standaard voor Woningisolatie; zonder verklaring vergelijkt de kern de warmtebehoefte van stap 1 met de standaard (NTA 8800 §5.3.2) | ja | – | `insulation_standard` |
+| Vooroorlogse standaard alleen met motivatie | ja | – | `prewar_standard_motivated` |
+| Maatregelen tegen oververhitting in stap 1 | ja | – | `overheating_measures` |
+| Stap 2: aardgasvrije hoofdverwarming waar realistisch mogelijk; een motivatie (`gasFreeNotRealisticMotivation`) of de vooroorlogse standaard voldoet | ja | – | `natural_gas_free_main_heating` |
+| Geen fossiele verbranding in stap 3 (ISSO 82.2); vervalt bij een gemotiveerde uitzondering | ja | – | `emission_free_result` |
+| Isolatieniveau geschikt voor LTV en HTK (verklaring) | – | ja | `low_temperature_ready` |
+| Motivatie als gevelisolatie technisch niet kan | – | als opgegeven | `facade_insulation_motivated` |
+| Maatregelen die de koelvraag beperken in stap 1 | – | ja | `cooling_demand_measures` |
+| EP2 van stap 3 op of onder de renovatiestandaard (tabel 5.7, ISSO 75.2) | – | ja | `renovation_standard_ep2` |
+| Overige hernieuwbare energie in stap 3 | ja | ja | `renewable_production` |
+| Opslag afgewogen (ISSO 82.2 §4.4.2) | ja | – | `storage_considered` |
+
+`registrationType` in de uitvoer is `maatwerkadvies_met_renovatiepaspoort` als het paspoort aan alle eisen voldoet, en anders `maatwerkadvies` (§4.2.8, p. 23). Het paspoortdocument genereert EP-Online bij de registratie; de kern levert alleen de berekening en de toetsing.
+
+Interpretatie: voor utiliteit noemt §3.2 item 2 "een minimale EP2-waarde" en staat het toe de renovatiestandaard uit ISSO 75.2 te gebruiken. De kern toetst tegen die renovatiestandaard. Ontbreekt de renovatiestandaard, bijvoorbeeld zonder labelfuncties, dan blijft de eis onbeslist (`null`).
+

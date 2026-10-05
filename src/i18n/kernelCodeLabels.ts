@@ -6,6 +6,7 @@
 
 /** Dutch labels. */
 export const kernelCodeLabelsNl: Record<string, string> = {
+  'kernel.issue.import_log_invalid': "Een regel in het importlogboek heeft geen hulpmiddel; open het project opnieuw of herstel het logboek (BRL 9501 §4.3.1).",
   'kernel.issue.absent_bacs_has_classes': "GBS: er zijn klassen opgegeven terwijl een GBS-systeem ontbreekt; zet GBS aanwezig of verwijder de klassen.",
   'kernel.issue.active_cooling_system_inconsistent': "Het bewijs voor actieve koeling hoort niet bij het opgegeven koelsysteem; controleer het systeemtype (§5.7.1).",
   'kernel.issue.active_cooling_system_not_listed': "Dit actieve koelsysteem staat niet in de lijst voor woningen (§5.7.1).",
@@ -768,6 +769,7 @@ export const kernelCodeLabelsNl: Record<string, string> = {
 
 /** English labels. */
 export const kernelCodeLabelsEn: Record<string, string> = {
+  'kernel.issue.import_log_invalid': "An entry of the import log names no tool; reopen the project or repair the log (BRL 9501 §4.3.1).",
   'kernel.issue.absent_bacs_has_classes': "BACS: classes are given while no BACS is present; mark BACS present or remove the classes.",
   'kernel.issue.active_cooling_system_inconsistent': "The active-cooling evidence does not match the cooling system; check the system type (§5.7.1).",
   'kernel.issue.active_cooling_system_not_listed': "This active cooling system is not in the list for dwellings (§5.7.1).",

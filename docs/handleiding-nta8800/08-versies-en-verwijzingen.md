@@ -15,7 +15,7 @@ Herlabelen moet met de rekenkern van de oorspronkelijke berekening (BRL 9500-W �
 - `relabel_kernel_version_differs`;
 - `relabel_software_kernel_differs`.
 
-Een nieuwere build kan dus geen labels van een oudere build herlabelen. De certificaathouder bewaart daarom elke gebruikte geattesteerde build minstens 24 maanden na de opname. BRL 9501 §5.3 vraagt daarnaast dat een oude rekenversie beschikbaar blijft na een normwijziging. Zie [`docs/nta8800-attestdossier.md`](../nta8800-attestdossier.md).
+Een nieuwere build kan dus geen labels van een oudere build herlabelen. De certificaathouder bewaart daarom elke gebruikte geattesteerde build minstens 24 maanden na de opname. BRL 9501 §5.3 (p. 9) vraagt daarnaast dat de attesthouder een oude rekenversie minstens drie jaar na een normwijziging beschikbaar houdt. Het versiebeleid (opbouw van het versienummer, uitwisselbaarheid tussen versies, registratie van de rekenkernversie bij RVO) staat in [`docs/nta8800-versiebeheer.md`](../nta8800-versiebeheer.md). Zie ook [`docs/nta8800-attestdossier.md`](../nta8800-attestdossier.md).
 
 ## Wijzigingen
 
@@ -28,6 +28,7 @@ Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, st
 | [nta8800-verificatiestatus.md](../nta8800-verificatiestatus.md) | stand van de verificatie, onafhankelijke herberekeningen, interpretatielijst |
 | [nta8800-dekkingsregister.md](../nta8800-dekkingsregister.md) | dekking per normonderdeel |
 | [nta8800-attestdossier.md](../nta8800-attestdossier.md) | eisen uit BRL 9501, BRL 9500, Bep en Regeling en de status per eis |
+| [nta8800-versiebeheer.md](../nta8800-versiebeheer.md) | versiebeleid volgens BRL 9501 §4.3: versienummers, uitwisselbaarheid, RVO-registratie en bewaartermijnen |
 | [nta8800-releasenotes.md](../nta8800-releasenotes.md) | wijzigingen per datum |
 | [nta8800-werkinstructie.md](../nta8800-werkinstructie.md) | korte werkinstructie voor de projectberekening |
 | [nta8800-energieprestatie-keten.md](../nta8800-energieprestatie-keten.md) | de rekenketen van hoofdstuk 5, 9, 10, 13, 14 en 16 |
@@ -44,7 +45,7 @@ Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, st
 De rekenkern is gebouwd op gelicentieerde bronnen:
 - NTA 8800:2025+C1:2026;
 - ISSO 82.1 (7e druk, met erratum), ISSO 75.1 (7e druk), ISSO 82.2 en ISSO 75.2 (3e druk);
-- BRL 9500-W en BRL 9500-U in de versie van 14 oktober 2025 (bindend verklaard, nog niet vastgesteld), en BRL 9500-MWA-W/U van 19 juni 2024; paginaverwijzingen gelden voor deze versies;
+- BRL 9500-W en BRL 9500-U van 29 mei 2026 (aangewezen; tekst en paginering gelijk aan de versie van 14 oktober 2025), BRL 9500-MWA-W/U van 24 maart 2026 (in werking per 29 mei 2026) en BRL 9501 van 29 mei 2026; paginaverwijzingen gelden voor deze versies;
 - het Besluit en de Regeling energieprestatie gebouwen;
 - het Praktijkhandboek v2.
 

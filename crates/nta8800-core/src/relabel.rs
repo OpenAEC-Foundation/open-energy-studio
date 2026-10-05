@@ -1,10 +1,10 @@
 //! Relabelling (herlabelen): which changes between the original project
 //! and the improved one may be counted.
 //!
-//! Sources (page numbers only, no text): BRL 9500-W draft 14-10-2025
+//! Sources (page numbers only, no text): BRL 9500-W 29-05-2026
 //! §4.2.3/4.2.4 (p. 23–24, original survey date and software version),
 //! Bijlage 6a (allowed measures, p. 67) and Bijlage 6b (measures that may
-//! not be counted, p. 68); BRL 9500-U draft 14-10-2025 §4.2.3 (p. 18–19)
+//! not be counted, p. 68); BRL 9500-U 29-05-2026 §4.2.3 (p. 18–19)
 //! with §4.2.4 (p. 19–20) and Bijlagen 6a/6b (p. 58–60). For utility
 //! buildings 6a covers only
 //! one-to-one replacements: geometric changes of insulation or
@@ -32,9 +32,9 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 pub const RELABEL_SOURCE_W: &str =
-    "BRL 9500-W (14-10-2025) §4.2.3–4.2.4 (p. 23–24), Bijlage 6a (p. 67) and 6b (p. 68)";
+    "BRL 9500-W (29-05-2026) §4.2.3–4.2.4 (p. 23–24), Bijlage 6a (p. 67) and 6b (p. 68)";
 pub const RELABEL_SOURCE_U: &str =
-    "BRL 9500-U (14-10-2025) §4.2.3 (p. 18–19), §4.2.4 (p. 19–20), Bijlage 6a (p. 58) and 6b (p. 59–60)";
+    "BRL 9500-U (29-05-2026) §4.2.3 (p. 18–19), §4.2.4 (p. 19–20), Bijlage 6a (p. 58) and 6b (p. 59–60)";
 
 /// BRL 9500 part that governs the relabel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -214,7 +214,9 @@ const PRODUCTION_GEOMETRY_KEYS: &[&str] = &[
 /// Project blocks that are not label input: the maatwerkadvies and the
 /// basic survey kept with the project, and the registration (compared only
 /// for the survey date).
-const NON_LABEL_BLOCKS: &[&str] = &["registration", "maatwerkadvies", "basisopname"];
+/// `importLog` records which tool read data in (BRL 9501 §4.3.1); it is
+/// not label input.
+const NON_LABEL_BLOCKS: &[&str] = &["registration", "maatwerkadvies", "basisopname", "importLog"];
 
 /// Window and glazing properties: one-to-one replacement of glazing (6a,
 /// W p. 67, U p. 58).
@@ -1136,5 +1138,13 @@ mod tests {
     #[test]
     fn utility_source_cites_the_relabel_paragraph() {
         assert!(RELABEL_SOURCE_U.contains("§4.2.4 (p. 19–20)"));
+    }
+
+    #[test]
+    fn import_log_is_not_label_input() {
+        let project = serde_json::json!({"id": "p", "zones": [{"id": "z", "floorArea": 10.0}]});
+        let mut logged = project.clone();
+        logged["importLog"] = serde_json::json!([{"tool": "UNIEC3"}]);
+        assert_eq!(label_input_hash(&project), label_input_hash(&logged));
     }
 }

@@ -1,6 +1,6 @@
 # 6. Maatwerkadvies
 
-Het paneel **Maatwerkadvies** staat op het tabblad Resultaten. Het werkt volgens BRL 9500-MWA-W/U (§3.1, p. 11; §4.2.5, p. 17) en ISSO 82.2 (woningen) of ISSO 75.2 (utiliteit), beide 3e druk. De volledige technische beschrijving staat in [`docs/nta8800-maatwerkadvies.md`](../nta8800-maatwerkadvies.md).
+Het paneel **Maatwerkadvies** staat op het tabblad Resultaten. Het werkt volgens BRL 9500-MWA-W/U van 24-03-2026, in werking per 29-05-2026 (§3.1, p. 13; §3.2 renovatiepaspoort, p. 14; §4.2.5, p. 21; §4.2.8 registratie, p. 23), en ISSO 82.2 (woningen) of ISSO 75.2 (utiliteit), beide 3e druk. De volledige technische beschrijving staat in [`docs/nta8800-maatwerkadvies.md`](../nta8800-maatwerkadvies.md).
 
 ## Werkwijze
 
@@ -48,6 +48,26 @@ Hoe het sjabloon werkt:
   - een isolatiemaatregel die niet beter is dan de huidige Rc;
   - een investering van 0 €.
 - **Startwaarden:** levensduur en categorie zijn bewerkbare suggesties. ISSO geeft geen levensduurtabel.
+
+## Renovatiepaspoort
+
+Een renovatiepaspoort is een maatwerkadvies met drie gestapelde stappen. Stap 2 bevat de maatregelen van stap 1, stap 3 die van stap 1 en 2. Vink **Renovatiepaspoort opstellen** aan en kies per stap een pakket. Welke eisen gelden, hangt af van de gebouwfunctie van het project.
+
+**Woningen (BRL 9500-MWA-W §3.2, p. 14):**
+- **Stap 1, isolatie:** minstens de Standaard voor Woningisolatie. Vink dit aan, of laat het open: de kern vergelijkt dan zelf de warmtebehoefte van stap 1 met de standaard (NTA 8800 §5.3.2).
+- **Vooroorlogse standaard:** kies deze als gevelisolatie technisch niet kan, met een motivatie. Een hybride warmtepomp is dan toegestaan.
+- **Oververhitting:** vink de maatregelen in stap 1 aan die het risico beperken.
+- **Stap 2:** een aardgasvrije hoofdverwarming waar dat realistisch mogelijk is. Kan dat niet, vul dan de motivatie in.
+- **Stap 3:** voorstellen voor overige hernieuwbare energie. Vink ook aan of opslag is afgewogen (ISSO 82.2 §4.4.2).
+
+**Utiliteit (BRL 9500-MWA-U §3.2, p. 14):**
+- **Stap 1, isolatie:** het isolatieniveau is voldoende voor lagetemperatuurverwarming en hogetemperatuurkoeling (vinkje).
+- **Gevelisolatie:** kan die technisch niet, vul dan de motivatie in.
+- **Koelvraag:** vink de maatregelen in stap 1 aan die de koelvraag beperken.
+- **EP2:** de EP2 van stap 3 moet op of onder de renovatiestandaard liggen (NTA 8800 tabel 5.7, zie ISSO 75.2). De kern toetst dit.
+- **Stap 3:** voorstellen voor overige hernieuwbare energie.
+
+Het resultaat toont per eis of die is gehaald. De regel **Registratie** zegt of het advies wordt geregistreerd als *Maatwerkadvies* of als *Maatwerkadvies met renovatiepaspoort* (§4.2.8). Dat laatste kan alleen als het paspoort aan alle eisen voldoet. Het paspoortdocument zelf maakt EP-Online bij de registratie.
 
 ## Handmatige maatregelen
 

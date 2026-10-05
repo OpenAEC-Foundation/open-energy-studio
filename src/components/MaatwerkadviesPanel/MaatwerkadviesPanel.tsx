@@ -321,6 +321,29 @@ export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: st
 }
 
 /** Maatwerkadvies (BRL 9500-MWA, ISSO 82.2/75.2): measures, packages, results and advice. */
+/** Measures to tick for a passport requirement (step 1 measures). */
+function MeasureChecks({ label, measures, selected, onChange }: {
+  label: string;
+  measures: Array<{ id: string; name: string }>;
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  return (
+    <div className="mwa-wide mwa-checks">
+      <em>{label}</em>
+      {measures.map((measure) => (
+        <label key={measure.id} className="mwa-check">
+          <input type="checkbox" checked={selected.includes(measure.id)}
+            onChange={(e) => onChange(e.target.checked
+              ? [...selected, measure.id]
+              : selected.filter((id) => id !== measure.id))} />
+          {measure.name || measure.id}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function MaatwerkadviesPanel() {
   const { state, dispatch } = useEnergy();
   const { t } = useI18n();
@@ -351,6 +374,8 @@ export function MaatwerkadviesPanel() {
   const measuredUse: MwaMeasuredUse = definition.measured ?? {};
   const setMeasured = (patch: Partial<MwaMeasuredUse>) => update({ ...definition, measured: { ...measuredUse, ...patch } });
   const passport = definition.renovationPassport;
+  // BRL 9500-MWA-W §3.2 for dwellings, -U §3.2 for utility buildings.
+  const residentialPassport = project.buildingFunction === 'residential';
   const setPassport = (patch: Partial<MwaRenovationPassportInput>) => {
     if (passport) update({ ...definition, renovationPassport: { ...passport, ...patch } });
   };
@@ -576,38 +601,48 @@ export function MaatwerkadviesPanel() {
               </select>
             </label>
           ))}
-          <label className="mwa-check">
-            <input type="checkbox" checked={passport.insulationStandardMet ?? false}
-              onChange={(e) => setPassport({ insulationStandardMet: e.target.checked })} />
-            {t('mwa.passport.insulationStandard')}
-          </label>
-          <label className="mwa-check">
-            <input type="checkbox" checked={passport.prewarStandard ?? false}
-              onChange={(e) => setPassport({ prewarStandard: e.target.checked })} />
-            {t('mwa.passport.prewar')}
-          </label>
-          {passport.prewarStandard && <label className="mwa-wide">{t('mwa.passport.prewarMotivation')}
-            <input value={passport.prewarMotivation ?? ''} onChange={(e) => setPassport({ prewarMotivation: e.target.value })} />
-          </label>}
-          <label className="mwa-check">
-            <input type="checkbox" checked={passport.storageConsidered ?? false}
-              onChange={(e) => setPassport({ storageConsidered: e.target.checked })} />
-            {t('mwa.passport.storage')}
-          </label>
-          <div className="mwa-wide mwa-checks">
-            <em>{t('mwa.passport.overheating')}</em>
-            {definition.measures.map((measure) => (
-              <label key={measure.id} className="mwa-check">
-                <input type="checkbox" checked={(passport.overheatingMeasureIds ?? []).includes(measure.id)}
-                  onChange={(e) => setPassport({
-                    overheatingMeasureIds: e.target.checked
-                      ? [...(passport.overheatingMeasureIds ?? []), measure.id]
-                      : (passport.overheatingMeasureIds ?? []).filter((id) => id !== measure.id),
-                  })} />
-                {measure.name || measure.id}
-              </label>
-            ))}
-          </div>
+          {residentialPassport ? <>
+            <p className="mwa-wide">{t('mwa.passport.schemeW')}</p>
+            <label className="mwa-check">
+              <input type="checkbox" checked={passport.insulationStandardMet ?? false}
+                onChange={(e) => setPassport({ insulationStandardMet: e.target.checked })} />
+              {t('mwa.passport.insulationStandard')}
+            </label>
+            <label className="mwa-check">
+              <input type="checkbox" checked={passport.prewarStandard ?? false}
+                onChange={(e) => setPassport({ prewarStandard: e.target.checked })} />
+              {t('mwa.passport.prewar')}
+            </label>
+            {passport.prewarStandard && <label className="mwa-wide">{t('mwa.passport.prewarMotivation')}
+              <input value={passport.prewarMotivation ?? ''} onChange={(e) => setPassport({ prewarMotivation: e.target.value })} />
+            </label>}
+            <label className="mwa-wide">{t('mwa.passport.gasFreeNotRealistic')}
+              <input value={passport.gasFreeNotRealisticMotivation ?? ''}
+                onChange={(e) => setPassport({ gasFreeNotRealisticMotivation: e.target.value || undefined })} />
+            </label>
+            <label className="mwa-check">
+              <input type="checkbox" checked={passport.storageConsidered ?? false}
+                onChange={(e) => setPassport({ storageConsidered: e.target.checked })} />
+              {t('mwa.passport.storage')}
+            </label>
+            <MeasureChecks label={t('mwa.passport.overheating')} measures={definition.measures}
+              selected={passport.overheatingMeasureIds ?? []}
+              onChange={(ids) => setPassport({ overheatingMeasureIds: ids })} />
+          </> : <>
+            <p className="mwa-wide">{t('mwa.passport.schemeU')}</p>
+            <label className="mwa-check">
+              <input type="checkbox" checked={passport.lowTemperatureReady ?? false}
+                onChange={(e) => setPassport({ lowTemperatureReady: e.target.checked })} />
+              {t('mwa.passport.lowTemperatureReady')}
+            </label>
+            <label className="mwa-wide">{t('mwa.passport.facadeImpossible')}
+              <input value={passport.facadeInsulationImpossibleMotivation ?? ''}
+                onChange={(e) => setPassport({ facadeInsulationImpossibleMotivation: e.target.value || undefined })} />
+            </label>
+            <MeasureChecks label={t('mwa.passport.cooling')} measures={definition.measures}
+              selected={passport.coolingMeasureIds ?? []}
+              onChange={(ids) => setPassport({ coolingMeasureIds: ids })} />
+          </>}
         </div>}
       </details>
 
@@ -669,6 +704,7 @@ export function MaatwerkadviesPanel() {
           {assessment.renovationPassport && (
             <div className="nta-performance-bbl">
               <strong>{t('mwa.passport')}: {verdictText(assessment.renovationPassport.eligible)}</strong>
+              {assessment.registrationType && <p>{t('mwa.registrationType')}: {t(`mwa.registrationType.${assessment.registrationType}`)}</p>}
               <ul>{assessment.renovationPassport.requirements.map((item) => (
                 <li key={item.code}>{t(`mwa.passport.req.${item.code}`)}: {verdictText(item.met)}</li>
               ))}</ul>

@@ -216,7 +216,7 @@ function canonicalJson(value: unknown): string {
 
 /**
  * SHA-256 of the project's label input: everything except the registration,
- * the maatwerkadvies and the basic survey, which the relabel comparison
+ * the maatwerkadvies, the basic survey and the import log, which the relabel comparison
  * skips, in the kernel's canonical form (`label_input_hash` in relabel.rs),
  * so it equals the kernel's `currentLabelInputHash`. A stored comparison
  * whose hash differs is out of date.
@@ -226,6 +226,7 @@ export async function labelInputSha256(project: object): Promise<string> {
   delete rest.registration;
   delete rest.maatwerkadvies;
   delete rest.basisopname;
+  delete rest.importLog;
   return sha256Hex(utf8.encode(canonicalJson(rest)));
 }
 
