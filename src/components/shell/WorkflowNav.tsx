@@ -12,7 +12,7 @@ import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { Kbd, Tag } from '../ui';
 import { useMenu } from './TopBar';
-import { STEP_GROUPS, WORKFLOW_STEPS, TOOL_STEP, type Route, type StepId } from '../../core/navigation/routes';
+import { STEP_GROUPS, WORKFLOW_STEPS, TOOL_STEP, visibleSubs, type Route, type StepId } from '../../core/navigation/routes';
 import { isNewBuild, type StepStatus } from '../../core/nta/stepStatus';
 import type { IProject } from '../../core/energy/types';
 import type { ShellActions } from './ShellActions';
@@ -103,9 +103,9 @@ export function WorkflowNav({ project, route, statuses, floorAreaM2, actions }: 
                       {count > 0 && <span className={`nav-count ${status.errors > 0 ? 'errors' : 'warnings'}`} aria-hidden="true">{count}</span>}
                       <span className="visually-hidden">, {t('nav.stepNumber', { number: String(step.number) })}, {stepStateText(t, status)}</span>
                     </button>
-                    {current && step.subs.length > 0 && (
+                    {current && visibleSubs(step, project).length > 0 && (
                       <ul className="nav-subs">
-                        {step.subs.map((sub) => (
+                        {visibleSubs(step, project).map((sub) => (
                           <li key={sub.id}>
                             <button type="button" className="nav-sub" aria-current={route.sub === sub.id ? 'page' : undefined}
                               onClick={() => actions.navigate({ step: step.id, sub: sub.id })}>{t(sub.labelKey)}</button>

@@ -9,6 +9,8 @@ export interface RecentProject {
   path: string;
   name: string;
   buildingFunction?: BuildingFunction;
+  /** Energy label class of the last calculated result (e.g. 'A+'), when known. */
+  labelClass?: string;
   /** ISO 8601 time of the last open or save. */
   at: string;
 }
@@ -42,9 +44,14 @@ function write(entries: RecentProject[]): void {
   } catch { /* storage full or blocked: the list is a convenience */ }
 }
 
-/** Put a project file first in the list (one entry per path, newest first, at most eight). */
+/**
+ * Put a project file first in the list (one entry per path, newest first, at most eight).
+ * Without a label class (opened, not yet calculated) the label of the earlier entry is kept.
+ */
 export function recordRecentProject(entry: Omit<RecentProject, 'at'>, at = new Date()): RecentProject[] {
-  const next = [{ ...entry, at: at.toISOString() }, ...readRecentProjects().filter((item) => item.path !== entry.path)]
+  const current = readRecentProjects();
+  const labelClass = entry.labelClass ?? current.find((item) => item.path === entry.path)?.labelClass;
+  const next = [{ ...entry, ...(labelClass ? { labelClass } : {}), at: at.toISOString() }, ...current.filter((item) => item.path !== entry.path)]
     .slice(0, RECENT_PROJECTS_MAX);
   write(next);
   return next;

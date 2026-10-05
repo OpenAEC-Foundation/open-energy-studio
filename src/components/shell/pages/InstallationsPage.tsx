@@ -24,7 +24,9 @@ import { Banner, Button, Card, DataTable, IssueList, StatusPill, Tag, type Colum
 import { ItemActions } from '../../ItemActions/ItemActions';
 import { useShellActions } from '../ShellActions';
 import { routeLabel } from '../PageHeader';
-import { NtaStepSections } from '../NtaStepPage';
+import { HEATING_CHAIN, NtaStepSections, PART_KEYS, heatingPartFilled } from '../NtaStepPage';
+import { useNtaDraft } from '../../../context/NtaDraftProvider';
+import type { Draft } from '../../NtaPerformancePanel/NtaFormFields';
 
 /**
  * Installed PV peak power: from the NTA input when it has PV systems (16.4a/16.4b),
@@ -203,6 +205,33 @@ export function InstallationAddBar({ sub }: { sub?: string }) {
 
 // ── Overview: chain cards ───────────────────────────────────────────
 
+/**
+ * The heating chain of mockup 03: opwekking › distributie › afgifte › regeling,
+ * each phase marked filled or empty in the NTA input (the open draft, else the
+ * applied block) and opening that part of the heating stepper.
+ */
+function HeatingChain({ project }: { project: IProject }) {
+  const { t } = useI18n();
+  const actions = useShellActions();
+  const shared = useNtaDraft();
+  const nta = shared?.draft ?? (project.ntaCalculation as unknown as Draft | undefined);
+  return (
+    <ol className="chain-phases" aria-label={t('installations.chain.label')}>
+      {HEATING_CHAIN.map((part) => {
+        const filled = heatingPartFilled(nta, part);
+        return <li key={part}>
+          <button type="button" className={filled ? 'chain-phase chain-phase--filled' : 'chain-phase'} data-part={part}
+            onClick={() => { shared?.setHeatingPart(part); actions?.navigate({ step: 'installations', sub: 'heating' }); }}>
+            <span className="chain-phase__dot" aria-hidden="true" />
+            {t(PART_KEYS[part])}
+            <span className="visually-hidden">, {t(filled ? 'installations.chain.filled' : 'installations.chain.empty')}</span>
+          </button>
+        </li>;
+      })}
+    </ol>
+  );
+}
+
 export function InstallationsOverview() {
   const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
@@ -238,6 +267,7 @@ export function InstallationsOverview() {
                 {t('installations.open')} <ArrowRight aria-hidden="true" />
               </Button>
             </>}>
+            {service.id === 'heating' && <HeatingChain project={project} />}
             <ul className="chain-stages">
               {systems.map(({ key, item, index }) => (
                 <li key={item.id} data-path={formatKernelPath([key, index])}

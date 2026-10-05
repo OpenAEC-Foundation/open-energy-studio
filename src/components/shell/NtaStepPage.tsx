@@ -87,6 +87,16 @@ export function heatingPartForPath(path: string | undefined): HeatingPart | null
   return best?.part ?? null;
 }
 
+/** The heating chain on the Installaties overview (mockup 03): opwekking › distributie › afgifte › regeling. */
+export const HEATING_CHAIN: HeatingPart[] = ['generation', 'distribution', 'emission', 'control'];
+
+/** Whether the NTA input holds anything for a heating part. */
+export function heatingPartFilled(nta: Draft | null | undefined, part: HeatingPart): boolean {
+  if (!nta) return false;
+  return pageSections('installations', 'heating').some((def) =>
+    def.part === part && def.paths.some((own) => hasContent(read(nta, parseKernelPath(own)))));
+}
+
 interface Evidence {
   path: string;
   filled: boolean;
@@ -188,7 +198,7 @@ function AdvancedBlock({ defs, draft, open, children }: { defs: NtaSectionDef[];
   );
 }
 
-const PART_KEYS: Record<HeatingPart, string> = {
+export const PART_KEYS: Record<HeatingPart, string> = {
   generation: 'ntaStep.part.generation',
   distribution: 'ntaStep.part.distribution',
   emission: 'ntaStep.part.emission',

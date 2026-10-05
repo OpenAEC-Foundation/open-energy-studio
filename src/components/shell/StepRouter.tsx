@@ -15,7 +15,6 @@ import type { IProject } from '../../core/energy/types';
 import { Banner, Button, Card, IssueList } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary/ErrorBoundary';
 import { UnheatedSpacesPanel } from '../UnheatedSpacesPanel/UnheatedSpacesPanel';
-import { Building3DView } from '../Building3DView/Building3DView';
 import { HeatPumpInventoryPanel } from '../HeatPumpInventoryPanel/HeatPumpInventoryPanel';
 import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainReferencePanel';
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
@@ -24,9 +23,7 @@ import { ResultsDashboard } from './pages/results/ResultsDashboard';
 import { BasisopnamePanel, type SurveySection } from '../BasisopnamePanel/BasisopnamePanel';
 import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
-import { UValueCalculator } from '../UValueCalculator/UValueCalculator';
-import { ThermalBridgeCalculator } from '../ThermalBridgeCalculator/ThermalBridgeCalculator';
-import { HeatPumpSizingCalculator } from '../HeatPumpSizingCalculator/HeatPumpSizingCalculator';
+import { Building3DView, HeatPumpSizingCalculator, LazyPage, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
 import { PageHeader, SubTabs, routeLabel } from './PageHeader';
 import { ProjectOverview } from './pages/ProjectOverview';
 import { InstallationAddBar, InstallationsOverview, ServicePage, type ServiceId } from './pages/InstallationsPage';
@@ -105,7 +102,7 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
           {route.sub === 'thermalBridges' && <ThermalBridgesPage />}
           {route.sub === 'airTightness' && <AirTightnessPage />}
           {route.sub === 'unheated' && <UnheatedSpacesPanel />}
-          {route.sub === 'model3d' && <Building3DView />}
+          {route.sub === 'model3d' && <LazyPage><Building3DView /></LazyPage>}
           {route.sub !== 'model3d' && <NtaStepSections route={route} />}
         </div>
       </>;
@@ -209,9 +206,11 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       page = <>
         {header({ lead: t('page.tool.lead') })}
         <div className="page-body">
-          {route.sub === 'uvalue' && <UValueCalculator />}
-          {route.sub === 'thermal-bridge' && <ThermalBridgeCalculator />}
-          {route.sub === 'heat-pump-sizing' && <HeatPumpSizingCalculator />}
+          <LazyPage>
+            {route.sub === 'uvalue' && <UValueCalculator />}
+            {route.sub === 'thermal-bridge' && <ThermalBridgeCalculator />}
+            {route.sub === 'heat-pump-sizing' && <HeatPumpSizingCalculator />}
+          </LazyPage>
         </div>
       </>;
       break;

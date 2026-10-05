@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EnergyProvider, useEnergy, useDocumentManager, useHasActiveDocument } from './context/EnergyContext';
 import { KernelProvider, useKernel } from './context/KernelProvider';
-import { NtaDraftProvider } from './context/NtaDraftProvider';
+import { projectCalculated } from './core/nta/KernelClient';
+import { summarizeForPreview } from './core/nta/PreviewSummary';
+import { NtaDraftProvider, useNtaDraft } from './context/NtaDraftProvider';
 import { I18nProvider } from './i18n/I18nProvider';
 import { WelcomeScreen, type NewProjectKind } from './components/WelcomeScreen/WelcomeScreen';
 import { StatusBar } from './components/StatusBar/StatusBar';
@@ -19,7 +21,7 @@ import { CoolingSystemDialog } from './components/dialogs/CoolingSystemDialog/Co
 import { HotWaterSystemDialog } from './components/dialogs/HotWaterSystemDialog/HotWaterSystemDialog';
 import { SolarPVDialog } from './components/dialogs/SolarPVDialog/SolarPVDialog';
 import { SolarThermalDialog } from './components/dialogs/SolarThermalDialog/SolarThermalDialog';
-import { PrintPreviewDialog } from './components/dialogs/PrintPreviewDialog/PrintPreviewDialog';
+import { LazyPage, PrintPreviewDialog } from './components/shell/lazyPages';
 import { FeedbackDialog } from './components/dialogs/FeedbackDialog/FeedbackDialog';
 import { SettingsDialog } from './components/SettingsDialog/SettingsDialog';
 import { TopBar, type TopBarProps } from './components/shell/TopBar';
@@ -335,19 +337,43 @@ function ActiveDocumentShell({ files, paletteOpen, setPaletteOpen }: {
         <SolarThermalDialog editId={dialog.editId} onClose={closeDialog} />
       )}
       {printPreviewOpen && (
-        <PrintPreviewDialog onClose={() => setPrintPreviewOpen(false)} />
+        <LazyPage><PrintPreviewDialog onClose={() => setPrintPreviewOpen(false)} /></LazyPage>
       )}
       {paletteOpen && <CommandPalette entries={paletteEntries} onClose={() => setPaletteOpen(false)} />}
     </ShellActionsProvider>
   );
 }
 
+/** What the app level needs to know of the open document (its draft and kernel live below it). */
+export interface DocumentReport {
+  projectId: string;
+  /** The NTA draft has changes that are not applied. */
+  draftDirty: boolean;
+  /** Label class of a calculated kernel answer, for the recent-projects list. */
+  labelClass: string | null;
+}
+
+function DocumentReporter({ onReport }: { onReport: (report: DocumentReport | null) => void }) {
+  const { state } = useEnergy();
+  const draftDirty = useNtaDraft()?.dirty ?? false;
+  const settled = useKernel()?.settled ?? null;
+  const summary = settled ? summarizeForPreview(settled) : null;
+  const labelClass = summary && projectCalculated(summary.status) ? summary.labelClass ?? null : null;
+  const projectId = state.project.id;
+  useEffect(() => { onReport({ projectId, draftDirty, labelClass }); }, [projectId, draftDirty, labelClass, onReport]);
+  useEffect(() => () => onReport(null), [onReport]);
+  return null;
+}
+
 /** One kernel run per open document, shared by every view of the shell. */
-function ActiveDocumentContent(props: { files: FileCommands; paletteOpen: boolean; setPaletteOpen: (open: boolean) => void }) {
+function ActiveDocumentContent({ onReport, ...props }: {
+  files: FileCommands; paletteOpen: boolean; setPaletteOpen: (open: boolean) => void; onReport: (report: DocumentReport | null) => void;
+}) {
   const { state } = useEnergy();
   return (
     <KernelProvider project={state.project}>
       <NtaDraftProvider>
+        <DocumentReporter onReport={onReport} />
         <ActiveDocumentShell {...props} />
       </NtaDraftProvider>
     </KernelProvider>
@@ -376,6 +402,9 @@ function AppContent() {
   const toast = useToast();
   const confirmChoice = useConfirm();
   const untitledCounter = useRef(0);
+  // Draft state and label of the active document (both live below this component).
+  const activeReport = useRef<DocumentReport | null>(null);
+  const setActiveReport = useCallback((report: DocumentReport | null) => { activeReport.current = report; }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -458,7 +487,10 @@ function AppContent() {
   // Recently opened or saved project files (desktop only: browser documents have no path).
   const [recentProjects, setRecentProjects] = useState(readRecentProjects);
   const rememberRecent = useCallback((filePath: string, project: IProject) => {
-    setRecentProjects(recordRecentProject({ path: filePath, name: project.name, buildingFunction: project.buildingFunction }));
+    const report = activeReport.current?.projectId === project.id ? activeReport.current : null;
+    setRecentProjects(recordRecentProject({
+      path: filePath, name: project.name, buildingFunction: project.buildingFunction, labelClass: report?.labelClass ?? undefined,
+    }));
   }, []);
 
   const handleOpenExample = useCallback((kind: ExampleKind) => {
@@ -616,6 +648,17 @@ function AppContent() {
     const doc = docState.documents.find(d => d.id === id);
     if (!doc) return;
 
+    // NTA input that was edited but not applied is lost on closing (it is not part of the project yet).
+    if (id === docState.activeDocumentId && activeReport.current?.projectId === doc.state.project.id && activeReport.current.draftDirty) {
+      const choice = await confirmChoice({
+        title: t('app.unappliedDraft.title'),
+        message: t('app.unappliedDraft.message', { name: doc.state.project.name || t('app.untitled') }),
+        confirmLabel: t('app.unappliedDraft.discard'),
+        danger: true,
+      });
+      if (choice !== 'confirm') return;
+    }
+
     if (doc.state.isDirty) {
       // One translated dialog for desktop and browser: Opslaan · Niet opslaan · Annuleren.
       const choice = await confirmChoice({
@@ -632,7 +675,7 @@ function AppContent() {
     }
 
     docDispatch({ type: 'DOC_CLOSE', payload: id });
-  }, [docState.documents, docDispatch, writeProjectToDisk, confirmChoice, t]);
+  }, [docState.documents, docState.activeDocumentId, docDispatch, writeProjectToDisk, confirmChoice, t]);
 
   const handleCloseActiveTab = useCallback(() => {
     if (docState.activeDocumentId) void handleCloseTab(docState.activeDocumentId);
@@ -728,7 +771,7 @@ function AppContent() {
       <a className="skip-link" href="#main-content"
         onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('nav.skip')}</a>
       {hasActiveDoc ? (
-        <ActiveDocumentContent files={files} paletteOpen={paletteOpen} setPaletteOpen={setPaletteOpen} />
+        <ActiveDocumentContent files={files} paletteOpen={paletteOpen} setPaletteOpen={setPaletteOpen} onReport={setActiveReport} />
       ) : (
         <>
           <TopBar {...welcomeTopBar} />

@@ -17,16 +17,9 @@ import type { IProject } from '../../../core/energy/types';
 import type { ShellActions } from '../ShellActions';
 import { PageHeader, routeLabel } from '../PageHeader';
 import { stepStateText } from '../WorkflowNav';
+import { labelClassName } from '../labelClass';
 
 const MAX_ISSUES = 12;
-
-/** CSS class of the energy label colour. */
-export function labelClassName(label: string | null | undefined): string {
-  if (!label) return '';
-  const plus = (label.match(/\+/g) ?? []).length;
-  if (label.startsWith('A') && plus > 0) return plus === 1 ? 'lbl-ap' : `lbl-app${plus === 2 ? '2' : plus}`;
-  return `lbl-${label.toLowerCase()}`;
-}
 
 function progressOf(status: StepStatus): number {
   switch (status.state) {
