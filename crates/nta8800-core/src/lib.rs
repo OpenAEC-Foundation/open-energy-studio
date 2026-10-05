@@ -63,6 +63,7 @@ pub mod materials;
 pub mod micro_chp;
 pub mod monthly_demand;
 pub mod monthly_direct_transmission;
+pub mod norm_versions;
 pub mod opname;
 pub mod project_performance;
 pub mod pv;
@@ -298,7 +299,7 @@ pub fn capabilities() -> KernelCapabilities {
     KernelCapabilities {
         kernel_language: "rust",
         kernel_version: KERNEL_VERSION,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         calculation_available: false,
         attest_status: "unattested",
         implemented: &[
@@ -1603,7 +1604,7 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
     };
     InputAssessment {
         status,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint,
         calculation_available: false,

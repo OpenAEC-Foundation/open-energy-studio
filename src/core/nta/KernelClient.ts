@@ -3358,6 +3358,8 @@ export interface NtaExternalSupply {
     temperatureClass: 'below20_c' | 'at_least20_c_or_surface_water_or_unknown';
     supplierReference: string;
     annexP?: NtaAnnexPRoute | null;
+    /** NTA 8800:2024 only: source realised or permitted from 2013 (EER 23, else 16). */
+    realisedFrom2013?: boolean | null;
   } | null;
   /** P.7/P.71: electricity produced in the area with a direct physical connection. */
   areaElectricity?: Array<
@@ -3602,11 +3604,17 @@ export interface NtaAnnexAaInput {
     opaqueInnerAreaM2: number;
     windows?: Array<{ windowId: string; uWithShutterWPerM2k?: number | null }>;
     installedCapacityKw: number;
+    /** NTA 8800:2024 only: roof area A_r for the large-roof rule of step 2. */
+    roofAreaM2?: number | null;
   }>;
+  /** NTA 8800:2024 only: SWM of step 1, 50–100 kg/m². */
+  effectiveMassKgPerM2?: number | null;
 }
 
 interface NtaAnnexAaLoads {
   peakHour: number;
+  /** NTA 8800:2024: t_max of table AA.2, possibly between whole hours. */
+  peakTimeH?: number;
   internalW: number;
   outdoorAirW: number;
   opaqueW: number;
@@ -4084,6 +4092,8 @@ export async function fetchKernelInterpretations(): Promise<NtaInterpretationGro
 
 export interface BuildingPerformanceAssessment {
   status: 'calculated_unverified' | 'invalid';
+  normVersion?: NormVersion;
+  registrationEligible?: boolean;
   scope: string;
   chapter5Source: string;
   inputFingerprint: string;
@@ -4187,7 +4197,15 @@ export interface NtaProjectHeatingSystem {
   humidifiers?: NtaZoneHumidifier[];
 }
 
+/** Edition of NTA 8800 a calculation follows (`ntaCalculation.normVersion`); absent is the current one. */
+export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
+export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
+/** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
+export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024'];
+
 export interface NtaCalculationInput {
+  /** Edition to calculate in; older editions give `calculated_legacy_edition`, never registrable. */
+  normVersion?: NormVersion | null;
   calculationScope: 'residential' | 'utility';
   areaSourceReference: string;
   usageFunction: NtaUsageFunction;
@@ -4338,8 +4356,12 @@ export interface NtaChapterFiveIndicators {
 }
 
 export interface ProjectPerformanceAssessment {
-  status: 'calculated_unverified' | 'incomplete' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'incomplete' | 'invalid';
   targetNormVersion: string;
+  /** Edition calculated in (older kernels omit it: the current edition). */
+  normVersion?: NormVersion;
+  /** False for an older edition: the result may not be registered. */
+  registrationEligible?: boolean;
   kernelVersion: string;
   inputFingerprint: string;
   attestStatus: 'unattested';
@@ -5059,4 +5081,14 @@ export interface NtaMicroChp {
   /** 9.6.6.2.2.8 storage outside the test configuration (space heating only). */
   storage?: { lossWPerK: number; setTemperatureC: number; chargingAuxiliaryW?: number | null; sourceReference: string } | null;
   testReportReference: string;
+}
+
+/** True when the kernel calculated the project, in the current or in an older edition. */
+export function projectCalculated(status: ProjectPerformanceAssessment['status'] | null | undefined): boolean {
+  return status === 'calculated_unverified' || status === 'calculated_legacy_edition';
+}
+
+/** True when the result follows an older edition and therefore may not be registered. */
+export function legacyEdition(assessment: Pick<ProjectPerformanceAssessment, 'status' | 'registrationEligible'> | null | undefined): boolean {
+  return assessment?.status === 'calculated_legacy_edition' || assessment?.registrationEligible === false;
 }

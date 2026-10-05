@@ -3,7 +3,7 @@
 //! consultation draft and checked against the final edition.
 //! This selects a row only; gas input and auxiliary energy require a separate carrier audit.
 
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -206,7 +206,7 @@ pub fn assess_gas_heat_pump_forfait_draft(
         status: if valid { "diagnostic_valid" } else { "invalid" },
         scope: "public_chapter_9_draft_tables_9_27_9_29_gas_engine_or_absorption_lookup_only",
         consultation_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         table: if residential { "9.27" } else { "9.29" },

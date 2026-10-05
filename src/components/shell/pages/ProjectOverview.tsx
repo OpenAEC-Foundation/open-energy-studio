@@ -2,6 +2,7 @@
  * Step 1 Project: overview after mockup 01 — progress per step from the
  * kernel check, the open points with "Ga naar", the outcome and the project data.
  */
+import { projectCalculated } from '../../../core/nta/KernelClient';
 import type { ReactNode } from 'react';
 import { AlertTriangle, ArrowRight, Check, ChevronRight, Pencil, Upload, X } from 'lucide-react';
 import { useI18n } from '../../../i18n/i18n';
@@ -69,7 +70,7 @@ export function ProjectOverview({ project, statuses, actions }: {
   const kernel = useKernel();
   const assessment = kernel?.settled ?? null;
   const summary = assessment ? summarizeForPreview(assessment) : null;
-  const calculated = summary?.status === 'calculated_unverified';
+  const calculated = projectCalculated(summary?.status);
   const issues = kernelIssues(assessment);
   const errors = issues.filter((issue) => issue.kind === 'error').length;
   const warnings = issues.length - errors;

@@ -10,7 +10,7 @@ use crate::final_energy_draft::{as_f64, decimal};
 
 /// Final-edition citation of §5.5.8.
 const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §5.5.8 (p. 99–101)";
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -293,7 +293,7 @@ pub fn assess_bacs_draft(input: &BacsDraftInput) -> BacsDraftAssessment {
         status,
         scope: "nta8800_5_5_8_bacs_factor",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         final_edition_verified: true,

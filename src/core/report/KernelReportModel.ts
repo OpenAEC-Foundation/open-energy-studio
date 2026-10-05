@@ -1,5 +1,5 @@
 import type { IEnergyBreakdown } from '../energy/types';
-import type { BuildingPerformanceAssessment, MonthlyDemandAssessment, ProjectPerformanceAssessment } from '../nta/KernelClient';
+import { projectCalculated, type BuildingPerformanceAssessment, type MonthlyDemandAssessment, type ProjectPerformanceAssessment } from '../nta/KernelClient';
 import { kernelEnergyBreakdown } from '../nta/KernelBreakdown';
 
 /** One BENG row: value, Bbl limit and the kernel's own toets (null when not testable). */
@@ -44,7 +44,7 @@ function zonesOf(performance: BuildingPerformanceAssessment): Array<Partial<Mont
  * no calculated result.
  */
 export function kernelReportModel(assessment: ProjectPerformanceAssessment | null | undefined): KernelReportModel | null {
-  const performance = assessment?.status === 'calculated_unverified' ? assessment.performance : null;
+  const performance = projectCalculated(assessment?.status) ? assessment?.performance ?? null : null;
   if (!assessment || !performance) return null;
   const bbl = performance.bblCheck ?? null;
   const utility = assessment.derivedInput?.calculationScope === 'utility';

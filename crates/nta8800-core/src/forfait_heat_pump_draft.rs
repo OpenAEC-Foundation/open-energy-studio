@@ -3,7 +3,7 @@
 //! the public consultation draft and checked against the final edition. This
 //! is not a generator-energy calculation.
 
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -611,7 +611,7 @@ pub fn assess_forfait_heat_pump_draft(
         },
         scope: "public_chapter_9_draft_electric_heat_pump_forfait_lookup_only",
         consultation_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         table,

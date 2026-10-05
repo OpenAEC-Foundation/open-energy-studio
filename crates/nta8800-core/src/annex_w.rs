@@ -259,7 +259,13 @@ pub fn calculate_booster(pump: &BoosterHeatPump, output_kwh: &[f64; 12]) -> [Boo
         // W.8–W.10 (in kWh instead of MJ).
         let evaporator = output * (cop - 1.0) / cop;
         let standing = pump.standing_loss_kw * MONTH_HOURS[index];
-        let denominator = (output / cop - standing).max(standing);
+        // (W.9): the lower bound is new in 2025+C1 (p. 1123); 2024 has
+        // none (p. 1103).
+        let denominator = if crate::norm_versions::profile().booster_bounds {
+            (output / cop - standing).max(standing)
+        } else {
+            output / cop - standing
+        };
         let standing_heat = if denominator > 0.0 {
             (output / denominator - 1.0) * standing
         } else {
@@ -395,6 +401,31 @@ mod tests {
             jan.heating_system_heat_kwh,
             round_up(evaporator + standing_heat)
         );
+    }
+
+    #[test]
+    fn w9_lower_bound_is_new_in_2025() {
+        let input = pump();
+        let output = [20.0; 12];
+        let current = calculate_booster(&input, &output);
+        let legacy =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                calculate_booster(&input, &output)
+            });
+        let standing = 0.02 * 744.0;
+        let cop = current[0].cop;
+        let denominator = 20.0 / cop - standing;
+        assert!(denominator < standing);
+        // (W.9), 2025+C1 p. 1123: the denominator is at least E_ls.
+        let bounded = (20.0 / standing - 1.0) * standing;
+        assert!((current[0].standing_loss_heat_kwh - bounded).abs() < 1e-9);
+        // NTA 8800:2024 p. 1103: no bound.
+        let unbounded = if denominator > 0.0 {
+            (20.0 / denominator - 1.0) * standing
+        } else {
+            0.0
+        };
+        assert!((legacy[0].standing_loss_heat_kwh - unbounded).abs() < 1e-9);
     }
 
     #[test]

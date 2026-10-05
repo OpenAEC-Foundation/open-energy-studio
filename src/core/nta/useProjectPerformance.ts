@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { IProject } from '../energy/types';
-import { calculateProjectPerformanceWithRust, type ProjectPerformanceAssessment } from './KernelClient';
+import { calculateProjectPerformanceWithRust, projectCalculated, type ProjectPerformanceAssessment } from './KernelClient';
 
 export type ProjectPerformanceQuery =
   | { project: IProject; kind: 'loading' }
@@ -60,5 +60,5 @@ export function useProjectPerformance(project: IProject, enabled = true, refresh
 export function calculatedAssessment(query: ProjectPerformanceQuery | null): ProjectPerformanceAssessment | null {
   if (query?.kind !== 'done') return null;
   const { assessment } = query;
-  return assessment.status === 'calculated_unverified' && assessment.performance ? assessment : null;
+  return projectCalculated(assessment.status) && assessment.performance ? assessment : null;
 }

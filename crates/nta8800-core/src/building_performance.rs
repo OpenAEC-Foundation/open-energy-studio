@@ -18,9 +18,9 @@
 //! required for the indicators (5.27).
 
 use crate::annex_p::{
-    area_electricity, assess_route, source_factors, AnnexPRoute, AreaElectricityGenerator,
-    AreaElectricityResult, CollectiveHeatPumpSource, ScenarioFactors, SupplyFactors,
-    SystemFunction, SystemResult, COLD_FORFAIT, HEAT_FORFAIT,
+    area_electricity, assess_route, cold_forfait, heat_forfait, source_factors, AnnexPRoute,
+    AreaElectricityGenerator, AreaElectricityResult, CollectiveHeatPumpSource, ScenarioFactors,
+    SupplyFactors, SystemFunction, SystemResult,
 };
 use crate::annex_q::AnnexQSource;
 use crate::bbl_requirements::{
@@ -44,6 +44,7 @@ use crate::lighting::{
     assess_zone_lighting, validate_lighting, LightingContext, ZoneLighting, ZoneLightingResult,
 };
 use crate::monthly_demand::{InternalGains, MonthlyDemandInput, UtilityLighting};
+use crate::norm_versions::{self, NormVersion};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_cooling::{
     assess_cooling, validate_cooling, CoolingAssessment, CoolingContext, CoolingGeneratorKind,
@@ -54,7 +55,7 @@ use crate::space_heating_chain::{
     SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
 use crate::tojuli::{assess_tojuli, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions};
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -119,11 +120,13 @@ impl Carrier {
         }
     }
 
+    /// Table 5.3 of the active edition (2024 p. 94–95, 2025+C1 p. 96–98).
     fn co2_factor(self) -> f64 {
+        let profile = norm_versions::profile();
         match self {
-            Self::El => K_CO2_ELECTRICITY,
-            Self::Gas => K_CO2_GAS,
-            Self::Oil => K_CO2_OIL,
+            Self::El => profile.k_co2_electricity,
+            Self::Gas => profile.k_co2_gas,
+            Self::Oil => profile.k_co2_oil,
         }
     }
 
@@ -235,6 +238,11 @@ pub struct EnergyStorage {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BuildingPerformanceInput {
+    /// Edition of NTA 8800 to calculate with; default 2025+C1:2026, the only
+    /// registrable one. Left out of the serialized input (and with it the
+    /// fingerprint) when it is the default.
+    #[serde(default, skip_serializing_if = "NormVersion::is_default")]
+    pub norm_version: NormVersion,
     pub calculation_scope: CalculationScope,
     pub total_usable_floor_area_m2: f64,
     pub area_source_reference: String,
@@ -380,15 +388,18 @@ pub struct CarrierFactors {
     pub practice_cold: f64,
 }
 
-const FORFAIT_FACTORS: CarrierFactors = CarrierFactors {
-    district_heat: HEAT_FORFAIT,
-    district_hot_water: HEAT_FORFAIT,
-    district_cold: COLD_FORFAIT,
-    heat_pump_source: None,
-    practice_heat: 1.0,
-    practice_hot_water: 1.0,
-    practice_cold: 1.0,
-};
+/// Tables 5.2–5.4 without a declaration, in the active edition.
+fn forfait_factors() -> CarrierFactors {
+    CarrierFactors {
+        district_heat: heat_forfait(),
+        district_hot_water: heat_forfait(),
+        district_cold: cold_forfait(),
+        heat_pump_source: None,
+        practice_heat: 1.0,
+        practice_hot_water: 1.0,
+        practice_cold: 1.0,
+    }
+}
 
 /// 9.84 / 13.152 / 10.78: 1,0 for the forfait factor (no route) or an annex
 /// P route on measured values only, 0,95 for calculated values. A quality
@@ -454,26 +465,35 @@ fn resolve_external(
         "externalSupply.cooling",
     );
     let mut source_result = None;
-    let source: Option<ScenarioFactors> =
-        supply
-            .collective_heat_pump_source
-            .as_ref()
-            .and_then(|source| {
-                match source_factors(source, "externalSupply.collectiveHeatPumpSource") {
-                    Ok((factors, result)) => {
-                        source_result = result;
-                        Some(factors)
-                    }
-                    Err(found) => {
-                        issues.extend(found.into_iter().map(|item| issue(item.code, item.path)));
-                        None
-                    }
-                }
-            });
+    let source: Option<ScenarioFactors> = match supply.collective_heat_pump_source.as_ref() {
+        Some(source) => match source_factors(source, "externalSupply.collectiveHeatPumpSource") {
+            Ok((factors, result)) => {
+                source_result = result;
+                Some(factors)
+            }
+            Err(found) => {
+                issues.extend(found.into_iter().map(|item| issue(item.code, item.path)));
+                None
+            }
+        },
+        // NTA 8800:2024 9.6.3.1.3 (p. 323): without a declaration the
+        // source heat takes table 5.2 (p. 93) for external heat.
+        None if norm_versions::profile().heat_pump_source_route
+            == norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024 =>
+        {
+            Some(ScenarioFactors {
+                declared: heat_forfait(),
+                forfait: heat_forfait(),
+            })
+        }
+        None => None,
+    };
     let declared = CarrierFactors {
-        district_heat: heating.as_ref().map_or(HEAT_FORFAIT, |item| item.factors),
-        district_hot_water: hot_water.as_ref().map_or(HEAT_FORFAIT, |item| item.factors),
-        district_cold: cooling.as_ref().map_or(COLD_FORFAIT, |item| item.factors),
+        district_heat: heating.as_ref().map_or(heat_forfait(), |item| item.factors),
+        district_hot_water: hot_water
+            .as_ref()
+            .map_or(heat_forfait(), |item| item.factors),
+        district_cold: cooling.as_ref().map_or(cold_forfait(), |item| item.factors),
         heat_pump_source: source.map(|item| item.declared),
         practice_heat: external_practice_factor(heating.as_ref().and(supply.heating.as_ref())),
         practice_hot_water: external_practice_factor(
@@ -483,7 +503,7 @@ fn resolve_external(
     };
     let forfait = CarrierFactors {
         heat_pump_source: source.map(|item| item.forfait),
-        ..FORFAIT_FACTORS
+        ..forfait_factors()
     };
     let area = if supply.area_electricity.is_empty() {
         None
@@ -944,6 +964,10 @@ pub struct BuildingPerformanceAssessment {
     pub scope: &'static str,
     pub chapter_5_source: &'static str,
     pub target_norm_version: &'static str,
+    /// Edition the result was calculated with.
+    pub norm_version: NormVersion,
+    /// Only a 2025+C1:2026 result may be used for a label or registration.
+    pub registration_eligible: bool,
     pub kernel_version: &'static str,
     pub input_fingerprint: String,
     pub final_edition_verified: bool,
@@ -1938,6 +1962,92 @@ fn heat_pump_generator(input: &BuildingPerformanceInput) -> &Generator {
 }
 
 /// §9.2: a zone belongs to exactly one heating system.
+/// Inputs the active edition has no route for give `route_not_in_edition`;
+/// an edition without a profile gives `edition_not_implemented`.
+fn validate_edition(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
+    let version = norm_versions::current();
+    if !version.implemented() {
+        issues.push(issue("edition_not_implemented", "normVersion"));
+        return;
+    }
+    let profile = norm_versions::profile();
+    // 5.5.8: f_BACS 1,05 exists from 2025+C1 only.
+    if !profile.bacs_factor_route && (input.bacs_factor - 1.0).abs() > 1e-9 {
+        issues.push(issue("route_not_in_edition", "bacsFactor"));
+    }
+    // EER_bron of 9.6.8.1.1.2.3 exists in NTA 8800:2024 only (p. 346).
+    if profile.heat_pump_source_route != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+        && input
+            .external_supply
+            .collective_heat_pump_source
+            .as_ref()
+            .is_some_and(|source| source.realised_from_2013.is_some())
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            "externalSupply.collectiveHeatPumpSource.realisedFrom2013",
+        ));
+    }
+    if !profile.roof_edge_obstruction {
+        for (index, system) in input.pv_systems.iter().enumerate() {
+            if matches!(
+                system.obstruction,
+                Some(crate::solar_shading::CollectorObstruction::RoofEdge { .. })
+            ) {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("pvSystems[{index}].obstruction"),
+                ));
+            }
+        }
+    }
+    if !profile.permanent_shading_routes {
+        let chains = std::iter::once((&input.space_heating, "spaceHeating".to_string())).chain(
+            input
+                .additional_heating_systems
+                .iter()
+                .enumerate()
+                .map(|(index, system)| (system, format!("additionalHeatingSystems[{index}]"))),
+        );
+        for (chain, chain_path) in chains {
+            let demands = std::iter::once((&chain.demand, format!("{chain_path}.demand"))).chain(
+                chain
+                    .additional_zones
+                    .iter()
+                    .enumerate()
+                    .map(|(index, zone)| {
+                        (
+                            &zone.demand,
+                            format!("{chain_path}.additionalZones[{index}].demand"),
+                        )
+                    }),
+            );
+            for (demand, demand_path) in demands {
+                for (index, window) in demand.windows.iter().enumerate() {
+                    let Some(glazing) = window.glazing.as_ref() else {
+                        continue;
+                    };
+                    let path = format!("{demand_path}.windows[{index}].glazing");
+                    // 7.6.6.1.2 table 7.4 (2025 p. 190): solar-control glass
+                    // g 0,40 is new in 2025+C1.
+                    if glazing.glazing_type == Some(crate::solar_shading::GlazingType::SolarControl)
+                    {
+                        issues.push(issue("route_not_in_edition", format!("{path}.glazingType")));
+                    }
+                    // 7.6.6.1.3.2/7.6.6.1.3.3 (2025 p. 192–195): fixed and
+                    // rotatable louvres without ISO 15099 data are new.
+                    if glazing.fixed_louvres.is_some() {
+                        issues.push(issue(
+                            "route_not_in_edition",
+                            format!("{path}.fixedLouvres"),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn validate_heating_systems(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
     let mut seen = std::collections::HashSet::new();
     for id in input.zone_ids() {
@@ -2058,7 +2168,23 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             .heat_pump()
             .is_some_and(|(_, source)| source != SourceSystem::Individual)
     });
-    if input.external_supply.collective_heat_pump_source.is_some() && !collective_source {
+    // NTA 8800:2024 (p. 323): any table source of at least 15 °C books its heat.
+    let warm_source_2024 = norm_versions::profile().heat_pump_source_route
+        == norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+        && input.heating_systems().into_iter().any(|system| {
+            system.generator.heat_pump().is_some_and(|(forfait, _)| {
+                matches!(
+                    forfait.source,
+                    crate::forfait_heat_pump_draft::TableSource::Collective15To20C
+                        | crate::forfait_heat_pump_draft::TableSource::Collective20To40C
+                        | crate::forfait_heat_pump_draft::TableSource::CollectiveAtLeast40C
+                )
+            })
+        });
+    if input.external_supply.collective_heat_pump_source.is_some()
+        && !collective_source
+        && !warm_source_2024
+    {
         issues.push(issue(
             "collective_heat_pump_source_unused",
             "externalSupply.collectiveHeatPumpSource",
@@ -3047,9 +3173,28 @@ fn fill_hot_water_gains(
     }
 }
 
+/// Chapter 5 for one building, in the edition of `input.normVersion`.
+/// Results of an edition other than 2025+C1:2026 are not registrable.
 pub fn assess_building_performance(
     input: &BuildingPerformanceInput,
 ) -> BuildingPerformanceAssessment {
+    norm_versions::with_version(input.norm_version, || {
+        let mut assessment = assess_in_edition(input);
+        if !norm_versions::profile().indicators_2025 {
+            // 5.3.3–5.3.5, 5.6.4, 5.9 and annex AB are new in 2025+C1.
+            assessment.chapter5 = None;
+            assessment.final_energy_by_carrier.clear();
+            assessment.annual_final_energy_kwh = None;
+            assessment.annual_final_energy_eed_kwh = None;
+            assessment.annual_zeb_primary_total_kwh = None;
+            assessment.zeb_primary_total_indicator_kwh_per_m2 = None;
+            assessment.annual_zeb_co2_kg = None;
+        }
+        assessment
+    })
+}
+
+fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     // The chain input with chapter 14 lighting (7.28) and hot-water (7.29)
@@ -3162,6 +3307,7 @@ pub fn assess_building_performance(
     let mut heating = combine_heating_systems(heating, others);
     heating.heat_pump_systems = heat_pump_systems;
     validate(input, &mut issues);
+    validate_edition(input, &mut issues);
     validate_heating_systems(input, &mut issues);
     if let Some(error) = standalone_solar_issue {
         issues.push(issue(error.code, error.path));
@@ -3639,7 +3785,9 @@ pub fn assess_building_performance(
         },
         scope: "nta8800_single_zone_building_performance_unverified",
         chapter_5_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: norm_versions::current_label(),
+        norm_version: norm_versions::current(),
+        registration_eligible: norm_versions::current().registration_eligible(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         final_edition_verified: false,
@@ -3804,8 +3952,12 @@ impl RenewableByCarrier {
     }
 }
 
-/// 5.14a: `f_BAT;cor`.
+/// 5.14a: `f_BAT;cor`. The storage credit is new in 2025+C1 (p. 85–87);
+/// NTA 8800:2024 (5.10, p. 84–86) has none.
 fn storage_correction_factor(input: &BuildingPerformanceInput) -> f64 {
+    if !norm_versions::profile().storage_credit {
+        return 0.0;
+    }
     match (&input.storage, input.battery_storage_present) {
         (Some(storage), true)
             if storage.building_bound_electrical_kwh + storage.building_bound_thermal_kwh
@@ -3873,8 +4025,39 @@ fn compute(
         heating
             .heat_pump_systems
             .iter()
-            .any(|system| system.collective_source)
+            .any(|system| system.source_heat_booked())
     });
+    // NTA 8800:2024 9.6.8.1.1.2.3 (p. 346): source electricity of a 15–20 °C
+    // (ground)water or aquifer source, Q_HD;hp;in;bron / EER_bron (23 from
+    // 2013, else 16). 2025+C1 replaced it by f_P;el/23 (p. 362–363).
+    let source_eer = if input
+        .external_supply
+        .collective_heat_pump_source
+        .as_ref()
+        .and_then(|item| item.realised_from_2013)
+        == Some(true)
+    {
+        23.0
+    } else {
+        16.0
+    };
+    let source_aux_kwh = |index: usize| -> f64 {
+        if norm_versions::profile().heat_pump_source_route
+            != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+        {
+            return 0.0;
+        }
+        heating
+            .heat_pump_systems
+            .iter()
+            .filter(|system| system.source_15_to_20_c)
+            .filter_map(|system| {
+                let cop = system.generation_efficiency.filter(|cop| *cop >= 1.0)?;
+                let out = system.heat_pump_output_kwh.get(index).copied()?;
+                Some(out * (1.0 - 1.0 / cop) / source_eer)
+            })
+            .sum()
+    };
     // Per month: (Q_HD;hp;in;bron, ambient heat of 5.30/5.31 before the
     // outdoor share) over the heating systems.
     let heat_pump_split = |index: usize| -> (f64, f64) {
@@ -3890,7 +4073,7 @@ fn compute(
                 .copied()
                 .unwrap_or(0.0);
             let extracted = out * (1.0 - 1.0 / cop);
-            if system.collective_source {
+            if system.source_heat_booked() {
                 collective += extracted;
             } else {
                 ambient += extracted;
@@ -4146,6 +4329,11 @@ fn compute(
             hot_water_biomass = row.biomass_kwh;
             hot_water_biomass_heat = row.biomass_output_kwh;
         }
+        let source_aux = source_aux_kwh(index);
+        if source_aux > 0.0 {
+            used_el += source_aux;
+            by.add(F_AUXILIARY, C_EL, source_aux, 0.0);
+        }
         // 5.24/5.25 with E_nEPus;el = 0 (5.27): self-use capped at EP use.
         let produced_renewable: f64 = input
             .on_site_production
@@ -4215,7 +4403,8 @@ fn compute(
         }
         by.add(F_HOT_WATER, C_BM, hot_water_biomass, F_P_BIOMASS_B);
         fossil += used_bm_b * F_P_BIOMASS_B + used_bm_c;
-        co2 += used_bm_b * K_CO2_BIOMASS_B + used_bm_c * 0.104;
+        let k_biomass = norm_versions::profile().k_co2_biomass;
+        co2 += used_bm_b * 0.5 * k_biomass + used_bm_c * k_biomass;
         if used_bm > 0.0 {
             carriers.push(CarrierMonth {
                 carrier: "bm",
@@ -4271,7 +4460,7 @@ fn compute(
         zeb_co2 += zeb_c;
         // 5.10 and 5.13: exported electricity is subtracted at f_P;exp;el.
         fossil -= exported * F_P_ELECTRICITY;
-        co2 -= exported * K_CO2_ELECTRICITY;
+        co2 -= exported * Carrier::El.co2_factor();
         // 5.14a/5.14b: renewable production only (CHP excluded); the
         // correction is left out of the CO2 emission (§5.5.6.1).
         let correction =
@@ -4745,8 +4934,8 @@ mod tests {
         // EER 20 ≥ 8: fully renewable generator (5.49).
         let cold = result.cooling.as_ref().unwrap();
         assert_eq!(cold.generators[0].renewable_factor, 1.0);
-        assert_eq!(result.forfait.district_heat, HEAT_FORFAIT);
-        assert_eq!(result.forfait.district_cold, COLD_FORFAIT);
+        assert_eq!(result.forfait.district_heat, crate::annex_p::HEAT_FORFAIT);
+        assert_eq!(result.forfait.district_cold, crate::annex_p::COLD_FORFAIT);
     }
 
     #[test]
@@ -5015,6 +5204,99 @@ mod tests {
     }
 
     #[test]
+    fn edition_2024_books_warm_source_heat_with_eer_auxiliary_energy() {
+        use crate::annex_p::SourceTemperatureClass;
+        use crate::norm_versions::NormVersion;
+        let mut sample = input();
+        sample.norm_version = NormVersion::V2024;
+        let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            generator_id: "hp".into(),
+            classification_source_reference: "system design".into(),
+            scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
+            source: TableSource::Collective15To20C,
+            sink: crate::forfait_heat_pump_draft::TableSink::Hydronic,
+            design_supply_temperature_c: Some(35.0),
+            source_correction_factor: None,
+            source_correction_reference: None,
+            thermal_capacity_kw: Some(8.0),
+            capacity_source_reference: Some("rated".into()),
+            collective_building_installation: Some(false),
+            row_variant: crate::forfait_heat_pump_draft::TableRowVariant::Base,
+            high_efficiency_evidence: None,
+            source_temperature_c: Some(17.0),
+            source_temperature_evidence_reference: Some("design".into()),
+            source_quality_declaration_reference: None,
+            quality_declaration: None,
+        };
+        sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            regeneration: None,
+            forfait,
+            source_system: SourceSystem::CollectiveGroundwaterSurfaceOrAtLeast15C,
+            source_system_reference: "aquifer".into(),
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        sample.heat_pump_renewable = Some(HeatPumpRenewableEvidence {
+            source_below_20_c: true,
+            exhaust_air_source: false,
+            source_reference: "aquifer".into(),
+            combined_outdoor_and_exhaust_air: false,
+            outdoor_air_heat_fraction: None,
+            outdoor_air_fraction_reference: None,
+        });
+        sample.external_supply.collective_heat_pump_source = Some(CollectiveHeatPumpSource {
+            temperature_class: SourceTemperatureClass::Below20C,
+            supplier_reference: "invoice".into(),
+            realised_from_2013: None,
+            annex_p: None,
+        });
+        let unknown = assess_building_performance(&sample);
+        assert_eq!(
+            unknown.status, "calculated_unverified",
+            "{:?}",
+            unknown.issues
+        );
+        let cop = unknown.space_heating.generation_efficiency.unwrap();
+        let source: f64 = unknown
+            .space_heating
+            .monthly
+            .iter()
+            .map(|row| row.heat_pump_output_kwh * (1.0 - 1.0 / cop))
+            .sum();
+        assert!(source > 0.0);
+        let used = |result: &BuildingPerformanceAssessment, carrier: &str| -> f64 {
+            result
+                .carriers
+                .iter()
+                .filter(|item| item.carrier == carrier)
+                .map(|item| item.used_kwh)
+                .sum()
+        };
+        // 9.6.3.1.3 (2024 p. 323): the source heat is booked as dh.
+        assert!((used(&unknown, "dh") - source).abs() < 1e-6);
+        // 9.6.8.1.1.2.3 (2024 p. 346): source electricity Q/EER, EER 16
+        // when unknown and 23 for a source from 2013.
+        sample
+            .external_supply
+            .collective_heat_pump_source
+            .as_mut()
+            .unwrap()
+            .realised_from_2013 = Some(true);
+        let recent = assess_building_performance(&sample);
+        let difference = used(&unknown, "el") - used(&recent, "el");
+        assert!((difference - (source / 16.0 - source / 23.0)).abs() < 1e-6);
+        // The EER field does not exist in 2025+C1.
+        sample.norm_version = NormVersion::V2025C1;
+        assert!(assess_building_performance(&sample)
+            .issues
+            .iter()
+            .any(|item| {
+                item.code == "route_not_in_edition"
+                    && item.path == "externalSupply.collectiveHeatPumpSource.realisedFrom2013"
+            }));
+    }
+
+    #[test]
     fn collective_heat_pump_source_uses_its_own_factors() {
         use crate::annex_p::SourceTemperatureClass;
         let mut sample = input();
@@ -5061,6 +5343,7 @@ mod tests {
         sample.external_supply.collective_heat_pump_source = Some(CollectiveHeatPumpSource {
             temperature_class: SourceTemperatureClass::Below20C,
             supplier_reference: "invoice".into(),
+            realised_from_2013: None,
             annex_p: None,
         });
         let result = assess_building_performance(&sample);
@@ -7519,6 +7802,7 @@ mod tests {
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(0.0),
+            effective_mass_kg_per_m2: None,
             rooms: vec![crate::annex_aa::AnnexAaRoom {
                 id: "living".into(),
                 area_m2,
@@ -7529,6 +7813,7 @@ mod tests {
                     u_with_shutter_w_per_m2k: None,
                 }],
                 installed_capacity_kw: 0.0,
+                roof_area_m2: None,
             }],
         };
         sample.active_cooling.as_mut().unwrap().capacity =
@@ -7713,6 +7998,52 @@ mod tests {
             .iter()
             .any(|item| item.code == "pv_route_mixed"));
     }
+    #[test]
+    fn edition_2024_drops_storage_credit_and_switches_co2() {
+        use crate::norm_versions::NormVersion;
+        let mut sample = input();
+        sample.battery_storage_present = true;
+        sample.storage = Some(EnergyStorage {
+            building_bound_electrical_kwh: 3.0,
+            building_bound_thermal_kwh: 2.5,
+            source_reference: "installation".into(),
+        });
+        let current = assess_building_performance(&sample);
+        sample.norm_version = NormVersion::V2024;
+        let legacy = assess_building_performance(&sample);
+        assert_eq!(
+            legacy.status, "calculated_unverified",
+            "{:?}",
+            legacy.issues
+        );
+        assert_eq!(legacy.target_norm_version, "NTA 8800:2024 met INT-V1:2024");
+        assert!(!legacy.registration_eligible);
+        // 5.14a/5.14b (2025+C1 p. 85–87) do not exist in 2024 (5.10, p. 84–86).
+        let credit = current.annual_storage_correction_kwh.unwrap();
+        assert!(credit > 0.0);
+        assert_eq!(legacy.annual_storage_correction_kwh, Some(0.0));
+        assert!(
+            (legacy.annual_primary_fossil_kwh.unwrap()
+                - current.annual_primary_fossil_kwh.unwrap()
+                - credit)
+                .abs()
+                < 1e-9
+        );
+        // Table 5.3: K_CO2 el 0,34 / gas 0,183 (2024 p. 94) instead of
+        // 0,268 / 0,218 (2025+C1 p. 96); BENG figures do not use it.
+        assert_ne!(legacy.annual_co2_kg, current.annual_co2_kg);
+        // Indicators new in 2025+C1 are absent.
+        assert!(legacy.chapter5.is_none());
+        assert!(legacy.annual_final_energy_kwh.is_none());
+        // 5.5.8 (2025+C1 p. 89–91): f_BACS has no 2024 counterpart.
+        sample.bacs_factor = 1.05;
+        let refused = assess_building_performance(&sample);
+        assert!(refused
+            .issues
+            .iter()
+            .any(|item| item.code == "route_not_in_edition" && item.path == "bacsFactor"));
+    }
+
     #[test]
     fn storage_correction_follows_5_14a() {
         let mut sample = input();

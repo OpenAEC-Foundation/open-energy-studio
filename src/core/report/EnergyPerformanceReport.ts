@@ -87,7 +87,8 @@ export function titleHtml(title: string): string {
 }
 
 const STATUS: Record<string, string> = {
-  calculated_unverified: 'berekend (onverifieerd)', incomplete: 'onvolledig', invalid: 'ongeldig',
+  calculated_unverified: 'berekend (onverifieerd)', calculated_legacy_edition: 'berekend in oudere uitgave (niet voor registratie)',
+  incomplete: 'onvolledig', invalid: 'ongeldig',
   derived_input_rejected: 'afgeleide invoer afgewezen',
 };
 

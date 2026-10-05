@@ -4,7 +4,7 @@
 //! Generator heat remains supplied by the caller or a separate dispatch step.
 
 use crate::final_energy_draft::MonthlyEnergy;
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -233,7 +233,7 @@ pub fn assess_boiler_forfait_draft(
         },
         scope: "public_chapter_9_draft_gas_water_boiler_table_9_25_only",
         consultation_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         temperature_class: if issues.is_empty() {
@@ -412,7 +412,7 @@ pub fn assess_boiler_forfait_monthly_draft(
         },
         scope: "public_chapter_9_draft_gas_water_boiler_9_61_and_individual_forfait_aux_9_85",
         consultation_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         generation_efficiency: if issues.is_empty() {

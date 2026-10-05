@@ -4,7 +4,7 @@
 //! node input and installed powers are supplied.
 
 use crate::final_energy_draft::MonthlyEnergy;
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
@@ -318,7 +318,7 @@ pub fn assess_generator_dispatch_draft(
         },
         scope: "nta8800_9_6_1_installed_power_dispatch",
         consultation_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         monthly,

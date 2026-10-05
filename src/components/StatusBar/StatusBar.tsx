@@ -10,6 +10,7 @@ import { Check, X } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { useEnergy } from '../../context/EnergyContext';
+import { DEFAULT_NORM_VERSION, legacyEdition, projectCalculated } from '../../core/nta/KernelClient';
 import { useKernel } from '../../context/KernelProvider';
 import { summarizeForPreview } from '../../core/nta/PreviewSummary';
 import { Pill } from '../ui';
@@ -40,7 +41,10 @@ export function StatusBar() {
 
   const assessment = kernel?.settled ?? null;
   const summary = assessment ? summarizeForPreview(assessment) : null;
-  const calculated = summary?.status === 'calculated_unverified';
+  const calculated = projectCalculated(summary?.status);
+  // An older NTA 8800 edition: shown until the kernel answers, then from its result.
+  const edition = assessment?.normVersion ?? state.project.ntaCalculation?.normVersion;
+  const legacy = assessment ? legacyEdition(assessment) : edition != null && edition !== DEFAULT_NORM_VERSION;
   const bbl = assessment?.performance?.bblCheck ?? null;
   const phase = kernel?.phase ?? 'idle';
   const phaseKey = phase === 'current' && kernel?.verdict === 'withheld' ? 'withheld' : phase;
@@ -60,6 +64,11 @@ export function StatusBar() {
       </div>
       {assessment && (
         <span className="status-chip status-optional">{t('status.kernelName')} <b>{assessment.kernelVersion}</b> · {assessment.targetNormVersion}</span>
+      )}
+      {legacy && edition && (
+        <Pill tone="warn"><span className="status-legacy-edition" title={t('nta.edition.legacyTitle')}>
+          {t('status.legacyEdition', { edition: t(`nta.edition.${edition}`) })}
+        </span></Pill>
       )}
       <span className="status-sep" aria-hidden="true" />
       <div className="status-section">

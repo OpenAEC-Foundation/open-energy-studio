@@ -63,7 +63,7 @@ use crate::hybrid_heat_pump_monthly_draft::{
 use crate::monthly_demand::{
     apply_recoverable_losses, assess_monthly_demand, MonthlyDemandAssessment, MonthlyDemandInput,
 };
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
@@ -1191,6 +1191,26 @@ pub struct SystemHeatPump {
     pub collective_source: bool,
     /// 10.84: the heat pump uses a ground storage (WKO) as source.
     pub ground_storage_source: bool,
+    /// NTA 8800:2024 9.6.3.1.3 (p. 323): a table 9.27/9.29 heat pump on a
+    /// source of at least 15 °C, whose source heat is booked in 5.20.
+    pub source_from_15_c: bool,
+    /// NTA 8800:2024 9.6.8.1.1.2.3 (p. 346): the source is (ground)water or
+    /// an aquifer at 15 °C to 20 °C, with source electricity Q/EER.
+    pub source_15_to_20_c: bool,
+}
+
+impl SystemHeatPump {
+    /// Whether 5.20 books this system's source heat as Q_HD;hp;in;bron: a
+    /// collective source in 2025+C1 (9.6.8.1.1.2.3, p. 362–363), any table
+    /// source of at least 15 °C in 2024 (9.6.3.1.3, p. 323; INT-V1 p. 5).
+    pub fn source_heat_booked(&self) -> bool {
+        match crate::norm_versions::profile().heat_pump_source_route {
+            crate::norm_versions::HeatPumpSourceRoute::CollectiveOnly2025 => self.collective_source,
+            crate::norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024 => {
+                self.source_from_15_c
+            }
+        }
+    }
 }
 
 /// The heat pump of one heating system, `None` without one.
@@ -1205,6 +1225,16 @@ pub fn system_heat_pump(
             GasHeatPumpSource::Ground | GasHeatPumpSource::Groundwater
         )
     };
+    let warm_source = generator.heat_pump().map(|(forfait, _)| forfait.source);
+    let source_from_15_c = matches!(
+        warm_source,
+        Some(
+            TableSource::Collective15To20C
+                | TableSource::Collective20To40C
+                | TableSource::CollectiveAtLeast40C
+        )
+    );
+    let source_15_to_20_c = warm_source == Some(TableSource::Collective15To20C);
     let (collective_source, ground_storage_source) =
         if let Some((forfait, system)) = generator.heat_pump() {
             (
@@ -1251,6 +1281,8 @@ pub fn system_heat_pump(
         generation_efficiency: assessment.generation_efficiency,
         collective_source,
         ground_storage_source,
+        source_from_15_c,
+        source_15_to_20_c,
     })
 }
 
@@ -2688,7 +2720,7 @@ fn assess_chain_pass(
         },
         scope: "nta8800_space_heating_zones_single_generator_unverified",
         chapter_9_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         final_edition_verified: false,

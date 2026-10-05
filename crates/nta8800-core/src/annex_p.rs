@@ -287,6 +287,36 @@ pub const SOURCE_BELOW_20_FORFAIT: SupplyFactors = SupplyFactors {
     co2_kg_per_kwh: K_CO2_EL / 23.0,
 };
 
+/// Table 5.3 `K_CO2;el` of the active edition (2024 p. 94: 0,34;
+/// 2025+C1 p. 96: 0,268).
+pub fn k_co2_el() -> f64 {
+    crate::norm_versions::profile().k_co2_electricity
+}
+
+/// [`HEAT_FORFAIT`] with `K_CO2` of the active edition (2024 p. 95: 0,17).
+pub fn heat_forfait() -> SupplyFactors {
+    SupplyFactors {
+        co2_kg_per_kwh: crate::norm_versions::profile().k_co2_district_heat_forfait,
+        ..HEAT_FORFAIT
+    }
+}
+
+/// [`COLD_FORFAIT`] with `K_CO2;el / 3` of the active edition.
+pub fn cold_forfait() -> SupplyFactors {
+    SupplyFactors {
+        co2_kg_per_kwh: k_co2_el() / 3.0,
+        ..COLD_FORFAIT
+    }
+}
+
+/// [`SOURCE_BELOW_20_FORFAIT`] with `K_CO2;el / 23` of the active edition.
+pub fn source_below_20_forfait() -> SupplyFactors {
+    SupplyFactors {
+        co2_kg_per_kwh: k_co2_el() / 23.0,
+        ..SOURCE_BELOW_20_FORFAIT
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SystemFunction {
@@ -364,15 +394,17 @@ impl SystemCarrier {
     /// `K_CO2;del;ci` (tables 5.3 and 5.6).
     pub fn co2(self) -> f64 {
         match self {
-            Self::NaturalGas => 0.218,
-            Self::Oil => 0.326,
+            Self::NaturalGas => crate::norm_versions::profile().k_co2_gas,
+            Self::Oil => crate::norm_versions::profile().k_co2_oil,
             Self::Electricity {
                 direct_renewable_share,
-            } => K_CO2_EL * (1.0 - direct_renewable_share),
+            } => k_co2_el() * (1.0 - direct_renewable_share),
             Self::Biogas => 0.0 * 0.074,
             Self::BiomassAbove500Kw => 0.0 * 0.104,
-            Self::WasteIncineration => 0.138,
-            Self::BiofuelMix { biofuel_share } => 0.218 * (1.0 - biofuel_share),
+            Self::WasteIncineration => crate::norm_versions::profile().k_co2_waste_incineration,
+            Self::BiofuelMix { biofuel_share } => {
+                crate::norm_versions::profile().k_co2_gas * (1.0 - biofuel_share)
+            }
         }
     }
 
@@ -2018,7 +2050,7 @@ fn chp_conversion(
 fn chp_factors(carrier: &SystemCarrier, thermal: f64, electrical: f64) -> (f64, f64) {
     (
         (carrier.primary_factor() - electrical * F_P_EL).max(0.0) / thermal,
-        (carrier.co2() - electrical * K_CO2_EL) / thermal,
+        (carrier.co2() - electrical * k_co2_el()) / thermal,
     )
 }
 
@@ -2204,7 +2236,7 @@ fn factors(
             // P.6.5.4.7 and 5.47/5.55.
             Some(GenFactors {
                 f: aux * F_P_EL,
-                k: aux * K_CO2_EL,
+                k: aux * k_co2_el(),
                 pren: 1.0 - aux,
                 ..GenFactors::default()
             })
@@ -2224,7 +2256,7 @@ fn factors(
             // 5.48 generalised to 1 − 1/η.
             Some(GenFactors {
                 f: F_P_EL / eta,
-                k: K_CO2_EL / eta,
+                k: k_co2_el() / eta,
                 pren: heat_pump_renewable(function, eta),
                 eta: Some(eta),
                 ..GenFactors::default()
@@ -2439,7 +2471,7 @@ fn factors(
             // negative renewable share (interpretation).
             Some(GenFactors {
                 f: (1.0 - share) * F_P_EL / eta,
-                k: (1.0 - share) * K_CO2_EL / eta,
+                k: (1.0 - share) * k_co2_el() / eta,
                 pren: (1.0 - (1.0 - share) / eta).max(0.0),
                 eta: Some(eta),
                 ..GenFactors::default()
@@ -4487,7 +4519,7 @@ fn calculated(system: &CalculatedSystem, path: &str) -> Result<SystemResult, Vec
     renewable_energy += aux * aux_share * F_PREN_ELEC;
     // P.7 and P.9 with the (weighted) electricity factors.
     let primary = round_up(f_gen / efficiency + aux / out * F_P_EL * (1.0 - aux_share));
-    let co2 = k_gen / efficiency + aux / out * K_CO2_EL * (1.0 - aux_share);
+    let co2 = k_gen / efficiency + aux / out * k_co2_el() * (1.0 - aux_share);
     let e_prim = out * primary;
     let renewable = if renewable_energy + e_prim > 0.0 {
         round_renewable(function, renewable_energy / (renewable_energy + e_prim))
@@ -4660,7 +4692,7 @@ fn measured(system: &MeasuredSystem, path: &str) -> Result<SystemResult, Vec<Ann
     }
     // P.6 and its CO2 counterpart.
     let mut primary = -system.exported_electricity_kwh * F_P_EL;
-    let mut co2 = -system.exported_electricity_kwh * K_CO2_EL;
+    let mut co2 = -system.exported_electricity_kwh * k_co2_el();
     for item in &system.inputs {
         match item.chp_loss_electrical {
             None => {
@@ -4774,6 +4806,11 @@ pub struct CollectiveHeatPumpSource {
     /// Annex P values for the source; absent means the forfait values.
     #[serde(default)]
     pub annex_p: Option<AnnexPRoute>,
+    /// NTA 8800:2024 9.6.8.1.1.2.3 (p. 346): source (WKO) realised or
+    /// permitted from 2013, EER_bron 23; otherwise or unknown 16. Only in
+    /// the 2024 edition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub realised_from_2013: Option<bool>,
 }
 
 /// Declared and forfait (EMGforf) factors of one supply.
@@ -4811,14 +4848,23 @@ pub fn source_factors(
     if !issues.is_empty() {
         return Err(issues);
     }
+    let route_2024 = crate::norm_versions::profile().heat_pump_source_route
+        == crate::norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024;
     let forfait = match source.temperature_class {
-        SourceTemperatureClass::Below20C => SOURCE_BELOW_20_FORFAIT,
-        SourceTemperatureClass::AtLeast20COrSurfaceWaterOrUnknown => HEAT_FORFAIT,
+        // NTA 8800:2024 9.6.3.1.3 (p. 323, INT-V1 p. 5): the source heat
+        // takes f_P;del of table 5.2 (p. 93: 0,9) or annex P, whatever its
+        // temperature; the electricity of the source system is booked
+        // separately (9.6.8.1.1.2.3, p. 346).
+        _ if route_2024 => heat_forfait(),
+        SourceTemperatureClass::Below20C => source_below_20_forfait(),
+        SourceTemperatureClass::AtLeast20COrSurfaceWaterOrUnknown => heat_forfait(),
     };
     let declared_factors = declared.as_ref().map_or(forfait, |item| item.factors);
     let forfait_scenario = match source.temperature_class {
-        SourceTemperatureClass::Below20C => declared_factors,
-        SourceTemperatureClass::AtLeast20COrSurfaceWaterOrUnknown => HEAT_FORFAIT,
+        // 2025+C1 5.3.1.2 (p. 72): below 20 °C EMGforf uses the same value;
+        // 2024 has no such rule (p. 73).
+        SourceTemperatureClass::Below20C if !route_2024 => declared_factors,
+        _ => heat_forfait(),
     };
     Ok((
         ScenarioFactors {
@@ -5053,6 +5099,7 @@ mod tests {
         let source = CollectiveHeatPumpSource {
             temperature_class: SourceTemperatureClass::Below20C,
             supplier_reference: "invoice".into(),
+            realised_from_2013: None,
             annex_p: None,
         };
         let (factors, _) = source_factors(&source, "s").unwrap();
@@ -5061,6 +5108,7 @@ mod tests {
         let warm = CollectiveHeatPumpSource {
             temperature_class: SourceTemperatureClass::AtLeast20COrSurfaceWaterOrUnknown,
             supplier_reference: "invoice".into(),
+            realised_from_2013: None,
             annex_p: Some(AnnexPRoute::Declared {
                 primary_factor: 0.3,
                 renewable_factor: 0.5,

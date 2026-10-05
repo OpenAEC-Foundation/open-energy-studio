@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS } from '../../core/nta/KernelClient';
 import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
 import {
@@ -252,6 +253,10 @@ export function NtaCalculationForm({ project, initial, onSave, onCancel }: {
   }}>
     <p>{t('nta.form.help')}</p>
     <Section title={t('nta.form.general')}>
+      <SelectField {...field} path={['normVersion']} label={t('nta.form.normVersion')}
+        options={IMPLEMENTED_NORM_VERSIONS.map((edition) => [edition, t(`nta.edition.${edition}`)])} />
+      {read(draft, ['normVersion']) != null && read(draft, ['normVersion']) !== DEFAULT_NORM_VERSION
+        && <p className="nta-form-note" role="note">{t('nta.form.normVersionLegacy')}</p>}
       <SelectField {...field} path={['calculationScope']} label={t('nta.form.scope')}
         options={[['residential', t('nta.form.scope.residential')], ['utility', t('nta.form.scope.utility')]]} />
       <TextField {...field} path={['areaSourceReference']} label={t('nta.form.areaSource')} />

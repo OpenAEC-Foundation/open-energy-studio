@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
-use crate::{KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::KERNEL_VERSION;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -207,7 +207,7 @@ pub fn assess_direct_transmission(input: &DirectTransmissionInput) -> DirectTran
     DirectTransmissionAssessment {
         status: if valid { "input_valid" } else { "invalid" },
         scope: "diagnostic_direct_outdoor_only",
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint,
         reference_verified: false,

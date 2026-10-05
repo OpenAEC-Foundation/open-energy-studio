@@ -7,7 +7,7 @@ use crate::forfait_heat_pump_monthly_draft::SourceSystem;
 use crate::gas_heat_pump_forfait_draft::{
     assess_gas_heat_pump_forfait_draft, GasHeatPumpForfaitDraftInput, GasPumpSource,
 };
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -125,7 +125,9 @@ pub fn assess_gas_heat_pump_monthly_draft(
         issues.push(issue("months_incomplete", "generatorOutputKwh"));
     }
     let collective = input.source_system != SourceSystem::Individual;
+    // (9.62) f_cor.bron.col: 2025+C1 only (2024 p. 314–315 has none).
     let factor = match input.source_system {
+        _ if !crate::norm_versions::profile().collective_source_correction => 0.0,
         SourceSystem::Individual => 0.0,
         SourceSystem::CollectiveGround => 0.009,
         SourceSystem::CollectiveGroundwaterSurfaceOrAtLeast15C => 0.022,
@@ -178,7 +180,7 @@ pub fn assess_gas_heat_pump_monthly_draft(
         },
         scope: "public_chapter_9_draft_equation_9_62_gas_pump_terms_without_carrier_allocation",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         corrected_cop: if issues.is_empty() {

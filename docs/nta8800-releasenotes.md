@@ -2,6 +2,19 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — keuze van de NTA 8800-uitgave
+
+Rekenuitkomsten van bestaande projecten veranderen niet: zonder `ntaCalculation.normVersion` rekent de kern zoals voorheen in NTA 8800:2025+C1:2026, met dezelfde invoervingerafdruk.
+- **Nieuw invoerveld** `ntaCalculation.normVersion`: `"2025+C1"` (standaard) of `"2024"`. In de app staat het in het NTA-invoerformulier, blok *Algemeen*.
+- **Nieuwe status** `calculated_legacy_edition` voor een berekening in een oudere uitgave. De uitkomst draagt `normVersion` en `registrationEligible: false`, en `targetNormVersion` noemt de gekozen uitgave. De registratiecontrole geeft altijd `legacy_edition_not_registrable`. Het rekenpaneel, het NTA-rekenrapport en de statusbalk melden "niet voor registratie". De API geeft 200, net als bij `calculated_unverified`.
+- **Nieuwe codes:**
+  - `edition_not_implemented`: 2023, 2022 en 2020+A1 zijn bekend maar niet geïmplementeerd;
+  - `route_not_in_edition`: invoer voor een route die de gekozen uitgave niet kent.
+- **Indicatoren** die pas in 2025+C1 bestaan, zijn in een oudere uitgave `null`.
+- **API:** `GET /v1/version` geeft `supportedNormVersions`.
+- **NTA 8800:2024 met INT-V1:2024** is geïmplementeerd met 18 schakelpunten. Daarvan veranderen in de voorbeeldprojecten alleen de CO2-uitkomsten en de 2025-indicatoren. Nieuwe invoer, alleen in 2024: `effectiveMassKgPerM2` en `roofAreaM2` (bijlage AA), en `externalSupply.collectiveHeatPumpSource.realisedFrom2013`. Nieuwe codes: `annex_aa_effective_mass_required` en `annex_aa_effective_mass_invalid`.
+- **Uitleg:** [nta8800-normversies.md](nta8800-normversies.md) beschrijft de uitgaven, de schakelpunten (met paginanummers in beide uitgaven), de interpretaties en waarom de uitgave als thread-local wordt gekozen.
+
 ## 5 oktober 2026 — f_prac bij gedeclareerde warmtepomprendementen en reconciliatie met openbare rapporten
 
 Uitkomsten veranderen voor projecten met een kwaliteitsverklaring van een warmtepomp:

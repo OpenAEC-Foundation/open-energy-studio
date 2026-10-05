@@ -522,6 +522,25 @@ pub fn data_import_declaration(
     }
 }
 
+/// Only the designated edition (NTA 8800:2025+C1:2026) may be registered
+/// (Omgevingsregeling art. 5.11/5.12 lid 2); a calculation in an older
+/// edition is a comparison or control calculation.
+pub fn refuse_legacy_edition(
+    assessment: &mut RegistrationAssessment,
+    version: crate::norm_versions::NormVersion,
+) {
+    if version.registration_eligible() {
+        return;
+    }
+    assessment.issues.push(RegistrationIssue {
+        code: "legacy_edition_not_registrable",
+        path: "ntaCalculation.normVersion".into(),
+        severity: "error",
+    });
+    assessment.dossier_complete = false;
+    assessment.ready_for_registration = false;
+}
+
 /// Calculation results the registration checks need; filled by the
 /// project route. Every field is optional so the block can be checked on
 /// its own.

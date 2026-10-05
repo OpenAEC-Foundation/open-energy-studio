@@ -3,7 +3,7 @@
 //! heating/cooling demand, climate profile, ground route or BENG calculation.
 
 use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
-use crate::{KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::KERNEL_VERSION;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -113,7 +113,7 @@ pub fn assess_monthly_direct(input: &MonthlyDirectInput) -> MonthlyDirectAssessm
     MonthlyDirectAssessment {
         status: if valid { "input_valid" } else { "invalid" },
         scope: "diagnostic_direct_outdoor_signed_heat_flow_only",
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint,
         reference_verified: false,

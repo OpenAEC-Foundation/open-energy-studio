@@ -754,6 +754,11 @@ pub fn collector_obstruction_factor(
             height_m,
             distance_m,
         } => {
+            // Situation f is new in 2025+C1 (17.3.2 f, p. 702); NTA 8800:2024
+            // has no roof-edge situation (p. 678–687).
+            if !crate::norm_versions::profile().roof_edge_obstruction {
+                return None;
+            }
             let valid = |value: f64| value.is_finite() && value >= 0.0;
             if !(valid(*height_m) && valid(*distance_m)) {
                 return None;

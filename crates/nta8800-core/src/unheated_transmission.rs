@@ -8,7 +8,7 @@
 //! from annex I.2.4). Unheated basements belong to `H_g` (8.3), not here.
 
 use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
-use crate::{KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::KERNEL_VERSION;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -245,7 +245,7 @@ pub fn assess_unheated_transmission(
     UnheatedTransmissionAssessment {
         status: if valid { "input_valid" } else { "invalid" },
         scope: "unverified_unheated_space_conductance_8_4",
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint,
         reference_verified: false,

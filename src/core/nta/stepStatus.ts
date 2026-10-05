@@ -7,7 +7,7 @@
  * visible but are dimmed on new-build projects (besluit 5 oktober 2026).
  */
 import type { IProject } from '../energy/types';
-import type { ProjectPerformanceAssessment } from './KernelClient';
+import { projectCalculated, type ProjectPerformanceAssessment } from './KernelClient';
 import { routeForPath } from './gapRoutes';
 import { WORKFLOW_STEPS, type StepId } from '../navigation/routes';
 
@@ -54,11 +54,11 @@ function hasInput(step: StepId, project: IProject, assessment: ProjectPerformanc
     case 'installations': return project.heatingSystems.length + project.ventilationSystems.length
       + project.hotWaterSystems.length > 0 || Boolean(project.ntaCalculation);
     case 'check': return assessment != null;
-    case 'results': return assessment?.status === 'calculated_unverified' && assessment.performance != null;
+    case 'results': return projectCalculated(assessment?.status) && assessment?.performance != null;
     case 'survey': return project.basisopname != null;
     case 'advice': return project.maatwerkadvies != null;
     case 'relabel': return project.registration?.relabelComparison != null;
-    case 'report': return assessment?.status === 'calculated_unverified';
+    case 'report': return projectCalculated(assessment?.status);
     case 'registration': return Boolean(project.registration?.epOnlineNumber);
     default: return false;
   }

@@ -61,7 +61,7 @@ pub fn assess_declared_dhw(pump: &HeatPumpInput) -> DeclaredDhwAssessment {
     DeclaredDhwAssessment {
         status: if valid { "input_valid" } else { "invalid" },
         scope: "declared_dhw_test_input_only",
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(pump)),
         heat_pump_id: pump.id.clone(),

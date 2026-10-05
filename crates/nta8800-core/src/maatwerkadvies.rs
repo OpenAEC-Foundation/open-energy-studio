@@ -39,7 +39,7 @@ use crate::climate::OUTDOOR_TEMPERATURE_C;
 use crate::indicators_draft::CalculationScope;
 use crate::monthly_demand::{occupants_per_dwelling, InternalGains, MonthlyDemandInput, UsageFit};
 use crate::project_performance::assess_project_performance;
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
@@ -2215,7 +2215,7 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
     let empty = |issues: Vec<MwaIssue>| MaatwerkadviesAssessment {
         status: "invalid",
         scope: SCOPE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint.clone(),
         attest_status: "unattested",
@@ -2521,7 +2521,7 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
             "partially_calculated"
         },
         scope: SCOPE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         attest_status: "unattested",

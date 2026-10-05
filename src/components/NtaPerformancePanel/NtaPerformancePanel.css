@@ -151,3 +151,5 @@ fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-siz
 .nta-form-wide { grid-column: span 2; }
 @media (max-width: 720px) { .nta-form-wide { grid-column: auto; } }
 .nta-form select { text-overflow: ellipsis; }
+
+.nta-performance-legacy { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 8px 12px; border-left: 4px solid var(--unverified); background: var(--unverified-subtle); }

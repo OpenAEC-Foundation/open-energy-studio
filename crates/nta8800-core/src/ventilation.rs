@@ -2981,10 +2981,20 @@ fn nominal_fan_power(fan: &Fan) -> f64 {
             manufacture_year,
             electrical_input_w,
         } => {
+            let table = motor_efficiency(motor_power_w / 1000.0, *manufacture_year);
             let efficiency = match electrical_input_w {
-                // 11.136, rounded down to a multiple of 0,025.
-                Some(input) => ((motor_power_w / input) / 0.025 + 1e-9).floor() * 0.025,
-                None => motor_efficiency(motor_power_w / 1000.0, *manufacture_year),
+                // 11.136, rounded down to a multiple of 0,025. 2025+C1
+                // (p. 515) leaves the choice free; NTA 8800:2024 (p. 499)
+                // takes the measured value only when it is higher.
+                Some(input) => {
+                    let measured = ((motor_power_w / input) / 0.025 + 1e-9).floor() * 0.025;
+                    if crate::norm_versions::profile().motor_efficiency_free_choice {
+                        measured
+                    } else {
+                        measured.max(table)
+                    }
+                }
+                None => table,
             }
             .min(1.0);
             0.8 * motor_power_w / efficiency
@@ -3893,6 +3903,27 @@ mod tests {
         assert_eq!(DuctOutsideSituation::Situation1.delta_k(0), 0.0);
         assert_eq!(DuctOutsideSituation::Situation2.delta_k(0), 2.82);
         assert_eq!(DuctOutsideSituation::Situation3.delta_k(0), 5.72);
+    }
+
+    #[test]
+    fn measured_motor_efficiency_counts_only_when_higher_in_2024() {
+        // 1500/2500 = 0,600 against table 11.20 (1,5 kW, from 2005) 0,75.
+        let fan = Fan {
+            id: "f".into(),
+            power: FanPower::Motor {
+                motor_power_w: 1500.0,
+                manufacture_year: Some(2010),
+                electrical_input_w: Some(2500.0),
+            },
+        };
+        // (11.136), 2025+C1 p. 515: the measured value is a free choice.
+        close(nominal_fan_power(&fan), 0.8 * 1500.0 / 0.6, 1e-9);
+        // NTA 8800:2024 p. 499: only when higher than the table.
+        let legacy =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2024, || {
+                nominal_fan_power(&fan)
+            });
+        close(legacy, 0.8 * 1500.0 / 0.75, 1e-9);
     }
 
     #[test]

@@ -147,6 +147,33 @@ async fn health_and_version_identify_the_build() {
     assert_eq!(version["kernelVersion"], nta8800_core::KERNEL_VERSION);
     assert_eq!(version["targetNormVersion"], "NTA 8800:2025+C1:2026");
     assert_eq!(version["buildFingerprint"].as_str().unwrap().len(), 64);
+    let editions = version["supportedNormVersions"].as_array().unwrap();
+    assert_eq!(editions.len(), 5);
+    let current = editions
+        .iter()
+        .find(|item| item["default"] == true)
+        .unwrap();
+    assert_eq!(current["id"], "2025+C1");
+    assert_eq!(current["registrationEligible"], true);
+    let v2024 = editions.iter().find(|item| item["id"] == "2024").unwrap();
+    assert_eq!(v2024["implemented"], true);
+    assert_eq!(v2024["registrationEligible"], false);
+}
+
+#[tokio::test]
+async fn older_edition_calculates_but_is_not_registrable() {
+    let mut project = without_nulls(fixture("nta8800-example-terraced-dwelling.json"));
+    project["ntaCalculation"]["normVersion"] = json!("2024");
+    let (status, result) = post(
+        "/v1/nta8800/project/performance",
+        json!({ "project": project }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{}", result["gaps"]);
+    assert_eq!(result["status"], "calculated_legacy_edition");
+    assert_eq!(result["normVersion"], "2024");
+    assert_eq!(result["registrationEligible"], false);
+    assert_eq!(result["targetNormVersion"], "NTA 8800:2024 met INT-V1:2024");
 }
 
 #[tokio::test]

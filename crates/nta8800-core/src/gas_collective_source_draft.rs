@@ -7,7 +7,7 @@ use crate::gas_heat_pump_chain_draft::{
     assess_gas_heat_pump_chain_draft, GasHeatPumpChainDraftInput,
 };
 use crate::gas_heat_pump_forfait_draft::GasPumpSource;
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -191,7 +191,7 @@ pub fn assess_gas_collective_source_draft(
         scope: "public_chapters_5_and_9_collective_gas_heat_pump_source_forfait_only",
         chapter_5_draft_source: CHAPTER_5,
         chapter_9_draft_source: CHAPTER_9,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         source_energy_carrier: "dh",

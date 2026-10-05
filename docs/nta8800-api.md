@@ -35,9 +35,10 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
   - `serviceVersion` en `apiVersion`;
   - `kernelVersion` (het rekenkerngedeelte van het versienummer, BRL 9501 §5.2);
   - `targetNormVersion` (NTA 8800:2025+C1:2026);
+  - `supportedNormVersions`: de bekende edities van NTA 8800 (`id`, `label`, `implemented`, `registrationEligible`, `default`, aanwijzingsperiode). Een project kiest een editie met `ntaCalculation.normVersion` (`"2024"` of `"2025+C1"`, standaard `"2025+C1"`); zie [nta8800-normversies.md](nta8800-normversies.md);
   - `buildCommit` (uit `OES_BUILD_COMMIT` tijdens het bouwen, anders `null`);
   - `buildFingerprint`, een SHA-256 over versies en bewerkingentabel. Twee builds met dezelfde vingerafdruk hebben dezelfde kern en dezelfde routes.
-- Elke rekenuitkomst bevat zelf ook `kernelVersion`, `targetNormVersion` en `inputFingerprint`.
+- Elke rekenuitkomst bevat zelf ook `kernelVersion`, `targetNormVersion` en `inputFingerprint`; projectuitkomsten ook `normVersion` en `registrationEligible`. Een berekening in een oudere editie heeft status `calculated_legacy_edition` (HTTP 200) en is nooit registreerbaar.
 - `GET /health` geeft `{"status":"ok"}`.
 - `GET /v1/openapi.json` geeft het OpenAPI 3.1-document. Daarin staat per bewerking `operationId` en `x-mcp-tool` (de MCP-toolnaam).
 

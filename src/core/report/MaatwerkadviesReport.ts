@@ -16,6 +16,7 @@ function n(value: number | null | undefined, digits = 0): string { return `<td c
 /** Dutch text of the assessment and attest status. */
 const STATUS: Record<string, string> = {
   calculated_unverified: 'berekend, niet geverifieerd',
+  calculated_legacy_edition: 'berekend in oudere uitgave, niet voor registratie',
   partially_calculated: 'gedeeltelijk berekend (niet alle varianten)',
   invalid: 'ongeldig',
   unattested: 'niet geattesteerd',

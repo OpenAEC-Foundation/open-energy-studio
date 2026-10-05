@@ -234,6 +234,18 @@ impl ForfaitMaterial {
     /// λ_for in W/(m·K), before the E.2.1 conversion factors.
     pub fn lambda(self) -> f64 {
         use ForfaitMaterial::*;
+        if !crate::norm_versions::profile().bio_based_lambda_2025 {
+            // NTA 8800:2024 tables E.11/E.12 (p. 791): one row per
+            // bio-based material; reed is an "other material" at 0,200.
+            match self {
+                FlaxBoard | FlaxSprayed | SheepWool | Cotton => return 0.050,
+                Coconut => return 0.055,
+                Straw => return 0.060,
+                HempBoard | HempOther => return 0.100,
+                Reed => return 0.200,
+                _ => {}
+            }
+        }
         match self {
             GlassWool | StoneWool | EpsBoard | Xps => 0.040,
             MineralWoolFlakes | EpsWhiteBeads | CellularGlass | WoodFibre | CelluloseLoose => 0.045,
@@ -264,6 +276,13 @@ impl ForfaitMaterial {
     pub fn in_situ_product(self) -> Option<InSituProduct> {
         use ForfaitMaterial::*;
         match self {
+            // NTA 8800:2024 table E.5 (p. 783): only mineral-wool flakes
+            // take 1,00; cellulose and sprayed flax fall under "overig".
+            CelluloseLoose | FlaxSprayed
+                if !crate::norm_versions::profile().bio_based_ageing_one =>
+            {
+                Some(InSituProduct::Other)
+            }
             MineralWoolFlakes | CelluloseLoose | FlaxSprayed => {
                 Some(InSituProduct::FibresAndFlakes)
             }

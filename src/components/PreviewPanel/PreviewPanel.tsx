@@ -1,3 +1,4 @@
+import { projectCalculated } from '../../core/nta/KernelClient';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
@@ -105,7 +106,7 @@ export function PreviewPanel({ embedded = false }: { embedded?: boolean } = {}) 
     ? hasNtaBlock ? { kind: 'loading', project } : { kind: 'idle' }
     : kernel;
   const summary = visibleKernel.kind === 'done' ? visibleKernel.summary : null;
-  const calculated = summary?.status === 'calculated_unverified';
+  const calculated = projectCalculated(summary?.status);
 
   return (
     <div className={embedded ? 'preview-panel embedded' : 'preview-panel'} style={embedded ? undefined : { width }}>

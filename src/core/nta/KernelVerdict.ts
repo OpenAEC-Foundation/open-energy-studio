@@ -1,4 +1,4 @@
-import type { ProjectPerformanceAssessment } from './KernelClient';
+import { projectCalculated, type ProjectPerformanceAssessment } from './KernelClient';
 
 /**
  * The one rule for what the simplified (indicative) engine may show next to the NTA kernel.
@@ -16,7 +16,7 @@ export type KernelVerdict = 'calculated' | 'withheld' | 'noNtaInputYet' | 'unkno
 
 export function kernelVerdict(assessment: ProjectPerformanceAssessment | null | undefined): KernelVerdict {
   if (!assessment) return 'unknown';
-  if (assessment.status === 'calculated_unverified' && assessment.performance) return 'calculated';
+  if (projectCalculated(assessment.status) && assessment.performance) return 'calculated';
   const gaps = assessment.gaps ?? [];
   if (assessment.status === 'incomplete' && gaps.length > 0
     && gaps.every((gap) => gap.code === 'nta_calculation_block_missing')) return 'noNtaInputYet';

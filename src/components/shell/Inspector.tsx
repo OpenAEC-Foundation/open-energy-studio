@@ -6,6 +6,7 @@
  * A selected building element gets the inline editor (F5); on Installaties
  * without a selection the panel shows the energy per service.
  */
+import { projectCalculated } from '../../core/nta/KernelClient';
 import { X } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
@@ -66,7 +67,7 @@ export function Inspector({ onClose }: { onClose: () => void }) {
 export function ServiceEnergyPanel() {
   const { t, locale } = useI18n();
   const kernel = useKernel();
-  const performance = kernel?.settled?.status === 'calculated_unverified' ? kernel.settled.performance : null;
+  const performance = projectCalculated(kernel?.settled?.status) ? kernel?.settled?.performance ?? null : null;
   const summary = performance ? summarizeServiceEnergy(performance.energyByService) : null;
   const kwh = (value: number) => `${formatNumber(value, locale, 0)} kWh`;
   const carrier = (code: string) => { const key = `inspector.carrier.${code}`; const text = t(key); return text === key ? code : text; };

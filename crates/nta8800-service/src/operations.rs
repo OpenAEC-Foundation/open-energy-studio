@@ -24,7 +24,8 @@ pub struct InputSpec {
 pub enum StatusRule {
     /// `status == "invalid"` is 422, everything else 200.
     Invalid,
-    /// Only `status == "calculated_unverified"` is 200, everything else 422.
+    /// Only `calculated_unverified` (and `calculated_legacy_edition`, a
+    /// calculation in an older edition) is 200, everything else 422.
     Calculated,
     /// Always 200.
     Always,
@@ -39,7 +40,9 @@ impl StatusRule {
         let status = body.get("status").and_then(Value::as_str).unwrap_or("");
         let refused = match self {
             StatusRule::Invalid => status == "invalid",
-            StatusRule::Calculated => status != "calculated_unverified",
+            StatusRule::Calculated => {
+                status != "calculated_unverified" && status != "calculated_legacy_edition"
+            }
             StatusRule::Always => false,
             StatusRule::InvalidCase => status == "invalid_case",
             StatusRule::ReferenceCompare => {
@@ -270,6 +273,8 @@ fn project_projection(body: &Value, members: &[&str]) -> Outcome {
                 "status",
                 "kernelVersion",
                 "targetNormVersion",
+                "normVersion",
+                "registrationEligible",
                 "inputFingerprint",
                 "attestStatus",
                 "gaps",
@@ -383,6 +388,7 @@ pub fn version_value() -> Value {
         "apiVersion": "v1",
         "kernelVersion": nta8800_core::KERNEL_VERSION,
         "targetNormVersion": nta8800_core::TARGET_NORM_VERSION,
+        "supportedNormVersions": nta8800_core::norm_versions::supported_editions(),
         "buildCommit": option_env!("OES_BUILD_COMMIT"),
         "buildFingerprint": build_fingerprint(),
     })
