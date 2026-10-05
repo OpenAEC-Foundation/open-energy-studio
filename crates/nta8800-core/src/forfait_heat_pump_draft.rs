@@ -123,6 +123,37 @@ pub struct ForfaitHeatPumpDraftInput {
     /// Claimed source quality declaration; its authenticity is not checked here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_quality_declaration_reference: Option<String>,
+    /// A quality declaration (kwaliteitsverklaring, e.g. BCRG) whose
+    /// efficiency replaces the table 9.27/9.28/9.29 value (§9.1, p. 285).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality_declaration: Option<HeatPumpQualityDeclaration>,
+}
+
+/// Declared values of a heat pump for space heating (§9.1, p. 285): the
+/// declared `η_H;gen` (COP) replaces the table value and is rounded down to
+/// a multiple of 0,05 (electric) — the table `c_source` of footnote a still
+/// applies to ground and groundwater sources. The declared energy fraction
+/// and auxiliary energy are applied by the space-heating chain.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeatPumpQualityDeclaration {
+    /// Declaration number and issuer, e.g. "BCRG 91849/03".
+    pub declaration_reference: String,
+    /// Declared `η_H;gen;si;hp` (COP) for the design supply temperature and
+    /// annual heat demand of this system (interpolated in the declaration).
+    pub generation_efficiency: f64,
+    /// Declared `F_H;gen;si,gpref`; omitted means 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub energy_fraction: Option<f64>,
+    /// Declared `W_H;aux` of the appliance in kWh per year; replaces the
+    /// 9.85 forfait auxiliary energy. Omitted keeps the forfait.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auxiliary_kwh_per_year: Option<f64>,
+}
+
+/// Round down to a multiple of `step` (§9.1, p. 285).
+fn round_down_to(value: f64, step: f64) -> f64 {
+    ((value / step) + 1e-9).floor() * step
 }
 
 fn is_base_row(row: &TableRowVariant) -> bool {
@@ -455,7 +486,15 @@ pub fn assess_forfait_heat_pump_draft(
             ));
         }
         if issues.is_empty() {
-            table_cop = Some(2.8);
+            table_cop = Some(
+                input
+                    .quality_declaration
+                    .as_ref()
+                    .filter(|item| {
+                        item.generation_efficiency.is_finite() && item.generation_efficiency > 0.0
+                    })
+                    .map_or(2.8, |item| round_down_to(item.generation_efficiency, 0.05)),
+            );
             corrected_cop = table_cop;
         }
     } else {
@@ -505,6 +544,49 @@ pub fn assess_forfait_heat_pump_draft(
                 TableRowVariant::Table928HighEfficiency => {
                     high_row_values(input.source).and_then(|row| row.get(index).copied())
                 }
+            };
+            if let Some(declaration) = &input.quality_declaration {
+                if declaration.declaration_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "source_required",
+                        "qualityDeclaration.declarationReference",
+                    ));
+                }
+                if !declaration.generation_efficiency.is_finite()
+                    || declaration.generation_efficiency <= 0.0
+                    || declaration.generation_efficiency > 15.0
+                {
+                    issues.push(issue(
+                        "heat_pump_declared_efficiency_invalid",
+                        "qualityDeclaration.generationEfficiency",
+                    ));
+                }
+                if declaration
+                    .energy_fraction
+                    .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
+                {
+                    issues.push(issue(
+                        "heat_pump_declared_fraction_invalid",
+                        "qualityDeclaration.energyFraction",
+                    ));
+                }
+                if declaration
+                    .auxiliary_kwh_per_year
+                    .is_some_and(|value| !value.is_finite() || value < 0.0)
+                {
+                    issues.push(issue(
+                        "heat_pump_declared_auxiliary_invalid",
+                        "qualityDeclaration.auxiliaryKwhPerYear",
+                    ));
+                }
+            }
+            // §9.1 (p. 285): a declared value replaces the table cell and is
+            // rounded down to a multiple of 0,05 for electric generators.
+            let selected_value = match &input.quality_declaration {
+                Some(declaration) => selected_value
+                    .map(|_| round_down_to(declaration.generation_efficiency, 0.05))
+                    .or(Some(round_down_to(declaration.generation_efficiency, 0.05))),
+                None => selected_value,
             };
             match selected_value {
                 Some(value) if issues.is_empty() => {
@@ -570,6 +652,7 @@ mod tests {
             source_temperature_c: None,
             source_temperature_evidence_reference: None,
             source_quality_declaration_reference: None,
+            quality_declaration: None,
         }
     }
 
@@ -888,5 +971,39 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "table_cell_unavailable"));
+    }
+
+    /// §9.1 (p. 285): a declared COP replaces the table cell, rounded down
+    /// to 0,05; invalid declarations are refused.
+    #[test]
+    fn quality_declaration_replaces_the_table_cop() {
+        let mut input = example(
+            TableScope::ResidentialAtMost25Kw,
+            TableSource::OutdoorAir,
+            35.0,
+        );
+        let table = assess_forfait_heat_pump_draft(&input)
+            .corrected_cop
+            .unwrap();
+        input.quality_declaration = Some(HeatPumpQualityDeclaration {
+            declaration_reference: "BCRG 0000/01".into(),
+            generation_efficiency: 4.349,
+            energy_fraction: Some(1.0),
+            auxiliary_kwh_per_year: Some(30.0),
+        });
+        let declared = assess_forfait_heat_pump_draft(&input);
+        assert_eq!(declared.status, "input_valid");
+        assert!((declared.corrected_cop.unwrap() - 4.30).abs() < 1e-9);
+        assert!(declared.corrected_cop.unwrap() > table);
+        input
+            .quality_declaration
+            .as_mut()
+            .unwrap()
+            .declaration_reference = " ".into();
+        input.quality_declaration.as_mut().unwrap().energy_fraction = Some(1.2);
+        let invalid = assess_forfait_heat_pump_draft(&input);
+        let codes: Vec<&str> = invalid.issues.iter().map(|item| item.code).collect();
+        assert!(codes.contains(&"source_required"));
+        assert!(codes.contains(&"heat_pump_declared_fraction_invalid"));
     }
 }

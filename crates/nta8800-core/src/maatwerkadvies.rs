@@ -921,7 +921,10 @@ fn resolve_use(profile: &UsageProfile, input: &BuildingPerformanceInput) -> Reso
 fn zone_occupants(demand: &MonthlyDemandInput) -> Option<f64> {
     match &demand.internal_gains {
         InternalGains::Residential { dwelling_count, .. } if *dwelling_count > 0 => {
-            let dwellings = f64::from(*dwelling_count);
+            let dwellings = demand
+                .internal_gains
+                .zone_dwellings()
+                .unwrap_or(f64::from(*dwelling_count));
             Some(dwellings * occupants_per_dwelling(demand.usable_floor_area_m2 / dwellings))
         }
         _ => None,

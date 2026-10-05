@@ -1,0 +1,964 @@
+{
+  "id": "public-comparison-b",
+  "name": "Vergelijking openbaar rapport B (rijwoning)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.1, NTA 8800:2022); niet de echte woning.",
+  "buildingFunction": "residential",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Rekenzone 1",
+      "floorArea": 135.33,
+      "volume": 351.86,
+      "height": 2.6,
+      "surfaces": [
+        {
+          "id": "front",
+          "name": "front",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 34.06,
+          "orientation": "NW",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "w1",
+              "name": "raam 1",
+              "area": 0.47,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w2",
+              "name": "raam 2",
+              "area": 1.21,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w3",
+              "name": "raam 3",
+              "area": 1.46,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w4",
+              "name": "raam 4",
+              "area": 2.18,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w5",
+              "name": "raam 5",
+              "area": 1.14,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w6",
+              "name": "raam 6",
+              "area": 2.18,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w7",
+              "name": "raam 7",
+              "area": 2.52,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            },
+            {
+              "id": "w8",
+              "name": "raam 8",
+              "area": 0.48,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "front"
+            }
+          ]
+        },
+        {
+          "id": "roof-nw",
+          "name": "roof-nw",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 26.61,
+          "orientation": "NW",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "side-sw",
+          "name": "side-sw",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 4.64,
+          "orientation": "SW",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "rear",
+          "name": "rear",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 31.54,
+          "orientation": "SE",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "w9",
+              "name": "raam 9",
+              "area": 4.35,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SE",
+              "surfaceId": "rear"
+            },
+            {
+              "id": "w10",
+              "name": "raam 10",
+              "area": 5.54,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SE",
+              "surfaceId": "rear"
+            },
+            {
+              "id": "w11",
+              "name": "raam 11",
+              "area": 0.76,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SE",
+              "surfaceId": "rear"
+            },
+            {
+              "id": "w12",
+              "name": "raam 12",
+              "area": 2.62,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SE",
+              "surfaceId": "rear"
+            },
+            {
+              "id": "w13",
+              "name": "raam 13",
+              "area": 1.76,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "SE",
+              "surfaceId": "rear"
+            }
+          ]
+        },
+        {
+          "id": "roof-se",
+          "name": "roof-se",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 30.87,
+          "orientation": "SE",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "w14",
+              "name": "raam 14",
+              "area": 2.08,
+              "uValue": 1.3,
+              "gValue": 0.45,
+              "orientation": "SE",
+              "surfaceId": "roof-se"
+            }
+          ]
+        },
+        {
+          "id": "side-ne",
+          "name": "side-ne",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 1.89,
+          "orientation": "NE",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "flat-dormer",
+          "name": "flat-dormer",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 4.25,
+          "orientation": "horizontal",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "flat-ext",
+          "name": "flat-ext",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 1.0,
+          "orientation": "horizontal",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "floor",
+          "name": "floor",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 50.04,
+          "orientation": "horizontal",
+          "constructionId": "c-floor",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb1",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.53,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb2",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 19.7,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb3",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 6.67,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb4",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 9.6,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb5",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 1.3,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb6",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 2.07,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb7",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 1.3,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb8",
+          "name": "psi 0.03",
+          "psiValue": 0.03,
+          "length": 6.26,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb9",
+          "name": "psi 0.05",
+          "psiValue": 0.05,
+          "length": 2.47,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb10",
+          "name": "psi 0.5",
+          "psiValue": 0.5,
+          "length": 2.07,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb11",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 2.37,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb12",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 3.2,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb13",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 1.19,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb14",
+          "name": "psi 0.19",
+          "psiValue": 0.19,
+          "length": 1.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb15",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 2.6,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb16",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 12.25,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb17",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 6.45,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb18",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 6.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb19",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 2.47,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb20",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 2.47,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb21",
+          "name": "psi 0.03",
+          "psiValue": 0.03,
+          "length": 6.26,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb22",
+          "name": "psi 0.05",
+          "psiValue": 0.05,
+          "length": 2.47,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb23",
+          "name": "psi 0.12",
+          "psiValue": 0.12,
+          "length": 1.3,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb24",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 3.2,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb25",
+          "name": "psi 0.12",
+          "psiValue": 0.12,
+          "length": 1.3,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb26",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 1.19,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb27",
+          "name": "psi 0.19",
+          "psiValue": 0.19,
+          "length": 1.18,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb28",
+          "name": "psi 0.5",
+          "psiValue": 0.5,
+          "length": 0.9,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb29",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 0.9,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb30",
+          "name": "psi 0.19",
+          "psiValue": 0.19,
+          "length": 2.62,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb31",
+          "name": "psi 0.5",
+          "psiValue": 0.5,
+          "length": 1.17,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb32",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 1.17,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb33",
+          "name": "psi 0.19",
+          "psiValue": 0.19,
+          "length": 0.22,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        }
+      ],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.4
+      }
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-wall",
+      "name": "Gevel Rc 4,7",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-roof",
+      "name": "Dak Rc 6,3",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-floor",
+      "name": "Vloer Rc 3,7",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2475
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "residential",
+    "constructionYear": 2024,
+    "areaSourceReference": "openbare bron Uniec 3.1.6.2 woning 2",
+    "usageFunction": "residential",
+    "dwellingType": "other",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "heavy",
+      "ceiling": "open_or_none",
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2: dragend metselwerk, niet-massieve betonvloeren"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "one dwelling"
+    },
+    "surfaceTilts": [
+      {
+        "surfaceId": "roof-nw",
+        "tiltDeg": 35.0,
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      {
+        "surfaceId": "roof-se",
+        "tiltDeg": 35.0,
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; 3 small windows with overhang/side obstruction modelled minimal"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "floor",
+        "exposedPerimeterM": 10.29,
+        "constructionResistanceM2kPerW": 3.87,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 4.88,
+              "psiWPerMk": 0.27,
+              "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+            },
+            {
+              "lengthM": 4.98,
+              "psiWPerMk": 0.45,
+              "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+            },
+            {
+              "lengthM": 0.43,
+              "psiWPerMk": 0.6,
+              "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+            }
+          ]
+        },
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012
+        },
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2; perimeter = sum of foundation bridge lengths"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "45_40",
+      "installation": "individual",
+      "usageFunction": "residential",
+      "connectedStoreys": 3,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "insulated",
+          "period": "from1995"
+        }
+      },
+      "valvesInsulated": false,
+      "actualPipeLengthM": 86.61,
+      "pump": {
+        "method": "calculated",
+        "heatMeterPresent": false,
+        "energyEfficiencyIndex": 0.23,
+        "electricPowerKw": 0.078,
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "hp",
+        "classificationSourceReference": "Hitachi Yutaki Split Combi 8 kW (Uniec: productspecifiek COP 4,05)",
+        "scope": "residential_at_most25_kw",
+        "source": "outdoor_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 45,
+        "thermalCapacityKw": 8,
+        "capacitySourceReference": "type name 8 kW",
+        "collectiveBuildingInstallation": false,
+        "qualityDeclaration": {
+          "declarationReference": "BCRG-kwaliteitsverklaring lucht/water-warmtepomp (fictief voorbeeld)",
+          "generationEfficiency": 4.05,
+          "energyFraction": 1.0
+        }
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "buitenlucht"
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "residential without BACS",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 200.0,
+          "panelAreaM2": 9.9
+        },
+        "azimuthDeg": 135.0,
+        "tiltDeg": 35.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      }
+    ],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential",
+    "activeCooling": {
+      "system": "compression_table10_29",
+      "capacity": {
+        "method": "dynamic_cooling_load",
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2: actieve koeling voldoende capaciteit"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+    },
+    "cooling": {
+      "emission": {
+        "emitter": "floor_cooling",
+        "balancing": "none_or_unknown",
+        "control": "standalone_per_room",
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      "distribution": {
+        "designTemperature": "t17_to21",
+        "pipe": {
+          "kind": "insulated_from1995"
+        },
+        "fittingsInsulated": false,
+        "pipeLengthM": 86.61,
+        "pump": {
+          "hydraulicallyBalanced": false,
+          "floorCount": 3,
+          "heatMeter": false,
+          "individualDwellingInstallation": true,
+          "labelPowerKw": 0.033,
+          "energyEfficiencyIndex": 0.23,
+          "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      "generators": [
+        {
+          "id": "cool",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.1.6.2 woning 2 compressiekoeling forfaitair"
+        }
+      ]
+    },
+    "verticalPipes": [],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 135.33,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 135.33
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 10.42,
+      "constructionYear": 2024,
+      "floorAboveCrawlspace": true,
+      "heatingSetpointC": 20.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d2",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "declared",
+              "value": 0.912,
+              "standard": "en13141_7",
+              "sourceReference": "BCRG Itho HRU ECO 300"
+            },
+            "bypass": {
+              "kind": "full"
+            },
+            "layout": "central",
+            "supplyDuctInsulation": {
+              "kind": "uninsulated"
+            },
+            "equipmentReference": "Itho HRU ECO 300"
+          },
+          "ducts": "luka_a_b_c",
+          "equipmentReference": "Itho HRU ECO 300"
+        }
+      },
+      "installedCapacity": {
+        "totalDm3PerS": 55.1,
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.4,
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "declared",
+        "fans": [
+          {
+            "id": "f1",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 21.7
+            }
+          }
+        ],
+        "control": {
+          "method": "declared",
+          "monthly": [
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364
+          ],
+          "sourceReference": "BCRG f 0,364"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "one dwelling"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "kitchen_and_bathroom",
+        "kitchenLengthM": 7.0,
+        "bathroomLengthM": 7.0,
+        "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2 6-8 m"
+      },
+      "generator": {
+        "kind": "heat_pump",
+        "exhaustAirSource": false,
+        "declared": {
+          "value": 1.55,
+          "sourceReference": "BCRG-kwaliteitsverklaring tapwater (fictief voorbeeld)"
+        }
+      },
+      "equipmentReference": "Hitachi Yutaki combi 260 L"
+    }
+  }
+}

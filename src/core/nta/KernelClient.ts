@@ -628,7 +628,7 @@ export interface MonthlyDemandInput {
     sourceReference: string;
   };
   internalGains:
-    | { method: 'residential'; dwellingCount: number; sourceReference: string }
+    | { method: 'residential'; dwellingCount: number; /** 6.2b: A_g;zi / Σ A_g;zi; omitted: derived for multi-zone projects. */ dwellingShare?: number | null; sourceReference: string }
     | {
         method: 'utility';
         /** Φ_int;L (7.28): from chapter 14 lighting, declared W_t, or resolved. */
@@ -962,6 +962,20 @@ export interface ForfaitHeatPumpDraftInput {
   sourceTemperatureC?: number | null;
   sourceTemperatureEvidenceReference?: string | null;
   sourceQualityDeclarationReference?: string | null;
+  /** §9.1 (p. 285): a quality declaration (e.g. BCRG) replacing the table COP. */
+  qualityDeclaration?: HeatPumpQualityDeclaration | null;
+}
+
+/** Declared heat-pump values for space heating (kwaliteitsverklaring, §9.1). */
+export interface HeatPumpQualityDeclaration {
+  /** Declaration number and issuer, e.g. "BCRG 91849/03". */
+  declarationReference: string;
+  /** Declared η_H;gen (COP) for this design supply temperature and demand; rounded down to 0,05. */
+  generationEfficiency: number;
+  /** Declared F_H;gen;gpref; omitted means 1. Below 1 the rest is the integrated electric backup (η = 1). */
+  energyFraction?: number | null;
+  /** Declared W_H;aux in kWh per year; replaces the 9.85 forfait. */
+  auxiliaryKwhPerYear?: number | null;
 }
 
 export interface ForfaitHeatPumpDraftAssessment {
@@ -3902,7 +3916,9 @@ export type NtaHotWaterGenerator =
     | { kind: 'heat_pump'; exhaustAirSource: boolean; sourceCorrection?: number | null; measuredClass?: NtaApplicationClass | null;
         outdoorAirFraction?: number | null;
         /** Annex V: on the same regenerated ground source as the space-heating heat pump (V.1, table V.1). */
-        sameGroundSource?: boolean }
+        sameGroundSource?: boolean;
+        /** §13.8.4.7.2: a quality-declaration value replacing 1,4·c_source; with measuredClass c_W;gen applies. */
+        declared?: { value: number; sourceReference: string } | null }
     | { kind: 'heat_pump_en16147'; profile: 's' | 'm' | 'l' | 'xl'; deliveredKwhPerDay: number; inputKwhPerDay: number;
         exhaustAirSource: boolean; storageWithoutLegionellaCycle: boolean; outdoorAirFraction?: number | null;
         /** 13.153b SCF (smart = 1 from 0,07) and 13.153c temperatures; omitted means no correction. */
@@ -3937,7 +3953,7 @@ export interface NtaHotWaterSystem {
   /** 7.82: b_U of the unheated space with pipes or vessels; ϑ_ztu = ϑ_set − b_U·(ϑ_set − ϑ_e). */
   unheatedReductionFactor?: number | null;
   need:
-    | { method: 'residential'; dwellingCount: number; sourceReference: string }
+    | { method: 'residential'; dwellingCount: number; /** 6.2b: A_g;zi / Σ A_g;zi; omitted: derived for multi-zone projects. */ dwellingShare?: number | null; sourceReference: string }
     | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
   emission:
     | { method: 'residential'; served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';

@@ -67,6 +67,9 @@ use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
+    "§9.1 (p. 285): a heat-pump quality declaration (kwaliteitsverklaring, e.g. BCRG) replaces the table 9.27/9.29 COP, rounded down to 0,05; c_source of footnote a still applies; the value is read from the declaration for this system's design supply temperature and demand by the user (linear interpolation allowed)",
+    "§9.1: a declared energy fraction F_H;gen;gpref below 1 is completed by the appliance's integrated electric backup heater at η = 1 (the assumption under which such declarations are drawn up); in a set of several generators it is refused, because 9.6.1 shares the load there",
+    "§9.1: a declared annual W_H;aux replaces the 9.85 forfait and is spread over the months by the heat-pump output",
     "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
     "7.82: ϑ_ztu of the unheated space follows from distributionSystem.unheatedReductionFactor (b_U); without it and without entered values 13 °C is used",
     "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
@@ -3800,6 +3803,22 @@ fn generate_multiple(
     // needs annex Q.
     for (index, part) in set.generators.iter().enumerate() {
         if let Generator::HeatPumpForfait(generator) = &part.generator {
+            // A declared energy fraction below 1 assumes an integrated
+            // backup; in a set 9.6.1 shares the load, so it cannot apply.
+            if generator
+                .forfait
+                .quality_declaration
+                .as_ref()
+                .and_then(|item| item.energy_fraction)
+                .is_some_and(|value| value < 1.0)
+            {
+                issues.push(issue(
+                    "heat_pump_declared_fraction_in_multiple_set",
+                    format!(
+                        "generator.generators[{index}].generator.forfait.qualityDeclaration.energyFraction"
+                    ),
+                ));
+            }
             if generator
                 .forfait
                 .design_supply_temperature_c
@@ -4415,10 +4434,26 @@ fn generate(
                     "generator.auxiliary",
                 ));
             }
+            // §9.1 (p. 285) with a quality declaration: the declared energy
+            // fraction F_H;gen;gpref of the heat pump; the rest is delivered
+            // by the appliance's integrated electric backup heater (η = 1),
+            // the assumption under which such declarations are drawn up.
+            let declaration = generator.forfait.quality_declaration.as_ref();
+            let declared_fraction = declaration
+                .and_then(|item| item.energy_fraction)
+                .filter(|value| value.is_finite() && *value > 0.0 && *value <= 1.0)
+                .unwrap_or(1.0);
+            let pump_outputs: Vec<MonthlyEnergy> = outputs
+                .iter()
+                .map(|item| MonthlyEnergy {
+                    energy_kwh: item.energy_kwh * declared_fraction,
+                    ..item.clone()
+                })
+                .collect();
             let result =
                 assess_forfait_heat_pump_monthly_draft(&ForfaitHeatPumpMonthlyDraftInput {
                     forfait,
-                    generator_output_kwh: outputs.to_vec(),
+                    generator_output_kwh: pump_outputs,
                     generator_output_reference: "derived by space_heating_chain".into(),
                     source_system: generator.source_system,
                     source_system_reference: generator.source_system_reference.clone(),
@@ -4430,8 +4465,9 @@ fn generate(
                     .map(|item| issue(item.code, format!("generator.{}", item.path))),
             );
             generation_efficiency = result.corrected_cop;
-            for (row, pump) in monthly.iter_mut().zip(&result.monthly) {
-                row.generator_electricity_kwh = pump.generator_input_electricity_kwh;
+            for ((row, pump), total) in monthly.iter_mut().zip(&result.monthly).zip(outputs) {
+                row.generator_electricity_kwh = pump.generator_input_electricity_kwh
+                    + total.energy_kwh * (1.0 - declared_fraction);
                 row.collective_source_heat_kwh = pump.collective_source_heat_kwh;
                 row.heat_pump_output_kwh = pump.generator_output_kwh;
             }
@@ -4448,7 +4484,24 @@ fn generate(
                 .iter()
                 .map(|row| (row.month, row.generator_electricity_kwh))
                 .collect();
-            let auxiliary: Option<Vec<f64>> = if collective {
+            let declared_auxiliary = declaration.and_then(|item| item.auxiliary_kwh_per_year);
+            let auxiliary: Option<Vec<f64>> = if let Some(annual) = declared_auxiliary {
+                // Declared W_H;aux per year, spread over the months by the
+                // heat-pump output (§9.1 replaces the 9.85 forfait).
+                let total: f64 = monthly.iter().map(|row| row.heat_pump_output_kwh).sum();
+                Some(
+                    monthly
+                        .iter()
+                        .map(|row| {
+                            if total > 0.0 {
+                                annual * row.heat_pump_output_kwh / total
+                            } else {
+                                annual / 12.0
+                            }
+                        })
+                        .collect(),
+                )
+            } else if collective {
                 generator.auxiliary.as_ref().map(|auxiliary| {
                     monthly
                         .iter()
@@ -5061,7 +5114,53 @@ mod tests {
             source_temperature_c: None,
             source_temperature_evidence_reference: None,
             source_quality_declaration_reference: None,
+            quality_declaration: None,
         }
+    }
+
+    /// §9.1 (p. 285): a quality declaration sets the COP, the energy
+    /// fraction (the rest by the integrated electric backup at η = 1) and the
+    /// annual auxiliary energy.
+    #[test]
+    fn declared_heat_pump_sets_cop_fraction_and_auxiliary() {
+        let mut forfait = heat_pump();
+        forfait.quality_declaration =
+            Some(crate::forfait_heat_pump_draft::HeatPumpQualityDeclaration {
+                declaration_reference: "BCRG 0000/01".into(),
+                generation_efficiency: 4.35,
+                energy_fraction: Some(0.9),
+                auxiliary_kwh_per_year: Some(30.0),
+            });
+        let mut input = boiler_chain();
+        input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+            forfait,
+            source_system: SourceSystem::Individual,
+            source_system_reference: "outdoor unit".into(),
+            regeneration: None,
+            auxiliary_measurements: None,
+            auxiliary: None,
+        });
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert!((result.generation_efficiency.unwrap() - 4.35).abs() < 1e-9);
+        let mut auxiliary = 0.0;
+        for row in &result.monthly {
+            let expected = row.generator_output_kwh * (0.9 / 4.35 + 0.1);
+            assert!((row.generator_electricity_kwh - expected).abs() < 1e-6);
+            assert!((row.heat_pump_output_kwh - 0.9 * row.generator_output_kwh).abs() < 1e-6);
+            auxiliary += row.auxiliary_electricity_kwh.unwrap_or(0.0);
+        }
+        // Generator auxiliary 30 kWh plus the distribution pump energy.
+        let distribution: f64 = result
+            .monthly
+            .iter()
+            .map(|row| row.distribution_auxiliary_electricity_kwh)
+            .sum();
+        assert!(auxiliary >= 30.0 - 1e-6, "{auxiliary} {distribution}");
     }
 
     #[test]

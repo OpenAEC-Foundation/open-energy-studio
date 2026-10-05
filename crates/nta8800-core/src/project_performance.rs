@@ -491,13 +491,9 @@ fn single_detached_dwelling(
     let zones = derived.zone_inputs();
     let dwellings: u32 = zones
         .iter()
-        .filter_map(|zone| match &zone.internal_gains {
-            crate::monthly_demand::InternalGains::Residential { dwelling_count, .. } => {
-                Some(*dwelling_count)
-            }
-            _ => None,
-        })
-        .sum();
+        .filter_map(|zone| zone.internal_gains.zone_dwellings())
+        .sum::<f64>()
+        .round() as u32;
     let apartment = zones.iter().any(|zone| {
         zone.dwelling_type == Some(crate::monthly_demand::DwellingType::ApartmentBuilding)
             || zone
@@ -1663,6 +1659,30 @@ impl ErrorMove for FirstError {
     }
 }
 
+/// 6.2b (p. 160): with several calculation zones each zone takes
+/// N_woon;zi = A_g;zi / Σ A_g;zi × N_woon, unless the input states the share.
+fn zone_internal_gains(
+    gains: &InternalGains,
+    multi_zone: bool,
+    zone_area_m2: f64,
+    total_area_m2: f64,
+) -> InternalGains {
+    match gains {
+        InternalGains::Residential {
+            dwelling_count,
+            dwelling_share: None,
+            source_reference,
+        } if multi_zone && total_area_m2 > 0.0 && zone_area_m2 > 0.0 => {
+            InternalGains::Residential {
+                dwelling_count: *dwelling_count,
+                dwelling_share: Some((zone_area_m2 / total_area_m2).min(1.0)),
+                source_reference: format!("{source_reference}; N_woon;zi per 6.2b"),
+            }
+        }
+        other => other.clone(),
+    }
+}
+
 #[cfg(test)]
 thread_local! {
     // Deserializations `blank_paths` made on this thread (tests bound the
@@ -2784,6 +2804,7 @@ fn derive_input(
     }
     let nta = nta?;
     let multi_zone = project.zones.len() > 1;
+    let total_zone_area: f64 = project.zones.iter().map(|zone| zone.floor_area).sum();
     if multi_zone
         && nta
             .vertical_pipes
@@ -3155,9 +3176,13 @@ fn derive_input(
             thermal_mass: data
                 .and_then(|item| item.thermal_mass.clone())
                 .unwrap_or_else(|| nta.thermal_mass.clone()),
-            internal_gains: data
-                .map(|item| item.internal_gains.clone())
-                .unwrap_or_else(|| nta.internal_gains.clone()),
+            internal_gains: zone_internal_gains(
+                data.map(|item| &item.internal_gains)
+                    .unwrap_or(&nta.internal_gains),
+                multi_zone,
+                zone.floor_area,
+                total_zone_area,
+            ),
             window_inventory_complete: true,
             windows,
             opaque_inventory_complete: true,

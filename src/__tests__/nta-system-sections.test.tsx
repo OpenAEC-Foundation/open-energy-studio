@@ -269,6 +269,25 @@ describe('NTA system sections', () => {
     expect(current().windowSolar.obstruction.cooling).toHaveLength(12);
   });
 
+  it('enters a heat-pump quality declaration for heating and hot water (§9.1, §13.8.4.7.2)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ generator: { kind: 'heat_pump_forfait', forfait: {} }, hotWater: { generator: { kind: 'heat_pump', exhaustAirSource: false } } }}
+      body={(draft, change) => <>
+        <SpaceGeneratorFields draft={draft} change={change} base={['generator']} project={project} heatPumpNote={false} />
+        <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
+      </>} />);
+    await user.click(screen.getByLabelText('Use a heat-pump quality declaration (e.g. BCRG)'));
+    await user.type(screen.getAllByLabelText('Number and issuer of the quality declaration')[0], 'BCRG 91849/03');
+    await user.type(screen.getByLabelText('Generation efficiency ηH;gen (COP) from the declaration'), '4.35');
+    await user.type(screen.getByLabelText('Auxiliary energy WH;aux from the declaration, kWh/year (empty: 9.85 forfait)'), '30');
+    await user.click(screen.getByLabelText('Generation efficiency from a quality declaration (e.g. BCRG)'));
+    await user.type(screen.getByLabelText('Generation efficiency ηW;gen from the declaration'), '1.3');
+    const draft = current();
+    expect(draft.generator.forfait.qualityDeclaration).toEqual({
+      declarationReference: 'BCRG 91849/03', generationEfficiency: 4.35, energyFraction: 1, auxiliaryKwhPerYear: 30 });
+    expect(draft.hotWater.generator.declared).toEqual({ value: 1.3, sourceReference: '' });
+  }, 60000);
+
   it('assigns zones to a further heating system (§9.2)', async () => {
     const user = userEvent.setup();
     const zoned = { ...project, zones: [{ id: 'z1', name: 'Begane grond' }, { id: 'z2', name: 'Verdieping' }] } as unknown as IProject;

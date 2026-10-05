@@ -2,6 +2,37 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — kwaliteitsverklaring warmtepomp, woning in meerdere zones, vergelijking met openbare rapporten
+
+Aanleiding: drie openbare BENG-rapporten zijn nagebouwd ([vergelijking](nta8800-vergelijking-openbare-rapporten.md)).
+
+### Nieuwe invoer
+
+- **Kwaliteitsverklaring van een warmtepomp voor ruimteverwarming (§9.1, p. 285).** De forfaitaire warmtepomp neemt nu een optionele `forfait.qualityDeclaration` aan:
+  - `declarationReference`: het nummer en de uitgever van de verklaring;
+  - `generationEfficiency`: de COP. Die vervangt de waarde uit tabel 9.27/9.29 en wordt naar beneden afgerond op 0,05. c_source blijft gelden.
+  - `energyFraction`: bij een waarde onder 1 levert de geïntegreerde elektrische bijverwarming de rest, met rendement 1.
+  - `auxiliaryKwhPerYear`: vervangt het forfait van 9.85.
+
+  Een fractie onder 1 in een set van meerdere opwekkers geeft `heat_pump_declared_fraction_in_multiple_set`.
+- **Gedeclareerd tapwaterrendement van een warmtepomp (§13.8.4.7.2, p. 640).** `declared` bij een tapwaterwarmtepomp vervangt 1,4·c_source en wordt afgerond op 0,05. Zonder toepassingsklasse geldt de waarde zoals in de verklaring geïnterpoleerd; met een klasse wordt de correctie c_W;gen toegepast.
+- Beide hebben een eigen sectie in het NTA-formulier.
+
+### Resultaten die veranderen
+
+- **Woning of woongebouw in meerdere rekenzones (6.2b, p. 160).** Per zone geldt nu N_woon;zi = A_g;zi / Σ A_g;zi × N_woon. Dat raakt de interne warmtewinst (7.21–7.24) en BENG 1.
+  - Voorheen telde elke zone het volledige `dwellingCount`, zodat bewoners per zone dubbel meetelden.
+  - Een eigen aandeel kan worden opgegeven met `internalGains.dwellingShare`.
+  - Projecten met één zone veranderen niet.
+
+### Nieuwe melding
+
+- `cooling_emission_loss_exceeds_need` (niet-blokkerend): het koudeafgifteverlies van formule 10.15 is groter dan de koudebehoefte in ten minste één maand.
+
+### Vastgelegd als interpretatie
+
+- **Regelenergie koeling (10.87, p. 425).** 0,010 kW, altijd in bedrijf, ook bij een omkeerbare warmtepomp: 87,6 kWh per jaar.
+
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 
 De applicatie was gebouwd tegen de concepten van BRL 9500-W/U en BRL 9501 van 14-10-2025 en tegen BRL 9500-MWA-W/U van 19-06-2024. Inmiddels zijn de aangewezen versies openbaar.
