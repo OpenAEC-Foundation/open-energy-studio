@@ -40,6 +40,7 @@ import { migrateLegacyRelabel, relabelNoticeKey } from './core/nta/Registration'
 import { normalizeProject } from './core/energy/normalizeProject';
 import { isTauri } from '@tauri-apps/api/core';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { ConfirmProvider, ToastProvider, useConfirm, useToast } from './components/ui';
 
 /** Whether the relabel migration notice for this key was shown already (per browser profile). */
 function relabelNoticeShown(key: string): boolean {
@@ -73,6 +74,7 @@ function ActiveDocumentContent({
 }) {
   const { state, dispatch } = useEnergy();
   const { t, locale } = useI18n();
+  const toast = useToast();
   const { dialog, project, result } = state;
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
@@ -166,9 +168,9 @@ function ActiveDocumentContent({
       const loaded = withImportRecord(await openUNIEC3FileDialog(), 'UNIEC3');
       docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
-      alert('UNIEC3 import mislukt: ' + (err as Error).message);
+      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'UNIEC3' }), message: (err as Error).message });
     }
-  }, [docDispatch]);
+  }, [docDispatch, toast, t]);
 
   const handleExportVABI = useCallback(() => {
     downloadVABI(project);
@@ -179,9 +181,9 @@ function ActiveDocumentContent({
       const loaded = withImportRecord(await openVABIFileDialog(), 'VABI');
       docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
-      alert('VABI import mislukt: ' + (err as Error).message);
+      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'VABI' }), message: (err as Error).message });
     }
-  }, [docDispatch]);
+  }, [docDispatch, toast, t]);
 
   return (
     <>
@@ -283,10 +285,11 @@ function ActiveDocumentContent({
 // ── Minimal status bar when no document is open ──
 
 function EmptyStatusBar() {
+  const { t } = useI18n();
   return (
     <div className="status-bar">
       <div className="status-section">
-        <span className="status-hint">Ready</span>
+        <span className="status-hint">{t('status.ready')}</span>
       </div>
       <div className="status-section" />
     </div>
@@ -299,6 +302,8 @@ function AppContent() {
   const { docState, docDispatch } = useDocumentManager();
   const hasActiveDoc = useHasActiveDocument();
   const { t } = useI18n();
+  const toast = useToast();
+  const confirmChoice = useConfirm();
   const untitledCounter = useRef(0);
 
   const createEmptyProject = useCallback((): IProject => {
@@ -396,22 +401,34 @@ function AppContent() {
       // fields is shown once per project.
       if (markedForReview > 0
         || (missing.length > 0 && !relabelNoticeShown(await relabelNoticeKey(loaded.id, label, json)))) {
-        alert(t('relabel.migrationNotice', {
-          fields: missing.map((field) => t(`relabel.migrationField.${field}`)).join(', '),
-          count: String(markedForReview),
-        }));
+        toast.show({
+          tone: 'warn',
+          title: t('app.toast.relabelMigrated'),
+          message: t('relabel.migrationNotice', {
+            fields: missing.map((field) => t(`relabel.migrationField.${field}`)).join(', '),
+            count: String(markedForReview),
+          }),
+        });
       }
       const current = await stampProject(loaded);
       const [difference] = compareKernelStamp(saved, current);
       if (difference === 'version' && saved && current) {
-        alert(t('project.kernelChanged', { saved: describeStamp(saved), current: describeStamp(current) }));
+        toast.show({
+          tone: 'warn',
+          title: t('app.toast.kernelChanged'),
+          message: t('project.kernelChanged', { saved: describeStamp(saved), current: describeStamp(current) }),
+        });
       } else if (difference === 'input') {
-        alert(t('project.inputChanged'));
+        toast.show({ tone: 'warn', title: t('app.toast.inputChanged'), message: t('project.inputChanged') });
       }
     } catch (err) {
-      alert(t('project.openFailed', { message: (err as Error).message ?? String(err) }));
+      toast.show({
+        tone: 'error',
+        title: t('app.toast.openFailed'),
+        message: t('project.openFailed', { message: (err as Error).message ?? String(err) }),
+      });
     }
-  }, [docDispatch, t]);
+  }, [docDispatch, t, toast]);
 
   const handleOpenProject = useCallback(async () => {
     if (!isTauri()) {
@@ -439,10 +456,10 @@ function AppContent() {
     } catch (err) {
       const msg = (err as Error).message;
       if (msg && !msg.includes('cancelled')) {
-        alert(t('project.openFailed', { message: msg }));
+        toast.show({ tone: 'error', title: t('app.toast.openFailed'), message: t('project.openFailed', { message: msg }) });
       }
     }
-  }, [openProjectText, t]);
+  }, [openProjectText, t, toast]);
 
   // ── Save (Ctrl+S) — save to existing path, or prompt Save As if new ──
   const handleSaveProject = useCallback(async () => {
@@ -478,26 +495,22 @@ function AppContent() {
     if (!doc) return;
 
     if (doc.state.isDirty) {
-      try {
-        const { ask } = await import('@tauri-apps/plugin-dialog');
-        const shouldSave = await ask(
-          `"${doc.state.project.name || 'Untitled'}" has unsaved changes. Save before closing?`,
-          { title: 'Unsaved Changes', kind: 'warning', okLabel: 'Save', cancelLabel: 'Discard' },
-        );
-        if (shouldSave) {
-          const savedPath = await writeProjectToDisk(doc.state.project, doc.filePath, false);
-          if (savedPath === null) return; // User cancelled Save As — don't close
-        }
-      } catch {
-        const shouldDiscard = confirm(
-          `"${doc.state.project.name || 'Untitled'}" has unsaved changes. Discard and close?`
-        );
-        if (!shouldDiscard) return;
+      // One translated dialog for desktop and browser: Opslaan · Niet opslaan · Annuleren.
+      const choice = await confirmChoice({
+        title: t('app.unsaved.title'),
+        message: t('app.unsaved.message', { name: doc.state.project.name || t('app.untitled') }),
+        confirmLabel: t('app.unsaved.save'),
+        denyLabel: t('app.unsaved.discard'),
+      });
+      if (choice === 'cancel') return;
+      if (choice === 'confirm') {
+        const savedPath = await writeProjectToDisk(doc.state.project, doc.filePath, false);
+        if (savedPath === null) return; // User cancelled Save As — don't close
       }
     }
 
     docDispatch({ type: 'DOC_CLOSE', payload: id });
-  }, [docState.documents, docDispatch, writeProjectToDisk]);
+  }, [docState.documents, docDispatch, writeProjectToDisk, confirmChoice, t]);
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
@@ -566,9 +579,13 @@ function AppContent() {
 export default function App() {
   return (
     <I18nProvider>
-      <EnergyProvider>
-        <AppContent />
-      </EnergyProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <EnergyProvider>
+            <AppContent />
+          </EnergyProvider>
+        </ConfirmProvider>
+      </ToastProvider>
     </I18nProvider>
   );
 }

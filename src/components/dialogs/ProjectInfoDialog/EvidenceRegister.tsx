@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useI18n } from '../../../i18n/i18n';
+import { FileButton } from '../../ui';
 import type { NtaEvidenceItem, NtaEvidenceKind, NtaRelabelProof } from '../../../core/nta/KernelClient';
 
 /** Roles of a file in a relabel (BRL 9500-W §4.2.3, p. 23). */
@@ -70,7 +71,7 @@ export function EvidenceRegister({ evidence, onChange }: EvidenceRegisterProps) 
       <p className="dialog-hint">{t('evidence.hint', { prefix: EVIDENCE_REFERENCE_PREFIX })}</p>
       <div className="dialog-field">
         <label htmlFor="evidence-add">{t('evidence.add')}</label>
-        <input id="evidence-add" type="file" multiple disabled={busy}
+        <FileButton id="evidence-add" multiple disabled={busy}
           onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
       </div>
       {error && <p role="alert">{error}</p>}

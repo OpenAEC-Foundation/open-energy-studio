@@ -4,7 +4,7 @@
 .nta-performance h3 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
 .nta-performance p, .nta-performance small { color: var(--text-secondary); }
 .nta-performance-title p { margin: 5px 0 0; max-width: 70ch; }
-.nta-performance-badge { padding: 3px 8px; border: 1px solid var(--energy-orange, #f59e0b); border-radius: 999px; color: var(--energy-orange, #f59e0b); font-weight: 600; white-space: nowrap; }
+.nta-performance-badge { padding: 3px 8px; border: 1px solid var(--unverified); border-radius: 999px; background: var(--unverified-subtle); color: var(--unverified); font-weight: 600; white-space: nowrap; }
 .nta-performance-unavailable { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
 .nta-performance-gaps { margin-top: 12px; }
 .nta-performance-gaps > p { display: flex; gap: 6px; align-items: center; color: var(--text-primary); font-weight: 600; }

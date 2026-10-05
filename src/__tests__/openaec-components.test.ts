@@ -35,12 +35,13 @@ describe('TitleBar', () => {
 describe('StatusBar', () => {
   const css = readCSS('components/StatusBar/StatusBar.css');
 
-  it('uses amber accent as background', () => {
-    expect(css).toMatch(/\.status-bar[^}]*background:\s*var\(--accent\)/s);
+  // UI redesign F1: the status bar is neutral chrome, not an amber call to action.
+  it('uses the neutral chrome surface as background', () => {
+    expect(css).toMatch(/\.status-bar[^}]*background:\s*var\(--surface-chrome\)/s);
   });
 
-  it('uses dark text on amber background', () => {
-    expect(css).toMatch(/\.status-bar[^}]*color:\s*var\(--bg-dark\)/s);
+  it('uses theme text colour on the chrome surface', () => {
+    expect(css).toMatch(/\.status-bar[^}]*color:\s*var\(--fg-2\)/s);
   });
 
 });

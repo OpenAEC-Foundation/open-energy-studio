@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import syntheticCase from '../../../training-data/nta8800-gas-chain-diagnostic-synthetic.json';
 import { compareGasHeatPumpChainDiagnosticWithRust, type GasChainDiagnosticCase, type GasChainDiagnosticComparison } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
+import { FileButton } from '../ui';
 import './GasChainReferencePanel.css';
 
 export function GasChainReferencePanel() {
@@ -88,9 +89,9 @@ export function GasChainReferencePanel() {
         <button type="button" onClick={() => setCaseText(JSON.stringify(syntheticCase, null, 2))}>
           {t('kernel.gasReference.example')}
         </button>
-        <label>{t('kernel.gasReference.file')}
-          <input type="file" accept=".json,application/json" onChange={(event) => void loadFile(event.target.files?.[0])} />
-        </label>
+        <label htmlFor="gas-reference-file">{t('kernel.gasReference.file')}</label>
+        <FileButton id="gas-reference-file" accept=".json,application/json"
+          onChange={(event) => void loadFile(event.target.files?.[0])} />
       </div>
       <label>{t('kernel.gasReference.json')}
         <textarea value={text} rows={9} spellCheck={false} onChange={(event) => setCaseText(event.target.value)} />

@@ -54,6 +54,11 @@ interface DialogShellProps {
   bodyClassName?: string;
   style?: React.CSSProperties;
   footer?: React.ReactNode;
+  /**
+   * `modal` (default): a centred, draggable dialog. `sheet`: a side sheet docked
+   * right (the inspector variant of the redesign, ontwerp.md §5.2).
+   */
+  variant?: 'modal' | 'sheet';
 }
 
 export function DialogShell({
@@ -67,7 +72,9 @@ export function DialogShell({
   bodyClassName,
   style,
   footer,
+  variant = 'modal',
 }: DialogShellProps) {
+  const sheet = variant === 'sheet';
   const titleId = useId();
   // ── Drag support ──
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -75,6 +82,7 @@ export function DialogShell({
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
 
   const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    if (sheet) return; // a docked side sheet does not move
     if ((e.target as HTMLElement).closest('.dialog-close-btn')) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -88,7 +96,7 @@ export function DialogShell({
       setPosition({ x: rect.left, y: rect.top });
     }
     e.preventDefault();
-  }, [position]);
+  }, [position, sheet]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -203,10 +211,11 @@ export function DialogShell({
     : undefined;
 
   return (
-    <div className="dialog-overlay" onClick={handleOverlayClick} onMouseDown={blockEvent} onDoubleClick={blockEvent}>
+    <div className={sheet ? 'dialog-overlay dialog-overlay--sheet' : 'dialog-overlay'}
+      onClick={handleOverlayClick} onMouseDown={blockEvent} onDoubleClick={blockEvent}>
       <div
         ref={dialogRef}
-        className={`${className ? `dialog ${className}` : 'dialog'}${shake ? ' dialog-shake' : ''}`}
+        className={`${className ? `dialog ${className}` : 'dialog'}${sheet ? ' dialog--sheet' : ''}${shake ? ' dialog-shake' : ''}`}
         style={{ ...style, ...positionStyle }}
         role="dialog"
         aria-modal="true"
@@ -223,11 +232,11 @@ export function DialogShell({
         {footer !== undefined ? footer : (
           <div className="dialog-footer">
             <button className="btn" onClick={onClose}>
-              {cancelLabel ?? 'Cancel'}
+              {cancelLabel ?? i18next.t('dialog.cancel')}
             </button>
             {onSubmit && (
               <button className="btn btn-primary" onClick={onSubmit}>
-                {submitLabel ?? 'Save'}
+                {submitLabel ?? i18next.t('dialog.save')}
               </button>
             )}
           </div>

@@ -2,6 +2,14 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — UI-herontwerp, fase F1 en F2 (geen rekenwijziging)
+
+Eerste fasen van het UI-herontwerp (`docs/ui-redesign/ontwerp.md`). Rekenkern, invoer en uitkomsten zijn ongewijzigd.
+- **Huisstijl en leesbaarheid:** nieuwe designtokens; Inter, Space Grotesk en JetBrains Mono worden met de app meegeleverd, dus ook offline in de desktopversie. Gedempte tekst haalt nu WCAG AA (4,7 : 1 donker, 5,0 : 1 licht). De statusbalk is neutraal in plaats van amber; de scrollbalk volgt het thema; "Onverifieerd" heeft een eigen violette kleur in plaats van de waarschuwingskleur.
+- **Meldingen:** foutmeldingen bij openen en importeren verschijnen als melding rechtsonder in plaats van een browservenster. Sluiten van een tabblad met niet-opgeslagen wijzigingen vraagt in de app-taal "Opslaan · Niet opslaan · Annuleren", ook in de browserversie.
+- **Taal:** de feedbackknop en het feedbackformulier zijn Nederlands; bestandskeuzes tonen "Bestand kiezen…" in plaats van de Engelse browsertekst; de teksten van het 3D-model ontbraken en zijn toegevoegd.
+- **Bouwstenen:** knoppen, invoervelden met eenheid (komma en punt worden beide geaccepteerd), keuzeknoppen, kaarten, tabellen, statuslabels, dialogen en zijpanelen voor de volgende fasen.
+
 ## 5 oktober 2026 — aansluiting op de definitieve BRL-versies van 29 mei 2026
 
 De applicatie was gebouwd tegen de concepten van BRL 9500-W/U en BRL 9501 van 14-10-2025 en tegen BRL 9500-MWA-W/U van 19-06-2024. Inmiddels zijn de aangewezen versies openbaar.
