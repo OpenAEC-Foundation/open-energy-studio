@@ -21,15 +21,15 @@ for crate in crates/nta8800-core crates/nta8800-service; do
   step "rustfmt $crate"
   cargo fmt --manifest-path "$crate/Cargo.toml" --check
   step "tests $crate"
-  cargo test --manifest-path "$crate/Cargo.toml" --quiet
+  cargo test --locked --manifest-path "$crate/Cargo.toml" --quiet
   step "clippy $crate"
-  cargo clippy --manifest-path "$crate/Cargo.toml" --all-targets --quiet -- -D warnings
+  cargo clippy --locked --manifest-path "$crate/Cargo.toml" --all-targets --quiet -- -D warnings
 done
 
 if [[ -n "${NTA_REFERENCE_PLAN:-}" || -n "${NTA_REFERENCE_CASE_DIR:-}" ]]; then
   mapfile -d '' -t nta_reference_cases < <(find "$NTA_REFERENCE_CASE_DIR" -maxdepth 1 -type f -name '*.json' -print0 | sort -z)
   step "planned reference comparisons"
-  cargo run --quiet --manifest-path crates/nta8800-service/Cargo.toml \
+  cargo run --locked --quiet --manifest-path crates/nta8800-service/Cargo.toml \
     --bin reference_gate -- --plan "$NTA_REFERENCE_PLAN" "${nta_reference_cases[@]}"
 else
   step "planned reference comparisons skipped (no plan or case directory configured)"
@@ -42,7 +42,7 @@ if [ "${NTA_SKIP_MSRV:-0}" != "1" ]; then
 fi
 
 step "Tauri check"
-cargo check --manifest-path src-tauri/Cargo.toml --quiet
+cargo check --locked --manifest-path src-tauri/Cargo.toml --quiet
 
 step "TypeScript"
 npx tsc --noEmit

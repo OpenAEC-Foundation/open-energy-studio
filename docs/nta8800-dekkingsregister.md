@@ -40,6 +40,8 @@ Na UI-fase F10 slaagde de [volledige technische gate en devbuild op `837eb02`](n
 
 De manifestlezer weigert nu symbolische links naar artefacten buiten de uitvoermap. Een gerichte positieve en negatieve test en hercontrole van het F10-manifest slaagden; de NTA-reken-, referentie- en attestkolommen blijven ongewijzigd.
 
+De lokale technische gate gebruikt nu `--locked` voor alle Cargo-routes. De volledige offline run slaagde met 797 kern-, 57 service- en 744 frontendtests plus integratiegroepen, MSRV, format, Clippy, Tauri en TypeScript/Vite. Omdat officiële actuele cases ontbreken, werd de geplande referentiebatch overgeslagen en blijven alle normatieve referentie- en attestkolommen ongewijzigd.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
