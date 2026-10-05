@@ -1215,7 +1215,8 @@
       "pump": {
         "method": "included_in_generator_auxiliary"
       },
-      "sourceReference": "openbare bron Uniec 3.2.7.0 woning 1"
+      "sourceReference": "openbare bron Uniec 3.2.7.0 woning 1",
+      "unheatedPipeLengthM": 0.0
     },
     "generator": {
       "kind": "heat_pump_forfait",
@@ -1322,7 +1323,8 @@
           "energyEfficiencyIndex": 0.23,
           "sourceReference": "openbare bron Uniec 3.2.7.0 woning 1"
         },
-        "sourceReference": "openbare bron Uniec 3.2.7.0 woning 1"
+        "sourceReference": "openbare bron Uniec 3.2.7.0 woning 1",
+        "unconditionedPipeLengthM": 0.0
       },
       "generators": [
         {
