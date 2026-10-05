@@ -1112,7 +1112,7 @@ fn label_result(result: &BuildingPerformanceAssessment) -> LabelResult {
     LabelResult {
         label_class: result.indicative_label_class,
         need_indicator_kwh_per_m2: result.need_indicator_kwh_per_m2_year,
-        // The label scenario (Regeling art. 2 lid 3 / art. 3 lid 3).
+        // The label scenario (Omgevingsregeling art. 5.11 lid 4 / 5.12 lid 4).
         primary_fossil_indicator_kwh_per_m2: result.label_primary_fossil_indicator_kwh_per_m2_year,
         renewable_share_percent: result.label_renewable_share_percent,
         tojuli_max_k: result.tojuli_max_k,

@@ -1,9 +1,12 @@
-//! Summary of the label data of Regeling energieprestatie gebouwen art. 4
-//! (p. 5–6): a. the general building data (use function, construction
-//! year, usable floor area and, for dwellings, the dwelling type), b. the
+//! Summary of the label data of Omgevingsregeling art. 5.13 (BWBR0045528,
+//! version 2026-10-01; before 2024 Regeling energieprestatie gebouwen
+//! art. 4): a. the general building data (use function, construction year,
+//! usable floor area and, for dwellings, the dwelling type), b. the
 //! insulation per element type and c. the installations including the
 //! solar water heater, next to the indicators (d) that the building
-//! assessment already reports.
+//! assessment already reports. Since 29 May 2026 art. 5.13a lists the
+//! elements a label must carry; [`LabelElements`] gives the ones the
+//! calculation can supply.
 //!
 //! The summary is derived from the project and the derived kernel input; it
 //! adds no calculation.
@@ -81,7 +84,7 @@ pub struct LabelData {
     pub indicators: Option<LabelIndicators>,
 }
 
-/// Regeling art. 4 indicators taken from the calculation.
+/// Omgevingsregeling art. 5.13 onder d: indicators taken from the calculation.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelIndicators {
@@ -93,6 +96,90 @@ pub struct LabelIndicators {
     pub energy_need_kwh_per_m2: Option<f64>,
     pub renovation_standard_kwh_per_m2: Option<f64>,
     pub indicative_label_class: Option<&'static str>,
+    /// Omgevingsregeling art. 5.13a lid 1, as far as the calculation
+    /// supplies them.
+    pub elements: LabelElements,
+}
+
+/// Omgevingsregeling art. 5.13a lid 1 (in force 29 May 2026). Elements a
+/// (class), b (EP2), c (renewable share) and j (energy need) are the
+/// indicators above. Element e (WLC-GWP) comes from the registration, k and
+/// l are statements of the adviser and m is filled in by the issuer, so
+/// those are `None` here unless supplied.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelElements {
+    /// d. Operational greenhouse-gas emission, kg CO2/(m²·yr) (§5.5.6.1).
+    pub operational_co2_kg_per_m2: Option<f64>,
+    /// e. WLC-GWP from the registration, kg CO2-eq/(m²·yr).
+    pub wlc_gwp_kg_co2_eq_per_m2: Option<f64>,
+    /// f. Final energy use, kWh/(m²·yr) (5.3h).
+    pub final_energy_kwh_per_m2: Option<f64>,
+    /// g. Primary fossil energy use, kWh per year (EP_tot × A_g).
+    pub annual_primary_fossil_kwh: Option<f64>,
+    /// g. Renewable primary energy, kWh per year (5.28).
+    pub annual_renewable_primary_kwh: Option<f64>,
+    /// g. Final energy use, kWh per year (5.57).
+    pub annual_final_energy_kwh: Option<f64>,
+    /// h. Renewable energy produced on site, kWh per year.
+    pub renewable_production_kwh: Option<f64>,
+    /// i. Carrier with the largest final energy use (5.57/5.58).
+    pub main_energy_carrier: Option<&'static str>,
+    /// i. Renewable source with the largest share in 5.39a–h.
+    pub main_renewable_source: Option<&'static str>,
+    /// k. Able to respond to external signals; not determined by NTA 8800.
+    pub responds_to_external_signals: Option<bool>,
+    /// l. Heating distribution designed for low temperatures; adviser's
+    /// statement, not determined by the calculation.
+    pub low_temperature_heating: Option<bool>,
+}
+
+impl LabelElements {
+    pub fn from_performance(
+        result: &crate::building_performance::BuildingPerformanceAssessment,
+    ) -> Self {
+        let chapter5 = result.chapter5.as_ref();
+        let main_energy_carrier = result
+            .final_energy_by_carrier
+            .iter()
+            .filter(|item| item.annual_kwh > 0.0)
+            .max_by(|a, b| a.annual_kwh.total_cmp(&b.annual_kwh))
+            .map(|item| item.carrier);
+        let main_renewable_source = chapter5.and_then(|item| {
+            let by = &item.renewable_by_carrier;
+            [
+                ("electricity", by.electricity),
+                ("heat_pump_heat", by.heat_pump_heat),
+                ("solar_heat", by.solar_heat),
+                ("cold", by.cold),
+                ("biomass", by.biomass),
+                ("external_heat", by.external_heat),
+                ("external_cold", by.external_cold),
+            ]
+            .into_iter()
+            .filter(|(_, value)| *value > 0.0)
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(name, _)| name)
+        });
+        let produced: f64 = result
+            .electricity_balance
+            .iter()
+            .map(|month| month.produced_kwh)
+            .sum();
+        Self {
+            operational_co2_kg_per_m2: result.co2_kg_per_m2,
+            wlc_gwp_kg_co2_eq_per_m2: None,
+            final_energy_kwh_per_m2: chapter5.map(|item| item.final_energy_kwh_per_m2),
+            annual_primary_fossil_kwh: result.annual_primary_fossil_kwh,
+            annual_renewable_primary_kwh: result.annual_renewable_primary_kwh,
+            annual_final_energy_kwh: result.annual_final_energy_kwh,
+            renewable_production_kwh: (!result.electricity_balance.is_empty()).then_some(produced),
+            main_energy_carrier,
+            main_renewable_source,
+            responds_to_external_signals: None,
+            low_temperature_heating: None,
+        }
+    }
 }
 
 impl LabelIndicators {
@@ -101,7 +188,7 @@ impl LabelIndicators {
     ) -> Self {
         let chapter5 = result.chapter5.as_ref();
         Self {
-            // Regeling art. 2 lid 3 / art. 3 lid 3: the label scenario.
+            // Omgevingsregeling art. 5.11 lid 4 / 5.12 lid 4: the label scenario.
             primary_fossil_kwh_per_m2: result.label_primary_fossil_indicator_kwh_per_m2_year,
             renewable_share_percent: result.label_renewable_share_percent,
             tojuli_max_k: result.tojuli_max_k,
@@ -112,12 +199,13 @@ impl LabelIndicators {
             renovation_standard_kwh_per_m2: chapter5
                 .and_then(|item| item.renovation_standard_kwh_per_m2),
             indicative_label_class: result.indicative_label_class,
+            elements: LabelElements::from_performance(result),
         }
     }
 }
 
 pub const LABEL_DATA_SOURCE: &str =
-    "Regeling energieprestatie gebouwen art. 4 (gegevens op het energielabel)";
+    "Omgevingsregeling art. 5.13 en 5.13a (BWBR0045528, versie 2026-10-01; gegevens en verplichte elementen energielabel)";
 
 #[derive(Default)]
 struct Accumulator {
@@ -307,7 +395,7 @@ pub fn general_data(
             .and_then(|function| tag(&function))
             .or_else(|| tag(&project.building_function)),
         // The same resolved year as §5.3.2: the registration, else the NTA
-        // block (Regeling art. 4 a, p. 5).
+        // block (Omgevingsregeling art. 5.13 onder a).
         construction_year: derived
             .and_then(|input| input.construction_year)
             .or_else(|| {

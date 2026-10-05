@@ -41,7 +41,7 @@ describe('registration block', () => {
       .toEqual({ client: 'Eigenaar', serialProject: true, constructionYear: 1930, software: softwareIdentity() });
   });
 
-  it('records the program and cleans the WLC-GWP block (Regeling art. 5, BRL 9500-W p. 21)', () => {
+  it('records the program and cleans the WLC-GWP block (Omgevingsregeling art. 5.14, BRL 9500-W p. 21)', () => {
     expect(softwareIdentity()).toEqual({ name: SOFTWARE_NAME, version });
     expect(cleanRegistration({ wlcGwp: { reportReference: ' ' } })).toBeUndefined();
     expect(cleanRegistration({ messageType: 'replacement', wlcGwp: { valueKgCo2EqPerM2Year: 7.5, reportReference: ' wlc.pdf ' } }))
@@ -140,7 +140,7 @@ describe('registration block', () => {
     expect(html).toContain('7,50 kg CO₂-eq/m²·jr (wlc.pdf)');
     expect(html).toContain('plausibility_borderline_label');
     expect(html).toContain('registratie');
-    // Dossier state and readiness are shown apart (Regeling art. 2/3).
+    // Dossier state and readiness are shown apart (Omgevingsregeling art. 5.11/5.12 lid 2).
     expect(html).toContain('<th>Dossier compleet</th><td>nee</td>');
     const attestMissing = {
       ...assessment,

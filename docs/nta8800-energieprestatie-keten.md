@@ -804,7 +804,7 @@ Een onbepaalde factor geeft de melding `bacs_factor_undetermined`.
 
 **Labelgegevens**
 
-De labelgegevens (Regeling art. 4) bevatten deze indicatoren in `labelData.indicators`.
+De labelgegevens (Omgevingsregeling art. 5.13) bevatten deze indicatoren in `labelData.indicators`.
 
 ## Meerdere tapwatersystemen per gebouw (§13.2.4)
 

@@ -260,8 +260,8 @@ describe('project dossier', () => {
     });
     const archive = unzipSync(zipProjectDossier(bundle));
     expect(Object.keys(archive).sort()).toEqual([
-      'dossier-checklist.json', 'evidence/ev-1-foto.jpg', 'kernel-output.json', 'manifest.json',
-      'project.oes.json', 'rekenrapport.html',
+      'dossier-checklist.json', 'ep-online-gegevensoverzicht.json', 'evidence/ev-1-foto.jpg', 'kernel-output.json',
+      'manifest.json', 'project.oes.json', 'rekenrapport.html',
     ]);
     const manifest = JSON.parse(strFromU8(archive['manifest.json']));
     expect(manifest.kernel.inputFingerprint).toBe('abc');

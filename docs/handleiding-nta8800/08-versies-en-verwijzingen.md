@@ -27,7 +27,7 @@ Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, st
 |---|---|
 | [nta8800-verificatiestatus.md](../nta8800-verificatiestatus.md) | stand van de verificatie, onafhankelijke herberekeningen, interpretatielijst |
 | [nta8800-dekkingsregister.md](../nta8800-dekkingsregister.md) | dekking per normonderdeel |
-| [nta8800-attestdossier.md](../nta8800-attestdossier.md) | eisen uit BRL 9501, BRL 9500, Bep en Regeling en de status per eis |
+| [nta8800-attestdossier.md](../nta8800-attestdossier.md) | eisen uit BRL 9501, BRL 9500, het Bbl en de Omgevingsregeling en de status per eis |
 | [nta8800-versiebeheer.md](../nta8800-versiebeheer.md) | versiebeleid volgens BRL 9501 §4.3: versienummers, uitwisselbaarheid, RVO-registratie en bewaartermijnen |
 | [nta8800-releasenotes.md](../nta8800-releasenotes.md) | wijzigingen per datum |
 | [nta8800-werkinstructie.md](../nta8800-werkinstructie.md) | korte werkinstructie voor de projectberekening |
@@ -46,7 +46,7 @@ De rekenkern is gebouwd op gelicentieerde bronnen:
 - NTA 8800:2025+C1:2026;
 - ISSO 82.1 (7e druk, met erratum), ISSO 75.1 (7e druk), ISSO 82.2 en ISSO 75.2 (3e druk);
 - BRL 9500-W en BRL 9500-U van 29 mei 2026 (aangewezen; tekst en paginering gelijk aan de versie van 14 oktober 2025), BRL 9500-MWA-W/U van 24 maart 2026 (in werking per 29 mei 2026) en BRL 9501 van 29 mei 2026; paginaverwijzingen gelden voor deze versies;
-- het Besluit en de Regeling energieprestatie gebouwen;
+- het Besluit bouwwerken leefomgeving (art. 4.149 en 6.29) en de Omgevingsregeling (art. 5.11–5.14, bijlagen IX–Xa); het Besluit en de Regeling energieprestatie gebouwen zijn per 1 januari 2024 ingetrokken;
 - het Praktijkhandboek v2.
 
 Deze bronnen staan niet in de repository. Code en documentatie verwijzen alleen naar paragrafen, formules, tabellen en pagina's.

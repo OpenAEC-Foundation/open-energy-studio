@@ -274,7 +274,7 @@ pub struct ProjectPerformanceAssessment {
     /// §5.5.8 assessment when `ntaCalculation.bacs` is given.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bacs: Option<crate::bacs_draft::BacsDraftAssessment>,
-    /// Label data of Regeling energieprestatie gebouwen art. 4.
+    /// Label data of Omgevingsregeling art. 5.13.
     pub label_data: Option<crate::label_data::LabelData>,
 }
 
@@ -458,7 +458,7 @@ fn registration_context(
             )
         }),
         label_function: derived.and_then(|input| input.label_function),
-        // Regeling art. 2 lid 3 (p. 4): the dwelling label, and so its
+        // Omgevingsregeling art. 5.11 lid 4: the dwelling label, and so its
         // registration checks, follow the EMGforf scenario.
         primary_fossil_kwh_per_m2: performance.and_then(|result| {
             result
@@ -656,8 +656,8 @@ fn nta_block_construction_year(project_value: &Value) -> Option<u32> {
     year_at(project_value, "/ntaCalculation/constructionYear")
 }
 
-/// The bouwjaar of §5.3.2 (p. 75–76) and of the label data (Regeling art.
-/// 4 a): the registration, else the NTA block. The chapter 11 year is not
+/// The bouwjaar of §5.3.2 (p. 75–76) and of the label data (Omgevingsregeling
+/// art. 5.13 onder a): the registration, else the NTA block. The chapter 11 year is not
 /// used: table 11.13 (p. 486) also takes a renovatiejaar.
 pub(crate) fn resolved_construction_year(project_value: &Value) -> Option<u32> {
     registration_construction_year(project_value)
@@ -984,7 +984,7 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
     let mut warnings = Vec::new();
 
     // One building bouwjaar feeds §5.3.2 (p. 75–76) and the label data
-    // (Regeling art. 4 a): the registration year, else the NTA block. A
+    // (Omgevingsregeling art. 5.13 onder a): the registration year, else the NTA block. A
     // differing NTA block year means one of the two is wrong.
     let registered = registration_construction_year(project_value);
     let block = nta_block_construction_year(project_value);
@@ -1460,6 +1460,12 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
             .as_ref()
             .filter(|result| result.status == "calculated_unverified")
             .map(crate::label_data::LabelIndicators::from_performance);
+        // Art. 5.13a lid 1 onder e: the WLC-GWP comes from the registration.
+        if let Some(indicators) = data.indicators.as_mut() {
+            indicators.elements.wlc_gwp_kg_co2_eq_per_m2 = project_value
+                .pointer("/registration/wlcGwp/valueKgCo2EqPerM2Year")
+                .and_then(Value::as_f64);
+        }
         data
     });
     let registration = match project_value.get("registration") {
@@ -3437,7 +3443,7 @@ mod tests {
     fn complete_project_reaches_unverified_indicators() {
         let result = assess_project_performance(&project());
         assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
-        // Regeling art. 4: the label data carries the calculated indicators.
+        // Omgevingsregeling art. 5.13: the label data carries the calculated indicators.
         let label = result
             .label_data
             .as_ref()
@@ -3638,6 +3644,49 @@ mod tests {
         assert_eq!(result.status, "incomplete");
     }
 
+    /// Omgevingsregeling art. 5.13a lid 1: the label elements the calculation
+    /// supplies, and the WLC-GWP taken from the registration.
+    #[test]
+    fn label_elements_follow_article_5_13a() {
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        value["registration"] = serde_json::json!({ "wlcGwp": { "valueKgCo2EqPerM2Year": 7.5 } });
+        let result = assess_project_performance(&value);
+        let performance = result.performance.as_ref().unwrap();
+        let elements = &result
+            .label_data
+            .as_ref()
+            .unwrap()
+            .indicators
+            .as_ref()
+            .unwrap()
+            .elements;
+        assert_eq!(
+            elements.operational_co2_kg_per_m2,
+            performance.co2_kg_per_m2
+        );
+        assert_eq!(elements.wlc_gwp_kg_co2_eq_per_m2, Some(7.5));
+        assert_eq!(
+            elements.final_energy_kwh_per_m2,
+            performance
+                .chapter5
+                .as_ref()
+                .map(|item| item.final_energy_kwh_per_m2)
+        );
+        assert_eq!(
+            elements.annual_final_energy_kwh,
+            performance.annual_final_energy_kwh
+        );
+        // The example has a gas boiler and a small PV system.
+        assert_eq!(elements.main_energy_carrier, Some("gas"));
+        assert!(elements.renewable_production_kwh.unwrap() > 0.0);
+        assert!(elements.main_renewable_source.is_some());
+        assert_eq!(elements.responds_to_external_signals, None);
+        assert_eq!(elements.low_temperature_heating, None);
+    }
+
     /// The example projects of the start screen (src/core/nta/ExampleProjects.ts)
     /// calculate out of the box with plausible indicators.
     #[test]
@@ -3714,7 +3763,7 @@ mod tests {
         }
     }
 
-    /// One building bouwjaar (§5.3.2, Regeling art. 4 a): the registration,
+    /// One building bouwjaar (§5.3.2, Omgevingsregeling art. 5.13 onder a): the registration,
     /// else the NTA block; the chapter 11 year (bouw- of renovatiejaar) is
     /// never used and only warned about when it predates the bouwjaar.
     #[test]

@@ -27,7 +27,7 @@ type TextKey = 'referenceObjectId' | 'bagObjectId' | 'postcode' | 'houseNumber' 
 
 type TextField = { key: TextKey; type?: 'date' };
 
-/** Address and object (Regeling art. 5 lid 1 onder a). */
+/** Address and object (Omgevingsregeling art. 5.14 lid 1 onder a). */
 const objectFields: TextField[] = [
   { key: 'bagObjectId' }, { key: 'postcode' }, { key: 'houseNumber' }, { key: 'houseNumberAddition' },
   { key: 'buildingType' }, { key: 'referenceObjectId' },

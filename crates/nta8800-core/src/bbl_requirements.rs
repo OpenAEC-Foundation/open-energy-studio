@@ -197,7 +197,7 @@ pub fn bbl_limits_mixed(
     Some(weighted)
 }
 
-pub const A0_SOURCE: &str = "Omgevingsregeling art. 5.11/5.12 lid 5, bijlagen IXa/Xa (Stcrt. 2026, 18123; in werking mei 2026)";
+pub const A0_SOURCE: &str = "Omgevingsregeling art. 5.11/5.12 lid 5, bijlagen IXa/Xa (Stcrt. 2026, 18123; BWBR0045528 versie 2026-10-01)";
 
 /// Annexes IXa/Xa: maximum primary fossil energy for the A0 designation.
 pub fn a0_primary_fossil_max(function: BblFunction) -> f64 {

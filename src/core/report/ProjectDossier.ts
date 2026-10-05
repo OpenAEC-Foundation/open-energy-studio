@@ -8,6 +8,7 @@ import { serializeProject, type KernelStamp } from '../io/ProjectSerializer';
 import { labelInputSha256, relabelDeadline } from '../nta/Registration';
 import { isProductionPath } from '../nta/RelabelText';
 import { measureEvidenceNotes } from '../nta/MwaTemplates';
+import { buildEpOnlineOverview } from './EpOnlineOverview';
 
 /**
  * Project dossier of an EP adviser (BRL 9500-W Bijlage 3, p. 61–63;
@@ -305,6 +306,8 @@ export async function buildProjectDossier(
     'project.oes.json': strToU8(serializeProject(withoutStoredOriginal(project), kernel)),
   };
   if (assessment) files['kernel-output.json'] = strToU8(JSON.stringify(assessment, null, 2));
+  // Check overview against the label in EP-Online afterwards; not an upload file.
+  files['ep-online-gegevensoverzicht.json'] = strToU8(JSON.stringify(buildEpOnlineOverview(project, assessment), null, 2));
   if (context.reportHtml) files['rekenrapport.html'] = strToU8(context.reportHtml);
   if (context.opname) files['basisopname-output.json'] = strToU8(JSON.stringify(context.opname, null, 2));
   if (context.relabel) {
