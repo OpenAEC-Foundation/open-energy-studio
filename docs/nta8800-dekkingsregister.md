@@ -26,6 +26,8 @@ De [NTA-devbuildprocedure](nta8800-build-procedure.md) legt de broncommit, afhan
 
 De [uitgevoerde bouw op `62a4a29`](nta8800-build-verificatie-2026-10-05-62a4a29.md) bevestigt de lokale debugbundel en de drie servicebinaries met onafhankelijk nagekeken hashes. Bestaande frontendafhankelijkheden werden gebruikt; een verse `npm ci`-run blijft apart te controleren. Geen norm-, referentie- of attestkolom verandert hierdoor.
 
+Een afzonderlijke manifestlezer kan deze vier bestanden, groottes, hashes en debmetadata later opnieuw toetsen. De positieve controle en negatieve proeven voor padmanipulatie en ontbrekend/gewijzigd artefact slaagden. De geclaimde broncommit en normatieve inhoud vereisen afzonderlijk bewijs; de dekkingskolommen blijven ongewijzigd.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
