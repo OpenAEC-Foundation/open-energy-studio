@@ -48,7 +48,7 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.solarPV.title')}
       onClose={onClose}
       onSubmit={handleSave}

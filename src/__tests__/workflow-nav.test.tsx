@@ -143,18 +143,19 @@ describe('Step pages keep the ribbon actions', () => {
     expect(actions.importVABI).toHaveBeenCalledOnce();
   });
 
+  // F5: each Gebouw sub page has its own add actions.
   it.each([
-    [/Add zone/i, 'zone-editor'],
-    [/Add construction/i, 'construction-editor'],
-    [/Add surface/i, 'surface-editor'],
-    [/Add window/i, 'window-editor'],
-    [/Add thermal bridge/i, 'thermal-bridge'],
-    [/Add point thermal bridge/i, 'point-bridge'],
-    [/Air tightness/i, 'air-tightness'],
-  ])('Building: %s opens %s', async (title, dialog) => {
+    [/Add zone/i, 'zone-editor', 'zones'],
+    [/Add construction/i, 'construction-editor', 'constructions'],
+    [/Add surface/i, 'surface-editor', 'envelope'],
+    [/Add window/i, 'window-editor', 'envelope'],
+    [/Add thermal bridge/i, 'thermal-bridge', 'thermalBridges'],
+    [/Add point thermal bridge/i, 'point-bridge', 'thermalBridges'],
+    [/Air tightness/i, 'air-tightness', 'airTightness'],
+  ])('Building: %s opens %s', async (title, dialog, sub) => {
     const user = userEvent.setup();
     const actions = makeActions();
-    renderWithProviders(<Shell actions={actions} route={{ step: 'building', sub: 'envelope' }} />);
+    renderWithProviders(<Shell actions={actions} route={{ step: 'building', sub }} />);
     await user.click(within(screen.getByRole('group', { name: 'Add' })).getByTitle(title));
     expect(actions.openDialog).toHaveBeenCalledWith(dialog);
   });
@@ -174,9 +175,9 @@ describe('Step pages keep the ribbon actions', () => {
     expect(actions.openDialog).toHaveBeenCalledWith(dialog);
   });
 
-  it('Installations: lists the systems of the project model (formerly the project tree)', async () => {
+  it('Installations: lists the systems of a service on its sub page (formerly the project tree)', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Shell actions={makeActions()} route={{ step: 'installations', sub: 'systems' }} />);
+    renderWithProviders(<Shell actions={makeActions()} route={{ step: 'installations', sub: 'heating' }} />);
     expect(screen.getByRole('heading', { name: /^Heating \(1\)/ })).toBeInTheDocument();
     const row = screen.getByRole('row', { name: /Warmtepomp lucht/ });
     expect(row).toHaveAttribute('data-path', 'heatingSystems[0]');
@@ -185,10 +186,23 @@ describe('Step pages keep the ribbon actions', () => {
     expect(within(row).getByRole('button', { name: /^Edit: Warmtepomp lucht/ })).toBeInTheDocument();
   });
 
-  it('Building: lists zones, surfaces and constructions (formerly the project tree)', () => {
-    renderWithProviders(<Shell actions={makeActions()} route={{ step: 'building', sub: 'envelope' }} />);
-    expect(screen.getByRole('heading', { name: /Woonfunctie/ })).toBeInTheDocument();
-    expect(screen.getAllByText(/Surfaces/).length).toBeGreaterThan(0);
+  it('Installations: the overview shows a chain card per present service and links to its sub page', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    renderWithProviders(<Shell actions={actions} route={{ step: 'installations', sub: 'systems' }} />);
+    const heating = screen.getByRole('heading', { name: 'Heating', level: 2 }).closest('section') as HTMLElement;
+    expect(within(heating).getByText(/Warmtepomp lucht/).closest('[data-path]')).toHaveAttribute('data-path', 'heatingSystems[0]');
+    await user.click(within(heating).getByRole('button', { name: 'Open: Heating' }));
+    expect(actions.navigate).toHaveBeenCalledWith({ step: 'installations', sub: 'heating' });
+    // Services without systems or NTA input share one dashed card.
+    expect(screen.getByRole('region', { name: 'Services not present' })).toHaveTextContent(/Humidification/);
+  });
+
+  it('Building: zones and constructions have their own sub pages (formerly the project tree)', () => {
+    const { unmount } = renderWithProviders(<Shell actions={makeActions()} route={{ step: 'building', sub: 'zones' }} />);
+    expect(screen.getByRole('row', { name: /Woonfunctie/ })).toHaveAttribute('data-path', 'zones[0]');
+    unmount();
+    renderWithProviders(<Shell actions={makeActions()} route={{ step: 'building', sub: 'constructions' }} />);
     expect(screen.getByRole('heading', { name: 'Constructions' })).toBeInTheDocument();
   });
 

@@ -11,9 +11,18 @@ import { createDefaultProject } from '../context/EnergyContext';
 describe('routeForPath', () => {
   it.each([
     ['zones[0].surfaces[1].windows[0].gValue', 'building', 'envelope'],
-    ['/constructions/0/uValue', 'building', 'envelope'],
+    ['/constructions/0/uValue', 'building', 'constructions'],
+    ['zones[0].thermalBridges[2].psiValue', 'building', 'thermalBridges'],
+    ['zones[0].pointThermalBridges[0]', 'building', 'thermalBridges'],
+    ['zones[1].airTightness.qv10', 'building', 'airTightness'],
+    ['zones[0].floorArea', 'building', 'zones'],
     ['unheatedSpaces[2].kind', 'building', 'unheated'],
-    ['heatingSystems[0].efficiency', 'installations', 'systems'],
+    ['heatingSystems[0].efficiency', 'installations', 'heating'],
+    ['hotWaterSystems[0]', 'installations', 'hotWater'],
+    ['ventilationSystems[0].sfp', 'installations', 'ventilation'],
+    ['coolingSystems[0]', 'installations', 'cooling'],
+    ['solarPV[0].peakPower', 'installations', 'generation'],
+    ['solarThermal[0]', 'installations', 'generation'],
     ['ntaHeatPumps[1].declaration', 'installations', 'heatPumps'],
     ['ntaCalculation.dynamicWindows[0]', 'check', 'input'],
     ['ntaCalculation.someFutureBlock', 'check', 'input'],
@@ -21,7 +30,7 @@ describe('routeForPath', () => {
     ['registration.relabelComparison.original', 'relabel', undefined],
     ['basisopname.zones[0].area', 'survey', undefined],
     ['maatwerkadvies.measures[3]', 'advice', undefined],
-    ['derivedInput.zones[0].floorAreaM2', 'building', 'envelope'],
+    ['derivedInput.zones[0].floorAreaM2', 'building', 'zones'],
   ])('routes %s to %s › %s', (path, step, sub) => {
     const route = routeForPath(path);
     expect(route.step).toBe(step);

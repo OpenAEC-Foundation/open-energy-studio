@@ -104,7 +104,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.heating.title')}
       onClose={onClose}
       onSubmit={handleSave}

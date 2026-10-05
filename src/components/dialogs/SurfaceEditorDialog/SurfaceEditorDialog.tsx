@@ -84,7 +84,7 @@ export function SurfaceEditorDialog({ editId, onClose }: SurfaceEditorDialogProp
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.surface.title')}
       onClose={onClose}
       onSubmit={handleSave}

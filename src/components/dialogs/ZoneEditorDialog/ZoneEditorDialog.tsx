@@ -48,7 +48,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
   };
 
   return (
-    <DialogShell
+    <DialogShell variant="sheet"
       title={t('dialog.zone.title')}
       onClose={onClose}
       onSubmit={handleSave}

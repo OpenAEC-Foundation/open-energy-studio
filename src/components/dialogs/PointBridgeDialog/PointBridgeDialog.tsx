@@ -42,7 +42,7 @@ export function PointBridgeDialog({ editId, onClose }: { editId?: string | null;
     onClose();
   };
 
-  return <DialogShell title={t('kernel.pointBridge.title')} onClose={onClose} onSubmit={save}
+  return <DialogShell variant="sheet" title={t('kernel.pointBridge.title')} onClose={onClose} onSubmit={save}
     submitLabel={t('dialog.save')} cancelLabel={t('dialog.cancel')}>
     <p>{t('kernel.pointBridge.scope')}</p>
     <div className="dialog-field"><label htmlFor="point-bridge-name">{t('properties.name')}</label>
