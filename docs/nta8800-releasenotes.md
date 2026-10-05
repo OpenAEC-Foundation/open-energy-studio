@@ -2,6 +2,14 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — Omgevingsregeling als bron, labelelementen art. 5.13a, EP-Online-overzicht
+
+Geen rekenwijziging in de kern.
+
+- **Bronverwijzingen.** De Regeling en het Besluit energieprestatie gebouwen zijn per 1 januari 2024 ingetrokken. De code, de meldingen en de documentatie verwijzen nu naar de opvolgers: Omgevingsregeling art. 5.11–5.14 en bijlagen IX–Xa (BWBR0045528, versie 2026-10-01) en Bbl art. 6.29 lid 4 voor de geldigheid van tien jaar. De klassegrenzen (bijlagen IX en X), de A0-waarden (bijlagen IXa en Xa met de voorwaarden van lid 5), het forfaitaire scenario voor woningen (art. 5.11 lid 4) en de kwaliteitsverklaringen voor utiliteit (art. 5.12 lid 4) zijn nagelopen tegen die versie en kloppen.
+- **Labelelementen (art. 5.13a lid 1, sinds 29 mei 2026).** `labelData.indicators.elements` geeft de elementen die de berekening kan leveren: operationele CO₂ per m², WLC-GWP uit de registratie, finaal energiegebruik per m², het jaarlijkse primair fossiele, hernieuwbare primaire en finale energiegebruik, de hernieuwbare productie en de belangrijkste energiedrager en hernieuwbare bron. Reageren op externe signalen en een afgiftesysteem voor lage temperaturen zijn verklaringen en blijven leeg.
+- **EP-Online-gegevensoverzicht.** Het projectdossier bevat `ep-online-gegevensoverzicht.json` met de veldnamen van het openbare exportschema `EpbdExportTypesV4`. Het is een controleoverzicht, geen registratiebestand: het uploadformaat van EP-Online is niet openbaar.
+
 ## 4 oktober 2026 — achtergehouden resultaten overal, volledige codelijst, luchtdichtheid bij openen
 
 Geen rekenwijziging in de kern.

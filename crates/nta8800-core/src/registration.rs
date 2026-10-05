@@ -6,23 +6,23 @@
 //! the original software version and survey date, p. 23–24), §4.2.5
 //! (registration within three months, six for serial projects; names and
 //! competence numbers of both advisers; toets Bbl: survey date equals
-//! registration date, p. 24); Besluit energieprestatie gebouwen art. 2.1
-//! lid 7 (label valid ten years from the survey date, p. 4); Regeling
-//! energieprestatie gebouwen art. 4 and 5 (label and registration data,
-//! p. 5–6); BRL 9500-W §3.1 (mandatory detailed survey, p. 14–15; BRL
+//! registration date, p. 24); Bbl art. 6.29 lid 4 (label valid ten years
+//! from the survey date); Omgevingsregeling art. 5.13 and 5.14 (label and
+//! registration data; BWBR0045528, version 2026-10-01, which replaced the
+//! Regeling energieprestatie gebouwen on 1 January 2024); BRL 9500-W §3.1 (mandatory detailed survey, p. 14–15; BRL
 //! 9500-U §3.1 p. 11) and Bijlage 3 (project dossier with evidence,
 //! p. 61–63). BRL 9500-U mirrors these clauses.
 //!
 //! Added on 3 October 2026:
-//! - the attested software of the registration (Regeling art. 5 lid 1 onder b,
-//!   p. 6; Regeling art. 2/3 require a BRL 9501-attested program, p. 4–5);
+//! - the attested software of the registration (Omgevingsregeling art. 5.14 lid 1
+//!   onder b; art. 5.11/5.12 lid 2 require a BRL 9501-attested program);
 //! - the separate relabel message type and the replacement of an incorrect
 //!   label within 24 months (BRL 9500-W §4.2.5 opmerking 4 and 5, p. 24–25);
 //! - the WLC-GWP result for new buildings over 1000 m² checked against the
 //!   Bbl from 1-1-2028 (BRL 9500-W p. 18, 21 and 62);
 //! - the BAG addressable object as the lowest registration level of a
 //!   residential label (Praktijkhandboek v2 p. 46); other buildings may use
-//!   the pand or verblijfsobject id (Regeling art. 5 lid 1 onder a, p. 6);
+//!   the pand or verblijfsobject id (Omgevingsregeling art. 5.14 lid 1 onder a);
 //!   A_g to two decimals (Praktijkhandboek p. 70);
 //! - plausibility warnings modelled on the dossier selection of BRL
 //!   9500-W §7.2.2 (p. 42). Their thresholds are this program's own choice.
@@ -38,7 +38,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
-pub const REGISTRATION_SOURCE: &str = "BRL 9500-W/U (14-10-2025) §4.2.3–4.2.5; Besluit energieprestatie gebouwen art. 2.1 lid 7; Regeling energieprestatie gebouwen art. 4–5";
+pub const REGISTRATION_SOURCE: &str = "BRL 9500-W/U (14-10-2025) §4.2.3–4.2.5; Bbl art. 6.29 lid 4; Omgevingsregeling art. 5.13 en 5.14 (versie 2026-10-01)";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,7 +79,7 @@ pub enum MessageType {
     Replacement,
 }
 
-/// The program that made the calculation (Regeling art. 5 lid 1 onder b, p. 6).
+/// The program that made the calculation (Omgevingsregeling art. 5.14 lid 1 onder b.
 /// The application fills it in; the attest number stays empty until the
 /// program is attested under BRL 9501.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -347,7 +347,7 @@ pub struct Registration {
     /// Replacement: EP-Online number of the label that is replaced.
     #[serde(default)]
     pub replaced_ep_online_number: Option<String>,
-    /// The program that made the calculation (Regeling art. 5 lid 1 onder b).
+    /// The program that made the calculation (Omgevingsregeling art. 5.14 lid 1 onder b).
     #[serde(default)]
     pub software: Option<SoftwareIdentity>,
     /// WLC-GWP result (BRL 9500-W p. 18, 21, 62).
@@ -444,14 +444,14 @@ pub struct RegistrationAssessment {
     /// The program of the registration: the stored identity, or this
     /// program for projects saved before the identity was recorded.
     pub software: SoftwareIdentity,
-    /// Whether that program carries a BRL 9501 attest number (Regeling
-    /// art. 2/3, p. 4–5). Reported apart from `issues`: it is a property of
+    /// Whether that program carries a BRL 9501 attest number (Omgevingsregeling
+    /// art. 5.11/5.12 lid 2). Reported apart from `issues`: it is a property of
     /// the program, not of the dossier.
     pub software_attested: bool,
     /// The dossier holds everything the registration needs (no `issues`).
     pub dossier_complete: bool,
     /// The dossier is complete and the program carries a BRL 9501 attest:
-    /// Regeling art. 2/3 (p. 4–5) only allow an attested program.
+    /// Omgevingsregeling art. 5.11/5.12 lid 2 only allow an attested program.
     pub ready_for_registration: bool,
     pub issues: Vec<RegistrationIssue>,
     /// Plausibility findings (severity `warning`); they never block
@@ -488,7 +488,7 @@ pub struct RegistrationContext {
     pub whole_building: bool,
 }
 
-/// Name of this program in the registration (Regeling art. 5 lid 1 onder b).
+/// Name of this program in the registration (Omgevingsregeling art. 5.14 lid 1 onder b).
 pub const SOFTWARE_NAME: &str = "Open Energy Studio";
 
 /// First day on which the WLC-GWP result is required (BRL 9500-W p. 18).
@@ -606,8 +606,8 @@ impl Registration {
 
 /// BAG ids are 16 digits; digits 5–6 give the object type. Praktijkhandboek
 /// v2 p. 46: a residential label is registered on an addressable object,
-/// a verblijfsobject (01), ligplaats (02) or standplaats (03). Regeling
-/// art. 5 lid 1 onder a (p. 6) also allows the pand id (10), which other
+/// a verblijfsobject (01), ligplaats (02) or standplaats (03). Omgevingsregeling
+/// art. 5.14 lid 1 onder a also allows the pand id (10), which other
 /// buildings may use.
 fn check_bag_object_id(id: &str, residential: bool, issues: &mut Vec<RegistrationIssue>) {
     let id = id.trim();
@@ -627,7 +627,7 @@ fn check_bag_object_id(id: &str, residential: bool, issues: &mut Vec<Registratio
     }
 }
 
-/// The program of the registration (Regeling art. 5 lid 1 onder b, p. 6).
+/// The program of the registration (Omgevingsregeling art. 5.14 lid 1 onder b.
 /// Projects saved before the identity was recorded get this program with
 /// the kernel version; blank fields are filled the same way. A relabel
 /// keeps the stored calculation core (BRL 9500-W §4.2.4, p. 24), falling
@@ -1756,7 +1756,7 @@ mod tests {
 
     #[test]
     fn software_bag_and_message_types() {
-        // Regeling art. 5 lid 1 onder b: the attested program is part of
+        // Omgevingsregeling art. 5.14 lid 1 onder b: the attested program is part of
         // the data. The attest is a property of the program, reported apart
         // from the dossier issues, so it does not block readiness.
         let mut unattested = complete();
@@ -1764,7 +1764,7 @@ mod tests {
         let result = assess_registration(&unattested);
         assert!(result.dossier_complete, "{:?}", result.issues);
         assert!(!result.software_attested);
-        // Regeling art. 2/3 (p. 4–5): only an attested program registers.
+        // Omgevingsregeling art. 5.11/5.12 lid 2: only an attested program registers.
         assert!(!result.ready_for_registration);
         let attested = assess_registration(&complete());
         assert!(attested.software_attested);
@@ -1781,7 +1781,7 @@ mod tests {
         assert_eq!(result.software.version, KERNEL_VERSION);
 
         // Praktijkhandboek p. 46: a residential label on an addressable
-        // object; Regeling art. 5 lid 1 onder a (p. 6) also allows the pand
+        // object; Omgevingsregeling art. 5.14 lid 1 onder a also allows the pand
         // id, which a utility building may use.
         let dwelling = RegistrationContext {
             residential: true,
@@ -2011,7 +2011,7 @@ mod tests {
         ] {
             assert!(found.contains(&code), "{code}: {found:?}");
         }
-        // The class follows the label EP2 (Regeling art. 2 lid 3), so the
+        // The class follows the label EP2 (Omgevingsregeling art. 5.11 lid 4), so the
         // borderline warning points there.
         assert!(result
             .plausibility

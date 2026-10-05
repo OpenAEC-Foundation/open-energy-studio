@@ -65,7 +65,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "13.184/13.185 with 5.20a (p. 653, p. 89): the hot-water share of a combi or delivery set on the heating generator is E_W and carries no f_BACS; the generator's auxiliary energy stays with space heating",
     "declared internal gains (§7.5.3.1/7.5.3.2, p. 179–180; 7.21, p. 177): a flux within 0,01 W/m² of the table value, or of the table value plus the §5.4.2 q_L, gives no warning; any other value a non-blocking warning",
     "16.11–16.13: only CHP electricity of heating and hot-water systems counts as on-site production (without f_BACS); the electricity of a CHP driving absorption cooling (ε_chp;el) is reported only",
-    "Regeling art. 2 lid 3 and art. 3 lid 3 (p. 4–5): with area measures (EMG) a dwelling label uses the forfait scenario (EMGforf), a utility label the quality declarations; BENG 2/3 and the Bbl check use the declaration scenario",
+    "Omgevingsregeling art. 5.11 lid 4 and art. 5.12 lid 4: with area measures (EMG) a dwelling label uses the forfait scenario (EMGforf), a utility label the quality declarations; BENG 2/3 and the Bbl check use the declaration scenario",
     "5.3: when EPTot + EPrenTot ≤ 0 the renewable share is undefined (null) while EP2 stays defined; a negative EPTot giving RER > 100 % is kept literally with a warning",
     "§5.3.1 (p. 70): residential (Bbl 1a–1e) and utility functions are never area-weighted together, so a mixed bblFunctions list is refused; function lists must sum to A_g;tot within 0,5 % (or 0,5 m²)",
     "Bbl table 4.148A values are transcribed from the consolidated Bbl text (BWBR0041297, not among the licensed sources); every row, including the education BENG 1 base 190, matches the official versions 2026-01-01 and 2026-09-24",
@@ -988,7 +988,7 @@ pub struct BuildingPerformanceAssessment {
     /// BENG 3.
     pub renewable_share_percent: Option<f64>,
     /// EP2 of the label scenario: EMGforf for a dwelling with area
-    /// measures (Regeling art. 2 lid 3), otherwise BENG 2.
+    /// measures (Omgevingsregeling art. 5.11 lid 4), otherwise BENG 2.
     pub label_primary_fossil_indicator_kwh_per_m2_year: Option<f64>,
     /// RER of the label scenario; `None` when undefined.
     pub label_renewable_share_percent: Option<f64>,
@@ -2004,7 +2004,7 @@ fn validate_function_lists(input: &BuildingPerformanceInput, issues: &mut Vec<Pe
             .into_iter()
             .any(|function| function == LabelFunction::Residential)
         {
-            // Regeling bijlage Ia (p. 17) has no woonfunctie column.
+            // Omgevingsregeling bijlage X has no woonfunctie column.
             issues.push(issue(
                 "label_functions_residential_in_utility",
                 "labelFunctions",
@@ -3339,7 +3339,7 @@ pub fn assess_building_performance(
         .as_ref()
         .filter(|_| valid)
         .and_then(|result| result.scenarios.first());
-    // Regeling art. 2 lid 3 (p. 4): a dwelling label uses the forfait values
+    // Omgevingsregeling art. 5.11 lid 4: a dwelling label uses the forfait values
     // for area measures (EMGforf); art. 3 lid 3 (p. 5): a utility label uses
     // the quality declarations, the first scenario. BENG and Bbl stay on the
     // first scenario.
@@ -4899,7 +4899,7 @@ mod tests {
             forfait.primary_fossil_indicator_kwh_per_m2_year
                 > declared.primary_fossil_indicator_kwh_per_m2_year
         );
-        // Regeling art. 2 lid 3 (p. 4): the label uses EMGforf ...
+        // Omgevingsregeling art. 5.11 lid 4: the label uses EMGforf ...
         assert_eq!(
             dwelling.label_primary_fossil_indicator_kwh_per_m2_year,
             Some(forfait.primary_fossil_indicator_kwh_per_m2_year)

@@ -25,10 +25,10 @@ Alle getoonde BENG-waarden komen uit de kern. De oude, vereenvoudigde berekening
 
 ## Label en labelgegevens
 
-- **Klasse:** de labelklasse volgt uit de afgeronde EP2 en de klassegrenzen van de Regeling (bijlagen I/Ia, p. 15–17). Bij gemengde functies zijn de grenzen naar oppervlakte gewogen.
-- **Woningen:** het label gebruikt de forfaitaire EMG-waarden (Regeling art. 2 lid 3, p. 4). BENG 2 en 3 en de Bbl-toets blijven op de kwaliteitsverklaring. De uitvoer heeft daarom aparte velden: `labelPrimaryFossilIndicatorKwhPerM2Year` en `labelRenewableSharePercent`.
+- **Klasse:** de labelklasse volgt uit de afgeronde EP2 en de klassegrenzen van de Omgevingsregeling (bijlagen IX en X). Bij gemengde functies zijn de grenzen naar oppervlakte gewogen.
+- **Woningen:** het label gebruikt de forfaitaire EMG-waarden (Omgevingsregeling art. 5.11 lid 4). BENG 2 en 3 en de Bbl-toets blijven op de kwaliteitsverklaring. De uitvoer heeft daarom aparte velden: `labelPrimaryFossilIndicatorKwhPerM2Year` en `labelRenewableSharePercent`.
 - **Indicatief:** de klasse is altijd indicatief, omdat het programma niet geattesteerd is.
-- **Labelgegevens (Regeling art. 4):**
+- **Labelgegevens (Omgevingsregeling art. 5.13):**
   - algemene gegevens: functie, bouwjaar, A_g op twee decimalen, woningtype;
   - isolatie per element;
   - installaties;

@@ -5,14 +5,15 @@
 //! (dwellings, residential buildings, lodging outside a lodging building) or
 //! annex X (utility buildings, per use function). Source: consolidated text
 //! on wetten.overheid.nl, version valid from 2026-01-01 (BWBR0045528),
-//! retrieved 2026-10-01. The official label is issued by the Minister only
+//! retrieved 2026-10-01; every class bound was checked again on 2026-10-05
+//! against the official XML of version 2026-10-01 (unchanged). The official label is issued by the Minister only
 //! after registration by a certified adviser with a BRL 9501-attested
 //! program; this module therefore returns an indicative class only.
 
 use serde::{Deserialize, Serialize};
 
 pub const LABEL_SOURCE: &str =
-    "Omgevingsregeling art. 5.11/5.12 lid 4, bijlagen IX en X (BWBR0045528, versie 2026-01-01)";
+    "Omgevingsregeling art. 5.11/5.12 lid 4, bijlagen IX en X (BWBR0045528, versie 2026-10-01)";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]

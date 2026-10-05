@@ -182,14 +182,14 @@ function registrationSection(registration: NtaRegistration | undefined, assessme
     <tr><th>Uiterste registratiedatum</th>${cell(assessment?.registrationDeadline ?? assessment?.relabelDeadline ?? '—')}<th>Geldig tot (opnamedatum + 10 jaar)</th>${cell(assessment?.validUntil ?? '—')}</tr>
     <tr><th>EP-Online-nummer</th>${cell(registration.epOnlineNumber ?? 'nog niet geregistreerd')}<th>Dossier compleet</th>${cell(assessment ? ((assessment.dossierComplete ?? assessment.issues.length === 0) ? 'ja' : 'nee') : '—')}</tr>
     <tr><th>Gereed voor registratie</th>${cell(readinessText(assessment))}<th>Rekenprogramma geattesteerd</th>${cell(assessment?.softwareAttested ? 'ja' : 'nee')}</tr>
-    <tr><th>Rekenprogramma (Regeling art. 5)</th>${cell(softwareText)}<th>WLC-GWP</th>${cell(wlcText)}</tr>
+    <tr><th>Rekenprogramma (Omgevingsregeling art. 5.14)</th>${cell(softwareText)}<th>WLC-GWP</th>${cell(wlcText)}</tr>
     ${messageType === 'replacement' ? `<tr><th>Vervangt label</th>${cell(registration.replacedEpOnlineNumber ?? '—')}<th>Uiterste vervangdatum</th>${cell(assessment?.replacementDeadline ?? '—')}</tr>` : ''}
   </tbody></table>
   ${issues ? `<table><thead><tr><th>Soort</th><th>Code</th><th>Pad</th></tr></thead><tbody>${issues}</tbody></table>` : ''}
   ${assessment ? `<p>Bron termijnen: ${escapeHtml(assessment.source)}.</p>` : ''}`;
 }
 
-/** Label data of Regeling energieprestatie gebouwen art. 4. */
+/** Label data of Omgevingsregeling art. 5.13. */
 function labelDataSection(labelData: LabelData | null | undefined): string {
   if (!labelData) return '';
   const envelope = labelData.envelope.map((item) => `<tr>${cell(CATEGORY[item.category] ?? item.category)}<td class="n">${num(item.areaM2, 1)}</td>

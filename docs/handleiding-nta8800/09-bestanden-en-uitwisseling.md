@@ -42,3 +42,7 @@ Wat het **niet** bevat of garandeert:
 | **Projectdossier exporteren (ZIP)** | het dossier met projectbestand, kernuitvoer, rekenrapport, bewijs, checklist en manifest (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)) |
 
 Het BENG-rapport exporteer je met **Exporteer rapport** in het lint of het menu (zie [hoofdstuk 4](04-uitvoer.md)).
+
+## EP-Online
+
+Registreren in EP-Online gebeurt met een registratiebestand dat alleen een geattesteerd rekenprogramma maakt (Omgevingsregeling art. 5.11/5.12 lid 2 en 3). Het formaat daarvan is niet openbaar en wordt na attestering via RVO verkregen; deze app maakt het dus niet. Het projectdossier bevat wel `ep-online-gegevensoverzicht.json`: dezelfde gegevens met de veldnamen van het openbare exportschema `EpbdExportTypesV4`, om het geregistreerde label achteraf te controleren (zie hoofdstuk 7).

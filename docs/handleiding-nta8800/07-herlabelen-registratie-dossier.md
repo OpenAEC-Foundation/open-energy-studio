@@ -16,17 +16,17 @@ De registratiegegevens staan in **Projectgegevens** → *Registratie (BRL 9500)*
 - **WLC-GWP:** voor nieuwe gebouwen boven 1000 m² bij een toets Bbl vanaf 1-1-2028 en de oplevering daarna (BRL 9500-W p. 18, 21, 62).
 - **Vorige labelklasse:** alleen voor de plausibiliteitscontrole.
 
-Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, versie, kernversie en attestnummer (Regeling art. 5 lid 1 onder b, p. 6). Bij een herlabeling is dat anders: dan blijft de opgeslagen identiteit van de oorspronkelijke berekening staan en schrijft de app niet de huidige (BRL 9500-W §4.2.4, p. 24).
+Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, versie, kernversie en attestnummer (Omgevingsregeling art. 5.14 lid 1 onder b). Bij een herlabeling is dat anders: dan blijft de opgeslagen identiteit van de oorspronkelijke berekening staan en schrijft de app niet de huidige (BRL 9500-W §4.2.4, p. 24).
 
 **Controles van de kern**
 - **Termijn:** registratie binnen drie maanden na de opname, of zes bij seriematige projecten (BRL §4.2.5).
 - **Detailopname:** bij toets Bbl en oplevering is een detailopname verplicht (BRL 9500-W §3.1).
-- **BAG-id:** het BAG-id heeft 16 cijfers. Een woning vraagt een verblijfsobject, ligplaats of standplaats. Utiliteit mag ook een pand-id gebruiken (Regeling art. 5 lid 1 onder a; Praktijkhandboek p. 46).
+- **BAG-id:** het BAG-id heeft 16 cijfers. Een woning vraagt een verblijfsobject, ligplaats of standplaats. Utiliteit mag ook een pand-id gebruiken (Omgevingsregeling art. 5.14 lid 1 onder a; Praktijkhandboek p. 46).
 - **Eén label per adres:** de app houdt lokaal bij welke labels er in deze installatie geregistreerd zijn. Ze waarschuwt als hetzelfde adres al een geldig woninglabel heeft. Labels die buiten deze installatie zijn geregistreerd, kan ze niet zien.
 
 **Status**
 - `dossierComplete` geeft aan of het dossier compleet is.
-- `readyForRegistration` is alleen waar als het dossier compleet is **en** het programma geattesteerd is (Regeling art. 2 en 3, p. 4–5). Zolang er geen attestnummer is, blijft dit onwaar.
+- `readyForRegistration` is alleen waar als het dossier compleet is **en** het programma geattesteerd is (Omgevingsregeling art. 5.11 en 5.12 lid 2. Zolang er geen attestnummer is, blijft dit onwaar.
 
 ## Bewijsregister
 
@@ -98,6 +98,7 @@ Kies **Rapport** → **Projectdossier exporteren (ZIP)**. De ZIP bevat:
 |---|---|
 | `project.oes.json` | het project, zonder het opgeslagen origineel |
 | `kernel-output.json` | de volledige kernuitvoer |
+| `ep-online-gegevensoverzicht.json` | de gegevens zoals EP-Online ze publiceert (veldnamen van het openbare exportschema `EpbdExportTypesV4`), om het geregistreerde label achteraf te controleren; **geen registratiebestand** |
 | `rekenrapport.html` | het NTA-rekenrapport |
 | `basisopname-output.json` | de opname-uitkomst, bij een basisopname |
 | `herlabel-vergelijking.json` | de vergelijking, met de uitkomst van de nieuwe kernvergelijking (`kernelRecheck`), bij herlabelen |
@@ -107,5 +108,7 @@ Kies **Rapport** → **Projectdossier exporteren (ZIP)**. De ZIP bevat:
 | `manifest.json` | moment, projectnaam, kernversie met normversie en invoervingerafdruk, attestatus, per bestand pad, SHA-256 en grootte, het aantal ontbrekende bewijsstukken (`missingEvidence`) en de checklist |
 
 **Checklist.** De checklist hangt af van het doel, het opnametype, de representativiteit en herlabelen. Bij een basisopname toetst ze de redenen voor de toegepaste standaardwaarden. Het tabblad Rapport toont dezelfde checklist als de export. Terwijl de berekening loopt, staan punten op "bezig"; in een export komt die status nooit voor.
+
+**EP-Online.** De app kan een label niet zelf registreren. Het uploadformaat van EP-Online is niet openbaar en is alleen voor geattesteerde rekenprogramma's via RVO verkrijgbaar. Het gegevensoverzicht in de ZIP gebruikt de veldnamen van het openbare exportschema, zodat u na registratie kunt nagaan of EP-Online dezelfde waarden toont als de berekening. `missingRequired` noemt de velden die voor een registratie nog ontbreken, zoals de registratiedatum of het certificaathoudernummer.
 
 **Bewaren.** Bewaar het dossier en het databestand vijftien jaar (Praktijkhandboek p. 47). Dat is een taak van de certificaathouder.

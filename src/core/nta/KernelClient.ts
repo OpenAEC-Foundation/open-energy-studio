@@ -4103,7 +4103,7 @@ export interface BuildingPerformanceAssessment {
   needIndicatorKwhPerM2Year: number | null;
   primaryFossilIndicatorKwhPerM2Year: number | null;
   renewableSharePercent: number | null;
-  /** EP2 of the label scenario: EMGforf for a dwelling with area measures (Regeling art. 2 lid 3), otherwise BENG 2. */
+  /** EP2 of the label scenario: EMGforf for a dwelling with area measures (Omgevingsregeling art. 5.11 lid 4), otherwise BENG 2. */
   labelPrimaryFossilIndicatorKwhPerM2Year?: number | null;
   /** RER of the label scenario. */
   labelRenewableSharePercent?: number | null;
@@ -4346,7 +4346,7 @@ export interface ProjectPerformanceAssessment {
     triggeringSystemIds: string[];
     issues: Array<{ code: string; path: string }>;
   } | null;
-  /** Regeling energieprestatie gebouwen art. 4 label data. */
+  /** Omgevingsregeling art. 5.13 label data. */
   labelData?: LabelData | null;
 }
 
@@ -4377,7 +4377,7 @@ export interface NtaRegistration {
   messageType?: NtaMessageType;
   /** Replacement: EP-Online number of the replaced label. */
   replacedEpOnlineNumber?: string;
-  /** Program that made the calculation (Regeling art. 5 lid 1 onder b); filled in by the app. */
+  /** Program that made the calculation (Omgevingsregeling art. 5.14 lid 1 onder b); filled in by the app. */
   software?: NtaSoftwareIdentity;
   /** WLC-GWP result, required for new buildings > 1000 m² checked against the Bbl from 2028. */
   wlcGwp?: { valueKgCo2EqPerM2Year?: number; reportReference?: string };
@@ -4839,7 +4839,7 @@ export interface RegistrationAssessment {
   softwareAttested?: boolean;
   /** The dossier holds everything the registration needs (no `issues`). */
   dossierComplete?: boolean;
-  /** Dossier complete and program attested (Regeling art. 2/3, p. 4–5). */
+  /** Dossier complete and program attested (Omgevingsregeling art. 5.11/5.12 lid 2. */
   readyForRegistration: boolean;
   issues: Array<{ code: string; path: string; severity: 'error' | 'missing' }>;
   /** BRL 9500 §7.2.2-style plausibility warnings; never block registration. */
@@ -4861,7 +4861,7 @@ export interface NtaBacsEvidence {
 
 export interface LabelData {
   source: string;
-  /** Regeling art. 4 a. */
+  /** Omgevingsregeling art. 5.13 onder a. */
   general: {
     useFunction: string | null;
     constructionYear: number | null;
@@ -4887,7 +4887,7 @@ export interface LabelData {
     solarWaterHeaterCount: number;
     solarWaterHeaterUses: string[];
   };
-  /** Regeling art. 4 indicators from the calculation. */
+  /** Omgevingsregeling art. 5.13 indicators from the calculation. */
   indicators?: {
     primaryFossilKwhPerM2: number | null;
     renewableSharePercent: number | null;
@@ -4897,6 +4897,27 @@ export interface LabelData {
     energyNeedKwhPerM2: number | null;
     renovationStandardKwhPerM2: number | null;
     indicativeLabelClass: string | null;
+    /** Omgevingsregeling art. 5.13a lid 1 (since 29 May 2026), as far as the calculation supplies them. */
+    elements?: {
+      /** d. kg CO2/(m²·yr). */
+      operationalCo2KgPerM2: number | null;
+      /** e. From the registration. */
+      wlcGwpKgCo2EqPerM2: number | null;
+      /** f. kWh/(m²·yr). */
+      finalEnergyKwhPerM2: number | null;
+      /** g. kWh per year. */
+      annualPrimaryFossilKwh: number | null;
+      annualRenewablePrimaryKwh: number | null;
+      annualFinalEnergyKwh: number | null;
+      /** h. kWh per year. */
+      renewableProductionKwh: number | null;
+      /** i. */
+      mainEnergyCarrier: string | null;
+      mainRenewableSource: string | null;
+      /** k and l: statements, not calculated. */
+      respondsToExternalSignals: boolean | null;
+      lowTemperatureHeating: boolean | null;
+    };
   } | null;
 }
 

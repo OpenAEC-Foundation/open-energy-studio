@@ -10,7 +10,7 @@
 
 **Basisopname.** De opname is gecontroleerd tegen de tabellen van ISSO 82.1 7e druk (met erratum) en ISSO 75.1 7e druk. Afwijkingen en ontbrekende opties zijn toegevoegd. De utiliteitsopname kent nu meerdere rekenzones.
 
-**BRL 9500.** De volgende onderdelen zijn tegen BRL 9500-W/U, de Regeling en het Praktijkhandboek gelegd:
+**BRL 9500.** De volgende onderdelen zijn tegen BRL 9500-W/U, de Omgevingsregeling en het Praktijkhandboek gelegd:
 - registratie: programma-identiteit, WLC-GWP, BAG-controle, berichttypen en plausibiliteit;
 - het woninglabel op EMGforf;
 - herlabelen: 6a/6b, een vergelijking die bij registratie opnieuw wordt gedraaid en de verankering van het origineel.
@@ -207,7 +207,7 @@ Interpretaties die een BRL 9501-beoordelaar waarschijnlijk aankaart:
 - biomassaklasse per installatie (tabel 5.2/5.4, p. 94): de klasse hangt af van hoe de toestellen gemodelleerd zijn. De opwekkers van één meervoudige set tellen op; identieke systemen (§9.1, p. 287) en aparte verwarmingssystemen (bijvoorbeeld kachels in verschillende zones) zijn afzonderlijke installaties;
 - restset bij een geschatte β₁ ≥ 1 in een bijlage Q-set: opgegeven nominale vermogens wegen de overige voorkeuren (9.56); alleen zonder vermogens tellen ze gelijk (programmakeuze);
 - V.1 (p. 1115) verwijst voor η_H;gen naar 14.6, dat in deze editie de daglichtafhankelijkheid van verlichting is; de kern neemt de geleverde COP met η_el = 1/f_P;del;el (onttrekking Q·(1 − η_el/COP)). Lezen als COP·η_el geeft Q·(1 − 1/COP) en een hogere R; de kernlezing is de behoudende.
-- label met gebiedsmaatregelen (Regeling art. 2 lid 3 en art. 3 lid 3, p. 4–5): een woninglabel rekent met het forfaitaire scenario (EMGforf), een utiliteitslabel met de kwaliteitsverklaringen; BENG 2/3 en de Bbl-toets blijven op het scenario met verklaring. De uitvoer heeft daarvoor `labelPrimaryFossilIndicatorKwhPerM2Year` en `labelRenewableSharePercent`;
+- label met gebiedsmaatregelen (Omgevingsregeling art. 5.11 lid 4 en art. 5.12 lid 4): een woninglabel rekent met het forfaitaire scenario (EMGforf), een utiliteitslabel met de kwaliteitsverklaringen; BENG 2/3 en de Bbl-toets blijven op het scenario met verklaring. De uitvoer heeft daarvoor `labelPrimaryFossilIndicatorKwhPerM2Year` en `labelRenewableSharePercent`;
 - 5.3: bij EPTot + EPrenTot ≤ 0 is het aandeel hernieuwbare energie onbepaald (`null`), EP2 blijft bepaald (bijvoorbeeld 0 voor A++++); een negatieve EPTot met RER boven 100 % blijft letterlijk, met een waarschuwing;
 - §5.3.1 (p. 70): woon- en utiliteitsfuncties worden nooit samen naar oppervlakte gewogen; een gemengde `bblFunctions`-lijst wordt geweigerd. Functielijsten moeten binnen 0,5 % (of 0,5 m²) optellen tot A_g;tot;
 - bijlage Z (p. 1133): ook de brandurenfactor van tabel 14.1 in het maatwerkadvies telt als gebruiksaanpassing, dus zonder label;

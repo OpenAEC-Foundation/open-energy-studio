@@ -24,7 +24,7 @@ De rekenkern (`crates/nta8800-core`, Rust) rekent de energieprestatie volgens **
 
 Daarnaast bevat het programma:
 - **Basisopname:** voor bestaande woningen volgens ISSO 82.1 (7e druk, met erratum) en voor utiliteitsgebouwen volgens ISSO 75.1 (7e druk). Zie [hoofdstuk 2](02-basisopname.md).
-- **Labelgegevens en labelklasse:** volgens de Regeling energieprestatie gebouwen, bijlagen I/Ia.
+- **Labelgegevens en labelklasse:** volgens de Omgevingsregeling, art. 5.11–5.13a en bijlagen IX/X (tot 2024 de Regeling energieprestatie gebouwen).
 - **Bbl-toets:** de BENG-grenswaarden, ook voor gemengde functies.
 - **Maatwerkadvies:** volgens BRL 9500-MWA en ISSO 82.2/75.2. Zie [hoofdstuk 6](06-maatwerkadvies.md).
 - **Registratie, herlabelen en dossier:** registratiegegevens, herlabelen (BRL 9500 bijlagen 6a/6b) en een projectdossier met manifest. Zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md).

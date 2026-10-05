@@ -2,7 +2,7 @@ import { version } from '../../../package.json';
 import type { NtaRegistration, NtaSoftwareIdentity } from './KernelClient';
 import { sha256Hex } from './Evidence';
 
-/** Name of this program in the registration (Regeling art. 5 lid 1 onder b, p. 6). */
+/** Name of this program in the registration (Omgevingsregeling art. 5.14 lid 1 onder b. */
 export const SOFTWARE_NAME = 'Open Energy Studio';
 
 /**
@@ -84,7 +84,7 @@ export function cleanRegistration(registration: NtaRegistration, kernelVersion?:
     result[key] = value;
   }
   if (!Object.keys(result).length) return undefined;
-  // Regeling art. 5 lid 1 onder b: the registration records the program used.
+  // Omgevingsregeling art. 5.14 lid 1 onder b: the registration records the program used.
   // A relabel keeps the program of the original calculation (BRL 9500-W
   // §4.2.4, p. 24); a replacement is a new calculation with the current
   // attested version (p. 23), so it records this program.
