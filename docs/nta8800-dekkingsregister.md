@@ -22,6 +22,8 @@ De lokale verificatiescript voert nu ook de TypeScript-/Vite-productiebouw uit n
 
 De desktopmatrix in CI installeert frontendafhankelijkheden nu met `npm ci` uit het lockbestand in plaats van een nieuwe oplossing van versies. De offline dry-run slaagde; deze wijziging raakt alleen de technische bouwherleidbaarheid, niet de normatieve dekking.
 
+De [NTA-devbuildprocedure](nta8800-build-procedure.md) legt de broncommit, afhankelijkheidslocks, toolversies en artefacthashes samen vast en houdt `referenceVerified=false` en `attestStatus=unattested`. De procedure is bewijsadministratie voor een latere toets en verandert geen reken- of attestkolom.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
