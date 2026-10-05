@@ -38,6 +38,8 @@ De [herstelde desktopbouw op `dc1b917`](nta8800-build-verificatie-2026-10-05-dc1
 
 Na UI-fase F10 slaagde de [volledige technische gate en devbuild op `837eb02`](nta8800-build-verificatie-2026-10-05-837eb02.md) met 744 frontendtests, 797 kern- en 57 servicetests plus hun integratiegroepen, MSRV-controle, format, Clippy en TypeScript/Vite. Het debugpakket en drie servicebinaries hebben gecontroleerde hashes. De officiële referentiebatch ontbrak nog en geen van de normatieve referentie- of attestkolommen verandert hierdoor.
 
+De manifestlezer weigert nu symbolische links naar artefacten buiten de uitvoermap. Een gerichte positieve en negatieve test en hercontrole van het F10-manifest slaagden; de NTA-reken-, referentie- en attestkolommen blijven ongewijzigd.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.

@@ -4,7 +4,7 @@
 
 Voor dezelfde commit weigert de script bestaande artefactnamen in de uitvoermap te overschrijven. Gebruik een nieuwe uitvoermap voor een herbouw die u naast de eerdere artefacten wilt vergelijken.
 
-Controleer een bewaard pakket later met `python3 scripts/verify-nta-build.py /pad/naar/oes-nta8800-build_...json`. Deze lezer controleert de vier bestandsgroottes en SHA-256-hashes, veilige unieke bestandsnamen, de Linux-debpakketmetadata en de expliciet ongetoetste status. Een gekopieerd manifest kan echter een willekeurige broncommit claimen; vergelijk de manifesthash met een afzonderlijk bewaard dossier en controleer de bronstand apart. Een geslaagde bytecontrole bewijst geen normatieve juistheid.
+Controleer een bewaard pakket later met `python3 scripts/verify-nta-build.py /pad/naar/oes-nta8800-build_...json`. Deze lezer controleert de vier bestandsgroottes en SHA-256-hashes, veilige unieke bestandsnamen zonder symbolische links, de Linux-debpakketmetadata en de expliciet ongetoetste status. Een gekopieerd manifest kan echter een willekeurige broncommit claimen; vergelijk de manifesthash met een afzonderlijk bewaard dossier en controleer de bronstand apart. Een geslaagde bytecontrole bewijst geen normatieve juistheid.
 
 Met `--source-repo /pad/naar/repo` toetst dezelfde lezer bovendien of de geclaimde commit in die Git-repository bestaat en of de vier lockbestanden, pakketversie, kernelversie en doeluitgave in die commit met het manifest overeenkomen. Deze koppeling bewijst nog niet dat de binaries werkelijk uit die bron zijn gecompileerd; daarvoor blijven een vertrouwde bouwomgeving en een reproduceerbare tweede bouw nodig.
 
