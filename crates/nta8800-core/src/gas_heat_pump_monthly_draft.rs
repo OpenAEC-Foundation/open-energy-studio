@@ -7,7 +7,7 @@ use crate::forfait_heat_pump_monthly_draft::SourceSystem;
 use crate::gas_heat_pump_forfait_draft::{
     assess_gas_heat_pump_forfait_draft, GasHeatPumpForfaitDraftInput, GasPumpSource,
 };
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -178,7 +178,7 @@ pub fn assess_gas_heat_pump_monthly_draft(
         },
         scope: "public_chapter_9_draft_equation_9_62_gas_pump_terms_without_carrier_allocation",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         corrected_cop: if issues.is_empty() {

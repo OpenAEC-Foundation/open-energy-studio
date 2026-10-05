@@ -276,7 +276,7 @@ pub fn assess_declared_heating_table(
             "invalid"
         },
         scope: "declared_space_heating_table_interpolation_only",
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         declaration_id: input.declaration_id.clone(),

@@ -4084,6 +4084,8 @@ export async function fetchKernelInterpretations(): Promise<NtaInterpretationGro
 
 export interface BuildingPerformanceAssessment {
   status: 'calculated_unverified' | 'invalid';
+  normVersion?: NormVersion;
+  registrationEligible?: boolean;
   scope: string;
   chapter5Source: string;
   inputFingerprint: string;
@@ -4187,7 +4189,15 @@ export interface NtaProjectHeatingSystem {
   humidifiers?: NtaZoneHumidifier[];
 }
 
+/** Edition of NTA 8800 a calculation follows (`ntaCalculation.normVersion`); absent is the current one. */
+export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
+export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
+/** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
+export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024'];
+
 export interface NtaCalculationInput {
+  /** Edition to calculate in; older editions give `calculated_legacy_edition`, never registrable. */
+  normVersion?: NormVersion | null;
   calculationScope: 'residential' | 'utility';
   areaSourceReference: string;
   usageFunction: NtaUsageFunction;
@@ -4338,8 +4348,12 @@ export interface NtaChapterFiveIndicators {
 }
 
 export interface ProjectPerformanceAssessment {
-  status: 'calculated_unverified' | 'incomplete' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'incomplete' | 'invalid';
   targetNormVersion: string;
+  /** Edition calculated in (older kernels omit it: the current edition). */
+  normVersion?: NormVersion;
+  /** False for an older edition: the result may not be registered. */
+  registrationEligible?: boolean;
   kernelVersion: string;
   inputFingerprint: string;
   attestStatus: 'unattested';
@@ -5059,4 +5073,14 @@ export interface NtaMicroChp {
   /** 9.6.6.2.2.8 storage outside the test configuration (space heating only). */
   storage?: { lossWPerK: number; setTemperatureC: number; chargingAuxiliaryW?: number | null; sourceReference: string } | null;
   testReportReference: string;
+}
+
+/** True when the kernel calculated the project, in the current or in an older edition. */
+export function projectCalculated(status: ProjectPerformanceAssessment['status'] | null | undefined): boolean {
+  return status === 'calculated_unverified' || status === 'calculated_legacy_edition';
+}
+
+/** True when the result follows an older edition and therefore may not be registered. */
+export function legacyEdition(assessment: Pick<ProjectPerformanceAssessment, 'status' | 'registrationEligible'> | null | undefined): boolean {
+  return assessment?.status === 'calculated_legacy_edition' || assessment?.registrationEligible === false;
 }

@@ -1,4 +1,4 @@
-import type { ProjectPerformanceAssessment } from './KernelClient';
+import { projectCalculated, type ProjectPerformanceAssessment } from './KernelClient';
 
 /** Figures the live preview shows; all come from the Rust kernel. */
 export interface PreviewSummary {
@@ -25,7 +25,7 @@ export interface PreviewSummary {
 
 /** Summarise a project-performance result for the preview panel. */
 export function summarizeForPreview(assessment: ProjectPerformanceAssessment): PreviewSummary {
-  const performance = assessment.status === 'calculated_unverified' ? assessment.performance : null;
+  const performance = projectCalculated(assessment.status) ? assessment.performance : null;
   const limits = performance?.bblCheck?.limits ?? null;
   const zones = performance
     ? [performance.spaceHeating.demand, ...performance.spaceHeating.additionalZoneDemands]

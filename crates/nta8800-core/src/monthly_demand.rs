@@ -23,7 +23,7 @@ use crate::solar_shading::{
     Obstruction,
 };
 use crate::unheated_transmission::{assess_unheated_transmission, UnheatedTransmissionInput};
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -2464,7 +2464,7 @@ fn assess_resolved(
             "invalid"
         },
         scope: SCOPE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         climate_source: CLIMATE_SOURCE,
         input_fingerprint: fingerprint,

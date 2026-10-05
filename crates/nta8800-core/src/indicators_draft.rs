@@ -7,7 +7,7 @@ use crate::final_energy_draft::{as_f64, decimal};
 
 /// Final-edition citation of the §5.3.1 indicators.
 const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §5.3.1, formules 5.1–5.8 (p. 72–79)";
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use rust_decimal::{Decimal, RoundingStrategy};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -256,7 +256,7 @@ pub fn assess_indicators_draft(input: &IndicatorsDraftInput) -> IndicatorsDraftA
         },
         scope: "public_chapter_5_draft_indicators_from_supplied_annual_totals_only",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         final_edition_verified: false,

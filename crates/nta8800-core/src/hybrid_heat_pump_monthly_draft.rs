@@ -18,7 +18,7 @@ use crate::heating_aux_draft::{
     assess_heating_aux_measured_draft, ElectricHeatPumpAuxMeasurements, GeneratorElectricityMonth,
     HeatingAuxMeasuredDraftAssessment, HeatingAuxMeasuredDraftInput,
 };
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -303,7 +303,7 @@ pub fn assess_hybrid_heat_pump_monthly_draft(
         },
         scope: "public_chapter_9_draft_new_build_dispatch_electric_heat_pump_gas_boiler_and_optional_measured_aux",
         kernel_version: KERNEL_VERSION,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         input_fingerprint: input_fingerprint(&json!(input)),
         dispatch: if issues.is_empty() {
             Some(dispatch)

@@ -9,7 +9,7 @@ use crate::final_energy_draft::{
 use crate::gas_collective_source_draft::{
     assess_gas_collective_source_draft, GasCollectiveSourceDraftInput,
 };
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 
 /// Final-edition citation of the E_EPus composition.
 const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, formules 5.20–5.21 (p. 89–91)";
@@ -358,7 +358,7 @@ pub fn assess_epus_draft(input: &EpusDraftInput) -> EpusDraftAssessment {
         },
         scope: "public_chapter_5_draft_service_composition_only",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         final_edition_verified: false,

@@ -44,6 +44,7 @@ use crate::lighting::{
     assess_zone_lighting, validate_lighting, LightingContext, ZoneLighting, ZoneLightingResult,
 };
 use crate::monthly_demand::{InternalGains, MonthlyDemandInput, UtilityLighting};
+use crate::norm_versions::{self, NormVersion};
 use crate::pv::{monthly_yield_kwh, validate_pv, PvSystem};
 use crate::space_cooling::{
     assess_cooling, validate_cooling, CoolingAssessment, CoolingContext, CoolingGeneratorKind,
@@ -54,7 +55,7 @@ use crate::space_heating_chain::{
     SpaceHeatingChainAssessment, SpaceHeatingChainInput,
 };
 use crate::tojuli::{assess_tojuli, ActiveCoolingEvidence, TojuliAssessment, TojuliOptions};
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -235,6 +236,11 @@ pub struct EnergyStorage {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BuildingPerformanceInput {
+    /// Edition of NTA 8800 to calculate with; default 2025+C1:2026, the only
+    /// registrable one. Left out of the serialized input (and with it the
+    /// fingerprint) when it is the default.
+    #[serde(default, skip_serializing_if = "NormVersion::is_default")]
+    pub norm_version: NormVersion,
     pub calculation_scope: CalculationScope,
     pub total_usable_floor_area_m2: f64,
     pub area_source_reference: String,
@@ -944,6 +950,10 @@ pub struct BuildingPerformanceAssessment {
     pub scope: &'static str,
     pub chapter_5_source: &'static str,
     pub target_norm_version: &'static str,
+    /// Edition the result was calculated with.
+    pub norm_version: NormVersion,
+    /// Only a 2025+C1:2026 result may be used for a label or registration.
+    pub registration_eligible: bool,
     pub kernel_version: &'static str,
     pub input_fingerprint: String,
     pub final_edition_verified: bool,
@@ -1938,6 +1948,79 @@ fn heat_pump_generator(input: &BuildingPerformanceInput) -> &Generator {
 }
 
 /// §9.2: a zone belongs to exactly one heating system.
+/// Inputs the active edition has no route for give `route_not_in_edition`;
+/// an edition without a profile gives `edition_not_implemented`.
+fn validate_edition(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
+    let version = norm_versions::current();
+    if !version.implemented() {
+        issues.push(issue("edition_not_implemented", "normVersion"));
+        return;
+    }
+    let profile = norm_versions::profile();
+    // 5.5.8: f_BACS 1,05 exists from 2025+C1 only.
+    if !profile.bacs_factor_route && (input.bacs_factor - 1.0).abs() > 1e-9 {
+        issues.push(issue("route_not_in_edition", "bacsFactor"));
+    }
+    if !profile.roof_edge_obstruction {
+        for (index, system) in input.pv_systems.iter().enumerate() {
+            if matches!(
+                system.obstruction,
+                Some(crate::solar_shading::CollectorObstruction::RoofEdge { .. })
+            ) {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("pvSystems[{index}].obstruction"),
+                ));
+            }
+        }
+    }
+    if !profile.permanent_shading_routes {
+        let chains = std::iter::once((&input.space_heating, "spaceHeating".to_string())).chain(
+            input
+                .additional_heating_systems
+                .iter()
+                .enumerate()
+                .map(|(index, system)| (system, format!("additionalHeatingSystems[{index}]"))),
+        );
+        for (chain, chain_path) in chains {
+            let demands = std::iter::once((&chain.demand, format!("{chain_path}.demand"))).chain(
+                chain
+                    .additional_zones
+                    .iter()
+                    .enumerate()
+                    .map(|(index, zone)| {
+                        (
+                            &zone.demand,
+                            format!("{chain_path}.additionalZones[{index}].demand"),
+                        )
+                    }),
+            );
+            for (demand, demand_path) in demands {
+                for (index, window) in demand.windows.iter().enumerate() {
+                    let Some(glazing) = window.glazing.as_ref() else {
+                        continue;
+                    };
+                    let path = format!("{demand_path}.windows[{index}].glazing");
+                    // 7.6.6.1.2 table 7.4 (2025 p. 190): solar-control glass
+                    // g 0,40 is new in 2025+C1.
+                    if glazing.glazing_type == Some(crate::solar_shading::GlazingType::SolarControl)
+                    {
+                        issues.push(issue("route_not_in_edition", format!("{path}.glazingType")));
+                    }
+                    // 7.6.6.1.3.2/7.6.6.1.3.3 (2025 p. 192–195): fixed and
+                    // rotatable louvres without ISO 15099 data are new.
+                    if glazing.fixed_louvres.is_some() {
+                        issues.push(issue(
+                            "route_not_in_edition",
+                            format!("{path}.fixedLouvres"),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn validate_heating_systems(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>) {
     let mut seen = std::collections::HashSet::new();
     for id in input.zone_ids() {
@@ -3047,9 +3130,28 @@ fn fill_hot_water_gains(
     }
 }
 
+/// Chapter 5 for one building, in the edition of `input.normVersion`.
+/// Results of an edition other than 2025+C1:2026 are not registrable.
 pub fn assess_building_performance(
     input: &BuildingPerformanceInput,
 ) -> BuildingPerformanceAssessment {
+    norm_versions::with_version(input.norm_version, || {
+        let mut assessment = assess_in_edition(input);
+        if !norm_versions::profile().indicators_2025 {
+            // 5.3.3–5.3.5, 5.6.4, 5.9 and annex AB are new in 2025+C1.
+            assessment.chapter5 = None;
+            assessment.final_energy_by_carrier.clear();
+            assessment.annual_final_energy_kwh = None;
+            assessment.annual_final_energy_eed_kwh = None;
+            assessment.annual_zeb_primary_total_kwh = None;
+            assessment.zeb_primary_total_indicator_kwh_per_m2 = None;
+            assessment.annual_zeb_co2_kg = None;
+        }
+        assessment
+    })
+}
+
+fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAssessment {
     let fingerprint =
         input_fingerprint(&serde_json::to_value(input).expect("typed input serializes"));
     // The chain input with chapter 14 lighting (7.28) and hot-water (7.29)
@@ -3162,6 +3264,7 @@ pub fn assess_building_performance(
     let mut heating = combine_heating_systems(heating, others);
     heating.heat_pump_systems = heat_pump_systems;
     validate(input, &mut issues);
+    validate_edition(input, &mut issues);
     validate_heating_systems(input, &mut issues);
     if let Some(error) = standalone_solar_issue {
         issues.push(issue(error.code, error.path));
@@ -3639,7 +3742,9 @@ pub fn assess_building_performance(
         },
         scope: "nta8800_single_zone_building_performance_unverified",
         chapter_5_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: norm_versions::current_label(),
+        norm_version: norm_versions::current(),
+        registration_eligible: norm_versions::current().registration_eligible(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         final_edition_verified: false,

@@ -3,7 +3,7 @@
 //! Equation 9.91/9.92 only; month hours and generator heat are supplied inputs.
 
 use crate::gas_heat_pump_forfait_draft::GasPumpDrive;
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
@@ -205,7 +205,7 @@ pub fn assess_gas_heat_pump_aux_draft(
         },
         scope: "public_chapter_9_draft_9_91_9_92_gas_generator_auxiliary_only",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         monthly,

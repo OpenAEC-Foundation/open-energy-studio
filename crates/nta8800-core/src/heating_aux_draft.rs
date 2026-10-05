@@ -3,7 +3,7 @@
 //! All coefficients and generator input electricity must be independently supplied.
 
 use crate::final_energy_draft::{as_f64, decimal};
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -311,7 +311,7 @@ pub fn assess_heating_aux_measured_draft(
         },
         scope: "public_chapter_9_draft_9_86_9_88_measured_electric_heat_pump_only",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         final_edition_verified: false,
@@ -443,7 +443,7 @@ pub fn assess_heating_aux_draft(input: &HeatingAuxDraftInput) -> HeatingAuxDraft
         },
         scope: "public_chapter_9_draft_9_85_measured_coefficients_one_individual_generator_only",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
         final_edition_verified: false,

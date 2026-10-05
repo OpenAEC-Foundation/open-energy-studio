@@ -3,7 +3,7 @@ import { AlertCircle, Calculator, CircleHelp } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
 import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
-import type { NtaCalculationInput } from '../../core/nta/KernelClient';
+import { legacyEdition, projectCalculated, type NtaCalculationInput } from '../../core/nta/KernelClient';
 import { useProjectPerformance, type ProjectPerformanceQuery } from '../../core/nta/useProjectPerformance';
 import { formatNumber } from '../../i18n/format';
 import { KernelCode, KernelDetail } from '../KernelCode/KernelCode';
@@ -78,7 +78,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
 
 
   const performance = assessment?.performance ?? null;
-  const calculated = assessment?.status === 'calculated_unverified' && performance;
+  const calculated = projectCalculated(assessment?.status) && performance;
   const heating = performance?.spaceHeating;
   const issues = performance?.issues ?? [];
   const extras = calculated && performance ? summarizeExtras(performance) : null;
@@ -94,6 +94,12 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
         <span className="nta-performance-badge">{t('nta.performance.unverified')}</span>
       </div>
 
+      {!loading && assessment && legacyEdition(assessment) && (
+        <div className="nta-performance-legacy" role="note">
+          <AlertCircle size={16} />
+          <span><strong>{t('nta.edition.legacyTitle')}</strong> {t('nta.edition.legacyBody', { edition: assessment.targetNormVersion })}</span>
+        </div>
+      )}
       {loading && <p role="status">{t('kernel.loading')}</p>}
       {!loading && error && (
         <div className="nta-performance-unavailable" role="alert">

@@ -19,6 +19,7 @@ use crate::monthly_demand::{
     ComponentTransmission, DwellingType, InternalGains, MonthlyDemandInput, OpaqueElement,
     Setpoints, ThermalMass, Transmission, UsageFunction, VentilationFlow, Window,
 };
+use crate::norm_versions::NormVersion;
 use crate::pv::PvSystem;
 use crate::solar_shading::{MovableShading, Obstruction};
 use crate::space_cooling::CoolingSystem;
@@ -29,7 +30,7 @@ use crate::space_heating_chain::{
 use crate::tojuli::ActiveCoolingEvidence;
 use crate::{
     direct_boundary_input_zone, input_fingerprint, unheated_zone_input, ProjectInput,
-    ThermalBoundary, KERNEL_VERSION, TARGET_NORM_VERSION,
+    ThermalBoundary, KERNEL_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -38,6 +39,9 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NtaCalculationInput {
+    /// Edition of NTA 8800; default 2025+C1:2026, the only registrable one.
+    #[serde(default, skip_serializing_if = "NormVersion::is_default")]
+    pub norm_version: NormVersion,
     pub calculation_scope: CalculationScope,
     pub area_source_reference: String,
     /// Usage function for tables 7.13–7.15.
@@ -254,6 +258,11 @@ pub struct InputGap {
 pub struct ProjectPerformanceAssessment {
     pub status: &'static str,
     pub target_norm_version: &'static str,
+    /// Edition of the calculation (`ntaCalculation.normVersion`).
+    pub norm_version: NormVersion,
+    /// Only a 2025+C1:2026 calculation may be registered; an older edition
+    /// gives status `calculated_legacy_edition`.
+    pub registration_eligible: bool,
     pub kernel_version: &'static str,
     pub input_fingerprint: String,
     pub attest_status: &'static str,
@@ -1442,10 +1451,15 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
     if let Some(result) = &performance {
         gaps.extend(tojuli_evidence_gaps(&result.tojuli));
     }
+    let version = project_norm_version(project_value);
     let status = match (&derived, &performance) {
         (None, _) => "incomplete",
         (Some(_), Some(result)) if result.status == "calculated_unverified" => {
-            "calculated_unverified"
+            if version.registration_eligible() {
+                "calculated_unverified"
+            } else {
+                "calculated_legacy_edition"
+            }
         }
         _ => "invalid",
     };
@@ -1480,11 +1494,13 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
                             .filter(|result| result.status == "calculated_unverified"),
                         label_data.as_ref(),
                     );
-                    Some(crate::registration::assess_project_registration(
+                    let mut assessment = crate::registration::assess_project_registration(
                         &registration,
                         project_value,
                         &context,
-                    ))
+                    );
+                    crate::registration::refuse_legacy_edition(&mut assessment, version);
+                    Some(assessment)
                 }
                 Err(error) => {
                     gaps.push(InputGap {
@@ -1510,7 +1526,9 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
     gaps.extend(range_gaps);
     let mut assessment = ProjectPerformanceAssessment {
         status,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: version.label(),
+        norm_version: version,
+        registration_eligible: version.registration_eligible(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         attest_status: "unattested",
@@ -1531,6 +1549,16 @@ pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAs
         withhold_results(&mut assessment);
     }
     refuse_non_finite(assessment)
+}
+
+/// `ntaCalculation.normVersion`, or the default edition when absent or
+/// unreadable (an unreadable value is reported by `derive_input`).
+fn project_norm_version(project_value: &Value) -> NormVersion {
+    project_value
+        .pointer("/ntaCalculation/normVersion")
+        .filter(|value| !value.is_null())
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
+        .unwrap_or_default()
 }
 
 /// Marks the assessment invalid and withholds every computed part.
@@ -3324,7 +3352,20 @@ fn derive_input(
             }
         },
     };
+    // 5.5.8 is new in 2025+C1: older editions have no f_BACS.
+    let (bacs_factor, bacs_source_reference) = if nta.norm_version.profile().bacs_factor_route {
+        (bacs_factor, bacs_source_reference)
+    } else {
+        (
+            1.0,
+            format!(
+                "{} kent geen f_BACS (5.5.8 is nieuw in 2025+C1)",
+                nta.norm_version.label()
+            ),
+        )
+    };
     Some(BuildingPerformanceInput {
+        norm_version: nta.norm_version,
         hot_water_need_fit: None,
         calculation_scope: nta.calculation_scope,
         total_usable_floor_area_m2: total_area,

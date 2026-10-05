@@ -2,6 +2,17 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — keuze van de NTA 8800-uitgave
+
+Rekenuitkomsten van bestaande projecten veranderen niet: zonder `ntaCalculation.normVersion` rekent de kern zoals voorheen in NTA 8800:2025+C1:2026, met dezelfde invoervingerafdruk.
+- **Nieuw invoerveld** `ntaCalculation.normVersion`: `"2025+C1"` (standaard) of `"2024"`. In de app staat het in het NTA-invoerformulier, blok *Algemeen*.
+- **Nieuwe status** `calculated_legacy_edition` voor een berekening in een oudere uitgave. De uitkomst draagt `normVersion` en `registrationEligible: false`, en `targetNormVersion` noemt de gekozen uitgave. De registratiecontrole geeft altijd `legacy_edition_not_registrable`. Het rekenpaneel, het NTA-rekenrapport en de statusbalk melden "niet voor registratie". De API geeft 200, net als bij `calculated_unverified`.
+- **Nieuwe codes:**
+  - `edition_not_implemented`: 2023, 2022 en 2020+A1 zijn bekend maar niet geïmplementeerd;
+  - `route_not_in_edition`: invoer voor een route die de gekozen uitgave niet kent.
+- **Indicatoren** die pas in 2025+C1 bestaan, zijn in een oudere uitgave `null`.
+- **API:** `GET /v1/version` geeft `supportedNormVersions`.
+
 ## 5 oktober 2026 — HTTP-API en MCP-server
 
 Rekenuitkomsten veranderen niet. Wat wel verandert voor clients van de API of de MCP-server:

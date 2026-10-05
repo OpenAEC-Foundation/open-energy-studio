@@ -63,7 +63,7 @@ use crate::hybrid_heat_pump_monthly_draft::{
 use crate::monthly_demand::{
     apply_recoverable_losses, assess_monthly_demand, MonthlyDemandAssessment, MonthlyDemandInput,
 };
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
 
 pub const OMITTED_TERMS: &[&str] = &[
@@ -2687,7 +2687,7 @@ fn assess_chain_pass(
         },
         scope: "nta8800_space_heating_zones_single_generator_unverified",
         chapter_9_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         final_edition_verified: false,

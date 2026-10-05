@@ -4,7 +4,7 @@
 //! already be monthly E_EPus values from an independently established upstream
 //! route; this module does not derive them.
 
-use crate::{input_fingerprint, KERNEL_VERSION, TARGET_NORM_VERSION};
+use crate::{input_fingerprint, KERNEL_VERSION};
 use rust_decimal::{Decimal, RoundingStrategy};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -312,7 +312,7 @@ pub fn assess_final_energy_draft(input: &FinalEnergyDraftInput) -> FinalEnergyDr
         },
         scope: "public_chapter_5_draft_arithmetic_only",
         draft_source: DRAFT_SOURCE,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         final_edition_verified: false,

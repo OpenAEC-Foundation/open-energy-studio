@@ -1,5 +1,6 @@
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
+import { DEFAULT_NORM_VERSION } from '../../core/nta/KernelClient';
 import './StatusBar.css';
 
 export function StatusBar() {
@@ -9,6 +10,8 @@ export function StatusBar() {
 
   const zoneCount = project.zones.length;
   const surfaceCount = project.zones.reduce((sum, z) => sum + z.surfaces.length, 0);
+  const edition = project.ntaCalculation?.normVersion;
+  const legacy = edition != null && edition !== DEFAULT_NORM_VERSION;
 
   return (
     <div className="status-bar">
@@ -24,6 +27,11 @@ export function StatusBar() {
         <span>
           <strong>{t('status.surfaces')}:</strong> {surfaceCount}
         </span>
+        {legacy && (
+          <span className="status-indicative status-legacy-edition" title={t('nta.edition.legacyTitle')}>
+            {t('status.legacyEdition', { edition: t(`nta.edition.${edition}`) })}
+          </span>
+        )}
         {result && (
           <span className="status-indicative">BENG: {t('results.indicative')}</span>
         )}

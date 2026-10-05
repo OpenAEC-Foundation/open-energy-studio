@@ -1,4 +1,5 @@
 import type { IProject } from '../energy/types';
+import { legacyEdition, projectCalculated } from '../nta/KernelClient';
 import type {
   BuildingPerformanceAssessment, LabelData, NtaChapterFiveIndicators, NtaCoolingResult, NtaInterpretationGroup,
   NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment,
@@ -236,6 +237,8 @@ export function generateNtaCalculationReportHTML(
     <p>Project: ${escapeHtml(project.name)} · Project-ID: ${escapeHtml(project.id)} · Gegenereerd: ${generatedTime}</p>
     <div class="notice"><strong>Onverifieerde berekening — geen officieel energielabel, niet geattesteerd.</strong>
     Deze uitkomst komt uit de Rust-rekenkern van Open Energy Studio. De kern is getranscribeerd uit de gelicentieerde normtekst maar nog niet met referentiegevallen geverifieerd; niet-ondersteunde situaties worden afgewezen of als opgegeven waarde vermeld. Een energielabel wordt pas vastgesteld na registratie door een gecertificeerde adviseur met een BRL 9501-geattesteerd rekenprogramma (Omgevingsregeling art. 5.11/5.12).</div>
+    ${legacyEdition(assessment) ? `<div class="notice legacy-edition" role="note"><strong>Oudere uitgave — niet voor registratie.</strong>
+    Berekend volgens ${escapeHtml(assessment.targetNormVersion)}. Alleen een berekening volgens de aangewezen uitgave (NTA 8800:2025+C1:2026) mag worden geregistreerd; deze uitkomst dient alleen ter vergelijking.</div>` : ''}
     <h2>Herleidbaarheid</h2><table><tbody>
       <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Kernelversie</th>${cell(assessment.kernelVersion)}</tr>
       <tr><th>Status</th>${cell(assessment.status)}<th>Atteststatus</th>${cell(assessment.attestStatus)}</tr>
@@ -247,7 +250,7 @@ export function generateNtaCalculationReportHTML(
     ${warnings.length > 0 ? `<h2>Plausibiliteit</h2><p>Deze meldingen houden de berekening niet tegen. De invoer of de uitkomst botst met de norm of met andere invoer, of is extreem volgens de letter van de norm.</p>
       <table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${warnings
         .map((warning) => `<tr>${dutchCodeCell(warning.code)}${cell(warning.path)}<td>${dutchDetailHtml(warning.detail)}</td></tr>`).join('')}</tbody></table>` : ''}`;
-  if (!performance || assessment.status !== 'calculated_unverified') {
+  if (!performance || !projectCalculated(assessment.status)) {
     const gaps = assessment.gaps.map((gap) => `<tr>${dutchCodeCell(gap.code)}${cell(gap.path)}<td>${dutchDetailHtml(gap.detail)}</td></tr>`).join('');
     const issues = (performance?.issues ?? []).map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}<td></td></tr>`).join('');
     return `${head}<h2>Geen uitkomst</h2><p>De rekenkern geeft geen uitkomst. Onderstaande invoergaten of afwijzingen moeten eerst worden opgelost.</p>
