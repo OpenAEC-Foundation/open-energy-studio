@@ -1,0 +1,17 @@
+{
+  "name": "nta8800-wasm",
+  "type": "module",
+  "description": "WebAssembly adapter for the Open Energy Studio NTA 8800 kernel: the same operation registry as the HTTP API and the MCP server, running in the browser",
+  "version": "0.1.0",
+  "license": "LGPL-3.0-or-later",
+  "files": [
+    "nta8800_bg.wasm",
+    "nta8800.js",
+    "nta8800.d.ts"
+  ],
+  "main": "nta8800.js",
+  "types": "nta8800.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -6,7 +6,9 @@
 //! exposure needs a separate authentication and deployment design.
 
 pub mod http;
-pub mod operations;
+/// The operation registry lives in `nta8800-operations`; it is re-exported
+/// here so `nta8800_service::operations` keeps working for the adapters.
+pub use nta8800_operations as operations;
 
 use axum::{extract::Json, http::StatusCode};
 use serde::Serialize;

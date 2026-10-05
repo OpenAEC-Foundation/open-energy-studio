@@ -12,7 +12,8 @@
     "tauri:build": "tauri build",
     "bump": "node scripts/bump-version.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:wasm": "wasm-pack build crates/nta8800-wasm --target web --release --out-dir ../../src/kernel-wasm --out-name nta8800 && node -e \"require('fs').rmSync('src/kernel-wasm/.gitignore',{force:true})\""
   },
   "dependencies": {
     "@tauri-apps/api": "2.10.1",
