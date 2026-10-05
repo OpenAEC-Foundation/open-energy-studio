@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n/i18n';
 import { legacyEdition, projectCalculated, type NtaCalculationInput } from '../../core/nta/KernelClient';
 import { type ProjectPerformanceQuery } from '../../core/nta/useProjectPerformance';
 import { useKernelQuery } from '../../context/KernelProvider';
+import { useNtaDraft } from '../../context/NtaDraftProvider';
 import { formatNumber } from '../../i18n/format';
 import { KernelCode, KernelDetail } from '../KernelCode/KernelCode';
 import { buildNtaCalculationTemplate } from '../../core/nta/NtaCalculationTemplate';
@@ -30,6 +31,8 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
   const { t, locale } = useI18n();
   const project: IProject = state.project;
   const ownQuery = useKernelQuery(project, suppliedQuery === undefined);
+  // The full form starts from the draft of the steps when it holds unapplied changes.
+  const shared = useNtaDraft();
   const kwh = (value: number | null | undefined) => formatNumber(value, locale);
   const [editing, setEditing] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -376,7 +379,8 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
         </>}
       </div>
       {formOpen && editorProjectId.current === project.id && <NtaCalculationForm project={project}
-        initial={(project.ntaCalculation as unknown as Record<string, unknown> | undefined) ?? buildNtaCalculationTemplate(project)}
+        initial={(shared?.dirty ? shared.draft : null)
+          ?? (project.ntaCalculation as unknown as Record<string, unknown> | undefined) ?? buildNtaCalculationTemplate(project)}
         onCancel={() => setFormOpen(false)}
         onSave={(block) => {
           dispatch({ type: 'SET_NTA_CALCULATION', payload: block as unknown as NtaCalculationInput });

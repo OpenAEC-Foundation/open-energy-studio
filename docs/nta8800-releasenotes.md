@@ -22,6 +22,19 @@ Uitkomsten veranderen voor projecten met een kwaliteitsverklaring van een warmte
 - **Warm tapwater.** Een gedeclareerd warmtepomprendement (§13.8.4.7.2) rekent nu met f_prac 0,95 volgens 13.152 (p. 616–617), in plaats van 1,0. Alleen de forfaitaire waarden houden 1,0.
 - **Vergelijkingsfixtures.** `training-data/nta8800-public-comparison-{a,b,c}.json` zijn gecorrigeerd naar de rapportinvoer: productwaarden voor de ventilatoren (A: 8,5 W, f 0,147; B: 4 units van 21,7 W, f 0,364), de gedeclareerde hulpenergie van 146 kWh bij B, en geen leidingen buiten de verwarmde of gekoelde zone. Vastgelegde uitkomsten: A 94,00 / 35,15 / 74,9; B 52,96 / 28,84 / 62,6; C 64,70 / 31,54 / 69,0.
 - **Documentatie.** De regel-voor-regel-reconciliatie staat in `docs/nta8800-vergelijking-openbare-rapporten.md`. Vragen over 10.15, 10.87 en f_prac staan in `docs/nta8800-vragen-nen.md`.
+
+## 5 oktober 2026 — UI-herontwerp, fase F6: NTA-invoer in de stappen (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd; het NTA-blok heeft dezelfde vorm.
+- **De NTA-invoer staat bij de stap waar hij hoort.** Project: uitgave, rekenomvang en de andere algemene gegevens. Gebouw: gebruiksfuncties, setpoints, massa en interne warmte bij Rekenzones; ramen, dynamische ramen, dakhellingen en vloeren op grond bij Schil & ramen; serres bij Onverwarmde ruimten. Installaties: Verwarming in vijf plus één delen (Opwekking, Distributie, Afgifte, Regeling & BCRG, Hulpenergie, Zonneverwarming), Warm tapwater, Ventilatie, Koeling, Bevochtiging, Verlichting (nieuw, utiliteit), Opwekking (PV, externe levering en bijlage P, opgegeven stromen, opslag) en Gebouwautomatisering. Controle › NTA-invoer houdt de bevestigingen, het volledige formulier en de JSON-editor.
+- **Eén concept, één keer toepassen.** Alle stappen bewerken hetzelfde concept; van stap wisselen verliest niets. De balk onderaan toont het aantal wijzigingen, Ongedaan maken, Vorige stap en Toepassen en verder. Toepassen doet wat Opslaan in het formulier deed.
+- **Basis / Alle velden.** Minder gebruikte secties staan in Basis achter "Geavanceerd" en klappen vanzelf open bij invoer, een kernmelding of Ga naar.
+- **Bron & bewijs per sectie** met de bronvelden van die sectie, ingevuld of open, en Ga naar.
+- **Getallen** accepteren een komma of een punt en tonen de waarde in de taal van de app.
+- **Controle in het contextpaneel**: fouten, aandachtspunten en weggelaten correcties, de punten van de open pagina eerst, met Ga naar naar het veld. Een veld met een kernmelding heeft een rode of gele rand.
+- **Ga naar** opent nu de juiste stap, subpagina, het verwarmingsdeel en zo nodig het ingeklapte blok, en zet de focus in het veld. Een ongeldig NTA-blok (`nta_calculation_block_invalid`) wijst naar het veld uit de kernmelding, bijvoorbeeld `ntaCalculation.setpoints.heatingC`. Daardoor tellen NTA-meldingen in de navigatie bij Gebouw of Installaties in plaats van bij Controle.
+- **Alleen bij de editie 2024** staan de velden effectieve massa en dakoppervlak per vertrek (bijlage AA) en "collectieve bron gerealiseerd vanaf 2013" (bijlage P). Bij een andere editie meldt de app achtergebleven waarden en biedt Verwijderen aan.
+
 ## 5 oktober 2026 — UI-herontwerp, fase F5: Gebouw en Installaties per onderdeel (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet. Opgeslagen projecten openen ongewijzigd; ids van zones, vlakken, ramen en systemen blijven gelijk.

@@ -1,12 +1,14 @@
 /**
- * The one contextual panel on the right (ontwerp §3.3). For now it holds the
- * two former side panels: Eigenschappen (the selected item, with edit and
- * delete) and Voorbeeld (the live kernel preview). The switch between them is
- * the old ribbon "Preview" toggle (`TOGGLE_PREVIEW`); Ctrl . hides the panel.
+ * The one contextual panel on the right (ontwerp §3.3). It holds the two
+ * former side panels, Eigenschappen (the selected item, with edit and delete)
+ * and Voorbeeld (the live kernel preview; the old ribbon "Preview" toggle,
+ * `TOGGLE_PREVIEW`), and since F6 Controle: the kernel findings and omitted
+ * corrections, this page first, each with "Ga naar". Ctrl . hides the panel.
  * A selected building element gets the inline editor (F5); on Installaties
  * without a selection the panel shows the energy per service.
  */
 import { projectCalculated } from '../../core/nta/KernelClient';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
@@ -18,6 +20,9 @@ import { ElementInspector, findBuildingElement } from './ElementInspector';
 import { PropertiesPanel } from '../PropertiesPanel/PropertiesPanel';
 import { PreviewPanel } from '../PreviewPanel/PreviewPanel';
 import { ErrorBoundary } from '../ErrorBoundary/ErrorBoundary';
+import { InspectorCheckPanel } from './InspectorCheckPanel';
+
+type InspectorTab = 'properties' | 'preview' | 'check';
 
 export function Inspector({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
@@ -26,35 +31,44 @@ export function Inspector({ onClose }: { onClose: () => void }) {
   const element = findBuildingElement(state.project, state.selectedItemType, state.selectedItemId);
   // On Installaties a building selection is left over from Gebouw: show the energy per service instead.
   const installationsContext = state.route.step === 'installations' && (!state.selectedItemId || element != null);
-  const show = (wantPreview: boolean) => { if (wantPreview !== preview) dispatch({ type: 'TOGGLE_PREVIEW' }); };
+  const [checkOpen, setCheckOpen] = useState(false);
+  const tab: InspectorTab = checkOpen ? 'check' : preview ? 'preview' : 'properties';
+  const select = (next: InspectorTab) => {
+    setCheckOpen(next === 'check');
+    if (next !== 'check' && (next === 'preview') !== preview) dispatch({ type: 'TOGGLE_PREVIEW' });
+  };
+  const tabs: Array<{ id: InspectorTab; label: string }> = [
+    { id: 'properties', label: t('shell.inspector.properties') },
+    { id: 'preview', label: t('shell.inspector.preview') },
+    { id: 'check', label: t('shell.inspector.check') },
+  ];
 
   const onTabKey = (event: React.KeyboardEvent) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
-    show(!preview);
-    const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-    tabs[preview ? 0 : 1]?.focus();
+    const index = tabs.findIndex((item) => item.id === tab);
+    const next = (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    select(tabs[next].id);
+    event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   };
 
   return (
     <aside className="inspector" aria-label={t('shell.inspector.title')}>
       <div className="inspector-head">
         <div className="inspector-tabs" role="tablist" aria-label={t('shell.inspector.title')} onKeyDown={onTabKey}>
-          <button type="button" role="tab" id="inspector-tab-properties" className="inspector-tab" aria-selected={!preview}
-            aria-controls="inspector-panel" tabIndex={preview ? -1 : 0} onClick={() => show(false)}>
-            {t('shell.inspector.properties')}
-          </button>
-          <button type="button" role="tab" id="inspector-tab-preview" className="inspector-tab" aria-selected={preview}
-            aria-controls="inspector-panel" tabIndex={preview ? 0 : -1} onClick={() => show(true)}>
-            {t('shell.inspector.preview')}
-          </button>
+          {tabs.map((item) => (
+            <button key={item.id} type="button" role="tab" id={`inspector-tab-${item.id}`} className="inspector-tab"
+              aria-selected={tab === item.id} aria-controls="inspector-panel" tabIndex={tab === item.id ? 0 : -1}
+              onClick={() => select(item.id)}>
+              {item.label}
+            </button>
+          ))}
         </div>
         <IconButton size="sm" icon={<X aria-hidden="true" />} aria-label={t('shell.inspector.close')} onClick={onClose} />
       </div>
-      <div className="inspector-body" id="inspector-panel" role="tabpanel"
-        aria-labelledby={preview ? 'inspector-tab-preview' : 'inspector-tab-properties'}>
+      <div className="inspector-body" id="inspector-panel" role="tabpanel" aria-labelledby={`inspector-tab-${tab}`}>
         <ErrorBoundary resetKey={state.project}>
-          {preview ? <PreviewPanel embedded /> : installationsContext
+          {tab === 'check' ? <InspectorCheckPanel /> : tab === 'preview' ? <PreviewPanel embedded /> : installationsContext
             ? <ServiceEnergyPanel />
             : element ? <ElementInspector /> : <PropertiesPanel embedded />}
         </ErrorBoundary>

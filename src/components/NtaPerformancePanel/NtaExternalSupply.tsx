@@ -3,7 +3,7 @@ import {
   annexPGeneratorKindTemplate, annexPGeneratorTemplate, annexPPlotTemplate, annexPRouteTemplate,
 } from '../../core/nta/NtaSystemTemplates';
 import {
-  CheckField, NumberField, read, SelectField, TextField, type Draft, type Path,
+  CheckField, NumberField, read, SelectField, TextField, TriStateField, type Draft, type Path,
 } from './NtaFormFields';
 import { CalculatedHotWaterStorageFields, PipeDistributionFields, storageVesselTemplate } from './NtaAnnexPDetails';
 import { PvSystemFields, peakPowerTemplate } from './NtaPvFields';
@@ -518,6 +518,25 @@ export function AnnexPRouteFields({ draft, change, base, fn, label }: SectionPro
 }
 
 /** §5.8 / annex P: the external-supply block of the NTA input. */
+/**
+ * INT-V1:2024: a collective heat-pump source realised from 2013 on. Only the 2024
+ * edition has this input; under another edition a value left behind is offered
+ * for removal (the kernel reports it as route_not_in_edition).
+ */
+export function RealisedFrom2013Field({ draft, change, path }: SectionProps & { path: Path }) {
+  const { t } = useI18n();
+  const value = read(draft, path);
+  if (read(draft, ['normVersion']) === '2024') {
+    return <TriStateField draft={draft} onChange={change} path={path} label={t('ntaStep.realisedFrom2013')}
+      yes={t('nta.form.yes')} no={t('nta.form.no')} />;
+  }
+  if (value == null) return null;
+  return <p className="nta-form-note nta-form-error" role="alert">
+    {t('ntaStep.staleEdition', { field: t('ntaStep.realisedFrom2013') })}{' '}
+    <button type="button" onClick={() => change(path, undefined)}>{t('nta.form.remove')}</button>
+  </p>;
+}
+
 export function ExternalSupplyFields({ draft, change }: SectionProps) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
@@ -538,6 +557,7 @@ export function ExternalSupplyFields({ draft, change }: SectionProps) {
         ['below20_c', t('nta.annexP.sourceClass.below20')],
         ['at_least20_c_or_surface_water_or_unknown', t('nta.annexP.sourceClass.atLeast20')]]} />
       <TextField {...field} path={[...base, 'collectiveHeatPumpSource', 'supplierReference']} label={t('nta.annexP.supplierReference')} />
+      <RealisedFrom2013Field draft={draft} change={change} path={[...base, 'collectiveHeatPumpSource', 'realisedFrom2013']} />
       <AnnexPRouteFields draft={draft} change={change} base={[...base, 'collectiveHeatPumpSource', 'annexP']} fn="heating"
         label={t('nta.annexP.sourceRoute')} />
     </>}

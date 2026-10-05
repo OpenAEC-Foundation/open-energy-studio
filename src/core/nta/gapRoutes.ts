@@ -5,9 +5,10 @@
  * `zones[0].surfaces[1].windows[0].gValue`, `ntaCalculation.dynamicWindows[0]`
  * or `/constructions/0/uValue`. The longest matching prefix decides the step
  * and sub page that "Ga naar" opens; paths without a match land on Controle,
- * which lists the raw code.
+ * which lists the raw code. Paths in the NTA input go to the step page that
+ * edits their section (F6).
  */
-import { parseKernelPath, type PathSegment } from './pathUtil';
+import { formatKernelPath, parseKernelPath, type PathSegment } from './pathUtil';
 import { normalizeRoute, type Route, type StepId } from '../navigation/routes';
 
 /** `*` matches any array index; other segments match literally. */
@@ -18,6 +19,91 @@ interface GapRoute {
   step: StepId;
   sub?: string;
 }
+
+type NtaTarget = [StepId, string?];
+
+/**
+ * Members of `ntaCalculation` → the step page with their section. The register
+ * in `components/NtaPerformancePanel/NtaSections.tsx` uses the same targets
+ * (checked by gap-routes.test.ts).
+ */
+export const NTA_INPUT_ROUTES: Record<string, NtaTarget> = {
+  '': ['check', 'input'],
+  normVersion: ['project'],
+  calculationScope: ['project'],
+  areaSourceReference: ['project'],
+  usageFunction: ['project'],
+  dwellingType: ['project'],
+  bblFunction: ['project'],
+  zebHeatDeliveryTemperature: ['project'],
+  permitApplicationAfter20260529: ['project'],
+  constructionYear: ['project'],
+  fossilAppliancesOutsideCalculation: ['project'],
+  labelFunctions: ['building', 'zones'],
+  bblFunctions: ['building', 'zones'],
+  functionAreas: ['building', 'zones'],
+  setpoints: ['building', 'zones'],
+  zoneData: ['building', 'zones'],
+  'zoneData.*.verticalPipes': ['installations', 'heating'],
+  'zoneData.*.ventilation': ['installations', 'ventilation'],
+  'zoneData.*.ventilationFlows': ['installations', 'ventilation'],
+  thermalMass: ['building', 'zones'],
+  internalGains: ['building', 'zones'],
+  windowSolar: ['building', 'envelope'],
+  dynamicWindows: ['building', 'envelope'],
+  surfaceTilts: ['building', 'envelope'],
+  groundFloors: ['building', 'envelope'],
+  unheatedSpaces: ['building', 'unheated'],
+  sunrooms: ['building', 'unheated'],
+  generator: ['installations', 'heating'],
+  identicalSystems: ['installations', 'heating'],
+  collectiveConnection: ['installations', 'heating'],
+  heatPumpRenewable: ['installations', 'heating'],
+  emission: ['installations', 'heating'],
+  distribution: ['installations', 'heating'],
+  distributionSystem: ['installations', 'heating'],
+  verticalPipes: ['installations', 'heating'],
+  additionalHeatingSystems: ['installations', 'heating'],
+  heatingSystems: ['installations', 'heating'],
+  spaceHeatingSolar: ['installations', 'heating'],
+  ventilation: ['installations', 'ventilation'],
+  ventilationFlows: ['installations', 'ventilation'],
+  demandUsesFixedC1Ventilation: ['installations', 'ventilation'],
+  hotWater: ['installations', 'hotWater'],
+  additionalHotWaterSystems: ['installations', 'hotWater'],
+  activeCooling: ['installations', 'cooling'],
+  cooling: ['installations', 'cooling'],
+  coolingSystems: ['installations', 'cooling'],
+  humidifiers: ['installations', 'humidification'],
+  lighting: ['installations', 'lighting'],
+  pvSystems: ['installations', 'generation'],
+  externalSupply: ['installations', 'generation'],
+  declaredUses: ['installations', 'generation'],
+  onSiteProduction: ['installations', 'generation'],
+  declaredRenewableHeat: ['installations', 'generation'],
+  batteryStoragePresent: ['installations', 'generation'],
+  storage: ['installations', 'generation'],
+  bacs: ['installations', 'bacs'],
+  bacsFactor: ['installations', 'bacs'],
+  bacsSourceReference: ['installations', 'bacs'],
+  useInventoryComplete: ['check', 'input'],
+  productionInventoryComplete: ['check', 'input'],
+};
+
+function ntaRoutes(): GapRoute[] {
+  return Object.entries(NTA_INPUT_ROUTES).map(([member, [step, sub]]) => ({
+    prefix: member ? `ntaCalculation.${member}` : 'ntaCalculation', step, ...(sub ? { sub } : {}),
+  }));
+}
+
+/**
+ * Members that only exist in the NTA input: a kernel path that starts with one
+ * of them (a path of the building assessment, without `ntaCalculation.`) is
+ * routed and focused as a path in the NTA input.
+ */
+const NTA_ONLY_MEMBERS = new Set(Object.keys(NTA_INPUT_ROUTES)
+  .filter((member) => member !== '' && !member.includes('.'))
+  .filter((member) => !['heatingSystems', 'coolingSystems', 'unheatedSpaces'].includes(member)));
 
 /** Order does not matter: the longest matching prefix wins. */
 export const GAP_ROUTES: GapRoute[] = [
@@ -38,19 +124,7 @@ export const GAP_ROUTES: GapRoute[] = [
   { prefix: 'zones.*.airTightness', step: 'building', sub: 'airTightness' },
   { prefix: 'constructions', step: 'building', sub: 'constructions' },
   { prefix: 'unheatedSpaces', step: 'building', sub: 'unheated' },
-  { prefix: 'ntaCalculation.unheatedSpaces', step: 'building', sub: 'unheated' },
-  { prefix: 'ntaCalculation.sunrooms', step: 'building', sub: 'unheated' },
-  { prefix: 'ntaCalculation.calculationScope', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.usageFunction', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.setpoints', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.thermalMass', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.internalGains', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.surfaceTilts', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.windowSolar', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.dynamicWindows', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.groundFloors', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.zoneData', step: 'check', sub: 'input' },
-  // Installations (simplified model and NTA input).
+  // Installations (simplified model).
   { prefix: 'heatingSystems', step: 'installations', sub: 'heating' },
   { prefix: 'ventilationSystems', step: 'installations', sub: 'ventilation' },
   { prefix: 'coolingSystems', step: 'installations', sub: 'cooling' },
@@ -58,27 +132,8 @@ export const GAP_ROUTES: GapRoute[] = [
   { prefix: 'solarPV', step: 'installations', sub: 'generation' },
   { prefix: 'solarThermal', step: 'installations', sub: 'generation' },
   { prefix: 'ntaHeatPumps', step: 'installations', sub: 'heatPumps' },
-  { prefix: 'ntaCalculation.emission', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.distribution', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.distributionSystem', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.generator', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.additionalHeatingSystems', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.verticalPipes', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.ventilation', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.ventilationFlows', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.hotWater', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.additionalHotWaterSystems', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.cooling', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.coolingSystems', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.humidifiers', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.lighting', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.pvSystems', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.onSiteProduction', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.externalSupply', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.declaredUses', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.spaceHeatingSolar', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation.bacs', step: 'check', sub: 'input' },
-  { prefix: 'ntaCalculation', step: 'check', sub: 'input' },
+  // NTA input: the step page that edits the section (F6, see NtaSections).
+  ...ntaRoutes(),
   // Existing buildings and delivery.
   { prefix: 'basisopname', step: 'survey' },
   { prefix: 'maatwerkadvies', step: 'advice' },
@@ -96,19 +151,25 @@ export const FALLBACK_ROUTE: Route = { step: 'check', sub: 'overview' };
 
 /** The step and sub page for a kernel path; `focusPath` carries the path for "Ga naar". */
 export function routeForPath(path: string | null | undefined): Route {
-  const segments = parseKernelPath(path)
+  let segments = parseKernelPath(path)
     // Kernel paths below the derived input use the same names as the project model.
     .filter((segment, index) => !(index === 0 && segment === 'derivedInput'));
+  let focusPath = path;
+  if (typeof segments[0] === 'string' && NTA_ONLY_MEMBERS.has(segments[0])) {
+    segments = ['ntaCalculation', ...segments];
+    focusPath = formatKernelPath(segments);
+  }
   let best: (typeof compiled)[number] | null = null;
   for (const route of compiled) {
     if (matches(segments, route.segments) && (best == null || route.segments.length > best.segments.length)) best = route;
   }
   const target: Route = best ? { step: best.step, ...(best.sub ? { sub: best.sub } : {}) } : FALLBACK_ROUTE;
-  return normalizeRoute({ ...target, ...(path ? { focusPath: path } : {}) });
+  return normalizeRoute({ ...target, ...(focusPath ? { focusPath } : {}) });
 }
 
 /** True when the path has an explicit route (not the check fallback). */
 export function hasExplicitRoute(path: string | null | undefined): boolean {
-  const segments = parseKernelPath(path);
+  const parsed = parseKernelPath(path);
+  const segments = typeof parsed[0] === 'string' && NTA_ONLY_MEMBERS.has(parsed[0]) ? ['ntaCalculation', ...parsed] : parsed;
   return compiled.some((route) => matches(segments, route.segments));
 }

@@ -24,7 +24,24 @@ describe('routeForPath', () => {
     ['solarPV[0].peakPower', 'installations', 'generation'],
     ['solarThermal[0]', 'installations', 'generation'],
     ['ntaHeatPumps[1].declaration', 'installations', 'heatPumps'],
-    ['ntaCalculation.dynamicWindows[0]', 'check', 'input'],
+    ['ntaCalculation.dynamicWindows[0]', 'building', 'envelope'],
+    ['ntaCalculation.groundFloors[0].exposedPerimeterM', 'building', 'envelope'],
+    ['ntaCalculation.setpoints.heatingC', 'building', 'zones'],
+    ['ntaCalculation.zoneData[1].setpoints', 'building', 'zones'],
+    ['ntaCalculation.zoneData[1].verticalPipes', 'installations', 'heating'],
+    ['ntaCalculation.sunrooms[0]', 'building', 'unheated'],
+    ['ntaCalculation.generator.kind', 'installations', 'heating'],
+    ['ntaCalculation.emission.fans.testedPowerW', 'installations', 'heating'],
+    ['ntaCalculation.ventilation.infiltration', 'installations', 'ventilation'],
+    ['ntaCalculation.hotWater.need.dwellingCount', 'installations', 'hotWater'],
+    ['ntaCalculation.activeCooling.capacity.calculation.effectiveMassKgPerM2', 'installations', 'cooling'],
+    ['ntaCalculation.humidifiers[0]', 'installations', 'humidification'],
+    ['ntaCalculation.lighting.zones[0]', 'installations', 'lighting'],
+    ['ntaCalculation.pvSystems[0].peakPower', 'installations', 'generation'],
+    ['ntaCalculation.externalSupply.collectiveHeatPumpSource.realisedFrom2013', 'installations', 'generation'],
+    ['ntaCalculation.bacsFactor', 'installations', 'bacs'],
+    ['ntaCalculation.normVersion', 'project', undefined],
+    ['ntaCalculation.useInventoryComplete', 'check', 'input'],
     ['ntaCalculation.someFutureBlock', 'check', 'input'],
     ['registration.client', 'registration', undefined],
     ['registration.relabelComparison.original', 'relabel', undefined],
@@ -36,6 +53,27 @@ describe('routeForPath', () => {
     expect(route.step).toBe(step);
     expect(route.sub).toBe(sub);
     expect(route.focusPath).toBe(path);
+  });
+
+  it('routes NTA paths of the building assessment (without prefix) as NTA input paths', () => {
+    expect(routeForPath('externalSupply.collectiveHeatPumpSource.realisedFrom2013')).toEqual({
+      step: 'installations', sub: 'generation', focusPath: 'ntaCalculation.externalSupply.collectiveHeatPumpSource.realisedFrom2013',
+    });
+    expect(routeForPath('activeCooling.capacity.calculation.rooms[0].roofAreaM2').focusPath)
+      .toBe('ntaCalculation.activeCooling.capacity.calculation.rooms[0].roofAreaM2');
+    // Project-model lists keep their own route.
+    expect(routeForPath('heatingSystems[0]').focusPath).toBe('heatingSystems[0]');
+    expect(hasExplicitRoute('pvSystems[0]')).toBe(true);
+  });
+
+  it('sends every section of the NTA register to the page that renders it', async () => {
+    const { NTA_SECTIONS } = await import('../components/NtaPerformancePanel/NtaSections');
+    for (const section of NTA_SECTIONS) {
+      for (const path of section.paths) {
+        const route = routeForPath(`ntaCalculation.${path}`);
+        expect([section.id, route.step, route.sub]).toEqual([section.id, section.step, section.sub]);
+      }
+    }
   });
 
   it('lets the longest prefix win', () => {
@@ -102,6 +140,23 @@ describe('"Ga naar" focus', () => {
     expect(document.activeElement).toBe(target);
     expect(target).toHaveClass('focus-flash');
     expect(focusPathIn(container, 'heatingSystems[0]')).toBeNull();
+    container.remove();
+  });
+
+  it('opens a collapsed "Geavanceerd" block and matches the extra paths of a section', async () => {
+    const { focusPathIn } = await import('../components/shell/StepRouter');
+    const container = document.createElement('div');
+    container.innerHTML = '<details><summary>Geavanceerd</summary><fieldset data-path="ntaCalculation.declaredUses" '
+      + 'data-paths="ntaCalculation.onSiteProduction"><label data-path="ntaCalculation.declaredUses[0].monthlyKwh">x<input /></label>'
+      + '</fieldset></details>';
+    document.body.appendChild(container);
+    const details = container.querySelector('details')!;
+    expect(details.open).toBe(false);
+    expect(focusPathIn(container, 'ntaCalculation.declaredUses[0].monthlyKwh')?.tagName).toBe('INPUT');
+    expect(details.open).toBe(true);
+    details.open = false;
+    expect(focusPathIn(container, 'ntaCalculation.onSiteProduction.pv')?.tagName).toBe('FIELDSET');
+    expect(details.open).toBe(true);
     container.remove();
   });
 });
