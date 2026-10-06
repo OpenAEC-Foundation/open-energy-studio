@@ -68,12 +68,42 @@ export function calculationZoneTemplate(index: number): Record<string, unknown> 
 }
 
 /** Typed views for the kernel calls; the kernel validates the content. */
+/** The lists whose items carry their own source reference in the kernel input. */
+const SOURCED_LISTS: string[][] = [
+  ['envelope', 'surfaces'], ['envelope', 'windows'], ['envelope', 'doors'], ['pv'], ['hotWater', 'solar'],
+];
+
+/**
+ * The survey with the source of the building data ("Bron van de gebouwgegevens",
+ * one per survey as on the ISSO opnameformulier) on every surface, window, door
+ * and PV system without a source of its own. Without any source the kernel still
+ * reports each item, so nothing is invented.
+ */
+export function withSurveySources(survey: Record<string, unknown>): Record<string, unknown> {
+  const source = typeof survey.sourceReference === 'string' ? survey.sourceReference.trim() : '';
+  if (!source) return survey;
+  const next = structuredClone(survey);
+  for (const path of SOURCED_LISTS) {
+    let parent: unknown = next;
+    for (const key of path.slice(0, -1)) parent = (parent as Record<string, unknown> | undefined)?.[key];
+    const list = (parent as Record<string, unknown> | undefined)?.[path[path.length - 1]];
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (item && typeof item === 'object') {
+        const own = (item as Record<string, unknown>).sourceReference;
+        if (typeof own !== 'string' || own.trim() === '') (item as Record<string, unknown>).sourceReference = source;
+      }
+    }
+  }
+  return next;
+}
+
 export function asResidential(stored: StoredSurvey): ResidentialSurvey {
-  return stored.survey as unknown as ResidentialSurvey;
+  return withSurveySources(stored.survey) as unknown as ResidentialSurvey;
 }
 
 export function asUtility(stored: StoredSurvey): UtilitySurvey {
-  return stored.survey as unknown as UtilitySurvey;
+  return withSurveySources(stored.survey) as unknown as UtilitySurvey;
 }
 
 /**

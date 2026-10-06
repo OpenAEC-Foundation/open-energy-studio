@@ -764,7 +764,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const requestId = useRef(0);
 
   const save = (next: StoredSurvey | undefined, keepResult = false) => {
-    dispatch({ type: 'SET_BASISOPNAME', payload: next });
+    // The question-flow progress lives beside the survey; an edit here must not drop it.
+    const progress = (stored as { progress?: unknown } | undefined)?.progress;
+    dispatch({ type: 'SET_BASISOPNAME', payload: next && progress && !('progress' in next) ? { ...next, progress } as StoredSurvey : next });
     if (!keepResult) {
       requestId.current += 1;
       setResult(null);
@@ -876,6 +878,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     {show('general') && <><Section title={t('opname.general')}>
       <TextField {...field} path={['id']} label={t('opname.id')} />
       <NumberField {...field} path={['constructionYear']} label={t('opname.constructionYear')} step="1" />
+      <TextField {...field} path={['sourceReference']} label={t('survey.sourceReference')} />
       {kind === 'residential' && <NumberField {...field} path={['usableFloorAreaM2']} label={t('opname.usableFloorArea')} />}
       <NumberField {...field} path={['buildingHeightM']} label={t('opname.buildingHeight')} />
       <NumberField {...field} path={['storeys']} label={t('opname.storeys')} step="1" />
