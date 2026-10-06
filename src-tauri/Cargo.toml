@@ -1,6 +1,6 @@
 [package]
 name = "open-energy-studio"
-version = "0.1.6-alpha"
+version = "0.1.7-alpha"
 description = "Energy performance workspace with an experimental NTA 8800 input audit"
 authors = ["Open Energy Studio Contributors"]
 license = "LGPL-3.0-or-later"

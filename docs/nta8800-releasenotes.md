@@ -2,6 +2,15 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+
+## 6 oktober 2026 — basisopname: alle ontwerptemperatuurklassen en tabel 9.28
+
+Uitkomsten veranderen alleen voor opnames die een nieuwe klasse of tabel 9.28 gebruiken.
+- **Ontwerptemperatuurklasse.** De opname biedt nu alle klassen van NTA-tabel 9.14 (30/27 tot en met 90/70) plus 60/45 en 70/50 van de ISSO-formulieren. Aanvoer- en gemiddelde temperatuur komen uit die tabel; 60/45 en 70/50 nemen de regel met dezelfde aanvoertemperatuur (60/50, 70/60). De verklaring voor een warmtepomp boven 70 °C wordt ook bij 75/65 en 80/60 gevraagd.
+- **Tabel 9.28 in de opname-wizard.** Bij een elektrische warmtepomp met bodem, grondwater of buitenlucht als bron kan de adviseur aangeven dat het toestel aan tabel 9.28 voldoet, met product, meetrapport, meetnorm en de gemeten COP per testconditie. Voorheen kon dat alleen in de JSON-weergave.
+- **Release.** Versie 0.1.7-alpha; de release-job slaat een bestaande release over in plaats van te falen.
+- **Leidingdoorvoeren onbekend (7.3.3).** Eén ongeïsoleerde doorvoer per bouwlaag in plaats van elke leiding door alle bouwlagen: een woning van drie lagen krijgt 5,4 in plaats van 16,2 W/K. Dit verlaagt de warmtebehoefte van grondgebonden opnames met meer dan één bouwlaag zonder opgegeven leidingen. De RVO-regressiewaarden zijn bijgewerkt; de tussenwoning en twee-onder-een-kap liggen nu dichter bij RVO (+0,8 % en +2,2 %).
+- **EDR-effect (ISSO 54).** EPWReal B01 BENG 2 van +12,2 % naar −0,3 %, B05 van +2,0 % naar +0,4 %, B02 naar +0,9 %, B03 warmtebehoefte van +4,6 % naar +0,3 %.
 ## 5 oktober 2026 — rekenkern in de browser via WebAssembly (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet. De webversie rekent nu met dezelfde Rust-kern als de desktop-app en de HTTP-API, in de browser zelf.

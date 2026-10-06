@@ -2416,7 +2416,7 @@ export interface ResidentialSurvey {
   heating: {
     generator: OpnameHeatingGenerator;
     emitters: 'radiators' | 'low_temperature_radiators' | 'floor_heating' | 'floor_heating_and_radiators' | 'air_heating' | 'local_heaters';
-    designClass?: 'c45_40' | 'c55_47' | 'c70_50' | 'c90_70' | null;
+    designClass?: 'c30_27' | 'c35_30' | 'c40_35' | 'c45_40' | 'c50_42' | 'c55_47' | 'c60_45' | 'c60_50' | 'c65_55' | 'c70_50' | 'c70_60' | 'c75_65' | 'c80_60' | 'c90_70' | null;
     /** Controlled declaration for a heat pump above 70 °C (table 9.9, erratum §4). */
     heatPumpAbove70Declaration?: string | null;
     balanced?: boolean | null;

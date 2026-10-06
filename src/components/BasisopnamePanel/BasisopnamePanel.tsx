@@ -20,6 +20,23 @@ import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
 import '../shell/pages/existing/existing.css';
 
+/** Survey design temperature classes: table 9.9 defaults and NTA table 9.14 rows (supply/return, °C). */
+const DESIGN_CLASSES = ['c30_27', 'c35_30', 'c40_35', 'c45_40', 'c50_42', 'c55_47', 'c60_45', 'c60_50', 'c65_55', 'c70_50', 'c70_60', 'c75_65', 'c80_60', 'c90_70'];
+/**
+ * NTA table 9.28 test conditions per heat-pump source (NEN-EN 14511); the
+ * kernel checks each measured COP against its minimum. Other sources have no
+ * table 9.28 row.
+ */
+const TABLE_9_28_CONDITIONS: Record<string, string[]> = {
+  ground: ['b0_w45', 'b0_w35'],
+  groundwater: ['w10_w45', 'w10_w35'],
+  outdoor_air: ['a7_wet6_w45', 'a7_wet6_w35', 'a_minus7_wet_minus8_w45'],
+};
+/** Test standard edition the kernel accepts for table 9.28. */
+const TABLE_9_28_TEST_STANDARD = 'NEN-EN 14511-2:2022';
+/** Classes with a design supply temperature above 70 °C: a heat pump needs a controlled declaration. */
+const DESIGN_CLASSES_ABOVE_70 = ['c75_65', 'c80_60', 'c90_70'];
+
 // ISSO 82.1 (dwellings) and 75.1 (utility) basisopname: structured fields for
 // the main survey sections, a JSON view for the rest, and the kernel route
 // that derives the NTA 8800 input with the applied defaults (ISSO pages).
@@ -487,8 +504,26 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
       stale.push('sourceTemperatureC', 'sourceTemperatureReference');
     }
     if (value !== 'high_temperature') stale.push('sourceQualityDeclarationReference');
+    // The table 9.28 test conditions differ per source.
+    stale.push('highEfficiencyEvidence');
     change(path, { ...without(stale), source: value });
   };
+  const table928Conditions = typeof source === 'string' ? TABLE_9_28_CONDITIONS[source] : undefined;
+  const drive = read(draft, [...path, 'drive']);
+  const showTable928 = table928Conditions != null && (drive == null || drive === 'electric');
+  const evidencePath = [...path, 'highEfficiencyEvidence'];
+  const hasEvidence = read(draft, evidencePath) != null;
+  const changeTable928 = (checked: boolean) => change(path, checked
+    ? {
+      ...generator,
+      highEfficiencyEvidence: {
+        productReference: '',
+        testReportReference: '',
+        testStandardEdition: TABLE_9_28_TEST_STANDARD,
+        points: (table928Conditions ?? []).map((condition) => ({ condition, measuredCop: null })),
+      },
+    }
+    : without(['highEfficiencyEvidence']));
   const changeCollectiveSource = (checked: boolean) => {
     if (checked) change(path, { ...generator, collectiveSourceReference: '' });
     else change(path, without(source === 'surface_water'
@@ -531,6 +566,21 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
       </>}
       {source === 'high_temperature' && <TextField {...field} path={[...path, 'sourceQualityDeclarationReference']}
         label={t('opname.heating.sourceQualityDeclaration')} />}
+      {showTable928 && <>
+        <label className="nta-form-check">
+          <input type="checkbox" checked={hasEvidence} onChange={(event) => changeTable928(event.target.checked)} />
+          {t('opname.heating.table928')}
+        </label>
+        {hasEvidence && <>
+          <TextField {...field} path={[...evidencePath, 'productReference']} label={t('opname.heating.table928Product')} />
+          <TextField {...field} path={[...evidencePath, 'testReportReference']} label={t('opname.heating.table928Report')} />
+          <TextField {...field} path={[...evidencePath, 'testStandardEdition']} label={t('opname.heating.table928Standard')} />
+          {(table928Conditions ?? []).map((condition, index) =>
+            <NumberField key={condition} {...field} path={[...evidencePath, 'points', index, 'measuredCop']}
+              label={t('opname.heating.table928Cop', { condition: t(`opname.heating.table928Condition.${condition}`) })} />)}
+          <p className="nta-form-note">{t('opname.heating.table928Note')}</p>
+        </>}
+      </>}
       <p className="nta-form-note">{t('opname.heating.heatPumpNote')}</p>
     </>}
     {kind === 'local_fired' && <>
@@ -889,8 +939,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
       <EmitterFields draft={draft} change={change} t={t} />
       <SelectField {...field} path={['heating', 'designClass']} label={t('opname.heating.designClass')}
-        options={opts(t, 'opname.heating.designClassKind', ['c45_40', 'c55_47', 'c70_50', 'c90_70'])} />
-      {read(draft, ['heating', 'designClass']) === 'c90_70' &&
+        options={opts(t, 'opname.heating.designClassKind', DESIGN_CLASSES)} />
+      {DESIGN_CLASSES_ABOVE_70.includes(String(read(draft, ['heating', 'designClass']))) &&
         <TextField {...field} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} />}
       <DistributionFields draft={draft} change={change} t={t} />
       <CheckField {...field} path={['heating', 'addedPreferredGenerator']} label={t('opname.heating.addedPreferred')} />

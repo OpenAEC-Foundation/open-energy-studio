@@ -198,6 +198,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "::notice::Release v${VERSION} already exists; raise the version with scripts/bump-version.js to publish a new prerelease."
+            exit 0
+          fi
           gh release create "v${VERSION}" --title "v${VERSION}" --prerelease
           find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \) \
             -exec gh release upload "v${VERSION}" {} +

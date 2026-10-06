@@ -203,10 +203,10 @@ pub struct SurveyVerticalPipe {
     pub shared_zones: Option<u32>,
 }
 
-/// §7.2.4 table 7.7 and NTA 7.3.3: the vertical pipes, with one
-/// uninsulated pipe per storey of the zone when their number is unknown.
-/// `default_count` is the number of uninsulated pipes when the pipes are
-/// not determinable, with the rule recorded by the caller.
+/// §7.2.4 table 7.7 and NTA 7.3.3: the vertical pipes. `default_count` is
+/// the number of uninsulated pipes, each through `storeys` storeys, when the
+/// pipes are not determinable; the caller records the rule. A dwelling uses
+/// one pipe through all its storeys (one crossing per storey).
 pub(crate) fn vertical_pipes(
     pipes: Option<&[SurveyVerticalPipe]>,
     storeys: u32,
@@ -750,11 +750,16 @@ pub fn derive_residential_input(
     let area = survey.usable_floor_area_m2;
     let storeys = survey.storeys.unwrap_or(survey.heating.storeys).max(1);
     if survey.vertical_pipes.is_none() {
+        // 7.3.3: one fictitious uninsulated pipe per storey, each crossing
+        // that storey: N storey crossings in total, which is one pipe through
+        // all N storeys (formula 7.17, 1,8 W/K per crossing). Counting N pipes
+        // through N storeys each gave N² crossings; ISSO 54 EDR test
+        // EPWReal B03 (three storeys, "onbekend") confirms N.
         recorder.record(
             "vertical_pipes_unknown_one_per_storey",
             "verticalPipes",
-            format!("{storeys} uninsulated pipe(s), {storeys} storey(s) each"),
-            "ISSO 82.1 p. 63 (table 7.7); NTA 8800 7.3.3",
+            format!("{storeys} storey crossing(s) of an uninsulated pipe"),
+            "ISSO 82.1 p. 63 (table 7.7); NTA 8800 7.3.3; ISSO 54 EPWReal B03",
         );
     }
     let demand = json!({
@@ -773,7 +778,7 @@ pub fn derive_residential_input(
             "verticalPipes": vertical_pipes(
                 survey.vertical_pipes.as_deref(),
                 storeys,
-                storeys,
+                1,
                 reference,
                 recorder,
             ),
@@ -1104,14 +1109,17 @@ mod tests {
     }
 
     #[test]
-    fn vertical_pipes_default_to_one_per_storey() {
+    fn vertical_pipes_default_to_one_crossing_per_storey() {
+        // 7.3.3 and ISSO 54 EPWReal B03: unknown pipes in a dwelling of N
+        // storeys give N storey crossings (one pipe through all storeys),
+        // not N pipes through N storeys each.
         let mut survey = fixture("1930");
-        survey.storeys = Some(2);
+        survey.storeys = Some(3);
         let mut recorder = Recorder::default();
         let input = derive_residential_input(&survey, &mut recorder).unwrap();
         let pipes = &input["spaceHeating"]["demand"]["transmission"]["verticalPipes"];
-        assert_eq!(pipes.as_array().unwrap().len(), 2);
-        assert_eq!(pipes[0]["storeys"], 2);
+        assert_eq!(pipes.as_array().unwrap().len(), 1);
+        assert_eq!(pipes[0]["storeys"], 3);
         assert_eq!(pipes[0]["insulated"], false);
         // Determined absent: no pipes.
         survey.vertical_pipes = Some(Vec::new());

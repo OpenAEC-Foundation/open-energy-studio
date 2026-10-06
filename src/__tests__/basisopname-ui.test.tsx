@@ -54,6 +54,32 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.verticalPipes).toEqual([]);
   }, 60000);
 
+  it('records table 9.28 evidence for a heat pump and every NTA design class', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Generator' })[0], 'heat_pump');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'ground');
+    await user.click(screen.getByRole('checkbox', { name: 'Meets table 9.28 (higher efficiency, shown by a test report)' }));
+    await user.type(screen.getByRole('textbox', { name: 'Product (make and type)' }), 'Brine HP 6');
+    await user.type(screen.getByRole('spinbutton', { name: 'Measured COP at B0/W35' }), '4.6');
+    let generator = stored()!.survey.heating.generator;
+    expect(generator.highEfficiencyEvidence).toMatchObject({
+      productReference: 'Brine HP 6',
+      testStandardEdition: 'NEN-EN 14511-2:2022',
+      points: [{ condition: 'b0_w45', measuredCop: null }, { condition: 'b0_w35', measuredCop: 4.6 }],
+    });
+    // Another source has other test conditions: the evidence is dropped.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'outdoor_air');
+    generator = stored()!.survey.heating.generator;
+    expect(generator.highEfficiencyEvidence).toBeUndefined();
+
+    // ISSO 54 EDR forms use 75/65; above 70 °C the heat-pump declaration is asked.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Design temperature class (table 9.9)' }), 'c75_65');
+    expect(stored()!.survey.heating.designClass).toBe('c75_65');
+    expect(screen.getByRole('textbox', { name: 'Controlled declaration for a heat pump above 70 °C' })).toBeInTheDocument();
+  }, 60000);
+
   it('edits ventilation controls, system E, heating strips, solar-control glass and the 90/70 declaration', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
