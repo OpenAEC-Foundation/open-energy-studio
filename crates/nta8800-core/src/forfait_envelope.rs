@@ -92,6 +92,14 @@ const PSI_TABLE: &[(u16, u8, f64, f64)] = &[
 /// ψ_for for a detail position; `None` when the position/variant does not
 /// exist (use [`PSI_DEFAULT`] only for genuinely missing positions).
 pub fn forfait_psi(position: u16, variant: u8, column: PsiColumn) -> Option<f64> {
+    // Detail 17: 0,06 / 0,09 from 2024 (p. 803), 0,60 / 0,90 in 2023 (p. 804).
+    if (position, variant) == (17, 0) {
+        let psi = crate::norm_versions::profile().psi_detail_17;
+        return Some(match column {
+            PsiColumn::A => psi[0],
+            PsiColumn::B => psi[1],
+        });
+    }
     PSI_TABLE
         .iter()
         .find(|(p, v, _, _)| *p == position && *v == variant)

@@ -50,4 +50,31 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     wide_collective_low_temperature_sources: true,
     // Tables 5.2/5.4 (p. 94–100).
     biomass_threshold_kw: 500.0,
+    // Below: unchanged since 2024; pages of the 2024 edition.
+    // Table 13.2 (2024 p. 527): only the "overig" kitchen row.
+    kitchen_diameter_rows: false,
+    // Table 11.7 (2024 p. 449).
+    tau_ventilative_cooling: crate::ventilation::TAU_VENTILATIVE_COOLING,
+    // 11.2.3.3.1 (2024 p. 461).
+    ventilative_cooling_operation: [0.35, 0.50],
+    // (11.71a) (2024 p. 460–461).
+    discharge_opening_route: true,
+    // Table 11.8 (2024 p. 455).
+    dwelling_occupancy_factor: None,
+    // Table 17.1 (2024 p. 674).
+    argii_temperature_c: crate::climate::ARGII_TEMPERATURE_C,
+    // 11.3.2.7 (2024 p. 491).
+    fan_temperature_rise_k: [0.7, 0.4, 0.7],
+    // Table I.1 detail 17 (2024 p. 803).
+    psi_detail_17: [0.06, 0.09],
+    // Table E.10 (2024 p. 790).
+    wood_fibre_cellulose_lambda: 0.045,
+    // (P.25) (2024 p. 948).
+    reference_power_divisor: crate::annex_p::REFERENCE_POWER_DIVISOR,
+    // P.6.5.4.8 (2024 p. 958) with the temperature-difference correction.
+    geothermal_efficiency_fixed: false,
+    // Annex AA (2024 p. 1115–1127).
+    annex_aa_route: true,
+    // Table 5.7 (2024 p. 74).
+    renovation_standard: true,
 };

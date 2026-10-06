@@ -399,6 +399,13 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             validate_active_cooling(evidence, input, options.residential, "activeCooling");
         let mut annex_aa = None;
         if let CoolingCapacityEvidence::AnnexAa { calculation, .. } = &evidence.capacity {
+            // 5.7.1 of NTA 8800:2023 (p. 103–104) has no annex AA.
+            if !crate::norm_versions::profile().annex_aa_route {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    "activeCooling.capacity.method",
+                ));
+            }
             match calculation {
                 None => issues.push(issue(
                     "annex_aa_calculation_required",
@@ -655,6 +662,36 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 5.7.1 of NTA 8800:2023 (p. 103–104) has no annex AA; 2024 p. 106
+    /// and annex AA (p. 1115–1127) do.
+    #[test]
+    fn annex_aa_capacity_proof_is_not_in_2023() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let input = demand();
+        let aa = evidence(CoolingCapacityEvidence::AnnexAa {
+            calculation: None,
+            source_reference: "annex AA".into(),
+        });
+        let run = |version| {
+            with_version(version, || {
+                assess_tojuli(
+                    &input,
+                    TojuliOptions {
+                        active_cooling: Some(&aa),
+                        ..TojuliOptions::default()
+                    },
+                )
+            })
+        };
+        let refused = |result: &TojuliAssessment| {
+            result.issues.iter().any(|item| {
+                item.code == "route_not_in_edition" && item.path == "activeCooling.capacity.method"
+            })
+        };
+        assert!(refused(&run(NormVersion::V2023)));
+        assert!(!refused(&run(NormVersion::V2024)));
+    }
     use crate::direct_transmission::LinearBridge;
     use crate::project_performance::assess_project_performance;
     use serde_json::Value;

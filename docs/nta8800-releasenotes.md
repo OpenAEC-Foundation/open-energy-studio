@@ -2,6 +2,26 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — NTA 8800:2023 als oudere uitgave
+
+Opgeslagen projecten zonder `normVersion` of met `"2025+C1"` of `"2024"` rekenen ongewijzigd.
+- **`normVersion: "2023"`** rekent nu, met status `calculated_legacy_edition` en `targetNormVersion` `NTA 8800:2023`. Zo'n berekening is nooit registreerbaar. Eerder gaf `"2023"` `edition_not_implemented`.
+- Het profiel van 2023 is het profiel van 2024 plus veertien eigen schakelpunten, elk met de pagina's in beide uitgaven (docs/nta8800-normversies.md, punten 19–32):
+  - tabel 13.2 met de keukenrijen voor ≤ 8 en ≤ 10 mm;
+  - zomernachtventilatie: τ_argII, f_argII, f_τ van woningen, θ_e;argII en geen (11.71a);
+  - ΔT_fan;
+  - Ψ van detail 17;
+  - λ van houtvezel en cellulose;
+  - deler 8 800 in (P.25) en het vaste rendement 20 van geothermie;
+  - biomassagrens 100 kW;
+  - geen bijlage AA als koelcapaciteitsbewijs;
+  - geen renovatiestandaard.
+- **Nieuwe invoer, alleen in 2023:** `hotWater.emission.kitchenPipeDiameter` (`up_to_8_mm`, `up_to_10_mm`, `other`). In 2024 en 2025+C1 geeft een waarde ≤ 8 of ≤ 10 mm `route_not_in_edition`.
+- **Ook geweigerd in 2023 (`route_not_in_edition`):** een spuiopening volgens (11.71a) en bijlage AA als bewijs voor de koelcapaciteit.
+- **Niet omgeschakeld** (de kern rekent hier met de 2024-route): de oude afgiftetabellen voor verwarming en koeling, tabel 13.4 naar leidingklasse, enkele distributieregels, de bronwarmteroute, restwarmte en een aantal routes van bijlage I en hoofdstuk 8. De lijst staat in docs/nta8800-normversies.md.
+- **Openbare gevallen:** C in 2023 met een keukenleiding ≤ 10 mm komt op BENG 2 30,19 (2024: 31,54; rapport 28,70). De versiepost van 1,35 verdwijnt.
+- **App:** het veld *Uitgave NTA 8800* biedt nu ook NTA 8800:2023. Het veld voor de binnendiameter van de keukenleiding verschijnt alleen in 2023. De invoer *Collectieve bron gerealiseerd vanaf 2013* geldt in 2023 en 2024 (9.6.8.1.1.2.3, 2023 p. 349).
+
 ## 5 oktober 2026 — UI-herontwerp, fase F10: thema's, toegankelijkheid, vertaling en afronding (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet; opgeslagen projecten openen ongewijzigd. Het UI-herontwerp is hiermee afgerond.

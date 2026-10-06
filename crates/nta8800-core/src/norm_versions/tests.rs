@@ -255,3 +255,118 @@ mod switch_points {
         );
     }
 }
+
+/// NTA 8800:2023 against 2024: each value with the page of both editions.
+mod switch_points_2023 {
+    use crate::norm_versions::{with_version, NormVersion};
+
+    fn v2023<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2023, body)
+    }
+
+    fn v2024<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2024, body)
+    }
+
+    #[test]
+    fn profile_2023_is_2024_plus_its_own_differences() {
+        let p23 = NormVersion::V2023.profile();
+        let p24 = NormVersion::V2024.profile();
+        assert!(NormVersion::V2023.implemented());
+        assert!(!NormVersion::V2023.registration_eligible());
+        assert_eq!(p23.version, NormVersion::V2023);
+        // Table 5.3 (2023 p. 92–93, 2024 p. 94–95) and 5.6 (p. 114 / 117).
+        assert_eq!(p23.k_co2_electricity, p24.k_co2_electricity);
+        assert_eq!(p23.k_co2_gas, p24.k_co2_gas);
+        assert_eq!(p23.k_co2_district_heat_forfait, 0.17);
+        assert_eq!(p23.k_co2_waste_incineration, 0.113);
+        // Tables 5.2/5.3: 100 kW (2023 p. 90–93) against 500 kW (2024 p. 92–95).
+        assert_eq!(
+            (p23.biomass_threshold_kw, p24.biomass_threshold_kw),
+            (100.0, 500.0)
+        );
+        // (I.3): d/0,2 in both (2023 p. 815, 2024 p. 814).
+        assert_eq!(p23.reed_thatch_divisor, p24.reed_thatch_divisor);
+        // Table 11.7 τ_argII May–November (2023 p. 454, 2024 p. 449).
+        assert_eq!(
+            p23.tau_ventilative_cooling[4..11],
+            [0.12, 0.18, 0.28, 0.25, 0.17, 0.06, 0.01]
+        );
+        assert_eq!(
+            p24.tau_ventilative_cooling[4..11],
+            [0.46, 0.75, 0.81, 0.79, 0.75, 0.26, 0.05]
+        );
+        // Table 17.1 θ_e;argII May–September (2023 p. 676, 2024 p. 674).
+        let may_sep = |p: &crate::norm_versions::NormProfile| {
+            p.argii_temperature_c[4..9]
+                .iter()
+                .map(|value| value.unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(may_sep(p23), [14.56, 15.62, 16.17, 16.90, 15.11]);
+        assert_eq!(may_sep(p24), [16.42, 16.76, 17.51, 18.24, 16.74]);
+        assert_eq!(p23.argii_temperature_c[9], p24.argii_temperature_c[9]);
+        assert_eq!(p23.argii_temperature_c[10], p24.argii_temperature_c[10]);
+        // 11.2.3.3.1 f_argII (2023 p. 466, 2024 p. 461).
+        assert_eq!(p23.ventilative_cooling_operation, [0.5, 0.9]);
+        assert_eq!(p24.ventilative_cooling_operation, [0.35, 0.50]);
+        // (11.71a): 2024 p. 460–461 only.
+        assert!(!p23.discharge_opening_route && p24.discharge_opening_route);
+        // Table 11.8 f_τ of dwellings (2023 p. 460, 2024 p. 455).
+        assert_eq!(p23.dwelling_occupancy_factor, Some(0.80));
+        assert_eq!(p24.dwelling_occupancy_factor, None);
+        // 11.3.2.7 ΔT_fan (2023 p. 496, 2024 p. 491).
+        assert_eq!(p23.fan_temperature_rise_k, [1.0, 0.7, 1.5]);
+        assert_eq!(p24.fan_temperature_rise_k, [0.7, 0.4, 0.7]);
+        // (P.25) (2023 p. 950, 2024 p. 948) and P.6.5.4.8 (p. 960 / 958).
+        assert_eq!(p23.reference_power_divisor, 8800.0);
+        assert_eq!(p24.reference_power_divisor, 5400.0);
+        assert!(p23.geothermal_efficiency_fixed && !p24.geothermal_efficiency_fixed);
+        // 5.7.1 (2023 p. 103–104) without annex AA; table 5.7 (2024 p. 74)
+        // absent in 2023.
+        assert!(!p23.annex_aa_route && p24.annex_aa_route);
+        assert!(!p23.renovation_standard && p24.renovation_standard);
+        assert!(p23.kitchen_diameter_rows && !p24.kitchen_diameter_rows);
+    }
+
+    #[test]
+    fn table_13_2_kitchen_rows_by_inner_diameter() {
+        use crate::domestic_hot_water::{kitchen_emission_for, KitchenPipeDiameter::*};
+        // 2023 p. 533: band 6–8 m gives 0,67 (≤ 8 mm), 0,55 (≤ 10 mm) and
+        // 0,43 (overig); 2024 p. 527 has the "overig" row only.
+        assert_eq!(v2023(|| kitchen_emission_for(7.0, Some(UpTo8Mm))), 0.67);
+        assert_eq!(v2023(|| kitchen_emission_for(7.0, Some(UpTo10Mm))), 0.55);
+        assert_eq!(v2023(|| kitchen_emission_for(7.0, Some(Other))), 0.43);
+        assert_eq!(v2023(|| kitchen_emission_for(7.0, None)), 0.43);
+        assert_eq!(v2023(|| kitchen_emission_for(15.0, Some(UpTo10Mm))), 0.35);
+        assert_eq!(v2023(|| kitchen_emission_for(1.0, Some(UpTo8Mm))), 1.00);
+        assert_eq!(v2024(|| kitchen_emission_for(7.0, Some(UpTo10Mm))), 0.43);
+    }
+
+    #[test]
+    fn table_e_10_wood_fibre_and_cellulose() {
+        use crate::materials::ForfaitMaterial;
+        // 2023 p. 791: 0,050; 2024 p. 790: 0,045.
+        assert_eq!(v2023(|| ForfaitMaterial::WoodFibre.lambda()), 0.050);
+        assert_eq!(v2023(|| ForfaitMaterial::CelluloseLoose.lambda()), 0.050);
+        assert_eq!(v2024(|| ForfaitMaterial::WoodFibre.lambda()), 0.045);
+        assert_eq!(v2024(|| ForfaitMaterial::CelluloseLoose.lambda()), 0.045);
+        // Bio-based rows of 2024 hold in 2023 too (2023 p. 792).
+        assert_eq!(v2023(|| ForfaitMaterial::SheepWool.lambda()), 0.050);
+    }
+
+    #[test]
+    fn table_i_1_detail_17() {
+        use crate::forfait_envelope::{forfait_psi, PsiColumn};
+        // 2023 p. 804: 0,60 / 0,90; 2024 p. 803: 0,06 / 0,09.
+        assert_eq!(v2023(|| forfait_psi(17, 0, PsiColumn::A)), Some(0.60));
+        assert_eq!(v2023(|| forfait_psi(17, 0, PsiColumn::B)), Some(0.90));
+        assert_eq!(v2024(|| forfait_psi(17, 0, PsiColumn::A)), Some(0.06));
+        assert_eq!(v2024(|| forfait_psi(17, 0, PsiColumn::B)), Some(0.09));
+        // Neighbouring details are unchanged.
+        assert_eq!(
+            v2023(|| forfait_psi(16, 0, PsiColumn::A)),
+            v2024(|| forfait_psi(16, 0, PsiColumn::A))
+        );
+    }
+}

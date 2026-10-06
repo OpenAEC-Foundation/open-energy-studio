@@ -199,7 +199,7 @@ describe('2024-only inputs', () => {
       onSave={(block) => { saved = block; }} onCancel={() => undefined} />);
     await user.type(screen.getByRole('spinbutton', { name: 'Effective mass (annex AA, 2024 edition), kg/m²' }), '165');
     await user.type(screen.getByRole('spinbutton', { name: 'Roof area of room woonkamer (annex AA, 2024 edition), m²' }), '12,5');
-    await user.selectOptions(screen.getByLabelText('Collective source realised from 2013 (2024 edition)'), 'true');
+    await user.selectOptions(screen.getByLabelText('Collective source realised from 2013 (2023 or 2024 edition)'), 'true');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const block = saved as unknown as typeof block2024 & {
       activeCooling: { capacity: { calculation: { effectiveMassKgPerM2: number; rooms: Array<{ roofAreaM2: number }> } } };
@@ -220,8 +220,8 @@ describe('2024-only inputs', () => {
     renderWithProviders(<NtaCalculationForm project={createDefaultProject()} initial={stale}
       onSave={(block) => { saved = block; }} onCancel={() => undefined} />);
     expect(screen.queryByLabelText(/Effective mass/)).toBeNull();
-    expect(screen.queryByLabelText('Collective source realised from 2013 (2024 edition)')).toBeNull();
-    const alerts = screen.getAllByRole('alert').filter((alert) => /only the 2024 edition/.test(alert.textContent ?? ''));
+    expect(screen.queryByLabelText('Collective source realised from 2013 (2023 or 2024 edition)')).toBeNull();
+    const alerts = screen.getAllByRole('alert').filter((alert) => /only the 2024 edition|only the 2023 and 2024 editions/.test(alert.textContent ?? ''));
     expect(alerts).toHaveLength(2);
     for (const alert of alerts) await user.click(within(alert).getByRole('button', { name: 'Remove' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -234,7 +234,7 @@ describe('2024-only inputs', () => {
     renderWithProviders(<Harness initial={{ step: 'installations', sub: 'cooling' }} block={block2024} />);
     expect(await screen.findByTestId('nta-annex-aa-2024')).toBeInTheDocument();
     act(() => navigateTo({ step: 'installations', sub: 'generation' }));
-    expect(await screen.findByLabelText('Collective source realised from 2013 (2024 edition)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Collective source realised from 2013 (2023 or 2024 edition)')).toBeInTheDocument();
   });
 });
 

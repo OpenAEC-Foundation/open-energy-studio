@@ -59,8 +59,24 @@ describe('NTA 8800 editions', () => {
     renderWithProviders(<NtaCalculationForm project={project} initial={{ normVersion: '2024' }}
       onSave={() => undefined} onCancel={() => undefined} />);
     const select = screen.getByLabelText('NTA 8800 edition') as HTMLSelectElement;
-    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024']);
+    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024', '2023']);
     expect(select.value).toBe('2024');
     expect(screen.getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
+  });
+
+  it('shows the table 13.2 kitchen pipe diameter only for the 2023 edition', () => {
+    const project = createDefaultProject();
+    const hotWater = { emission: { method: 'residential', served: 'kitchen_and_bathroom', kitchenLengthM: 7, kitchenPipeDiameter: 'up_to_10_mm' } };
+    const label = 'Inner diameter of the kitchen draw-off pipe over at least two thirds of its length (table 13.2, 2023 edition)';
+    const { unmount } = renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ normVersion: '2023', calculationScope: 'residential', hotWater } as never}
+      onSave={() => undefined} onCancel={() => undefined} />);
+    expect((screen.getByLabelText(label) as HTMLSelectElement).value).toBe('up_to_10_mm');
+    unmount();
+    renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ normVersion: '2024', calculationScope: 'residential', hotWater } as never}
+      onSave={() => undefined} onCancel={() => undefined} />);
+    expect(screen.queryByLabelText(label)).toBeNull();
+    expect(screen.getByText(/only the 2023 edition has this input/)).toBeInTheDocument();
   });
 });

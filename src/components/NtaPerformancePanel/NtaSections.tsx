@@ -25,7 +25,7 @@ import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductG
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import { ExternalSupplyFields } from './NtaExternalSupply';
 import {
-  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
+  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, HotWaterGeneratorFields, KitchenPipeDiameterField, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
   SpaceGeneratorFields, WindowObstructionFields,
 } from './NtaSystemSections';
 import {
@@ -644,6 +644,7 @@ function HotWaterSection(props: NtaSectionProps) {
       <SelectField {...f} path={['hotWater', 'emission', 'served']} label={t('nta.form.hotWaterTaps')} options={[
         ['kitchen_and_bathroom', t('nta.form.dhwTaps.both')], ['bathroom_only', t('nta.form.dhwTaps.bathroom')], ['kitchen_only', t('nta.form.dhwTaps.kitchen')]]} />
       <NumberField {...f} path={['hotWater', 'emission', 'kitchenLengthM']} label={t('nta.form.hotWaterKitchenLength')} />
+      <KitchenPipeDiameterField draft={draft} change={change} path={['hotWater', 'emission', 'kitchenPipeDiameter']} />
       <NumberField {...f} path={['hotWater', 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
     </> : <NumberField {...f} path={['hotWater', 'emission', 'meanLengthM']} label={t('nta.form.hotWaterMeanLength')} />}
     <TextField {...f} path={['hotWater', 'emission', 'sourceReference']} label={t('nta.form.source')} />

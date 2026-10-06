@@ -112,7 +112,7 @@ fn registration_refuses_an_older_edition() {
 
 #[test]
 fn edition_without_profile_is_refused() {
-    for edition in ["2023", "2022", "2020+A1"] {
+    for edition in ["2022", "2020+A1"] {
         let result = assess_project_performance(&project(DWELLING, Some(edition)));
         assert_eq!(result.status, "invalid", "{edition}");
         let performance = result.performance.as_ref().unwrap();
@@ -187,5 +187,79 @@ fn example_projects_differ_only_where_the_editions_differ() {
         ] {
             assert_eq!(current.get(key), legacy.get(key), "{key}");
         }
+    }
+}
+
+/// NTA 8800:2023 is calculated as an older edition with its own label.
+#[test]
+fn edition_2023_is_calculated_but_not_registrable() {
+    for json in [DWELLING, OFFICE] {
+        let result = assess_project_performance(&project(json, Some("2023")));
+        assert_eq!(
+            result.status, "calculated_legacy_edition",
+            "{:?}",
+            result.gaps
+        );
+        assert_eq!(result.norm_version, NormVersion::V2023);
+        assert!(!result.registration_eligible);
+        assert_eq!(result.target_norm_version, "NTA 8800:2023");
+        assert!(result.performance.as_ref().unwrap().chapter5.is_none());
+    }
+}
+
+fn changed_keys(a: &ProjectPerformanceAssessment, b: &ProjectPerformanceAssessment) -> Vec<String> {
+    let a = serde_json::to_value(a.performance.as_ref().unwrap()).unwrap();
+    let b = serde_json::to_value(b.performance.as_ref().unwrap()).unwrap();
+    a.as_object()
+        .unwrap()
+        .iter()
+        .filter(|(key, value)| {
+            !matches!(
+                key.as_str(),
+                "inputFingerprint" | "targetNormVersion" | "normVersion"
+            ) && (value.is_number() || value.is_string() || value.is_boolean())
+                && b.get(key.as_str()) != Some(value)
+        })
+        .map(|(key, _)| key.clone())
+        .collect()
+}
+
+/// 2023 against 2024 on the example projects. The dwelling has no input on
+/// a route that differs. The office changes only TOjuli, through ΔT_C;fan
+/// of utility buildings: 1,5 K in 2023 (p. 496) against 0,7 K in 2024
+/// (p. 491).
+#[test]
+fn example_projects_2023_differ_from_2024_only_where_the_editions_differ() {
+    let run = |json, edition| assess_project_performance(&project(json, Some(edition)));
+    assert!(changed_keys(&run(DWELLING, "2024"), &run(DWELLING, "2023")).is_empty());
+    assert_eq!(
+        changed_keys(&run(OFFICE, "2024"), &run(OFFICE, "2023")),
+        ["tojuliMaxK"]
+    );
+}
+
+/// Table 13.2 diameter rows exist in NTA 8800:2023 only (p. 533; 2024
+/// p. 527 and 2025+C1 p. 543 have one kitchen row).
+#[test]
+fn kitchen_pipe_diameter_is_a_2023_route() {
+    let with_diameter = |edition: &str| {
+        let mut value = project(DWELLING, Some(edition));
+        let emission = &mut value["ntaCalculation"]["hotWater"]["emission"];
+        assert!(emission.is_object(), "{emission}");
+        emission["kitchenPipeDiameter"] = json!("up_to_10_mm");
+        assess_project_performance(&value)
+    };
+    assert_eq!(with_diameter("2023").status, "calculated_legacy_edition");
+    for edition in ["2024", "2025+C1"] {
+        let result = with_diameter(edition);
+        assert_eq!(result.status, "invalid", "{edition}");
+        assert!(result
+            .performance
+            .as_ref()
+            .unwrap()
+            .issues
+            .iter()
+            .any(|issue| issue.code == "route_not_in_edition"
+                && issue.path.ends_with("emission.kitchenPipeDiameter")));
     }
 }

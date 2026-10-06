@@ -34,8 +34,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::climate::{
-    ARGII_TEMPERATURE_C as VENTILATIVE_COOLING_TEMPERATURE_C, COLD_RECOVERY_SUPPLY_TEMPERATURE_C,
-    MONTH_HOURS, OUTDOOR_TEMPERATURE_C, WIND_SPEED_M_PER_S,
+    COLD_RECOVERY_SUPPLY_TEMPERATURE_C, MONTH_HOURS, OUTDOOR_TEMPERATURE_C, WIND_SPEED_M_PER_S,
 };
 use crate::monthly_demand::{VentilationFlow, VentilationMonth};
 
@@ -158,7 +157,10 @@ impl VentilationFunction {
     /// Table 11.8 f_τ; dwellings depend on the dwelling area.
     fn occupancy_factor(self, dwelling_area_m2: f64) -> f64 {
         match self {
-            Self::Residential => (0.38 + dwelling_area_m2 * 0.006).min(0.8),
+            // 2023 p. 460: a fixed 0,80.
+            Self::Residential => crate::norm_versions::profile()
+                .dwelling_occupancy_factor
+                .unwrap_or((0.38 + dwelling_area_m2 * 0.006).min(0.8)),
             Self::AssemblyChildCare => 0.30,
             Self::OtherAssembly => 0.15,
             Self::Cell => 0.80,
@@ -813,8 +815,9 @@ pub enum CoolingOperation {
 impl CoolingOperation {
     fn factor(self) -> f64 {
         match self {
-            Self::Manual => 0.35,
-            Self::Automatic => 0.50,
+            // 2025 p. 466 / 2024 p. 461: 0,35 / 0,50; 2023 p. 466: 0,5 / 0,9.
+            Self::Manual => crate::norm_versions::profile().ventilative_cooling_operation[0],
+            Self::Automatic => crate::norm_versions::profile().ventilative_cooling_operation[1],
             Self::AutomaticWithTemperature => 1.0,
         }
     }
@@ -1463,6 +1466,12 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             };
             if !area_ok {
                 issues.push(issue("opening_area_invalid", format!("{path}.area")));
+            }
+            // (11.71a) is new in 2024 (p. 460–461); 2023 (p. 465) has none.
+            if matches!(opening.area, OpeningArea::Discharge { .. })
+                && !crate::norm_versions::profile().discharge_opening_route
+            {
+                issues.push(issue("route_not_in_edition", format!("{path}.area.method")));
             }
             if !opening.centre_height_m.is_finite()
                 || opening.centre_height_m < 0.0
@@ -2342,11 +2351,13 @@ fn mechanical_supply_temperature(
     // 11.129/11.130.
     let extract_out = context.indoor_c - duct_outside;
     let mut recovery_rise = 0.0;
+    // 11.3.2.7: 0,7 / 0,4 / 0,7 K; 2023 (p. 496) 1 / 0,7 / 1,5 K.
+    let rise = crate::norm_versions::profile().fan_temperature_rise_k;
     let mut fan_rise = match context.balance {
-        Balance::Heating => 0.7,
+        Balance::Heating => rise[0],
         Balance::Cooling => match input.category {
-            Category::Residential => 0.4,
-            Category::Utility => 0.7,
+            Category::Residential => rise[1],
+            Category::Utility => rise[2],
         },
     };
     if let (VentSysOp::Balanced, Some(recovery)) = (op, &unit.heat_recovery) {
@@ -2499,8 +2510,10 @@ fn ventilative_cooling_flows(
     let Some(cooling) = &input.ventilative_cooling else {
         return (0.0, 0.0);
     };
-    let tau = TAU_VENTILATIVE_COOLING[month_index];
-    let Some(argii_c) = VENTILATIVE_COOLING_TEMPERATURE_C[month_index] else {
+    // Table 11.7 τ_argII and table 17.1 θ_e;argII differ per edition.
+    let profile = crate::norm_versions::profile();
+    let tau = profile.tau_ventilative_cooling[month_index];
+    let Some(argii_c) = profile.argii_temperature_c[month_index] else {
         return (0.0, 0.0);
     };
     if tau == 0.0 {
@@ -2741,7 +2754,8 @@ fn balance_month(
     } else {
         (0.0, 0.0)
     };
-    let argii_temperature = VENTILATIVE_COOLING_TEMPERATURE_C[m].unwrap_or(outdoor);
+    let argii_temperature =
+        crate::norm_versions::profile().argii_temperature_c[m].unwrap_or(outdoor);
 
     // Supply temperatures.
     let context = SupplyContext {
@@ -3310,6 +3324,39 @@ pub fn assess_ventilation(input: &VentilationInput) -> VentilationAssessment {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Edition switches of 11.2.3.3 and 11.3.2.7: f_argII (2023 p. 466,
+    /// 2024 p. 461), table 11.7 τ_argII (2023 p. 454, 2024 p. 449), f_τ of
+    /// dwellings (table 11.8, 2023 p. 460, 2024 p. 455), table 17.1
+    /// θ_e;argII (2023 p. 676, 2024 p. 674) and ΔT_fan (2023 p. 496,
+    /// 2024 p. 491).
+    #[test]
+    fn ventilative_cooling_and_fan_rise_follow_the_edition() {
+        use crate::norm_versions::{profile, with_version, NormVersion};
+        let old = |body: fn() -> f64| with_version(NormVersion::V2023, body);
+        assert_eq!(CoolingOperation::Manual.factor(), 0.35);
+        assert_eq!(CoolingOperation::Automatic.factor(), 0.50);
+        assert_eq!(old(|| CoolingOperation::Manual.factor()), 0.5);
+        assert_eq!(old(|| CoolingOperation::Automatic.factor()), 0.9);
+        assert_eq!(
+            old(|| CoolingOperation::AutomaticWithTemperature.factor()),
+            1.0
+        );
+        assert_eq!(
+            VentilationFunction::Residential.occupancy_factor(40.0),
+            0.38 + 40.0 * 0.006
+        );
+        assert_eq!(
+            old(|| VentilationFunction::Residential.occupancy_factor(40.0)),
+            0.80
+        );
+        assert_eq!(old(|| profile().tau_ventilative_cooling[6]), 0.28);
+        assert_eq!(profile().tau_ventilative_cooling[6], 0.81);
+        assert_eq!(old(|| profile().argii_temperature_c[6].unwrap()), 16.17);
+        assert_eq!(profile().argii_temperature_c[6], Some(17.51));
+        assert_eq!(old(|| profile().fan_temperature_rise_k[2]), 1.5);
+        assert_eq!(profile().fan_temperature_rise_k, [0.7, 0.4, 0.7]);
+    }
 
     fn unit(variant: SystemVariant) -> SystemUnit {
         SystemUnit {

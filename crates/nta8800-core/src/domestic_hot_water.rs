@@ -121,6 +121,39 @@ pub fn kitchen_emission(length_m: f64) -> f64 {
     [1.00, 0.69, 0.53, 0.43, 0.36, 0.31, 0.27, 0.24][length_band(length_m)]
 }
 
+/// Table 13.2 of NTA 8800:2023 (p. 533): kitchen row by the inner diameter
+/// over at least two thirds of the pipe length. From 2024 (p. 527) only the
+/// "overig" row exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KitchenPipeDiameter {
+    #[serde(rename = "up_to_8_mm")]
+    UpTo8Mm,
+    #[serde(rename = "up_to_10_mm")]
+    UpTo10Mm,
+    /// "Overig", or unknown.
+    Other,
+}
+
+/// Table 13.2 `η_W;em;k` with the 2023 diameter rows where the active
+/// edition has them.
+pub fn kitchen_emission_for(length_m: f64, diameter: Option<KitchenPipeDiameter>) -> f64 {
+    let band = length_band(length_m);
+    match diameter {
+        Some(KitchenPipeDiameter::UpTo8Mm)
+            if crate::norm_versions::profile().kitchen_diameter_rows =>
+        {
+            [1.00, 0.86, 0.75, 0.67, 0.60, 0.55, 0.50, 0.46][band]
+        }
+        Some(KitchenPipeDiameter::UpTo10Mm)
+            if crate::norm_versions::profile().kitchen_diameter_rows =>
+        {
+            [1.00, 0.79, 0.65, 0.55, 0.48, 0.43, 0.38, 0.35][band]
+        }
+        _ => kitchen_emission(length_m),
+    }
+}
+
 /// Table 13.2 `η_W;em;b`.
 pub fn bathroom_emission(length_m: f64) -> f64 {
     [1.00, 0.95, 0.90, 0.86, 0.82, 0.78, 0.75, 0.72][length_band(length_m)]
@@ -168,6 +201,14 @@ pub enum HotWaterEmission {
         served: ServedTaps,
         #[serde(default, rename = "kitchenLengthM")]
         kitchen_length_m: Option<f64>,
+        /// Table 13.2 of NTA 8800:2023 only: inner diameter of the kitchen
+        /// draw-off pipe over at least two thirds of its length.
+        #[serde(
+            default,
+            rename = "kitchenPipeDiameter",
+            skip_serializing_if = "Option::is_none"
+        )]
+        kitchen_pipe_diameter: Option<KitchenPipeDiameter>,
         #[serde(default, rename = "bathroomLengthM")]
         bathroom_length_m: Option<f64>,
         #[serde(rename = "sourceReference")]
@@ -1934,6 +1975,7 @@ pub fn validate_hot_water(
         HotWaterEmission::Residential {
             served,
             kitchen_length_m,
+            kitchen_pipe_diameter,
             bathroom_length_m,
             source_reference,
         } => {
@@ -1944,6 +1986,14 @@ pub fn validate_hot_water(
             let needs_bathroom = *served != ServedTaps::KitchenOnly;
             if needs_kitchen && !kitchen_length_m.is_some_and(|v| v.is_finite() && v >= 0.0) {
                 push("hot_water_length_invalid", "emission.kitchenLengthM");
+            }
+            // Table 13.2 diameter rows exist in NTA 8800:2023 only.
+            if matches!(
+                kitchen_pipe_diameter,
+                Some(KitchenPipeDiameter::UpTo8Mm | KitchenPipeDiameter::UpTo10Mm)
+            ) && !crate::norm_versions::profile().kitchen_diameter_rows
+            {
+                push("route_not_in_edition", "emission.kitchenPipeDiameter");
             }
             if needs_bathroom && !bathroom_length_m.is_some_and(|v| v.is_finite() && v >= 0.0) {
                 push("hot_water_length_invalid", "emission.bathroomLengthM");
@@ -2687,10 +2737,12 @@ fn emission_efficiency(system: &HotWaterSystem) -> f64 {
         HotWaterEmission::Residential {
             served,
             kitchen_length_m,
+            kitchen_pipe_diameter,
             bathroom_length_m,
             ..
         } => {
-            let kitchen = kitchen_emission(kitchen_length_m.unwrap_or(0.0));
+            let kitchen =
+                kitchen_emission_for(kitchen_length_m.unwrap_or(0.0), *kitchen_pipe_diameter);
             let bathroom = bathroom_emission(bathroom_length_m.unwrap_or(0.0));
             match served {
                 ServedTaps::BathroomOnly => bathroom,
@@ -4321,6 +4373,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(3.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(5.0),
                 source_reference: "drawing".into(),
             },
@@ -5665,6 +5718,7 @@ mod tests {
         bad.emission = HotWaterEmission::Residential {
             served: ServedTaps::KitchenAndBathroom,
             kitchen_length_m: None,
+            kitchen_pipe_diameter: None,
             bathroom_length_m: Some(-1.0),
             source_reference: String::new(),
         };
