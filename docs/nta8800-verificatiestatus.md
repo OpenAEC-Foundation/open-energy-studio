@@ -25,7 +25,7 @@
 
 **Openstaand, externe gegevens of besluiten.**
 - officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026 met hun verwachte uitkomsten (BRL 9501 van 29-05-2026, §4.2 en §11). Openbaar is alleen versie 2.0 van 2022, voor NTA 8800:2022, zonder de uitkomsten;
-- het EP-Online-uitwisselschema (XSD);
+- het EP-Online-uitwisselschema voor **aanlevering/registratie** (XSD); de openbare RVO-XSD voor het opvragen van het totaalbestand is een ander contract, zie het [bronnenregister](nta8800-bronnenregister.md);
 - het uurklimaat van 17.3.8;
 - ISO 6946 tabel 8 (spouwen kleiner dan 20 mm);
 - het attestnummer.
@@ -111,6 +111,8 @@ De eerste desktopbouw met die libraryset stopte op de ingebouwde Tauri-versiecon
 **Bronobjectcontrole (5 oktober).** De manifestlezer eist bij `--source-repo` nu een werkelijk Git-commitobject; een boom- of tag-SHA kan de broncommitcontrole niet meer passeren. Twee gerichte manifesttests en hercontrole van het bewaarde F10-pakket slaagden. Dit is een controle van bewijsmetadata, niet van bouwherkomst of normatieve uitkomsten.
 
 **JSON-uitvoerbewaking (5 oktober).** De gedeelde HTTP/MCP-operatielaag geeft nu een expliciete 500-fout `serialization_failed` wanneer een kernresultaat niet als JSON kan worden voorgesteld. Voorheen kon de conversie dan stilzwijgend `null` als geslaagd resultaat leveren. De nieuwe regressietest, alle 58 servicetests plus integratiegroepen, Rust-formatcontrole en Clippy slaagden. Dit bewaakt de transportuitvoer en verandert de NTA-reken- of atteststatus niet.
+
+**Desktopdevbuild op `413e932` (5 oktober).** De [nieuwe debugbundel en drie servicebinaries](nta8800-build-verificatie-2026-10-05-413e932.md) zijn vanuit de schone bronstand gebouwd en met een afzonderlijke manifestlezer gecontroleerd. De servicewijziging die niet-serialiseerbare JSON-uitvoer weigert zit in deze API/MCP-binaries. De officiële actuele referentiegevallen, visuele UI-acceptatie en attestering blijven open.
 
 **Aparte labelscenario-indicatoren in het harnas (4 oktober).** Naast BENG 2/3 zijn nu `labelPrimaryFossil` en `labelRenewableShare` numeriek vergelijkbaar. Zij lezen de bestaande Rust-uitvoer van het labelscenario, zodat bij een woning met EMG-maatregelen een forfaitaire labelwaarde niet met de declaratiegebaseerde BENG-waarde wordt verward. De gerichte vergelijkingstest en Clippy slaagden. De verwachting kwam uit een interne synthetische fixture; een onafhankelijke actuele EDR-labelvergelijking ontbreekt nog.
 
