@@ -211,7 +211,10 @@ fn wall_height_m(below: &FloorBelow) -> Option<f64> {
             ..
         } => *wall_height_above_ground_m,
     };
-    match (crate::norm_versions::profile().crawl_wall_height_fixed, given) {
+    match (
+        crate::norm_versions::profile().crawl_wall_height_fixed,
+        given,
+    ) {
         (true, None) => Some(CRAWL_WALL_HEIGHT_M),
         (false, Some(height)) if height.is_finite() && height >= 0.0 => Some(height),
         _ => None,

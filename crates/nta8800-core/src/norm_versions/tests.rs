@@ -769,7 +769,10 @@ mod switch_points_2022 {
         assert!(!p22.preference_beta_building_share && p23.preference_beta_building_share);
         // Table E.5 (2022 p. 775, 2023 p. 785) and (I.2) (p. 805 / 814).
         assert_eq!(
-            (p22.mineral_wool_flakes_ageing, p23.mineral_wool_flakes_ageing),
+            (
+                p22.mineral_wool_flakes_ageing,
+                p23.mineral_wool_flakes_ageing
+            ),
             (1.05, 1.00)
         );
         assert_eq!((p22.lambda_equi_ntr, p23.lambda_equi_ntr), (0.06, 0.045));
@@ -814,9 +817,15 @@ mod switch_points_2022 {
         use crate::monthly_demand::{specific_heat_capacity_by_mass, CeilingColumn::*};
         // 2022 p. 181–182: < 250, 250–500, 500–750, > 750 kg/m².
         assert_eq!(specific_heat_capacity_by_mass(200.0, OpenOrNone), 80.0);
-        assert_eq!(specific_heat_capacity_by_mass(250.0, ClosedOrSuspended), 110.0);
+        assert_eq!(
+            specific_heat_capacity_by_mass(250.0, ClosedOrSuspended),
+            110.0
+        );
         assert_eq!(specific_heat_capacity_by_mass(750.0, OpenOrNone), 360.0);
-        assert_eq!(specific_heat_capacity_by_mass(751.0, ClosedOrSuspended), 250.0);
+        assert_eq!(
+            specific_heat_capacity_by_mass(751.0, ClosedOrSuspended),
+            250.0
+        );
     }
 
     #[test]

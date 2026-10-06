@@ -1546,10 +1546,7 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
     );
     if let Some(mass) = input.thermal_mass.mass_kg_per_m2 {
         if !crate::norm_versions::profile().thermal_mass_by_kg_per_m2 {
-            issues.push(issue(
-                "route_not_in_edition",
-                "thermalMass.massKgPerM2",
-            ));
+            issues.push(issue("route_not_in_edition", "thermalMass.massKgPerM2"));
         } else if !(mass.is_finite() && mass > 0.0) {
             issues.push(issue("thermal_mass_invalid", "thermalMass.massKgPerM2"));
         }

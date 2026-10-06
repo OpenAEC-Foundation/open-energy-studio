@@ -112,15 +112,13 @@ fn registration_refuses_an_older_edition() {
 
 #[test]
 fn edition_without_profile_is_refused() {
-    for edition in ["2020+A1"] {
-        let result = assess_project_performance(&project(DWELLING, Some(edition)));
-        assert_eq!(result.status, "invalid", "{edition}");
-        let performance = result.performance.as_ref().unwrap();
-        assert!(performance
-            .issues
-            .iter()
-            .any(|issue| issue.code == "edition_not_implemented"));
-    }
+    let result = assess_project_performance(&project(DWELLING, Some("2020+A1")));
+    assert_eq!(result.status, "invalid");
+    let performance = result.performance.as_ref().unwrap();
+    assert!(performance
+        .issues
+        .iter()
+        .any(|issue| issue.code == "edition_not_implemented"));
 }
 
 #[test]
@@ -345,7 +343,8 @@ fn edition_2022_is_calculated_but_not_registrable() {
     for json in [DWELLING, OFFICE] {
         let result = assess_project_performance(&project_2023_compatible(json, "2022"));
         assert_eq!(
-            result.status, "calculated_legacy_edition",
+            result.status,
+            "calculated_legacy_edition",
             "{:?} {:?}",
             result.gaps,
             result.performance.as_ref().map(|item| &item.issues)
@@ -380,7 +379,11 @@ fn thermal_mass_by_kg_per_m2_is_a_2022_route() {
     };
     let plain = assess_project_performance(&project(DWELLING, Some("2022")));
     let light = with_mass("2022");
-    assert_eq!(light.status, "calculated_legacy_edition", "{:?}", light.gaps);
+    assert_eq!(
+        light.status, "calculated_legacy_edition",
+        "{:?}",
+        light.gaps
+    );
     let need = |result: &ProjectPerformanceAssessment| {
         indicator(result, "/needIndicatorKwhPerM2Year").unwrap()
     };

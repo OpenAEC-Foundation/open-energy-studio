@@ -401,6 +401,9 @@ function MassSection(props: NtaSectionProps) {
       label={t(`nta.form.mass.${part}`)} options={[['light', t('nta.form.mass.light')], ['heavy', t('nta.form.mass.heavy')], ['very_heavy', t('nta.form.mass.veryHeavy')]]} />)}
     <SelectField {...f} path={['thermalMass', 'ceiling']} label={t('nta.form.mass.ceiling')}
       options={[['open_or_none', t('nta.form.mass.open')], ['closed_or_suspended', t('nta.form.mass.closed')]]} />
+    {read(props.draft, ['normVersion']) === '2022' || read(props.draft, ['thermalMass', 'massKgPerM2']) != null
+      ? <NumberField {...f} path={['thermalMass', 'massKgPerM2']} label={t('ntaStep.massKgPerM2')} />
+      : null}
     <TextField {...f} path={['thermalMass', 'sourceReference']} label={t('nta.form.source')} />
   </>;
 }

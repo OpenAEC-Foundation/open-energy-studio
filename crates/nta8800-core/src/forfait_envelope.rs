@@ -1039,8 +1039,10 @@ mod tests {
         assert!((r23 - (0.05 / 0.045 + 0.36)).abs() < 1e-12);
         // A known higher λ is a 2023 route.
         let refused = with_version(NormVersion::V2022, || known(Some(0.05)).validate("e"));
-        assert!(refused.iter().any(|item| item.code == "route_not_in_edition"
-            && item.path == "e.insulation.knownLambdaEquivalent"));
+        assert!(refused
+            .iter()
+            .any(|item| item.code == "route_not_in_edition"
+                && item.path == "e.insulation.knownLambdaEquivalent"));
         assert!(with_version(NormVersion::V2023, || known(Some(0.05)).validate("e")).is_empty());
     }
 

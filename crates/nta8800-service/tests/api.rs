@@ -162,7 +162,13 @@ async fn health_and_version_identify_the_build() {
     assert_eq!(v2023["implemented"], true);
     assert_eq!(v2023["registrationEligible"], false);
     let v2022 = editions.iter().find(|item| item["id"] == "2022").unwrap();
-    assert_eq!(v2022["implemented"], false);
+    assert_eq!(v2022["implemented"], true);
+    assert_eq!(v2022["registrationEligible"], false);
+    let v2020 = editions
+        .iter()
+        .find(|item| item["id"] == "2020+A1")
+        .unwrap();
+    assert_eq!(v2020["implemented"], false);
 }
 
 #[tokio::test]

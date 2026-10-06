@@ -1146,6 +1146,24 @@ mod tests {
             && item.path == "l.lightingZones[0].power.ledFrom2017"));
     }
 
+    /// Table 14.4 (NTA 8800:2022 p. 639) is a 2022 route; 2023 sets MF = 1
+    /// (p. 649).
+    #[test]
+    fn constant_illuminance_is_a_2022_route() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let mut zone = office(vec![forfait_zone(200.0)]);
+        if let InstalledPower::Forfait { led_from_2017 } = &mut zone.lighting_zones[0].power {
+            *led_from_2017 = false;
+        }
+        zone.lighting_zones[0].constant_illuminance = Some(ConstantIlluminance::LedL80);
+        assert!(
+            with_version(NormVersion::V2022, || validate_lighting(&zone, 200.0, "l")).is_empty()
+        );
+        let issues = with_version(NormVersion::V2023, || validate_lighting(&zone, 200.0, "l"));
+        assert!(issues.iter().any(|item| item.code == "route_not_in_edition"
+            && item.path == "l.lightingZones[0].constantIlluminance"));
+    }
+
     /// §14.5.1 (p. 664): the large-group rule outside an office function
     /// only gives F_o;D = 1 (14.16), the least favourable value, so it is
     /// a warning and the zone still calculates.

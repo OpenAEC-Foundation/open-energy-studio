@@ -694,11 +694,19 @@ mod tests {
             with_version(edition, || assess_forfait_heat_pump_draft(input).table_cop)
         };
         // 2022 p. 314: the outdoor-air row is the same up to 55 °C.
-        let air = example(TableScope::UtilityCollectiveOrOver25Kw, TableSource::OutdoorAir, 55.0);
+        let air = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            55.0,
+        );
         assert_eq!(cop(NormVersion::V2022, &air), Some(2.8));
         assert_eq!(cop(NormVersion::V2022, &air), cop(NormVersion::V2023, &air));
         // Above 55 °C annex Q (2022 p. 313); 2023 p. 323 has 2,2 at 60 °C.
-        let hot = example(TableScope::UtilityCollectiveOrOver25Kw, TableSource::OutdoorAir, 60.0);
+        let hot = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            60.0,
+        );
         assert_eq!(cop(NormVersion::V2023, &hot), Some(2.2));
         assert_eq!(
             codes(NormVersion::V2022, &hot),

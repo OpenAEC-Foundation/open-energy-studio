@@ -2,17 +2,14 @@
 
 De rekenkern rekent standaard volgens de aangewezen uitgave, **NTA 8800:2025+C1:2026**. Een project kan ook een oudere uitgave kiezen. Dat is bedoeld om oude berekeningen na te rekenen en uitkomsten te vergelijken. Een berekening in een oudere uitgave is **nooit registreerbaar**.
 
-Paginaverwijzingen gaan naar de gelicentieerde PDF's: NTA 8800:2023, NTA 8800:2024 (met het interpretatiedocument INT-V1:2024) en NTA 8800:2025+C1:2026. Voor 2023 bestaat geen interpretatiedocument; in de bronmap staan voor 2023 alleen wijzigingsdocumenten van ISSO en BRL. Deze repository bevat geen normtekst, alleen paragraaf-, formule-, tabel- en paginanummers.
+Paginaverwijzingen gaan naar de gelicentieerde PDF's: NTA 8800:2022, NTA 8800:2023, NTA 8800:2024 (met het interpretatiedocument INT-V1:2024) en NTA 8800:2025+C1:2026. Voor 2022 en 2023 bestaat geen interpretatiedocument; in de bronmap staan daarvoor alleen wijzigingsdocumenten van ISSO en BRL. Deze repository bevat geen normtekst, alleen paragraaf-, formule-, tabel- en paginanummers.
 
 ## Kiezen van een uitgave
 
-- **Projectbestand:** `ntaCalculation.normVersion`, met `"2025+C1"` (standaard), `"2024"` of `"2023"`. Ontbreekt het veld, dan rekent de kern in 2025+C1. De invoervingerafdruk van een project zonder het veld verandert daardoor niet.
+- **Projectbestand:** `ntaCalculation.normVersion`, met `"2025+C1"` (standaard), `"2024"`, `"2023"` of `"2022"`. Ontbreekt het veld, dan rekent de kern in 2025+C1. De invoervingerafdruk van een project zonder het veld verandert daardoor niet.
 - **App:** het NTA-invoerformulier heeft in het blok *Algemeen* het veld *Uitgave NTA 8800*. Bij een oudere uitgave tonen het rekenpaneel, het NTA-rekenrapport en de statusbalk "niet voor registratie".
 - **API en MCP:** elke `POST`-bewerking neemt het optionele verzoeklid `normVersion`; zie [Uitgave per route](#uitgave-per-route). Zonder dat lid lezen de projectbewerkingen het veld uit het project. `GET /v1/version` (`get_version`) geeft onder `supportedNormVersions` de bekende uitgaven, met `implemented`, `registrationEligible`, `default` en de aanwijzingsperiode.
-- **Bekend, niet geïmplementeerd:** `"2023"`, `"2022"` en `"2020+A1"`. De kern weigert die met `edition_not_implemented` (status `invalid`). Een onbekende waarde is een invoergat.
-
-- **API en MCP:** de projectbewerkingen lezen het veld uit het project. `GET /v1/version` (`get_version`) geeft onder `supportedNormVersions` de bekende uitgaven, met `implemented`, `registrationEligible`, `default` en de aanwijzingsperiode.
-- **Bekend, niet geïmplementeerd:** `"2022"` en `"2020+A1"`. De kern weigert die met `edition_not_implemented` (status `invalid`). Een onbekende waarde is een invoergat.
+- **Bekend, niet geïmplementeerd:** `"2020+A1"`. De kern weigert die met `edition_not_implemented` (status `invalid`). Een onbekende waarde is een invoergat.
 
 ## Uitgave per route
 
@@ -43,8 +40,8 @@ Elke ingang van de kern rekent in een gekozen uitgave en zet die op de uitkomst 
 | Uitkomst | 2025+C1 | Oudere uitgave |
 | --- | --- | --- |
 | Status | `calculated_unverified` | `calculated_legacy_edition` |
-| `targetNormVersion` | `NTA 8800:2025+C1:2026` | `NTA 8800:2024 met INT-V1:2024` of `NTA 8800:2023` |
-| `normVersion`, `registrationEligible` | `2025+C1`, `true` | `2024` of `2023`, `false` |
+| `targetNormVersion` | `NTA 8800:2025+C1:2026` | `NTA 8800:2024 met INT-V1:2024`, `NTA 8800:2023` of `NTA 8800:2022` |
+| `normVersion`, `registrationEligible` | `2025+C1`, `true` | `2024`, `2023` of `2022`, `false` |
 | Registratiecontrole | volgens BRL 9500 | altijd de fout `legacy_edition_not_registrable` |
 | Indicatoren die pas in 2025+C1 bestaan (§5.3.3–5.3.5, 5.5.6.1–2, 5.5.7, 5.6.4, 5.9, bijlage AB) | berekend | `null` |
 
@@ -54,7 +51,7 @@ Invoer voor een route die de gekozen uitgave niet kent, wordt geweigerd met `rou
 
 `crates/nta8800-core/src/norm_versions/` bevat:
 - de enum `NormVersion` (oplopend: 2020+A1, 2022, 2023, 2024, 2025+C1);
-- per geïmplementeerde uitgave één `NormProfile` (`v2025.rs`, `v2024.rs`, `v2023.rs`) met de getallen en routekeuzes, elk met paginaverwijzing. Het profiel van 2023 is cumulatief: alles waarin 2024 van 2025+C1 afwijkt, geldt ook in 2023, plus de eigen verschillen hieronder.
+- per geïmplementeerde uitgave één `NormProfile` (`v2025.rs`, `v2024.rs`, `v2023.rs`, `v2022.rs`) met de getallen en routekeuzes, elk met paginaverwijzing. De oudere profielen zijn cumulatief: alles waarin 2024 van 2025+C1 afwijkt, geldt ook in 2023, en alles waarin 2023 afwijkt ook in 2022, plus de eigen verschillen hieronder. Invoer die alleen "2023" heette (tabel 13.2-keukenrijen, `emission.edition2023`, `cooling.emission.edition2023`, paneel-`buildYear`, `uninsulatedPipesInUninsulatedShell`), geldt daardoor ook in 2022.
 
 De invoer draagt de uitgave (`NtaCalculationInput.normVersion`, `BuildingPerformanceInput.normVersion`, `ResidentialSurvey`/`UtilitySurvey.normVersion`, de basis van het maatwerkadvies, het oorspronkelijke project bij herlabelen). Elke ingang (`assess_project_performance`, `assess_building_performance`, de opnames, `assess_maatwerkadvies`, `assess_relabel`) zet de uitgave voor de duur van de berekening als **thread-local** (`norm_versions::with_version`). De service doet dat ook voor de constructies en diagnoses. Rekenfuncties lezen `norm_versions::profile()` op het punt waar de uitgaven verschillen.
 
@@ -122,6 +119,38 @@ Bovenop de achttien punten hierboven. Pagina's links uit NTA 8800:2023, rechts u
 
 Gelijk in 2023 en 2024, dus geen schakelpunt: K_CO2 (tabel 5.3, p. 92–93; AVI tabel 5.6, p. 114), f_P el 1,45 en gas 1,0 (tabel 5.2, p. 89), λequi;ntr 0,045 (p. 814–815; alleen 2022 had 0,06), (I.3) d/0,2 (p. 815), tabel 13.18 (p. 617) en EER_bron 23/16 voor een WKO-bron (9.6.8.1.1.2.3, p. 349).
 
+## Verschillen 2022 → 2023 die de kern omschakelt
+
+Bovenop de punten 1–48. Pagina's links uit NTA 8800:2022, rechts uit NTA 8800:2023. Het verschil is opnieuw uit beide PDF's afgeleid (genormaliseerde tekstvergelijking plus symboolvergelijking).
+
+| # | Onderwerp | 2022 (pagina) | 2023 (pagina) | Kern |
+| --- | --- | --- | --- | --- |
+| 49 | Tabellen 9.27/9.29 warmtepompen | kolommen tot 55 °C, geen bronrijen ≥ 15 °C, 9.27 voor alle woningen; boven 55 °C bijlage Q (p. 313–317) | tot 70 °C, bronrijen 15–20/20–40/≥ 40 °C, grens 25 kW/collectief (p. 319–324) | `heat_pump_tables_2022`: `designSupplyTemperatureC` > 55 en `source` `collective*` → `route_not_in_edition`; geen `table_scope_capacity_mismatch`; grondwater zonder temperatuurgrens |
+| 50 | Bronwarmte Q_HD;hp;in;bron (5.20, 9.84, 9.6.8.1.1.2.3) | bestaat niet (p. 94–96, 335, 341) | p. 96–98, 343, 349 | `HeatPumpSourceRoute::None2022` |
+| 51 | Tabel P.5 | tot 55 °C, geen bronrijen (p. 941) | tot 75 °C met bronrijen (p. 955) | `efficiency.source`/`supplyTemperatureC` → `route_not_in_edition` |
+| 52 | Flexmodus (prijsplafond) | bestaat niet | 5.8, P.6.5.4.11 (p. 111, 963) | `electric_flex` → `route_not_in_edition` |
+| 53 | Biomassagrens bmA | geen kW-grens, "valt onder het Activiteitenbesluit" (p. 88–92) | 100 kW (p. 90–94) | `biomass_threshold_kw` = ∞; het veld `biomassAbove500Kw` betekent in 2022 "valt onder het Activiteitenbesluit" |
+| 54 | (9.58) bijgeplaatste preferente opwekker | Σ Φ / Φ_H;tot (p. 305) | Σ Φ · f_gebouw;si;H / Φ_H;tot (p. 309) | `preference_beta_building_share` |
+| 55 | Tabel 9.14 ontwerptemperatuurklassen | zonder 60/50 en 70/60 (p. 290) | met (p. 294) | `designTemperatureClass` `60_50`/`70_60` → `route_not_in_edition` |
+| 56 | Ventilatorvermogen getest volgens NEN-EN 16430 | bestaat niet (p. 282) | p. 286 | `emission.fans.testedPowerW` → `route_not_in_edition` |
+| 57 | Tabel 7.5 "onbekende kleur" | bestaat niet (p. 176) | p. 180 | `colour: unknown` → `route_not_in_edition` |
+| 58 | Tabel 7.10 specifieke interne warmtecapaciteit | naar massa per m² (< 250, 250–500, 500–750, > 750 kg/m²) (p. 181–182) | naar vloer- en wandtype, tabellen 7.10–7.12 (p. 185–186) | `thermalMass.massKgPerM2` (alleen 2022); zonder die invoer de vloer/wandklassen (zelfde D_m-waarden; interpretatie) |
+| 59 | (8.47) hoogte h boven maaiveld | werkelijke hoogte (p. 236) | vast 0,125 m (p. 240) | `wallHeightAboveGroundM` op kruipruimte/onverwarmde kelder: verplicht in 2022 (`ground_floor_wall_height_required`), daarna `route_not_in_edition` |
+| 60 | Tabel E.5 minerale-wolvlokken F_A;iso | 1,05 (p. 775) | 1,00 (p. 785) | `mineral_wool_flakes_ageing` |
+| 61 | (I.2) λ_equi;ntr | 0,06 (p. 805) | 0,045 of een bekende hogere λ (p. 814) | `knownLambdaEquivalent` → `route_not_in_edition` |
+| 62 | Zwembad in (11.57) | bestaat niet (p. 451) | q_usi;spec sport × 2 (p. 459) | `swimmingPool` → `route_not_in_edition` |
+| 63 | η_hr volgens NEN-EN 13053 | geen rij (p. 482) | p. 490–491 | `standard: en13053` → `route_not_in_edition` |
+| 64 | f_sto;dis;ls = 1,5 elektroboiler met geïsoleerde leiding | p. 550 | vervallen (p. 557–558) | `electricBoilerInsulatedPipe` (alleen 2022) |
+| 65 | ϑ_sto;amb met ventilatieretourluchtwarmtepomp (13.69a/13.137a) | bestaat niet (p. 557, 584) | p. 565, 592 | `storage_ambient_exhaust_air` |
+| 66 | C_W;mixed air (13.153b) | bestaat niet (p. 600–602) | p. 609–611 | `mixedAir` → `route_not_in_edition` |
+| 67 | Tabel 14.4 onderhoudsfactor MF | 0,8 lineair TL / 0,7 led L80 met nieuwwaardecompensatie, F_C = 1 − ½(1 − MF) (p. 639) | MF = 1 (p. 649) | `lightingZones[].constantIlluminance` (alleen 2022) |
+
+Gelijk in 2022 en 2023, dus geen schakelpunt: tabellen 5.2/5.3 behalve flexmodus en biomassa, (P.25) met 8 800 (2022 p. 937; de deler 4 000 uit een eerdere inventaris staat niet in 2022), tabel I.1 details 6, 7 en 17, de paneeltabellen I.13/I.14, de afgiftetabellen 9.2–9.10 en 10.2–10.5, tabel 11.5 (de rijkeuze bij een onbekend roostertype is invoer) en de bijlagen S–Z.
+
+**Acceptatie met een openbaar rapport.** Het openbare rapport r1 (woongebouw met 28 appartementen in Schagen, berekend volgens NTA 8800:2022) is niet nagebouwd. De rapport-PDF en het tekstuittreksel stonden alleen in een tijdelijke werkmap en waren bij de invoering niet meer beschikbaar. Daarnaast vraagt r1 een volledige meerzonige schematisering van 28 woningen uit een samenvatting zonder bouwkundige details; zo'n invoer zou grotendeels aannames zijn. De acceptatie van 2022 berust daarom op de schakelpunttests en de verschiltests hierboven. Een herbouw van r1 is een open punt.
+
+Geen invoer in de kern, dus niet omgeschakeld: de standaard voor woningisolatie (2023 p. 74; de hoofdstuk-5-indicatoren zijn in oudere uitgaven al `null`), gemeenschappelijke ruimten in woongebouwen en kelderkasten tot 4 m² (schematisering), het gecombineerde circulatiesysteem met cv-water (2022 p. 531–541), het keukenvat van 10 l (2023 p. 559, opnameregel) en ramen/deuren met minder dan 65 % glas (2023 p. 815–816).
+
 ## Besluiten bij de invoering van 2023
 
 Vóór het programmeren nagelopen in de 2023-PDF:
@@ -176,6 +205,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - Per schakelpunt een eenheidstest in de module van het schakelpunt, met de paginaverwijzing in de test.
 - `crates/nta8800-core/tests/norm_versions.rs`: de projectroute (status, vingerafdruk, registratie, niet-geïmplementeerde en onbekende uitgaven) en verschiltests van de voorbeeldprojecten in 2024 tegen 2025+C1 en 2023 tegen 2024. Daarin verandert alleen wat de lijsten hierboven voorspellen: in 2023 tegen 2024 verandert de woning niet en het kantoor alleen in TOjuli (ΔT_fan, punt 25). Het voorbeeldkantoor gebruikt de ledkolom van tabel 14.3; die invoer wordt in 2023 geweigerd (punt 33), dus de verschiltest zet hem in beide uitgaven op "overig". De invoer `kitchenPipeDiameter` wordt buiten 2023 geweigerd.
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2023`), `ventilation.rs`, `annex_p.rs` en `tojuli.rs`: per schakelpunt van 2023 de waarde met de pagina in beide uitgaven.
+- `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2022`), `forfait_heat_pump_draft.rs`, `annex_p.rs`, `ground.rs`, `forfait_envelope.rs`, `lighting.rs` en `tests/norm_versions.rs` (`edition_2022_*`, `example_projects_2022_*`, `thermal_mass_by_kg_per_m2_is_a_2022_route`): de schakelpunten van 2022. Op de voorbeeldprojecten verandert in 2022 tegen 2023 niets: geen van beide heeft invoer op een route die verschilt.
 - `crates/nta8800-core/tests/public_comparison.rs`: de openbare gevallen B en C (gepubliceerd in 2023) in 2023; zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md).
 - `crates/nta8800-service/tests/api.rs`: `supportedNormVersions` en een berekening in 2024 via HTTP.
 - Per route 2024 tegen 2025+C1 (verschil, stempel, status): `opname/mod.rs` en `opname/utility.rs` (`*_in_its_edition`), `maatwerkadvies.rs` (`variants_follow_the_base_edition`), `relabel.rs` (`relabel_keeps_the_original_edition`) en `registration.rs` (`relabel_in_the_original_edition_is_not_refused_as_legacy`).
