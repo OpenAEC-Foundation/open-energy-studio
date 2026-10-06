@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from 'fs';
 
 const version = process.argv[2];
-if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+if (!version || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) {
   console.error('Usage: node scripts/bump-version.js <version>');
-  console.error('Example: node scripts/bump-version.js 2026.2.0');
+  console.error('Example: node scripts/bump-version.js 0.1.7-alpha');
   process.exit(1);
 }
 
