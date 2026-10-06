@@ -2,14 +2,14 @@
 
 De rekenkern rekent standaard volgens de aangewezen uitgave, **NTA 8800:2025+C1:2026**. Een project kan ook een oudere uitgave kiezen. Dat is bedoeld om oude berekeningen na te rekenen en uitkomsten te vergelijken. Een berekening in een oudere uitgave is **nooit registreerbaar**.
 
-Paginaverwijzingen gaan naar de gelicentieerde PDF's: NTA 8800:2022, NTA 8800:2023, NTA 8800:2024 (met het interpretatiedocument INT-V1:2024) en NTA 8800:2025+C1:2026. Voor 2022 en 2023 bestaat geen interpretatiedocument; in de bronmap staan daarvoor alleen wijzigingsdocumenten van ISSO en BRL. Deze repository bevat geen normtekst, alleen paragraaf-, formule-, tabel- en paginanummers.
+Paginaverwijzingen gaan naar de gelicentieerde PDF's: NTA 8800:2020+A1:2020 (de geconsolideerde uitgave), NTA 8800:2022, NTA 8800:2023, NTA 8800:2024 (met het interpretatiedocument INT-V1:2024) en NTA 8800:2025+C1:2026. Voor 2022 en 2023 bestaat geen interpretatiedocument; in de bronmap staan daarvoor alleen wijzigingsdocumenten van ISSO en BRL. Deze repository bevat geen normtekst, alleen paragraaf-, formule-, tabel- en paginanummers.
 
 ## Kiezen van een uitgave
 
-- **Projectbestand:** `ntaCalculation.normVersion`, met `"2025+C1"` (standaard), `"2024"`, `"2023"` of `"2022"`. Ontbreekt het veld, dan rekent de kern in 2025+C1. De invoervingerafdruk van een project zonder het veld verandert daardoor niet.
+- **Projectbestand:** `ntaCalculation.normVersion`, met `"2025+C1"` (standaard), `"2024"`, `"2023"`, `"2022"` of `"2020+A1"`. Ontbreekt het veld, dan rekent de kern in 2025+C1. De invoervingerafdruk van een project zonder het veld verandert daardoor niet.
 - **App:** het NTA-invoerformulier heeft in het blok *Algemeen* het veld *Uitgave NTA 8800*. Bij een oudere uitgave tonen het rekenpaneel, het NTA-rekenrapport en de statusbalk "niet voor registratie".
 - **API en MCP:** elke `POST`-bewerking neemt het optionele verzoeklid `normVersion`; zie [Uitgave per route](#uitgave-per-route). Zonder dat lid lezen de projectbewerkingen het veld uit het project. `GET /v1/version` (`get_version`) geeft onder `supportedNormVersions` de bekende uitgaven, met `implemented`, `registrationEligible`, `default` en de aanwijzingsperiode.
-- **Bekend, niet geïmplementeerd:** `"2020+A1"`. De kern weigert die met `edition_not_implemented` (status `invalid`). Een onbekende waarde is een invoergat.
+- **Alle bekende uitgaven rekenen.** `edition_not_implemented` blijft bestaan voor een uitgave zonder profiel, maar geen bekende uitgave valt daar nu onder. Een onbekende waarde is een invoergat.
 
 ## Uitgave per route
 
@@ -145,11 +145,44 @@ Bovenop de punten 1–48. Pagina's links uit NTA 8800:2022, rechts uit NTA 8800:
 | 66 | C_W;mixed air (13.153b) | bestaat niet (p. 600–602) | p. 609–611 | `mixedAir` → `route_not_in_edition` |
 | 67 | Tabel 14.4 onderhoudsfactor MF | 0,8 lineair TL / 0,7 led L80 met nieuwwaardecompensatie, F_C = 1 − ½(1 − MF) (p. 639) | MF = 1 (p. 649) | `lightingZones[].constantIlluminance` (alleen 2022) |
 
-Gelijk in 2022 en 2023, dus geen schakelpunt: tabellen 5.2/5.3 behalve flexmodus en biomassa, (P.25) met 8 800 (2022 p. 937; de deler 4 000 uit een eerdere inventaris staat niet in 2022), tabel I.1 details 6, 7 en 17, de paneeltabellen I.13/I.14, de afgiftetabellen 9.2–9.10 en 10.2–10.5, tabel 11.5 (de rijkeuze bij een onbekend roostertype is invoer) en de bijlagen S–Z.
+Gelijk in 2022 en 2023, dus geen schakelpunt: tabellen 5.2/5.3 behalve flexmodus en biomassa, (P.25) met 8 800 (2022 p. 937; de deler 4 000 is die van 2020+A1, punt 70), tabel I.1 details 6, 7 en 17, de paneeltabellen I.13/I.14, de afgiftetabellen 9.2–9.10 en 10.2–10.5, tabel 11.5 (de rijkeuze bij een onbekend roostertype is invoer) en de bijlagen S–Z.
 
 **Acceptatie met een openbaar rapport.** Het openbare rapport r1 (woongebouw met 28 appartementen in Schagen, berekend volgens NTA 8800:2022) is niet nagebouwd. De rapport-PDF en het tekstuittreksel stonden alleen in een tijdelijke werkmap en waren bij de invoering niet meer beschikbaar. Daarnaast vraagt r1 een volledige meerzonige schematisering van 28 woningen uit een samenvatting zonder bouwkundige details; zo'n invoer zou grotendeels aannames zijn. De acceptatie van 2022 berust daarom op de schakelpunttests en de verschiltests hierboven. Een herbouw van r1 is een open punt.
 
 Geen invoer in de kern, dus niet omgeschakeld: de standaard voor woningisolatie (2023 p. 74; de hoofdstuk-5-indicatoren zijn in oudere uitgaven al `null`), gemeenschappelijke ruimten in woongebouwen en kelderkasten tot 4 m² (schematisering), het gecombineerde circulatiesysteem met cv-water (2022 p. 531–541), het keukenvat van 10 l (2023 p. 559, opnameregel) en ramen/deuren met minder dan 65 % glas (2023 p. 815–816).
+
+## Verschillen 2020+A1 → 2022 die de kern omschakelt
+
+Het profiel van 2020+A1 is cumulatief op 2022: alles waarin 2022 van 2023 verschilt (punten 49–67) geldt ook hier. De invoer die alleen 2022 kent (`thermalMass.massKgPerM2`, `wallHeightAboveGroundM`, `electricBoilerInsulatedPipe`, `lightingZones[].constantIlluminance`) en de 2023-invoer gelden dus ook onder 2020+A1. Bron: de geconsolideerde uitgave NTA 8800:2020+A1:2020 tegen NTA 8800:2022, met een tekstvergelijking per pagina. Het afzonderlijke interpretatiedocument bij 2020+A1 is niet verwerkt.
+
+| # | Onderwerp | 2020+A1 | 2022 | Kern |
+|---|---|---|---|---|
+| 68 | (16.4) piekvermogen PV | K_pk per m² naar beneden afgerond op 5 W/m², oppervlakte zoals opgegeven, geen paneelroute (p. 651) | piekvermogen per paneel afgerond op 5 W, K_pk en oppervlakte op 2 decimalen (p. 656–657) | `pv_kpk_per_m2_floor`; `peakPower.method: panels` → `route_not_in_edition` |
+| 69 | (I.2) λ_equi;ntr | 0,045 (p. 796) | 0,06 (p. 805) | `lambda_equi_ntr`; een bekende hogere λ blijft geweigerd |
+| 70 | (P.25) deler referentievermogen | 4 000, benuttingsgraad 0,13 (p. 925) | 8 800, benuttingsgraad 0,28 (p. 937) | `reference_power_divisor` |
+| 71 | Restwarmte | η = 1, f_P;del;rw 0,1 (tabel 5.5), K_CO2 0,034 (tabel 5.6), f_Pren 0,9 (5.47) (p. 109–113, 933) | f_rw;aux;spec 0,07 met elektrische hulpenergie (p. 945) | `residual_heat_fixed_factors`; `auxiliarySpecific` → `route_not_in_edition` |
+| 72 | Kleine systemen bijlage P | geen tabel P.0, geen kleine-systeemwaarde bij P.11, geen forfait 0,009 0 voor koudedistributie (p. 920, 960, 969) | p. 930, 972, 981 | `small_system_forfait_route`: `distribution.method: small_system_forfait`, `network: small_system` en de forfaitaire koude-hulpenergie → `route_not_in_edition` |
+| 73 | β van de preferente opwekker onbekend | geen waarde; vermogens vereist (p. 925) | β = 0,5 (p. 936) | `unknown_beta_route`: zonder vermogen `generator_power_required` |
+| 74 | (9.85) forfaitaire hulpenergie | één set voor alle toestellen, ook warmtepompen: A 87,6 (vóór 2015 of onbekend) of 13,0 kWh (vanaf 2015), B 0,132, C 1,44/3,6, B_nom 24 kW (p. 334–336) | A 43,8 vanaf 2015; warmtepompen A 43,8, B 0,132, C 0,7, B_nom 3 (p. 338) | `device_aux_a_from_2015_kwh`, `heat_pump_aux_constants` |
+| 75 | (11.142) f_systype van E1 | 1,5 op de hele zone (p. 495) | gesplitst naar oppervlakte (11.139–11.141, p. 498–499) | `fan_systype_combined` |
+| 76 | Tabellen I.1/I.2 | één Ψ-kolom; detail 14 is 0,70; geen standaard 0,5 voor een positie zonder waarde (p. 786–788) | kolommen A en B, detail 14 0,03/0,13, standaard 0,5 (p. 793–796) | `psi_columns_and_default`, `psi_detail_14`; kolom B en een brug zonder positie → `route_not_in_edition` |
+| 77 | Werkelijke leidinglengte (9.4.2.3, 10.4.2.3) | alleen utiliteitsbouw; woningen forfaitair (p. 292, 363) | ook woningen (p. 294, 367) | `residential_actual_pipe_length`: `distributionSystem.actualPipeLengthM` bij een woonfunctie → `route_not_in_edition` |
+| 78 | (13.148a) debiet uit een kwaliteitsverklaring | bestaat niet (p. 590) | p. 594 | `declaredFlowM3PerH` → `route_not_in_edition`; de eis uit opmerking 3 vervalt |
+| 79 | (11.106a) koudeterugwinning met 100 % bypass | bestaat niet (p. 476) | p. 479 | `bypass.coldRecoveryEvidence` → `route_not_in_edition` |
+
+**Interpretatie bij punt 74.** De warmtepompinvoer van de kern heeft geen bouwjaar. Onder 2020+A1 krijgt een warmtepomp daarom A = 87,6 kWh ("vóór 2015 of onbekend"). Een gasketel met `installationYear` vanaf 2015 krijgt 13,0 kWh.
+
+**Niet omgeschakeld (geen invoer of geen route in de kern):**
+- de indicator E_wePRenTot (2022 p. 72) bestaat in 2020+A1 niet; de kern geeft hem alleen in het hoofdstuk-5-blok van 2025+C1, dat in oudere uitgaven `null` is;
+- de afrondingsregels van bijlage C (Rc op vier decimalen afgekapt in 2020+A1, p. 742; twee decimalen rekenkundig in 2022, p. 747), de tabellen C.3/C.4 voor sterk geventileerde spouwen (2020 p. 748–750) en de λ-afronding van tabel E.14 (2022 p. 784): de constructie-invoer van de kern levert Rc al als gegeven of rekent niet met deze rijen;
+- de belemmeringsregels voor koeling bij meerdere belemmeringen (2022 p. 677–678): de keuze van de methode is invoer;
+- de boosterwarmtepomp met zonneboiler (0,55 × Q_W;sol;us, 2022 p. 561–576): de kern heeft geen invoer voor die combinatie;
+- de aanwezigheidsfactor F_o;D voor kantoortuinen groter dan 30 m² (2022 p. 640): de regel is in 2022 verduidelijkt; de keuze `largeOfficeGroup` is invoer;
+- voorraadvaten groter dan 2 000 l (2022 p. 549): 2020+A1 noemt alleen vaten tot 2 000 l, zonder andere route;
+- de tapwaterwarmtepomp met "type vóór 2021" (2020 p. 584–594) en de klasse-eis bij warmtepompen (2022 p. 607): de keuze van de methode is invoer;
+- de forfaitaire Ψ-voorwaarden (Rc ≥ 4,5 in 2020+A1, ≥ 4,7 in 2022, detail 1): de adviseur toetst de voorwaarde.
+
+**Acceptatie met een openbaar rapport.** Er is geen openbaar rapport in 2020+A1 nagebouwd (r4 stond alleen in een tijdelijke werkmap). De acceptatie berust op de schakelpunttests en de verschiltest hieronder.
 
 ## Besluiten bij de invoering van 2023
 
@@ -206,6 +239,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - `crates/nta8800-core/tests/norm_versions.rs`: de projectroute (status, vingerafdruk, registratie, niet-geïmplementeerde en onbekende uitgaven) en verschiltests van de voorbeeldprojecten in 2024 tegen 2025+C1 en 2023 tegen 2024. Daarin verandert alleen wat de lijsten hierboven voorspellen: in 2023 tegen 2024 verandert de woning niet en het kantoor alleen in TOjuli (ΔT_fan, punt 25). Het voorbeeldkantoor gebruikt de ledkolom van tabel 14.3; die invoer wordt in 2023 geweigerd (punt 33), dus de verschiltest zet hem in beide uitgaven op "overig". De invoer `kitchenPipeDiameter` wordt buiten 2023 geweigerd.
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2023`), `ventilation.rs`, `annex_p.rs` en `tojuli.rs`: per schakelpunt van 2023 de waarde met de pagina in beide uitgaven.
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2022`), `forfait_heat_pump_draft.rs`, `annex_p.rs`, `ground.rs`, `forfait_envelope.rs`, `lighting.rs` en `tests/norm_versions.rs` (`edition_2022_*`, `example_projects_2022_*`, `thermal_mass_by_kg_per_m2_is_a_2022_route`): de schakelpunten van 2022. Op de voorbeeldprojecten verandert in 2022 tegen 2023 niets: geen van beide heeft invoer op een route die verschilt.
+- `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2020`), `annex_p.rs` (restwarmte) en `tests/norm_versions.rs` (`edition_2020a1_*`, `example_projects_2020a1_*`): de schakelpunten van 2020+A1. De verschiltest zet de PV-paneelroute van de voorbeelden om naar een opgegeven K_pk van 200 W/m² met hetzelfde piekvermogen. Tegen 2022 veranderen in beide voorbeelden alleen de grootheden die de hulpenergie van de warmtepomp volgen (punt 74): primair fossiel, CO2 en het hernieuwbare aandeel. Behoefte, TOjuli en omgevingswarmte blijven gelijk.
 - `crates/nta8800-core/tests/public_comparison.rs`: de openbare gevallen B en C (gepubliceerd in 2023) in 2023; zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md).
 - `crates/nta8800-service/tests/api.rs`: `supportedNormVersions` en een berekening in 2024 via HTTP.
 - Per route 2024 tegen 2025+C1 (verschil, stempel, status): `opname/mod.rs` en `opname/utility.rs` (`*_in_its_edition`), `maatwerkadvies.rs` (`variants_follow_the_base_edition`), `relabel.rs` (`relabel_keeps_the_original_edition`) en `registration.rs` (`relabel_in_the_original_edition_is_not_refused_as_legacy`).

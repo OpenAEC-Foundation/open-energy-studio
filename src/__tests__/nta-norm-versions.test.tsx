@@ -59,7 +59,7 @@ describe('NTA 8800 editions', () => {
     renderWithProviders(<NtaCalculationForm project={project} initial={{ normVersion: '2024' }}
       onSave={() => undefined} onCancel={() => undefined} />);
     const select = screen.getByLabelText('NTA 8800 edition') as HTMLSelectElement;
-    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024', '2023', '2022']);
+    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024', '2023', '2022', '2020+A1']);
     expect(select.value).toBe('2024');
     expect(screen.getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('NTA 8800 editions', () => {
       initial={{ normVersion: '2024', calculationScope: 'residential', hotWater } as never}
       onSave={() => undefined} onCancel={() => undefined} />);
     expect(screen.queryByLabelText(label)).toBeNull();
-    expect(screen.getByText(/only the 2022 and 2023 editions have this input/)).toBeInTheDocument();
+    expect(screen.getByText(/only the 2020\+A1, 2022 and 2023 editions have this input/)).toBeInTheDocument();
   });
 
   it('offers the 2023 heating-emission description only for the 2023 edition', () => {
@@ -95,6 +95,35 @@ describe('NTA 8800 editions', () => {
       initial={{ normVersion: '2024', calculationScope: 'residential', emission } as never}
       onSave={() => undefined} onCancel={() => undefined} />);
     expect(screen.queryByLabelText(label)).toBeNull();
-    expect(screen.getByText(/only the 2022 and 2023 editions have this input/)).toBeInTheDocument();
+    expect(screen.getByText(/only the 2020\+A1, 2022 and 2023 editions have this input/)).toBeInTheDocument();
+  });
+
+  it('offers the 2022-only inputs only for the 2022 edition and flags values left behind', () => {
+    const project = createDefaultProject();
+    const initial = {
+      calculationScope: 'utility',
+      groundFloors: [{ below: { kind: 'crawlspace', floorResistanceM2kPerW: 3.5, depthClass: 'other', wallResistanceM2kPerW: 2,
+        wallUValueWPerM2k: 0.4, wallHeightAboveGroundM: 0.3 } }],
+      hotWater: { storage: [{ id: 'v1', volumeL: 80, loss: { method: 'forfait' }, connectionFactor: 2, electricBoilerInsulatedPipe: true,
+        inHeatedZone: true, sourceReference: '' }] },
+      lighting: [{ lightingZones: [{ id: 'z1', areaM2: 100, power: { method: 'forfait', ledFrom2017: false }, parasitic: { method: 'forfait' },
+        occupancy: { control: 'manual_or_unknown', centralOnControl: false }, daylight: { method: 'none' }, extractedLuminaires: false,
+        constantIlluminance: 'led_l80' }] }],
+    };
+    const height = 'Wall height above ground level to the top of the ground floor h (m, NTA 8800:2022 formula 8.47)';
+    const boiler = 'Electric boiler with insulated hot-water pipes (f_sto;dis;ls = 1.5, NTA 8800:2022 § 13.6.3)';
+    const illuminance = 'Constant-illuminance control (NTA 8800:2022 table 14.4)';
+    const { unmount } = renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ ...initial, normVersion: '2022' } as never} onSave={() => undefined} onCancel={() => undefined} />);
+    expect((screen.getByLabelText(height) as HTMLInputElement).value).toBe('0.3');
+    expect((screen.getByLabelText(boiler) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(illuminance) as HTMLSelectElement).value).toBe('led_l80');
+    unmount();
+    renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ ...initial, normVersion: '2023' } as never} onSave={() => undefined} onCancel={() => undefined} />);
+    expect(screen.queryByLabelText(height)).toBeNull();
+    expect(screen.queryByLabelText(boiler)).toBeNull();
+    expect(screen.queryByLabelText(illuminance)).toBeNull();
+    expect(screen.getAllByText(/only the 2022 and 2020\+A1 editions have this input/)).toHaveLength(3);
   });
 });

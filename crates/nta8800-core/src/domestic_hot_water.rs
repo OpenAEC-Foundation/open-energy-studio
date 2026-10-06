@@ -2290,9 +2290,18 @@ pub fn validate_hot_water(
                     &format!("{exhaust_field}.declaredFlowM3PerH"),
                 );
             }
+            // (13.148a) is new in NTA 8800:2022 (p. 594; 2020+A1 p. 590).
+            let declared_route = crate::norm_versions::profile().declared_exhaust_air_flow_route;
+            if !declared_route && exhaust.declared_flow_m3_per_h.is_some() {
+                push(
+                    "route_not_in_edition",
+                    &format!("{exhaust_field}.declaredFlowM3PerH"),
+                );
+            }
             // 13.148 note 3: with measured efficiencies the flow comes from
             // the declaration with the measurements.
-            if exhaust.declared_flow_m3_per_h.is_none()
+            if declared_route
+                && exhaust.declared_flow_m3_per_h.is_none()
                 && matches!(
                     generator,
                     HotWaterGenerator::HeatPumpEn16147 { .. }

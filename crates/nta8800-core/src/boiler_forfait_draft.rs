@@ -348,7 +348,8 @@ pub fn assess_boiler_forfait_monthly_draft(
         .installation_year
         .is_some_and(|year| year >= 2015)
     {
-        43.8
+        // 13,0 kWh in NTA 8800:2020+A1 (p. 336), 43,8 from 2022 (p. 338).
+        crate::norm_versions::profile().device_aux_a_from_2015_kwh
     } else {
         87.6
     };

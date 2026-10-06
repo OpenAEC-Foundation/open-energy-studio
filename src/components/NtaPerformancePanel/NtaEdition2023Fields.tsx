@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { useI18n } from '../../i18n/i18n';
 import { CheckField, NumberField, read, SelectField, type Draft, type Path } from './NtaFormFields';
 
-// Inputs that NTA 8800:2023 has and 2022 keeps (the kernel profile of 2022
-// is cumulative on 2023). Under another edition a value left
+// Inputs that NTA 8800:2023 has and 2022 and 2020+A1 keep (the kernel
+// profiles of the older editions are cumulative on 2023). Under another edition a value left
 // behind is offered for removal (the kernel reports route_not_in_edition),
 // as for the table 13.2 kitchen pipe diameter.
 
@@ -12,7 +12,7 @@ type Change = (path: Path, value: unknown) => void;
 function Only2023({ draft, change, path, label, children }:
   { draft: Draft; change: Change; path: Path; label: string; children: ReactNode }) {
   const { t } = useI18n();
-  if (['2023', '2022'].includes(read(draft, ['normVersion']) as string)) return <>{children}</>;
+  if (['2023', '2022', '2020+A1'].includes(read(draft, ['normVersion']) as string)) return <>{children}</>;
   const left = read(draft, path);
   if (left == null || left === false) return null;
   return <p className="nta-form-note nta-form-error" role="alert">

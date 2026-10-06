@@ -96,6 +96,9 @@ pub const K_CO2_EL: f64 = 0.268;
 pub const F_PREN_ELEC: f64 = 1.45;
 /// P.6.5.4.7: specific auxiliary energy to make residual heat available.
 pub const RESIDUAL_HEAT_AUX: f64 = 0.07;
+/// NTA 8800:2020+A1 tables 5.5/5.6 (p. 109–110): residual heat (rw).
+pub const RESIDUAL_HEAT_PRIMARY_2020: f64 = 0.1;
+pub const RESIDUAL_HEAT_CO2_2020: f64 = 0.034;
 /// P.29: `Δε_chp;el / ε_chp;th` for CHP with power loss.
 pub const CHP_LOSS_RATIO: f64 = 0.18;
 /// P.6.5.4.8: geothermal efficiency at 40 K cooling.
@@ -2242,6 +2245,28 @@ fn factors(
         GeneratorKind::ResidualHeat {
             auxiliary_specific,
             auxiliary_reference,
+        } if crate::norm_versions::profile().residual_heat_fixed_factors => {
+            // NTA 8800:2020+A1 P.6.5.4.7 (p. 933) with tables 5.5/5.6 and
+            // (5.47) (p. 109–113): η = 1, f_P;del;rw 0,1, K_CO2 0,034 and
+            // f_Pren 0,9; a different efficiency includes the auxiliary
+            // energy, so there is no f_rw;aux;spec.
+            if auxiliary_specific.is_some() || auxiliary_reference.is_some() {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("{kpath}.auxiliarySpecific"),
+                ));
+                return None;
+            }
+            Some(GenFactors {
+                f: RESIDUAL_HEAT_PRIMARY_2020,
+                k: RESIDUAL_HEAT_CO2_2020,
+                pren: 1.0 - RESIDUAL_HEAT_PRIMARY_2020,
+                ..GenFactors::default()
+            })
+        }
+        GeneratorKind::ResidualHeat {
+            auxiliary_specific,
+            auxiliary_reference,
         } => {
             let aux = match auxiliary_specific {
                 Some(value) => {
@@ -3294,6 +3319,10 @@ fn distribution(
             if system.function == SystemFunction::Cooling || *connections == 0 {
                 issues.push(issue("small_system_forfait_invalid", dpath.clone()));
             }
+            // Table P.0 is new in NTA 8800:2022 (p. 930; 2020+A1 p. 920).
+            if !crate::norm_versions::profile().small_system_forfait_route {
+                issues.push(issue("route_not_in_edition", dpath.clone()));
+            }
             if !other_loss_kwh.is_finite() || *other_loss_kwh < 0.0 {
                 issues.push(issue("value_invalid", format!("{dpath}.otherLossKwh")));
             }
@@ -3963,6 +3992,11 @@ fn energy_fractions(
                         }
                         None => {
                             known = false;
+                            // β 0,5 for an unknown ratio is new in NTA 8800:2022
+                            // (p. 936); 2020+A1 (p. 925) needs the powers.
+                            if !crate::norm_versions::profile().unknown_beta_route {
+                                ok &= require_powers(input, group, path, issues);
+                            }
                             UNKNOWN_BETA
                         }
                     };
@@ -4149,9 +4183,22 @@ fn auxiliary_energy(
             network,
             farthest_distance_km,
         } => {
+            let edition = crate::norm_versions::profile().small_system_forfait_route;
             let specific = match ctx.function {
                 SystemFunction::HotWater => Some(SECONDARY_AUX_SPECIFIC),
+                // The 0,009 0 cold forfait is new in NTA 8800:2022 (p. 981;
+                // 2020+A1 p. 969).
+                SystemFunction::Cooling if !edition => {
+                    issues.push(issue("route_not_in_edition", apath.clone()));
+                    None
+                }
                 SystemFunction::Cooling => Some(COLD_AUX_SPECIFIC),
+                SystemFunction::Heating
+                    if !edition && *network == Some(AuxiliaryNetwork::SmallSystem) =>
+                {
+                    issues.push(issue("route_not_in_edition", format!("{apath}.network")));
+                    None
+                }
                 SystemFunction::Heating => match network {
                     None => {
                         issues.push(issue(
@@ -5075,6 +5122,37 @@ mod tests {
             });
         close(residual_2023.0, 0.07 * 1.45);
         close(residual_2023.2, 0.8985);
+        // NTA 8800:2020+A1 tables 5.5/5.6 and (5.47) (p. 109–113, 933):
+        // f_P;del;rw 0,1, K_CO2 0,034, f_Pren 0,9; no f_rw;aux;spec.
+        let residual_2020 =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2020A1, || {
+                let fixed = generator_factors(
+                    &GeneratorKind::ResidualHeat {
+                        auxiliary_specific: None,
+                        auxiliary_reference: None,
+                    },
+                    SystemFunction::Heating,
+                    "g",
+                    &mut issues,
+                )
+                .unwrap();
+                let mut refused = Vec::new();
+                let declared = generator_factors(
+                    &GeneratorKind::ResidualHeat {
+                        auxiliary_specific: Some(0.05),
+                        auxiliary_reference: Some("verklaring".into()),
+                    },
+                    SystemFunction::Heating,
+                    "g",
+                    &mut refused,
+                );
+                assert!(declared.is_none());
+                assert_eq!(refused[0].code, "route_not_in_edition");
+                fixed
+            });
+        close(residual_2020.0, 0.1);
+        close(residual_2020.1, 0.034);
+        close(residual_2020.2, 0.9);
         // Geothermal 83/40 °C: Δθ = 40 K → η = 20, f_Pren 0,95 (5.48).
         let geo = generator_factors(
             &GeneratorKind::Geothermal {

@@ -2,6 +2,17 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 6 oktober 2026 — NTA 8800:2020+A1
+
+De uitgave `"2020+A1"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2022, plus de punten 68–79 in docs/nta8800-normversies.md:
+- PV (16.4): K_pk per m² naar beneden afgerond op 5 W/m²; de paneelroute (`peakPower.method: panels`) bestaat niet;
+- λ_equi;ntr 0,045; (P.25) met deler 4 000; restwarmte met f_P;del 0,1, K_CO2 0,034 en f_Pren 0,9;
+- (9.85): A = 13,0 kWh voor toestellen vanaf 2015 en dezelfde forfaitaire set voor warmtepompen (A 87,6, B 0,132, C 0,4, B_nom 24);
+- (11.142): f_systype 1,5 voor systeem E1; tabel I.1 met één kolom en detail 14 = 0,70;
+- geweigerd met `route_not_in_edition`: tabel P.0 en de kleine-systeemwaarden van bijlage P, β = 0,5 bij onbekende vermogens, kolom B en de standaard-Ψ van 0,5, de werkelijke leidinglengte bij woningen, (13.148a) en (11.106a).
+
+De 2022-invoer (massa per m², wandhoogte, elektroboiler met geïsoleerde leiding, constante-lichtsterkteregeling) heeft nu velden in het formulier en is zichtbaar onder 2022 en 2020+A1. Resultaten onder 2022, 2023, 2024 en 2025+C1 zijn ongewijzigd.
+
 ## 6 oktober 2026 — NTA 8800:2022
 
 De uitgave `"2022"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2023, plus de punten 49–67 in docs/nta8800-normversies.md:

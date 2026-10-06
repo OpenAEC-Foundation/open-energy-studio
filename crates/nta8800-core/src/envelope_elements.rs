@@ -347,10 +347,18 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
         if b.description.trim().is_empty() {
             push("source_reference_required", format!("{path}.description"));
         }
+        let edition = crate::norm_versions::profile().psi_columns_and_default;
         if let Some(position) = b.position {
-            if forfait_psi(position, b.variant, b.column).is_none() {
+            if !edition && b.column == PsiColumn::B {
+                // NTA 8800:2020+A1 tables I.1/I.2 (p. 786–788): one column.
+                push("route_not_in_edition", format!("{path}.column"));
+            } else if forfait_psi(position, b.variant, b.column).is_none() {
                 push("bridge_position_not_in_table", format!("{path}.position"));
             }
+        } else if !edition {
+            // The 0,5 W/(m·K) of a position without a value is new in 2022
+            // (p. 793).
+            push("route_not_in_edition", format!("{path}.position"));
         }
     }
     if input.forfait_supplement && !input.forfait_bridges.is_empty() {

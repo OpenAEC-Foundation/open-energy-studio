@@ -744,7 +744,7 @@ mod switch_points_2022 {
         let p23 = NormVersion::V2023.profile();
         assert!(NormVersion::V2022.implemented());
         assert!(!NormVersion::V2022.registration_eligible());
-        assert!(!NormVersion::V2020A1.implemented());
+        assert!(NormVersion::V2020A1.implemented());
         assert_eq!(p22.version, NormVersion::V2022);
         assert_eq!(NormVersion::V2022.label(), "NTA 8800:2022");
         // Everything 2023 has against 2024 holds in 2022 too.
@@ -847,5 +847,124 @@ mod switch_points_2022 {
         // 2022 p. 639 with (14.15) and F_CC = 1: 1 − ½·(1 − MF).
         assert!((ConstantIlluminance::LinearFluorescent.compensation_factor() - 0.9).abs() < 1e-12);
         assert!((ConstantIlluminance::LedL80.compensation_factor() - 0.85).abs() < 1e-12);
+    }
+}
+
+/// NTA 8800:2020+A1 against 2022: each value with the page of both editions.
+mod switch_points_2020 {
+    use crate::forfait_envelope::{forfait_psi, PsiColumn};
+    use crate::norm_versions::{with_version, NormVersion};
+    use crate::pv::PeakPower;
+
+    fn v2020<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2020A1, body)
+    }
+
+    fn v2022<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2022, body)
+    }
+
+    fn close(a: f64, b: f64) {
+        assert!((a - b).abs() < 1e-9, "{a} != {b}");
+    }
+
+    #[test]
+    fn profile_2020_is_2022_plus_its_own_differences() {
+        let p20 = NormVersion::V2020A1.profile();
+        let p22 = NormVersion::V2022.profile();
+        assert!(NormVersion::V2020A1.implemented());
+        assert!(!NormVersion::V2020A1.registration_eligible());
+        assert_eq!(p20.version, NormVersion::V2020A1);
+        assert_eq!(NormVersion::V2020A1.label(), "NTA 8800:2020+A1:2020");
+        // Everything 2022 has against 2023 holds in 2020+A1 too.
+        assert!(p20.heat_pump_tables_2022 && p20.thermal_mass_by_kg_per_m2);
+        assert!(!p20.crawl_wall_height_fixed && p20.lighting_maintenance_factor);
+        assert_eq!(
+            p20.mineral_wool_flakes_ageing,
+            p22.mineral_wool_flakes_ageing
+        );
+        // (I.2) 2020 p. 796: 0,045; 2022 p. 805: 0,06.
+        assert_eq!((p20.lambda_equi_ntr, p22.lambda_equi_ntr), (0.045, 0.06));
+        assert!(!p20.lambda_equi_known_route);
+        // (P.25) 2020 p. 925: 4 000; 2022 p. 937: 8 800.
+        assert_eq!(
+            (p20.reference_power_divisor, p22.reference_power_divisor),
+            (4000.0, 8800.0)
+        );
+        // 9.85 forfait A from 2015: 2020 p. 336 13,0; 2022 p. 338 43,8.
+        assert_eq!(
+            (
+                p20.device_aux_a_from_2015_kwh,
+                p22.device_aux_a_from_2015_kwh
+            ),
+            (13.0, 43.8)
+        );
+        // (11.142) 2020 p. 495: f_systype 1,5 for E1.
+        assert_eq!(p20.fan_systype_combined, Some(1.5));
+        assert_eq!(p22.fan_systype_combined, None);
+        // 2020 p. 786: Ψ detail 14 0,70; 2022 p. 793: 0,03.
+        assert_eq!((p20.psi_detail_14, p22.psi_detail_14), (0.70, 0.03));
+        for (own, later) in [
+            (p20.pv_kpk_per_m2_floor, !p22.pv_kpk_per_m2_floor),
+            (
+                p20.residual_heat_fixed_factors,
+                !p22.residual_heat_fixed_factors,
+            ),
+            (
+                !p20.small_system_forfait_route,
+                p22.small_system_forfait_route,
+            ),
+            (!p20.unknown_beta_route, p22.unknown_beta_route),
+            (!p20.heat_pump_aux_constants, p22.heat_pump_aux_constants),
+            (!p20.psi_columns_and_default, p22.psi_columns_and_default),
+            (
+                !p20.residential_actual_pipe_length,
+                p22.residential_actual_pipe_length,
+            ),
+            (
+                !p20.declared_exhaust_air_flow_route,
+                p22.declared_exhaust_air_flow_route,
+            ),
+            (!p20.cold_recovery_route, p22.cold_recovery_route),
+        ] {
+            assert!(own && later);
+        }
+    }
+
+    #[test]
+    fn pv_peak_power_per_m2_is_floored_to_5_w() {
+        // 2020 p. 651: K_pk 203 → 200 W/m², area as given; 2022 p. 657:
+        // two decimals for both.
+        let declared = PeakPower::DeclaredSpecific {
+            peak_power_w_per_m2: 203.0,
+            panel_area_m2: 1.234,
+        };
+        close(v2020(|| declared.kw()), 200.0 * 1.234 / 1000.0);
+        close(v2022(|| declared.kw()), 203.0 * 1.23 / 1000.0);
+    }
+
+    #[test]
+    fn table_i1_has_one_column_and_detail_14_is_0_70() {
+        // 2020 p. 786: detail 14 0,70; 2022 p. 793: 0,03 / 0,13.
+        assert_eq!(v2020(|| forfait_psi(14, 0, PsiColumn::A)), Some(0.70));
+        assert_eq!(v2022(|| forfait_psi(14, 0, PsiColumn::A)), Some(0.03));
+        assert_eq!(v2020(|| forfait_psi(1, 0, PsiColumn::A)), Some(0.27));
+        assert_eq!(v2020(|| forfait_psi(1, 0, PsiColumn::B)), None);
+        assert_eq!(v2022(|| forfait_psi(1, 0, PsiColumn::B)), Some(0.41));
+    }
+
+    #[test]
+    fn heat_pumps_take_the_device_aux_forfait() {
+        // 2020 p. 334–336: A 87,6, B 0,132, C 1,44/3,6, B_nom 24; 2022
+        // p. 338: A 43,8, B 0,132, C 0,7, B_nom 3.
+        let aux = crate::space_heating_chain::heat_pump_forfait_auxiliary_kwh;
+        close(
+            v2020(|| aux(100.0)),
+            87.6 / 12.0 + 0.132 * 100.0 / (0.4 * 24.0),
+        );
+        close(
+            v2022(|| aux(100.0)),
+            43.8 / 12.0 + 0.132 * 100.0 / (0.7 * 3.0),
+        );
     }
 }

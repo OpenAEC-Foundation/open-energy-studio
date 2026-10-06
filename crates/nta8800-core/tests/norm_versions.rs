@@ -111,17 +111,6 @@ fn registration_refuses_an_older_edition() {
 }
 
 #[test]
-fn edition_without_profile_is_refused() {
-    let result = assess_project_performance(&project(DWELLING, Some("2020+A1")));
-    assert_eq!(result.status, "invalid");
-    let performance = result.performance.as_ref().unwrap();
-    assert!(performance
-        .issues
-        .iter()
-        .any(|issue| issue.code == "edition_not_implemented"));
-}
-
-#[test]
 fn unknown_edition_is_an_input_gap() {
     let result = assess_project_performance(&project(DWELLING, Some("2019")));
     assert_eq!(result.status, "incomplete");
@@ -398,4 +387,81 @@ fn thermal_mass_by_kg_per_m2_is_a_2022_route() {
         .iter()
         .any(|issue| issue.code == "route_not_in_edition"
             && issue.path.ends_with("thermalMass.massKgPerM2")));
+}
+
+#[test]
+fn edition_2020a1_is_calculated_but_not_registrable() {
+    for json in [DWELLING, OFFICE] {
+        let result = assess_project_performance(&project_2020_compatible(json, "2020+A1"));
+        assert_eq!(
+            result.status,
+            "calculated_legacy_edition",
+            "{:?} {:?}",
+            result.gaps,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        assert_eq!(result.norm_version, NormVersion::V2020A1);
+        assert!(!result.registration_eligible);
+        assert_eq!(result.target_norm_version, "NTA 8800:2020+A1:2020");
+        let performance = result.performance.as_ref().unwrap();
+        assert!(!performance
+            .issues
+            .iter()
+            .any(|issue| issue.code == "edition_not_implemented"));
+    }
+}
+
+/// 2020+A1 against 2022 on the example projects. Both projects have a heat
+/// pump; the energy need, TOjuli and ambient heat stay the same and only
+/// the quantities fed by the auxiliary energy change: 9.85 has one forfait
+/// for all devices in 2020+A1 (p. 334–336) against own heat-pump constants
+/// from 2022 (p. 338).
+#[test]
+fn example_projects_2020a1_differ_from_2022_only_where_the_editions_differ() {
+    let run = |json, edition| assess_project_performance(&project_2020_compatible(json, edition));
+    let allowed = [
+        "annualCo2Kg",
+        "annualPrimaryFossilKwh",
+        "co2KgPerM2",
+        "labelPrimaryFossilIndicatorKwhPerM2Year",
+        "labelRenewableSharePercent",
+        "primaryFossilIndicatorKwhPerM2Year",
+        "renewableSharePercent",
+        "indicativeLabelClass",
+    ];
+    for json in [DWELLING, OFFICE] {
+        let legacy = run(json, "2020+A1");
+        assert_eq!(
+            legacy.status,
+            "calculated_legacy_edition",
+            "{:?}",
+            legacy.performance.as_ref().map(|item| &item.issues)
+        );
+        let changed = changed_keys(&run(json, "2022"), &legacy);
+        assert!(
+            changed.iter().all(|key| allowed.contains(&key.as_str())),
+            "{changed:?}"
+        );
+    }
+}
+
+/// The 16.4b panel route is not in NTA 8800:2020+A1 (p. 651): the example
+/// panels become a declared K_pk of 200 W/m² over the same peak power.
+fn project_2020_compatible(json: &str, edition: &str) -> Value {
+    let mut value = project_2023_compatible(json, edition);
+    if let Some(systems) = value["ntaCalculation"]["pvSystems"].as_array_mut() {
+        for system in systems {
+            let peak = &system["peakPower"];
+            if peak["method"] == "panels" {
+                let watt = peak["panelPeakPowerW"].as_f64().unwrap()
+                    * peak["panelCount"].as_f64().unwrap();
+                system["peakPower"] = json!({
+                    "method": "declared_specific",
+                    "peakPowerWPerM2": 200.0,
+                    "panelAreaM2": watt / 200.0,
+                });
+            }
+        }
+    }
+    value
 }

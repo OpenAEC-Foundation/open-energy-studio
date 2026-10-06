@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n/i18n';
+import { ElectricBoilerInsulatedPipe2022Field } from './NtaEdition2022Fields';
 import type { IProject } from '../../core/energy/types';
 import {
   additionalHotWaterGeneratorTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
@@ -21,7 +22,7 @@ import {
 export function KitchenPipeDiameterField({ draft, change, path }: { draft: Draft; change: (path: Path, value: unknown) => void; path: Path }) {
   const { t } = useI18n();
   const value = read(draft, path);
-  if (['2023', '2022'].includes(read(draft, ['normVersion']) as string)) {
+  if (['2023', '2022', '2020+A1'].includes(read(draft, ['normVersion']) as string)) {
     return <SelectField draft={draft} onChange={change} path={path} label={t('ntaStep.kitchenPipeDiameter')}
       options={(['up_to_8_mm', 'up_to_10_mm', 'other'] as const).map((key) => [key, t(`ntaStep.kitchenPipeDiameter.${key}`)])} />;
   }
@@ -455,6 +456,7 @@ export function HotWaterStorageFields({ draft, change, base = ['hotWater'] }: Se
         <SelectField {...field} path={at('connectionFactor')} label={t('nta.form.vessel.connection')}
           options={['1', '2', '3', '4', '5'].map((key) => [key, key])}
           onChange={(path, value) => change(path, value == null ? null : Number(value))} />
+        <ElectricBoilerInsulatedPipe2022Field draft={draft} change={change} path={at('electricBoilerInsulatedPipe')} />
         <CheckField {...field} path={at('inHeatedZone')} label={t('nta.form.vessel.heated')} />
         {!heated && <NumberField {...field} path={at('unheatedAmbientC')} label={t('nta.form.vessel.ambient')} />}
         <CheckField {...field} path={at('notInApplianceTest')} label={t('nta.form.vessel.notInTest')} />

@@ -93,6 +93,14 @@ const PSI_TABLE: &[(u16, u8, f64, f64)] = &[
 /// exist (use [`PSI_DEFAULT`] only for genuinely missing positions).
 pub fn forfait_psi(position: u16, variant: u8, column: PsiColumn) -> Option<f64> {
     // Detail 17: 0,06 / 0,09 from 2024 (p. 803), 0,60 / 0,90 in 2023 (p. 804).
+    // NTA 8800:2020+A1 tables I.1/I.2 (p. 786–788) have one Ψ column.
+    if column == PsiColumn::B && !crate::norm_versions::profile().psi_columns_and_default {
+        return None;
+    }
+    // Detail 14: 0,70 in 2020+A1 (p. 786), 0,03 / 0,13 from 2022 (p. 793).
+    if (position, variant) == (14, 0) && column == PsiColumn::A {
+        return Some(crate::norm_versions::profile().psi_detail_14);
+    }
     if (position, variant) == (17, 0) {
         let psi = crate::norm_versions::profile().psi_detail_17;
         return Some(match column {
