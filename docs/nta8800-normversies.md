@@ -76,6 +76,8 @@ Bovenop de achttien punten hierboven. Pagina's links uit NTA 8800:2023, rechts u
 | 30 | Biomassagrens bmA | 100 kW (p. 90–93) | 500 kW (p. 92–95) | `biomass_class_limit_kw`; het invoerveld `biomassAbove500Kw` betekent "boven de grens van de uitgave" |
 | 31 | Bijlage AA als bewijs koelcapaciteit (5.7.1) | bestaat niet; actieve koeling met voldoende capaciteit geldt als voldaan (p. 103–104) | p. 106, 1115–1127 | `capacity.method: annex_aa` → `route_not_in_edition` |
 | 32 | Renovatiestandaard (tabel 5.7) | bestaat niet (p. 70–72) | p. 73–74 | `null` (hoofdstuk-5-indicatoren zijn in beide oudere uitgaven al `null`) |
+| 33 | Tabel 14.3 kolom "led vanaf 2017" | één kolom (p. 648) | 16 / 12 W/m² (p. 646) | `ledFrom2017: true` → `route_not_in_edition` |
+| 34 | Roeden in U_w (8.17)/(8.18) | geen term (p. 214–218) | p. 219–222 | `glazingBars` → `route_not_in_edition` |
 
 Gelijk in 2023 en 2024, dus geen schakelpunt: K_CO2 (tabel 5.3, p. 92–93; AVI tabel 5.6, p. 114), f_P el 1,45 en gas 1,0 (tabel 5.2, p. 89), λequi;ntr 0,045 (p. 814–815; alleen 2022 had 0,06), (I.3) d/0,2 (p. 815), tabel 13.18 (p. 617) en EER_bron 23/16 voor een WKO-bron (9.6.8.1.1.2.3, p. 349).
 
@@ -98,7 +100,7 @@ Vóór het programmeren nagelopen in de 2023-PDF:
 - Beschaduwing: f_sh;with wordt in 2023 voor woningen niet op 0 gezet (p. 179–183).
 - Bronwarmte: drempel ≥ 20 °C en de bronterm binnen (9.84) (p. 326, 343). De kern volgt de 2024-route van 9.6.3.1.3.
 - Restwarmte f_Pren = 1 − f_P;del;rw (p. 116–121).
-- Paneel-U volgens bouwjaar (I.13/I.14, p. 818–821); geen roedenterm (8.17/8.18, p. 214–218); geen terugvalwaarde U_fr uit tabel 8.3 (p. 221); geen omrekening U_rc van lichtkoepels (p. 207); geen kolom LED vanaf 2017 in tabel 14.3 (p. 648). Invoer voor deze 2024-routes wordt in 2023 nog niet geweigerd.
+- Paneel-U volgens bouwjaar (I.13/I.14, p. 818–821); geen terugvalwaarde U_fr uit tabel 8.3 (p. 221); geen omrekening U_rc van lichtkoepels (p. 207). De kern rekent hier met de 2024-route.
 
 ## Geen schakelpunt: rechtgezet door INT-V1:2024
 
@@ -134,7 +136,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 
 - `crates/nta8800-core/src/norm_versions/tests.rs`: standaarduitgave, serde, het herstellen van de thread-local (ook na een paniek) en de profielwaarden met paginaverwijzing.
 - Per schakelpunt een eenheidstest in de module van het schakelpunt, met de paginaverwijzing in de test.
-- `crates/nta8800-core/tests/norm_versions.rs`: de projectroute (status, vingerafdruk, registratie, niet-geïmplementeerde en onbekende uitgaven) en verschiltests van de voorbeeldprojecten in 2024 tegen 2025+C1 en 2023 tegen 2024. Daarin verandert alleen wat de lijsten hierboven voorspellen: in 2023 tegen 2024 verandert de woning niet en het kantoor alleen in TOjuli (ΔT_fan, punt 25). De invoer `kitchenPipeDiameter` wordt buiten 2023 geweigerd.
+- `crates/nta8800-core/tests/norm_versions.rs`: de projectroute (status, vingerafdruk, registratie, niet-geïmplementeerde en onbekende uitgaven) en verschiltests van de voorbeeldprojecten in 2024 tegen 2025+C1 en 2023 tegen 2024. Daarin verandert alleen wat de lijsten hierboven voorspellen: in 2023 tegen 2024 verandert de woning niet en het kantoor alleen in TOjuli (ΔT_fan, punt 25). Het voorbeeldkantoor gebruikt de ledkolom van tabel 14.3; die invoer wordt in 2023 geweigerd (punt 33), dus de verschiltest zet hem in beide uitgaven op "overig". De invoer `kitchenPipeDiameter` wordt buiten 2023 geweigerd.
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2023`), `ventilation.rs`, `annex_p.rs` en `tojuli.rs`: per schakelpunt van 2023 de waarde met de pagina in beide uitgaven.
 - `crates/nta8800-core/tests/public_comparison.rs`: de openbare gevallen B en C (gepubliceerd in 2023) in 2023; zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md).
 - `crates/nta8800-service/tests/api.rs`: `supportedNormVersions` en een berekening in 2024 via HTTP.

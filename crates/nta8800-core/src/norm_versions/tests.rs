@@ -327,6 +327,10 @@ mod switch_points_2023 {
         assert!(!p23.annex_aa_route && p24.annex_aa_route);
         assert!(!p23.renovation_standard && p24.renovation_standard);
         assert!(p23.kitchen_diameter_rows && !p24.kitchen_diameter_rows);
+        // Table 14.3 (2023 p. 648, 2024 p. 646) and (8.17)/(8.18) (2023
+        // p. 214–218, 2024 p. 219–222).
+        assert!(!p23.led_2017_column && p24.led_2017_column);
+        assert!(!p23.glazing_bar_term && p24.glazing_bar_term);
     }
 
     #[test]

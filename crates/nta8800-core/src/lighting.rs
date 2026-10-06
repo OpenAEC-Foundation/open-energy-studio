@@ -603,6 +603,23 @@ pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> 
         .iter()
         .filter(|item| matches!(item.power, InstalledPower::Forfait { .. }))
         .count();
+    // Table 14.3: the LED-from-2017 column exists from 2024 (p. 646), not in
+    // 2023 (p. 648).
+    if !crate::norm_versions::profile().led_2017_column {
+        for (index, item) in zone.lighting_zones.iter().enumerate() {
+            if matches!(
+                item.power,
+                InstalledPower::Forfait {
+                    led_from_2017: true
+                }
+            ) {
+                push(
+                    "route_not_in_edition",
+                    format!("lightingZones[{index}].power.ledFrom2017"),
+                );
+            }
+        }
+    }
     if forfait_power != 0 && forfait_power != zone.lighting_zones.len() {
         // §14.3.4: the forfait applies to all lighting zones of the zone.
         push("lighting_forfait_mixed", "lightingZones".into());
@@ -1061,6 +1078,26 @@ mod tests {
             },
             extracted_luminaires: false,
         }
+    }
+
+    /// Table 14.3: the LED-from-2017 column exists from 2024 (p. 646), not
+    /// in 2023 (p. 648).
+    #[test]
+    fn led_from_2017_is_not_in_2023() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let zone = office(vec![forfait_zone(200.0)]);
+        assert!(matches!(
+            zone.lighting_zones[0].power,
+            InstalledPower::Forfait {
+                led_from_2017: true
+            }
+        ));
+        assert!(
+            with_version(NormVersion::V2024, || validate_lighting(&zone, 200.0, "l")).is_empty()
+        );
+        let issues = with_version(NormVersion::V2023, || validate_lighting(&zone, 200.0, "l"));
+        assert!(issues.iter().any(|item| item.code == "route_not_in_edition"
+            && item.path == "l.lightingZones[0].power.ledFrom2017"));
     }
 
     /// §14.5.1 (p. 664): the large-group rule outside an office function

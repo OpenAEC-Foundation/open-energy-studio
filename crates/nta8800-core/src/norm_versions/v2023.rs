@@ -87,4 +87,8 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     annex_aa_route: false,
     // No renovatiestandaard and no table 5.7 in chapter 5 (5.3.1, p. 70–72).
     renovation_standard: false,
+    // Table 14.3 (p. 648): one column, no LED value.
+    led_2017_column: false,
+    // 8.3 (p. 214–218): no glazing-bar term.
+    glazing_bar_term: false,
 };

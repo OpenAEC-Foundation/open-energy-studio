@@ -190,11 +190,31 @@ fn example_projects_differ_only_where_the_editions_differ() {
     }
 }
 
+/// The example office uses the LED-from-2017 column of table 14.3, which
+/// NTA 8800:2023 does not have (p. 648); for 2023 it is set to "overig".
+fn project_2023_compatible(json: &str, edition: &str) -> Value {
+    fn clear(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                if let Some(led) = map.get_mut("ledFrom2017") {
+                    *led = json!(false);
+                }
+                map.values_mut().for_each(clear);
+            }
+            Value::Array(items) => items.iter_mut().for_each(clear),
+            _ => {}
+        }
+    }
+    let mut value = project(json, Some(edition));
+    clear(&mut value);
+    value
+}
+
 /// NTA 8800:2023 is calculated as an older edition with its own label.
 #[test]
 fn edition_2023_is_calculated_but_not_registrable() {
     for json in [DWELLING, OFFICE] {
-        let result = assess_project_performance(&project(json, Some("2023")));
+        let result = assess_project_performance(&project_2023_compatible(json, "2023"));
         assert_eq!(
             result.status, "calculated_legacy_edition",
             "{:?}",
@@ -205,6 +225,16 @@ fn edition_2023_is_calculated_but_not_registrable() {
         assert_eq!(result.target_norm_version, "NTA 8800:2023");
         assert!(result.performance.as_ref().unwrap().chapter5.is_none());
     }
+    // Unchanged, the office asks for a 2024 column.
+    let office = assess_project_performance(&project(OFFICE, Some("2023")));
+    assert_eq!(office.status, "invalid");
+    assert!(office
+        .performance
+        .as_ref()
+        .unwrap()
+        .issues
+        .iter()
+        .any(|issue| issue.code == "route_not_in_edition" && issue.path.ends_with("ledFrom2017")));
 }
 
 fn changed_keys(a: &ProjectPerformanceAssessment, b: &ProjectPerformanceAssessment) -> Vec<String> {
@@ -224,13 +254,13 @@ fn changed_keys(a: &ProjectPerformanceAssessment, b: &ProjectPerformanceAssessme
         .collect()
 }
 
-/// 2023 against 2024 on the example projects. The dwelling has no input on
-/// a route that differs. The office changes only TOjuli, through ΔT_C;fan
-/// of utility buildings: 1,5 K in 2023 (p. 496) against 0,7 K in 2024
-/// (p. 491).
+/// 2023 against 2024 on the example projects (the office without the LED
+/// column in both). The dwelling has no input on a route that differs. The
+/// office changes only TOjuli, through ΔT_C;fan of utility buildings: 1,5 K
+/// in 2023 (p. 496) against 0,7 K in 2024 (p. 491).
 #[test]
 fn example_projects_2023_differ_from_2024_only_where_the_editions_differ() {
-    let run = |json, edition| assess_project_performance(&project(json, Some(edition)));
+    let run = |json, edition| assess_project_performance(&project_2023_compatible(json, edition));
     assert!(changed_keys(&run(DWELLING, "2024"), &run(DWELLING, "2023")).is_empty());
     assert_eq!(
         changed_keys(&run(OFFICE, "2024"), &run(OFFICE, "2023")),

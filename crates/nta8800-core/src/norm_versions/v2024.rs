@@ -81,4 +81,8 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     annex_aa_route: true,
     // Table 5.7 (2024 p. 74).
     renovation_standard: true,
+    // Table 14.3 (2024 p. 646).
+    led_2017_column: true,
+    // (8.17)/(8.18) with glazing bars (2024 p. 219–222).
+    glazing_bar_term: true,
 };

@@ -264,6 +264,10 @@ pub struct NormProfile {
     pub annex_aa_route: bool,
     /// Table 5.7 renovatiestandaard (§5.3.1.2).
     pub renovation_standard: bool,
+    /// Table 14.3 column "ledverlichting geïnstalleerd vanaf 2017".
+    pub led_2017_column: bool,
+    /// (8.17)/(8.18) glazing-bar (roeden) term in U_w.
+    pub glazing_bar_term: bool,
 }
 
 thread_local! {
