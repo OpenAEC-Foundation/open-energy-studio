@@ -3010,6 +3010,7 @@ mod tests {
                 },
                 daylight: Daylight::None,
                 extracted_luminaires: false,
+                constant_illuminance: None,
             }],
             source_reference: "plan".into(),
             burning_hours_factor: None,

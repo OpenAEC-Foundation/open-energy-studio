@@ -361,6 +361,15 @@ fn source_classification_issues(input: &ForfaitHeatPumpDraftInput) -> Vec<TableI
     let Some((lower, upper)) = bounds else {
         return Vec::new();
     };
+    // NTA 8800:2022 tables 9.27/9.29 (p. 314–317): "grondwater" without a
+    // source temperature; the warmer source rows do not exist.
+    if crate::norm_versions::profile().heat_pump_tables_2022 {
+        return if input.source == GroundwaterBelow15C {
+            Vec::new()
+        } else {
+            vec![issue("route_not_in_edition", "source")]
+        };
+    }
     let mut issues = Vec::new();
     if input.source_temperature_c.map_or(true, |value| {
         !value.is_finite() || value < lower || value >= upper
@@ -455,7 +464,10 @@ pub fn assess_forfait_heat_pump_draft(
                 "collectiveBuildingInstallation",
             ));
         }
+        // NTA 8800:2022 (p. 314, 317): table 9.27 for dwellings, 9.29 for
+        // utility buildings, without the 25 kW or collective boundary.
         if input.scope == TableScope::ResidentialAtMost25Kw
+            && !crate::norm_versions::profile().heat_pump_tables_2022
             && (input.thermal_capacity_kw.is_some_and(|value| value > 25.0)
                 || input.collective_building_installation == Some(true))
         {
@@ -508,6 +520,16 @@ pub fn assess_forfait_heat_pump_draft(
                 "designSupplyTemperatureC",
             ));
         }
+        // NTA 8800:2022 p. 313–317: the tables end at 55 °C; above it annex Q
+        // applies.
+        let index = if crate::norm_versions::profile().heat_pump_tables_2022
+            && index.is_some_and(|value| value > 5)
+        {
+            issues.push(issue("route_not_in_edition", "designSupplyTemperatureC"));
+            None
+        } else {
+            index
+        };
         let correction_required = input.scope == TableScope::ResidentialAtMost25Kw
             && matches!(
                 selected_source,
@@ -654,6 +676,73 @@ mod tests {
             source_quality_declaration_reference: None,
             quality_declaration: None,
         }
+    }
+
+    #[test]
+    fn tables_9_27_and_9_29_of_2022() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let codes = |edition, input: &ForfaitHeatPumpDraftInput| {
+            with_version(edition, || {
+                assess_forfait_heat_pump_draft(input)
+                    .issues
+                    .iter()
+                    .map(|item| (item.code, item.path))
+                    .collect::<Vec<_>>()
+            })
+        };
+        let cop = |edition, input: &ForfaitHeatPumpDraftInput| {
+            with_version(edition, || assess_forfait_heat_pump_draft(input).table_cop)
+        };
+        // 2022 p. 314: the outdoor-air row is the same up to 55 °C.
+        let air = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            55.0,
+        );
+        assert_eq!(cop(NormVersion::V2022, &air), Some(2.8));
+        assert_eq!(cop(NormVersion::V2022, &air), cop(NormVersion::V2023, &air));
+        // Above 55 °C annex Q (2022 p. 313); 2023 p. 323 has 2,2 at 60 °C.
+        let hot = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            60.0,
+        );
+        assert_eq!(cop(NormVersion::V2023, &hot), Some(2.2));
+        assert_eq!(
+            codes(NormVersion::V2022, &hot),
+            vec![("route_not_in_edition", "designSupplyTemperatureC")]
+        );
+        // No source-temperature rows in 2022 (2023 p. 319–324).
+        let mut warm = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::Collective20To40C,
+            45.0,
+        );
+        warm.source_temperature_c = Some(25.0);
+        warm.source_temperature_evidence_reference = Some("design".into());
+        warm.source_quality_declaration_reference = Some("declaration".into());
+        assert!(codes(NormVersion::V2023, &warm).is_empty());
+        assert_eq!(
+            codes(NormVersion::V2022, &warm),
+            vec![("route_not_in_edition", "source")]
+        );
+        // "Grondwater" without a temperature, and table 9.27 for every
+        // dwelling: no 25 kW or collective boundary in 2022 (p. 314).
+        let mut ground = example(
+            TableScope::ResidentialAtMost25Kw,
+            TableSource::GroundwaterBelow15C,
+            35.0,
+        );
+        ground.source_correction_factor = Some(1.0);
+        ground.source_correction_reference = Some("annex V".into());
+        ground.thermal_capacity_kw = Some(40.0);
+        ground.capacity_source_reference = Some("type plate".into());
+        ground.collective_building_installation = Some(true);
+        assert!(codes(NormVersion::V2022, &ground).is_empty());
+        assert_eq!(cop(NormVersion::V2022, &ground), Some(4.5));
+        assert!(codes(NormVersion::V2023, &ground)
+            .iter()
+            .any(|(code, _)| *code == "table_scope_capacity_mismatch"));
     }
 
     #[test]

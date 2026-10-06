@@ -439,6 +439,11 @@ pub struct StorageVessel {
     pub loss: StorageLoss,
     /// `f_sto;dis;ls` 1–5 (§13.6.3); ignored for a measured `H_sto;ls`.
     pub connection_factor: u8,
+    /// NTA 8800:2022 §13.6.3 (p. 550): an electric boiler with insulated
+    /// hot-water pipes, `f_sto;dis;ls` = 1,5 instead of `connectionFactor`.
+    /// Not in 2023 (p. 557–558) and later.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub electric_boiler_insulated_pipe: bool,
     /// Placed in a heated zone; otherwise 13 °C or the given ambient.
     pub in_heated_zone: bool,
     #[serde(default)]
@@ -1391,6 +1396,10 @@ impl TwoProfileTest {
             ));
         }
         if let Some(mixed) = &self.mixed_air {
+            // 13.153b is new in NTA 8800:2023 (p. 609–611).
+            if !crate::norm_versions::profile().mixed_air_route {
+                issues.push(("route_not_in_edition", format!("{prefix}.mixedAir")));
+            }
             // 13.153b: combi heat pumps on outdoor and return air only.
             if !(self.electric() && self.combi && self.exhaust_air_source) {
                 issues.push((
@@ -2139,6 +2148,14 @@ pub fn validate_hot_water(
             push(
                 "hot_water_storage_connection_invalid",
                 &format!("{base}.connectionFactor"),
+            );
+        }
+        if vessel.electric_boiler_insulated_pipe
+            && !crate::norm_versions::profile().electric_boiler_insulated_pipe_factor
+        {
+            push(
+                "route_not_in_edition",
+                &format!("{base}.electricBoilerInsulatedPipe"),
             );
         }
         if let StorageLoss::Measured {
@@ -3483,9 +3500,11 @@ struct SolarTotals {
 /// room is `ϑ_int;set;H;stc` with an exhaust-air heat pump for hot water,
 /// otherwise the levelled `ϑ_int;set;H;zi,mi` of 7.9.4.
 fn solar_storage_ambient(system: &HotWaterSystem, context: HotWaterContext) -> [f64; 12] {
-    let exhaust_air = units(system)
-        .iter()
-        .any(|unit| exhaust_air_heat_pump(unit.generator));
+    // (13.69a)/(13.137a) are new in NTA 8800:2023 (p. 565, 592).
+    let exhaust_air = crate::norm_versions::profile().storage_ambient_exhaust_air
+        && units(system)
+            .iter()
+            .any(|unit| exhaust_air_heat_pump(unit.generator));
     solar_ambient(exhaust_air, context)
 }
 
@@ -4114,7 +4133,13 @@ pub fn assess_hot_water_with(
                 )
             }
         };
-        let factor = f64::from(vessel.connection_factor);
+        let factor = if vessel.electric_boiler_insulated_pipe
+            && crate::norm_versions::profile().electric_boiler_insulated_pipe_factor
+        {
+            1.5
+        } else {
+            f64::from(vessel.connection_factor)
+        };
         let label_c = StorageLabel::C.standing_loss_w(vessel.volume_l);
         let measured = vessel.loss.measured_transmission_w_per_k();
         let watts = |index: usize| match vessel.loss {
@@ -5372,6 +5397,7 @@ mod tests {
                 produced_from_2018: true,
             },
             connection_factor: 3,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -5733,6 +5759,7 @@ mod tests {
                 label: StorageLabel::B,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -5783,6 +5810,7 @@ mod tests {
                 label: StorageLabel::A,
             },
             connection_factor: 2,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -5840,6 +5868,7 @@ mod tests {
             volume_l: 120.0,
             loss: standby,
             connection_factor: 3,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6104,6 +6133,7 @@ mod tests {
                 label: StorageLabel::C,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6145,6 +6175,7 @@ mod tests {
                 label: StorageLabel::B,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6239,6 +6270,7 @@ mod tests {
                 label: StorageLabel::C,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,

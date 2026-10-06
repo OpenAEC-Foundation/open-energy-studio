@@ -902,6 +902,22 @@ pub enum ShadingDevice {
 }
 
 impl ShadingDevice {
+    /// Table 7.5 has the "onbekende kleur" rows from NTA 8800:2023 (p. 180);
+    /// 2022 p. 176 lacks them.
+    pub fn in_edition(self) -> bool {
+        let unknown = matches!(
+            self,
+            Self::ExternalScreen {
+                colour: ShadeColour::Unknown
+            } | Self::ExternalVenetianBlind {
+                colour: ShadeColour::Unknown
+            } | Self::ExternalRollerShutter {
+                colour: ShadeColour::Unknown
+            }
+        );
+        !unknown || crate::norm_versions::profile().unknown_shade_colour_rows
+    }
+
     /// `F_c` of tables 7.5/7.6; table 7.6 by orientation.
     pub fn reduction_factor(self, orientation: Orientation) -> f64 {
         use Orientation::*;

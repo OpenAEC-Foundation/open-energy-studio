@@ -59,6 +59,13 @@ pub enum DesignTemperatureClass {
 }
 
 impl DesignTemperatureClass {
+    /// Table 9.14 has 60/50 and 70/60 from NTA 8800:2023 (p. 294); 2022
+    /// p. 290 lacks them.
+    pub fn in_edition(self) -> bool {
+        crate::norm_versions::profile().design_classes_60_and_70
+            || !matches!(self, Self::C60 | Self::C70)
+    }
+
     /// Table 9.14: (`ϑ_H,a;ontw`, `Δϑ_H,ontw`).
     pub fn design(self) -> (f64, f64) {
         match self {

@@ -2120,7 +2120,31 @@ fn factors(
                     format!("{kpath}.efficiency.sourceReference"),
                     issues,
                 ),
-                HeatPumpEfficiency::TableP5 { source, .. } => {
+                HeatPumpEfficiency::TableP5 {
+                    source,
+                    supply_temperature_c,
+                } => {
+                    // NTA 8800:2022 table P.5 (p. 941): up to 55 °C and
+                    // without the source-temperature rows.
+                    if crate::norm_versions::profile().heat_pump_tables_2022 {
+                        if matches!(
+                            source,
+                            TableP5Source::ElectricSource15To20C
+                                | TableP5Source::ElectricSource20To40C
+                                | TableP5Source::ElectricSourceAtLeast40C
+                        ) {
+                            issues.push(issue(
+                                "route_not_in_edition",
+                                format!("{kpath}.efficiency.source"),
+                            ));
+                        }
+                        if *supply_temperature_c > 55.0 {
+                            issues.push(issue(
+                                "route_not_in_edition",
+                                format!("{kpath}.efficiency.supplyTemperatureC"),
+                            ));
+                        }
+                    }
                     let electric_drive = matches!(drive, SystemCarrier::Electricity { .. });
                     if source.electric() != electric_drive {
                         issues.push(issue(
@@ -2401,6 +2425,10 @@ fn factors(
                 format!("{kpath}.registrationReference"),
                 issues,
             );
+            // The flex mode is new in NTA 8800:2023 (p. 111, 963).
+            if !crate::norm_versions::profile().flex_mode_route {
+                issues.push(issue("route_not_in_edition", kpath.clone()));
+            }
             // 5.8: at least 500 connections and a heat buffer.
             if *connections < 500 || !*heat_buffer {
                 issues.push(issue("flex_mode_conditions_not_met", kpath.clone()));
@@ -6316,6 +6344,53 @@ mod tests {
             codes(calculated(&input, "s")),
             vec!["flex_mode_conditions_not_met"]
         );
+        // The flex mode is new in NTA 8800:2023 (p. 111, 963).
+        if let GeneratorKind::ElectricFlex { connections, .. } = &mut input.generators[1].kind {
+            *connections = 600;
+        }
+        assert_eq!(
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2022, || {
+                codes(calculated(&input, "s"))
+            }),
+            vec!["route_not_in_edition"]
+        );
+    }
+
+    #[test]
+    fn table_p5_of_2022_ends_at_55_c_without_source_rows() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let pump = |source, supply| {
+            let mut item = generator(
+                "hp",
+                None,
+                GeneratorKind::HeatPump {
+                    efficiency: HeatPumpEfficiency::TableP5 {
+                        source,
+                        supply_temperature_c: supply,
+                    },
+                    drive: SystemCarrier::Electricity {
+                        direct_renewable_share: 0.0,
+                    },
+                },
+            );
+            item.energy_fraction = Some(1.0);
+            system(vec![item])
+        };
+        let run = |edition, input: &CalculatedSystem| {
+            with_version(edition, || codes(calculated(input, "s")))
+        };
+        let valid = |edition, input: &CalculatedSystem| {
+            with_version(edition, || calculated(input, "s").is_ok())
+        };
+        // 2022 p. 941: columns up to 55 °C, no 15–20/20–40/≥ 40 °C rows.
+        let plain = pump(TableP5Source::ElectricGround, 50.0);
+        assert!(valid(NormVersion::V2022, &plain));
+        let hot = pump(TableP5Source::ElectricGround, 70.0);
+        assert!(valid(NormVersion::V2023, &hot));
+        assert_eq!(run(NormVersion::V2022, &hot), vec!["route_not_in_edition"]);
+        let warm = pump(TableP5Source::ElectricSource20To40C, 45.0);
+        assert!(valid(NormVersion::V2023, &warm));
+        assert_eq!(run(NormVersion::V2022, &warm), vec!["route_not_in_edition"]);
     }
 
     fn buried_segment() -> PipeSegment {

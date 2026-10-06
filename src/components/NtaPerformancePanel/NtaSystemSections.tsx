@@ -21,7 +21,7 @@ import {
 export function KitchenPipeDiameterField({ draft, change, path }: { draft: Draft; change: (path: Path, value: unknown) => void; path: Path }) {
   const { t } = useI18n();
   const value = read(draft, path);
-  if (read(draft, ['normVersion']) === '2023') {
+  if (['2023', '2022'].includes(read(draft, ['normVersion']) as string)) {
     return <SelectField draft={draft} onChange={change} path={path} label={t('ntaStep.kitchenPipeDiameter')}
       options={(['up_to_8_mm', 'up_to_10_mm', 'other'] as const).map((key) => [key, t(`ntaStep.kitchenPipeDiameter.${key}`)])} />;
   }

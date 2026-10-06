@@ -1203,6 +1203,13 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             ));
         }
         function_area += item.area_m2;
+        // (11.57) with a swimming pool is new in NTA 8800:2023 (p. 459).
+        if item.swimming_pool && !crate::norm_versions::profile().swimming_pool_route {
+            issues.push(issue(
+                "route_not_in_edition",
+                format!("functions[{index}].swimmingPool"),
+            ));
+        }
         if item.swimming_pool && item.function != VentilationFunction::Sport {
             issues.push(issue(
                 "swimming_pool_requires_sport_function",
@@ -1662,8 +1669,18 @@ fn validate_unit(
             HeatRecoveryEfficiency::Declared {
                 value,
                 source_reference,
-                ..
+                standard,
             } => {
+                // The NEN-EN 13053 row is new in NTA 8800:2023 (p. 490–491;
+                // 2022 p. 482).
+                if *standard == EfficiencyStandard::En13053
+                    && !crate::norm_versions::profile().en_13053_route
+                {
+                    issues.push(issue(
+                        "route_not_in_edition",
+                        format!("{rpath}.efficiency.standard"),
+                    ));
+                }
                 if !(0.0..=1.0).contains(value) {
                     issues.push(issue(
                         "heat_recovery_efficiency_invalid",

@@ -20,6 +20,7 @@
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 
+mod v2022;
 mod v2023;
 mod v2024;
 mod v2025;
@@ -88,7 +89,7 @@ impl NormVersion {
     pub const fn implemented(self) -> bool {
         matches!(
             self,
-            NormVersion::V2023 | NormVersion::V2024 | NormVersion::V2025C1
+            NormVersion::V2022 | NormVersion::V2023 | NormVersion::V2024 | NormVersion::V2025C1
         )
     }
 
@@ -106,6 +107,7 @@ impl NormVersion {
 
     pub fn profile(self) -> &'static NormProfile {
         match self {
+            NormVersion::V2022 => &v2022::PROFILE,
             NormVersion::V2023 => &v2023::PROFILE,
             NormVersion::V2024 => &v2024::PROFILE,
             _ => &v2025::PROFILE,
@@ -168,6 +170,9 @@ pub enum HeatPumpSourceRoute {
     /// external heat (Q_HD;hp;in;bron in 9.84); a 15–20 °C (ground)water
     /// source keeps the source auxiliary energy Q/EER (p. 349).
     From20C2023,
+    /// 2022: tables 9.27/9.29 have no source-temperature rows (p. 314–317)
+    /// and 5.20/9.84 no Q_HD;hp;in;bron; no source heat is booked.
+    None2022,
 }
 
 impl HeatPumpSourceRoute {
@@ -319,6 +324,49 @@ pub struct NormProfile {
     /// 10.3.3 cooling emission per tables 10.2–10.5 of NTA 8800:2023 instead
     /// of tables 10.35/10.4/10.5 of 2024.
     pub cooling_emission_tables_2023: bool,
+    /// Tables 9.27/9.29 and P.5 of NTA 8800:2022: columns up to 55 °C,
+    /// no source-temperature rows, table 9.27 for all dwellings (no 25 kW
+    /// or collective split). Above 55 °C annex Q applies (2022 p. 313).
+    pub heat_pump_tables_2022: bool,
+    /// 5.8 and P.6.5.4.11: electric generators in the flex mode.
+    pub flex_mode_route: bool,
+    /// (9.58): the installed power of the preferences times f_gebouw;si;H.
+    pub preference_beta_building_share: bool,
+    /// Table 9.14 design temperature classes 60/50 and 70/60.
+    pub design_classes_60_and_70: bool,
+    /// 9.3.3 table 9.11 note: fan power of an assembly tested to
+    /// NEN-EN 16430.
+    pub tested_emission_fan_power: bool,
+    /// Table 7.5 rows "onbekende kleur".
+    pub unknown_shade_colour_rows: bool,
+    /// Table 7.10 by the mass of the zone per m² usable area (2022) instead
+    /// of tables 7.10–7.12 by floor and wall type.
+    pub thermal_mass_by_kg_per_m2: bool,
+    /// (8.47): h is the fixed value 0,125 m; 2022 takes the actual height.
+    pub crawl_wall_height_fixed: bool,
+    /// Table E.5 F_A;iso of mineral-wool flakes (MW).
+    pub mineral_wool_flakes_ageing: f64,
+    /// (I.2) λ_equi;ntr, W/(m·K).
+    pub lambda_equi_ntr: f64,
+    /// (I.2): a known higher λ including anchors, moisture and ageing
+    /// replaces λ_equi;ntr.
+    pub lambda_equi_known_route: bool,
+    /// 11.2.2.x (11.57): rooms with a swimming pool take twice the sport
+    /// function's q_usi;spec.
+    pub swimming_pool_route: bool,
+    /// Table 11.x: heat-recovery efficiency declared per NEN-EN 13053.
+    pub en_13053_route: bool,
+    /// 13.6.3: f_sto;dis;ls = 1,5 for an electric boiler with insulated
+    /// hot-water pipes (2022 only).
+    pub electric_boiler_insulated_pipe_factor: bool,
+    /// (13.69a)/(13.137a): ϑ_sto;amb = ϑ_int;set;H;stc with an exhaust-air
+    /// heat pump for hot water.
+    pub storage_ambient_exhaust_air: bool,
+    /// 13.153b: C_W;mixed air of combi heat pumps on mixed air.
+    pub mixed_air_route: bool,
+    /// (14.15) with table 14.4: F_C from the maintenance factor MF of
+    /// systems with constant-illuminance control (2022 only).
+    pub lighting_maintenance_factor: bool,
 }
 
 thread_local! {

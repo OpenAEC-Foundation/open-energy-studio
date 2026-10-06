@@ -2,6 +2,17 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 6 oktober 2026 — NTA 8800:2022
+
+De uitgave `"2022"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2023, plus de punten 49–67 in docs/nta8800-normversies.md:
+- warmtepomptabellen 9.27/9.29 en P.5 tot 55 °C, zonder bronrijen en zonder 25 kW-grens; daarboven bijlage Q; geen bronwarmte Q_HD;hp;in;bron en geen flexmodus;
+- biomassa zonder kW-grens, (9.58) zonder f_gebouw;si;H, tabel 9.14 zonder 60/50 en 70/60;
+- tabel E.5 minerale-wolvlokken 1,05, λ_equi;ntr 0,06, tabel 7.5 zonder "onbekende kleur";
+- nieuwe invoer die alleen onder 2022 geldt: `thermalMass.massKgPerM2` (tabel 7.10 naar massa), `wallHeightAboveGroundM` voor (8.47), `electricBoilerInsulatedPipe` (f_sto;dis;ls 1,5) en `lightingZones[].constantIlluminance` (tabel 14.4);
+- zwembadventilatie, η_hr volgens NEN-EN 13053, C_W;mixed air, het getest ventilatorvermogen (NEN-EN 16430) en 13.69a/13.137a bestaan in 2022 niet.
+
+De invoer die tot nu toe "alleen 2023" was, geldt ook in 2022; het formulier toont die velden onder beide edities. Nieuwe codes: `thermal_mass_invalid`, `ground_floor_wall_height_required`. Resultaten onder 2023, 2024 en 2025+C1 zijn ongewijzigd.
+
 ## 6 oktober 2026 — NTA 8800:2023 compleet
 
 De uitgave 2023 rekent nu ook de punten die eerder op de 2024-route terugvielen (docs/nta8800-normversies.md, punten 35–48):

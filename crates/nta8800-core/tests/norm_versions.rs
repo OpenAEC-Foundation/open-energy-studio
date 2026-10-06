@@ -112,15 +112,13 @@ fn registration_refuses_an_older_edition() {
 
 #[test]
 fn edition_without_profile_is_refused() {
-    for edition in ["2022", "2020+A1"] {
-        let result = assess_project_performance(&project(DWELLING, Some(edition)));
-        assert_eq!(result.status, "invalid", "{edition}");
-        let performance = result.performance.as_ref().unwrap();
-        assert!(performance
-            .issues
-            .iter()
-            .any(|issue| issue.code == "edition_not_implemented"));
-    }
+    let result = assess_project_performance(&project(DWELLING, Some("2020+A1")));
+    assert_eq!(result.status, "invalid");
+    let performance = result.performance.as_ref().unwrap();
+    assert!(performance
+        .issues
+        .iter()
+        .any(|issue| issue.code == "edition_not_implemented"));
 }
 
 #[test]
@@ -337,4 +335,67 @@ fn heating_emission_description_is_a_2023_route() {
             .any(|issue| issue.code == "route_not_in_edition"
                 && issue.path.ends_with("emission.edition2023")));
     }
+}
+
+/// NTA 8800:2022 is calculated as an older edition with its own label.
+#[test]
+fn edition_2022_is_calculated_but_not_registrable() {
+    for json in [DWELLING, OFFICE] {
+        let result = assess_project_performance(&project_2023_compatible(json, "2022"));
+        assert_eq!(
+            result.status,
+            "calculated_legacy_edition",
+            "{:?} {:?}",
+            result.gaps,
+            result.performance.as_ref().map(|item| &item.issues)
+        );
+        assert_eq!(result.norm_version, NormVersion::V2022);
+        assert!(!result.registration_eligible);
+        assert_eq!(result.target_norm_version, "NTA 8800:2022");
+        assert!(result.performance.as_ref().unwrap().chapter5.is_none());
+    }
+}
+
+/// 2022 against 2023 on the example projects (the office without the LED
+/// column in both). Neither project has input on a route that differs
+/// (heat pumps, flex mode, crawlspace, 2022 thermal mass, lighting MF), so
+/// nothing changes.
+#[test]
+fn example_projects_2022_differ_from_2023_only_where_the_editions_differ() {
+    let run = |json, edition| assess_project_performance(&project_2023_compatible(json, edition));
+    assert!(changed_keys(&run(DWELLING, "2023"), &run(DWELLING, "2022")).is_empty());
+    assert!(changed_keys(&run(OFFICE, "2023"), &run(OFFICE, "2022")).is_empty());
+}
+
+/// Table 7.10 of NTA 8800:2022 (p. 181–182) by kg/m²: 300 kg/m² is the row
+/// 250–500 kg/m² (110/180 kJ/(m²K)) against very heavy floors and heavy
+/// walls (250/450) of the example; 2023 (p. 185–186) refuses the input.
+#[test]
+fn thermal_mass_by_kg_per_m2_is_a_2022_route() {
+    let with_mass = |edition: &str| {
+        let mut value = project(DWELLING, Some(edition));
+        value["ntaCalculation"]["thermalMass"]["massKgPerM2"] = json!(300.0);
+        assess_project_performance(&value)
+    };
+    let plain = assess_project_performance(&project(DWELLING, Some("2022")));
+    let light = with_mass("2022");
+    assert_eq!(
+        light.status, "calculated_legacy_edition",
+        "{:?}",
+        light.gaps
+    );
+    let need = |result: &ProjectPerformanceAssessment| {
+        indicator(result, "/needIndicatorKwhPerM2Year").unwrap()
+    };
+    assert!(need(&light) > need(&plain));
+    let refused = with_mass("2023");
+    assert_eq!(refused.status, "invalid");
+    assert!(refused
+        .performance
+        .as_ref()
+        .unwrap()
+        .issues
+        .iter()
+        .any(|issue| issue.code == "route_not_in_edition"
+            && issue.path.ends_with("thermalMass.massKgPerM2")));
 }
