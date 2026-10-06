@@ -143,6 +143,28 @@ function QuestionBody({ part, stored, draft, change, t }: {
   }
 }
 
+/** Field labels of the answers a survey needs before the kernel can read it. */
+const MISSING_LABEL: Record<string, string> = {
+  dwelling: 'survey.q.woning.soort', 'dwelling.roofType': 'survey.dwelling.roofType', 'dwelling.floor': 'opname.dwelling.floor',
+  constructionYear: 'opname.constructionYear', usableFloorAreaM2: 'opname.usableFloorArea', buildingHeightM: 'opname.buildingHeight',
+  'construction.floor': 'survey.construction.floor', 'construction.wall': 'survey.construction.wall',
+  'heating.generator': 'survey.q.verwarming.toestel', 'heating.emitters': 'opname.heating.emitters',
+  'hotWater.generator': 'survey.q.warm-water.toestel', 'ventilation.principle': 'survey.ventilation.principle',
+};
+
+/** What a notice is about: the field of a missing answer, or the surface, window, door or panel by its name. */
+function issueSubject(path: string, draft: Draft, t: T): string | null {
+  const bare = path.replace(/^basisopname\./, '');
+  if (MISSING_LABEL[bare]) return t(MISSING_LABEL[bare]);
+  const item = /^(envelope\.(?:surfaces|windows|doors|rooflights)|pv)\[(\d+)\]/.exec(bare);
+  if (item) {
+    const list = read(draft, item[1].split('.')) as Array<Record<string, unknown>> | undefined;
+    const id = list?.[Number(item[2])]?.id;
+    if (id) return String(id);
+  }
+  return bare.startsWith('derivedInput') ? null : bare;
+}
+
 /** Short facts of a step for the Controle page. */
 function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): string[] {
   const n = (value: unknown, digits = 0) => typeof value === 'number' ? formatNumber(value, locale, digits) : '—';
@@ -152,12 +174,12 @@ function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): stri
     case 'woning': {
       const choice = dwellingChoice(draft);
       return [choice ? t(`survey.dwelling.${choice}`) : '—',
-        t('survey.fact.year', { year: n(read(draft, ['constructionYear'])) }),
+        t('survey.fact.year', { year: typeof read(draft, ['constructionYear']) === 'number' ? String(read(draft, ['constructionYear'])) : '—' }),
         t('survey.fact.area', { area: n(read(draft, ['usableFloorAreaM2']), 1) })];
     }
     case 'gebouw': {
       const functions = (read(draft, ['functions']) as Array<Record<string, unknown>> | undefined) ?? [];
-      return [t('survey.fact.year', { year: n(read(draft, ['constructionYear'])) }),
+      return [t('survey.fact.year', { year: typeof read(draft, ['constructionYear']) === 'number' ? String(read(draft, ['constructionYear'])) : '—' }),
         t('survey.fact.functions', { count: functions.length, area: n(area(functions, 'areaM2'), 0) })];
     }
     case 'zones': return [t('survey.fact.zones', { count: ((read(draft, ['zones']) as unknown[]) ?? []).length })];
@@ -205,7 +227,7 @@ function ResultCard({ result, busy, error, t, locale }: {
     {label ? <div className="survey-label-row">
       <span className="survey-label" style={{ background: labelColor(label) }}>{label}</span>
       <span>{t('survey.result.ep2')}<br /><strong>{formatNumber(performance?.primaryFossilIndicatorKwhPerM2Year, locale, 1)}</strong> {t('unit.kwhPerM2Year')}</span>
-    </div> : <p className="survey-muted">{busy ? t('survey.result.busy') : error ? t('survey.result.error') : t('survey.result.none')}</p>}
+    </div> : <p className="survey-muted">{busy ? t('survey.result.busy') : error ? `${t('survey.result.error')} (${error})` : t('survey.result.none')}</p>}
     {result && result.issues.length > 0 && <p className="survey-issues-note">{t('survey.result.issues', { count: result.issues.length })}</p>}
     <p className="survey-muted">{t('survey.result.note')}</p>
   </div>;
@@ -255,7 +277,8 @@ function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
         {result.issues.map((item, index) => {
           const target = questionForPath(item.path, stored);
           return <li key={index}>
-            <span><KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} /></span>
+            <span><KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} />
+              {issueSubject(item.path, draft, t) && <span className="survey-muted"> · {issueSubject(item.path, draft, t)}</span>}</span>
             <button type="button" className="btn btn-sm" onClick={() => onGoToPath(item.path)}>
               {t('survey.check.goTo', { step: t(`survey.step.${target.step}`) })}</button>
           </li>;

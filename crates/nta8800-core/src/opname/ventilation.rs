@@ -119,6 +119,11 @@ pub struct SurveyVentilation {
     /// Supply grilles with electric heating strips (§11.3.7, p. 145–146).
     #[serde(default)]
     pub grille_heating_strips: Option<SurveyGrilleHeatingStrips>,
+    /// Table 11.13 (ISSO 82.1 p. 152–153): duct airtightness class from a
+    /// measurement or the recognition rules (LUKA A, B or C; LUKA D); `None`
+    /// or unknown: f_lea;du 1,1.
+    #[serde(default)]
+    pub duct_airtightness: Option<super::utility::DuctAirtightnessAnswer>,
     pub source_reference: String,
 }
 
@@ -578,17 +583,23 @@ pub fn derive_ventilation(
         ),
     };
     let ducts = |principle: VentilationPrinciple, recorder: &mut Recorder| {
-        if principle != VentilationPrinciple::Natural {
-            recorder.record(
-                "duct_airtightness_unknown",
-                "ventilation.ducts",
-                "unknown (f_lea;du 1,1)".into(),
-                "ISSO 82.1 p. 153 (table 11.13)",
-            );
-            "unknown"
-        } else {
-            "no_ducts"
+        use super::utility::DuctAirtightnessAnswer;
+        if principle == VentilationPrinciple::Natural {
+            return "no_ducts";
         }
+        match survey.duct_airtightness {
+            Some(DuctAirtightnessAnswer::LukaAbc) => return "luka_a_b_c",
+            Some(DuctAirtightnessAnswer::LukaD) => return "luka_d",
+            Some(DuctAirtightnessAnswer::NoDucts) => return "no_ducts",
+            Some(DuctAirtightnessAnswer::Unknown) | None => {}
+        }
+        recorder.record(
+            "duct_airtightness_unknown",
+            "ventilation.ductAirtightness",
+            "unknown (f_lea;du 1,1)".into(),
+            "ISSO 82.1 p. 153 (table 11.13)",
+        );
+        "unknown"
     };
     let mut unit = json!({
         "variant": variant,
@@ -766,6 +777,7 @@ mod tests {
             controls: None,
             combined: None,
             grille_heating_strips: None,
+            duct_airtightness: None,
             source_reference: "survey".into(),
         }
     }
@@ -786,6 +798,26 @@ mod tests {
         )
         .input;
         (input, recorder)
+    }
+
+    #[test]
+    fn duct_airtightness_class_replaces_the_unknown_default() {
+        use super::super::utility::DuctAirtightnessAnswer;
+        let unknown = survey(VentilationPrinciple::Balanced);
+        let (input, recorder) = derive_with(&unknown);
+        assert!(input.to_string().contains("\"ducts\":\"unknown\""));
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "duct_airtightness_unknown"));
+        let mut luka = survey(VentilationPrinciple::Balanced);
+        luka.duct_airtightness = Some(DuctAirtightnessAnswer::LukaAbc);
+        let (input, recorder) = derive_with(&luka);
+        assert!(input.to_string().contains("\"ducts\":\"luka_a_b_c\""));
+        assert!(!recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "duct_airtightness_unknown"));
     }
 
     #[test]

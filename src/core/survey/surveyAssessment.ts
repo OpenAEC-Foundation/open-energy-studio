@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from 'react';
 import type { OpnameAssessment } from '../nta/KernelClient';
 import { assessResidentialSurveyWithRust, assessUtilitySurveyWithRust } from '../nta/KernelClient';
-import { asResidential, asUtility, type StoredSurvey } from '../nta/SurveyTemplates';
+import { asResidential, asUtility, missingSurveyAnswers, type StoredSurvey } from '../nta/SurveyTemplates';
 
 export interface SurveyAssessmentState {
   /** JSON of the survey the result belongs to. */
@@ -46,6 +46,16 @@ export async function assessSurvey(stored: StoredSurvey): Promise<void> {
   const surveyJson = JSON.stringify(stored.survey);
   if (state.surveyJson === surveyJson && (state.result || state.busy)) return;
   const current = ++request;
+  // Required answers still open: name them instead of a survey the kernel cannot read.
+  const missing = missingSurveyAnswers(stored);
+  if (missing.length > 0) {
+    set({ surveyJson, busy: false, error: null, result: {
+      status: 'derived_input_rejected', scope: stored.kind, source: 'app', appliedDefaults: [], warnings: [],
+      issues: missing.map((path) => ({ code: 'survey_answer_required', path })),
+      derivedInput: null, performance: null, referenceVerified: false,
+    } });
+    return;
+  }
   set({ surveyJson, busy: true, error: null });
   try {
     const assessment = stored.kind === 'residential'

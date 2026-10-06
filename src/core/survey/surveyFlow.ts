@@ -158,17 +158,25 @@ export function questionForPath(path: string, stored: StoredSurvey): { step: Sur
         const element = surfaces[Number(surface[1])]?.element;
         return { step: element === 'roof' || element === 'floor' ? 'dak-vloer' : 'gevels' };
       }
+      const window = /^envelope\.windows\[(\d+)\]/.exec(bare);
+      if (window) {
+        const envelope = stored.survey.envelope as { surfaces?: Array<{ id?: string; element?: string }>; windows?: Array<{ surfaceId?: string }> } | undefined;
+        const surfaceId = envelope?.windows?.[Number(window[1])]?.surfaceId;
+        if (envelope?.surfaces?.find((item) => item.id === surfaceId)?.element === 'roof') return { step: 'dak-vloer' };
+      }
       return { step: 'gevels' };
     }
     case 'heating': {
+      if (bare === 'heating.generator') return { step: 'verwarming', question: 'toestel' };
       const generator = /^heating\.(generator|nominalPowerKw|additionalGenerators)/.test(bare);
       return { step: 'verwarming', question: generator ? 'details' : 'afgifte' };
     }
     case 'hotWater': case 'additionalHotWaterSystems': {
+      if (bare === 'hotWater.generator') return { step: 'warm-water', question: 'toestel' };
       const generator = /^hotWater\.(generator|nominalPowerKw|additionalGenerators)/.test(bare);
       return { step: 'warm-water', question: generator ? 'details' : 'overig' };
     }
-    case 'ventilation': return { step: 'ventilatie', question: 'details' };
+    case 'ventilation': return { step: 'ventilatie', question: bare === 'ventilation.principle' ? 'systeem' : 'details' };
     case 'cooling': case 'coolingPresent': case 'coolingCollective': return { step: 'koeling' };
     case 'pv': case 'storage': return { step: 'zonnepanelen' };
     case 'derivedInput': case 'inklapRedenen': case '': return { step: 'controle' };

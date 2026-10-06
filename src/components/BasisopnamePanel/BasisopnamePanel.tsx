@@ -199,6 +199,8 @@ export function ResidentialVentilationBasics({ draft, change, t, hidePrinciple =
       <NumberField {...field} path={['ventilation', 'unitManufactureYear']} label={t('survey.ventilation.unitYear')} step="1" optional />
       <SelectField {...field} path={['ventilation', 'motor']} label={t('survey.ventilation.motor')}
         options={opts(t, 'survey.ventilation.motorKind', ['dc', 'ac', 'unknown'])} />
+      <SelectField {...field} path={['ventilation', 'ductAirtightness']} label={t('survey.ventilation.ducts')}
+        options={opts(t, 'survey.ventilation.ductsKind', ['luka_abc', 'luka_d', 'no_ducts', 'unknown'])} />
     </>}
     {grilles && <>
       <TriStateField {...field} {...yesNo} path={['ventilation', 'selfRegulatingVents']} label={t('survey.ventilation.selfRegulating')} />
@@ -793,6 +795,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const surfaces = list(draft, ['envelope', 'surfaces']);
   const windows = list(draft, ['envelope', 'windows']);
   const rooflights = list(draft, ['envelope', 'rooflights']);
+  const doors = list(draft, ['envelope', 'doors']);
   const buildingKind = read(draft, ['envelope', 'buildingKind', 'kind']);
   const hotWaterSystems = list(draft, ['additionalHotWaterSystems']);
   const ahu = read(draft, ['ventilation', 'ahu']);
@@ -893,10 +896,16 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
         <NumberField {...field} path={['swimmingPoolAreaM2']} label={t('opname.swimmingPoolArea')} />
         <CheckField {...field} path={['openlyConnectedResidenceAreas']} label={t('opname.openlyConnected')} />
       </>}
+      <SelectField {...field} path={['construction', 'floor']} label={t('survey.construction.floor')}
+        options={opts(t, 'survey.construction.floorKind', ['light', 'heavy', 'very_heavy'])} />
+      <SelectField {...field} path={['construction', 'wall']} label={t('survey.construction.wall')}
+        options={opts(t, 'survey.construction.wallKind', ['light', 'heavy', 'very_heavy'])} />
+      <CheckField {...field} path={['construction', 'lighterCeiling']} label={t('survey.construction.lighterCeiling')} />
+      <CheckField {...field} path={['construction', 'closedOrSuspendedCeiling']} label={t('survey.construction.closedCeiling')} />
       <label>{t('opname.verticalPipes')}
         <select value={verticalPipes == null ? 'default' : Array.isArray(verticalPipes) && verticalPipes.length === 0 ? 'none' : 'count'}
           onChange={(event) => change(['verticalPipes'], event.target.value === 'default' ? null
-            : event.target.value === 'none' ? [] : [{ insulated: false }])}>
+            : event.target.value === 'none' ? [] : [{ insulated: null }])}>
           <option value="default">{t('opname.verticalPipes.default')}</option>
           <option value="none">{t('opname.verticalPipes.none')}</option>
           <option value="count">{t('opname.verticalPipes.count')}</option>
@@ -905,8 +914,14 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       {Array.isArray(verticalPipes) && verticalPipes.length > 0 && <label>{t('opname.verticalPipes.number')}
         <input type="number" step="1" min="1" value={verticalPipes.length}
           onChange={(event) => change(['verticalPipes'], Array.from({ length: Math.max(1, Number(event.target.value) || 1) },
-            (_, index) => (verticalPipes as unknown[])[index] ?? { insulated: false }))} />
+            (_, index) => (verticalPipes as unknown[])[index] ?? { insulated: null }))} />
       </label>}
+      {Array.isArray(verticalPipes) && verticalPipes.map((_, index) => <div key={`vp${index}`} className="opname-item">
+        <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['verticalPipes', index, 'insulated']}
+          label={t('survey.verticalPipe.insulated', { n: index + 1 })} />
+        <NumberField {...field} path={['verticalPipes', index, 'sharedZones']} label={t('survey.verticalPipe.sharedZones', { n: index + 1 })}
+          step="1" optional />
+      </div>)}
     </Section></>}
 
     {show('zones') && <>{kind === 'utility' && <Section title={t('opname.zones')}>
@@ -969,7 +984,6 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             let next = write(draft, ['envelope', 'surfaces'], surfaces.filter((_, item) => item !== index));
             next = write(next, ['envelope', 'windows'], keep(windows));
             next = write(next, ['envelope', 'rooflights'], keep(rooflights));
-            const doors = list(draft, ['envelope', 'doors']);
             if (doors.length > 0) next = write(next, ['envelope', 'doors'], keep(doors));
             save({ kind, survey: next });
           }} />
@@ -983,7 +997,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
         <ListControls label={t('survey.addFloor')}
           onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'floor')])} />
       </>}
-      {part !== 'roofFloor' && windows.map((window, index) => {
+      {windows.map((window, index) => {
+        const onRoof = surfaces.find((surface) => surface.id === window.surfaceId)?.element === 'roof';
+        if ((part === 'walls' && onRoof) || (part === 'roofFloor' && !onRoof)) return null;
         const base: Path = ['envelope', 'windows', index];
         const situation = read(draft, [...base, 'shading', 'situation']);
         return <div key={`w${index}`} className="opname-item">
@@ -1019,6 +1035,32 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       {part !== 'roofFloor' && <ListControls label={t('opname.addWindow')}
         onAdd={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length,
           String((surfaces.find((surface) => surface.element === 'facade') ?? surfaces[0])?.id ?? ''))])} />}
+      {part !== 'walls' && surfaces.some((surface) => surface.element === 'roof') && <ListControls label={t('survey.addRoofWindow')}
+        onAdd={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length,
+          String(surfaces.find((surface) => surface.element === 'roof')?.id ?? ''))])} />}
+      {part !== 'roofFloor' && doors.map((door, index) => {
+        const base: Path = ['envelope', 'doors', index];
+        const glazed = Number(read(draft, [...base, 'glassFraction']) ?? 0) > 0;
+        return <div key={`d${index}`} className="opname-item">
+          <strong>{String(door.id ?? index)}</strong>
+          <SelectField {...field} path={[...base, 'surfaceId']} label={t('opname.window.surface')}
+            options={surfaces.map((surface) => [String(surface.id), String(surface.id)])} />
+          <NumberField {...field} path={[...base, 'areaM2']} label={t('survey.door.area')} />
+          <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={[...base, 'insulated']} label={t('survey.door.insulated')} />
+          <NumberField {...field} path={[...base, 'glassFraction']} label={t('survey.door.glassFraction')} optional />
+          {glazed && <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')}
+            options={opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single'])} />}
+          <SelectField {...field} path={[...base, 'frame']} label={t('opname.window.frame')}
+            options={opts(t, 'opname.window.frameKind', ['wood_or_plastic', 'metal_with_thermal_break', 'metal', 'none'])} />
+          <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'doors'], doors.filter((_, item) => item !== index))} />
+        </div>;
+      })}
+      {part !== 'roofFloor' && <ListControls label={t('survey.addDoor')}
+        onAdd={() => change(['envelope', 'doors'], [...doors, {
+          id: `deur-${doors.length + 1}`,
+          surfaceId: String((surfaces.find((surface) => surface.element === 'facade') ?? surfaces[0])?.id ?? ''),
+          areaM2: 2, insulated: null, glassFraction: 0, frame: 'wood_or_plastic', sourceReference: '',
+        }])} />}
       {part !== 'walls' && rooflights.map((rooflight, index) => {
         const base: Path = ['envelope', 'rooflights', index];
         return <div key={`r${index}`} className="opname-item">
@@ -1053,6 +1095,21 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       {DESIGN_CLASSES_ABOVE_70.includes(String(read(draft, ['heating', 'designClass']))) &&
         <TextField {...field} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} />}
       <DistributionFields draft={draft} change={change} t={t} />
+      <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['heating', 'balanced']} label={t('survey.heating.balanced')} />
+      <SelectField {...field} path={['heating', 'control']} label={t('survey.heating.control')}
+        options={opts(t, 'survey.heating.controlKind', ['room_thermostat', 'central_with_radiator_valves', 'individual_room_control', 'unknown'])}
+        onChange={(path, value) => change(path, value ?? 'unknown')} />
+      <label>{t('survey.heating.unheatedPipes')}
+        <select value={String(read(draft, ['heating', 'unheatedPipes', 'kind']) ?? '')}
+          onChange={(event) => change(['heating', 'unheatedPipes'], event.target.value === '' ? null : { kind: event.target.value })}>
+          <option value="">{t('survey.heating.unheatedPipesKind.unknown')}</option>
+          <option value="absent">{t('survey.heating.unheatedPipesKind.absent')}</option>
+          <option value="present">{t('survey.heating.unheatedPipesKind.present')}</option>
+        </select>
+      </label>
+      {read(draft, ['heating', 'unheatedPipes', 'kind']) === 'present' &&
+        <NumberField {...field} path={['heating', 'unheatedPipes', 'lengthM']} label={t('survey.heating.unheatedPipesLength')} optional />}
+      <NumberField {...field} path={['heating', 'storeys']} label={t('survey.heating.storeys')} step="1" optional />
       <CheckField {...field} path={['heating', 'addedPreferredGenerator']} label={t('opname.heating.addedPreferred')} />
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, ['heating', 'collective']) != null}
@@ -1232,6 +1289,10 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             options={opts(t, 'opname.pv.module', ['monocrystalline', 'polycrystalline', 'cigs', 'cd_te', 'amorphous_unknown', 'unknown'])} />
           <NumberField {...field} path={[...base, 'azimuthDeg']} label={t('opname.pv.azimuth')} />
           <NumberField {...field} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />
+          <NumberField {...field} path={[...base, 'installationYear']} label={t('survey.pv.installationYear')} step="1" optional />
+          <SelectField {...field} path={[...base, 'mounting']} label={t('survey.pv.mounting')}
+            options={opts(t, 'survey.pv.mountingKind', ['not_ventilated', 'moderately_ventilated', 'strongly_ventilated', 'unknown'])}
+            onChange={(path, value) => change(path, value ?? 'unknown')} />
           <label>{t('opname.pv.shading')}
             <select value={typeof method === 'string' ? method : ''}
               onChange={(event) => change([...base, 'shading'], event.target.value === '' ? undefined

@@ -14,7 +14,7 @@ import { stepStatuses } from '../core/nta/stepStatus';
 import {
   markProgress, questionForPath, stepForKind, stepState, surveyStep, surveySteps,
 } from '../core/survey/surveyFlow';
-import { surveyTemplate } from '../core/nta/SurveyTemplates';
+import { missingSurveyAnswers, surveyExample, surveyTemplate, withSurveySources } from '../core/nta/SurveyTemplates';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -47,7 +47,7 @@ describe('survey flow definition', () => {
     expect(surveySteps('utility')[0].id).toBe('gebouw');
     expect(stepForKind('general', 'utility')).toBe('gebouw');
     expect(stepForKind('zones', 'residential')).toBe('woning');
-    const stored = surveyTemplate('residential');
+    const stored = surveyExample('residential');
     const surfaces = (stored.survey.envelope as { surfaces: Array<{ element: string }> }).surfaces;
     const roof = surfaces.findIndex((surface) => surface.element === 'roof');
     expect(questionForPath(`basisopname.envelope.surfaces[${roof}].insulation`, stored).step).toBe('dak-vloer');
@@ -67,6 +67,39 @@ describe('survey flow definition', () => {
     expect(stepState(step, progress)).toBe('done');
     // An answered question stays answered when skipped later.
     expect(markProgress(progress, 'verwarming.toestel', 'skipped').skipped).not.toContain('verwarming.toestel');
+  });
+});
+
+describe('empty dwelling survey', () => {
+  it('starts without example surfaces or sources and names the answers still needed', () => {
+    const stored = surveyTemplate('residential');
+    const survey = stored.survey as { envelope: { surfaces: unknown[]; windows: unknown[] }; sourceReference: string };
+    expect(survey.envelope.surfaces).toEqual([]);
+    expect(survey.envelope.windows).toEqual([]);
+    expect(survey.sourceReference).toBe('');
+    expect(missingSurveyAnswers(stored)).toEqual(expect.arrayContaining([
+      'dwelling', 'constructionYear', 'usableFloorAreaM2', 'buildingHeightM', 'construction.floor', 'construction.wall',
+      'heating.generator', 'heating.emitters', 'hotWater.generator', 'ventilation.principle',
+    ]));
+    // The required answer leads to its question.
+    expect(questionForPath('heating.generator', stored)).toEqual({ step: 'verwarming', question: 'toestel' });
+    expect(questionForPath('ventilation.principle', stored)).toEqual({ step: 'ventilatie', question: 'systeem' });
+  });
+
+  it('gives items and answer blocks without a source the source of the building data', () => {
+    const filled = withSurveySources({
+      sourceReference: 'waarneming', areaSourceReference: '', construction: { floor: 'heavy', sourceReference: '' },
+      heating: { sourceReference: 'typeplaatje' },
+      envelope: { surfaces: [{ id: 'g1', sourceReference: '' }], windows: [{ id: 'r1' }], doors: [{ id: 'd1', sourceReference: 'tekening' }] },
+      pv: [{ id: 'pv1', sourceReference: '' }],
+    }) as Record<string, any>;
+    expect(filled.areaSourceReference).toBe('waarneming');
+    expect(filled.construction.sourceReference).toBe('waarneming');
+    expect(filled.heating.sourceReference).toBe('typeplaatje');
+    expect(filled.envelope.surfaces[0].sourceReference).toBe('waarneming');
+    expect(filled.envelope.windows[0].sourceReference).toBe('waarneming');
+    expect(filled.envelope.doors[0].sourceReference).toBe('tekening');
+    expect(filled.pv[0].sourceReference).toBe('waarneming');
   });
 });
 

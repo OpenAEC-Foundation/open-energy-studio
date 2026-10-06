@@ -102,7 +102,9 @@ describe('basisopname panel', () => {
     expect(survey.ventilation.combined).toEqual({ decentralAreaM2: 0, totalResidenceAreaM2: 0 });
     expect(survey.ventilation.grilleHeatingStrips).toEqual({ sourceReference: '', maxTemperatureRiseK: 8 });
 
-    // p. 94: product g for solar-control glass.
+    // p. 94: product g for solar-control glass. A new survey starts empty: add a facade and a window.
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    await user.click(screen.getByRole('button', { name: 'Add window' }));
     await user.click(screen.getAllByRole('checkbox', { name: 'Solar-control glass or film with product data' })[0]);
     await user.type(screen.getByRole('spinbutton', { name: 'g-value from the product data' }), '0.3');
     // Table 9.9 / erratum §4.
@@ -206,6 +208,9 @@ describe('basisopname panel', () => {
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Building type' }), 'floating');
     await user.click(screen.getByRole('checkbox', { name: 'New berth from 2018' }));
+    // A new survey starts empty: add a facade and a roof first.
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    await user.click(screen.getByRole('button', { name: 'Add roof face' }));
     await user.selectOptions(screen.getAllByRole('combobox', { name: 'Boundary' })[0], 'sunroom');
     await user.click(screen.getByRole('button', { name: 'Add rooflight with quality declaration' }));
     const survey = stored()!.survey;

@@ -3,8 +3,10 @@ import utilityExample from '../../../training-data/nta8800-opname-utility-1985-o
 import type { OpnameAssessment, ResidentialSurvey, UtilitySurvey } from './KernelClient';
 import { assessResidentialSurveyWithRust, assessUtilitySurveyWithRust } from './KernelClient';
 
-// Starting points of the ISSO 82.1 / 75.1 basisopname editor: the synthetic
-// survey fixtures of the kernel tests, edited by the adviser.
+// Starting points of the ISSO 82.1 / 75.1 basisopname editor. A new dwelling
+// survey starts empty: no example surfaces, sources or answers that count
+// without being visible (found entering ISSO 54 EPWRealB 01). The utility
+// survey still starts from the synthetic office fixture of the kernel tests.
 
 export type SurveyKind = 'residential' | 'utility';
 
@@ -15,9 +17,58 @@ export interface StoredSurvey {
   progress?: { done?: string[]; skipped?: string[] };
 }
 
+/** An empty dwelling survey: only the answers that are "unknown" by default (ISSO 82.1 defaults apply). */
+export function emptyResidentialSurvey(): Record<string, unknown> {
+  return {
+    id: '',
+    areaSourceReference: '',
+    envelope: { surfaces: [], windows: [], doors: [] },
+    heating: { control: 'unknown', sourceReference: '' },
+    hotWater: { served: 'kitchen_and_bathroom', showerHeatRecovery: 'unknown', sourceReference: '' },
+    ventilation: { sourceReference: '' },
+    pv: [],
+    sourceReference: '',
+  };
+}
+
+/** The start of a new survey: empty for a dwelling, the office example for a utility building. */
 export function surveyTemplate(kind: SurveyKind): StoredSurvey {
+  return kind === 'residential'
+    ? { kind, survey: emptyResidentialSurvey() }
+    : { kind, survey: structuredClone(utilityExample) as Record<string, unknown> };
+}
+
+/** The synthetic example survey of a kind (kernel test fixture), e.g. for demos and tests. */
+export function surveyExample(kind: SurveyKind): StoredSurvey {
   const source = kind === 'residential' ? residentialExample : utilityExample;
   return { kind, survey: structuredClone(source) as Record<string, unknown> };
+}
+
+/**
+ * The answers a dwelling survey needs before the kernel can read it, as survey
+ * paths. The kernel rejects a survey without them as unreadable, so the app
+ * names them instead (the question flow leads to each).
+ */
+export function missingSurveyAnswers(stored: StoredSurvey): string[] {
+  if (stored.kind !== 'residential') return [];
+  const survey = stored.survey as Record<string, unknown>;
+  const at = (path: string): unknown => path.split('.').reduce<unknown>(
+    (value, key) => (value != null && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined), survey);
+  const blank = (value: unknown) => value == null || value === '' || (typeof value === 'number' && !Number.isFinite(value));
+  const missing: string[] = [];
+  const dwelling = at('dwelling') as Record<string, unknown> | undefined;
+  if (!dwelling?.kind) missing.push('dwelling');
+  else if (dwelling.kind === 'single_family') {
+    if (blank(dwelling.position)) missing.push('dwelling');
+    if (blank(dwelling.roofType)) missing.push('dwelling.roofType');
+  } else if (dwelling.kind === 'apartment') {
+    if (blank(dwelling.floor)) missing.push('dwelling.floor');
+  }
+  for (const path of ['constructionYear', 'usableFloorAreaM2', 'buildingHeightM', 'construction.floor', 'construction.wall',
+    'heating.generator', 'heating.emitters', 'hotWater.generator', 'ventilation.principle']) {
+    if (blank(at(path))) missing.push(path);
+  }
+  return missing;
 }
 
 /** Kernel shape of a survey heating generator for a chosen kind. */
@@ -72,6 +123,8 @@ export function calculationZoneTemplate(index: number): Record<string, unknown> 
 const SOURCED_LISTS: string[][] = [
   ['envelope', 'surfaces'], ['envelope', 'windows'], ['envelope', 'doors'], ['pv'], ['hotWater', 'solar'],
 ];
+/** The answer blocks that carry a source reference of their own. */
+const SOURCED_BLOCKS = ['construction', 'heating', 'hotWater', 'ventilation', 'cooling'];
 
 /**
  * The survey with the source of the building data ("Bron van de gebouwgegevens",
@@ -83,6 +136,14 @@ export function withSurveySources(survey: Record<string, unknown>): Record<strin
   const source = typeof survey.sourceReference === 'string' ? survey.sourceReference.trim() : '';
   if (!source) return survey;
   const next = structuredClone(survey);
+  const empty = (value: unknown) => typeof value !== 'string' || value.trim() === '';
+  if ('areaSourceReference' in next && empty(next.areaSourceReference)) next.areaSourceReference = source;
+  for (const key of SOURCED_BLOCKS) {
+    const block = next[key];
+    if (block && typeof block === 'object' && !Array.isArray(block) && empty((block as Record<string, unknown>).sourceReference)) {
+      (block as Record<string, unknown>).sourceReference = source;
+    }
+  }
   for (const path of SOURCED_LISTS) {
     let parent: unknown = next;
     for (const key of path.slice(0, -1)) parent = (parent as Record<string, unknown> | undefined)?.[key];
