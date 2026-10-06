@@ -251,6 +251,11 @@ pub struct DistributionSystem {
     /// Collective buffer vessel (9.2.3.3/9.2.3.5); only with calculated Ψ.
     #[serde(default)]
     pub buffer_vessel: Option<BufferVessel>,
+    /// NTA 8800:2023 9.4.3 (p. 299): uninsulated pipes run in an uninsulated
+    /// outer wall or floor of the heated zone, f_H;dis;rbl = 0,5. From 2024
+    /// those pipes count as pipes in an unheated space (p. 285).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub uninsulated_pipes_in_uninsulated_shell: bool,
     pub pump: DistributionPump,
     pub source_reference: String,
 }
@@ -1209,6 +1214,10 @@ impl SystemHeatPump {
             crate::norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024 => {
                 self.source_from_15_c
             }
+            // NTA 8800:2023 p. 326: only a source of at least 20 °C.
+            crate::norm_versions::HeatPumpSourceRoute::From20C2023 => {
+                self.source_from_15_c && !self.source_15_to_20_c
+            }
         }
     }
 }
@@ -1461,6 +1470,20 @@ fn zone_terms(
             format!("{prefix}emission.balancing"),
         ));
     }
+    // NTA 8800:2023 tables 9.2–9.10 (p. 273–285) exist in that edition only.
+    if let Some(edition) = &emission.edition2023 {
+        if !crate::norm_versions::profile().emission_tables_2023 {
+            issues.push(issue(
+                "route_not_in_edition",
+                format!("{prefix}emission.edition2023"),
+            ));
+        } else if !edition.valid() {
+            issues.push(issue(
+                "emission_2023_input_invalid",
+                format!("{prefix}emission.edition2023"),
+            ));
+        }
+    }
     // 9.23: air heater auxiliary energy (tables 9.12/9.13).
     if let Some(heaters) = &emission.air_heaters {
         if heaters
@@ -1675,6 +1698,14 @@ fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<Ch
             format!("{path}.connectedStoreys"),
         ));
     }
+    if system.uninsulated_pipes_in_uninsulated_shell
+        && !crate::norm_versions::profile().distribution_half_recoverable_route
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.uninsulatedPipesInUninsulatedShell"),
+        ));
+    }
     for (value, field) in [
         (system.actual_pipe_length_m, "actualPipeLengthM"),
         (system.unheated_pipe_length_m, "unheatedPipeLengthM"),
@@ -1805,7 +1836,12 @@ fn calculate_distribution(
         .design_temperature_class
         .unwrap_or(DesignTemperatureClass::C90);
     let (design_supply, design_spread) = class.design();
-    let full_month = system.pipes_also_for_hot_water || system.collective_hot_water_delivery_set;
+    // 2024 p. 285–286 and 289–290: full-month t_H;op for combined pipes and
+    // delivery sets, ϑ_H;mean ≥ 65 °C (9.30) and L_zi = 0 for heating-only
+    // pipes. NTA 8800:2023 (p. 290–294) has none of these rules.
+    let rules_2024 = crate::norm_versions::profile().distribution_2024_rules;
+    let full_month =
+        rules_2024 && (system.pipes_also_for_hot_water || system.collective_hot_water_delivery_set);
     // Table 9.X: pump fraction 0,10 for dwellings with an individual installation.
     let pump_fraction = if system.usage_function == ReductionFunction::Residential
         && system.installation == Installation::Individual
@@ -1856,7 +1892,7 @@ fn calculate_distribution(
     let mean = |zone: usize, month: usize| {
         let (supply, ret) = supply_return[zone][month];
         let value = (supply + ret) / 2.0;
-        if system.collective_hot_water_delivery_set {
+        if rules_2024 && system.collective_hot_water_delivery_set {
             value.max(DELIVERY_SET_MIN_MEAN_C)
         } else {
             value
@@ -1877,7 +1913,11 @@ fn calculate_distribution(
         ));
         return result;
     }
-    let shared = system.pipes_also_for_hot_water && system.installation == Installation::Collective;
+    // Table 9.16 rows for combined collective pipes: 2024 p. 292; absent
+    // in NTA 8800:2023 (p. 296).
+    let shared = system.pipes_also_for_hot_water
+        && system.installation == Installation::Collective
+        && crate::norm_versions::profile().table_9_16_combined_rows;
     let psi_zone = system.pipe_transmittance.value(connected_area_m2, shared);
     let psi_unheated = system
         .unheated_pipe_transmittance
@@ -1905,8 +1945,9 @@ fn calculate_distribution(
             continue;
         }
         let share = zone.area_m2 / zone_area;
-        // 9.4.1: L_zi = 0 when the pipes serve space heating only.
-        let zone_length = if system.pipes_also_for_hot_water {
+        // 9.4.1: L_zi = 0 when the pipes serve space heating only (2024
+        // p. 284–285; not in NTA 8800:2023 p. 290–291).
+        let zone_length = if system.pipes_also_for_hot_water || !rules_2024 {
             in_zone_with_fittings * share
         } else {
             0.0
@@ -1920,8 +1961,16 @@ fn calculate_distribution(
                     / 1000.0
                     * share;
             result.zone_loss[index][month] = (in_zone + unheated) * building_fraction;
-            // 9.38 with f_H;dis;rbl = 1; losses in unheated spaces are not recoverable.
-            result.zone_recoverable[index][month] = in_zone * building_fraction;
+            // 9.38 with f_H;dis;rbl = 1 (0,5 for NTA 8800:2023 p. 299 pipes
+            // in an uninsulated shell); losses in unheated spaces are not
+            // recoverable.
+            let recoverable_fraction = if system.uninsulated_pipes_in_uninsulated_shell {
+                0.5
+            } else {
+                1.0
+            };
+            result.zone_recoverable[index][month] =
+                recoverable_fraction * in_zone * building_fraction;
         }
     }
 
@@ -1965,7 +2014,9 @@ fn calculate_distribution(
                 let peak = (0..12)
                     .max_by(|a, b| totals[*a].total_cmp(&totals[*b]))
                     .unwrap_or(0);
-                let spread = if system.collective_hot_water_delivery_set {
+                // 2024 p. 300: Δϑ_H;min = Δϑ_H,ontw with delivery sets; not
+                // in NTA 8800:2023 (p. 304).
+                let spread = if rules_2024 && system.collective_hot_water_delivery_set {
                     design_spread
                 } else {
                     hydronic
@@ -6889,6 +6940,7 @@ mod tests {
             unheated_ambient_c: None,
             unheated_reduction_factor: None,
             buffer_vessel: None,
+            uninsulated_pipes_in_uninsulated_shell: false,
             pump,
             source_reference: "installation survey".into(),
         }
@@ -7418,6 +7470,92 @@ mod tests {
         assert!(found.contains(&"distribution_system_required"));
         assert!(found.contains(&"distribution_pump_input_required"));
     }
+    /// NTA 8800:2023 9.4 against 2024: full-month operation and
+    /// ϑ_H;mean ≥ 65 °C with delivery sets (2024 p. 286, 290; absent in 2023
+    /// p. 291, 294), table 9.16 combined rows (2024 p. 292, 2023 p. 296),
+    /// L_zi = 0 for heating-only pipes (2024 p. 284–285, 2023 p. 290–291)
+    /// and f_H;dis;rbl = 0,5 in an uninsulated shell (2023 p. 299 only).
+    #[test]
+    fn distribution_rules_switch_with_the_2023_edition() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let mut input = collective_boiler_chain();
+        input.distribution = Distribution::Calculated {
+            heating_limit_extra_kwh: Some(vec![0.0; 12]),
+            source_reference: "9.26".into(),
+        };
+        let distribution = input.distribution_system.as_mut().unwrap();
+        distribution.pipes_also_for_hot_water = true;
+        distribution.collective_hot_water_delivery_set = true;
+        distribution.pipe_transmittance = PipeTransmittance::Forfait {
+            insulation: crate::heating_distribution::PipeInsulation::Unknown,
+        };
+        let run = |version, input: &SpaceHeatingChainInput| {
+            with_version(version, || assess_space_heating_chain(input))
+        };
+        let v24 = run(NormVersion::V2024, &input);
+        let v23 = run(NormVersion::V2023, &input);
+        for result in [&v24, &v23] {
+            assert_eq!(
+                result.status, "calculated_unverified",
+                "{:?}",
+                result.issues
+            );
+        }
+        let (s24, s23) = (
+            v24.distribution.as_ref().unwrap(),
+            v23.distribution.as_ref().unwrap(),
+        );
+        // Table 9.16, uninsulated or unknown, connected area ≤ 200 m²:
+        // combined row 2,0 (2024 p. 292), heating row 1,0 (2023 p. 296).
+        assert_eq!(s24.psi_zone_w_per_mk, 2.0);
+        assert_eq!(s23.psi_zone_w_per_mk, 1.0);
+        // July: whole month (744 h) and 65 °C in 2024; table 9.15 hours and
+        // the 9.31/9.32 temperature (here the setpoint) in 2023.
+        assert_eq!(s24.zones[0].operating_hours[6], 744.0);
+        assert!(s23.zones[0].operating_hours[6] < 744.0);
+        assert!(s24.zones[0]
+            .mean_medium_temperature_c
+            .iter()
+            .all(|t| *t >= 65.0));
+        assert_eq!(s23.zones[0].mean_medium_temperature_c[6], 20.0);
+
+        // Heating-only pipes: L_zi = 0 in 2024, so only the recoverable pump
+        // energy (table 9.18, 0,25) remains; 2023 keeps the zone pipes.
+        let mut heating_only = input.clone();
+        let only = heating_only.distribution_system.as_mut().unwrap();
+        only.pipes_also_for_hot_water = false;
+        only.collective_hot_water_delivery_set = false;
+        let h24 = run(NormVersion::V2024, &heating_only);
+        let h23 = run(NormVersion::V2023, &heating_only);
+        let jan24 = &h24.monthly[0];
+        let jan23 = &h23.monthly[0];
+        let pump_part = |month: &ChainMonth| 0.25 * month.distribution_auxiliary_electricity_kwh;
+        assert!((jan24.recoverable_loss_kwh - pump_part(jan24)).abs() < 1e-9);
+        assert!(jan23.recoverable_loss_kwh > pump_part(jan23) + 100.0);
+
+        // f_H;dis;rbl = 0,5 halves the recoverable pipe loss (2023 p. 299).
+        let mut half = heating_only.clone();
+        half.distribution_system
+            .as_mut()
+            .unwrap()
+            .uninsulated_pipes_in_uninsulated_shell = true;
+        let f23 = run(NormVersion::V2023, &half);
+        let jan_half = &f23.monthly[0];
+        assert!(
+            (jan_half.recoverable_loss_kwh
+                - (pump_part(jan23) + 0.5 * (jan23.recoverable_loss_kwh - pump_part(jan23))))
+            .abs()
+                < 1e-9
+        );
+        assert_eq!(jan_half.distribution_loss_kwh, jan23.distribution_loss_kwh);
+        let f24 = run(NormVersion::V2024, &half);
+        assert!(f24
+            .issues
+            .iter()
+            .any(|item| item.code == "route_not_in_edition"
+                && item.path == "distributionSystem.uninsulatedPipesInUninsulatedShell"));
+    }
+
     #[test]
     fn collective_fixture_calculates_distribution_and_pump() {
         let input: SpaceHeatingChainInput = serde_json::from_str(include_str!(

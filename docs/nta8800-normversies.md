@@ -105,29 +105,39 @@ Bovenop de achttien punten hierboven. Pagina's links uit NTA 8800:2023, rechts u
 | 32 | Renovatiestandaard (tabel 5.7) | bestaat niet (p. 70–72) | p. 73–74 | `null` (hoofdstuk-5-indicatoren zijn in beide oudere uitgaven al `null`) |
 | 33 | Tabel 14.3 kolom "led vanaf 2017" | één kolom (p. 648) | 16 / 12 W/m² (p. 646) | `ledFrom2017: true` → `route_not_in_edition` |
 | 34 | Roeden in U_w (8.17)/(8.18) | geen term (p. 214–218) | p. 219–222 | `glazingBars` → `route_not_in_edition` |
+| 35 | f_sh;with woningen (7.6.6.1.4) | tabel 7.7 ook op de warmtebalans; automatische zonwering van woningen tabel 7.7 (p. 179–181) | 0 op de warmtebalans; automatisch tabel 7.9 (p. 181, 186) | `dwelling_shading_heating_off`; `automatic` in een woning → `route_not_in_edition` |
+| 36 | Restwarmte f_Pren (5.47)/(5.55) | 1 − f_rw;aux;spec·f_P;del;el = 0,8985 (p. 116, 121, 959) | 1 − f_rw;aux;spec = 0,93 (p. 119, 124) | `residual_heat_pren_primary` |
+| 37 | Lichtkoepels U_rc → U_C (8.2.2.1 e) | bestaat niet (p. 207) | p. 210 | element `rooflight` → `route_not_in_edition` |
+| 38 | Paneel-U naar bouwjaar (I.13/I.14) | vanaf 1965 per bouwjaarklasse (p. 818–820) | alleen I.11/I.12 (p. 817–818) | `buildYear` op `forfait_panel` (alleen 2023; verplicht zonder bekende dikte → `panel_build_year_required`); de basisopname geeft het bouwjaar door |
+| 39 | NEN 1087-factor zonder roosterspecificatie (11.71) | 0,5 (p. 466) | 0,3 (p. 461) | `screenUnspecified` op `opening_angle` (alle edities) |
+| 40 | A_w;cros (11.77) | alleen naar oriëntatie (p. 469) | dakopening β < 60° in elke sector (11.77a/b, p. 464) | `cross_area_roof_all_sectors` |
+| 41 | Distributie verwarming 9.4 | L_zi ≠ 0 ook voor alleen-verwarming, t_H;op uit tabel 9.15, geen 65 °C en Δϑ_H,ontw bij afleversets (p. 290–294, 304) | L_zi = 0, volle maand, ≥ 65 °C (p. 284–290, 300) | `distribution_2024_rules` |
+| 42 | Tabel 9.16 gecombineerde collectieve leidingen | geen eigen rijen (p. 296) | p. 292 | `table_9_16_combined_rows` |
+| 43 | f_H;dis;rbl 0,5 in ongeïsoleerde schil (9.4.3) | p. 299 | bestaat niet (leidingen tellen als onverwarmd, p. 285) | `uninsulatedPipesInUninsulatedShell` (alleen 2023) |
+| 44 | Tabel 13.4 onbekende diameter | rijen "klein"/"overig" (p. 542) | tabel 13.29 en 35/80 mm (p. 537–538) | `table_13_4_system_psi`; "klein" = ten hoogste 500 m² aangesloten (interpretatie) |
+| 45 | Serieschakeling tapwater 13.141a–d en 13.8.4.10 | bestaat niet | p. 595, 638 | `series` en `heat_pump_series` → `route_not_in_edition` |
+| 46 | Bronwarmte warmtepomp | alleen bron ≥ 20 °C als externe warmte (p. 326, 343); EER_bron blijft (p. 349) | elke bron ≥ 15 °C (p. 323) | `HeatPumpSourceRoute::From20C2023` |
+| 47 | Afgifte verwarming 9.3 | tabellen 9.2–9.10, (9.17)–(9.20) (p. 273–285) | tabellen 9.2–9.4 (p. 279–280) | `emission.edition2023` (alleen 2023); zonder die invoer de onbekende waarden van 2023 |
+| 48 | Afgifte koeling 10.3.3 | tabellen 10.2–10.5 (p. 360–364) | tabellen 10.35/10.4/10.5 (p. 359) | `cooling.emission.edition2023` (alleen 2023); zonder die invoer afgeleid van de 2024-velden |
 
 Gelijk in 2023 en 2024, dus geen schakelpunt: K_CO2 (tabel 5.3, p. 92–93; AVI tabel 5.6, p. 114), f_P el 1,45 en gas 1,0 (tabel 5.2, p. 89), λequi;ntr 0,045 (p. 814–815; alleen 2022 had 0,06), (I.3) d/0,2 (p. 815), tabel 13.18 (p. 617) en EER_bron 23/16 voor een WKO-bron (9.6.8.1.1.2.3, p. 349).
 
 ## Besluiten bij de invoering van 2023
 
 Vóór het programmeren nagelopen in de 2023-PDF:
-- **Oude tabellen afgifte verwarming en productroute** (2023 p. 273–286 tegen 2024 p. 278–280): niet omgeschakeld. De kern rekent ook in 2023 met de drie samengevatte tabellen van 2024. De oude route bestaat uit losse correcties (Δθstr, Δθctr, Δθemb, Δθim, Δθroomaut, tabellen voor hoge ruimten) en een productroute (9.13)–(9.15). Daarvoor ontbreekt invoer in de kern. Dit is een bekende afwijking van een 2023-berekening.
-- **Oude route afgifte koeling** (tabellen 10.2–10.5 en de productroute, 2023 p. 360–364 tegen tabel 10.35, 2024 p. 358–359): niet omgeschakeld, om dezelfde reden. Het effect op de openbare rapporten is klein (zie de toelichting bij 10.15 in de vergelijking).
-- **Zomernachtventilatie:** tabel 11.7, f_argII, (11.71a), f_τ en θ_e;argII zijn omgeschakeld (punten 20–24). Niet omgeschakeld: de factor voor NEN 1087 (0,5 in 2023, 0,3 in 2024) en de voorwaarde β ≥ 60° voor dwarsventilatie, die 2023 niet stelt. Daarvoor heeft de kern geen eigen invoer.
+- **Afgifte verwarming** (2023 p. 273–285, punt 47): de forfaitaire tabellen 9.2–9.10 met (9.17)–(9.20), ook voor ruimten hoger dan 4 m. Invoer `emission.edition2023`. Zonder die invoer leidt de kern de 2023-waarden af uit de 2024-velden: eigenschappen die de 2024-invoer niet kent, krijgen de waarde "onbekend" (de hoogste van de categorie, of (9.18a)), de regeling is niet gecertificeerd (Δθctr,1), een onbekend leidingsysteem telt als eenpijps, "individuele ruimtethermostaten" geeft Δθroomaut −0,5, luchtverwarming volgt 9.3.3.4. Tabel 9.3 drukt 2,5 K voor centrale regeling alleen in de kolom Δθctr,2; de kern leest die voor beide kolommen. De productroute (9.13)–(9.15) met CA-waarden is niet als aparte route opgenomen: de gecertificeerde kolom Δθctr,2 (`certifiedControl`) dekt de gangbare toepassing.
+- **Afgifte koeling** (2023 p. 360–364, punt 48): tabellen 10.2–10.5. Invoer `cooling.emission.edition2023`. Zonder die invoer: Δϑctr,1, de rij van tabel 10.4 die bij de 2024-keuze hoort (statisch → "per afgiftesysteem zonder groepen", dynamisch of niet van toepassing → 0) en Δϑroomaut +0,5 ("standalone") voor elke regeling per ruimte, 0 voor onbekend.
+- **Zomernachtventilatie:** tabel 11.7, f_argII, (11.71a), f_τ en θ_e;argII (punten 20–24), de factor voor NEN 1087 (punt 39) en de sectorindeling van (11.77) (punt 40). De voorwaarde "dak met een hoek van ten hoogste 60°" voor dwarsventilatie staat in beide uitgaven gelijk (2023 p. 467, 2024 p. 460); het verschil zit in (11.77a/b).
 - **Tabel 13.2 met de rijen ≤ 8 en ≤ 10 mm:** omgeschakeld, met de twee-derde-regel als omschrijving van de invoer (punt 19). Zonder invoer geldt de rij "overig of onbekend", net als in 2024.
 - **Biomassagrens:** 100 kW in 2023 (punt 30).
 - **λequi;ntr:** 0,045 in 2023 en 2024, geen schakelpunt.
 - **Deler in bijlage P:** 8 800 in 2023 (punt 28).
 
-## Niet omgeschakeld in 2023 (kern rekent met de 2024-route)
+## Niet omgeschakeld in 2023
 
-- Afgifte verwarming en koeling: zie de besluiten hierboven.
-- Tabel 13.4 met de rijen "klein/overig" in plaats van de diameters van tabel 13.29 (2023 p. 542); de hotfill- en serieregels (13.141a–c, 13.8.4.10) en de regel L = 0 bij gecombineerde circulatie bestaan in 2023 niet.
-- Distributie: L_zi ≠ 0 voor alleen-verwarmingsleidingen in verwarmde zones (2023 p. 290), geen volle maand t_H,op (p. 291), geen 65 °C-regel voor afleversets, f_dis;rbl 0,5 voor ongeïsoleerde leidingen in een ongeïsoleerde buitenmuur (p. 299), geen collectief-gecombineerde rijen in tabel 9.16 (p. 296).
-- Beschaduwing: f_sh;with wordt in 2023 voor woningen niet op 0 gezet (p. 179–183).
-- Bronwarmte: drempel ≥ 20 °C en de bronterm binnen (9.84) (p. 326, 343). De kern volgt de 2024-route van 9.6.3.1.3.
-- Restwarmte f_Pren = 1 − f_P;del;rw (p. 116–121).
-- Paneel-U volgens bouwjaar (I.13/I.14, p. 818–821); geen terugvalwaarde U_fr uit tabel 8.3 (p. 221); geen omrekening U_rc van lichtkoepels (p. 207). De kern rekent hier met de 2024-route.
+Alle eerder hier genoemde punten zijn schakelpunten geworden (35–48). Twee punten vragen geen schakelpunt, omdat de kern de 2024-regel niet als eigen route heeft:
+- **Terugvalwaarde U_fr uit tabel 8.3** (2024 p. 227, niet in 2023 p. 221–222): de kern rekent U_fr nooit zelf uit tabel 8.3; `frameUWPerM2K` is altijd opgegeven met een bron. Onder 2023 hoort die bron NEN-EN-ISO 10077-2 te zijn. De route `frame_table` (U_W uit tabel 8.3 als geheel) bestaat in beide uitgaven.
+- **L = 0 bij een gecombineerd circulatiesysteem voor tapwater en verwarming** (2024 p. 533, niet in 2023 p. 539): de kern heeft geen invoer voor zo'n gecombineerd circulatiesysteem; de circulatieleiding wordt in beide uitgaven volledig gerekend.
 
 ## Geen schakelpunt: rechtgezet door INT-V1:2024
 
@@ -140,6 +150,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 
 ## Interpretaties
 
+- **Tabel 13.4 in 2023 (p. 542):** de rij "klein" heeft geen definitie. De kern leest "klein" als een systeem met ten hoogste 500 m² aangesloten gebruiksoppervlakte, de grens die 2024 (p. 538) voor utiliteitsgebouwen gebruikt.
 - **Tabel 13.18 in 2024 (p. 614):** de tabel geeft geen interpolatieregel. De kern neemt de kolom van de grootste tabelwaarde die niet groter is dan de jaarlijkse tapwarmtevraag. 2025+C1 (p. 630–631) interpoleert lineair.
 - **Bronwarmte in 2024:** 9.6.3.1.3 (p. 323, aangepast door INT-V1 p. 5) telt de bronwarmte van elke warmtepomp uit tabel 9.27/9.29 met een bron van ten minste 15 °C mee in (5.20). De kern leest dat af aan de bronrij (15–20, 20–40, ≥ 40 °C). Voetnoot e van tabel 9.27/9.29 (p. 316–317, 320–321), die een bron vanaf 20 °C als externe warmte behandelt, past daarbinnen. De bronwarmte krijgt f_P;del 0,9 van tabel 5.2 (p. 93) en K_CO2 0,17 van tabel 5.3 (p. 95), of de waarden uit bijlage P. Voor een (grond)water- of aquiferbron van 15–20 °C komt daar de hulpenergie van het bronsysteem bij: Q/EER, met EER 23 voor een bron vanaf 2013 en anders 16 (9.6.8.1.1.2.3, p. 346). Het invoerveld is `externalSupply.collectiveHeatPumpSource.realisedFrom2013`; zonder dat veld geldt 16.
 - **Bijlage AA in 2024:**

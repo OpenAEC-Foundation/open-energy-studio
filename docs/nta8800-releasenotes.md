@@ -2,6 +2,18 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 6 oktober 2026 — NTA 8800:2023 compleet
+
+De uitgave 2023 rekent nu ook de punten die eerder op de 2024-route terugvielen (docs/nta8800-normversies.md, punten 35–48):
+- afgifte verwarming volgens tabellen 9.2–9.10 (ook ruimten hoger dan 4 m) en afgifte koeling volgens tabellen 10.2–10.5, met een eigen 2023-invoer die alleen onder 2023 zichtbaar is;
+- distributie: L_zi ook voor alleen-verwarmingsleidingen, bedrijfstijd uit tabel 9.15, geen 65 °C-regel voor afleversets, tabel 9.16 zonder gecombineerde rijen, f_H;dis;rbl 0,5 voor leidingen in een ongeïsoleerde schil (nieuwe 2023-invoer);
+- f_sh;with van woningen, restwarmte f_Pren, bronwarmte vanaf 20 °C, paneel-U naar bouwjaar (tabellen I.13/I.14, nieuwe 2023-invoer `buildYear`), tabel 13.4 "klein/overig", de NEN 1087-factor 0,5 en (11.77) zonder dak-in-elke-sector;
+- lichtkoepels (U_rc) en de serieschakelingen voor tapwater worden onder 2023 geweigerd (`route_not_in_edition`).
+
+Nieuw voor alle edities: `screenUnspecified` op een opening met openingshoek (NEN 1087-doorlaat × 0,3, onder 2023 × 0,5).
+
+Openbare rapporten onder 2023: B 52,96 / 29,10 / 62,5 (was 28,95), C 64,70 / 30,44 / 69,8 (was 30,19). De resultaten onder 2024 en 2025+C1 zijn ongewijzigd.
+
 ## 5 oktober 2026 — NTA 8800-editie op elke route
 
 Opgeslagen projecten zonder `ntaCalculation.normVersion` rekenen ongewijzigd in 2025+C1; hun vingerafdruk en label-invoer-hash veranderen niet. Wat verandert voor een project of verzoek in een oudere editie (zie [nta8800-normversies.md](nta8800-normversies.md#uitgave-per-route)):

@@ -2237,11 +2237,18 @@ fn factors(
                 ));
                 return None;
             }
-            // P.6.5.4.7 and 5.47/5.55.
+            // P.6.5.4.7 and 5.47/5.55: 1 − f_rw;aux;spec (2024 p. 119, 124);
+            // 1 − f_P;del;rw with f_P;del;rw = f_rw;aux;spec·f_P;del;el in
+            // NTA 8800:2023 (p. 116, 121 and 959).
+            let pren = if crate::norm_versions::profile().residual_heat_pren_primary {
+                1.0 - aux * F_P_EL
+            } else {
+                1.0 - aux
+            };
             Some(GenFactors {
                 f: aux * F_P_EL,
                 k: aux * k_co2_el(),
-                pren: 1.0 - aux,
+                pren,
                 ..GenFactors::default()
             })
         }
@@ -4852,8 +4859,11 @@ pub fn source_factors(
     if !issues.is_empty() {
         return Err(issues);
     }
-    let route_2024 = crate::norm_versions::profile().heat_pump_source_route
-        == crate::norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024;
+    // NTA 8800:2023 (p. 343) books ≥ 20 °C source heat with table 5.2 or
+    // annex P as well.
+    let route_2024 = crate::norm_versions::profile()
+        .heat_pump_source_route
+        .books_table_sources();
     let forfait = match source.temperature_class {
         // NTA 8800:2024 9.6.3.1.3 (p. 323, INT-V1 p. 5): the source heat
         // takes f_P;del of table 5.2 (p. 93: 0,9) or annex P, whatever its
@@ -5020,6 +5030,23 @@ mod tests {
         .unwrap();
         close(residual.0, 0.07 * 1.45);
         close(residual.2, 0.93);
+        // NTA 8800:2023 (5.47) p. 116 with P.6.5.4.7 p. 959: f_Pren =
+        // 1 − f_P;del;rw = 1 − 0,07·1,45 = 0,8985; 2024 p. 119: 1 − 0,07.
+        let residual_2023 =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
+                generator_factors(
+                    &GeneratorKind::ResidualHeat {
+                        auxiliary_specific: None,
+                        auxiliary_reference: None,
+                    },
+                    SystemFunction::HotWater,
+                    "g",
+                    &mut issues,
+                )
+                .unwrap()
+            });
+        close(residual_2023.0, 0.07 * 1.45);
+        close(residual_2023.2, 0.8985);
         // Geothermal 83/40 °C: Δθ = 40 K → η = 20, f_Pren 0,95 (5.48).
         let geo = generator_factors(
             &GeneratorKind::Geothermal {

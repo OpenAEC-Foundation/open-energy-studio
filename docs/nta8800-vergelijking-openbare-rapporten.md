@@ -96,12 +96,17 @@ B en C zijn gepubliceerd volgens NTA 8800:2023. De kern rekent die editie nu ook
 
 | Geval | Rapport | Kern 2024 | Kern 2023 |
 |---|---|---|---|
-| B | 54,61 / 27,10 / 64,8 | 52,96 / 28,84 / 62,6 | 52,96 / 28,95 / 62,5 |
-| C (keukenleiding ≤ 10 mm) | 64,47 / 28,70 / 70,9 | 64,70 / 31,54 / 69,0 | 64,70 / 30,19 / 69,9 |
+| B | 54,61 / 27,10 / 64,8 | 52,96 / 28,84 / 62,6 | 52,96 / 29,10 / 62,5 |
+| C (keukenleiding ≤ 10 mm) | 64,47 / 28,70 / 70,9 | 64,70 / 31,54 / 69,0 | 64,70 / 30,44 / 69,8 |
 
 - C: met `kitchenPipeDiameter: "up_to_10_mm"` geeft tabel 13.2 (2023 p. 533) η_W;em;k 0,55 in plaats van 0,43. BENG 2 daalt precies 1,35 en BENG 3 stijgt 0,9: de versiepost van de tabel hierboven verdwijnt. Wat overblijft (+1,49 BENG 2) is 10.87 (+0,50), 10.15 (+1,46) en de rest (−0,47).
-- B: de schakelpunten van 2023 verhogen BENG 2 met 0,11; BENG 1 blijft gelijk. B heeft geen gegevens over de binnendiameter, dus tabel 13.2 blijft op "overig". Het verschil met het rapport blijft verklaard door 10.87, 10.15 en de rest.
-- De afgifteroutes van 2023 voor verwarming en koeling (oude Δθ-tabellen) zijn niet omgeschakeld. Volgens de toelichting bij 10.15 verandert dat de letterlijke uitkomst minder dan 0,5 %.
+- B: de schakelpunten van 2023 verhogen BENG 2 met 0,26; BENG 1 blijft gelijk. Opgebouwd uit:
+  - **+0,11: ΔT_C;fan** (11.3.2.7). Voor de koudebehoefte van woningen geldt 0,7 K in 2023 (p. 496) tegen 0,4 K in 2024 (p. 491). B heeft een WTW-unit met volledige bypass, dus de uitzondering "WTW zonder bypass: 0 K" geldt niet. De warmere toevoerlucht verhoogt de koudebehoefte van de werkelijke ventilatie en daarmee de koeling in BENG 2. BENG 1 rekent met het vaste systeem C1 zonder ventilatoren in de toevoer en verandert niet. Nagegaan door elk schakelpunt afzonderlijk op de 2024-waarde te zetten: alleen de koelwaarde van ΔT_fan geeft het verschil (de verwarmingswaarde is voor B 0 K in beide uitgaven, omdat het WTW-rendement de dissipatie bevat). De waarden zijn juist overgenomen.
+  - **+0,13: afgifte verwarming** volgens tabel 9.4 van 2023 (vloerverwarming, onbekende isolatie → (9.18a), Δθctr,1 2,5, eenpijpskolom 0,7, Δθroomaut −0,5, Δθim −0,2: 3,2 K tegen 2,5 K in 2024).
+  - **+0,02: afgifte koeling** volgens tabellen 10.2–10.5 (vloerkoeling: −4,0 K tegen −3,55 K).
+- C: −1,35 door tabel 13.2 (≤ 10 mm), +0,24 afgifte verwarming en +0,02 afgifte koeling; ΔT_C;fan heeft voor C geen effect. Uitkomst 30,44 (was 30,19 vóór de afgifteschakelpunten).
+- B heeft geen gegevens over de binnendiameter, dus tabel 13.2 blijft op "overig". Het verschil met het rapport blijft verklaard door 10.87, 10.15 en de rest.
+- De afgifteroutes van 2023 (tabellen 9.2–9.10 en 10.2–10.5) zijn nu omgeschakeld. Omdat de rapporten de 2023-afgiftegegevens niet tonen, rekent de kern met de onbekende waarden van 2023; dat verhoogt BENG 2 en vergroot het verschil met de rapporten iets. Met de werkelijke afgiftegegevens (`emission.edition2023`) kan dat dalen.
 
 De test staat in `crates/nta8800-core/tests/public_comparison.rs` (`cases_b_and_c_under_nta_8800_2023`).
 

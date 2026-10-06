@@ -13,8 +13,9 @@ use crate::constructions::{
     U_VENTILATION_GRILLE,
 };
 use crate::forfait_envelope::{
-    forfait_door_u, forfait_glazed_door_u, forfait_panel_u, forfait_psi, forfait_window_u,
-    ForfaitGlass, ForfaitOpaque, ForfaitOpaqueResult, PanelInsulation, PsiColumn, PSI_DEFAULT,
+    forfait_door_u, forfait_glazed_door_u, forfait_panel_u, forfait_panel_u_in_edition,
+    forfait_psi, forfait_window_u, ForfaitGlass, ForfaitOpaque, ForfaitOpaqueResult,
+    PanelInsulation, PsiColumn, PSI_DEFAULT,
 };
 use crate::materials::round_half_up;
 use crate::window_u::{round_transparent, FrameGroup, WindowInput, WindowMethod, WindowResult};
@@ -55,6 +56,10 @@ pub enum ElementKind {
         cavity: bool,
         frame: FrameGroup,
         exterior: bool,
+        /// Build year of the building (part), NTA 8800:2023 tables I.13/I.14
+        /// only (p. 819–820).
+        #[serde(default, rename = "buildYear", skip_serializing_if = "Option::is_none")]
+        build_year: Option<i32>,
     },
     /// Note 2 of 8.2.2.1 (NEN-EN 1873).
     Rooflight {
@@ -251,9 +256,22 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                 cavity,
                 frame,
                 exterior,
+                build_year,
             } => {
                 if forfait_panel_u(*insulation, *cavity, *frame, *exterior).is_none() {
                     push("panel_thickness_outside_table", el.clone());
+                }
+                // Tables I.13/I.14 by build year exist in NTA 8800:2023 only;
+                // there a panel without a known thickness needs the year.
+                let tables = crate::norm_versions::profile().panel_build_year_tables;
+                if build_year.is_some() && !tables {
+                    push("route_not_in_edition", format!("{el}.buildYear"));
+                }
+                if tables
+                    && build_year.is_none()
+                    && !matches!(insulation, PanelInsulation::KnownThickness { .. })
+                {
+                    push("panel_build_year_required", format!("{el}.buildYear"));
                 }
                 if e.in_forfait_supplement {
                     push(
@@ -267,6 +285,11 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                 area_with_upstand_m2,
                 source_reference,
             } => {
+                // NTA 8800:2023 8.2.2.1 (p. 207) has no rooflight category and
+                // no U_rc conversion (2024 p. 210).
+                if !crate::norm_versions::profile().rooflight_route {
+                    push("route_not_in_edition", el.clone());
+                }
                 if !positive(*u_rc) || !positive(*area_with_upstand_m2) {
                     push("rooflight_invalid", el.clone());
                 }
@@ -411,8 +434,11 @@ fn element_result(e: &EnvelopeElement) -> ElementResult {
             cavity,
             frame,
             exterior,
+            build_year,
         } => {
-            let u = forfait_panel_u(*insulation, *cavity, *frame, *exterior).unwrap_or(f64::NAN);
+            let u =
+                forfait_panel_u_in_edition(*insulation, *cavity, *frame, *exterior, *build_year)
+                    .unwrap_or(f64::NAN);
             base("I.2.2.4", u, round_transparent(u))
         }
         ElementKind::Rooflight {
@@ -647,6 +673,7 @@ mod tests {
                 cavity: false,
                 frame: FrameGroup::WoodOrPlastic,
                 exterior: true,
+                build_year: None,
             },
         ));
         bad.elements.push(element(

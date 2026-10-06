@@ -28,8 +28,8 @@ use serde_json::{json, Value};
 use super::Recorder;
 use crate::climate::Orientation;
 use crate::forfait_envelope::{
-    basic_survey_unheated_transfer, forfait_door_u, forfait_panel_u, forfait_window_u,
-    BuildingKind, ElementType, ForfaitGlass, ForfaitOpaque, InsulationState, PanelInsulation,
+    basic_survey_unheated_transfer, forfait_door_u, forfait_window_u, BuildingKind, ElementType,
+    ForfaitGlass, ForfaitOpaque, InsulationState, PanelInsulation,
 };
 use crate::window_u::FrameGroup;
 
@@ -883,7 +883,14 @@ pub fn derive_envelope_zone(
             let p_path = format!("envelope.panels[{p_index}]");
             openings_area += panel.area_m2;
             let frame = frame_group(panel.frame, recorder, &p_path);
-            match forfait_panel_u(panel.insulation, panel.cavity, frame, exterior) {
+            // NTA 8800:2023 tables I.13/I.14 take the build year (p. 819–820).
+            match crate::forfait_envelope::forfait_panel_u_in_edition(
+                panel.insulation,
+                panel.cavity,
+                frame,
+                exterior,
+                Some(construction_year),
+            ) {
                 Some(u) => push_opaque_or_partition(
                     &mut opaque,
                     &mut partitions,

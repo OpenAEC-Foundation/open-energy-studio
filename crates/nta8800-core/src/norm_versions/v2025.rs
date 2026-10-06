@@ -81,4 +81,17 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     led_2017_column: true,
     // (8.17)/(8.18) with glazing bars (2024 p. 219–222).
     glazing_bar_term: true,
+    dwelling_shading_heating_off: true,
+    residual_heat_pren_primary: false,
+    rooflight_route: true,
+    panel_build_year_tables: false,
+    unspecified_screen_factor: 0.3,
+    cross_area_roof_all_sectors: true,
+    distribution_2024_rules: true,
+    table_9_16_combined_rows: true,
+    distribution_half_recoverable_route: false,
+    table_13_4_system_rows: false,
+    hot_water_series_routes: true,
+    emission_tables_2023: false,
+    cooling_emission_tables_2023: false,
 };

@@ -373,4 +373,355 @@ mod switch_points_2023 {
             v2024(|| forfait_psi(16, 0, PsiColumn::A))
         );
     }
+
+    #[test]
+    fn f_sh_with_of_dwellings_on_the_heating_balance() {
+        use crate::climate::Orientation::South;
+        use crate::solar_shading::Balance::*;
+        use crate::solar_shading::{shading_fraction, ShadingControl::*};
+        // Table 7.7 July, south vertical 0,59 (2023 p. 181, 2024 p. 184).
+        // 2024 p. 181 case 1: 0 on the heating balance of dwellings; 2023
+        // p. 179 has no such case.
+        assert_eq!(
+            v2024(|| shading_fraction(ManualResidential, South, 90.0, 7, Heating)),
+            0.0
+        );
+        assert_eq!(
+            v2023(|| shading_fraction(ManualResidential, South, 90.0, 7, Heating)),
+            0.59
+        );
+        // Automatic shading of a dwelling: table 7.7 in 2023 (p. 181).
+        assert_eq!(
+            v2023(|| shading_fraction(AutomaticResidentialIso52016, South, 90.0, 7, Cooling)),
+            0.59
+        );
+        assert_eq!(
+            v2023(|| shading_fraction(AutomaticResidentialIso52016, South, 90.0, 7, Heating)),
+            0.59
+        );
+        assert_eq!(
+            v2024(|| shading_fraction(AutomaticResidentialIso52016, South, 90.0, 7, Heating)),
+            0.0
+        );
+        // The generic automatic control (table 7.9) is for utility buildings
+        // only in 2023 (p. 183).
+        assert!(v2024(|| Automatic.in_edition(true)));
+        assert!(!v2023(|| Automatic.in_edition(true)));
+        assert!(v2023(|| Automatic.in_edition(false)));
+    }
+
+    #[test]
+    fn tables_i_13_and_i_14_panels_by_build_year() {
+        use crate::forfait_envelope::{forfait_panel_u_in_edition, PanelInsulation::*};
+        use crate::window_u::FrameGroup::*;
+        // 2023 p. 819–820: 1992–2012 metal without thermal break 4,2
+        // (outside) and 3,0 (not outside); from 2013 1,65 and 1,4.
+        let u = |year, frame, exterior| {
+            forfait_panel_u_in_edition(AbsentOrUnknown, false, frame, exterior, Some(year))
+        };
+        assert_eq!(v2023(|| u(2000, MetalWithoutThermalBreak, true)), Some(4.2));
+        assert_eq!(
+            v2023(|| u(2000, MetalWithoutThermalBreak, false)),
+            Some(3.0)
+        );
+        assert_eq!(v2023(|| u(2015, WoodOrPlastic, true)), Some(1.65));
+        assert_eq!(v2023(|| u(2015, MetalWithThermalBreak, false)), Some(1.4));
+        assert_eq!(v2023(|| u(1970, WoodOrPlastic, true)), Some(3.7));
+        // Before 1965 table I.11 (2023 p. 818): 3,7 without cavity.
+        assert_eq!(v2023(|| u(1960, WoodOrPlastic, true)), Some(3.7));
+        // 2024 p. 817 takes table I.11 whatever the year: insulation
+        // unknown, no cavity, metal without break 4,9.
+        assert_eq!(v2024(|| u(2015, MetalWithoutThermalBreak, true)), Some(4.9));
+        // A known thickness keeps tables I.15/I.16 in both editions.
+        let known = |year| {
+            forfait_panel_u_in_edition(
+                KnownThickness { thickness_mm: 20.0 },
+                false,
+                WoodOrPlastic,
+                true,
+                Some(year),
+            )
+        };
+        assert_eq!(v2023(|| known(2015)), v2024(|| known(2015)));
+    }
+
+    #[test]
+    fn table_13_4_rows_for_an_unknown_diameter() {
+        use crate::domestic_hot_water::{table_13_4_system_psi, PipeInsulation::*};
+        // 2023 p. 542 rows "klein" and "overig"; 2024 p. 537 replaced them
+        // by table 13.29 and the 35/80 mm rule (p. 538).
+        assert_eq!(table_13_4_system_psi(true, Unknown), 0.4);
+        assert_eq!(table_13_4_system_psi(true, Mm20), 0.25);
+        assert_eq!(table_13_4_system_psi(false, None), 2.0);
+        assert_eq!(table_13_4_system_psi(false, Mm15), 0.56);
+        let p23 = NormVersion::V2023.profile();
+        let p24 = NormVersion::V2024.profile();
+        assert!(p23.table_13_4_system_rows && !p24.table_13_4_system_rows);
+        assert!(!p23.hot_water_series_routes && p24.hot_water_series_routes);
+    }
+
+    #[test]
+    fn stage_two_profile_switches() {
+        use crate::norm_versions::HeatPumpSourceRoute;
+        let p23 = NormVersion::V2023.profile();
+        let p24 = NormVersion::V2024.profile();
+        let p25 = NormVersion::V2025C1.profile();
+        // (11.71): NEN 1087 opening without screen data, 0,5 (2023 p. 466)
+        // against 0,3 (2024 p. 461, 2025+C1 unchanged).
+        assert_eq!(p23.unspecified_screen_factor, 0.5);
+        assert_eq!(p24.unspecified_screen_factor, 0.3);
+        assert_eq!(p25.unspecified_screen_factor, 0.3);
+        // (11.77) 2023 p. 469 against (11.77a/b) 2024 p. 464.
+        assert!(!p23.cross_area_roof_all_sectors && p24.cross_area_roof_all_sectors);
+        // Note 2 of 8.2.2.1 e): 2024 p. 210 only.
+        assert!(!p23.rooflight_route && p24.rooflight_route);
+        // (5.47)/(5.55): 2023 p. 116/121 against 2024 p. 119/124.
+        assert!(p23.residual_heat_pren_primary && !p24.residual_heat_pren_primary);
+        // 9.4: 2023 p. 290–299 against 2024 p. 284–295.
+        assert!(!p23.distribution_2024_rules && p24.distribution_2024_rules);
+        assert!(!p23.table_9_16_combined_rows && p24.table_9_16_combined_rows);
+        assert!(p23.distribution_half_recoverable_route);
+        assert!(!p24.distribution_half_recoverable_route);
+        // Source heat ≥ 20 °C (2023 p. 326, 343) against ≥ 15 °C (2024 p. 323).
+        assert_eq!(p23.heat_pump_source_route, HeatPumpSourceRoute::From20C2023);
+        assert!(p23.heat_pump_source_route.books_table_sources());
+        assert!(p24.heat_pump_source_route.books_table_sources());
+        assert!(!p25.heat_pump_source_route.books_table_sources());
+        // 2024 and 2025+C1 share these values.
+        assert_eq!(
+            p24.dwelling_shading_heating_off,
+            p25.dwelling_shading_heating_off
+        );
+        assert_eq!(p24.panel_build_year_tables, p25.panel_build_year_tables);
+    }
+
+    #[test]
+    fn source_heat_from_20_c_in_2023() {
+        use crate::space_heating_chain::SystemHeatPump;
+        let pump = |from_15: bool, from_15_to_20: bool| SystemHeatPump {
+            heat_pump_output_kwh: vec![100.0; 12],
+            generator_electricity_kwh: vec![25.0; 12],
+            generation_efficiency: Some(4.0),
+            collective_source: false,
+            ground_storage_source: false,
+            source_from_15_c: from_15,
+            source_15_to_20_c: from_15_to_20,
+        };
+        // A 15–20 °C (ground)water source: external heat in 2024 (p. 323),
+        // not in 2023 (≥ 20 °C, p. 326).
+        assert!(v2024(|| pump(true, true).source_heat_booked()));
+        assert!(!v2023(|| pump(true, true).source_heat_booked()));
+        // A 20–40 °C source books its heat in both.
+        assert!(v2024(|| pump(true, false).source_heat_booked()));
+        assert!(v2023(|| pump(true, false).source_heat_booked()));
+        assert!(!v2023(|| pump(false, false).source_heat_booked()));
+    }
+
+    #[test]
+    fn heating_emission_tables_9_2_to_9_10() {
+        use crate::heating_emission::*;
+        let close = |a: f64, b: f64| assert!((a - b).abs() < 1e-9, "{a} != {b}");
+        let with = |kind, certified, room_automation, pipe_system, balancing| Emission2023 {
+            kind,
+            certified_control: certified,
+            room_automation,
+            pipe_system,
+            balancing,
+        };
+        // Table 9.3 (2023 p. 277–278): Δθ_str = (0,7 + 1,3)/2, Δθ_ctr,1 2,5,
+        // Δθ_im;emt −0,3; table 9.2 two-pipe static 0,4; Δθ_roomaut −0,5.
+        let radiators = with(
+            Emission2023Kind::Radiators {
+                control: RoomControl2023::Room,
+                over_temperature: OverTemperature2023::TwoPipe42K,
+                position: RadiatorPosition2023::InnerWall,
+            },
+            false,
+            RoomAutomation2023::IndividualPerRoom,
+            PipeSystem2023::TwoPipe,
+            BalancingRow2023::Static,
+        );
+        close(radiators.increment_k(), 1.0 + 2.5 - 0.3 + 0.4 - 0.5);
+        // Table 9.4 (p. 279–280): wet floor, minimal insulation (9.18):
+        // Δθ_emb (0,7 + 0,5)/2, Δθ_ctr,2 1,5, Δθ_im;emt −0,2, one-pipe 0,7.
+        let floor = with(
+            Emission2023Kind::Surface {
+                control: RoomControl2023::Room,
+                system: SurfaceSystem2023::FloorWetOrUnknown,
+                insulation: SurfaceInsulation2023::MinimalInsulation,
+            },
+            true,
+            RoomAutomation2023::Unknown,
+            PipeSystem2023::OnePipe,
+            BalancingRow2023::NoneOrUnknown,
+        );
+        close(floor.increment_k(), 0.6 + 1.5 - 0.2 + 0.7);
+        // Table 9.6 (p. 282): unknown wall and control, variation b: the
+        // highest 3,1; Δθ_im −0,3. Certified PI at an outer wall: 0,7.
+        let electric = |wall, control, certified| {
+            with(
+                Emission2023Kind::ElectricAir { wall, control },
+                certified,
+                RoomAutomation2023::Unknown,
+                PipeSystem2023::NotHydronic,
+                BalancingRow2023::NoneOrUnknown,
+            )
+            .increment_k()
+        };
+        close(
+            electric(
+                WallArea2023::Unknown,
+                ElectricAirControl2023::Unknown,
+                false,
+            ),
+            3.1 - 0.3,
+        );
+        close(
+            electric(
+                WallArea2023::OuterWall,
+                ElectricAirControl2023::PiPerRoom,
+                true,
+            ),
+            0.7 - 0.3,
+        );
+        // Table 9.7 (p. 283): recirculation, high quality 0,7.
+        close(
+            with(
+                Emission2023Kind::VentilationAir {
+                    configuration: VentilationAirHeating2023::Recirculation,
+                },
+                true,
+                RoomAutomation2023::Unknown,
+                PipeSystem2023::NotHydronic,
+                BalancingRow2023::NoneOrUnknown,
+            )
+            .increment_k(),
+            0.7,
+        );
+        // 9.19 (p. 283) with table 9.8 0,60 K/m at 8 m: 10·0,60/16·2,9;
+        // table 9.10 Δθ_ctr,1 2,5.
+        let high = |height_m, emitter, radiant, certified| {
+            with(
+                Emission2023Kind::HighRoom {
+                    height_m,
+                    emitter,
+                    control: HighRoomControl2023::Controlled,
+                    radiant,
+                },
+                certified,
+                RoomAutomation2023::Unknown,
+                PipeSystem2023::NotHydronic,
+                BalancingRow2023::NoneOrUnknown,
+            )
+        };
+        close(
+            high(8.0, HighRoomEmitter2023::WarmAirFromCeiling, None, false).increment_k(),
+            10.0 * 0.60 / 16.0 * 2.9 + 2.5,
+        );
+        // 9.20 (p. 284) dark radiators, 10 m, RF 0,55, p_h 70 W/m²:
+        // 10·(0,36/0,75 + 0,354 − 0,9) = −0,66; Δθ_str 10·0,20/16·3,9;
+        // certified controlled Δθ_ctr,2 0,7 (table 9.10, p. 285).
+        let product = RadiantProduct2023 {
+            radiation_factor: None,
+            specific_power_w_per_m2: 70.0,
+        };
+        close(
+            high(
+                10.0,
+                HighRoomEmitter2023::DarkRadiators,
+                Some(product),
+                true,
+            )
+            .increment_k(),
+            10.0 * 0.20 / 16.0 * 3.9 - 0.66 + 0.7,
+        );
+        assert!(!high(10.0, HighRoomEmitter2023::DarkRadiators, None, true).valid());
+        assert!(!high(4.0, HighRoomEmitter2023::WarmAirFromCeiling, None, true).valid());
+        assert!(!high(
+            7.0,
+            HighRoomEmitter2023::WarmAirHorizontalLowTemperature,
+            None,
+            true
+        )
+        .valid());
+
+        // A 2024 input under 2023: the unknown values of each category.
+        let input = |system, balancing, control| EmissionInput {
+            system,
+            balancing,
+            control,
+            source_reference: "test".into(),
+            fans: None,
+            air_heaters: None,
+            edition2023: None,
+        };
+        let floor_2024 = input(
+            EmissionSystem::FloorHeating,
+            HydronicBalancing::NoneOrUnknown,
+            EmissionControl::IndividualRoomThermostats,
+        );
+        // 2024 p. 279–280: 0,3 + 0,7 + 1,5. 2023: 0 + 2,5 + 0,7 (9.18a)
+        // − 0,2 + 0,7 − 0,5.
+        close(v2024(|| temperature_increment_k(&floor_2024)), 2.5);
+        close(v2023(|| temperature_increment_k(&floor_2024)), 3.2);
+        let radiators_2024 = input(
+            EmissionSystem::RadiatorsOrConvectors,
+            HydronicBalancing::NoneOrUnknown,
+            EmissionControl::MainRoomThermostat,
+        );
+        // 2023: (1,6 + 1,7)/2 + 2,5 − 0,3 + 0,7.
+        close(v2024(|| temperature_increment_k(&radiators_2024)), 3.55);
+        close(v2023(|| temperature_increment_k(&radiators_2024)), 4.55);
+        // An explicit 2023 description wins under 2023.
+        let mut described = radiators_2024.clone();
+        described.edition2023 = Some(radiators);
+        close(v2023(|| temperature_increment_k(&described)), 3.1);
+        close(v2024(|| temperature_increment_k(&described)), 3.55);
+    }
+
+    #[test]
+    fn cooling_emission_tables_10_2_to_10_5() {
+        use crate::space_cooling::*;
+        let close = |a: f64, b: f64| assert!((a - b).abs() < 1e-9, "{a} != {b}");
+        let emission = |emitter, balancing, control| CoolingEmission {
+            emitter,
+            balancing,
+            control,
+            fan_coil_count: 0,
+            source_reference: "test".into(),
+            edition2023: None,
+        };
+        // Floor cooling without balancing, standalone per room:
+        // 2024 p. 359 table 10.35 −1,7, table 10.4 −0,6, table 10.5 −1,25;
+        // 2023 p. 362–364: Δϑ_str −0,7, Δϑ_ctr,1 −2,5, Δϑ_emb −0,7,
+        // Δϑ_hydr −0,6, Δϑ_roomaut +0,5.
+        let floor = emission(
+            CoolingEmitter::FloorCooling,
+            CoolingBalancing::NoneOrUnknown,
+            CoolingControl::StandalonePerRoom,
+        );
+        close(v2024(|| floor.delta_internal()), -1.7 - 0.6 - 1.25);
+        close(
+            v2023(|| floor.delta_internal()),
+            -0.7 - 2.5 - 0.7 - 0.6 + 0.5,
+        );
+        // Certified P control from before 1988 (Δϑ_ctr,2 −1,5), fan coil on
+        // the ceiling (0/0), direct expansion (0) and a network (+1,2).
+        let mut fan_coil = emission(
+            CoolingEmitter::FanCoilOrRacOnCeiling,
+            CoolingBalancing::NotApplicable,
+            CoolingControl::CentralWithRoomControl,
+        );
+        fan_coil.edition2023 = Some(CoolingEmission2023 {
+            control: CoolingRoomControl2023::PBefore1988,
+            certified_control: true,
+            balancing: CoolingBalancingRow2023::DynamicOrDirectExpansion,
+            room_automation: CoolingRoomAutomation2023::NetworkWithOverrideAndAdaptive,
+        });
+        close(v2023(|| fan_coil.delta_internal()), -1.5 + 1.2);
+        close(v2024(|| fan_coil.delta_internal()), -0.5 - 0.75);
+        // Central control stays −2,5 with a certified product.
+        fan_coil.edition2023.as_mut().unwrap().control = CoolingRoomControl2023::Central;
+        close(v2023(|| fan_coil.delta_internal()), -2.5 + 1.2);
+    }
 }

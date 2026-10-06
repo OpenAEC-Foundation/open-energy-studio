@@ -478,8 +478,9 @@ fn resolve_external(
         },
         // NTA 8800:2024 9.6.3.1.3 (p. 323): without a declaration the
         // source heat takes table 5.2 (p. 93) for external heat.
-        None if norm_versions::profile().heat_pump_source_route
-            == norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024 =>
+        None if norm_versions::profile()
+            .heat_pump_source_route
+            .books_table_sources() =>
         {
             Some(ScenarioFactors {
                 declared: heat_forfait(),
@@ -1977,7 +1978,7 @@ fn validate_edition(input: &BuildingPerformanceInput, issues: &mut Vec<Performan
     }
     // EER_bron of 9.6.8.1.1.2.3 exists in NTA 8800:2024 only (p. 346).
     // Also in NTA 8800:2023 (p. 349).
-    if profile.heat_pump_source_route != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+    if !profile.heat_pump_source_route.books_table_sources()
         && input
             .external_supply
             .collective_heat_pump_source
@@ -2169,9 +2170,12 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             .heat_pump()
             .is_some_and(|(_, source)| source != SourceSystem::Individual)
     });
-    // NTA 8800:2024 (p. 323): any table source of at least 15 °C books its heat.
-    let warm_source_2024 = norm_versions::profile().heat_pump_source_route
-        == norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+    // NTA 8800:2024 (p. 323): any table source of at least 15 °C books its
+    // heat; NTA 8800:2023 books it from 20 °C (p. 326) and keeps EER_bron
+    // of the declared 15–20 °C source (p. 349).
+    let warm_source_2024 = norm_versions::profile()
+        .heat_pump_source_route
+        .books_table_sources()
         && input.heating_systems().into_iter().any(|system| {
             system.generator.heat_pump().is_some_and(|(forfait, _)| {
                 matches!(
@@ -4044,8 +4048,10 @@ fn compute(
         16.0
     };
     let source_aux_kwh = |index: usize| -> f64 {
-        if norm_versions::profile().heat_pump_source_route
-            != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+        // 9.6.8.1.1.2.3: 2024 p. 346 and NTA 8800:2023 p. 349.
+        if !norm_versions::profile()
+            .heat_pump_source_route
+            .books_table_sources()
         {
             return 0.0;
         }
@@ -7326,6 +7332,7 @@ mod tests {
                 control: CoolingControl::CentralWithRoomControl,
                 fan_coil_count: 0,
                 source_reference: "design".into(),
+                edition2023: None,
             },
             distribution: None,
             generators: vec![CoolingGenerator {

@@ -164,6 +164,18 @@ pub enum HeatPumpSourceRoute {
     /// 2025+C1 p. 362–363: collective sources only, forfait f_P;el/23 below
     /// 20 °C.
     CollectiveOnly2025,
+    /// 2023 p. 326 and 343: only a source of at least 20 °C counts as
+    /// external heat (Q_HD;hp;in;bron in 9.84); a 15–20 °C (ground)water
+    /// source keeps the source auxiliary energy Q/EER (p. 349).
+    From20C2023,
+}
+
+impl HeatPumpSourceRoute {
+    /// The 2023/2024 routes that book table sources of a heat pump (9.27/9.29)
+    /// as external heat, whatever the collective set-up.
+    pub fn books_table_sources(self) -> bool {
+        matches!(self, Self::AnySourceFrom15C2024 | Self::From20C2023)
+    }
 }
 
 /// Table 13.18 lookup between columns.
@@ -268,6 +280,45 @@ pub struct NormProfile {
     pub led_2017_column: bool,
     /// (8.17)/(8.18) glazing-bar (roeden) term in U_w.
     pub glazing_bar_term: bool,
+    /// 7.6.6.1.4: f_sh;with = 0 on the heating balance of dwellings with
+    /// manual or ISO 52016-3 tuned automatic shading; 2023 uses table 7.7 on
+    /// both balances.
+    pub dwelling_shading_heating_off: bool,
+    /// (5.47)/(5.55) f_Pren of residual heat: 1 − f_rw;aux;spec (2024+), or
+    /// 1 − f_P;del;rw with f_P;del;rw = f_rw;aux;spec·f_P;del;el (2023).
+    pub residual_heat_pren_primary: bool,
+    /// Note 2 of 8.2.2.1 e): U_rc of rooflights per NEN-EN 1873 converted
+    /// to U_C. Absent in 2023.
+    pub rooflight_route: bool,
+    /// I.2.2.4.2 tables I.13/I.14: forfait panel U by build-year class for
+    /// buildings from 1965 (2023 only).
+    pub panel_build_year_tables: bool,
+    /// (11.71) factor on the NEN 1087 net opening without louvre or screen
+    /// specification.
+    pub unspecified_screen_factor: f64,
+    /// (11.77a/b): roof openings (β < 60°) count in every orientation sector.
+    pub cross_area_roof_all_sectors: bool,
+    /// 9.4.1/9.4.2: L_zi = 0 for heating-only pipes in heated zones, full
+    /// month t_H;op for combined pipes and ϑ_H;mean ≥ 65 °C with delivery
+    /// sets (9.30). All three absent in 2023.
+    pub distribution_2024_rules: bool,
+    /// Table 9.16 rows for collective heating plus hot-water pipes.
+    pub table_9_16_combined_rows: bool,
+    /// 9.4.3: f_H;dis;rbl = 0,5 for uninsulated pipes in an uninsulated
+    /// outer wall or floor of a heated zone (2023 only).
+    pub distribution_half_recoverable_route: bool,
+    /// Table 13.4 rows "klein"/"overig" for an unknown diameter (2023)
+    /// instead of table 13.29 and the 35/80 mm rule.
+    pub table_13_4_system_rows: bool,
+    /// 13.141a–d series arrangements and 13.8.4.10 heat pumps in series.
+    pub hot_water_series_routes: bool,
+    /// 9.3.2–9.3.3 heating emission per tables 9.2–9.10 of NTA 8800:2023
+    /// (Δθ_str, Δθ_ctr, Δθ_emb, Δθ_rad, Δθ_im, Δθ_hydr, Δθ_roomaut) instead
+    /// of tables 9.2–9.4 of 2024.
+    pub emission_tables_2023: bool,
+    /// 10.3.3 cooling emission per tables 10.2–10.5 of NTA 8800:2023 instead
+    /// of tables 10.35/10.4/10.5 of 2024.
+    pub cooling_emission_tables_2023: bool,
 }
 
 thread_local! {

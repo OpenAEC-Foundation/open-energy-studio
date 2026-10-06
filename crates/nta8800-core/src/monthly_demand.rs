@@ -1702,6 +1702,12 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                         format!("{path}.glazing.fixedLouvres.control"),
                     ));
                 }
+                if !control.in_edition(function.is_residential()) {
+                    issues.push(issue(
+                        "route_not_in_edition",
+                        format!("{path}.glazing.fixedLouvres.control"),
+                    ));
+                }
             }
             if window.dynamic.is_some()
                 && (glazing.glazing_type.is_some() || glazing.diffusing.is_some())
@@ -1771,6 +1777,12 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             if !shading.control.fits_function(function.is_residential()) {
                 issues.push(issue(
                     "window_shading_control_function_mismatch",
+                    format!("{path}.movableShading.control"),
+                ));
+            }
+            if !shading.control.in_edition(function.is_residential()) {
+                issues.push(issue(
+                    "route_not_in_edition",
                     format!("{path}.movableShading.control"),
                 ));
             }
