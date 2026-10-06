@@ -2,6 +2,7 @@
 //! the OpenAPI document and the tests. Every operation has exactly one HTTP
 //! route and one MCP tool with the same name, so the two adapters cannot drift.
 
+use nta8800_core::norm_versions::{self, NormVersion};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
 
@@ -386,6 +387,230 @@ fn run_maatwerkadvies(body: &Value) -> Outcome {
             ),
         },
     }
+}
+
+// ---------------------------------------------------------------- editions
+
+/// Request member that selects the NTA 8800 edition of any operation.
+pub const NORM_VERSION_MEMBER: &str = "normVersion";
+
+/// How an operation takes the edition of a request.
+enum EditionRoute {
+    /// The input carries its own edition at these (member, JSON pointer)
+    /// places; the request's edition is written there when absent and must
+    /// match when present.
+    Slots(Vec<(&'static str, &'static str)>),
+    /// The kernel function runs with the edition active (constructions and
+    /// diagnostic routes).
+    Active,
+    /// The result does not depend on the edition (label-input hash).
+    Independent,
+    /// Reference cases are compared in 2025+C1:2026 only.
+    Fixed,
+}
+
+fn edition_route(op: &Operation, body: &Value) -> EditionRoute {
+    const PROJECT: &str = "/ntaCalculation/normVersion";
+    match op.name {
+        "validate_project"
+        | "calculate_beng"
+        | "calculate_project_performance"
+        | "get_energy_by_service"
+        | "get_label_data"
+        | "assess_registration" => EditionRoute::Slots(vec![("project", PROJECT)]),
+        "assess_residential_survey" | "assess_utility_survey" => {
+            EditionRoute::Slots(vec![("survey", "/normVersion")])
+        }
+        "calculate_building_performance" => EditionRoute::Slots(vec![("input", "/normVersion")]),
+        // Every variant is calculated in the base situation's edition.
+        "assess_maatwerkadvies" => EditionRoute::Slots(vec![(
+            "input",
+            match body.pointer("/input/base/kind").and_then(Value::as_str) {
+                Some("building") => "/base/input/normVersion",
+                _ => "/base/project/ntaCalculation/normVersion",
+            },
+        )]),
+        // A relabel stays in the original's edition (BRL 9500-W §4.2.4).
+        "assess_relabel" => EditionRoute::Slots(vec![("original", PROJECT), ("current", PROJECT)]),
+        "get_label_input_hash" => EditionRoute::Independent,
+        "audit_reference_case"
+        | "compare_reference_case"
+        | "compare_direct_diagnostic"
+        | "compare_gas_heat_pump_chain_diagnostic" => EditionRoute::Fixed,
+        _ => EditionRoute::Active,
+    }
+}
+
+fn edition_error(code: &str, message: String, path: String) -> Outcome {
+    let supported: Vec<&str> = NormVersion::ALL
+        .iter()
+        .map(|version| version.id())
+        .collect();
+    Outcome {
+        status: 400,
+        body: error_body(
+            code,
+            message,
+            Some(path),
+            json!({ "supportedNormVersions": supported }),
+        ),
+    }
+}
+
+/// The request's `normVersion`, if any.
+fn requested_norm_version(body: &Value) -> Result<Option<NormVersion>, Outcome> {
+    match body.get(NORM_VERSION_MEMBER) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => serde_json::from_value(value.clone())
+            .map(Some)
+            .map_err(|_| {
+                edition_error(
+                    "invalid_norm_version",
+                    format!("`normVersion` must be one of the edition identifiers, not {value}"),
+                    NORM_VERSION_MEMBER.into(),
+                )
+            }),
+    }
+}
+
+/// Writes `version` into the input's own edition slots, refusing a request
+/// that contradicts the input.
+fn place_edition(
+    slots: &[(&'static str, &'static str)],
+    body: &mut Value,
+    version: NormVersion,
+) -> Result<(), Outcome> {
+    for (member, pointer) in slots {
+        let path = format!("{member}{}", pointer.replace('/', "."));
+        let Some(input) = body.get_mut(*member) else {
+            continue;
+        };
+        match input.pointer(pointer).filter(|value| !value.is_null()) {
+            Some(found) => {
+                let found: Option<NormVersion> = serde_json::from_value(found.clone()).ok();
+                if found != Some(version) {
+                    return Err(edition_error(
+                        "norm_version_conflict",
+                        format!(
+                            "`normVersion` {} differs from the edition in `{path}`",
+                            version.id()
+                        ),
+                        path,
+                    ));
+                }
+            }
+            // The default edition is the absent one: writing it would change
+            // the input's fingerprint and label-input hash.
+            None if version.is_default() => {}
+            None => {
+                let (parent, key) = pointer.rsplit_once('/').expect("slot pointer has a key");
+                match input.pointer_mut(parent).and_then(Value::as_object_mut) {
+                    Some(object) => {
+                        object.insert(key.to_string(), json!(version));
+                    }
+                    None => {
+                        return Err(edition_error(
+                            "norm_version_not_applicable",
+                            format!(
+                                "`normVersion` {} cannot be placed: `{path}` has no parent object",
+                                version.id()
+                            ),
+                            path,
+                        ))
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Records the edition a result was calculated with: `normVersion` and
+/// `targetNormVersion` are added when the kernel did not set them, and a
+/// calculation in an older edition gets the legacy status (never
+/// registrable). Error envelopes stay as they are.
+fn stamp_edition(outcome: &mut Outcome, version: NormVersion) {
+    let Some(object) = outcome.body.as_object_mut() else {
+        return;
+    };
+    if object.contains_key("error") {
+        return;
+    }
+    let version = object
+        .get(NORM_VERSION_MEMBER)
+        .and_then(|value| serde_json::from_value::<NormVersion>(value.clone()).ok())
+        .unwrap_or(version);
+    object
+        .entry(NORM_VERSION_MEMBER)
+        .or_insert_with(|| json!(version));
+    object
+        .entry("targetNormVersion")
+        .or_insert_with(|| json!(version.label()));
+    if !version.registration_eligible() {
+        if object.get("status").and_then(Value::as_str) == Some("calculated_unverified") {
+            object.insert("status".into(), json!("calculated_legacy_edition"));
+        }
+        if object.contains_key("registrationEligible") {
+            object.insert("registrationEligible".into(), json!(false));
+        }
+    }
+}
+
+/// Runs an operation as the HTTP and MCP adapters do: with the request's
+/// optional `normVersion` applied (written into the input's own edition, or
+/// active while the kernel runs) and the edition stamped on the result.
+pub fn execute(op: &Operation, body: &Value) -> Outcome {
+    if op.method == Method::Get {
+        return (op.run)(body);
+    }
+    let requested = match requested_norm_version(body) {
+        Ok(requested) => requested,
+        Err(outcome) => return outcome,
+    };
+    let mut version = requested.unwrap_or_default();
+    let mut body = body.clone();
+    match edition_route(op, &body) {
+        EditionRoute::Slots(slots) => {
+            if let Some(version) = requested {
+                if let Err(outcome) = place_edition(&slots, &mut body, version) {
+                    return outcome;
+                }
+            }
+            // The input's own edition (for a relabel the original's) is the
+            // one the kernel applies.
+            version = slots
+                .first()
+                .and_then(|(member, pointer)| body.get(*member)?.pointer(pointer))
+                .and_then(|value| serde_json::from_value(value.clone()).ok())
+                .unwrap_or_default();
+        }
+        EditionRoute::Active if !version.implemented() => {
+            return Outcome {
+                status: 422,
+                body: error_body(
+                    "edition_not_implemented",
+                    format!("The kernel has no profile for {}", version.label()),
+                    Some(NORM_VERSION_MEMBER.into()),
+                    Value::Null,
+                ),
+            };
+        }
+        EditionRoute::Fixed if !version.is_default() => {
+            return edition_error(
+                "norm_version_not_applicable",
+                "Reference cases are compared in NTA 8800:2025+C1:2026 only".into(),
+                NORM_VERSION_MEMBER.into(),
+            );
+        }
+        EditionRoute::Active | EditionRoute::Independent | EditionRoute::Fixed => {}
+    }
+    let mut outcome = norm_versions::with_version(version, || (op.run)(&body));
+    // The legacy status is a success under every status rule, so stamping
+    // never changes the HTTP status.
+    if outcome.status == 200 || outcome.status == 422 {
+        stamp_edition(&mut outcome, version);
+    }
+    outcome
 }
 
 /// Kernel, norm and service identity of this build.

@@ -2,6 +2,15 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — NTA 8800-editie op elke route
+
+Opgeslagen projecten zonder `ntaCalculation.normVersion` rekenen ongewijzigd in 2025+C1; hun vingerafdruk en label-invoer-hash veranderen niet. Wat verandert voor een project of verzoek in een oudere editie (zie [nta8800-normversies.md](nta8800-normversies.md#uitgave-per-route)):
+- **Basisopname** (woning en utiliteit) rekent in de editie van het project (veld `normVersion` van de opname). In een oudere editie: status `calculated_legacy_edition`, `registrationEligible: false` en de waarschuwing `survey_protocol_edition_differs`, omdat het ISSO-opnameprotocol (7e druk, 2025) bij 2025+C1 hoort. Vergelijken mag, registreren niet. Voorheen rekende de opname altijd in 2025+C1.
+- **Maatwerkadvies** rekent de basissituatie en alle varianten in de editie van de basis. Een maatregel die de editie wijzigt, is ongeldig (`measure_changes_norm_version`). Alle varianten geldig in een oudere editie: status `calculated_legacy_edition`. Nieuw in de uitkomst: `normVersion` en `registrationEligible`.
+- **Herlabelen** vergelijkt in de editie van het oorspronkelijke project (BRL 9500-W §4.2.4 p. 23–24, U p. 19–20). Een andere editie in het huidige project is niet toegestaan. Een herlabeling in de oudere editie van het origineel wordt in de registratiecontrole niet meer geweigerd met `legacy_edition_not_registrable`. Nieuw in de uitkomst: `normVersion`, `targetNormVersion`, `currentNormVersion`.
+- **API en MCP:** elke `POST`-bewerking neemt het lid `normVersion` en stempelt de editie op de uitkomst (`normVersion`, `targetNormVersion`). Nieuwe foutcodes: `invalid_norm_version`, `norm_version_conflict`, `norm_version_not_applicable` (400) en `edition_not_implemented` (422). Constructies en diagnoses in een oudere editie krijgen status `calculated_legacy_edition`. Het OpenAPI-document en de MCP-toolschema's beschrijven het lid.
+- **App:** de basisopname neemt de editie van het project en toont die in de resultaatkaart (met "niet voor registratie" bij een oudere editie). Het maatwerkadvies toont de editie van alle varianten. De desktopopdracht voor constructies neemt een optionele editie.
+
 ## 5 oktober 2026 — UI-herontwerp, fase F10: thema's, toegankelijkheid, vertaling en afronding (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet; opgeslagen projecten openen ongewijzigd. Het UI-herontwerp is hiermee afgerond.

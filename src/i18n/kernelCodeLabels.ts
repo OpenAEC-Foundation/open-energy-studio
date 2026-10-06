@@ -7,6 +7,10 @@
 /** Dutch labels. */
 export const kernelCodeLabelsNl: Record<string, string> = {
   'kernel.issue.unknown_tool': "MCP: de gevraagde tool bestaat niet; vraag de toollijst op met tools/list.",
+  'kernel.issue.serialization_failed': "De uitkomst van de rekenkern kon niet als JSON worden weergegeven en is achtergehouden.",
+  'kernel.issue.invalid_norm_version': "Onbekende uitgave van NTA 8800; kies 2025+C1, 2024, 2023, 2022 of 2020+A1.",
+  'kernel.issue.norm_version_conflict': "De gevraagde uitgave van NTA 8800 verschilt van de uitgave in de invoer.",
+  'kernel.issue.norm_version_not_applicable': "De gevraagde uitgave van NTA 8800 kan op deze invoer niet worden toegepast.",
   'kernel.issue.kernel_panic': "De rekenkern is onverwacht gestopt bij deze invoer; meld dit met het invoerbestand.",
   'kernel.issue.invalid_request_shape': "Het verzoek heeft niet de verwachte vorm; controleer het veld op het aangegeven pad.",
   'kernel.issue.not_found': "Deze API-route bestaat niet; zie /v1/openapi.json voor de beschikbare routes.",
@@ -782,6 +786,10 @@ export const kernelCodeLabelsNl: Record<string, string> = {
 /** English labels. */
 export const kernelCodeLabelsEn: Record<string, string> = {
   'kernel.issue.unknown_tool': "MCP: the requested tool does not exist; request the list with tools/list.",
+  'kernel.issue.serialization_failed': "The kernel result could not be represented as JSON and is withheld.",
+  'kernel.issue.invalid_norm_version': "Unknown NTA 8800 edition; choose 2025+C1, 2024, 2023, 2022 or 2020+A1.",
+  'kernel.issue.norm_version_conflict': "The requested NTA 8800 edition differs from the edition in the input.",
+  'kernel.issue.norm_version_not_applicable': "The requested NTA 8800 edition cannot be applied to this input.",
   'kernel.issue.kernel_panic': "The calculation kernel stopped unexpectedly on this input; report it with the input file.",
   'kernel.issue.invalid_request_shape': "The request does not have the expected shape; check the field at the given path.",
   'kernel.issue.not_found': "This API route does not exist; see /v1/openapi.json for the available routes.",

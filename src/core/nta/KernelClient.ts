@@ -2259,8 +2259,11 @@ export interface EnvelopeInput {
 }
 
 export interface EnvelopeAssessment {
-  status: 'calculated_unverified' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'invalid';
   scope: string;
+  /** Edition the constructions were calculated in. */
+  normVersion?: NormVersion;
+  targetNormVersion?: string;
   issues: Array<{ code: string; path: string }>;
   elements: Array<{
     id: string;
@@ -2281,15 +2284,17 @@ export interface EnvelopeAssessment {
   referenceVerified: false;
 }
 
-export async function calculateConstructionsWithRust(input: EnvelopeInput): Promise<EnvelopeAssessment> {
+/** Construction U/Rc values in `normVersion` (absent: the current edition). */
+export async function calculateConstructionsWithRust(input: EnvelopeInput, normVersion?: NormVersion | null): Promise<EnvelopeAssessment> {
+  const edition = normVersion && normVersion !== DEFAULT_NORM_VERSION ? normVersion : undefined;
   if (isTauri()) {
-    return invoke<EnvelopeAssessment>('calculate_constructions', { input });
+    return invoke<EnvelopeAssessment>('calculate_constructions', { input, normVersion: edition });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/constructions/calculate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify(edition ? { input, normVersion: edition } : { input }),
     });
     return response.json() as Promise<EnvelopeAssessment>;
   }
@@ -2553,6 +2558,8 @@ export interface OpnameGrilleHeatingStrips {
 
 export interface ResidentialSurvey {
   id: string;
+  /** NTA 8800 edition to calculate in (the project's); absent is 2025+C1. Older: comparison only. */
+  normVersion?: NormVersion;
   constructionYear: number;
   renovation?: {
     envelopePostInsulated: boolean;
@@ -2780,9 +2787,15 @@ export interface OpnameStorage {
 }
 
 export interface OpnameAssessment {
-  status: 'calculated_unverified' | 'derived_input_rejected' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'derived_input_rejected' | 'invalid';
   scope: string;
   source: string;
+  /** Label of the NTA 8800 edition the survey was calculated in. */
+  targetNormVersion?: string;
+  /** Edition the survey was calculated in (the project's `ntaCalculation.normVersion`). */
+  normVersion?: NormVersion;
+  /** Only a 2025+C1 survey may be registered. */
+  registrationEligible?: boolean;
   appliedDefaults: Array<{ rule: string; path: string; value: string; source: string; inklapReden?: string }>;
   warnings: Array<{ code: string; path: string; note: string }>;
   issues: Array<{ code: string; path: string }>;
@@ -2811,6 +2824,8 @@ export async function assessResidentialSurveyWithRust(survey: ResidentialSurvey)
 /** ISSO 75.1 basic survey of an existing utility building (one calculation zone). */
 export interface UtilitySurvey {
   id: string;
+  /** NTA 8800 edition to calculate in (the project's); absent is 2025+C1. */
+  normVersion?: NormVersion;
   constructionYear: number;
   renovation?: ResidentialSurvey['renovation'];
   buildingType:
@@ -4545,6 +4560,11 @@ export interface RelabelAssessment {
   originalLabelInputHash?: string;
   /** Kernel hash of the compared project's label input; differs after a later edit. */
   currentLabelInputHash?: string;
+  /** Edition of the original project; the relabel is calculated in it (BRL 9500-W §4.2.4). */
+  normVersion?: NormVersion;
+  targetNormVersion?: string;
+  /** Edition of the current project; another edition than the original's is not allowed. */
+  currentNormVersion?: NormVersion;
 }
 
 export async function assessRelabelWithRust(original: unknown, current: unknown): Promise<RelabelAssessment> {
@@ -4789,9 +4809,13 @@ export interface MwaRegressionLine {
 }
 
 export interface MaatwerkadviesAssessment {
-  status: 'calculated_unverified' | 'partially_calculated' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'partially_calculated' | 'invalid';
   scope: string;
   targetNormVersion: string;
+  /** Edition of the base situation; every variant is calculated in it. */
+  normVersion?: NormVersion;
+  /** Only a 2025+C1 advice may be registered. */
+  registrationEligible?: boolean;
   kernelVersion: string;
   inputFingerprint: string;
   attestStatus: string;

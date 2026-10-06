@@ -7,7 +7,7 @@ import {
 import { Pill } from '../ui';
 import { labelColor } from '../shell/pages/results/resultsData';
 import {
-  assessResidentialSurveyWithRust, assessUtilitySurveyWithRust, type OpnameAssessment,
+  assessResidentialSurveyWithRust, assessUtilitySurveyWithRust, DEFAULT_NORM_VERSION, type OpnameAssessment,
 } from '../../core/nta/KernelClient';
 import {
   asResidential, asUtility, calculationZoneTemplate, heatingGeneratorTemplate, hotWaterGeneratorTemplate, pvTemplate,
@@ -637,6 +637,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
   const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
   const stored = state.project.basisopname as StoredSurvey | undefined;
+  const edition = state.project.ntaCalculation?.normVersion ?? null;
   const [result, setResult] = useState<OpnameAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -688,9 +689,10 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
     setError(null);
     setResult(null);
     try {
+      // The survey is calculated in the project's edition (`ntaCalculation.normVersion`).
       const assessment = kind === 'residential'
-        ? await assessResidentialSurveyWithRust(asResidential(stored))
-        : await assessUtilitySurveyWithRust(asUtility(stored));
+        ? await assessResidentialSurveyWithRust(asResidential(stored, edition))
+        : await assessUtilitySurveyWithRust(asUtility(stored, edition));
       // A survey the kernel cannot read (e.g. a cleared required field) comes back as
       // `{ error, message }` without issues; show it as an error, not as a result.
       const refused = assessment as Partial<OpnameAssessment> & { error?: string; message?: string };
@@ -1111,6 +1113,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       <h3 className="opname-result-heading">{t('opname.resultHeading')}</h3>
       <p className="nta-form-note">{t('opname.resultNote')}</p>
       <p><strong>{t('opname.status')}:</strong> {t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
+      <p className="opname-edition"><strong>{t('opname.edition')}:</strong> {t(`nta.edition.${result.normVersion ?? DEFAULT_NORM_VERSION}`)}</p>
       {performance && <ul className="opname-indicators">
         <li>{t('opname.label')}: <strong>{performance.indicativeLabelClass ?? '—'}</strong></li>
         <li>BENG 1: {formatNumber(performance.needIndicatorKwhPerM2Year, locale, 2)} kWh/m²</li>
@@ -1166,6 +1169,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             <small>{t('opname.resultCard.separate')}</small></span>
         </div>
         <p className="opname-aside-status">{t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}</p>
+        <p className="opname-aside-edition">{t('opname.edition')}: {t(`nta.edition.${result.normVersion ?? DEFAULT_NORM_VERSION}`)}</p>
+        {result.registrationEligible === false && <Pill tone="warn">{t('nta.edition.legacyTitle')}</Pill>}
         {result.issues.length > 0 && <p className="opname-aside-issues" role="status">
           {t('opname.resultCard.issues', { count: result.issues.length })}</p>}
         {result.appliedDefaults.length > 0 && <p className="opname-aside-defaults">

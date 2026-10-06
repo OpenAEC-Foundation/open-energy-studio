@@ -14,7 +14,7 @@ use axum::{
 };
 use serde_json::{json, Value};
 
-use crate::operations::{error_body, operations, Method, Operation, Outcome};
+use crate::operations::{error_body, execute, operations, Method, Operation, Outcome};
 
 /// Runtime options of the HTTP adapter.
 #[derive(Debug, Clone)]
@@ -72,7 +72,7 @@ async fn dispatch(op: &'static Operation, payload: Result<Json<Value>, JsonRejec
         });
     }
     // Kernel work is CPU-bound; keep it off the async workers.
-    match tokio::task::spawn_blocking(move || (op.run)(&body)).await {
+    match tokio::task::spawn_blocking(move || execute(op, &body)).await {
         Ok(outcome) => respond(outcome),
         Err(_) => respond(Outcome {
             status: 500,
@@ -245,6 +245,19 @@ fn input_schema(op: &Operation) -> Value {
         json!({ "type": "object", "description": input.description }),
     );
     let mut required = vec![input.key];
+    let editions: Vec<&str> = nta8800_core::norm_versions::NormVersion::ALL
+        .iter()
+        .map(|version| version.id())
+        .collect();
+    properties.insert(
+        crate::operations::NORM_VERSION_MEMBER.to_string(),
+        json!({
+            "type": "string",
+            "enum": editions,
+            "default": nta8800_core::norm_versions::NormVersion::default().id(),
+            "description": "NTA 8800 edition to calculate with (default 2025+C1, the only registrable one). Written into the input's own edition (ntaCalculation.normVersion, survey or building normVersion, maatwerkadvies base, both relabel projects) when absent and must match it when present; diagnostic routes run with it active. Results record normVersion and targetNormVersion; an older edition gives status calculated_legacy_edition and is never registrable, except a relabel in the original's edition. Reference cases accept only 2025+C1."
+        }),
+    );
     if op.name == "assess_relabel" {
         properties.insert(
             "current".to_string(),

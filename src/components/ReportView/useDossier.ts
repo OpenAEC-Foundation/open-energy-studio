@@ -49,12 +49,13 @@ export function useDossier(
   const currentSha = labelSha?.project === project ? labelSha.sha : null;
   // The survey assessment, as the export passes it, for the collapse reasons.
   const survey = project.basisopname;
+  const edition = project.ntaCalculation?.normVersion ?? null;
   const [opname, setOpname] = useState<{ survey: typeof survey; result: OpnameAssessment | null } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    assessStoredSurvey(survey).then((result) => { if (!cancelled) setOpname({ survey, result }); });
+    assessStoredSurvey(survey, edition).then((result) => { if (!cancelled) setOpname({ survey, result }); });
     return () => { cancelled = true; };
-  }, [survey]);
+  }, [survey, edition]);
   const opnameDone = opname?.survey === survey;
   const checklist = useMemo(() => {
     if (exported && exported.project === project) return exported.checklist;

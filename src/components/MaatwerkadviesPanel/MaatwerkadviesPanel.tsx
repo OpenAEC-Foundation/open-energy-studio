@@ -7,6 +7,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import i18next, { useI18n } from '../../i18n/i18n';
 import {
   assessMaatwerkadviesWithRust,
+  DEFAULT_NORM_VERSION,
   type MaatwerkadviesAssessment,
   type MwaMeasure,
   type MwaMeasureCategory,
@@ -665,6 +666,12 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
     </div>
   );
 
+  // Every variant is calculated in the base project's edition.
+  const editionBlock = assessment && (
+    <p className="mwa-edition">{t('mwa.edition')}: <strong>{t(`nta.edition.${assessment.normVersion ?? DEFAULT_NORM_VERSION}`)}</strong>
+      {assessment.registrationEligible === false && <> — {t('nta.edition.legacyTitle')}</>}</p>
+  );
+
   const issuesBlock = assessment && assessment.issues.length > 0 && (
     <ul className="nta-performance-gaps">
       {assessment.issues.map((item, index) => <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} /> <code>{item.path}</code> <KernelDetail detail={item.detail} /></li>)}
@@ -741,6 +748,7 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
         {error && <p role="alert">{error}</p>}
         {assessment && (
           <div className="mwa-results">
+            {editionBlock}
             {issuesBlock}
             {tableBlock}
             {adviceBlock}
@@ -782,6 +790,7 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
         {issuesBlock && <Card title={t('mwa.page.issues')} level={2}>{issuesBlock}</Card>}
         {assessment ? <div className="mwa-overview">
           <Card title={t('mwa.page.labelPath')} subtitle={t('mwa.page.labelPathSub')} level={2}>
+            {editionBlock}
             {assessment.current
               ? <LabelPathChart bars={labelPathBars(assessment, advisedId, t('mwa.current'))} />
               : <p className="nta-form-note">{t('mwa.page.noVariants')}</p>}

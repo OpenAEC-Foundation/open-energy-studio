@@ -524,12 +524,24 @@ pub fn data_import_declaration(
 
 /// Only the designated edition (NTA 8800:2025+C1:2026) may be registered
 /// (Omgevingsregeling art. 5.11/5.12 lid 2); a calculation in an older
-/// edition is a comparison or control calculation.
+/// edition is a comparison or control calculation. The exception is a
+/// relabel: it keeps the method and software version of the original
+/// survey (BRL 9500-W §4.2.4 p. 23–24, U p. 19–20), so it may be in the
+/// original's older edition when the kernel's own comparison found that
+/// edition.
 pub fn refuse_legacy_edition(
     assessment: &mut RegistrationAssessment,
     version: crate::norm_versions::NormVersion,
 ) {
     if version.registration_eligible() {
+        return;
+    }
+    let original_edition = assessment
+        .relabel_assessment
+        .as_ref()
+        .and_then(|relabel| relabel.get("normVersion"))
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
+    if assessment.message_type == MessageType::Relabel && original_edition == Some(version) {
         return;
     }
     assessment.issues.push(RegistrationIssue {
@@ -2475,5 +2487,63 @@ mod tests {
         let mut issues = Vec::new();
         data_import_declaration(&serde_json::json!({"importLog": "x"}), &mut issues);
         assert_eq!(issues[0].path, "importLog");
+    }
+
+    /// A relabel in the original's older edition may be registered (BRL
+    /// 9500-W §4.2.4 p. 23–24); a regular label in that edition may not.
+    #[test]
+    fn relabel_in_the_original_edition_is_not_refused_as_legacy() {
+        use crate::norm_versions::NormVersion;
+        let original = serde_json::json!({
+            "buildingFunction": "residential",
+            "registration": {"epOnlineNumber": "EP-123", "certificateNumber": "K12345",
+                "surveyDate": "2026-01-31"},
+            "ntaCalculation": {"normVersion": "2024"},
+            "constructions": [{"id": "c1", "rcValue": 0.4}]
+        });
+        let mut improved = original.clone();
+        improved["constructions"][0]["rcValue"] = serde_json::json!(3.5);
+        let text = serde_json::to_string_pretty(
+            &serde_json::json!({"type": "open-energy-studio", "version": "1.0", "project": original}),
+        )
+        .unwrap();
+        let mut relabel = complete();
+        relabel.message_type = Some(MessageType::Relabel);
+        relabel.original_kernel_version = Some(KERNEL_VERSION.into());
+        relabel.improvement_date = Some("2027-01-31".into());
+        relabel_dossier(&mut relabel);
+        let record = relabel.relabel_comparison.as_mut().unwrap();
+        record.original_sha256 = Some(format!("{:x}", Sha256::digest(text.as_bytes())));
+        record.original_project_text = Some(text);
+        record.assessment =
+            serde_json::to_value(crate::relabel::assess_relabel(&original, &improved)).unwrap();
+        let codes = |registration: &Registration, version: NormVersion| {
+            let mut result = assess_project_registration(
+                registration,
+                &improved,
+                &RegistrationContext::default(),
+            );
+            refuse_legacy_edition(&mut result, version);
+            result
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        let found = codes(&relabel, NormVersion::V2024);
+        assert!(found.is_empty(), "{found:?}");
+        // A regular registration in 2024 is refused.
+        let found = codes(&complete(), NormVersion::V2024);
+        assert!(
+            found.contains(&"legacy_edition_not_registrable"),
+            "{found:?}"
+        );
+        // A relabel calculated in another older edition than the original's
+        // is refused too.
+        let found = codes(&relabel, NormVersion::V2023);
+        assert!(
+            found.contains(&"legacy_edition_not_registrable"),
+            "{found:?}"
+        );
     }
 }

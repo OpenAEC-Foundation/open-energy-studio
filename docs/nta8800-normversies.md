@@ -8,8 +8,32 @@ Paginaverwijzingen gaan naar de gelicentieerde PDF's: NTA 8800:2024 (met het int
 
 - **Projectbestand:** `ntaCalculation.normVersion`, met `"2025+C1"` (standaard) of `"2024"`. Ontbreekt het veld, dan rekent de kern in 2025+C1. De invoervingerafdruk van een project zonder het veld verandert daardoor niet.
 - **App:** het NTA-invoerformulier heeft in het blok *Algemeen* het veld *Uitgave NTA 8800*. Bij een oudere uitgave tonen het rekenpaneel, het NTA-rekenrapport en de statusbalk "niet voor registratie".
-- **API en MCP:** de projectbewerkingen lezen het veld uit het project. `GET /v1/version` (`get_version`) geeft onder `supportedNormVersions` de bekende uitgaven, met `implemented`, `registrationEligible`, `default` en de aanwijzingsperiode.
+- **API en MCP:** elke `POST`-bewerking neemt het optionele verzoeklid `normVersion`; zie [Uitgave per route](#uitgave-per-route). Zonder dat lid lezen de projectbewerkingen het veld uit het project. `GET /v1/version` (`get_version`) geeft onder `supportedNormVersions` de bekende uitgaven, met `implemented`, `registrationEligible`, `default` en de aanwijzingsperiode.
 - **Bekend, niet geïmplementeerd:** `"2023"`, `"2022"` en `"2020+A1"`. De kern weigert die met `edition_not_implemented` (status `invalid`). Een onbekende waarde is een invoergat.
+
+## Uitgave per route
+
+Elke ingang van de kern rekent in een gekozen uitgave en zet die op de uitkomst (`normVersion`, `targetNormVersion`; waar een registratie mogelijk is ook `registrationEligible`).
+
+| Route | Waar de uitgave staat | Uitkomst in een oudere uitgave |
+| --- | --- | --- |
+| Project (`assess_project_performance`, registratie, labeldata, energie per dienst) | `ntaCalculation.normVersion` | `calculated_legacy_edition`, `legacy_edition_not_registrable` |
+| Gebouw (`assess_building_performance`) | `normVersion` van de gebouwinvoer | `registrationEligible: false` (in de service ook status `calculated_legacy_edition`) |
+| Basisopname woning/utiliteit (`assess_residential_survey`, `assess_utility_survey`) | `normVersion` van de opname; de app neemt de uitgave van het project | `calculated_legacy_edition`, waarschuwing `survey_protocol_edition_differs` |
+| Maatwerkadvies (`assess_maatwerkadvies`) | de basissituatie: `ntaCalculation.normVersion` van het project of `normVersion` van de gebouwinvoer | `calculated_legacy_edition` als alle varianten rekenen; een maatregel die de uitgave wijzigt, is ongeldig (`measure_changes_norm_version`) |
+| Herlabelen (`assess_relabel`) | `ntaCalculation.normVersion` van het **oorspronkelijke** project | een andere uitgave in het huidige project is *niet toegestaan* (6b-achtig, eigen cluster) |
+| Constructies en diagnoses (API, MCP; constructies ook in de desktop-app) | verzoeklid `normVersion`; de kern rekent met die uitgave actief | `calculated_unverified` wordt `calculated_legacy_edition` |
+| Referentiegevallen | het geval zelf (alleen 2025+C1) | `normVersion` ≠ `2025+C1` geeft `norm_version_not_applicable` |
+| Label-invoer-hash | — (hangt niet van de uitgave af) | ongewijzigd |
+
+**Basisopname in een oudere uitgave.** Het opnameprotocol (ISSO 82.1 en 75.1, 7e druk 2025) hoort bij NTA 8800:2025+C1. Een oudere uitgave is in de kern alleen toegestaan om te **vergelijken**: de kern past dezelfde ISSO-opnameregels en forfaits toe en rekent het gebouw daarna in de gekozen uitgave. De uitkomst krijgt de waarschuwing `survey_protocol_edition_differs`, de status `calculated_legacy_edition` en `registrationEligible: false`. Een oude opname die volgens een eerdere druk van ISSO 82.1/75.1 is gedaan, wordt dus niet nagebootst; de kern kent alleen de 7e druk.
+
+**Herlabelen.** Een herlabeling gebruikt de methodiek en de softwareversie van de oorspronkelijke opname (BRL 9500-W 2026 §4.2.4 p. 23–24; BRL 9500-U 2026 p. 19–20). Daarom:
+- vergelijkt `assess_relabel` in de uitgave van het oorspronkelijke project (`normVersion`) en meldt ook die van het huidige project (`currentNormVersion`). Ontbreekt het veld, dan geldt 2025+C1; een ontbrekend en een expliciet `"2025+C1"` zijn gelijk;
+- is een andere uitgave in het huidige project een wijziging die niet is toegestaan (`/ntaCalculation/normVersion`);
+- weigert de registratiecontrole een herlabeling in een oudere uitgave **niet** met `legacy_edition_not_registrable`, als die uitgave gelijk is aan die van het oorspronkelijke project volgens de eigen hervergelijking van de kern. Elke andere registratie in een oudere uitgave blijft geweigerd. Het projectveld `registrationEligible` blijft `false`: het zegt iets over een gewone registratie in die uitgave.
+
+**Service.** Het verzoeklid `normVersion` wordt in de eigen plek van de invoer geschreven als die ontbreekt (zie de tabel; bij herlabelen in beide projecten). Staat er al een andere uitgave, dan antwoordt de service 400 `norm_version_conflict`. Ontbreekt de plek (bijvoorbeeld een project zonder `ntaCalculation`), dan volgt 400 `norm_version_not_applicable`. De standaarduitgave wordt nooit in de invoer geschreven; zo veranderen invoervingerafdruk en label-invoer-hash niet. Een onbekende waarde geeft 400 `invalid_norm_version`. Een diagnose in een uitgave zonder profiel geeft 422 `edition_not_implemented`.
 
 ## Wat er verandert bij een oudere uitgave
 
@@ -29,9 +53,9 @@ Invoer voor een route die de gekozen uitgave niet kent, wordt geweigerd met `rou
 - de enum `NormVersion` (oplopend: 2020+A1, 2022, 2023, 2024, 2025+C1);
 - per geïmplementeerde uitgave één `NormProfile` (`v2025.rs`, `v2024.rs`) met de getallen en routekeuzes, elk met paginaverwijzing.
 
-De invoer draagt de uitgave (`NtaCalculationInput.normVersion`, `BuildingPerformanceInput.normVersion`). `assess_building_performance` zet de uitgave voor de duur van de berekening als **thread-local** (`norm_versions::with_version`). Rekenfuncties lezen `norm_versions::profile()` op het punt waar de uitgaven verschillen.
+De invoer draagt de uitgave (`NtaCalculationInput.normVersion`, `BuildingPerformanceInput.normVersion`, `ResidentialSurvey`/`UtilitySurvey.normVersion`, de basis van het maatwerkadvies, het oorspronkelijke project bij herlabelen). Elke ingang (`assess_project_performance`, `assess_building_performance`, de opnames, `assess_maatwerkadvies`, `assess_relabel`) zet de uitgave voor de duur van de berekening als **thread-local** (`norm_versions::with_version`). De service doet dat ook voor de constructies en diagnoses. Rekenfuncties lezen `norm_versions::profile()` op het punt waar de uitgaven verschillen.
 
-Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op één thread, en de bewaker herstelt de vorige uitgave ook bij een paniek. Zo hoeven niet tientallen functiesignaturen en struct-initialisaties te veranderen voor een getal dat in één uitgave anders is. Andere threads (de service, parallelle tests) rekenen ongestoord in hun eigen uitgave. Een rekenfunctie die buiten `assess_building_performance` wordt aangeroepen (een conceptdiagnose of eenheidstest), rekent in 2025+C1.
+Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op één thread, en de bewaker herstelt de vorige uitgave ook bij een paniek. Zo hoeven niet tientallen functiesignaturen en struct-initialisaties te veranderen voor een getal dat in één uitgave anders is. Andere threads (de service, parallelle tests) rekenen ongestoord in hun eigen uitgave. Een rekenfunctie die zonder `with_version` wordt aangeroepen (een eenheidstest), rekent in 2025+C1. De service draait elk verzoek in een eigen blokkerende taak; een test met parallelle verzoeken in 2024 en 2025+C1 laat zien dat de uitgave niet tussen verzoeken lekt.
 
 ## Verschillen 2024 → 2025+C1 die de kern omschakelt
 
@@ -92,4 +116,6 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - Per schakelpunt een eenheidstest in de module van het schakelpunt, met de paginaverwijzing in de test.
 - `crates/nta8800-core/tests/norm_versions.rs`: de projectroute (status, vingerafdruk, registratie, niet-geïmplementeerde en onbekende uitgaven) en een verschiltest van de voorbeeldprojecten in 2024 en 2025+C1. Daarin verandert alleen wat de lijst hierboven voorspelt.
 - `crates/nta8800-service/tests/api.rs`: `supportedNormVersions` en een berekening in 2024 via HTTP.
+- Per route 2024 tegen 2025+C1 (verschil, stempel, status): `opname/mod.rs` en `opname/utility.rs` (`*_in_its_edition`), `maatwerkadvies.rs` (`variants_follow_the_base_edition`), `relabel.rs` (`relabel_keeps_the_original_edition`) en `registration.rs` (`relabel_in_the_original_edition_is_not_refused_as_legacy`).
+- `crates/nta8800-service/src/lib.rs`: `every_route_kind_takes_and_stamps_the_edition`, `every_post_operation_documents_norm_version` en de gelijktijdigheidstest `parallel_requests_keep_their_own_edition` (32 parallelle verzoeken, afwisselend 2024 en 2025+C1).
 - `src/__tests__/nta-norm-versions.test.tsx`: de keuze in het formulier, de status als "berekend", en de melding in het rapport en de statusbalk.
