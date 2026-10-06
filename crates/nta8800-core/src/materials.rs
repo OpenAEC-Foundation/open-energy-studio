@@ -248,7 +248,11 @@ impl ForfaitMaterial {
         }
         match self {
             GlassWool | StoneWool | EpsBoard | Xps => 0.040,
-            MineralWoolFlakes | EpsWhiteBeads | CellularGlass | WoodFibre | CelluloseLoose => 0.045,
+            MineralWoolFlakes | EpsWhiteBeads | CellularGlass => 0.045,
+            // Table E.10: 0,045 from 2024 (p. 790), 0,050 in 2023 (p. 791).
+            WoodFibre | CelluloseLoose => {
+                crate::norm_versions::profile().wood_fibre_cellulose_lambda
+            }
             EpsGreyBeads | PurSprayedClosedCell => 0.035,
             PurPirBoard | PhenolicFoam => 0.030,
             PurSprayedOpenCell => 0.045,

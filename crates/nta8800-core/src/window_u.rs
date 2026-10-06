@@ -590,6 +590,11 @@ impl WindowInput {
                         ));
                     }
                 }
+                // (8.17)/(8.18) glazing bars: from 2024 (p. 219–222), not in
+                // 2023 (p. 214–218).
+                if glazing_bars.is_some() && !crate::norm_versions::profile().glazing_bar_term {
+                    issues.push(issue("route_not_in_edition", format!("{m}.glazingBars")));
+                }
                 if let Some(bars) = glazing_bars {
                     if !(bars.length_m.is_finite() && bars.length_m >= 0.0)
                         || !(bars.psi_w_per_mk.is_finite() && bars.psi_w_per_mk >= 0.0)
@@ -875,6 +880,25 @@ mod tests {
         let expected = (1.2 * 1.2 + 0.5 * 1.4 + 4.6 * 0.06) / 1.7;
         assert!((r.u_w - expected).abs() < 1e-12);
         assert_eq!(r.u_rounded, round_transparent(expected));
+        // (8.17)/(8.18) glazing bars: 2024 p. 219–222, absent in 2023
+        // (p. 214–218).
+        let mut barred = window;
+        if let WindowMethod::Detailed { glazing_bars, .. } = &mut barred.method {
+            *glazing_bars = Some(GlazingBars {
+                length_m: 2.0,
+                psi_w_per_mk: 0.05,
+                source_reference: "bars".into(),
+            });
+        }
+        use crate::norm_versions::{with_version, NormVersion};
+        assert!(with_version(NormVersion::V2024, || barred.validate("w")).is_empty());
+        let issues = with_version(NormVersion::V2023, || barred.validate("w"));
+        assert!(
+            issues
+                .iter()
+                .any(|item| item.code == "route_not_in_edition"
+                    && item.path == "w.method.glazingBars")
+        );
     }
 
     #[test]

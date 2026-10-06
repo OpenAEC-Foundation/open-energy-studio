@@ -13,6 +13,25 @@ import {
   AnnexQHeatPumpFields, BoilerForfaitFields, ForfaitHeaterFields, LocalHeaterFields, ProductBoilerFields,
 } from './NtaProductGenerators';
 
+/**
+ * Table 13.2 of NTA 8800:2023: the kitchen row by inner pipe diameter. Only the
+ * 2023 edition has this input; under another edition a value left behind is
+ * offered for removal (the kernel reports it as route_not_in_edition).
+ */
+export function KitchenPipeDiameterField({ draft, change, path }: { draft: Draft; change: (path: Path, value: unknown) => void; path: Path }) {
+  const { t } = useI18n();
+  const value = read(draft, path);
+  if (read(draft, ['normVersion']) === '2023') {
+    return <SelectField draft={draft} onChange={change} path={path} label={t('ntaStep.kitchenPipeDiameter')}
+      options={(['up_to_8_mm', 'up_to_10_mm', 'other'] as const).map((key) => [key, t(`ntaStep.kitchenPipeDiameter.${key}`)])} />;
+  }
+  if (value == null) return null;
+  return <p className="nta-form-note nta-form-error" role="alert">
+    {t('ntaStep.staleEdition2023', { field: t('ntaStep.kitchenPipeDiameter') })}{' '}
+    <button type="button" onClick={() => change(path, undefined)}>{t('nta.form.remove')}</button>
+  </p>;
+}
+
 // System inputs of the NTA form that share a base path: space-heating
 // generators (also nested in `multiple`), hot-water generators, solar water
 // heaters, cooling ratings and window obstruction.
@@ -603,6 +622,7 @@ export function AdditionalHotWaterSystemsFields({ draft, change, residential }: 
             ['kitchen_and_bathroom', t('nta.form.dhwTaps.both')], ['bathroom_only', t('nta.form.dhwTaps.bathroom')],
             ['kitchen_only', t('nta.form.dhwTaps.kitchen')]]} />
           <NumberField {...field} path={[...base, 'emission', 'kitchenLengthM']} label={t('nta.form.hotWaterKitchenLength')} />
+          <KitchenPipeDiameterField draft={draft} change={change} path={[...base, 'emission', 'kitchenPipeDiameter']} />
           <NumberField {...field} path={[...base, 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
           <NumberField {...field} path={[...base, 'connectedTaps', 'bathrooms']} label={t('nta.form.dhwSystems.bathrooms')} step="1" />
           <NumberField {...field} path={[...base, 'connectedTaps', 'kitchens']} label={t('nta.form.dhwSystems.kitchens')} step="1" />

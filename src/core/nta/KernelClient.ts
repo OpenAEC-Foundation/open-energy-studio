@@ -3985,7 +3985,10 @@ export interface NtaHotWaterSystem {
     | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
   emission:
     | { method: 'residential'; served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
-        kitchenLengthM?: number | null; bathroomLengthM?: number | null; sourceReference: string }
+        kitchenLengthM?: number | null;
+        /** Table 13.2 of NTA 8800:2023 only: inner diameter of the kitchen pipe over two thirds of its length. */
+        kitchenPipeDiameter?: 'up_to_8_mm' | 'up_to_10_mm' | 'other' | null;
+        bathroomLengthM?: number | null; sourceReference: string }
     | { method: 'utility'; meanLengthM: number; sourceReference: string };
   showerHeatRecovery?: {
     showers: Array<
@@ -4216,7 +4219,7 @@ export interface NtaProjectHeatingSystem {
 export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
 export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
 /** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
-export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024'];
+export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024', '2023'];
 
 export interface NtaCalculationInput {
   /** Edition to calculate in; older editions give `calculated_legacy_edition`, never registrable. */

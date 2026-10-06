@@ -1976,6 +1976,7 @@ fn validate_edition(input: &BuildingPerformanceInput, issues: &mut Vec<Performan
         issues.push(issue("route_not_in_edition", "bacsFactor"));
     }
     // EER_bron of 9.6.8.1.1.2.3 exists in NTA 8800:2024 only (p. 346).
+    // Also in NTA 8800:2023 (p. 349).
     if profile.heat_pump_source_route != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
         && input
             .external_supply
@@ -3729,7 +3730,8 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
             let external = delivered(&["dh", "dw", "dc"]) * 3.6 / 1000.0;
             // 5.19a names ci ≠ el, dh; dw and dc are in 5.18a already.
             let other = delivered(&["gas", "oil", "bm"]) * 3.6 / 35.17;
-            let renovation = if residential {
+            // Table 5.7 does not exist in NTA 8800:2023 (p. 70–72).
+            let renovation = if residential || !norm_versions::profile().renovation_standard {
                 None
             } else {
                 renovation_standard(&label_functions)
@@ -5845,6 +5847,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -5969,6 +5972,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6037,6 +6041,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6107,6 +6112,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6177,6 +6183,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6405,6 +6412,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6487,6 +6495,7 @@ mod tests {
         bathroom.emission = HotWaterEmission::Residential {
             served: ServedTaps::BathroomOnly,
             kitchen_length_m: None,
+            kitchen_pipe_diameter: None,
             bathroom_length_m: Some(1.0),
             source_reference: "drawing".into(),
         };
@@ -6501,6 +6510,7 @@ mod tests {
         kitchen.emission = HotWaterEmission::Residential {
             served: ServedTaps::KitchenOnly,
             kitchen_length_m: Some(1.0),
+            kitchen_pipe_diameter: None,
             bathroom_length_m: None,
             source_reference: "drawing".into(),
         };

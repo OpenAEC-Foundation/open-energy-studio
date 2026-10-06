@@ -158,6 +158,11 @@ async fn health_and_version_identify_the_build() {
     let v2024 = editions.iter().find(|item| item["id"] == "2024").unwrap();
     assert_eq!(v2024["implemented"], true);
     assert_eq!(v2024["registrationEligible"], false);
+    let v2023 = editions.iter().find(|item| item["id"] == "2023").unwrap();
+    assert_eq!(v2023["implemented"], true);
+    assert_eq!(v2023["registrationEligible"], false);
+    let v2022 = editions.iter().find(|item| item["id"] == "2022").unwrap();
+    assert_eq!(v2022["implemented"], false);
 }
 
 #[tokio::test]

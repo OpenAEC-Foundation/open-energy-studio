@@ -68,7 +68,7 @@ Bijdrage per oorzaak aan het verschil kern − rapport, in BENG 2 kWh/(m²·jr) 
 | Regelenergie koeling 10.87 (87,6 kWh/jr) | interpretatie | +1,66 / −0,9 | +0,94 / −0,8 | +0,50 / −0,3 | blijft, vraag aan NEN |
 | Koudeafgifteverlies 10.15 | interpretatie | +8,55 / −5,0 | +1,83 / −1,6 | +1,46 / −1,0 | blijft, vraag aan NEN |
 | PV: afronding K_pk (editie 2020, formule 16.4) | versie | −0,57 / +0,4 | – | – | versieverschil |
-| Tapwater: kolom binnendiameter in tabel 13.2 (editie 2023) | versie | – | – | +1,35 / −0,9 | versieverschil |
+| Tapwater: kolom binnendiameter in tabel 13.2 (editie 2023) | versie | – | – | +1,35 / −0,9 | verdwijnt in de editie 2023 (zie onder) |
 | Rest (warmte- en koudebehoefte) | onverklaard | +0,30 / 0,0 | −1,04 / +0,2 | −0,47 / +0,4 | open |
 | **Totaal** | | **+8,65 / −4,4** | **−3,00 / +2,5** | **+2,74 / −1,8** | |
 
@@ -89,6 +89,21 @@ Na de twee correcties (invoer en f_prac) blijft over, in BENG 2 kWh/(m²·jr): A
    - Tapwater (C): de editie 2023 (p. 533) had η_k = 0,55 voor een binnendiameter tot 10 mm; 2025 (p. 543) geeft alleen 0,43. Met de oude waarde wordt de tapwaterwarmte 4 703,1 kWh, gelijk aan het rapport.
    - CO₂ (geen BENG): 0,34 in tabel 5.2 van 2023 tegen 0,268 in 2025. Met 0,34 komen de 451, 860 en 1 723 kg uit de rapporten exact terug.
 6. **Rest.** Netto warmtebehoefte rapport → kern: A 59,10 → 61,39 (+3,9 %), B 29,48 → 27,79 (−5,7 %), C 51,62 → 52,33. Dit is bouwfysica en invoerdetail (belemmering, thermische massa); in C ook het resterende verschil in koudebehoefte.
+
+### B en C in de editie 2023
+
+B en C zijn gepubliceerd volgens NTA 8800:2023. De kern rekent die editie nu ook (`normVersion: "2023"`, zie [nta8800-normversies.md](nta8800-normversies.md)). Uitkomsten BENG 1 / BENG 2 / BENG 3:
+
+| Geval | Rapport | Kern 2024 | Kern 2023 |
+|---|---|---|---|
+| B | 54,61 / 27,10 / 64,8 | 52,96 / 28,84 / 62,6 | 52,96 / 28,95 / 62,5 |
+| C (keukenleiding ≤ 10 mm) | 64,47 / 28,70 / 70,9 | 64,70 / 31,54 / 69,0 | 64,70 / 30,19 / 69,9 |
+
+- C: met `kitchenPipeDiameter: "up_to_10_mm"` geeft tabel 13.2 (2023 p. 533) η_W;em;k 0,55 in plaats van 0,43. BENG 2 daalt precies 1,35 en BENG 3 stijgt 0,9: de versiepost van de tabel hierboven verdwijnt. Wat overblijft (+1,49 BENG 2) is 10.87 (+0,50), 10.15 (+1,46) en de rest (−0,47).
+- B: de schakelpunten van 2023 verhogen BENG 2 met 0,11; BENG 1 blijft gelijk. B heeft geen gegevens over de binnendiameter, dus tabel 13.2 blijft op "overig". Het verschil met het rapport blijft verklaard door 10.87, 10.15 en de rest.
+- De afgifteroutes van 2023 voor verwarming en koeling (oude Δθ-tabellen) zijn niet omgeschakeld. Volgens de toelichting bij 10.15 verandert dat de letterlijke uitkomst minder dan 0,5 %.
+
+De test staat in `crates/nta8800-core/tests/public_comparison.rs` (`cases_b_and_c_under_nta_8800_2023`).
 
 De vragen over 10.15 en 10.87 staan in [nta8800-vragen-nen.md](nta8800-vragen-nen.md).
 

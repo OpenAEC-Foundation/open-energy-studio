@@ -20,6 +20,7 @@
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 
+mod v2023;
 mod v2024;
 mod v2025;
 
@@ -85,7 +86,10 @@ impl NormVersion {
 
     /// Whether the kernel has a profile for this edition.
     pub const fn implemented(self) -> bool {
-        matches!(self, NormVersion::V2024 | NormVersion::V2025C1)
+        matches!(
+            self,
+            NormVersion::V2023 | NormVersion::V2024 | NormVersion::V2025C1
+        )
     }
 
     /// Designation period, as dates (inclusive start, exclusive end), for
@@ -102,6 +106,7 @@ impl NormVersion {
 
     pub fn profile(self) -> &'static NormProfile {
         match self {
+            NormVersion::V2023 => &v2023::PROFILE,
             NormVersion::V2024 => &v2024::PROFILE,
             _ => &v2025::PROFILE,
         }
@@ -228,6 +233,41 @@ pub struct NormProfile {
     pub wide_collective_low_temperature_sources: bool,
     /// Biomass class threshold, kW (table 5.2/5.4).
     pub biomass_threshold_kw: f64,
+    /// Table 13.2: kitchen rows for an inner diameter of at most 8 or 10 mm
+    /// over two thirds of the length. Only the "overig" row from 2024.
+    pub kitchen_diameter_rows: bool,
+    /// Table 11.7 τ_argII;mi, ventilative cooling (summer-night ventilation).
+    pub tau_ventilative_cooling: [f64; 12],
+    /// 11.2.3.3.1 f_argII for manual and automatic operation.
+    pub ventilative_cooling_operation: [f64; 2],
+    /// (11.71a) opening area from discharge and entry-loss coefficients.
+    pub discharge_opening_route: bool,
+    /// Table 11.8 f_τ of dwellings: a fixed value, or `None` for
+    /// min(0,38 + 0,006·A_g; 0,8).
+    pub dwelling_occupancy_factor: Option<f64>,
+    /// Table 17.1 θ_e;argII;mi, °C.
+    pub argii_temperature_c: [Option<f64>; 12],
+    /// 11.3.2.7 ΔT_fan, K: heating, cooling of dwellings, cooling of utility
+    /// buildings.
+    pub fan_temperature_rise_k: [f64; 3],
+    /// Table I.1 detail 17 (dormer frame in a pitched roof), Ψ columns A and
+    /// B, W/(m·K).
+    pub psi_detail_17: [f64; 2],
+    /// Table E.10 λ of wood fibre (WF) and loose cellulose (LFCI), W/(m·K).
+    pub wood_fibre_cellulose_lambda: f64,
+    /// (P.25) divisor of the reference power.
+    pub reference_power_divisor: f64,
+    /// P.6.5.4.8: geothermal efficiency is the forfait 20, without the
+    /// temperature-difference correction.
+    pub geothermal_efficiency_fixed: bool,
+    /// Annex AA as proof of the capacity of an active cooling system (5.7.1).
+    pub annex_aa_route: bool,
+    /// Table 5.7 renovatiestandaard (§5.3.1.2).
+    pub renovation_standard: bool,
+    /// Table 14.3 column "ledverlichting geïnstalleerd vanaf 2017".
+    pub led_2017_column: bool,
+    /// (8.17)/(8.18) glazing-bar (roeden) term in U_w.
+    pub glazing_bar_term: bool,
 }
 
 thread_local! {

@@ -1902,6 +1902,10 @@ fn biomass_efficiency(net_efficiency: f64) -> f64 {
 }
 
 fn geothermal_efficiency(source_c: f64, return_c: f64) -> f64 {
+    // 2023 (P.6.5.4.8, p. 960): the forfait 20 without correction.
+    if crate::norm_versions::profile().geothermal_efficiency_fixed {
+        return GEOTHERMAL_EFFICIENCY_40K;
+    }
     GEOTHERMAL_EFFICIENCY_40K * (source_c - return_c - 3.0) / 40.0
 }
 
@@ -3894,9 +3898,9 @@ fn energy_fractions(
                 // cascade of P.6.5.3.2 and P.23 for the remainder.
                 // P.25 literally uses Q_HD;in;tot, the whole heat delivered
                 // by all generators, collective solar included (p. 968).
-                let reference_power = input
-                    .reference_power_kw
-                    .unwrap_or(input.input_kwh * 3.6 / REFERENCE_POWER_DIVISOR);
+                let reference_power = input.reference_power_kw.unwrap_or(
+                    input.input_kwh * 3.6 / crate::norm_versions::profile().reference_power_divisor,
+                );
                 fractions.reference_power_kw = Some(reference_power);
                 let last = groups.len() - 1;
                 let mut cumulative = 0.0;
@@ -4878,6 +4882,23 @@ pub fn source_factors(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P.6.5.4.8: forfait 20 without correction in 2023 (p. 960); (P.25)
+    /// divisor 8 800 in 2023 (p. 950) and 5 400 in 2024 (p. 948).
+    #[test]
+    fn geothermal_efficiency_and_reference_power_follow_the_edition() {
+        use crate::norm_versions::{profile, with_version, NormVersion};
+        assert_eq!(geothermal_efficiency(70.0, 40.0), 20.0 * 27.0 / 40.0);
+        assert_eq!(
+            with_version(NormVersion::V2023, || geothermal_efficiency(70.0, 40.0)),
+            20.0
+        );
+        assert_eq!(profile().reference_power_divisor, 5400.0);
+        assert_eq!(
+            with_version(NormVersion::V2023, || profile().reference_power_divisor),
+            8800.0
+        );
+    }
 
     fn close(a: f64, b: f64) {
         assert!((a - b).abs() < 1e-9, "{a} vs {b}");
