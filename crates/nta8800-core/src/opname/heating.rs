@@ -41,6 +41,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::Recorder;
+use crate::heating_distribution::DesignTemperatureClass;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -319,57 +320,96 @@ pub enum ControlAnswer {
     Unknown,
 }
 
-/// Table 9.9 classes (supply/return, °C).
+/// Design temperature class of the survey (supply/return, °C): the table 9.9
+/// defaults plus every class of NTA table 9.14, which the ISSO 54 EDR survey
+/// forms also use (35/30, 75/65, 80/60, …). Two survey classes have no NTA
+/// row of their own and take the row with the same design supply
+/// temperature: 70/50 → 70/60 and 60/45 → 60/50.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DesignClass {
+    C30_27,
+    C35_30,
+    C40_35,
     C45_40,
+    C50_42,
     C55_47,
+    C60_45,
+    C60_50,
+    C65_55,
     C70_50,
+    C70_60,
+    C75_65,
+    C80_60,
     C90_70,
 }
 
 impl DesignClass {
-    fn supply_c(self) -> f64 {
+    /// NTA table 9.14 row used for the distribution, the generator and the
+    /// emission, so they describe the same circuit.
+    fn nta(self) -> DesignTemperatureClass {
         match self {
-            Self::C45_40 => 45.0,
-            Self::C55_47 => 55.0,
-            Self::C70_50 => 70.0,
-            Self::C90_70 => 90.0,
+            Self::C30_27 => DesignTemperatureClass::C30,
+            Self::C35_30 => DesignTemperatureClass::C35,
+            Self::C40_35 => DesignTemperatureClass::C40,
+            Self::C45_40 => DesignTemperatureClass::C45,
+            Self::C50_42 => DesignTemperatureClass::C50,
+            Self::C55_47 => DesignTemperatureClass::C55,
+            Self::C60_45 | Self::C60_50 => DesignTemperatureClass::C60,
+            Self::C65_55 => DesignTemperatureClass::C65,
+            Self::C70_50 | Self::C70_60 => DesignTemperatureClass::C70,
+            Self::C75_65 => DesignTemperatureClass::C75,
+            Self::C80_60 => DesignTemperatureClass::C80,
+            Self::C90_70 => DesignTemperatureClass::C90,
         }
     }
 
-    /// Mean design emission temperature of the NTA table 9.14 class used
-    /// for the distribution (`kernel`), so the boiler and the distribution
-    /// describe the same circuit: 70/50 maps to 70/60 and takes 65 °C. Only
-    /// the 50 °C threshold of the boiler forfait reads it, so the choice
-    /// has no effect on the result.
+    fn supply_c(self) -> f64 {
+        self.nta().design().0
+    }
+
+    /// Mean design emission temperature of the NTA table 9.14 row: supply
+    /// minus half the design temperature difference. Only the 50 °C
+    /// threshold of the boiler forfait reads it.
     fn mean_c(self) -> f64 {
-        match self {
-            Self::C45_40 => 42.5,
-            Self::C55_47 => 51.0,
-            Self::C70_50 => 65.0,
-            Self::C90_70 => 80.0,
-        }
+        let (supply, difference) = self.nta().design();
+        supply - difference / 2.0
     }
 
     fn label(self) -> &'static str {
         match self {
+            Self::C30_27 => "30/27",
+            Self::C35_30 => "35/30",
+            Self::C40_35 => "40/35",
             Self::C45_40 => "45/40",
+            Self::C50_42 => "50/42",
             Self::C55_47 => "55/47",
+            Self::C60_45 => "60/45",
+            Self::C60_50 => "60/50",
+            Self::C65_55 => "65/55",
             Self::C70_50 => "70/50",
+            Self::C70_60 => "70/60",
+            Self::C75_65 => "75/65",
+            Self::C80_60 => "80/60",
             Self::C90_70 => "90/70",
         }
     }
 
-    /// NTA table 9.14 class for the distribution; ISSO 70/50 has no NTA
-    /// row and takes 70/60 (same design supply temperature).
+    /// Serialized NTA table 9.14 class for the kernel input.
     fn kernel(self) -> &'static str {
-        match self {
-            Self::C45_40 => "45_40",
-            Self::C55_47 => "55_47",
-            Self::C70_50 => "70_60",
-            Self::C90_70 => "90_70",
+        match self.nta() {
+            DesignTemperatureClass::C30 => "30_27",
+            DesignTemperatureClass::C35 => "35_30",
+            DesignTemperatureClass::C40 => "40_35",
+            DesignTemperatureClass::C45 => "45_40",
+            DesignTemperatureClass::C50 => "50_42",
+            DesignTemperatureClass::C55 => "55_47",
+            DesignTemperatureClass::C60 => "60_50",
+            DesignTemperatureClass::C65 => "65_55",
+            DesignTemperatureClass::C70 => "70_60",
+            DesignTemperatureClass::C75 => "75_65",
+            DesignTemperatureClass::C80 => "80_60",
+            DesignTemperatureClass::C90 => "90_70",
         }
     }
 }
@@ -2079,6 +2119,41 @@ mod tests {
         assert!(derived.heat_pump_renewable.is_some());
         // p. 110: no solar regeneration, c_source 1,0.
         assert_eq!(derived.generator["forfait"]["sourceCorrectionFactor"], 1.0);
+    }
+
+    #[test]
+    fn every_survey_class_takes_its_nta_table_9_14_row() {
+        // Classes of the ISSO 54 EDR survey forms (EPWReal B01–B07).
+        for (class, row, supply, mean) in [
+            (DesignClass::C35_30, "35_30", 35.0, 32.5),
+            (DesignClass::C55_47, "55_47", 55.0, 51.0),
+            (DesignClass::C60_45, "60_50", 60.0, 55.0),
+            (DesignClass::C70_50, "70_60", 70.0, 65.0),
+            (DesignClass::C75_65, "75_65", 75.0, 70.0),
+            (DesignClass::C80_60, "80_60", 80.0, 70.0),
+            (DesignClass::C90_70, "90_70", 90.0, 80.0),
+        ] {
+            assert_eq!(class.kernel(), row, "{}", class.label());
+            assert_eq!(class.supply_c(), supply, "{}", class.label());
+            assert_eq!(class.mean_c(), mean, "{}", class.label());
+            let parsed: DesignClass =
+                serde_json::from_value(json!(format!("c{}", class.label().replace('/', "_"))))
+                    .unwrap();
+            assert_eq!(parsed, class);
+        }
+        // 75/65 and 80/60 are above 70 °C: a heat pump needs the declaration.
+        let hp: HeatingGenerator = serde_json::from_value(json!({
+            "kind": "heat_pump", "source": "outdoor_air", "capacityKw": 6.0
+        }))
+        .unwrap();
+        let mut survey = heating(hp, Emitters::Radiators);
+        survey.design_class = Some(DesignClass::C75_65);
+        let mut recorder = Recorder::default();
+        derive_heating(&survey, 2015, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|issue| issue.path.contains("heatPumpAbove70Declaration")));
     }
 
     #[test]
