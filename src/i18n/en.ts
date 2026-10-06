@@ -629,7 +629,7 @@ export const en: Record<string, string> = {
   'feedback.errorGeneric': 'Failed to submit feedback. Please try again.',
 
   // Status bar
-  'kernel.issue.edition_not_implemented': 'This edition of NTA 8800 is not (yet) in the calculation kernel; choose NTA 8800:2025+C1:2026, NTA 8800:2024 or NTA 8800:2023.',
+  'kernel.issue.edition_not_implemented': 'This edition of NTA 8800 is not (yet) in the calculation kernel; choose NTA 8800:2025+C1:2026 or one of the older editions 2024, 2023, 2022 or 2020+A1.',
   'kernel.issue.serialization_failed': 'The kernel result could not be serialized as JSON and is withheld.',
   'kernel.issue.route_not_in_edition': 'This input belongs to a route the chosen edition of NTA 8800 does not have.',
   'registration.issue.legacy_edition_not_registrable': 'Calculated in an older edition of NTA 8800: not registrable. Only NTA 8800:2025+C1:2026 is designated.',

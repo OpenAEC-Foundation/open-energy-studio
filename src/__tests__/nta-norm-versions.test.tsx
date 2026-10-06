@@ -59,7 +59,7 @@ describe('NTA 8800 editions', () => {
     renderWithProviders(<NtaCalculationForm project={project} initial={{ normVersion: '2024' }}
       onSave={() => undefined} onCancel={() => undefined} />);
     const select = screen.getByLabelText('NTA 8800 edition') as HTMLSelectElement;
-    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024', '2023', '2022']);
+    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024', '2023', '2022', '2020+A1']);
     expect(select.value).toBe('2024');
     expect(screen.getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('NTA 8800 editions', () => {
       initial={{ normVersion: '2024', calculationScope: 'residential', hotWater } as never}
       onSave={() => undefined} onCancel={() => undefined} />);
     expect(screen.queryByLabelText(label)).toBeNull();
-    expect(screen.getByText(/only the 2022 and 2023 editions have this input/)).toBeInTheDocument();
+    expect(screen.getByText(/only the 2020\+A1, 2022 and 2023 editions have this input/)).toBeInTheDocument();
   });
 
   it('offers the 2023 heating-emission description only for the 2023 edition', () => {
@@ -95,7 +95,7 @@ describe('NTA 8800 editions', () => {
       initial={{ normVersion: '2024', calculationScope: 'residential', emission } as never}
       onSave={() => undefined} onCancel={() => undefined} />);
     expect(screen.queryByLabelText(label)).toBeNull();
-    expect(screen.getByText(/only the 2022 and 2023 editions have this input/)).toBeInTheDocument();
+    expect(screen.getByText(/only the 2020\+A1, 2022 and 2023 editions have this input/)).toBeInTheDocument();
   });
 
   it('offers the 2022-only inputs only for the 2022 edition and flags values left behind', () => {

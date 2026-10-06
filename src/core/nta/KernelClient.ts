@@ -4269,7 +4269,7 @@ export interface NtaProjectHeatingSystem {
 export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
 export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
 /** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
-export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024', '2023', '2022'];
+export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024', '2023', '2022', '2020+A1'];
 
 export interface NtaCalculationInput {
   /** Edition to calculate in; older editions give `calculated_legacy_edition`, never registrable. */

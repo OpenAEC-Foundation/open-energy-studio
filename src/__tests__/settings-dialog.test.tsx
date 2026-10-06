@@ -56,8 +56,8 @@ describe('default edition', () => {
     expect(buildNtaCalculationTemplate(project)).not.toHaveProperty('normVersion');
     localStorage.setItem(DEFAULT_EDITION_KEY, '2024');
     expect(buildNtaCalculationTemplate(project)).toMatchObject({ normVersion: '2024' });
-    localStorage.setItem(DEFAULT_EDITION_KEY, '2020+A1');
-    // Not implemented by the kernel: falls back to the current edition.
+    localStorage.setItem(DEFAULT_EDITION_KEY, '2019');
+    // Not an edition of the kernel: falls back to the current edition.
     expect(readDefaultEdition()).toBe('2025+C1');
     expect(buildNtaCalculationTemplate(project)).not.toHaveProperty('normVersion');
   });

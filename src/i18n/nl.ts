@@ -629,7 +629,7 @@ export const nl: Record<string, string> = {
   'feedback.errorGeneric': 'Versturen mislukt. Probeer het opnieuw.',
 
   // Status bar
-  'kernel.issue.edition_not_implemented': 'Deze uitgave van NTA 8800 is (nog) niet in de rekenkern opgenomen; kies NTA 8800:2025+C1:2026, NTA 8800:2024 of NTA 8800:2023.',
+  'kernel.issue.edition_not_implemented': 'Deze uitgave van NTA 8800 is (nog) niet in de rekenkern opgenomen; kies NTA 8800:2025+C1:2026 of een van de oudere uitgaven 2024, 2023, 2022 of 2020+A1.',
   'kernel.issue.serialization_failed': 'De uitkomst van de rekenkern kon niet als JSON worden weergegeven en is achtergehouden.',
   'kernel.issue.route_not_in_edition': 'Deze invoer hoort bij een route die de gekozen uitgave van NTA 8800 niet kent.',
   'registration.issue.legacy_edition_not_registrable': 'Berekend volgens een oudere uitgave van NTA 8800: niet registreerbaar. Alleen NTA 8800:2025+C1:2026 is aangewezen.',

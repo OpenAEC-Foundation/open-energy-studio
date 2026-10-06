@@ -168,7 +168,8 @@ async fn health_and_version_identify_the_build() {
         .iter()
         .find(|item| item["id"] == "2020+A1")
         .unwrap();
-    assert_eq!(v2020["implemented"], false);
+    assert_eq!(v2020["implemented"], true);
+    assert_eq!(v2020["registrationEligible"], false);
 }
 
 #[tokio::test]
