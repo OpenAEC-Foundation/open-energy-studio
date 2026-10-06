@@ -8,7 +8,8 @@ import {
 import { MaatwerkadviesPanel, type MwaTab } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel, relabelProofCounts } from '../components/MaatwerkadviesPanel/RelabelPanel';
 import { labelPathBars } from '../components/shell/pages/existing/MwaViews';
-import { WORKFLOW_STEPS } from '../core/navigation/routes';
+import { WORKFLOW_STEPS, normalizeRoute } from '../core/navigation/routes';
+import { SURVEY_STEP_IDS } from '../core/survey/surveyFlow';
 import type { MaatwerkadviesAssessment, MwaVariantResult } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
 
@@ -45,8 +46,12 @@ describe('survey wizard (F8)', () => {
     expect(surveySectionForPath('lighting.zones[0]')).toBe('zones');
     expect(surveySectionForPath('derivedInput')).toBe('result');
     expect(surveySectionForPath('constructionYear')).toBe('general');
+    // The survey route lists the steps of the question flow; old section ids still open the matching step.
     const survey = WORKFLOW_STEPS.find((step) => step.id === 'survey')!;
-    expect(survey.subs.map((sub) => sub.id)).toEqual([...SURVEY_SECTIONS]);
+    expect(survey.subs.map((sub) => sub.id)).toEqual(SURVEY_STEP_IDS);
+    expect(SURVEY_SECTIONS.filter((section) => section !== 'result').length).toBeGreaterThan(0);
+    expect(normalizeRoute({ step: 'survey', sub: 'envelope' }).sub).toBe('gevels');
+    expect(normalizeRoute({ step: 'survey', sub: 'result' }).sub).toBe('controle');
   });
 
   it('shows one section at a time, moves with the progress list and opens the failing section with "Go to"', async () => {

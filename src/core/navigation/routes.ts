@@ -6,6 +6,7 @@
  * alias so existing code that dispatches `SET_VIEW_MODE` keeps working.
  */
 import type { IProject, ViewMode } from '../energy/types';
+import { LEGACY_SURVEY_SUBS, SURVEY_STEP_IDS, surveySteps } from '../survey/surveyFlow';
 
 export type StepId =
   | 'project' | 'building' | 'installations' | 'check' | 'results'
@@ -35,6 +36,8 @@ export interface Route {
   sub?: string;
   /** Kernel or project path of the field to focus after navigating ("Ga naar"). */
   focusPath?: string;
+  /** The question of the basisopname step to show (question flow). */
+  question?: string;
 }
 
 export const WORKFLOW_STEPS: StepDefinition[] = [
@@ -80,18 +83,10 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
     ],
   },
   {
-    // The survey wizard (F8): one sub page per part of the survey, Rekenzones only for utility.
-    id: 'survey', number: 6, group: 'existing', labelKey: 'nav.step.survey', slug: 'basisopname', subs: [
-      { id: 'general', labelKey: 'opname.section.general' },
-      { id: 'zones', labelKey: 'opname.section.zones' },
-      { id: 'envelope', labelKey: 'opname.section.envelope' },
-      { id: 'heating', labelKey: 'opname.section.heating' },
-      { id: 'hotWater', labelKey: 'opname.section.hotWater' },
-      { id: 'ventilation', labelKey: 'opname.section.ventilation' },
-      { id: 'cooling', labelKey: 'opname.section.cooling' },
-      { id: 'pv', labelKey: 'opname.section.pv' },
-      { id: 'result', labelKey: 'opname.section.result' },
-    ],
+    // The basisopname question flow (UI redesign 2026-10): one sub page per step of
+    // src/core/survey/surveyFlow.ts; which steps show depends on the survey kind.
+    id: 'survey', number: 6, group: 'existing', labelKey: 'nav.step.survey', slug: 'basisopname',
+    subs: SURVEY_STEP_IDS.map((id) => ({ id, labelKey: `survey.step.${id}` })),
   },
   {
     id: 'advice', number: 7, group: 'existing', labelKey: 'nav.step.advice', slug: 'maatwerkadvies', subs: [
@@ -136,7 +131,8 @@ export function stepDefinition(step: StepId): StepDefinition {
 /** The sub pages shown for a project: the survey's Rekenzones only exist in a utility survey. */
 export function visibleSubs(definition: StepDefinition, project: IProject | null | undefined): SubPage[] {
   if (definition.id !== 'survey') return definition.subs;
-  return definition.subs.filter((sub) => sub.id !== 'zones' || project?.basisopname?.kind === 'utility');
+  const ids = surveySteps(project?.basisopname?.kind ?? 'residential').map((step) => step.id as string);
+  return definition.subs.filter((sub) => ids.includes(sub.id));
 }
 
 /** The default sub page of a step (its first), or undefined for steps without sub pages. */
@@ -147,8 +143,13 @@ export function defaultSub(step: StepId): string | undefined {
 /** Normalise a route: an unknown sub falls back to the step's first sub page. */
 export function normalizeRoute(route: Route): Route {
   const definition = stepDefinition(route.step);
+  // Saved links to the survey sections before the question flow.
+  if (definition.id === 'survey' && route.sub && LEGACY_SURVEY_SUBS[route.sub]) route = { ...route, sub: LEGACY_SURVEY_SUBS[route.sub] };
   const sub = route.sub && definition.subs.some((candidate) => candidate.id === route.sub) ? route.sub : defaultSub(route.step);
-  return { step: definition.id, ...(sub ? { sub } : {}), ...(route.focusPath ? { focusPath: route.focusPath } : {}) };
+  return {
+    step: definition.id, ...(sub ? { sub } : {}), ...(route.focusPath ? { focusPath: route.focusPath } : {}),
+    ...(route.question && definition.id === 'survey' ? { question: route.question } : {}),
+  };
 }
 
 /** Old view modes (ribbon era) as routes; `SET_VIEW_MODE` is an alias of navigating there. */

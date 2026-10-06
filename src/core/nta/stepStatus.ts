@@ -63,6 +63,11 @@ export function isNewBuild(project: IProject): boolean {
   return purpose === 'delivery' || purpose === 'bbl_check';
 }
 
+/** A project of an existing building with a basisopname: the app shows its question flow. */
+export function isSurveyProject(project: IProject): boolean {
+  return project.basisopname != null && !isNewBuild(project);
+}
+
 function hasInput(step: StepId, project: IProject, assessment: ProjectPerformanceAssessment | null | undefined): boolean {
   switch (step) {
     case 'project': return Boolean(project.name?.trim()) && Boolean(project.buildingFunction);

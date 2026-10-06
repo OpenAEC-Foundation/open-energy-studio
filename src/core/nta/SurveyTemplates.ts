@@ -11,6 +11,8 @@ export type SurveyKind = 'residential' | 'utility';
 export interface StoredSurvey {
   kind: SurveyKind;
   survey: Record<string, unknown>;
+  /** Question-flow progress (src/core/survey/surveyFlow.ts); never sent to the kernel. */
+  progress?: { done?: string[]; skipped?: string[] };
 }
 
 export function surveyTemplate(kind: SurveyKind): StoredSurvey {

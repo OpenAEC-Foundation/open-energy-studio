@@ -13,9 +13,108 @@ import { formatNumber } from '../../i18n/format';
 import { Kbd, Tag } from '../ui';
 import { useMenu } from './TopBar';
 import { STEP_GROUPS, WORKFLOW_STEPS, TOOL_STEP, visibleSubs, type Route, type StepId } from '../../core/navigation/routes';
-import { isNewBuild, type StepStatus } from '../../core/nta/stepStatus';
+import { isNewBuild, isSurveyProject, type StepStatus } from '../../core/nta/stepStatus';
 import type { IProject } from '../../core/energy/types';
 import type { ShellActions } from './ShellActions';
+import {
+  questionForPath, questionKey, questionState, stepState, surveySteps, stepForKind, type SurveyProgress,
+} from '../../core/survey/surveyFlow';
+import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
+import { labelColor } from './pages/results/resultsData';
+import type { StoredSurvey } from '../../core/nta/SurveyTemplates';
+
+type Translate = (key: string, params?: Record<string, string>) => string;
+type StoredWithProgress = StoredSurvey & { progress?: SurveyProgress };
+
+/** Label class and progress of the basisopname, for the project card. */
+function SurveyCardStatus({ stored, t }: { stored: StoredWithProgress; t: Translate }) {
+  const assessment = useSurveyAssessment();
+  const label = currentResult(assessment, stored)?.performance?.indicativeLabelClass ?? null;
+  const steps = surveySteps(stored.kind).filter((step) => !step.special);
+  const done = steps.filter((step) => stepState(step, stored.progress) === 'done').length;
+  return <div className="nav-survey-status">
+    <span>{t('nav.survey.progress', { done: String(done), total: String(steps.length) })}</span>
+    {label && <span className="nav-survey-label" style={{ background: labelColor(label) }} title={t('survey.result.title')}>{label}</span>}
+  </div>;
+}
+
+/** The steps of the basisopname with their state, the questions of the current step, and what comes after. */
+function SurveyNavList({ stored, route, statuses, navigate, t }: {
+  stored: StoredWithProgress; route: Route; statuses: Record<StepId, StepStatus>;
+  navigate: ShellActions['navigate']; t: Translate;
+}) {
+  const assessment = useSurveyAssessment();
+  const result = currentResult(assessment, stored);
+  const steps = surveySteps(stored.kind);
+  const currentStep = route.step === 'survey' ? stepForKind(route.sub, stored.kind) : null;
+  const issues = (id: string) => result?.issues.filter((item) => questionForPath(item.path, stored).step === id).length ?? 0;
+  const workflowStep = (step: typeof WORKFLOW_STEPS[number]) => {
+    const status = statuses[step.id];
+    const current = route.step === step.id;
+    return <li key={step.id}>
+      <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-step={step.id}
+        onClick={() => navigate({ step: step.id })}>
+        <StepBadge status={status} number={step.number} current={current} />
+        <span className="nav-step-label">{t(step.labelKey)}</span>
+        <span className="visually-hidden">, {stepStateText(t, status)}</span>
+      </button>
+    </li>;
+  };
+  return <>
+    <li className="nav-group-item">
+      <div className="nav-group" id="nav-group-survey">{t('nav.survey.steps')}</div>
+      <ol aria-labelledby="nav-group-survey" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {steps.map((step, index) => {
+          const state = stepState(step, stored.progress);
+          const errors = issues(step.id);
+          const current = currentStep === step.id;
+          const badge = state === 'done' ? 'complete' : state === 'skipped' ? 'skipped' : errors > 0 ? 'errors' : current ? 'current' : 'todo';
+          const stateText = state === 'done' ? t('nav.state.complete') : state === 'skipped' ? t('nav.state.skipped')
+            : state === 'partial' ? t('nav.state.partial') : t('nav.state.todo');
+          return <li key={step.id}>
+            <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-survey-step={step.id}
+              data-state={state} onClick={() => navigate({ step: 'survey', sub: step.id })}>
+              <span className={`nav-step-no ${badge}`} aria-hidden="true">
+                {state === 'done' ? <Check /> : state === 'skipped' ? '↷' : index + 1}
+              </span>
+              <span className="nav-step-label">{t(step.labelKey)}</span>
+              {errors > 0 && <span className="nav-count errors" aria-hidden="true">{errors}</span>}
+              {errors === 0 && state === 'skipped' && <span className="nav-later" aria-hidden="true">{t('survey.open.skipped')}</span>}
+              <span className="visually-hidden">, {stateText}{errors > 0 ? `, ${t('nav.state.errors', { count: String(errors) })}` : ''}</span>
+            </button>
+            {current && step.questions.length > 1 && <ul className="nav-subs">
+              {step.questions.map((question) => {
+                const answered = questionState(stored.progress, questionKey(step.id, question.id));
+                const here = (route.question ?? step.questions[0].id) === question.id;
+                return <li key={question.id}>
+                  <button type="button" className={`nav-sub nav-question nav-question--${answered}`} aria-current={here ? 'step' : undefined}
+                    onClick={() => navigate({ step: 'survey', sub: step.id, question: question.id })}>
+                    <span className="nav-question-mark" aria-hidden="true">{answered === 'done' ? '✓' : answered === 'skipped' ? '↷' : here ? '›' : '·'}</span>
+                    {t(`survey.navQuestion.${step.id}.${question.id}`)}
+                  </button>
+                </li>;
+              })}
+            </ul>}
+          </li>;
+        })}
+      </ol>
+    </li>
+    <li className="nav-group-item">
+      <div className="nav-group" id="nav-group-after">{t('nav.survey.after')}</div>
+      <ol aria-labelledby="nav-group-after" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {WORKFLOW_STEPS.filter((step) => ['advice', 'relabel', 'report', 'registration'].includes(step.id)).map(workflowStep)}
+      </ol>
+    </li>
+    <li className="nav-group-item">
+      <details className="nav-more" open={['project', 'building', 'installations', 'check', 'results'].includes(route.step)}>
+        <summary className="nav-group">{t('nav.survey.more')}</summary>
+        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {WORKFLOW_STEPS.filter((step) => ['project', 'building', 'installations', 'check', 'results'].includes(step.id)).map(workflowStep)}
+        </ol>
+      </details>
+    </li>
+  </>;
+}
 
 export interface WorkflowNavProps {
   project: IProject;
@@ -69,6 +168,7 @@ export function WorkflowNav({ project, route, statuses, floorAreaM2, actions }: 
   };
 
   const city = project.city?.trim();
+  const survey = isSurveyProject(project) ? project.basisopname as StoredWithProgress : null;
 
   return (
     <nav className="workflow-nav" aria-label={t('nav.ariaLabel')}>
@@ -82,10 +182,12 @@ export function WorkflowNav({ project, route, statuses, floorAreaM2, actions }: 
           <Tag>{t(utility ? 'nav.tag.utility' : 'nav.tag.residential')}</Tag>
           {project.registration?.purpose && <Tag>{t(newBuild ? 'nav.tag.newBuild' : 'nav.tag.existing')}</Tag>}
         </div>
+        {survey && <SurveyCardStatus stored={survey} t={t} />}
       </div>
 
       <ol className="nav-steps" ref={listRef} onKeyDown={onListKeyDown}>
-        {STEP_GROUPS.map((group) => (
+        {survey && <SurveyNavList stored={survey} route={route} statuses={statuses} navigate={actions.navigate} t={t} />}
+        {!survey && STEP_GROUPS.map((group) => (
           <li key={group.id} className="nav-group-item">
             <div className="nav-group" id={`nav-group-${group.id}`}>{t(group.labelKey)}</div>
             <ol aria-labelledby={`nav-group-${group.id}`} style={{ listStyle: 'none', margin: 0, padding: 0 }}>

@@ -359,7 +359,12 @@ export interface IProject {
    */
   importLog?: ProjectImportRecord[];
   /** ISSO 82.1/75.1 basisopname (survey) kept with the project; not part of the label fingerprint. */
-  basisopname?: { kind: 'residential' | 'utility'; survey: Record<string, unknown> };
+  basisopname?: {
+    kind: 'residential' | 'utility';
+    survey: Record<string, unknown>;
+    /** Question-flow progress (answered and skipped questions); never sent to the kernel. */
+    progress?: { done?: string[]; skipped?: string[] };
+  };
 }
 
 // ------------------------------------------------------------

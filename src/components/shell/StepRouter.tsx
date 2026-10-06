@@ -20,7 +20,7 @@ import { GasChainReferencePanel } from '../GasChainReferencePanel/GasChainRefere
 import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import { ResultsDashboard } from './pages/results/ResultsDashboard';
-import { BasisopnamePanel, type SurveySection } from '../BasisopnamePanel/BasisopnamePanel';
+import { SurveyWizard } from '../SurveyWizard/SurveyWizard';
 import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import { Building3DView, HeatPumpSizingCalculator, LazyPage, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
@@ -159,14 +159,11 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       </>;
       break;
     case 'survey':
-      // The survey wizard shows its own progress list instead of sub tabs (mockup 07).
+      // The basisopname question flow: the steps are in the navigation, the page shows one question.
       page = <>
-        <PageHeader route={route} lead={t('page.survey.lead')} />
+        {/* The question page has its own h1 (the question) and step line. */}
         <div className="page-body">{dimmedBanner}
-          <div className="survey-host">
-            <BasisopnamePanel section={route.sub as SurveySection | undefined}
-              onSection={(sub, focusPath) => actions.navigate({ step: 'survey', sub, ...(focusPath ? { focusPath } : {}) })} />
-          </div>
+          <SurveyWizard route={route} navigate={actions.navigate} />
         </div>
       </>;
       break;

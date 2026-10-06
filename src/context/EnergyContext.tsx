@@ -23,6 +23,7 @@ import {
 } from '../core/energy/types';
 import { deleteSurfaceFromProject, deleteWindowFromProject, deleteZoneFromProject } from '../core/energy/projectDelete';
 import { normalizeRoute, routeForViewMode, viewModeForRoute, type Route } from '../core/navigation/routes';
+import { isSurveyProject } from '../core/nta/stepStatus';
 
 // ============================================================
 // State
@@ -278,7 +279,8 @@ function createDocumentState(project: IProject): EnergyState {
     selectedItemType: null,
     isDirty: false,
     previewVisible: true,
-    route: { step: 'project' },
+    // A project with a basisopname reopens on its Controle page: everything on one page.
+    route: isSurveyProject(project) ? normalizeRoute({ step: 'survey', sub: 'controle' }) : { step: 'project' },
   };
 }
 

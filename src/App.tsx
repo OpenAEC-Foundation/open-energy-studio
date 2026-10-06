@@ -6,6 +6,8 @@ import { summarizeForPreview } from './core/nta/PreviewSummary';
 import { NtaDraftProvider, useNtaDraft } from './context/NtaDraftProvider';
 import { I18nProvider } from './i18n/I18nProvider';
 import { WelcomeScreen, type NewProjectKind } from './components/WelcomeScreen/WelcomeScreen';
+import { surveyTemplate } from './core/nta/SurveyTemplates';
+import { surveySteps } from './core/survey/surveyFlow';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { ProjectInfoDialog } from './components/dialogs/ProjectInfoDialog/ProjectInfoDialog';
 import { ZoneEditorDialog } from './components/dialogs/ZoneEditorDialog/ZoneEditorDialog';
@@ -480,8 +482,17 @@ function AppContent() {
 
   // Welcome screen: a new dwelling or utility building (office; the function can be changed in Projectgegevens).
   const handleNewProjectOf = useCallback((kind: NewProjectKind) => {
-    const project = createEmptyProject(kind === 'utility' ? 'office' : 'residential');
-    docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project } });
+    const utility = kind === 'utility' || kind === 'existing_utility';
+    const project = createEmptyProject(utility ? 'office' : 'residential');
+    const id = crypto.randomUUID();
+    if (kind === 'existing_residential' || kind === 'existing_utility') {
+      // An energy label for an existing building starts the basisopname question flow.
+      const surveyKind = utility ? 'utility' : 'residential';
+      docDispatch({ type: 'DOC_NEW', payload: { id, project: { ...project, basisopname: { ...surveyTemplate(surveyKind), progress: {} } } } });
+      docDispatch({ type: 'DOC_DISPATCH', payload: { id, action: { type: 'NAVIGATE', payload: { step: 'survey', sub: surveySteps(surveyKind)[0].id } } } });
+      return;
+    }
+    docDispatch({ type: 'DOC_NEW', payload: { id, project } });
   }, [docDispatch, createEmptyProject]);
 
   // Recently opened or saved project files (desktop only: browser documents have no path).

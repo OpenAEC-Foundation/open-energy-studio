@@ -11,7 +11,8 @@ import { IconButton } from '../ui';
 import { labelClassName } from '../shell/labelClass';
 import './WelcomeScreen.css';
 
-export type NewProjectKind = 'residential' | 'utility';
+/** New-build calculation, or a basisopname of an existing dwelling or utility building. */
+export type NewProjectKind = 'residential' | 'utility' | 'existing_residential' | 'existing_utility';
 
 interface WelcomeScreenProps {
   onNewProject: (kind: NewProjectKind) => void;
@@ -53,7 +54,21 @@ export function WelcomeScreen({
           <section className="welcome-panel" aria-labelledby="welcome-start">
             <h2 className="welcome-heading" id="welcome-start">{t('welcome.start')}</h2>
             <div className="welcome-new">
-              <button type="button" className="welcome-card welcome-card--primary" onClick={() => onNewProject('residential')}>
+              <button type="button" className="welcome-card welcome-card--primary" onClick={() => onNewProject('existing_residential')}>
+                <Home aria-hidden="true" />
+                <span className="welcome-card__text">
+                  <strong>{t('welcome.existingResidential')}</strong>
+                  <span>{t('welcome.existingResidentialHint')}</span>
+                </span>
+              </button>
+              <button type="button" className="welcome-card" onClick={() => onNewProject('existing_utility')}>
+                <Building2 aria-hidden="true" />
+                <span className="welcome-card__text">
+                  <strong>{t('welcome.existingUtility')}</strong>
+                  <span>{t('welcome.existingUtilityHint')}</span>
+                </span>
+              </button>
+              <button type="button" className="welcome-card" onClick={() => onNewProject('residential')}>
                 <Home aria-hidden="true" />
                 <span className="welcome-card__text">
                   <strong>{t('welcome.newResidential')}</strong>

@@ -16,6 +16,7 @@ import {
 import { KernelCode } from '../KernelCode/KernelCode';
 import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
+import type { SurveyPart } from '../../core/survey/surveyFlow';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
 import '../shell/pages/existing/existing.css';
@@ -44,12 +45,12 @@ const DESIGN_CLASSES_ABOVE_70 = ['c75_65', 'c80_60', 'c90_70'];
 type Change = (path: Path, value: unknown) => void;
 type T = (key: string, options?: Record<string, unknown>) => string;
 
-const HEATING_KINDS = ['boiler', 'heat_pump', 'local_fired', 'gas_air_heater', 'district_heat', 'electric', 'biomass',
+export const HEATING_KINDS = ['boiler', 'heat_pump', 'local_fired', 'gas_air_heater', 'district_heat', 'electric', 'biomass',
   'chp', 'none_present'];
 const HEAT_PUMP_SOURCES = ['outdoor_air', 'exhaust_air', 'outdoor_and_exhaust_air', 'heat_pump_panel', 'ground',
   'groundwater', 'surface_water', 'high_temperature', 'water_based_unknown'];
 const WATER_SOURCES = ['ground', 'groundwater', 'surface_water', 'high_temperature', 'water_based_unknown'];
-const HOT_WATER_KINDS: Record<SurveyKind, string[]> = {
+export const HOT_WATER_KINDS: Record<SurveyKind, string[]> = {
   residential: ['gas_appliance', 'electric_boiler', 'electric_instantaneous', 'heat_pump', 'district_heat',
     'collective_unknown', 'delivery_set_from_heating', 'none'],
   utility: ['gas_appliance', 'gas_storage_heater', 'electric_boiler', 'electric_instantaneous', 'heat_pump',
@@ -168,6 +169,47 @@ const CONTROL_TARGETS = ['none', 'supply', 'extract', 'supply_and_extract'];
  * ISSO 82.1 §11.3 (p. 143–146): controls of tables 11.4–11.6, central or
  * decentral heat recovery, system E and grilles with heating strips.
  */
+/** Ventilation principles of the survey (ISSO 82.1 §11). */
+export const VENTILATION_PRINCIPLES = ['natural', 'mechanical_extract', 'balanced', 'mechanical_supply'];
+
+/**
+ * The residential ventilation answers before the controls: the principle, the
+ * heat recovery and bypass of a balanced system, the fans, and the supply
+ * grilles of natural and extract systems (ISSO 82.1 tables 11.3–11.15).
+ */
+export function ResidentialVentilationBasics({ draft, change, t, hidePrinciple = false }: {
+  draft: Draft; change: Change; t: T;
+  /** The question flow asks the principle on its own page. */
+  hidePrinciple?: boolean;
+}) {
+  const field = { draft, onChange: change };
+  const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
+  const principle = read(draft, ['ventilation', 'principle']);
+  const mechanical = principle !== 'natural';
+  const grilles = principle === 'natural' || principle === 'mechanical_extract';
+  return <>
+    {!hidePrinciple && <SelectField {...field} path={['ventilation', 'principle']} label={t('survey.ventilation.principle')}
+      options={opts(t, 'survey.ventilation.principleKind', VENTILATION_PRINCIPLES)} />}
+    {principle === 'balanced' && <>
+      <SelectField {...field} path={['ventilation', 'heatRecovery']} label={t('survey.ventilation.heatRecovery')}
+        options={opts(t, 'opname.ventilation.heatRecoveryKind', HEAT_RECOVERY)} />
+      <TriStateField {...field} {...yesNo} path={['ventilation', 'bypassPresent']} label={t('survey.ventilation.bypass')} />
+    </>}
+    {mechanical && <>
+      <NumberField {...field} path={['ventilation', 'unitManufactureYear']} label={t('survey.ventilation.unitYear')} step="1" optional />
+      <SelectField {...field} path={['ventilation', 'motor']} label={t('survey.ventilation.motor')}
+        options={opts(t, 'survey.ventilation.motorKind', ['dc', 'ac', 'unknown'])} />
+    </>}
+    {grilles && <>
+      <TriStateField {...field} {...yesNo} path={['ventilation', 'selfRegulatingVents']} label={t('survey.ventilation.selfRegulating')} />
+      {read(draft, ['ventilation', 'selfRegulatingVents']) === true &&
+        <SelectField {...field} path={['ventilation', 'pressureClass']} label={t('survey.ventilation.pressureClass')}
+          options={opts(t, 'survey.ventilation.pressureClassKind', ['at_most1_pa', 'from1_to5_pa', 'from5_to10_pa'])} />}
+    </>}
+    <NumberField {...field} path={['ventilation', 'installationYear']} label={t('survey.ventilation.installationYear')} step="1" optional />
+  </>;
+}
+
 export function VentilationSurveyFields({ draft, change, t, withControls = true }: {
   draft: Draft; change: Change; t: T;
   /** The utility survey has no table 11.4–11.6 control answers (declared variant only). */
@@ -484,7 +526,11 @@ export function SolarControlField({ draft, base, change, t }: { draft: Draft; ba
   </>;
 }
 
-function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path: Path; change: Change; t: T }) {
+export function HeatingGeneratorFields({ draft, path, change, t, hideKind = false }: {
+  draft: Draft; path: Path; change: Change; t: T;
+  /** The question flow asks the kind on its own page with choice cards. */
+  hideKind?: boolean;
+}) {
   const field = { draft, onChange: change };
   const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
   const kind = read(draft, [...path, 'kind']);
@@ -533,8 +579,8 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
   const changeAppliance = (_: Path, value: unknown) =>
     change(path, { ...(value === 'steam_boiler' ? generator : without(['fuel'])), appliance: value });
   return <>
-    <KindSelect draft={draft} path={path} label={t('opname.heating.generator')} kinds={HEATING_KINDS}
-      prefix="opname.heating.kind" template={heatingGeneratorTemplate} change={change} t={t} />
+    {!hideKind && <KindSelect draft={draft} path={path} label={t('opname.heating.generator')} kinds={HEATING_KINDS}
+      prefix="opname.heating.kind" template={heatingGeneratorTemplate} change={change} t={t} />}
     {kind === 'boiler' && <>
       <SelectField {...field} path={[...path, 'boilerType']} label={t('opname.heating.boilerType')}
         options={opts(t, 'opname.heating.boiler', ['conventional', 'vr', 'hr100', 'hr104', 'hr107', 'hydrogen', 'oil'])} />
@@ -616,14 +662,16 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
   </>;
 }
 
-function HotWaterGeneratorFields({ draft, path, kind, change, t }: {
+export function HotWaterGeneratorFields({ draft, path, kind, change, t, hideKind = false }: {
   draft: Draft; path: Path; kind: SurveyKind; change: Change; t: T;
+  /** The question flow asks the kind on its own page with choice cards. */
+  hideKind?: boolean;
 }) {
   const field = { draft, onChange: change };
   const generator = read(draft, [...path, 'kind']);
   return <>
-    <KindSelect draft={draft} path={path} label={t('opname.hotWater.generator')} kinds={HOT_WATER_KINDS[kind]}
-      prefix="opname.hotWater.kind" template={hotWaterGeneratorTemplate} change={change} t={t} />
+    {!hideKind && <KindSelect draft={draft} path={path} label={t('opname.hotWater.generator')} kinds={HOT_WATER_KINDS[kind]}
+      prefix="opname.hotWater.kind" template={hotWaterGeneratorTemplate} change={change} t={t} />}
     {generator === 'gas_appliance' && <>
       <SelectField {...field} path={[...path, 'applianceType']} label={t('opname.hotWater.applianceType')}
         options={opts(t, 'opname.hotWater.appliance', ['bath_geyser', 'combi', 'kitchen_geyser', 'unknown'])} />
@@ -681,9 +729,31 @@ interface BasisopnamePanelProps {
   /** Wizard mode (shell step): only this section, with the progress list and result card. */
   section?: SurveySection;
   onSection?: (section: SurveySection, focusPath?: string) => void;
+  /**
+   * Question mode (the question flow): only the fields of this part, without
+   * heading, progress, result or actions; the question page around it has those.
+   */
+  part?: SurveyPart;
 }
 
-export function BasisopnamePanel({ section: requested, onSection }: BasisopnamePanelProps = {}) {
+/** The panel section that holds a question part; null for parts the question page draws itself. */
+const PART_SECTION: Record<SurveyPart, SurveySection | null> = {
+  dwellingType: null, general: 'general', zones: 'zones', walls: 'envelope', roofFloor: 'envelope',
+  heatingKind: null, heatingGenerator: 'heating', heatingRest: 'heating',
+  hotWaterKind: null, hotWaterGenerator: 'hotWater', hotWaterRest: 'hotWater',
+  ventilationPrinciple: null, ventilation: 'ventilation', cooling: 'cooling', pv: 'pv',
+};
+
+/** A new survey surface of an element, for the question pages (facades on a wall question, roofs and floors on the other). */
+function surfaceTemplate(index: number, element: 'facade' | 'roof' | 'floor'): Record<string, unknown> {
+  const base = { id: `${element === 'facade' ? 'gevel' : element === 'roof' ? 'dak' : 'vloer'}-${index + 1}`, element, cavity: false,
+    insulation: { kind: 'none_or_unknown' }, grossAreaM2: 10, sourceReference: '' };
+  if (element === 'facade') return { ...base, boundary: { kind: 'outdoor' }, orientation: 'south' };
+  if (element === 'roof') return { ...base, boundary: { kind: 'outdoor' }, orientation: 'south', tiltDeg: 45 };
+  return { ...base, boundary: { kind: 'ground' }, exposedPerimeterM: 10 };
+}
+
+export function BasisopnamePanel({ section: requested, onSection, part }: BasisopnamePanelProps = {}) {
   const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
   const stored = state.project.basisopname as StoredSurvey | undefined;
@@ -754,17 +824,25 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
   };
 
   const performance = result?.performance;
-  const wizard = requested != null;
+  const embedded = part != null;
+  const wizard = requested != null && !embedded;
   const sections = SURVEY_SECTIONS.filter((name) => name !== 'zones' || kind === 'utility');
   // Rekenzones only exist in the utility survey; a residential survey opens Algemeen instead.
   const section = requested && sections.includes(requested) ? requested : wizard ? sections[0] : undefined;
-  const show = (name: SurveySection) => !wizard || section === name;
+  const show = (name: SurveySection) => embedded ? PART_SECTION[part] === name : !wizard || section === name;
+  // Question mode splits a section over several questions.
+  const showSurface = (element: unknown) => part === 'walls' ? element === 'facade'
+    : part === 'roofFloor' ? element !== 'facade' : true;
+  const heatingGenerator = !embedded || part === 'heatingGenerator';
+  const heatingRest = !embedded || part === 'heatingRest';
+  const hotWaterGenerator = !embedded || part === 'hotWaterGenerator';
+  const hotWaterRest = !embedded || part === 'hotWaterRest';
   const issueCount = (name: SurveySection) => result?.issues.filter((item) => surveySectionForPath(item.path) === name).length ?? 0;
   const goTo = (path: string) => onSection?.(surveySectionForPath(path), `basisopname.${path.replace(/^basisopname\./, '')}`);
   const position = section ? sections.indexOf(section) : -1;
   const done = result ? sections.filter((name) => name !== 'result' && issueCount(name) === 0).length : 0;
 
-  return <section className={`nta-performance opname-panel${wizard ? ' opname-wizard' : ''}`} aria-label={t('opname.title')}>
+  return <section className={`nta-performance opname-panel${wizard ? ' opname-wizard' : ''}${embedded ? ' opname-embedded' : ''}`} aria-label={t('opname.title')}>
     {wizard && <nav className="opname-progress" aria-label={t('opname.progress')}>
       <p className="opname-progress-title">{t('opname.progress')}</p>
       <div className="opname-progress-bar" role="progressbar" aria-label={t('opname.progress')}
@@ -790,8 +868,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       </ol>
     </nav>}
     <div className="opname-main">
-    <h2>{t('opname.title')} — {t(`opname.kind.${kind}`)}</h2>
-    <p className="nta-form-note">{t('opname.scope')}</p>
+    {!embedded && <h2>{t('opname.title')} — {t(`opname.kind.${kind}`)}</h2>}
+    {!embedded && <p className="nta-form-note">{t('opname.scope')}</p>}
 
     <FieldPathPrefixProvider value="basisopname">
     <div className="nta-form">
@@ -832,8 +910,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       <CalculationZoneFields draft={draft} change={change} replace={(next) => save({ kind, survey: next })} t={t} />
     </Section>}</>}
 
-    {show('envelope') && <><Section title={t('opname.envelope')}>
-      {kind === 'residential' && <label>{t('opname.buildingKind')}
+    {show('envelope') && <><Section title={part === 'walls' ? t('survey.section.walls') : part === 'roofFloor' ? t('survey.section.roofFloor') : t('opname.envelope')}>
+      {kind === 'residential' && part !== 'roofFloor' && <label>{t('opname.buildingKind')}
         <select value={typeof buildingKind === 'string' ? buildingKind : 'regular'}
           onChange={(event) => change(['envelope', 'buildingKind'], event.target.value === 'regular' ? null
             : event.target.value === 'floating' ? { kind: 'floating', newBerthSince2018: false } : { kind: event.target.value })}>
@@ -841,15 +919,21 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             <option key={key} value={key}>{t(`opname.buildingKind.${key}`)}</option>)}
         </select>
       </label>}
-      {buildingKind === 'floating' &&
+      {buildingKind === 'floating' && part !== 'roofFloor' &&
         <CheckField {...field} path={['envelope', 'buildingKind', 'newBerthSince2018']} label={t('opname.buildingKind.newBerth')} />}
       {surfaces.map((surface, index) => {
+        if (!showSurface(surface.element)) return null;
         const base: Path = ['envelope', 'surfaces', index];
         const insulation = read(draft, [...base, 'insulation', 'kind']);
+        const element = read(draft, [...base, 'element']);
         return <div key={index} className="opname-item">
           <strong>{String(surface.id ?? index)}</strong>
           <SelectField {...field} path={[...base, 'element']} label={t('opname.surface.element')}
             options={opts(t, 'opname.surface.elementKind', ['facade', 'roof', 'floor'])} />
+          {element !== 'floor' && <SelectField {...field} path={[...base, 'orientation']} label={t('opname.orientation')}
+            options={opts(t, 'opname.orientationKind', ORIENTATIONS)} />}
+          {element === 'roof' && <NumberField {...field} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />}
+          {element === 'floor' && <NumberField {...field} path={[...base, 'exposedPerimeterM']} label={t('opname.surface.perimeter')} />}
           <label>{t('opname.surface.boundary')}
             <select value={String(read(draft, [...base, 'boundary', 'kind']) ?? '')}
               onChange={(event) => change([...base, 'boundary'], { kind: event.target.value })}>
@@ -875,9 +959,28 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             <NumberField {...field} path={[...base, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
             <CheckField {...field} path={[...base, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
           </>}
+          <RemoveButton label={t('opname.remove')} onRemove={() => {
+            // Openings on the removed surface go with it: the kernel rejects an opening without its surface.
+            const id = surface.id;
+            const keep = (items: Array<Record<string, unknown>>) => items.filter((item) => item.surfaceId !== id);
+            let next = write(draft, ['envelope', 'surfaces'], surfaces.filter((_, item) => item !== index));
+            next = write(next, ['envelope', 'windows'], keep(windows));
+            next = write(next, ['envelope', 'rooflights'], keep(rooflights));
+            const doors = list(draft, ['envelope', 'doors']);
+            if (doors.length > 0) next = write(next, ['envelope', 'doors'], keep(doors));
+            save({ kind, survey: next });
+          }} />
         </div>;
       })}
-      {windows.map((window, index) => {
+      {part !== 'roofFloor' && <ListControls label={t('survey.addFacade')}
+        onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'facade')])} />}
+      {part !== 'walls' && <>
+        <ListControls label={t('survey.addRoof')}
+          onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'roof')])} />
+        <ListControls label={t('survey.addFloor')}
+          onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'floor')])} />
+      </>}
+      {part !== 'roofFloor' && windows.map((window, index) => {
         const base: Path = ['envelope', 'windows', index];
         const situation = read(draft, [...base, 'shading', 'situation']);
         return <div key={`w${index}`} className="opname-item">
@@ -910,9 +1013,10 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
           <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'windows'], windows.filter((_, item) => item !== index))} />
         </div>;
       })}
-      <ListControls label={t('opname.addWindow')}
-        onAdd={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length, String(surfaces[0]?.id ?? ''))])} />
-      {rooflights.map((rooflight, index) => {
+      {part !== 'roofFloor' && <ListControls label={t('opname.addWindow')}
+        onAdd={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length,
+          String((surfaces.find((surface) => surface.element === 'facade') ?? surfaces[0])?.id ?? ''))])} />}
+      {part !== 'walls' && rooflights.map((rooflight, index) => {
         const base: Path = ['envelope', 'rooflights', index];
         return <div key={`r${index}`} className="opname-item">
           <strong>{String(rooflight.id ?? index)}</strong>
@@ -926,17 +1030,20 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
           <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'rooflights'], rooflights.filter((_, item) => item !== index))} />
         </div>;
       })}
-      <ListControls label={t('opname.addRooflight')}
+      {part !== 'walls' && <ListControls label={t('opname.addRooflight')}
         onAdd={() => change(['envelope', 'rooflights'], [...rooflights, {
           id: `lichtkoepel-${rooflights.length + 1}`,
           surfaceId: String(surfaces.find((surface) => surface.element === 'roof')?.id ?? ''),
           areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '',
-        }])} />
+        }])} />}
     </Section></>}
 
-    {show('heating') && <><Section title={t('opname.heating')}>
-      <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} />
+    {show('heating') && <><Section title={part === 'heatingRest' ? t('survey.section.heatingRest') : t('opname.heating')}>
+      {heatingGenerator && <>
+      <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} hideKind={part === 'heatingGenerator'} />
       <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
+      </>}
+      {heatingRest && <>
       <EmitterFields draft={draft} change={change} t={t} />
       <SelectField {...field} path={['heating', 'designClass']} label={t('opname.heating.designClass')}
         options={opts(t, 'opname.heating.designClassKind', DESIGN_CLASSES)} />
@@ -953,6 +1060,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         <NumberField {...field} path={['heating', 'collective', 'connectedDwellings']} label={t('opname.connectedDwellings')} step="1" />
         <NumberField {...field} path={['heating', 'collective', 'connectedUsableAreaM2']} label={t('opname.connectedArea')} />
       </>}
+      </>}
+      {heatingGenerator && <>
       {heatingExtras.map((_, index) => <div key={index} className="opname-item">
         <strong>{t('opname.additionalGenerator')} {index + 1}</strong>
         <HeatingGeneratorFields draft={draft} path={['heating', 'additionalGenerators', index, 'generator']} change={change} t={t} />
@@ -961,12 +1070,22 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       </div>)}
       <ListControls label={t('opname.addGenerator')}
         onAdd={() => change(['heating', 'additionalGenerators'], [...heatingExtras, { generator: heatingGeneratorTemplate('boiler'), nominalPowerKw: 20 }])} />
+      </>}
     </Section></>}
 
-    {show('hotWater') && <><Section title={t('opname.hotWater')}>
-      <HotWaterGeneratorFields draft={draft} path={['hotWater', 'generator']} kind={kind} change={change} t={t} />
+    {show('hotWater') && <><Section title={part === 'hotWaterRest' ? t('survey.section.hotWaterRest') : t('opname.hotWater')}>
+      {hotWaterGenerator && <>
+      <HotWaterGeneratorFields draft={draft} path={['hotWater', 'generator']} kind={kind} change={change} t={t} hideKind={part === 'hotWaterGenerator'} />
       <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
-      {kind === 'residential' && <>
+      </>}
+      {hotWaterRest && kind === 'residential' && <>
+        <SelectField {...field} path={['hotWater', 'served']} label={t('survey.hotWater.served')}
+          options={opts(t, 'survey.hotWater.servedKind', ['kitchen_and_bathroom', 'bathroom_only', 'kitchen_only'])} />
+        <NumberField {...field} path={['hotWater', 'kitchenLengthM']} label={t('survey.hotWater.kitchenLength')} optional />
+        <NumberField {...field} path={['hotWater', 'bathroomLengthM']} label={t('survey.hotWater.bathroomLength')} optional />
+        <NumberField {...field} path={['hotWater', 'showers']} label={t('survey.hotWater.showers')} step="1" />
+        <SelectField {...field} path={['hotWater', 'showerHeatRecovery']} label={t('survey.hotWater.showerHeatRecovery')}
+          options={opts(t, 'survey.hotWater.showerHeatRecoveryKind', ['none', 'vertical', 'horizontal', 'unknown'])} />
         <label className="nta-form-check">
           <input type="checkbox" checked={read(draft, ['hotWater', 'collective']) != null}
             onChange={(event) => change(['hotWater', 'collective'], event.target.checked ? {} : null)} />
@@ -980,6 +1099,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
           <NumberField {...field} path={['hotWater', 'boilerVessel', 'manufactureYear']} label={t('opname.manufactureYear')} step="1" />
         </>}
       </>}
+      {hotWaterGenerator && <>
       {hotWaterExtras.map((_, index) => <div key={index} className="opname-item">
         <strong>{t('opname.additionalGenerator')} {index + 1}</strong>
         <HotWaterGeneratorFields draft={draft} path={['hotWater', 'additionalGenerators', index, 'generator']} kind={kind} change={change} t={t} />
@@ -988,7 +1108,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       </div>)}
       <ListControls label={t('opname.addGenerator')}
         onAdd={() => change(['hotWater', 'additionalGenerators'], [...hotWaterExtras, { generator: hotWaterGeneratorTemplate('electric_instantaneous'), nominalPowerKw: 10 }])} />
-      {solar.map((_, index) => {
+      </>}
+      {hotWaterRest && solar.map((_, index) => {
         const base: Path = ['hotWater', 'solar', index];
         return <div key={`s${index}`} className="opname-item">
           <strong>{t('opname.solar')} {index + 1}</strong>
@@ -1006,8 +1127,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
           <RemoveButton label={t('opname.remove')} onRemove={() => change(['hotWater', 'solar'], solar.filter((_, item) => item !== index))} />
         </div>;
       })}
-      <ListControls label={t('opname.addSolar')} onAdd={() => change(['hotWater', 'solar'], [...solar, solarTemplate(solar.length)])} />
-      {kind === 'utility' && hotWaterSystems.map((_, index) => {
+      {hotWaterRest && <ListControls label={t('opname.addSolar')} onAdd={() => change(['hotWater', 'solar'], [...solar, solarTemplate(solar.length)])} />}
+      {hotWaterRest && kind === 'utility' && hotWaterSystems.map((_, index) => {
         const base: Path = ['additionalHotWaterSystems', index];
         const served = list(draft, [...base, 'servedAreas']);
         return <div key={`h${index}`} className="opname-item">
@@ -1028,7 +1149,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             onRemove={() => change(['additionalHotWaterSystems'], hotWaterSystems.filter((_, item) => item !== index))} />
         </div>;
       })}
-      {kind === 'utility' && <ListControls label={t('opname.hotWater.addSystem')}
+      {hotWaterRest && kind === 'utility' && <ListControls label={t('opname.hotWater.addSystem')}
         onAdd={() => change(['additionalHotWaterSystems'], [...hotWaterSystems, {
           generator: hotWaterGeneratorTemplate('electric_instantaneous'), showerHeatRecovery: 'none',
           servedAreas: [{ function: String(read(draft, ['functions', 0, 'function']) ?? 'office'), areaM2: 0 }], sourceReference: '',
@@ -1041,6 +1162,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
     </Section>}
 
     {kind === 'residential' && <Section title={t('opname.ventilation')}>
+      <ResidentialVentilationBasics draft={draft} change={change} t={t} hidePrinciple={part === 'ventilation'} />
       <VentilationSurveyFields draft={draft} change={change} t={t} />
     </Section>}
 
@@ -1150,7 +1272,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       </div>
     </details>}
 
-    {!wizard && <div className="opname-actions">
+    {!wizard && !embedded && <div className="opname-actions">
       <button type="button" className="btn btn-primary" disabled={busy} onClick={() => { void run(); }}>{t('opname.calculate')}</button>
       <button type="button" className="btn" onClick={() => save(undefined)}>{t('opname.discard')}</button>
     </div>}
