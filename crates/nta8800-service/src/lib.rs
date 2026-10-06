@@ -2343,4 +2343,217 @@ mod tests {
             .any(|issue| issue["code"] == "system_type_required"));
         assert_eq!(result["assessment"]["calculationAvailable"], false);
     }
+
+    fn survey_1975() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-opname-1975-apartment.json"
+        ))
+        .unwrap()
+    }
+
+    /// `normVersion` is accepted by every kind of route: written into the
+    /// input's own edition, active for diagnostics, refused where it cannot
+    /// apply, and stamped on the result.
+    #[tokio::test]
+    async fn every_route_kind_takes_and_stamps_the_edition() {
+        let (status, result) = post_json(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": survey_1975(), "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["status"], "calculated_legacy_edition");
+        assert_eq!(result["normVersion"], "2024");
+        assert_eq!(result["registrationEligible"], false);
+        assert_eq!(result["performance"]["normVersion"], "2024");
+        assert!(result["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["code"] == "survey_protocol_edition_differs"));
+
+        let mut explicit = survey_1975();
+        explicit["normVersion"] = json!("2025+C1");
+        let (status, result) = post_json(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": explicit, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(result["code"], "norm_version_conflict");
+        assert_eq!(result["path"], "survey.normVersion");
+
+        let (status, result) = post_json(
+            "/v1/nta8800/demand/monthly/calculate",
+            json!({ "input": monthly_demand_sample(), "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["normVersion"], "2024");
+        assert_eq!(result["targetNormVersion"], "NTA 8800:2024 met INT-V1:2024");
+        assert_eq!(result["status"], "calculated_legacy_edition");
+
+        let input: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-constructions-synthetic.json"
+        ))
+        .unwrap();
+        let (status, result) = post_json(
+            "/v1/nta8800/constructions/calculate",
+            json!({ "input": input }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(result["normVersion"], "2025+C1");
+        assert_eq!(result["status"], "calculated_unverified");
+        let (_, result) = post_json(
+            "/v1/nta8800/constructions/calculate",
+            json!({ "input": input, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(result["normVersion"], "2024");
+        assert_eq!(result["status"], "calculated_legacy_edition");
+
+        let (status, result) = post_json(
+            "/v1/nta8800/constructions/calculate",
+            json!({ "input": input, "normVersion": "1999" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(result["code"], "invalid_norm_version");
+
+        if !nta8800_core::norm_versions::NormVersion::V2020A1.implemented() {
+            let (status, result) = post_json(
+                "/v1/nta8800/constructions/calculate",
+                json!({ "input": input, "normVersion": "2020+A1" }),
+            )
+            .await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(result["code"], "edition_not_implemented");
+        }
+
+        let (status, result) = post_json(
+            "/v1/nta8800/reference/audit",
+            json!({ "case": {}, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(result["code"], "norm_version_not_applicable");
+
+        // Relabel: both projects take the edition; the result names it.
+        let original = json!({"buildingFunction": "residential", "ntaCalculation": {},
+            "constructions": [{"rcValue": 0.4}]});
+        let mut current = original.clone();
+        current["constructions"][0]["rcValue"] = json!(3.5);
+        let (status, result) = post_json(
+            "/v1/nta8800/relabel/assess",
+            json!({ "original": original, "current": current, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["normVersion"], "2024");
+        assert_eq!(result["currentNormVersion"], "2024");
+        assert_eq!(result["allowed"], true);
+        // Without a NTA block the edition has no place.
+        let (status, result) = post_json(
+            "/v1/nta8800/relabel/assess",
+            json!({ "original": {}, "current": {}, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(result["code"], "norm_version_not_applicable");
+
+        // Maatwerkadvies: the base edition applies to every variant.
+        let building: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-building-performance-synthetic.json"
+        ))
+        .unwrap();
+        let input = json!({
+            "base": {"kind": "building", "input": building},
+            "measures": [], "packages": [],
+            "tariffs": {"gasEurPerM3": 1.4, "electricityEurPerKwh": 0.3, "sourceReference": "test"}
+        });
+        let (status, result) = post_json(
+            "/v1/nta8800/maatwerkadvies",
+            json!({ "input": input, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{result}");
+        assert_eq!(result["normVersion"], "2024");
+        assert_eq!(result["status"], "calculated_legacy_edition");
+        assert_eq!(result["registrationEligible"], false);
+    }
+
+    #[test]
+    fn every_post_operation_documents_norm_version() {
+        let document = openapi_document();
+        for op in operations::operations() {
+            if op.method != operations::Method::Post {
+                continue;
+            }
+            let schema = request_schema(op);
+            let property = &schema["properties"]["normVersion"];
+            assert_eq!(property["type"], "string", "{}", op.name);
+            assert!(property["enum"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("2024")));
+            let documented = &document["paths"][op.path]["post"]["requestBody"]["content"]
+                ["application/json"]["schema"]["properties"]["normVersion"];
+            assert_eq!(documented, property, "{}", op.name);
+        }
+    }
+
+    /// Parallel requests in different editions do not leak the edition of
+    /// one request into another: the edition is per kernel run, restored on
+    /// the blocking thread afterwards.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn parallel_requests_keep_their_own_edition() {
+        let mut tasks = Vec::new();
+        for index in 0..16 {
+            let edition = if index % 2 == 0 { "2024" } else { "2025+C1" };
+            tasks.push(tokio::spawn(async move {
+                let (status, result) = post_json(
+                    "/v1/nta8800/opname/residential",
+                    json!({ "survey": survey_1975(), "normVersion": edition }),
+                )
+                .await;
+                (edition, status, result)
+            }));
+            let monthly = if index % 2 == 0 { "2025+C1" } else { "2024" };
+            tasks.push(tokio::spawn(async move {
+                let (status, result) = post_json(
+                    "/v1/nta8800/demand/monthly/calculate",
+                    json!({ "input": monthly_demand_sample(), "normVersion": monthly }),
+                )
+                .await;
+                (monthly, status, result)
+            }));
+        }
+        let mut surveys: std::collections::HashMap<&str, Value> = Default::default();
+        for task in tasks {
+            let (edition, status, result) = task.await.unwrap();
+            assert_eq!(status, StatusCode::OK, "{result}");
+            assert_eq!(result["normVersion"], edition);
+            let legacy = edition == "2024";
+            assert_eq!(
+                result["status"],
+                if legacy {
+                    "calculated_legacy_edition"
+                } else {
+                    "calculated_unverified"
+                }
+            );
+            if let Some(performance) = result.get("performance") {
+                assert_eq!(performance["normVersion"], edition);
+                assert_eq!(performance["chapter5"].is_null(), legacy);
+                // Every run in one edition gives the same numbers.
+                let previous = surveys
+                    .entry(edition)
+                    .or_insert_with(|| performance.clone());
+                assert_eq!(previous, performance);
+            }
+        }
+        assert_eq!(surveys.len(), 2);
+        assert_ne!(surveys["2024"], surveys["2025+C1"]);
+    }
 }

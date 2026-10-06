@@ -35,10 +35,8 @@ use super::ventilation::{
     apply_passive_cooling, ExchangerAnswer, MotorAnswer, PressureClass, RecoveryLayout,
     SurveyCombined, SurveyGrilleHeatingStrips, SurveyPassiveCooling, VentilationPrinciple,
 };
-use super::{
-    loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, OpnameIssue, Recorder,
-};
-use crate::building_performance::{assess_building_performance, BuildingPerformanceInput};
+use super::{loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, Recorder};
+use crate::building_performance::assess_building_performance;
 use crate::humidification::{Humidification, Humidifier, SteamCarrier};
 use crate::label_class::LabelFunction;
 use crate::monthly_demand::UsageFunction;
@@ -746,6 +744,14 @@ fn daylight_none() -> DaylightAnswer {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UtilitySurvey {
     pub id: String,
+    /// NTA 8800 edition to calculate with; default 2025+C1:2026. The ISSO
+    /// survey protocol is always the 2025 edition, so an older edition gives
+    /// a comparison only (`survey_protocol_edition_differs`).
+    #[serde(
+        default,
+        skip_serializing_if = "crate::norm_versions::NormVersion::is_default"
+    )]
+    pub norm_version: crate::norm_versions::NormVersion,
     pub construction_year: i32,
     #[serde(default)]
     pub renovation: Option<Renovation>,
@@ -4542,23 +4548,16 @@ fn humidifier_value(survey: &UtilitySurvey, zone_id: &str) -> Option<Value> {
     }))
 }
 
-/// Survey → kernel input → building performance (utility).
+/// Survey → kernel input → building performance (utility), in the
+/// survey's edition.
 pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
+    crate::norm_versions::with_version(survey.norm_version, || assess_utility_in_edition(survey))
+}
+
+fn assess_utility_in_edition(survey: &UtilitySurvey) -> OpnameAssessment {
     let mut recorder = Recorder::default();
     let derived = derive_utility_input(survey, &mut recorder);
-    let derived_input =
-        derived.and_then(
-            |value| match serde_json::from_value::<BuildingPerformanceInput>(value) {
-                Ok(input) => Some(input),
-                Err(error) => {
-                    recorder.issues.push(OpnameIssue {
-                        code: "derived_input_shape_invalid",
-                        path: error.to_string(),
-                    });
-                    None
-                }
-            },
-        );
+    let derived_input = super::parse_derived_input(derived, survey.norm_version, &mut recorder);
     let performance = derived_input.as_ref().map(assess_building_performance);
     remap_sources(&mut recorder.applied);
     super::apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
@@ -4569,10 +4568,14 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
         None => "invalid",
     };
     super::surface_rejection(status, performance.as_ref(), &mut recorder.issues);
+    let status = super::edition_status(status, survey.norm_version, &mut recorder);
     super::refuse_non_finite(OpnameAssessment {
         status,
         scope: "isso_75_1_basisopname_utility_unverified",
         source: ISSO_UTILITY_SOURCE,
+        target_norm_version: survey.norm_version.label(),
+        norm_version: survey.norm_version,
+        registration_eligible: survey.norm_version.registration_eligible(),
         applied_defaults: recorder.applied,
         warnings: recorder.warnings,
         issues: recorder.issues,
@@ -6787,5 +6790,35 @@ mod tests {
             Some("unit closed")
         );
         assert!(recorder.warnings.is_empty());
+    }
+
+    #[test]
+    fn utility_survey_is_calculated_in_its_edition() {
+        use crate::norm_versions::NormVersion;
+        let current = assess_utility_survey(&fixture("1985"));
+        let mut survey = fixture("1985");
+        survey.norm_version = NormVersion::V2024;
+        let legacy = assess_utility_survey(&survey);
+        assert_eq!(
+            current.status, "calculated_unverified",
+            "{:?}",
+            current.issues
+        );
+        assert!(current.registration_eligible);
+        assert_eq!(
+            legacy.status, "calculated_legacy_edition",
+            "{:?}",
+            legacy.issues
+        );
+        assert_eq!(legacy.norm_version, NormVersion::V2024);
+        assert!(!legacy.registration_eligible);
+        assert!(legacy
+            .warnings
+            .iter()
+            .any(|item| item.code == "survey_protocol_edition_differs"));
+        let then = legacy.performance.as_ref().unwrap();
+        assert_eq!(then.norm_version, NormVersion::V2024);
+        assert!(current.performance.as_ref().unwrap().chapter5.is_some());
+        assert!(then.chapter5.is_none());
     }
 }

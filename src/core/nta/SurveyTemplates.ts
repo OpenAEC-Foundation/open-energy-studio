@@ -1,7 +1,7 @@
 import residentialExample from '../../../training-data/nta8800-opname-1930-terraced.json';
 import utilityExample from '../../../training-data/nta8800-opname-utility-1985-office.json';
-import type { OpnameAssessment, ResidentialSurvey, UtilitySurvey } from './KernelClient';
-import { assessResidentialSurveyWithRust, assessUtilitySurveyWithRust } from './KernelClient';
+import type { NormVersion, OpnameAssessment, ResidentialSurvey, UtilitySurvey } from './KernelClient';
+import { assessResidentialSurveyWithRust, assessUtilitySurveyWithRust, DEFAULT_NORM_VERSION } from './KernelClient';
 
 // Starting points of the ISSO 82.1 / 75.1 basisopname editor: the synthetic
 // survey fixtures of the kernel tests, edited by the adviser.
@@ -66,12 +66,22 @@ export function calculationZoneTemplate(index: number): Record<string, unknown> 
 }
 
 /** Typed views for the kernel calls; the kernel validates the content. */
-export function asResidential(stored: StoredSurvey): ResidentialSurvey {
-  return stored.survey as unknown as ResidentialSurvey;
+/**
+ * The survey in the project's NTA 8800 edition (`ntaCalculation.normVersion`):
+ * the kernel calculates it in that edition; absent is the current one. An
+ * older edition is a comparison only (the ISSO protocol is the 2025 one).
+ */
+function inEdition<T>(survey: T, edition: NormVersion | null | undefined): T {
+  const { normVersion: _stored, ...rest } = survey as T & { normVersion?: NormVersion };
+  return (edition && edition !== DEFAULT_NORM_VERSION ? { ...rest, normVersion: edition } : rest) as T;
 }
 
-export function asUtility(stored: StoredSurvey): UtilitySurvey {
-  return stored.survey as unknown as UtilitySurvey;
+export function asResidential(stored: StoredSurvey, edition?: NormVersion | null): ResidentialSurvey {
+  return inEdition(stored.survey as unknown as ResidentialSurvey, edition);
+}
+
+export function asUtility(stored: StoredSurvey, edition?: NormVersion | null): UtilitySurvey {
+  return inEdition(stored.survey as unknown as UtilitySurvey, edition);
 }
 
 /**
@@ -79,12 +89,15 @@ export function asUtility(stored: StoredSurvey): UtilitySurvey {
  * reasons in the dossier checklist (BRL 9500 Bijlage 3). `null` without a
  * survey or when the kernel cannot assess it.
  */
-export async function assessStoredSurvey(stored: StoredSurvey | undefined | null): Promise<OpnameAssessment | null> {
+export async function assessStoredSurvey(
+  stored: StoredSurvey | undefined | null,
+  edition?: NormVersion | null,
+): Promise<OpnameAssessment | null> {
   if (!stored) return null;
   try {
     return stored.kind === 'residential'
-      ? await assessResidentialSurveyWithRust(asResidential(stored))
-      : await assessUtilitySurveyWithRust(asUtility(stored));
+      ? await assessResidentialSurveyWithRust(asResidential(stored, edition))
+      : await assessUtilitySurveyWithRust(asUtility(stored, edition));
   } catch {
     return null;
   }

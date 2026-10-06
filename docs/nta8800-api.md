@@ -38,7 +38,8 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
   - `supportedNormVersions`: de bekende edities van NTA 8800 (`id`, `label`, `implemented`, `registrationEligible`, `default`, aanwijzingsperiode). Een project kiest een editie met `ntaCalculation.normVersion` (`"2024"` of `"2025+C1"`, standaard `"2025+C1"`); zie [nta8800-normversies.md](nta8800-normversies.md);
   - `buildCommit` (uit `OES_BUILD_COMMIT` tijdens het bouwen, anders `null`);
   - `buildFingerprint`, een SHA-256 over versies en bewerkingentabel. Twee builds met dezelfde vingerafdruk hebben dezelfde kern en dezelfde routes.
-- Elke rekenuitkomst bevat zelf ook `kernelVersion`, `targetNormVersion` en `inputFingerprint`; projectuitkomsten ook `normVersion` en `registrationEligible`. Een berekening in een oudere editie heeft status `calculated_legacy_edition` (HTTP 200) en is nooit registreerbaar.
+- Elke rekenuitkomst bevat zelf ook `kernelVersion`, `targetNormVersion` en `inputFingerprint`; projectuitkomsten ook `normVersion` en `registrationEligible`. Een berekening in een oudere editie heeft status `calculated_legacy_edition` (HTTP 200) en is nooit registreerbaar (uitzondering: een herlabeling in de editie van het oorspronkelijke project).
+- **Editie per verzoek.** Elke `POST`-bewerking (en elke MCP-tool) neemt naast het invoerlid het optionele lid `normVersion` (`"2020+A1"`, `"2022"`, `"2023"`, `"2024"`, `"2025+C1"`; standaard `"2025+C1"`). De service schrijft het in de eigen plek van de invoer als die ontbreekt (`ntaCalculation.normVersion`, `survey.normVersion`, `input.normVersion`, de basis van het maatwerkadvies, beide projecten bij herlabelen) en rekent de constructies en diagnoses met die editie actief. Elke uitkomst krijgt `normVersion` en `targetNormVersion`. Referentiegevallen nemen alleen `"2025+C1"`. Details en de betekenis per route: [nta8800-normversies.md](nta8800-normversies.md#uitgave-per-route).
 - `GET /health` geeft `{"status":"ok"}`.
 - `GET /v1/openapi.json` geeft het OpenAPI 3.1-document. Daarin staat per bewerking `operationId` en `x-mcp-tool` (de MCP-toolnaam).
 
@@ -47,11 +48,11 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
 | Code | Betekenis | Body |
 |---|---|---|
 | 200 | Uitkomst | het resultaat van de kern |
-| 400 | Ongeldig verzoek: geen geldige JSON, geen object, ontbrekend lid of verkeerde vorm | foutenvelop |
+| 400 | Ongeldig verzoek: geen geldige JSON, geen object, ontbrekend lid, verkeerde vorm of een `normVersion` die niet past | foutenvelop |
 | 404 / 405 | Onbekende route of verkeerde methode | foutenvelop |
 | 413 | Body groter dan de limiet | foutenvelop |
 | 415 | `Content-Type` is geen `application/json` | foutenvelop |
-| 422 | De kern weigert of kan niet afmaken (status `invalid`, `incomplete`, `derived_input_rejected`, `invalid_case`, …) | de **beoordeling zelf**, met `status`, `gaps` en `issues` |
+| 422 | De kern weigert of kan niet afmaken (status `invalid`, `incomplete`, `derived_input_rejected`, `invalid_case`, …) | de **beoordeling zelf**, met `status`, `gaps` en `issues`; bij een diagnose in een editie zonder profiel de foutenvelop `edition_not_implemented` |
 | 500 | Uitkomst achtergehouden (`non_finite_result`) of kernfout (`kernel_panic`) | foutenvelop |
 | 501 | Alleen de verouderde route `/v1/nta8800/calculate` | foutenvelop |
 
@@ -67,13 +68,13 @@ De foutenvelop:
 }
 ```
 
-`error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes: `invalid_json`, `invalid_request_shape`, `missing_request_member`, `invalid_project_shape`, `invalid_maatwerkadvies_shape`, `payload_too_large`, `unsupported_media_type`, `not_found`, `method_not_allowed`, `non_finite_result`, `kernel_panic`, `calculation_unavailable`.
+`error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes: `invalid_json`, `invalid_request_shape`, `missing_request_member`, `invalid_project_shape`, `invalid_maatwerkadvies_shape`, `invalid_norm_version` (onbekende editie; `details.supportedNormVersions`), `norm_version_conflict` (de invoer heeft al een andere editie), `norm_version_not_applicable` (geen plek voor de editie, of een referentiegeval buiten 2025+C1), `edition_not_implemented`, `payload_too_large`, `unsupported_media_type`, `not_found`, `method_not_allowed`, `non_finite_result`, `kernel_panic`, `calculation_unavailable`.
 
 Een 422 is geen fout van de client of de server, maar een rekenuitkomst: lees `gaps` (ontbrekende invoer met pad) en `issues` (strijdige invoer). De betekenis van elke code staat in de app en in [hoofdstuk 5 van de handleiding](handleiding-nta8800/05-validatie.md).
 
 ## Bewerkingen
 
-Elke `POST` verwacht een JSON-object met één lid (soms twee), genoemd in de derde kolom. `null`-leden van objecten mag je weglaten; de desktop-app doet dat ook.
+Elke `POST` verwacht een JSON-object met één lid (soms twee), genoemd in de derde kolom, plus het optionele lid `normVersion`. `null`-leden van objecten mag je weglaten; de desktop-app doet dat ook.
 
 | Route | MCP-tool | Invoerlid | Wat |
 |---|---|---|---|
