@@ -7,13 +7,16 @@ interface KernelCodeProps {
   code: string;
   /** i18n prefixes tried in order; the default covers gaps, warnings and kernel issues. */
   prefixes?: string[];
+  /** Only the translated text (question flow); the code stays as tooltip. */
+  hideCode?: boolean;
 }
 
 /** A translated kernel code with the raw code as a small reference; the bare code when untranslated. */
-export function KernelCode({ code, prefixes }: KernelCodeProps) {
+export function KernelCode({ code, prefixes, hideCode = false }: KernelCodeProps) {
   const { t } = useI18n();
   const label = kernelCodeLabel(t, code, prefixes);
   if (!label.known) return <strong className="kernel-code"><code>{code}</code></strong>;
+  if (hideCode) return <strong className="kernel-code" title={code}><span>{label.text}</span></strong>;
   return <strong className="kernel-code"><span>{label.text}</span> <code className="kernel-code-ref">{code}</code></strong>;
 }
 

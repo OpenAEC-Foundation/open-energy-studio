@@ -62,7 +62,7 @@ describe('basisopname panel', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'ground');
     await user.click(screen.getByRole('checkbox', { name: 'Meets table 9.28 (higher efficiency, shown by a test report)' }));
     await user.type(screen.getByRole('textbox', { name: 'Product (make and type)' }), 'Brine HP 6');
-    await user.type(screen.getByRole('spinbutton', { name: 'Measured COP at B0/W35' }), '4.6');
+    await user.type(screen.getByRole('spinbutton', { name: /Measured COP at B0\/W35/ }), '4.6');
     let generator = stored()!.survey.heating.generator;
     expect(generator.highEfficiencyEvidence).toMatchObject({
       productReference: 'Brine HP 6',

@@ -442,3 +442,6 @@
 }
 /* The start screen has no navigation column at any width (the narrow-window rule above must not apply). */
 .app-shell.app-shell--empty { grid-template-columns: minmax(0, 1fr); }
+/* The page itself never scrolls sideways, also not by focus() or scrollIntoView (overflow: hidden still allows that). */
+html, body { overflow: clip; }
+.app-shell { overflow: clip; }

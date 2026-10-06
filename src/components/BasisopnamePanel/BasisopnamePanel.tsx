@@ -33,6 +33,10 @@ const TABLE_9_28_CONDITIONS: Record<string, string[]> = {
   groundwater: ['w10_w45', 'w10_w35'],
   outdoor_air: ['a7_wet6_w45', 'a7_wet6_w35', 'a_minus7_wet_minus8_w45'],
 };
+/** NTA table 9.28: the COP each test point must exceed (kernel forfait_heat_pump_draft.rs). */
+const TABLE_9_28_MINIMUM: Record<string, number> = {
+  b0_w45: 3.0, b0_w35: 3.5, w10_w45: 3.75, w10_w35: 4.4, a7_wet6_w45: 2.75, a7_wet6_w35: 2.85, a_minus7_wet_minus8_w45: 1.9,
+};
 /** Test standard edition the kernel accepts for table 9.28. */
 const TABLE_9_28_TEST_STANDARD = 'NEN-EN 14511-2:2022';
 /** Classes with a design supply temperature above 70 °C: a heat pump needs a controlled declaration. */
@@ -376,7 +380,7 @@ export function defaultValueLabel(t: T, value: string, locale = 'en') {
     const key = `opname.value.${id}`;
     const text = t(key);
     const label = text === key ? id.replace(/_/g, ' ') : text;
-    return <>{label} <code className="kernel-code-ref">{value}</code></>;
+    return <span title={value}>{label}</span>;
   }
   if (locale.toLowerCase().startsWith('nl')) return dutchDefaultValue(value) ?? value;
   return value;
@@ -594,7 +598,7 @@ export function HeatingGeneratorFields({ draft, path, change, t, hideKind = fals
         options={opts(t, 'opname.heating.driveKind', ['electric', 'gas_engine', 'gas_absorption'])} />
       <SelectField {...field} onChange={changeSource} path={[...path, 'source']} label={t('opname.heating.source')}
         options={opts(t, 'opname.heating.hpSource', HEAT_PUMP_SOURCES)} />
-      <NumberField {...field} path={[...path, 'capacityKw']} label={t('opname.capacityKw')} />
+      <NumberField {...field} path={[...path, 'capacityKw']} label={`${t('opname.capacityKw')} (${t('survey.heating.capacityEmpty')})`} optional />
       <CheckField {...field} path={[...path, 'highTemperature']} label={t('opname.heating.highTemperature')} />
       {typeof source === 'string' && WATER_SOURCES.includes(source) && <>
         <label className="nta-form-check">
@@ -625,8 +629,9 @@ export function HeatingGeneratorFields({ draft, path, change, t, hideKind = fals
           <TextField {...field} path={[...evidencePath, 'testStandardEdition']} label={t('opname.heating.table928Standard')} />
           {(table928Conditions ?? []).map((condition, index) =>
             <NumberField key={condition} {...field} path={[...evidencePath, 'points', index, 'measuredCop']}
-              label={t('opname.heating.table928Cop', { condition: t(`opname.heating.table928Condition.${condition}`) })} />)}
+              label={`${t('opname.heating.table928Cop', { condition: t(`opname.heating.table928Condition.${condition}`) })} (${t('survey.heating.table928Minimum', { value: String(TABLE_9_28_MINIMUM[condition] ?? '').replace('.', ',') })})`} />)}
           <p className="nta-form-note">{t('opname.heating.table928Note')}</p>
+          <p className="nta-form-note">{t('survey.heating.table928Declaration')}</p>
         </>}
       </>}
       <p className="nta-form-note">{t('opname.heating.heatPumpNote')}</p>
@@ -1086,7 +1091,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     {show('heating') && <><Section title={part === 'heatingRest' ? t('survey.section.heatingRest') : t('opname.heating')}>
       {heatingGenerator && <>
       <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} hideKind={part === 'heatingGenerator'} />
-      <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
+      <NumberField {...field} path={['heating', 'nominalPowerKw']} label={`${t('opname.nominalPowerKw')} (${t('survey.onlyWithMoreGenerators')})`}
+        disabled={heatingExtras.length === 0} />
       </>}
       {heatingRest && <>
       <EmitterFields draft={draft} change={change} t={t} />
@@ -1136,7 +1142,10 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     {show('hotWater') && <><Section title={part === 'hotWaterRest' ? t('survey.section.hotWaterRest') : t('opname.hotWater')}>
       {hotWaterGenerator && <>
       <HotWaterGeneratorFields draft={draft} path={['hotWater', 'generator']} kind={kind} change={change} t={t} hideKind={part === 'hotWaterGenerator'} />
-      <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
+      <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={`${t('opname.nominalPowerKw')} (${t('survey.onlyWithMoreGenerators')})`}
+        disabled={hotWaterExtras.length === 0} />
+      {kind === 'residential' && read(draft, ['hotWater', 'generator', 'kind']) === 'heat_pump' &&
+        <p className="nta-form-note">{t('survey.hotWater.heatPumpVessel')}</p>}
       </>}
       {hotWaterRest && kind === 'residential' && <>
         <SelectField {...field} path={['hotWater', 'served']} label={t('survey.hotWater.served')}

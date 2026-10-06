@@ -6,7 +6,7 @@
  * with everything. The questions are the existing sub pages of Project,
  * Gebouw and Installaties; their content is unchanged.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Building2, Factory, GraduationCap, HeartPulse, Home, MoreHorizontal, ShoppingBag, Upload } from 'lucide-react';
 import '../SurveyWizard/SurveyWizard.css';
 import './BuildFlow.css';
@@ -76,6 +76,7 @@ function Indicators({ summary, t, locale }: { summary: PreviewSummary; t: T; loc
 
 function ResultCard({ t, locale }: { t: T; locale: string }) {
   const kernel = useKernel();
+  const navigate = useShellActions()?.navigate;
   const assessment = kernel?.settled ?? null;
   const summary = assessment ? summarizeForPreview(assessment) : null;
   const calculated = summary != null && projectCalculated(summary.status);
@@ -96,7 +97,10 @@ function ResultCard({ t, locale }: { t: T; locale: string }) {
       </dl>
     </> : <p className="survey-muted">{kernel?.phase === 'loading' ? t('survey.result.busy')
       : kernel?.phase === 'error' ? t('survey.result.error') : t('build.result.none')}</p>}
-    {errors > 0 && <p className="survey-issues-note">{t('survey.result.issues', { count: errors })}</p>}
+    {errors > 0 && (navigate
+      ? <button type="button" className="survey-issues-note survey-issues-link" onClick={() => navigate({ step: 'check', sub: 'overview' })}>
+        {t('survey.result.issues', { count: errors })} ›</button>
+      : <p className="survey-issues-note">{t('survey.result.issues', { count: errors })}</p>)}
     <p className="survey-muted">{t('build.result.note')}</p>
   </div>;
 }
@@ -137,6 +141,22 @@ export function BuildFlowFrame({ route, lead, toolbar, children }: {
   const question = buildQuestionOf(route, steps);
   const stepIndex = steps.findIndex((step) => step.id === route.step);
   const step = steps[stepIndex];
+  // A question left after a change counts as answered, also when left through the navigation.
+  const energy = useEnergy();
+  const dispatch = energy.dispatch;
+  const latest = useRef(energy.state.project);
+  latest.current = energy.state.project;
+  const visitedKey = step && question != null ? buildQuestionKey(step.id, question) : null;
+  useEffect(() => {
+    if (!visitedKey) return undefined;
+    const entry = latest.current;
+    return () => {
+      const now = latest.current;
+      const [stepId, ...rest] = visitedKey.split('.');
+      if (now === entry || buildQuestionState(now.workflowProgress, stepId as BuildFlowStepId, rest.join('.')) !== 'todo') return;
+      dispatch({ type: 'SET_WORKFLOW_PROGRESS', payload: markProgress(now.workflowProgress, visitedKey, 'done') });
+    };
+  }, [visitedKey, dispatch]);
   if (!step || question == null) return <>{children}</>;
 
   const questionIndex = step.questions.indexOf(question);

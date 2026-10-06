@@ -85,6 +85,8 @@ function isTextEntry(target: EventTarget | null): boolean {
 /** Commands that do not need an open document; shared by the welcome screen and the shell. */
 interface FileCommands {
   onNewProject: () => void;
+  /** A new project of a kind: existing dwelling or utility building (basisopname), or new build. */
+  onNewProjectOf: (kind: NewProjectKind) => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
   onSaveAsProject: () => void;
@@ -735,6 +737,7 @@ function AppContent() {
 
   const files = useMemo<FileCommands>(() => ({
     onNewProject: handleNewProject,
+    onNewProjectOf: handleNewProjectOf,
     onOpenProject: handleOpenProject,
     onSaveProject: handleSaveProject,
     onSaveAsProject: handleSaveAsProject,
@@ -744,7 +747,7 @@ function AppContent() {
     onCloseActiveTab: handleCloseActiveTab,
     onOpenSettings: () => setSettingsOpen(true),
     onOpenFeedback: () => setFeedbackOpen(true),
-  }), [handleNewProject, handleOpenProject, handleSaveProject, handleSaveAsProject, handleImportUNIEC3, handleImportVABI,
+  }), [handleNewProject, handleNewProjectOf, handleOpenProject, handleSaveProject, handleSaveAsProject, handleImportUNIEC3, handleImportVABI,
     handleCloseTab, handleCloseActiveTab]);
 
   // The live preview of the inspector is a per-document setting, offered in Instellingen.

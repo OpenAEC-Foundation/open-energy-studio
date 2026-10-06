@@ -178,3 +178,6 @@
   .survey-indicators { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .survey-aside { position: static; max-width: none; }
 }
+.survey-issues-link { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; font-size: var(--fs-sm); font-weight: var(--weight-semibold); }
+.survey-issues-link:hover { text-decoration: underline; }
+.survey-issues-link:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }

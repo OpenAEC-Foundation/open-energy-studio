@@ -4,7 +4,7 @@
  * later", a live provisional label, a Controle page with everything on one
  * page and a Label page. The fields themselves are the BasisopnamePanel parts.
  */
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   Ban, Building2, CircleHelp, Factory, Fan, Flame, Home, Network, Plug, Thermometer, TreePine, Wind, Zap,
 } from 'lucide-react';
@@ -217,8 +217,10 @@ function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): stri
   }
 }
 
-function ResultCard({ result, busy, error, t, locale }: {
+function ResultCard({ result, busy, error, t, locale, onIssues }: {
   result: OpnameAssessment | null; busy: boolean; error: string | null; t: T; locale: string;
+  /** Opens the list of points (Controle). */
+  onIssues?: () => void;
 }) {
   const performance = result?.performance;
   const label = performance?.indicativeLabelClass ?? null;
@@ -228,7 +230,9 @@ function ResultCard({ result, busy, error, t, locale }: {
       <span className="survey-label" style={{ background: labelColor(label) }}>{label}</span>
       <span>{t('survey.result.ep2')}<br /><strong>{formatNumber(performance?.primaryFossilIndicatorKwhPerM2Year, locale, 1)}</strong> {t('unit.kwhPerM2Year')}</span>
     </div> : <p className="survey-muted">{busy ? t('survey.result.busy') : error ? `${t('survey.result.error')} (${error})` : t('survey.result.none')}</p>}
-    {result && result.issues.length > 0 && <p className="survey-issues-note">{t('survey.result.issues', { count: result.issues.length })}</p>}
+    {result && result.issues.length > 0 && (onIssues
+      ? <button type="button" className="survey-issues-note survey-issues-link" onClick={onIssues}>{t('survey.result.issues', { count: result.issues.length })} ›</button>
+      : <p className="survey-issues-note">{t('survey.result.issues', { count: result.issues.length })}</p>)}
     <p className="survey-muted">{t('survey.result.note')}</p>
   </div>;
 }
@@ -277,7 +281,7 @@ function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
         {result.issues.map((item, index) => {
           const target = questionForPath(item.path, stored);
           return <li key={index}>
-            <span><KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} />
+            <span><KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} hideCode />
               {issueSubject(item.path, draft, t) && <span className="survey-muted"> · {issueSubject(item.path, draft, t)}</span>}</span>
             <button type="button" className="btn btn-sm" onClick={() => onGoToPath(item.path)}>
               {t('survey.check.goTo', { step: t(`survey.step.${target.step}`) })}</button>
@@ -291,7 +295,8 @@ function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
       <table>
         <thead><tr><th>{t('opname.defaults.path')}</th><th>{t('opname.defaults.value')}</th></tr></thead>
         <tbody>{result.appliedDefaults.map((item, index) => <tr key={index}>
-          <td>{defaultPathLabel(t, item.path)}</td><td>{defaultValueLabel(t, item.value, locale)}</td>
+          <td>{defaultPathLabel(t, item.path)}{issueSubject(item.path, draft, t) && <span className="survey-muted"> · {issueSubject(item.path, draft, t)}</span>}</td>
+          <td>{defaultValueLabel(t, item.value, locale)}</td>
         </tr>)}</tbody>
       </table>
     </details>}
@@ -329,6 +334,22 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
   const requestedQuestion = route.question
     ?? (stored && route.focusPath ? questionForPath(route.focusPath, stored).question : undefined);
   const questionIndex = Math.max(0, step.questions.findIndex((question) => question.id === requestedQuestion));
+  // A question left after a change counts as answered, also when left through the navigation.
+  const latest = useRef(stored);
+  latest.current = stored;
+  const visitedKey = !step.special && step.questions.length > 0
+    ? questionKey(step.id, step.questions[Math.min(questionIndex, step.questions.length - 1)].id) : null;
+  useEffect(() => {
+    if (!visitedKey || !latest.current) return undefined;
+    const entry = JSON.stringify(latest.current.survey);
+    return () => {
+      const now = latest.current;
+      if (!now || JSON.stringify(now.survey) === entry || questionState(now.progress, visitedKey) !== 'todo') return;
+      dispatch({ type: 'SET_BASISOPNAME', payload: { ...now, progress: markProgress(now.progress, visitedKey, 'done') } });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visitedKey]);
+
   const setQuestionIndex = (index: number) =>
     navigate({ step: 'survey', sub: step.id, question: step.questions[index]?.id });
 
@@ -438,7 +459,8 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
     </div>
 
     <aside className="survey-aside" aria-label={t('survey.aside')}>
-      <ResultCard result={result} busy={assessment.busy} error={assessment.error} t={t} locale={locale} />
+      <ResultCard result={result} busy={assessment.busy} error={assessment.error} t={t} locale={locale}
+        onIssues={step.special === 'check' ? undefined : () => goToStep('controle')} />
       <div className="survey-card">
         <span className="survey-overline">{t('survey.open.title')}</span>
         {open.length === 0 ? <p className="survey-done">{t('survey.open.none')}</p> : <ul className="survey-open">

@@ -173,7 +173,8 @@ describe('Dutch records and translated values', () => {
     expect(screen.getByText(/ongeïsoleerd/)).toBeInTheDocument();
     expect(screen.getByText(/nee/)).toBeInTheDocument();
     expect(screen.getByText(/hr coated double/)).toBeInTheDocument();
-    expect(screen.getByText('HrCoatedDouble')).toHaveClass('kernel-code-ref');
+    // The internal code is no longer shown as text, only as tooltip.
+    expect(screen.getByText(/hr coated double/)).toHaveAttribute('title', 'HrCoatedDouble');
     expect(screen.getByText(/2,5/)).toBeInTheDocument();
   });
 });

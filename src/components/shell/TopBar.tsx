@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { DocumentTabs } from '../DocumentTabs/DocumentTabs';
+import type { NewProjectKind } from '../WelcomeScreen/WelcomeScreen';
 import { Button, IconButton, Kbd } from '../ui';
 import { isTauri } from '@tauri-apps/api/core';
 import { version } from '../../../package.json';
@@ -30,6 +31,8 @@ const INTERACTIVE = 'button, a, input, select, textarea, [role="menu"], .documen
 export interface TopBarProps {
   hasDocument: boolean;
   onNewProject: () => void;
+  /** The "+" menu offers the four project kinds of the welcome screen. */
+  onNewProjectOf?: (kind: NewProjectKind) => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
   onSaveAsProject: () => void;
@@ -136,7 +139,8 @@ export function TopBar(props: TopBarProps) {
       </div>
 
       {props.hasDocument && (
-        <DocumentTabs onCloseTab={props.onCloseTab} onNewProject={props.onNewProject} onOpenProject={props.onOpenProject} />
+        <DocumentTabs onCloseTab={props.onCloseTab} onNewProject={props.onNewProject} onNewProjectOf={props.onNewProjectOf}
+          onOpenProject={props.onOpenProject} />
       )}
       <div className="top-bar-drag" data-tauri-drag-region />
 

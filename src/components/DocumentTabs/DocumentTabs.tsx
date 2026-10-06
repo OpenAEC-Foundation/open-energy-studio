@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n/i18n';
 import { useDocumentManager } from '../../context/EnergyContext';
 import type { DocumentEntry } from '../../context/EnergyContext';
 import './DocumentTabs.css';
+import type { NewProjectKind } from '../WelcomeScreen/WelcomeScreen';
 
 function getTabLabel(doc: DocumentEntry): string {
   if (doc.filePath) {
@@ -15,10 +16,19 @@ function getTabLabel(doc: DocumentEntry): string {
 interface DocumentTabsProps {
   onCloseTab: (id: string) => void;
   onNewProject: () => void;
+  /** With this, "+" offers the project kinds (existing dwelling first) instead of one "New". */
+  onNewProjectOf?: (kind: NewProjectKind) => void;
   onOpenProject: () => void;
 }
 
-export function DocumentTabs({ onCloseTab, onNewProject, onOpenProject }: DocumentTabsProps) {
+const NEW_KINDS: Array<{ kind: NewProjectKind; labelKey: string }> = [
+  { kind: 'existing_residential', labelKey: 'welcome.existingResidential' },
+  { kind: 'existing_utility', labelKey: 'welcome.existingUtility' },
+  { kind: 'residential', labelKey: 'welcome.newResidential' },
+  { kind: 'utility', labelKey: 'welcome.newUtility' },
+];
+
+export function DocumentTabs({ onCloseTab, onNewProject, onNewProjectOf, onOpenProject }: DocumentTabsProps) {
   const { t } = useI18n();
   const { docState, docDispatch } = useDocumentManager();
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -113,7 +123,16 @@ export function DocumentTabs({ onCloseTab, onNewProject, onOpenProject }: Docume
           className="document-tab-menu"
           style={{ left: menuPos.x, top: menuPos.y }}
         >
-          <button
+          {onNewProjectOf && NEW_KINDS.map((item) => (
+            <button key={item.kind} type="button" className="document-tab-menu-item"
+              onClick={() => { setMenuPos(null); onNewProjectOf(item.kind); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 10.5 12 3l9 7.5" /><path d="M5 9v11h14V9" />
+              </svg>
+              {t(item.labelKey)}
+            </button>
+          ))}
+          {!onNewProjectOf && <button
             className="document-tab-menu-item"
             onClick={() => { setMenuPos(null); onNewProject(); }}
           >
@@ -124,7 +143,7 @@ export function DocumentTabs({ onCloseTab, onNewProject, onOpenProject }: Docume
               <line x1="9" y1="15" x2="15" y2="15" />
             </svg>
             {t('ribbon.new')}
-          </button>
+          </button>}
           <button
             className="document-tab-menu-item"
             onClick={() => { setMenuPos(null); onOpenProject(); }}
