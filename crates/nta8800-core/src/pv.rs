@@ -120,7 +120,19 @@ impl PeakPower {
             Self::Table16_1 {
                 module_type,
                 panel_area_m2,
-            } => module_type.peak_power_w_per_m2() * round2(*panel_area_m2) / 1000.0,
+            } => module_type.peak_power_w_per_m2() * area(*panel_area_m2) / 1000.0,
+            // NTA 8800:2020+A1 (16.4) (p. 651): the measured K_pk is rounded
+            // down to a multiple of 5 W/m²; from 2022 (p. 656–657) K_pk and
+            // the area carry two decimals.
+            Self::DeclaredSpecific {
+                peak_power_w_per_m2,
+                panel_area_m2,
+            } if crate::norm_versions::profile().pv_kpk_per_m2_floor => {
+                (peak_power_w_per_m2 / PANEL_POWER_STEP_W + 1e-9).floor()
+                    * PANEL_POWER_STEP_W
+                    * panel_area_m2
+                    / 1000.0
+            }
             Self::DeclaredSpecific {
                 peak_power_w_per_m2,
                 panel_area_m2,
@@ -139,6 +151,16 @@ impl PeakPower {
 
 fn round2(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
+}
+
+/// The panel area: two decimals from NTA 8800:2022 (p. 657), as given in
+/// 2020+A1 (p. 651).
+fn area(value: f64) -> f64 {
+    if crate::norm_versions::profile().pv_kpk_per_m2_floor {
+        value
+    } else {
+        round2(value)
+    }
 }
 
 /// p. 678: a collective system on a building of which only part is assessed.
@@ -347,6 +369,10 @@ pub fn validate_pv(system: &PvSystem, path: &str) -> Vec<PvIssue> {
             }
             if *panel_count == 0 {
                 push("pv_panel_count_invalid", "peakPower.panelCount");
+            }
+            // 16.4b is not in NTA 8800:2020+A1 (p. 651).
+            if crate::norm_versions::profile().pv_kpk_per_m2_floor {
+                push("route_not_in_edition", "peakPower.panelPeakPowerW");
             }
         }
     }

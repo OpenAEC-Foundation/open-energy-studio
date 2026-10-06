@@ -20,6 +20,7 @@
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 
+mod v2020a1;
 mod v2022;
 mod v2023;
 mod v2024;
@@ -87,10 +88,7 @@ impl NormVersion {
 
     /// Whether the kernel has a profile for this edition.
     pub const fn implemented(self) -> bool {
-        matches!(
-            self,
-            NormVersion::V2022 | NormVersion::V2023 | NormVersion::V2024 | NormVersion::V2025C1
-        )
+        true
     }
 
     /// Designation period, as dates (inclusive start, exclusive end), for
@@ -107,6 +105,7 @@ impl NormVersion {
 
     pub fn profile(self) -> &'static NormProfile {
         match self {
+            NormVersion::V2020A1 => &v2020a1::PROFILE,
             NormVersion::V2022 => &v2022::PROFILE,
             NormVersion::V2023 => &v2023::PROFILE,
             NormVersion::V2024 => &v2024::PROFILE,
@@ -367,6 +366,36 @@ pub struct NormProfile {
     /// (14.15) with table 14.4: F_C from the maintenance factor MF of
     /// systems with constant-illuminance control (2022 only).
     pub lighting_maintenance_factor: bool,
+    /// (16.4): K_pk per m² rounded down to 5 W/m², without the 16.4b panel
+    /// route and without rounding the area (2020+A1 only).
+    pub pv_kpk_per_m2_floor: bool,
+    /// P.6.5.4.7 / tables 5.5–5.6: residual heat with η = 1, f_P;del;rw
+    /// 0,1, K_CO2 0,034 and f_Pren 0,9 (5.47), no f_rw;aux;spec (2020+A1).
+    pub residual_heat_fixed_factors: bool,
+    /// P.6.4 table P.0 (small systems, per connection), the small-system
+    /// auxiliary value of P.11 and the 0,009 0 cold distribution forfait.
+    pub small_system_forfait_route: bool,
+    /// P.6.5.3.2 note 2: β 0,5 for the most preferred generator when unknown.
+    pub unknown_beta_route: bool,
+    /// 9.6.8.1.1.2.1: forfait A for devices from 2015, kWh.
+    pub device_aux_a_from_2015_kwh: f64,
+    /// 9.6.8.1.1.2.1: own forfait constants for electric heat pumps
+    /// (A 43,8, B 0,132, C 0,7, B_nom 3); otherwise the device values.
+    pub heat_pump_aux_constants: bool,
+    /// (11.142) f_systype of combined system E.1 as one value (2020+A1:
+    /// 1,5); `None` splits 11.139–11.141 by area.
+    pub fan_systype_combined: Option<f64>,
+    /// Tables I.1/I.2 with columns A and B and the 0,5 W/(m·K) default for
+    /// positions without a value; 2020+A1 has one column.
+    pub psi_columns_and_default: bool,
+    /// Table I.1 detail 14 (pitched roof, party wall), Ψ column A.
+    pub psi_detail_14: f64,
+    /// 9.4.2.3/10.4.2.3: the actual pipe length is allowed for dwellings.
+    pub residential_actual_pipe_length: bool,
+    /// (13.148a): q_ve;hp;W from a quality declaration.
+    pub declared_exhaust_air_flow_route: bool,
+    /// (11.106a): cold recovery through the heat exchanger with 100 % bypass.
+    pub cold_recovery_route: bool,
 }
 
 thread_local! {

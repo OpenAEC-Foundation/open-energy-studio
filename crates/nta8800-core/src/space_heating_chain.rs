@@ -1696,8 +1696,23 @@ struct DistributionResult {
     summary: Option<DistributionSummary>,
 }
 
-fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<ChainIssue>) {
+fn validate_distribution_system(
+    system: &DistributionSystem,
+    residential: bool,
+    issues: &mut Vec<ChainIssue>,
+) {
     let path = "distributionSystem";
+    // 9.4.2.3: NTA 8800:2020+A1 (p. 292) allows the actual pipe length only
+    // for utility buildings; from 2022 (p. 294) also for dwellings.
+    if residential
+        && system.actual_pipe_length_m.is_some()
+        && !crate::norm_versions::profile().residential_actual_pipe_length
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.actualPipeLengthM"),
+        ));
+    }
     if system
         .design_temperature_class
         .is_some_and(|class| !class.in_edition())
@@ -2198,6 +2213,12 @@ pub fn other_generator_auxiliary_kwh(
 
 /// 9.85 with the forfait constants for an individual electric heat pump.
 pub fn heat_pump_forfait_auxiliary_kwh(electricity_kwh: f64) -> f64 {
+    if !crate::norm_versions::profile().heat_pump_aux_constants {
+        // NTA 8800:2020+A1 9.6.8.1.1.2.1 (p. 334–336): heat pumps take the
+        // device forfait A 87,6 kWh (build year not given: "voor 2015 of
+        // onbekend"), B 0,132 kW, C 1,44/3,6 and B_nom 24 kW.
+        return 87.6 / 12.0 + 0.132 * electricity_kwh / (1.44 / 3.6 * 24.0);
+    }
     HEAT_PUMP_AUX_A_KWH / 12.0
         + HEAT_PUMP_AUX_B_KW * electricity_kwh / (HEAT_PUMP_AUX_C * HEAT_PUMP_AUX_B_NOM_KW)
 }
@@ -2406,7 +2427,10 @@ fn assess_chain_pass(
         });
     match &input.distribution_system {
         Some(system) => {
-            validate_distribution_system(system, &mut issues);
+            let residential = std::iter::once(&input.demand)
+                .chain(input.additional_zones.iter().map(|zone| &zone.demand))
+                .all(|zone| zone.usage_function.is_residential());
+            validate_distribution_system(system, residential, &mut issues);
             if matches!(system.pump, DistributionPump::IncludedInGeneratorAuxiliary)
                 && !input.generator.auxiliary_includes_pump()
             {

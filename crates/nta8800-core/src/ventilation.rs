@@ -1701,6 +1701,13 @@ fn validate_unit(
                 "bypass_fraction_invalid",
                 format!("{rpath}.bypass.fraction"),
             )),
+            // (11.106a) is new in NTA 8800:2022 (p. 479; 2020+A1 p. 476).
+            Bypass::Full {
+                cold_recovery_evidence: Some(_),
+            } if !crate::norm_versions::profile().cold_recovery_route => issues.push(issue(
+                "route_not_in_edition",
+                format!("{rpath}.bypass.coldRecoveryEvidence"),
+            )),
             Bypass::Full {
                 cold_recovery_evidence: Some(evidence),
             } if evidence.trim().is_empty() => issues.push(issue(
@@ -3111,12 +3118,23 @@ fn fan_electricity(
             manufacture_year,
         } => {
             let sfp = specific_fan_power(*current, *manufacture_year);
-            parts(&input.system)
-                .iter()
-                .map(|part| {
-                    sfp * part.unit.variant.fan_system_factor() * required_m3_per_h * part.fraction
-                })
-                .sum::<f64>()
+            // NTA 8800:2020+A1 (11.142) (p. 495): one f_systype 1,5 for E1;
+            // from 2022 (p. 498–499) 11.139–11.141 split by area.
+            if let (VentilationSystem::Combined { .. }, Some(systype)) = (
+                &input.system,
+                crate::norm_versions::profile().fan_systype_combined,
+            ) {
+                sfp * systype * required_m3_per_h
+            } else {
+                parts(&input.system)
+                    .iter()
+                    .map(|part| {
+                        sfp * part.unit.variant.fan_system_factor()
+                            * required_m3_per_h
+                            * part.fraction
+                    })
+                    .sum::<f64>()
+            }
         }
         Fans::Declared {
             fans,
