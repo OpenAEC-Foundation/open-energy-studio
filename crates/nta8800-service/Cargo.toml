@@ -8,6 +8,7 @@ description = "HTTP API and MCP adapters for the Open Energy Studio Rust kernel"
 
 [dependencies]
 nta8800-core = { path = "../nta8800-core" }
+nta8800-operations = { path = "../nta8800-operations" }
 axum = "0.8"
 rmcp = { version = "3.5", default-features = false, features = ["server", "macros", "transport-io"] }
 serde = { version = "1", features = ["derive"] }

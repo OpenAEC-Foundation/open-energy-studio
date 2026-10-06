@@ -46,17 +46,28 @@ jobs:
       - name: Rust formatting
         run: |
           cargo fmt --manifest-path crates/nta8800-core/Cargo.toml --check
+          cargo fmt --manifest-path crates/nta8800-operations/Cargo.toml --check
           cargo fmt --manifest-path crates/nta8800-service/Cargo.toml --check
+          cargo fmt --manifest-path crates/nta8800-wasm/Cargo.toml --check
 
       - name: Core and service tests
         run: |
           cargo test --manifest-path crates/nta8800-core/Cargo.toml
+          cargo test --manifest-path crates/nta8800-operations/Cargo.toml
           cargo test --manifest-path crates/nta8800-service/Cargo.toml
+          cargo test --manifest-path crates/nta8800-wasm/Cargo.toml
 
       - name: Clippy
         run: |
           cargo clippy --manifest-path crates/nta8800-core/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/nta8800-operations/Cargo.toml --all-targets -- -D warnings
           cargo clippy --manifest-path crates/nta8800-service/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/nta8800-wasm/Cargo.toml --all-targets -- -D warnings
+
+      - name: WebAssembly kernel compiles
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build --manifest-path crates/nta8800-wasm/Cargo.toml --target wasm32-unknown-unknown --release
 
       - name: Core minimum Rust version
         run: |

@@ -1,6 +1,8 @@
 //! One registry of kernel operations shared by the HTTP API, the MCP server,
-//! the OpenAPI document and the tests. Every operation has exactly one HTTP
-//! route and one MCP tool with the same name, so the two adapters cannot drift.
+//! the WebAssembly module, the OpenAPI document and the tests. Every operation
+//! has exactly one HTTP route and one MCP tool with the same name, so the
+//! adapters cannot drift. This crate depends only on the kernel and serde, so
+//! it compiles for `wasm32-unknown-unknown` as well as for the servers.
 
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};

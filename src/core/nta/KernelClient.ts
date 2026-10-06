@@ -1,5 +1,5 @@
 import { regenerateTemplatePatches, type LegacyTemplate, type MwaMeasureTemplate } from './MwaTemplates';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { kernelCall, kernelGet } from './kernelTransport';
 import type { IProject, INtaHeatPumpInput } from '../energy/types';
 import { kernelProject } from './KernelInput';
 
@@ -186,18 +186,7 @@ export interface DeclaredHeatingTableAssessment {
 }
 
 export async function diagnoseDeclaredHeatingTableWithRust(input: DeclaredHeatingTableInput): Promise<DeclaredHeatingTableAssessment> {
-  if (isTauri()) {
-    return invoke<DeclaredHeatingTableAssessment>('diagnose_declared_heating_table', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/declared-heating-table/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<DeclaredHeatingTableAssessment>;
-  }
-  throw new Error('Rust table diagnostics are available in the desktop app and local development server.');
+  return kernelCall<DeclaredHeatingTableAssessment>('diagnose_declared_heating_table', '/api/v1/nta8800/heat-pumps/declared-heating-table/diagnose', { input });
 }
 
 export interface DeclaredDhwAssessment {
@@ -224,18 +213,7 @@ export interface DeclaredDhwAssessment {
 }
 
 export async function diagnoseDeclaredDhwWithRust(input: INtaHeatPumpInput): Promise<DeclaredDhwAssessment> {
-  if (isTauri()) {
-    return invoke<DeclaredDhwAssessment>('diagnose_declared_dhw', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/declared-dhw/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<DeclaredDhwAssessment>;
-  }
-  throw new Error('Rust declaration diagnostics are available in the desktop app and local development server.');
+  return kernelCall<DeclaredDhwAssessment>('diagnose_declared_dhw', '/api/v1/nta8800/heat-pumps/declared-dhw/diagnose', { input });
 }
 
 export interface FinalEnergyDraftInput {
@@ -274,18 +252,7 @@ export interface FinalEnergyDraftAssessment {
 }
 
 export async function diagnoseFinalEnergyDraftWithRust(input: FinalEnergyDraftInput): Promise<FinalEnergyDraftAssessment> {
-  if (isTauri()) {
-    return invoke<FinalEnergyDraftAssessment>('diagnose_final_energy_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/energy/final-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<FinalEnergyDraftAssessment>;
-  }
-  throw new Error('Rust draft energy diagnostics are available in the desktop app and local development server.');
+  return kernelCall<FinalEnergyDraftAssessment>('diagnose_final_energy_draft', '/api/v1/nta8800/energy/final-draft/diagnose', { input });
 }
 
 export interface EpusDraftMonthlyUse {
@@ -341,18 +308,7 @@ export interface EpusDraftAssessment {
 }
 
 export async function diagnoseEpusDraftWithRust(input: EpusDraftInput): Promise<EpusDraftAssessment> {
-  if (isTauri()) {
-    return invoke<EpusDraftAssessment>('diagnose_epus_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/energy/epus-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<EpusDraftAssessment>;
-  }
-  throw new Error('Rust draft energy diagnostics are available in the desktop app and local development server.');
+  return kernelCall<EpusDraftAssessment>('diagnose_epus_draft', '/api/v1/nta8800/energy/epus-draft/diagnose', { input });
 }
 
 export type NtaOrientation =
@@ -752,18 +708,7 @@ export interface MonthlyDemandAssessment {
 }
 
 export async function calculateMonthlyDemandWithRust(input: MonthlyDemandInput): Promise<MonthlyDemandAssessment> {
-  if (isTauri()) {
-    return invoke<MonthlyDemandAssessment>('calculate_monthly_demand', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/demand/monthly/calculate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<MonthlyDemandAssessment>;
-  }
-  throw new Error('Rust demand calculation is available in the desktop app and local development server.');
+  return kernelCall<MonthlyDemandAssessment>('calculate_monthly_demand', '/api/v1/nta8800/demand/monthly/calculate', { input });
 }
 
 export interface BacsDraftInput {
@@ -816,18 +761,7 @@ export interface BacsDraftAssessment {
 }
 
 export async function diagnoseBacsDraftWithRust(input: BacsDraftInput): Promise<BacsDraftAssessment> {
-  if (isTauri()) {
-    return invoke<BacsDraftAssessment>('diagnose_bacs_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/energy/bacs-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<BacsDraftAssessment>;
-  }
-  throw new Error('Rust draft BACS diagnostics are available in the desktop app and local development server.');
+  return kernelCall<BacsDraftAssessment>('diagnose_bacs_draft', '/api/v1/nta8800/energy/bacs-draft/diagnose', { input });
 }
 
 export interface IndicatorsDraftInput {
@@ -867,18 +801,7 @@ export interface IndicatorsDraftAssessment {
 }
 
 export async function diagnoseIndicatorsDraftWithRust(input: IndicatorsDraftInput): Promise<IndicatorsDraftAssessment> {
-  if (isTauri()) {
-    return invoke<IndicatorsDraftAssessment>('diagnose_indicators_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/energy/indicators-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<IndicatorsDraftAssessment>;
-  }
-  throw new Error('Rust draft indicator diagnostics are available in the desktop app and local development server.');
+  return kernelCall<IndicatorsDraftAssessment>('diagnose_indicators_draft', '/api/v1/nta8800/energy/indicators-draft/diagnose', { input });
 }
 
 export interface HeatingAuxDraftInput {
@@ -914,18 +837,7 @@ export interface HeatingAuxDraftAssessment {
 }
 
 export async function diagnoseHeatingAuxDraftWithRust(input: HeatingAuxDraftInput): Promise<HeatingAuxDraftAssessment> {
-  if (isTauri()) {
-    return invoke<HeatingAuxDraftAssessment>('diagnose_heating_aux_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/heating-aux-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<HeatingAuxDraftAssessment>;
-  }
-  throw new Error('Rust draft heat-pump auxiliary diagnostics are available in the desktop app and local development server.');
+  return kernelCall<HeatingAuxDraftAssessment>('diagnose_heating_aux_draft', '/api/v1/nta8800/heat-pumps/heating-aux-draft/diagnose', { input });
 }
 
 export interface HeatingAuxMeasuredDraftInput extends Omit<HeatingAuxDraftInput, 'coefficients'> {
@@ -1006,18 +918,7 @@ export interface ForfaitHeatPumpDraftAssessment {
 }
 
 export async function diagnoseForfaitHeatPumpDraftWithRust(input: ForfaitHeatPumpDraftInput): Promise<ForfaitHeatPumpDraftAssessment> {
-  if (isTauri()) {
-    return invoke<ForfaitHeatPumpDraftAssessment>('diagnose_forfait_heat_pump_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/forfait-cop-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<ForfaitHeatPumpDraftAssessment>;
-  }
-  throw new Error('Rust draft heat-pump forfait diagnostics are available in the desktop app and local development server.');
+  return kernelCall<ForfaitHeatPumpDraftAssessment>('diagnose_forfait_heat_pump_draft', '/api/v1/nta8800/heat-pumps/forfait-cop-draft/diagnose', { input });
 }
 
 export interface GasHeatPumpForfaitDraftInput {
@@ -1056,15 +957,7 @@ export interface GasHeatPumpForfaitDraftAssessment {
 }
 
 export async function diagnoseGasHeatPumpForfaitDraftWithRust(input: GasHeatPumpForfaitDraftInput): Promise<GasHeatPumpForfaitDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpForfaitDraftAssessment>('diagnose_gas_heat_pump_forfait_draft', { input });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/gas-forfait-cop-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    if (!response.ok) throw new Error(`Gas heat pump diagnostic: HTTP ${response.status}`);
-    return response.json() as Promise<GasHeatPumpForfaitDraftAssessment>;
-  }
-  throw new Error('Rust gas heat-pump diagnostics are available in the desktop app and local development server.');
+  return kernelCall<GasHeatPumpForfaitDraftAssessment>('diagnose_gas_heat_pump_forfait_draft', '/api/v1/nta8800/heat-pumps/gas-forfait-cop-draft/diagnose', { input });
 }
 
 export interface GasHeatPumpAuxDraftInput {
@@ -1104,16 +997,7 @@ export interface GasHeatPumpAuxDraftAssessment {
 }
 
 export async function diagnoseGasHeatPumpAuxDraftWithRust(input: GasHeatPumpAuxDraftInput): Promise<GasHeatPumpAuxDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpAuxDraftAssessment>('diagnose_gas_heat_pump_aux_draft', { input });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/gas-aux-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    const assessment = await response.json() as GasHeatPumpAuxDraftAssessment;
-    if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas auxiliary diagnostic: HTTP ${response.status}`);
-    return assessment;
-  }
-  throw new Error('Rust gas auxiliary diagnostics are available in the desktop app and local development server.');
+  return kernelCall<GasHeatPumpAuxDraftAssessment>('diagnose_gas_heat_pump_aux_draft', '/api/v1/nta8800/heat-pumps/gas-aux-draft/diagnose', { input });
 }
 
 export interface GasHeatPumpMonthlyDraftInput {
@@ -1153,16 +1037,7 @@ export interface GasHeatPumpMonthlyDraftAssessment {
 }
 
 export async function diagnoseGasHeatPumpMonthlyDraftWithRust(input: GasHeatPumpMonthlyDraftInput): Promise<GasHeatPumpMonthlyDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpMonthlyDraftAssessment>('diagnose_gas_heat_pump_monthly_draft', { input });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/gas-forfait-monthly-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    const assessment = await response.json() as GasHeatPumpMonthlyDraftAssessment;
-    if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas monthly diagnostic: HTTP ${response.status}`);
-    return assessment;
-  }
-  throw new Error('Rust gas monthly diagnostics are available in the desktop app and local development server.');
+  return kernelCall<GasHeatPumpMonthlyDraftAssessment>('diagnose_gas_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/gas-forfait-monthly-draft/diagnose', { input });
 }
 
 export interface GasHeatPumpChainDraftInput {
@@ -1196,16 +1071,7 @@ export interface GasHeatPumpChainDraftAssessment {
 }
 
 export async function diagnoseGasHeatPumpChainDraftWithRust(input: GasHeatPumpChainDraftInput): Promise<GasHeatPumpChainDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpChainDraftAssessment>('diagnose_gas_heat_pump_chain_draft', { input });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/gas-chain-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    const assessment = await response.json() as GasHeatPumpChainDraftAssessment;
-    if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas chain diagnostic: HTTP ${response.status}`);
-    return assessment;
-  }
-  throw new Error('Rust gas chain diagnostics are available in the desktop app and local development server.');
+  return kernelCall<GasHeatPumpChainDraftAssessment>('diagnose_gas_heat_pump_chain_draft', '/api/v1/nta8800/heat-pumps/gas-chain-draft/diagnose', { input });
 }
 
 export type GasCollectiveSourceTemperatureClass = 'below20_c' | 'at_least20_c' | 'unknown';
@@ -1239,16 +1105,7 @@ export interface GasCollectiveSourceDraftAssessment {
 }
 
 export async function diagnoseGasCollectiveSourceDraftWithRust(input: GasCollectiveSourceDraftInput): Promise<GasCollectiveSourceDraftAssessment> {
-  if (isTauri()) return invoke<GasCollectiveSourceDraftAssessment>('diagnose_gas_collective_source_draft', { input });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/gas-collective-source-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    const assessment = await response.json() as GasCollectiveSourceDraftAssessment;
-    if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas collective source diagnostic: HTTP ${response.status}`);
-    return assessment;
-  }
-  throw new Error('Rust gas collective source diagnostics are available in the desktop app and local development server.');
+  return kernelCall<GasCollectiveSourceDraftAssessment>('diagnose_gas_collective_source_draft', '/api/v1/nta8800/heat-pumps/gas-collective-source-draft/diagnose', { input });
 }
 
 export type GasChainDiagnosticMetric = 'equation962_unallocated_input_term'
@@ -1294,23 +1151,7 @@ export interface GasChainDiagnosticComparison {
 export async function compareGasHeatPumpChainDiagnosticWithRust(
   caseInput: GasChainDiagnosticCase,
 ): Promise<GasChainDiagnosticComparison> {
-  if (isTauri()) return invoke<GasChainDiagnosticComparison>('compare_gas_heat_pump_chain_diagnostic', { case: caseInput });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/reference/gas-chain-diagnostic/compare', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ case: caseInput }),
-    });
-    const body = await response.text();
-    let parsed: unknown;
-    try { parsed = JSON.parse(body); } catch { throw new Error(`Gas reference comparison: HTTP ${response.status}: ${body}`); }
-    if (!parsed || typeof parsed !== 'object' || !('status' in parsed)) {
-      const problem = parsed as { error?: string; message?: string } | null;
-      throw new Error(problem?.message ?? problem?.error ?? `Gas reference comparison: HTTP ${response.status}`);
-    }
-    const assessment = parsed as GasChainDiagnosticComparison;
-    if (!response.ok && assessment.status !== 'invalid_case') throw new Error(`Gas reference comparison: HTTP ${response.status}`);
-    return assessment;
-  }
-  throw new Error('Rust gas reference comparisons are available in the desktop app and local development server.');
+  return kernelCall<GasChainDiagnosticComparison>('compare_gas_heat_pump_chain_diagnostic', '/api/v1/nta8800/reference/gas-chain-diagnostic/compare', { case: caseInput });
 }
 
 export interface ForfaitHeatPumpMonthlyDraftInput {
@@ -1350,18 +1191,7 @@ export interface ForfaitHeatPumpMonthlyDraftAssessment {
 export async function diagnoseForfaitHeatPumpMonthlyDraftWithRust(
   input: ForfaitHeatPumpMonthlyDraftInput,
 ): Promise<ForfaitHeatPumpMonthlyDraftAssessment> {
-  if (isTauri()) {
-    return invoke<ForfaitHeatPumpMonthlyDraftAssessment>('diagnose_forfait_heat_pump_monthly_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/forfait-monthly-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<ForfaitHeatPumpMonthlyDraftAssessment>;
-  }
-  throw new Error('Rust draft monthly heat-pump diagnostics are available in the desktop app and local development server.');
+  return kernelCall<ForfaitHeatPumpMonthlyDraftAssessment>('diagnose_forfait_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/forfait-monthly-draft/diagnose', { input });
 }
 
 export type NtaDispatchDesignContext = 'new_build' | 'existing' | 'existing_added_preferred';
@@ -1413,16 +1243,7 @@ export interface GeneratorDispatchDraftAssessment {
 export async function diagnoseGeneratorDispatchDraftWithRust(
   input: GeneratorDispatchDraftInput,
 ): Promise<GeneratorDispatchDraftAssessment> {
-  if (isTauri()) {
-    return invoke<GeneratorDispatchDraftAssessment>('diagnose_generator_dispatch_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heating/generator-dispatch-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<GeneratorDispatchDraftAssessment>;
-  }
-  throw new Error('Rust draft generator dispatch is available in the desktop app and local development server.');
+  return kernelCall<GeneratorDispatchDraftAssessment>('diagnose_generator_dispatch_draft', '/api/v1/nta8800/heating/generator-dispatch-draft/diagnose', { input });
 }
 
 export interface BoilerForfaitDraftInput {
@@ -1462,14 +1283,7 @@ export interface BoilerForfaitMonthlyDraftAssessment {
 }
 
 export async function diagnoseBoilerForfaitDraftWithRust(input: BoilerForfaitDraftInput): Promise<BoilerForfaitDraftAssessment> {
-  if (isTauri()) return invoke<BoilerForfaitDraftAssessment>('diagnose_boiler_forfait_draft', { input });
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/boilers/forfait-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<BoilerForfaitDraftAssessment>;
-  }
-  throw new Error('Rust draft boiler diagnostics are available in the desktop app and local development server.');
+  return kernelCall<BoilerForfaitDraftAssessment>('diagnose_boiler_forfait_draft', '/api/v1/nta8800/boilers/forfait-draft/diagnose', { input });
 }
 
 export interface HybridHeatPumpMonthlyDraftInput {
@@ -1504,16 +1318,7 @@ export interface HybridHeatPumpMonthlyDraftAssessment {
 export async function diagnoseHybridHeatPumpMonthlyDraftWithRust(
   input: HybridHeatPumpMonthlyDraftInput,
 ): Promise<HybridHeatPumpMonthlyDraftAssessment> {
-  if (isTauri()) {
-    return invoke<HybridHeatPumpMonthlyDraftAssessment>('diagnose_hybrid_heat_pump_monthly_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/hybrid-monthly-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<HybridHeatPumpMonthlyDraftAssessment>;
-  }
-  throw new Error('Rust draft hybrid heat-pump diagnostics are available in the desktop app and local development server.');
+  return kernelCall<HybridHeatPumpMonthlyDraftAssessment>('diagnose_hybrid_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/hybrid-monthly-draft/diagnose', { input });
 }
 
 export interface HeatingAuxMeasuredDraftAssessment {
@@ -1534,42 +1339,12 @@ export interface HeatingAuxMeasuredDraftAssessment {
 }
 
 export async function diagnoseHeatingAuxMeasuredDraftWithRust(input: HeatingAuxMeasuredDraftInput): Promise<HeatingAuxMeasuredDraftAssessment> {
-  if (isTauri()) {
-    return invoke<HeatingAuxMeasuredDraftAssessment>('diagnose_heating_aux_measured_draft', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heat-pumps/heating-aux-measured-draft/diagnose', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<HeatingAuxMeasuredDraftAssessment>;
-  }
-  throw new Error('Rust draft heat-pump measurement diagnostics are available in the desktop app and local development server.');
+  return kernelCall<HeatingAuxMeasuredDraftAssessment>('diagnose_heating_aux_measured_draft', '/api/v1/nta8800/heat-pumps/heating-aux-measured-draft/diagnose', { input });
 }
 
 export async function assessProjectWithRust(input: IProject): Promise<KernelAssessment> {
   const project = kernelProject(input);
-  if (isTauri()) {
-    return invoke<KernelAssessment>('validate_nta_project', { project });
-  }
-
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/validate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ project }),
-    });
-    if (!response.ok) {
-      const body: unknown = await response.json().catch(() => null);
-      const detail = body && typeof body === 'object' && 'message' in body
-        && typeof body.message === 'string' ? `: ${body.message}` : '';
-      throw new Error(`Rust API: HTTP ${response.status}${detail}`);
-    }
-    return response.json() as Promise<KernelAssessment>;
-  }
-
-  throw new Error('Rust validation is available in the desktop app and local development server.');
+  return kernelCall<KernelAssessment>('validate_nta_project', '/api/v1/nta8800/validate', { project });
 }
 
 export interface SpaceHeatingChainZone {
@@ -2282,18 +2057,7 @@ export interface EnvelopeAssessment {
 }
 
 export async function calculateConstructionsWithRust(input: EnvelopeInput): Promise<EnvelopeAssessment> {
-  if (isTauri()) {
-    return invoke<EnvelopeAssessment>('calculate_constructions', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/constructions/calculate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<EnvelopeAssessment>;
-  }
-  throw new Error('Rust construction calculation is available in the desktop app and local development server.');
+  return kernelCall<EnvelopeAssessment>('calculate_constructions', '/api/v1/nta8800/constructions/calculate', { input });
 }
 
 export type VentilationSystemVariant =
@@ -2500,18 +2264,7 @@ export interface VentilationAssessment {
 }
 
 export async function calculateVentilationWithRust(input: VentilationInput): Promise<VentilationAssessment> {
-  if (isTauri()) {
-    return invoke<VentilationAssessment>('calculate_ventilation', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/ventilation/calculate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<VentilationAssessment>;
-  }
-  throw new Error('Rust ventilation calculation is available in the desktop app and local development server.');
+  return kernelCall<VentilationAssessment>('calculate_ventilation', '/api/v1/nta8800/ventilation/calculate', { input });
 }
 
 /** ISSO 82.1 basic survey of an existing dwelling; see docs/nta8800-basisopname.md. */
@@ -2794,18 +2547,7 @@ export interface OpnameAssessment {
 }
 
 export async function assessResidentialSurveyWithRust(survey: ResidentialSurvey): Promise<OpnameAssessment> {
-  if (isTauri()) {
-    return invoke<OpnameAssessment>('assess_residential_survey', { survey });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/opname/residential', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ survey }),
-    });
-    return response.json() as Promise<OpnameAssessment>;
-  }
-  throw new Error('Rust basic survey is available in the desktop app and local development server.');
+  return kernelCall<OpnameAssessment>('assess_residential_survey', '/api/v1/nta8800/opname/residential', { survey });
 }
 
 /** ISSO 75.1 basic survey of an existing utility building (one calculation zone). */
@@ -3021,33 +2763,11 @@ export interface OpnameGasEngine {
 }
 
 export async function assessUtilitySurveyWithRust(survey: UtilitySurvey): Promise<OpnameAssessment> {
-  if (isTauri()) {
-    return invoke<OpnameAssessment>('assess_utility_survey', { survey });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/opname/utility', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ survey }),
-    });
-    return response.json() as Promise<OpnameAssessment>;
-  }
-  throw new Error('Rust basic survey is available in the desktop app and local development server.');
+  return kernelCall<OpnameAssessment>('assess_utility_survey', '/api/v1/nta8800/opname/utility', { survey });
 }
 
 export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
-  if (isTauri()) {
-    return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/heating/space-heating-chain/calculate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<SpaceHeatingChainAssessment>;
-  }
-  throw new Error('Rust heating chain calculation is available in the desktop app and local development server.');
+  return kernelCall<SpaceHeatingChainAssessment>('calculate_space_heating_chain', '/api/v1/nta8800/heating/space-heating-chain/calculate', { input });
 }
 
 /** Table 5.2/5.5 carriers delivered to the generators of a collective system. */
@@ -4080,14 +3800,11 @@ export interface NtaInterpretationGroup {
 
 /** The kernel's interpretation lists (crates/nta8800-core/src/interpretations.rs). */
 export async function fetchKernelInterpretations(): Promise<NtaInterpretationGroup[]> {
-  if (isTauri()) {
-    return invoke<NtaInterpretationGroup[]>('kernel_interpretations');
+  try {
+    return await kernelGet<NtaInterpretationGroup[]>('kernel_interpretations', '/api/v1/nta8800/interpretations');
+  } catch {
+    return [];
   }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/interpretations');
-    return response.json() as Promise<NtaInterpretationGroup[]>;
-  }
-  return [];
 }
 
 export interface BuildingPerformanceAssessment {
@@ -4174,18 +3891,7 @@ export interface BuildingPerformanceAssessment {
 }
 
 export async function calculateBuildingPerformanceWithRust(input: BuildingPerformanceInput): Promise<BuildingPerformanceAssessment> {
-  if (isTauri()) {
-    return invoke<BuildingPerformanceAssessment>('calculate_building_performance', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/performance/calculate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    return response.json() as Promise<BuildingPerformanceAssessment>;
-  }
-  throw new Error('Rust performance calculation is available in the desktop app and local development server.');
+  return kernelCall<BuildingPerformanceAssessment>('calculate_building_performance', '/api/v1/nta8800/performance/calculate', { input });
 }
 
 export interface NtaProjectHeatingSystem {
@@ -4548,19 +4254,7 @@ export interface RelabelAssessment {
 }
 
 export async function assessRelabelWithRust(original: unknown, current: unknown): Promise<RelabelAssessment> {
-  if (isTauri()) {
-    return invoke<RelabelAssessment>('assess_relabel', { original, current });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/relabel/assess', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ original, current }),
-    });
-    if (!response.ok) throw new Error(`Rust API: HTTP ${response.status}`);
-    return response.json() as Promise<RelabelAssessment>;
-  }
-  throw new Error('Relabel classification is available in the desktop app and local development server.');
+  return kernelCall<RelabelAssessment>('assess_relabel', '/api/v1/nta8800/relabel/assess', { original, current });
 }
 
 // ------------------------------------------------------------------
@@ -4871,20 +4565,7 @@ export function buildMaatwerkadviesInput(project: IProject, definition: NtaMaatw
 
 export async function assessMaatwerkadviesWithRust(project: IProject, definition: NtaMaatwerkadvies): Promise<MaatwerkadviesAssessment> {
   const input = buildMaatwerkadviesInput(project, definition);
-  if (isTauri()) {
-    return invoke<MaatwerkadviesAssessment>('assess_maatwerkadvies', { input });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/maatwerkadvies', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
-    });
-    const body = await response.json() as MaatwerkadviesAssessment & { error?: string; message?: string };
-    if (body.error) throw new Error(`${body.error}: ${body.message ?? ''}`);
-    return body;
-  }
-  throw new Error('Maatwerkadvies is available in the desktop app and local development server.');
+  return kernelCall<MaatwerkadviesAssessment>('assess_maatwerkadvies', '/api/v1/nta8800/maatwerkadvies', { input });
 }
 
 export interface RegistrationAssessment {
@@ -4993,18 +4674,7 @@ export interface LabelData {
 
 export async function calculateProjectPerformanceWithRust(input: IProject): Promise<ProjectPerformanceAssessment> {
   const project = kernelProject(input);
-  if (isTauri()) {
-    return invoke<ProjectPerformanceAssessment>('calculate_project_performance', { project });
-  }
-  if (import.meta.env.DEV) {
-    const response = await fetch('/api/v1/nta8800/project/performance', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ project }),
-    });
-    return response.json() as Promise<ProjectPerformanceAssessment>;
-  }
-  throw new Error('Rust project calculation is available in the desktop app and local development server.');
+  return kernelCall<ProjectPerformanceAssessment>('calculate_project_performance', '/api/v1/nta8800/project/performance', { project });
 }
 
 /** Chapter 13 result; see crates/nta8800-core/src/domestic_hot_water.rs. */

@@ -1334,6 +1334,8 @@ export const nl: Record<string, string> = {
   'nta.gap.direct_transmission_unresolved': 'Transmissie naar buiten niet af te leiden (begrenzing, koudebrugclassificatie of puntbruginventaris)',
   'nta.gap.unheated_transmission_unresolved': 'Transmissie via onverwarmde ruimte niet af te leiden',
   'nta.gap.project_shape_invalid': 'Projectstructuur ongeldig',
+  'nta.gap.unknown_operation': 'Onbekende kernoperatie',
+  'nta.gap.invalid_json': 'Ongeldige JSON in de aanvraag',
   'nta.gap.survey_shape_invalid': 'Opnamestructuur van het referentiegeval ongeldig',
   'nta.gap.survey_calculation_unavailable': 'Opname van het referentiegeval geeft geen volledige berekening',
   'nta.gap.calculation_input_ambiguous': 'Referentiegeval bevat zowel een project als een opname; kies één invoer',

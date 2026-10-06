@@ -1,0 +1,14 @@
+[package]
+name = "nta8800-operations"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "LGPL-3.0-or-later"
+description = "Transport-independent registry of the Open Energy Studio kernel operations, shared by the HTTP API, the MCP server and the WebAssembly module"
+
+[dependencies]
+nta8800-core = { path = "../nta8800-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_path_to_error = "0.1"
+sha2 = "0.10"

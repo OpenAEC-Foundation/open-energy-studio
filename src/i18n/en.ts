@@ -1334,6 +1334,8 @@ export const en: Record<string, string> = {
   'nta.gap.direct_transmission_unresolved': 'Outdoor transmission cannot be derived (boundary, bridge classification or point bridge inventory)',
   'nta.gap.unheated_transmission_unresolved': 'Transmission via unheated space cannot be derived',
   'nta.gap.project_shape_invalid': 'Project structure invalid',
+  'nta.gap.unknown_operation': 'Unknown kernel operation',
+  'nta.gap.invalid_json': 'Invalid JSON in the request',
   'nta.gap.survey_shape_invalid': 'Survey structure of the reference case invalid',
   'nta.gap.survey_calculation_unavailable': 'Survey of the reference case does not yield a complete calculation',
   'nta.gap.calculation_input_ambiguous': 'Reference case carries both a project and a survey; choose one input',

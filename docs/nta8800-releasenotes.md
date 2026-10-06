@@ -2,6 +2,15 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 5 oktober 2026 — rekenkern in de browser via WebAssembly (geen rekenwijziging)
+
+Rekenuitkomsten veranderen niet. De webversie rekent nu met dezelfde Rust-kern als de desktop-app en de HTTP-API, in de browser zelf.
+- **Nieuwe crates** `nta8800-operations` (het operatieregister, losgemaakt van de servicecrate) en `nta8800-wasm` (de WebAssembly-adapter met `run`, `version` en `list_operations`).
+- **Eén aanroeplaag** in de UI, `kernelTransport.ts`: desktop-app via Tauri, browser via wasm, ontwikkelserver via de `/api`-proxy.
+- **Gebouwd pakket** in `src/kernel-wasm/` (`npm run build:wasm`); het wasm-bestand van circa 8,5 MB laadt bij de eerste kernaanroep.
+- **Referentiegate** accepteert een basisopname als invoer; `scripts/edr-manifests.js` maakt manifesten uit de EDR-testen van ISSO 54 (zie het referentieprotocol).
+- Uitleg in [nta8800-wasm.md](nta8800-wasm.md).
+
 ## 5 oktober 2026 — UI-herontwerp, fase F10: thema's, toegankelijkheid, vertaling en afronding (geen rekenwijziging)
 
 Rekenuitkomsten veranderen niet; opgeslagen projecten openen ongewijzigd. Het UI-herontwerp is hiermee afgerond.

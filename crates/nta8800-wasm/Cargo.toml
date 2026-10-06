@@ -1,0 +1,21 @@
+[package]
+name = "nta8800-wasm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "LGPL-3.0-or-later"
+description = "WebAssembly adapter for the Open Energy Studio NTA 8800 kernel: the same operation registry as the HTTP API and the MCP server, running in the browser"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+nta8800-core = { path = "../nta8800-core" }
+nta8800-operations = { path = "../nta8800-operations" }
+serde_json = "1"
+wasm-bindgen = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
