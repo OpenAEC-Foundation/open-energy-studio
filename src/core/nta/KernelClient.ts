@@ -1593,6 +1593,8 @@ export interface SpaceHeatingChainInput {
     balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
     control: 'main_room_thermostat' | 'central_with_room_valves' | 'individual_room_thermostats' | 'other_or_unknown';
     sourceReference: string;
+    /** NTA 8800:2023 tables 9.2–9.10 only; without it a 2023 run takes the unknown values of that edition. */
+    edition2023?: NtaHeatingEmission2023 | null;
     /** Room fans (9.21/9.22, table 9.11); required for fan-assisted emitters. */
     fans?: {
       kind: 'fan_convector' | 'electric_heating' | 'dynamic_storage' | 'unknown';
@@ -1976,6 +1978,46 @@ export type NtaPipeTransmittance =
       surfaceCoefficientWPerM2K?: number | null;
     };
 
+/** NTA 8800:2023 9.3.2–9.3.3 (p. 273–285): the heating emission in that edition's terms. */
+export interface NtaHeatingEmission2023 {
+  kind:
+    | { type: 'radiators'; control: 'central' | 'room';
+        overTemperature: 'mechanical_ventilation' | 'fan_assisted' | 'local_heater' | 'two_pipe60_k_or_unknown' | 'two_pipe42_k'
+          | 'two_pipe30_k' | 'two_pipe20_k' | 'one_pipe60_k_or_unknown' | 'one_pipe42_k' | 'unknown';
+        position: 'inner_wall' | 'outer_wall_glass_without_protection' | 'outer_wall_glass_with_protection' | 'outer_wall' | 'unknown' }
+    | { type: 'surface'; control: 'central' | 'room';
+        system: 'mechanical_ventilation' | 'floor_wet_or_unknown' | 'floor_dry' | 'floor_thin_screed' | 'wall' | 'ceiling' | 'unknown';
+        insulation: 'without_insulation' | 'minimal_insulation' | 'double_insulation' | 'unknown' }
+    | { type: 'dwelling_air'; control: 'central' | 'room' }
+    | { type: 'electric_air'; wall: 'outer_wall' | 'inner_wall' | 'unknown';
+        control: 'p_per_zone' | 'central_with_local_p' | 'p_per_room' | 'pi_per_room' | 'unknown' }
+    | { type: 'ventilation_air'; configuration: 'reheat_room_air' | 'reheat_cascade' | 'reheat_extract_air' | 'reheat_unknown' | 'recirculation' }
+    | { type: 'high_room'; heightM: number;
+        emitter: 'warm_air_horizontal' | 'warm_air_horizontal_low_temperature' | 'warm_air_from_ceiling'
+          | 'warm_air_from_ceiling_low_temperature' | 'recirculation_two_step' | 'recirculation_pi' | 'dark_radiators'
+          | 'high_temperature_radiators' | 'ceiling_panels' | 'floor_uninsulated_spacing_up_to20_cm'
+          | 'floor_uninsulated_spacing_above20_cm' | 'floor_minimal_insulation_up_to10_cm'
+          | 'floor_minimal_insulation_above10_cm' | 'floor_thermally_decoupled' | 'floor_unknown';
+        control: 'not_controlled' | 'controlled';
+        /** 9.20: RF (default 0,55) and p_h of dark and high-temperature radiators. */
+        radiant?: { radiationFactor?: number | null; specificPowerWPerM2: number } | null };
+  /** NEN-EN 215/15500 certified control: Δθ_ctr,2, variation a of table 9.6, high quality of table 9.7. */
+  certifiedControl?: boolean;
+  roomAutomation?: 'unknown' | 'individual_per_room' | 'individual_with_manual_override' | 'network_with_override_and_adaptive';
+  pipeSystem?: 'one_pipe' | 'two_pipe' | 'unknown' | 'not_hydronic';
+  /** Row of table 9.2, top to bottom. */
+  balancing?: 'none_or_unknown' | 'static' | 'static_or_dynamic_with_groups' | 'dynamic_with_load_control' | 'dynamic_full';
+}
+
+/** NTA 8800:2023 10.3.3 (tables 10.2–10.5, p. 360–364): the cooling emission in that edition's terms. */
+export interface NtaCoolingEmission2023 {
+  control: 'central' | 'p_before1988' | 'room';
+  certifiedControl?: boolean;
+  balancing?: 'none_or_unknown' | 'static_per_emitter' | 'static_with_group_balancing' | 'static_with_dynamic_groups'
+    | 'dynamic_or_direct_expansion';
+  roomAutomation?: 'unknown' | 'standalone' | 'standalone_with_manual_override' | 'network_with_override_and_adaptive';
+}
+
 export interface NtaDistributionSystem {
   designTemperatureClass?: NtaDesignTemperatureClass | null;
   installation: 'individual' | 'collective';
@@ -1993,6 +2035,8 @@ export interface NtaDistributionSystem {
   unheatedAmbientC?: number[] | null;
   /** b_U of the unheated space with the pipes: ϑ_ztu per 7.82 when no ϑ_ztu is entered. */
   unheatedReductionFactor?: number | null;
+  /** NTA 8800:2023 9.4.3 only: uninsulated pipes in an uninsulated outer wall or floor, f_H;dis;rbl = 0,5. */
+  uninsulatedPipesInUninsulatedShell?: boolean;
   bufferVessel?: {
     volumeL: number;
     standingLossW?: number | null;
@@ -2239,7 +2283,9 @@ export type EnvelopeElementKind =
   | { kind: 'forfait_opaque'; element: Record<string, unknown> }
   | { kind: 'forfait_window'; glass: string; frame: FrameGroup; exterior: boolean }
   | { kind: 'forfait_door'; insulated: boolean; exterior: boolean; glassFraction?: number; glass?: string; frame?: FrameGroup }
-  | { kind: 'forfait_panel'; insulation: Record<string, unknown>; cavity: boolean; frame: FrameGroup; exterior: boolean }
+  | { kind: 'forfait_panel'; insulation: Record<string, unknown>; cavity: boolean; frame: FrameGroup; exterior: boolean;
+      /** NTA 8800:2023 tables I.13/I.14 only: build year of the building (part). */
+      buildYear?: number | null }
   | { kind: 'rooflight'; uRcWPerM2K: number; areaWithUpstandM2: number; sourceReference: string }
   | { kind: 'ventilation_grille' }
   | { kind: 'numerical'; couplingWPerK: number; constructionAreaM2: number; deltaUWPerM2K?: number; sourceReference: string };
@@ -2395,7 +2441,9 @@ export interface VentilationInput {
       area:
         | { method: 'declared'; netAreaM2: number }
         | { method: 'discharge'; grossAreaM2: number; dischargeCoefficient: number; entryLossCoefficient: number }
-        | { method: 'opening_angle'; maxNetAreaM2: number; maxAngleDeg: number };
+        | { method: 'opening_angle'; maxNetAreaM2: number; maxAngleDeg: number;
+            /** No louvre/mesh specification: NEN 1087 opening × 0,3 (2024+) or 0,5 (2023). */
+            screenUnspecified?: boolean };
       centreHeightM: number;
       openingHeightM: number;
       azimuthDeg: number;
@@ -3773,6 +3821,8 @@ export interface NtaCoolingSystem {
     control: 'unknown_or_other' | 'standalone_per_room' | 'central_with_room_control';
     fanCoilCount?: number;
     sourceReference: string;
+    /** NTA 8800:2023 tables 10.2–10.5 only. */
+    edition2023?: NtaCoolingEmission2023 | null;
   };
   distribution?: {
     designTemperature: 't6_to12_or_unknown' | 't12_to16' | 't12_to18' | 't17_to21';

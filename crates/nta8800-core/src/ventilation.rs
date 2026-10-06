@@ -769,7 +769,20 @@ pub enum OpeningArea {
         max_net_area_m2: f64,
         #[serde(rename = "maxAngleDeg")]
         max_angle_deg: f64,
+        /// No specification of louvres, perforations or mesh: A_w;max,k is
+        /// the NEN 1087 net opening times 0,3 (2024 p. 461) or 0,5
+        /// (NTA 8800:2023 p. 466).
+        #[serde(
+            default,
+            rename = "screenUnspecified",
+            skip_serializing_if = "is_false"
+        )]
+        screen_unspecified: bool,
     },
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 impl OpeningArea {
@@ -784,7 +797,15 @@ impl OpeningArea {
             Self::OpeningAngle {
                 max_net_area_m2,
                 max_angle_deg,
-            } => (1.46 * max_angle_deg / (max_angle_deg + 41.0)).min(1.0) * max_net_area_m2,
+                screen_unspecified,
+            } => {
+                let screen = if *screen_unspecified {
+                    crate::norm_versions::profile().unspecified_screen_factor
+                } else {
+                    1.0
+                };
+                (1.46 * max_angle_deg / (max_angle_deg + 41.0)).min(1.0) * max_net_area_m2 * screen
+            }
         }
     }
 }
@@ -1462,6 +1483,7 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
                 OpeningArea::OpeningAngle {
                     max_net_area_m2,
                     max_angle_deg,
+                    ..
                 } => finite_positive(*max_net_area_m2) && finite_positive(*max_angle_deg),
             };
             if !area_ok {
@@ -2589,7 +2611,12 @@ fn cross_area(openings: &[CoolingOpening], areas: &[f64], total: f64) -> f64 {
                 .iter()
                 .zip(areas)
                 .filter(|(o, _)| {
-                    o.tilt_deg < 60.0 || angular_difference(o.azimuth_deg, reference) <= 45.0
+                    // 11.77a/b (2024 p. 464): a roof opening (β < 60°) counts
+                    // in every sector; 11.77 of NTA 8800:2023 (p. 469) sorts
+                    // all openings by orientation only.
+                    (o.tilt_deg < 60.0
+                        && crate::norm_versions::profile().cross_area_roof_all_sectors)
+                        || angular_difference(o.azimuth_deg, reference) <= 45.0
                 })
                 .map(|(_, a)| a)
                 .sum();
@@ -3818,8 +3845,37 @@ mod tests {
         let angle = OpeningArea::OpeningAngle {
             max_net_area_m2: 2.0,
             max_angle_deg: 30.0,
+            screen_unspecified: false,
         };
         close(angle.net_area(), 1.46 * 30.0 / 71.0 * 2.0, 1e-12);
+        // Unspecified screen: NEN 1087 opening times 0,3 (2024 p. 461) or
+        // 0,5 (NTA 8800:2023 p. 466).
+        let screened = OpeningArea::OpeningAngle {
+            max_net_area_m2: 2.0,
+            max_angle_deg: 30.0,
+            screen_unspecified: true,
+        };
+        close(screened.net_area(), 1.46 * 30.0 / 71.0 * 2.0 * 0.3, 1e-12);
+        crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
+            close(screened.net_area(), 1.46 * 30.0 / 71.0 * 2.0 * 0.5, 1e-12);
+        });
+        // A roof hatch (β 30°) and a façade window, both facing north:
+        // 11.77a counts the hatch in every sector (2024 p. 464), so sectors
+        // 135° and 225° pair it with the window: 2·(1/√2)/4. 11.77 of
+        // NTA 8800:2023 (p. 469) sorts both into the north sector only, and
+        // no sector has area on both sides: A_w;cros = 0.
+        let mut hatch = opening(0.0);
+        hatch.tilt_deg = 30.0;
+        let mixed = vec![opening(0.0), hatch];
+        assert!(cross_ventilation(&mixed));
+        close(
+            cross_area(&mixed, &[1.0, 1.0], 2.0),
+            2.0 / 2f64.sqrt() / 4.0,
+            1e-12,
+        );
+        crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
+            close(cross_area(&mixed, &[1.0, 1.0], 2.0), 0.0, 1e-12);
+        });
         let discharge = OpeningArea::Discharge {
             gross_area_m2: 1.0,
             discharge_coefficient: 0.6,

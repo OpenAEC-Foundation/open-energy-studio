@@ -270,6 +270,26 @@ pub fn table_13_4_psi(outer_diameter_mm: f64, insulation: PipeInsulation) -> f64
     ROWS[best][column]
 }
 
+/// NTA 8800:2023 table 13.4 (p. 542) rows for an unknown diameter by type
+/// of system, "klein" or "overig".
+pub fn table_13_4_system_psi(small: bool, insulation: PipeInsulation) -> f64 {
+    const SMALL: [f64; 6] = [1.0, 0.4, 0.4, 0.3, 0.25, 0.2];
+    const OTHER: [f64; 6] = [2.0, 0.74, 0.74, 0.56, 0.46, 0.4];
+    let column = match insulation {
+        PipeInsulation::None => 0,
+        PipeInsulation::Unknown => 1,
+        PipeInsulation::Mm10 => 2,
+        PipeInsulation::Mm15 => 3,
+        PipeInsulation::Mm20 => 4,
+        PipeInsulation::Mm25 => 5,
+    };
+    if small {
+        SMALL[column]
+    } else {
+        OTHER[column]
+    }
+}
+
 /// Table 13.6 pump control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -2337,6 +2357,11 @@ pub fn validate_hot_water(
         }
     }
     if let Some(series) = &system.series {
+        // 13.141a–d exist from 2024 (p. 595); NTA 8800:2023 has no series
+        // arrangements.
+        if !crate::norm_versions::profile().hot_water_series_routes {
+            push("route_not_in_edition", "series");
+        }
         if system.additional_generators.len() != 1 {
             push("hot_water_series_requires_two_generators", "series");
         }
@@ -2406,6 +2431,13 @@ pub fn validate_hot_water(
 /// Issues of one generator (main or additional), as (code, path).
 fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'static str, String)> {
     let mut issues = Vec::new();
+    // §13.8.4.10 exists from 2024 (p. 638); NTA 8800:2023 has no stepped
+    // temperature rise.
+    if matches!(generator, HotWaterGenerator::HeatPumpSeries { .. })
+        && !crate::norm_versions::profile().hot_water_series_routes
+    {
+        issues.push(("route_not_in_edition", format!("{prefix}.kind")));
+    }
     if let HotWaterGenerator::Chp(chp) = generator {
         if chp.equipment_reference.trim().is_empty() {
             issues.push((
@@ -3992,9 +4024,19 @@ pub fn assess_hot_water_with(
                 80.0
             }
         });
-        let psi = circulation
-            .declared_psi_w_per_mk
-            .unwrap_or_else(|| table_13_4_psi(diameter, circulation.insulation));
+        let psi = circulation.declared_psi_w_per_mk.unwrap_or_else(|| {
+            match circulation.outer_diameter_mm {
+                // NTA 8800:2023 (p. 542) has no table 13.29 nor the 35/80 mm
+                // rule (2024 p. 537–538) but rows "klein"/"overig" for an
+                // unknown diameter; "klein" is read as at most 500 m²
+                // connected (the 2024 utility split), see
+                // docs/nta8800-normversies.md.
+                None if crate::norm_versions::profile().table_13_4_system_rows => {
+                    table_13_4_system_psi(building_area <= 500.0, circulation.insulation)
+                }
+                _ => table_13_4_psi(diameter, circulation.insulation),
+            }
+        });
         let length = circulation.length_m.unwrap_or(0.3 * reduced + 10.0);
         let unheated = circulation.unheated_length_m.unwrap_or(0.15 * length);
         let heated = length - unheated;

@@ -799,6 +799,13 @@ impl ShadingControl {
         match self {
             Self::ManualResidential | Self::ManualUtilityWithGlareProtection => &SHADING_TABLE_7_7,
             Self::ManualUtilityWithoutGlareProtection => &SHADING_TABLE_7_8,
+            // NTA 8800:2023 p. 181: automatic shading of dwellings takes
+            // table 7.7 (table 7.9 is for utility buildings only, p. 183).
+            Self::AutomaticResidentialIso52016
+                if !crate::norm_versions::profile().dwelling_shading_heating_off =>
+            {
+                &SHADING_TABLE_7_7
+            }
             Self::Automatic | Self::AutomaticResidentialIso52016 => &SHADING_TABLE_7_9,
         }
     }
@@ -809,6 +816,14 @@ impl ShadingControl {
             self,
             Self::ManualResidential | Self::AutomaticResidentialIso52016
         )
+    }
+
+    /// NTA 8800:2023 p. 181: automatic shading of a dwelling is a table 7.7
+    /// case; the generic `Automatic` (table 7.9) belongs to utility
+    /// buildings only in that edition.
+    pub fn in_edition(self, residential: bool) -> bool {
+        crate::norm_versions::profile().dwelling_shading_heating_off
+            || !(residential && self == Self::Automatic)
     }
 
     /// Whether the control variant fits a residential (`true`) or utility
@@ -1079,7 +1094,11 @@ pub fn shading_fraction(
     month: u8,
     balance: Balance,
 ) -> f64 {
-    if balance == Balance::Heating && control.off_for_heating() {
+    // 2024+ p. 181 case 1; NTA 8800:2023 (p. 179–181) has no such case.
+    if balance == Balance::Heating
+        && control.off_for_heating()
+        && crate::norm_versions::profile().dwelling_shading_heating_off
+    {
         0.0
     } else {
         shading_lookup(control.table(), orientation, tilt_deg, month)

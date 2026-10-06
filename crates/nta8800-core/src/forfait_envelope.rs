@@ -674,6 +674,42 @@ pub enum PanelInsulation {
     },
 }
 
+/// NTA 8800:2023 tables I.13/I.14 (p. 819–820): forfait U of a panel in a
+/// frame for a building (part) from 1965 whose data are missing, by
+/// build-year class; `None` before 1965 (tables I.11/I.12 apply).
+pub fn panel_u_by_build_year(build_year: i32, frame: FrameGroup, exterior: bool) -> Option<f64> {
+    let row: [f64; 3] = match (exterior, build_year) {
+        (_, ..=1964) => return None,
+        (true, 1965..=1991) => [3.7, 4.1, 4.9],
+        (true, 1992..=2012) => [3.7, 4.1, 4.2],
+        (true, _) => [1.65, 1.65, 1.65],
+        (false, 1965..=1991) => [2.8, 3.0, 3.4],
+        (false, 1992..=2012) => [2.8, 3.0, 3.0],
+        (false, _) => [1.4, 1.4, 1.4],
+    };
+    Some(row[frame_index(frame)])
+}
+
+/// Forfait panel U in the active edition: NTA 8800:2023 (I.2.2.4.1–2,
+/// p. 818–820) takes tables I.13/I.14 for a building from 1965 without a
+/// known insulation thickness; otherwise [`forfait_panel_u`].
+pub fn forfait_panel_u_in_edition(
+    insulation: PanelInsulation,
+    cavity: bool,
+    frame: FrameGroup,
+    exterior: bool,
+    build_year: Option<i32>,
+) -> Option<f64> {
+    if crate::norm_versions::profile().panel_build_year_tables
+        && !matches!(insulation, PanelInsulation::KnownThickness { .. })
+    {
+        if let Some(u) = build_year.and_then(|year| panel_u_by_build_year(year, frame, exterior)) {
+            return Some(u);
+        }
+    }
+    forfait_panel_u(insulation, cavity, frame, exterior)
+}
+
 /// Tables I.11/I.12 and I.15/I.16 (thickness rounded to 10 mm, 10–300 mm).
 pub fn forfait_panel_u(
     insulation: PanelInsulation,

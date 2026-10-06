@@ -293,3 +293,48 @@ fn kitchen_pipe_diameter_is_a_2023_route() {
                 && issue.path.ends_with("emission.kitchenPipeDiameter")));
     }
 }
+
+/// Tables 9.2–9.10 of NTA 8800:2023 (p. 273–285): the 2023 description of
+/// the heating emission is accepted under 2023 only, and there it replaces
+/// the forfait derived from the 2024 fields.
+#[test]
+fn heating_emission_description_is_a_2023_route() {
+    let described = |edition: &str| {
+        let mut value = project(DWELLING, Some(edition));
+        value["ntaCalculation"]["emission"]["edition2023"] = json!({
+            "kind": {"type": "surface", "control": "room",
+                     "system": "floor_wet_or_unknown", "insulation": "double_insulation"},
+            "certifiedControl": true,
+            "roomAutomation": "network_with_override_and_adaptive",
+            "pipeSystem": "two_pipe",
+            "balancing": "dynamic_full"
+        });
+        assess_project_performance(&value)
+    };
+    let plain = assess_project_performance(&project(DWELLING, Some("2023")));
+    let with_2023 = described("2023");
+    assert_eq!(
+        with_2023.status, "calculated_legacy_edition",
+        "{:?}",
+        with_2023.gaps
+    );
+    // Forfait (1,6 + 1,7)/2 + 2,5 − 0,3 + 0,7 = 4,55 K (capped at 0,15 by
+    // 9.16) against the description 0 + 1,5 + (0,7 + 0,1)/2 − 0,2 + 0 − 1,2
+    // = 0,5 K.
+    let beng2 = |result: &ProjectPerformanceAssessment| {
+        indicator(result, "/primaryFossilIndicatorKwhPerM2Year").unwrap()
+    };
+    assert!(beng2(&with_2023) < beng2(&plain));
+    for edition in ["2024", "2025+C1"] {
+        let result = described(edition);
+        assert_eq!(result.status, "invalid", "{edition}");
+        assert!(result
+            .performance
+            .as_ref()
+            .unwrap()
+            .issues
+            .iter()
+            .any(|issue| issue.code == "route_not_in_edition"
+                && issue.path.ends_with("emission.edition2023")));
+    }
+}

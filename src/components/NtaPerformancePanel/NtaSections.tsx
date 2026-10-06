@@ -11,6 +11,7 @@ import type { ComponentType } from 'react';
 import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS } from '../../core/nta/KernelClient';
 import type { IProject } from '../../core/energy/types';
 import type { StepId } from '../../core/navigation/routes';
+import { HeatingEmission2023Fields } from './NtaEdition2023Fields';
 import { useI18n } from '../../i18n/i18n';
 import {
   CheckField, NumberField, read, SelectField, TextField, TriStateField, useFieldPath, type Draft, type Path,
@@ -566,6 +567,7 @@ function EmissionSection(props: NtaSectionProps) {
       ['air_heating', t('nta.form.emission.air')], ['local_heater', t('nta.form.emission.local')], ['other_or_unknown', t('nta.form.unknown')]]} />
     {(read(draft, ['emission', 'system']) === 'air_heating' || read(draft, ['emission', 'airHeaters']) != null) &&
       <AirHeatersFields draft={draft} change={change} />}
+    <HeatingEmission2023Fields draft={draft} change={change} />
     <TextField {...f} path={['emission', 'sourceReference']} label={t('nta.form.source')} />
   </>;
 }

@@ -253,12 +253,135 @@ pub struct CoolingEmission {
     #[serde(default)]
     pub fan_coil_count: u32,
     pub source_reference: String,
+    /// NTA 8800:2023 tables 10.2–10.5 (p. 360–364); accepted under 2023
+    /// only. Without it a 2023 run derives the forfait from the fields
+    /// above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edition2023: Option<CoolingEmission2023>,
 }
 
 impl CoolingEmission {
-    /// 10.11: Δϑ_int;inc.
+    /// 10.11: Δϑ_int;inc; under NTA 8800:2023 the 10.11 sum of that
+    /// edition ([`CoolingEmission2023::delta_internal`]).
     pub fn delta_internal(&self) -> f64 {
+        if crate::norm_versions::profile().cooling_emission_tables_2023 {
+            return self
+                .edition2023
+                .unwrap_or_else(|| CoolingEmission2023::forfait_from(self))
+                .delta_internal(self.emitter);
+        }
         self.emitter.delta() + self.balancing.delta() + self.control.delta()
+    }
+}
+
+/// Room temperature control of table 10.2 (NTA 8800:2023 p. 362).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingRoomControl2023 {
+    /// Central supply temperature control without room control.
+    Central,
+    /// P control from before 1988.
+    PBefore1988,
+    /// Main-room or one-pipe control, room temperature control (P, PI, PI
+    /// with optimisation).
+    Room,
+}
+
+/// Rows of table 10.4 (NTA 8800:2023 p. 363) from top to bottom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingBalancingRow2023 {
+    /// None or unknown, a one-pipe system, or no NEN-EN 14336 G1 report.
+    #[default]
+    NoneOrUnknown,
+    StaticPerEmitter,
+    StaticWithGroupBalancing,
+    StaticWithDynamicGroups,
+    /// Dynamic per emitter with dynamic groups, or direct expansion.
+    DynamicOrDirectExpansion,
+}
+
+/// Table 10.5 (NTA 8800:2023 p. 364): Δϑ_roomaut.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingRoomAutomation2023 {
+    #[default]
+    Unknown,
+    Standalone,
+    StandaloneWithManualOverride,
+    NetworkWithOverrideAndAdaptive,
+}
+
+/// NTA 8800:2023 10.3.3 description of a cooling emission system (tables
+/// 10.2–10.5, p. 360–364).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CoolingEmission2023 {
+    pub control: CoolingRoomControl2023,
+    /// Controls certified to NEN-EN 15500-1/NEN-EN 215: Δϑ_ctr,2.
+    #[serde(default)]
+    pub certified_control: bool,
+    #[serde(default)]
+    pub balancing: CoolingBalancingRow2023,
+    #[serde(default)]
+    pub room_automation: CoolingRoomAutomation2023,
+}
+
+impl CoolingEmission2023 {
+    /// 10.11 of NTA 8800:2023 (p. 360) for `emitter`: Δϑ_str + Δϑ_ctr +
+    /// Δϑ_emb + Δϑ_rad + Δϑ_im,emt + Δϑ_hydr + Δϑ_roomaut, with Δϑ_rad and
+    /// Δϑ_im,emt 0 K (table 10.3), K.
+    pub fn delta_internal(&self, emitter: CoolingEmitter) -> f64 {
+        // Table 10.2: (Δϑ_str, Δϑ_emb).
+        let (stratification, embedded) = match emitter {
+            CoolingEmitter::FloorCooling => (-0.7, -0.7),
+            CoolingEmitter::WallCooling => (-0.4, -0.7),
+            CoolingEmitter::CeilingCooling => (0.0, -0.2),
+            CoolingEmitter::FanCoilOrRacOnCeiling => (0.0, 0.0),
+            CoolingEmitter::FanCoilOrRacOnOuterWall | CoolingEmitter::OtherOrUnknown => (-0.4, 0.0),
+        };
+        let control = match (self.certified_control, self.control) {
+            (true, CoolingRoomControl2023::PBefore1988 | CoolingRoomControl2023::Room) => -1.5,
+            _ => -2.5,
+        };
+        let hydronic = match self.balancing {
+            CoolingBalancingRow2023::NoneOrUnknown => -0.6,
+            CoolingBalancingRow2023::StaticPerEmitter => -0.4,
+            CoolingBalancingRow2023::StaticWithGroupBalancing => -0.3,
+            CoolingBalancingRow2023::StaticWithDynamicGroups => -0.2,
+            CoolingBalancingRow2023::DynamicOrDirectExpansion => 0.0,
+        };
+        let room = match self.room_automation {
+            CoolingRoomAutomation2023::Unknown => 0.0,
+            CoolingRoomAutomation2023::Standalone => 0.5,
+            CoolingRoomAutomation2023::StandaloneWithManualOverride => 1.0,
+            CoolingRoomAutomation2023::NetworkWithOverrideAndAdaptive => 1.2,
+        };
+        stratification + control + embedded + hydronic + room
+    }
+
+    /// The 2023 forfait for an input described in 2024 terms: an
+    /// uncertified control (Δϑ_ctr,1), the table 10.4 row of the 2024
+    /// balancing and Δϑ_roomaut "standalone" for any room control; see
+    /// docs/nta8800-normversies.md.
+    pub fn forfait_from(emission: &CoolingEmission) -> Self {
+        Self {
+            control: CoolingRoomControl2023::Room,
+            certified_control: false,
+            balancing: match emission.balancing {
+                CoolingBalancing::NoneOrUnknown => CoolingBalancingRow2023::NoneOrUnknown,
+                CoolingBalancing::Static => CoolingBalancingRow2023::StaticPerEmitter,
+                CoolingBalancing::Dynamic | CoolingBalancing::NotApplicable => {
+                    CoolingBalancingRow2023::DynamicOrDirectExpansion
+                }
+            },
+            room_automation: match emission.control {
+                CoolingControl::UnknownOrOther => CoolingRoomAutomation2023::Unknown,
+                CoolingControl::StandalonePerRoom | CoolingControl::CentralWithRoomControl => {
+                    CoolingRoomAutomation2023::Standalone
+                }
+            },
+        }
     }
 }
 
@@ -974,6 +1097,12 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
             "source_reference_required",
             "emission.sourceReference".into(),
         );
+    }
+    // NTA 8800:2023 tables 10.2–10.5 (p. 360–364) exist in that edition only.
+    if system.emission.edition2023.is_some()
+        && !crate::norm_versions::profile().cooling_emission_tables_2023
+    {
+        push("route_not_in_edition", "emission.edition2023".into());
     }
     if system.emission.fan_coil_count > 0 && !system.emission.emitter.fan_coil() {
         push(
@@ -2574,6 +2703,7 @@ mod tests {
                 control: CoolingControl::StandalonePerRoom,
                 fan_coil_count: 0,
                 source_reference: "design".into(),
+                edition2023: None,
             },
             distribution: None,
             generators,

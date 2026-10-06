@@ -115,9 +115,14 @@ fn one_dwelling_over_two_zones_shares_its_occupants() {
 /// Cases B and C were published in NTA 8800:2023. Under that edition the
 /// table 13.2 difference of case C disappears: η_W;em;k 0,55 for a kitchen
 /// pipe of at most 10 mm inner diameter (2023 p. 533) instead of 0,43
-/// (2024 p. 527) lowers BENG 2 by 1,35 kWh/(m²·jr). What remains against
-/// the reports is the reading of 10.15 and 10.87 and the building-physics
-/// rest (docs/nta8800-vergelijking-openbare-rapporten.md).
+/// (2024 p. 527) lowers BENG 2 by 1,35 kWh/(m²·jr). The other 2023 switch
+/// points raise BENG 2: ΔT_C;fan 0,7 K instead of 0,4 K for dwellings
+/// (11.3.2.7, 2023 p. 496 / 2024 p. 491; case B +0,11, C 0,00), the
+/// heating emission of tables 9.2–9.4 (2023 p. 275–280; B +0,13, C +0,24)
+/// and the cooling emission of tables 10.2–10.5 (2023 p. 362–364; +0,02
+/// each), both from the 2024 inputs with the unknown values of 2023. What
+/// remains against the reports is the reading of 10.15 and 10.87 and the
+/// building-physics rest (docs/nta8800-vergelijking-openbare-rapporten.md).
 #[test]
 fn cases_b_and_c_under_nta_8800_2023() {
     fn run(json: &str, edition: &str, kitchen_10_mm: bool) -> [f64; 3] {
@@ -143,18 +148,20 @@ fn cases_b_and_c_under_nta_8800_2023() {
         ]
     }
     let [b, c] = [&CASES[1], &CASES[2]];
-    // B: the 2023 switch points move BENG 2 by +0,11 (BENG 1 unchanged);
-    // the report does not give B's kitchen pipe as ≤ 10 mm.
+    // B: BENG 1 unchanged; BENG 2 28,84 → 29,10 (+0,11 ΔT_C;fan, +0,13
+    // heating emission, +0,02 cooling emission); the report does not give
+    // B's kitchen pipe as ≤ 10 mm.
     let b23 = run(b.json, "2023", false);
     assert!((b23[0] - b.beng1).abs() <= 0.05, "{b23:?}");
-    assert!((b23[1] - 28.95).abs() <= 0.05, "{b23:?}");
+    assert!((b23[1] - 29.10).abs() <= 0.05, "{b23:?}");
     assert!((b23[2] - 62.5).abs() <= 0.15, "{b23:?}");
-    // C: 31,54 (2024) → 30,19 (2023), published 28,70; BENG 3 69,0 → 69,9,
+    // C: 31,54 (2024) → 30,44 (2023: −1,35 table 13.2, +0,24 heating and
+    // +0,02 cooling emission), published 28,70; BENG 3 69,0 → 69,8,
     // published 70,9.
     let c24 = run(c.json, "2024", false);
     let c23 = run(c.json, "2023", true);
     assert!((c24[1] - c.beng2).abs() <= 0.05, "{c24:?}");
-    assert!((c24[1] - c23[1] - 1.35).abs() <= 0.02, "{c24:?} {c23:?}");
-    assert!((c23[2] - 69.9).abs() <= 0.15, "{c23:?}");
+    assert!((c23[1] - 30.44).abs() <= 0.05, "{c23:?}");
+    assert!((c23[2] - 69.8).abs() <= 0.15, "{c23:?}");
     assert!((c23[0] - c.beng1).abs() <= 0.05, "{c23:?}");
 }

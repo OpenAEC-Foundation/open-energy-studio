@@ -26,7 +26,7 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     // Table 9.16 (p. 296), as 2024.
     psi_collective_combined_small: 2.0,
     collective_source_correction: false,
-    heat_pump_source_route: HeatPumpSourceRoute::AnySourceFrom15C2024,
+    heat_pump_source_route: HeatPumpSourceRoute::From20C2023,
     roof_edge_obstruction: false,
     permanent_shading_routes: false,
     hot_water_building_share: false,
@@ -91,4 +91,32 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     led_2017_column: false,
     // 8.3 (p. 214–218): no glazing-bar term.
     glazing_bar_term: false,
+    // 2023 p. 179–181: table 7.7 also on the heating balance of dwellings
+    // (2024 p. 181).
+    dwelling_shading_heating_off: false,
+    // 2023 p. 116 (5.47), p. 121 (5.55) and P.6.5.4.7 p. 959 (2024 p. 119,
+    // 124: 1 − f_rw;aux;spec).
+    residual_heat_pren_primary: true,
+    // 2023 p. 207 lists no rooflight category (2024 p. 210).
+    rooflight_route: false,
+    // 2023 p. 818–820 (2024 p. 817–818 drops the build-year tables).
+    panel_build_year_tables: true,
+    // 2023 p. 466 (2024 p. 461: 0,3).
+    unspecified_screen_factor: 0.5,
+    // 2023 p. 469 (11.77) by orientation only (2024 p. 464, 11.77a/b).
+    cross_area_roof_all_sectors: false,
+    // 2023 p. 290–294 (2024 p. 284–290).
+    distribution_2024_rules: false,
+    // 2023 p. 296 (2024 p. 292).
+    table_9_16_combined_rows: false,
+    // 2023 p. 299 (2024 p. 295).
+    distribution_half_recoverable_route: true,
+    // 2023 p. 542 (2024 p. 537–538).
+    table_13_4_system_rows: true,
+    // 2023 has neither 13.141a–d nor 13.8.4.10 (2024 p. 595, 638).
+    hot_water_series_routes: false,
+    // 2023 p. 273–285 (2024 p. 278–280: tables 9.2–9.4).
+    emission_tables_2023: true,
+    // 2023 p. 360–364 (2024 p. 357–359: table 10.35).
+    cooling_emission_tables_2023: true,
 };
