@@ -436,6 +436,16 @@ impl ForfaitOpaque {
                     path: format!("{path}.insulation.knownLambdaEquivalent"),
                 });
             }
+            // (I.2): a known higher λ from NTA 8800:2023 (p. 814); 2022
+            // p. 805 has only the fixed 0,06.
+            if known_lambda_equivalent.is_some()
+                && !crate::norm_versions::profile().lambda_equi_known_route
+            {
+                issues.push(ForfaitIssue {
+                    code: "route_not_in_edition",
+                    path: format!("{path}.insulation.knownLambdaEquivalent"),
+                });
+            }
             if reed_thickness_m.is_some_and(|d| !(0.1..=0.4).contains(&d)) {
                 issues.push(ForfaitIssue {
                     code: "reed_thickness_out_of_range",
@@ -554,7 +564,10 @@ impl ForfaitOpaque {
                 } else {
                     (thickness_mm / 10.0).round() * 10.0
                 };
-                let lambda = known_lambda_equivalent.unwrap_or(0.045).max(0.045);
+                // (I.2) λ_equi;ntr: 0,045 or a known higher value (2023 p. 814
+                // and later), 0,06 in 2022 (p. 805).
+                let base = crate::norm_versions::profile().lambda_equi_ntr;
+                let lambda = known_lambda_equivalent.unwrap_or(base).max(base);
                 let mut r = d_mm / 1000.0 / lambda + self.element.additional_resistance();
                 if self.cavity && d_mm <= 30.0 {
                     r += self.element.cavity_resistance();
@@ -1002,6 +1015,33 @@ mod tests {
         )
         .calculate();
         assert!((thin.r_c - (0.02 / 0.05 + 0.36 + 0.16)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn lambda_equi_ntr_is_0_06_in_2022() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let known = |lambda: Option<f64>| {
+            element(
+                1970,
+                InsulationState::KnownThickness {
+                    thickness_mm: 50.0,
+                    thickness_proven: true,
+                    known_lambda_equivalent: lambda,
+                    reed_thickness_m: None,
+                    thermal_cushions: false,
+                },
+            )
+        };
+        // (I.2): 0,06 in 2022 (p. 805), 0,045 from 2023 (p. 814).
+        let r22 = with_version(NormVersion::V2022, || known(None).calculate().r_c);
+        let r23 = with_version(NormVersion::V2023, || known(None).calculate().r_c);
+        assert!((r22 - (0.05 / 0.06 + 0.36)).abs() < 1e-12);
+        assert!((r23 - (0.05 / 0.045 + 0.36)).abs() < 1e-12);
+        // A known higher λ is a 2023 route.
+        let refused = with_version(NormVersion::V2022, || known(Some(0.05)).validate("e"));
+        assert!(refused.iter().any(|item| item.code == "route_not_in_edition"
+            && item.path == "e.insulation.knownLambdaEquivalent"));
+        assert!(with_version(NormVersion::V2023, || known(Some(0.05)).validate("e")).is_empty());
     }
 
     #[test]

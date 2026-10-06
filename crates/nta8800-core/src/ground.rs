@@ -157,6 +157,15 @@ pub enum FloorBelow {
         /// ε, m² vent opening per m perimeter; `None` gives 0,001 2 (8.48).
         #[serde(default, rename = "ventilationOpeningM2PerM")]
         ventilation_opening_m2_per_m: Option<f64>,
+        /// NTA 8800:2022 (8.47) (p. 236): h, the height of the wall above
+        /// ground level up to the top of the ground floor, m. From 2023
+        /// (p. 240) h is the fixed 0,125 m and this input is refused.
+        #[serde(
+            default,
+            rename = "wallHeightAboveGroundM",
+            skip_serializing_if = "Option::is_none"
+        )]
+        wall_height_above_ground_m: Option<f64>,
     },
     UnheatedBasement {
         #[serde(default, rename = "floorResistanceM2kPerW")]
@@ -170,6 +179,13 @@ pub enum FloorBelow {
         /// Basement volume V, m³ (8.49).
         #[serde(rename = "volumeM3")]
         volume_m3: f64,
+        /// NTA 8800:2022 (8.47): h, see `Crawlspace`.
+        #[serde(
+            default,
+            rename = "wallHeightAboveGroundM",
+            skip_serializing_if = "Option::is_none"
+        )]
+        wall_height_above_ground_m: Option<f64>,
         /// n, air changes per hour; `None` gives the forfait 0,3 (8.49).
         #[serde(default, rename = "airChangesPerHour")]
         air_changes_per_hour: Option<f64>,
@@ -179,8 +195,40 @@ pub enum FloorBelow {
 /// R_si (downward) on the floor of the space below (8.33, table C.2), m²K/W.
 const R_SI_DOWN: f64 = 0.17;
 const R_SI_HORIZONTAL: f64 = 0.13;
-/// 8.47: h above ground level.
+/// 8.47: h above ground level (NTA 8800:2023 p. 240 and later).
 const CRAWL_WALL_HEIGHT_M: f64 = 0.125;
+
+/// h of (8.47): 0,125 m from NTA 8800:2023 (p. 240); the given height in
+/// 2022 (p. 236). `None` when the input does not fit the edition.
+fn wall_height_m(below: &FloorBelow) -> Option<f64> {
+    let given = match below {
+        FloorBelow::Crawlspace {
+            wall_height_above_ground_m,
+            ..
+        }
+        | FloorBelow::UnheatedBasement {
+            wall_height_above_ground_m,
+            ..
+        } => *wall_height_above_ground_m,
+    };
+    match (crate::norm_versions::profile().crawl_wall_height_fixed, given) {
+        (true, None) => Some(CRAWL_WALL_HEIGHT_M),
+        (false, Some(height)) if height.is_finite() && height >= 0.0 => Some(height),
+        _ => None,
+    }
+}
+
+/// The edition issue of h (8.47), if any.
+fn wall_height_issue(below: &FloorBelow) -> Option<&'static str> {
+    if wall_height_m(below).is_some() {
+        return None;
+    }
+    Some(if crate::norm_versions::profile().crawl_wall_height_fixed {
+        "route_not_in_edition"
+    } else {
+        "ground_floor_wall_height_required"
+    })
+}
 /// 8.48 forfait values.
 const CRAWL_VENTILATION_DEFAULT: f64 = 0.0012;
 const CRAWL_WIND_SPEED: f64 = 5.0;
@@ -261,7 +309,7 @@ fn below_terms(slab: &SlabOnGround, below: &FloorBelow) -> Option<BelowTerms> {
     };
     let u_g = u_bf + u_wall_part;
     // 8.47.
-    let u_x_t = 2.0 * CRAWL_WALL_HEIGHT_M * u_xw / b_prime;
+    let u_x_t = 2.0 * wall_height_m(below)? * u_xw / b_prime;
     // 8.48/8.49.
     let u_x_v = match below {
         FloorBelow::Crawlspace {
@@ -487,6 +535,9 @@ fn edge_insulated_external(perimeter: f64, d_f: f64, insulation: &EdgeInsulation
 /// (8.3.3.2 against 8.3.4.2), and edge insulation (D.7/D.8, table D.1) on
 /// anything but a slab on ground.
 pub fn combination_issue(slab: &SlabOnGround) -> Option<&'static str> {
+    if let Some(code) = slab.below.as_ref().and_then(wall_height_issue) {
+        return Some(code);
+    }
     if slab.below.is_some() && slab.heated_basement.is_some() {
         return Some("ground_floor_below_and_heated_basement");
     }
@@ -558,10 +609,11 @@ pub fn slab_coefficients(slab: &SlabOnGround) -> Option<SlabCoefficients> {
                 air_changes_per_hour,
                 ..
             } => {
-                // D.15/D.16 with h = 0,125 m, table D.1 (0, 1).
+                // D.15/D.16 with h = 0,125 m (2022: the given h), table D.1
+                // (0, 1).
                 let n = air_changes_per_hour.unwrap_or(BASEMENT_AIR_CHANGES);
-                let air =
-                    CRAWL_WALL_HEIGHT_M * perimeter * wall_u_value_w_per_m2k + 0.33 * n * volume_m3;
+                let air = wall_height_m(below)? * perimeter * wall_u_value_w_per_m2k
+                    + 0.33 * n * volume_m3;
                 let below_side = (area + terms.z * perimeter) * LAMBDA_GROUND / delta + air;
                 let floor = area * terms.u_f;
                 let internal = 1.0 / (1.0 / floor + 1.0 / below_side);
@@ -708,6 +760,7 @@ mod tests {
             wall_resistance_m2k_per_w: 0.35,
             wall_u_value_w_per_m2k: 1.9,
             ventilation_opening_m2_per_m: None,
+            wall_height_above_ground_m: None,
         });
         // Hand calculation: B' = 7,5; U_f = 1/(0,32 + 0,04) (8.43, C.2 R_se).
         let b = 7.5;
@@ -738,6 +791,46 @@ mod tests {
     }
 
     #[test]
+    fn crawlspace_wall_height_is_fixed_from_2023_and_given_in_2022() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let mut floor = slab(60.0, 16.0, 0.17 + 0.15);
+        floor.edge_thermal_bridges = EdgeThermalBridges::Forfait;
+        let crawlspace = |height: Option<f64>| FloorBelow::Crawlspace {
+            floor_resistance_m2k_per_w: 0.0,
+            depth_class: DepthClass::Other,
+            wall_resistance_m2k_per_w: 0.35,
+            wall_u_value_w_per_m2k: 1.9,
+            ventilation_opening_m2_per_m: None,
+            wall_height_above_ground_m: height,
+        };
+        floor.below = Some(crawlspace(None));
+        let fixed = with_version(NormVersion::V2023, || {
+            slab_on_ground_conductance(&floor).unwrap()
+        });
+        // NTA 8800:2022 p. 236: the given h; 0,125 m gives the 2023 result.
+        floor.below = Some(crawlspace(Some(0.125)));
+        let same = with_version(NormVersion::V2022, || {
+            slab_on_ground_conductance(&floor).unwrap()
+        });
+        assert!((fixed - same).abs() < 1e-12);
+        floor.below = Some(crawlspace(Some(0.6)));
+        let higher = with_version(NormVersion::V2022, || {
+            slab_on_ground_conductance(&floor).unwrap()
+        });
+        assert!(higher > fixed);
+        // 2023 p. 240 refuses the input; 2022 needs it.
+        assert_eq!(
+            with_version(NormVersion::V2023, || combination_issue(&floor)),
+            Some("route_not_in_edition")
+        );
+        floor.below = Some(crawlspace(None));
+        assert_eq!(
+            with_version(NormVersion::V2022, || combination_issue(&floor)),
+            Some("ground_floor_wall_height_required")
+        );
+    }
+
+    #[test]
     fn unheated_basement_uses_8_49_and_d15_d16() {
         let mut floor = slab(60.0, 16.0, 0.17 + 2.5);
         floor.below = Some(FloorBelow::UnheatedBasement {
@@ -746,6 +839,7 @@ mod tests {
             wall_resistance_m2k_per_w: 0.35,
             wall_u_value_w_per_m2k: 1.9,
             volume_m3: 120.0,
+            wall_height_above_ground_m: None,
             air_changes_per_hour: None,
         });
         let coefficients = slab_coefficients(&floor).unwrap();

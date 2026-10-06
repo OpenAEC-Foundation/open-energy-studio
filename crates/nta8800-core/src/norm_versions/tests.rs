@@ -725,3 +725,118 @@ mod switch_points_2023 {
         close(v2023(|| fan_coil.delta_internal()), -2.5 + 1.2);
     }
 }
+
+/// NTA 8800:2022 against 2023: each value with the page of both editions.
+mod switch_points_2022 {
+    use crate::norm_versions::{with_version, NormVersion};
+
+    fn v2022<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2022, body)
+    }
+
+    fn v2023<R>(body: impl FnOnce() -> R) -> R {
+        with_version(NormVersion::V2023, body)
+    }
+
+    #[test]
+    fn profile_2022_is_2023_plus_its_own_differences() {
+        let p22 = NormVersion::V2022.profile();
+        let p23 = NormVersion::V2023.profile();
+        assert!(NormVersion::V2022.implemented());
+        assert!(!NormVersion::V2022.registration_eligible());
+        assert!(!NormVersion::V2020A1.implemented());
+        assert_eq!(p22.version, NormVersion::V2022);
+        assert_eq!(NormVersion::V2022.label(), "NTA 8800:2022");
+        // Everything 2023 has against 2024 holds in 2022 too.
+        assert_eq!(p22.tau_ventilative_cooling, p23.tau_ventilative_cooling);
+        assert_eq!(p22.fan_temperature_rise_k, p23.fan_temperature_rise_k);
+        assert_eq!(p22.reference_power_divisor, 8800.0);
+        assert!(p22.emission_tables_2023 && p22.cooling_emission_tables_2023);
+        assert!(p22.kitchen_diameter_rows && p22.panel_build_year_tables);
+        // Tables 9.27/9.29/P.5 (2022 p. 314–317, 941; 2023 p. 319–324, 955).
+        assert!(p22.heat_pump_tables_2022 && !p23.heat_pump_tables_2022);
+        assert_eq!(
+            p22.heat_pump_source_route,
+            crate::norm_versions::HeatPumpSourceRoute::None2022
+        );
+        assert!(!p22.heat_pump_source_route.books_table_sources());
+        // Tables 5.2/5.4: no kW limit (2022 p. 88–92), 100 kW (2023 p. 90–94).
+        assert!(p22.biomass_threshold_kw.is_infinite());
+        assert_eq!(p23.biomass_threshold_kw, 100.0);
+        // Flex mode (2023 p. 111, 963).
+        assert!(!p22.flex_mode_route && p23.flex_mode_route);
+        // (9.58) (2022 p. 305, 2023 p. 309).
+        assert!(!p22.preference_beta_building_share && p23.preference_beta_building_share);
+        // Table E.5 (2022 p. 775, 2023 p. 785) and (I.2) (p. 805 / 814).
+        assert_eq!(
+            (p22.mineral_wool_flakes_ageing, p23.mineral_wool_flakes_ageing),
+            (1.05, 1.00)
+        );
+        assert_eq!((p22.lambda_equi_ntr, p23.lambda_equi_ntr), (0.06, 0.045));
+        assert!(!p22.lambda_equi_known_route && p23.lambda_equi_known_route);
+        // (8.47) (2022 p. 236, 2023 p. 240).
+        assert!(!p22.crawl_wall_height_fixed && p23.crawl_wall_height_fixed);
+        // Chapters 11, 13 and 14.
+        assert!(!p22.swimming_pool_route && !p22.en_13053_route && !p22.mixed_air_route);
+        assert!(p23.swimming_pool_route && p23.en_13053_route && p23.mixed_air_route);
+        assert!(p22.electric_boiler_insulated_pipe_factor);
+        assert!(!p23.electric_boiler_insulated_pipe_factor);
+        assert!(!p22.storage_ambient_exhaust_air && p23.storage_ambient_exhaust_air);
+        assert!(p22.lighting_maintenance_factor && !p23.lighting_maintenance_factor);
+    }
+
+    #[test]
+    fn table_9_14_without_60_50_and_70_60() {
+        use crate::heating_distribution::DesignTemperatureClass::*;
+        // 2022 p. 290 against 2023 p. 294.
+        assert!(!v2022(|| C60.in_edition()) && !v2022(|| C70.in_edition()));
+        assert!(v2022(|| C65.in_edition()) && v2022(|| C55.in_edition()));
+        assert!(v2023(|| C60.in_edition()) && v2023(|| C70.in_edition()));
+    }
+
+    #[test]
+    fn table_7_5_without_unknown_colour() {
+        use crate::solar_shading::{ShadeColour, ShadingDevice};
+        // 2022 p. 176 against 2023 p. 180.
+        let unknown = ShadingDevice::ExternalScreen {
+            colour: ShadeColour::Unknown,
+        };
+        let white = ShadingDevice::ExternalScreen {
+            colour: ShadeColour::White,
+        };
+        assert!(!v2022(|| unknown.in_edition()));
+        assert!(v2022(|| white.in_edition()));
+        assert!(v2023(|| unknown.in_edition()));
+    }
+
+    #[test]
+    fn table_7_10_by_mass_per_m2() {
+        use crate::monthly_demand::{specific_heat_capacity_by_mass, CeilingColumn::*};
+        // 2022 p. 181–182: < 250, 250–500, 500–750, > 750 kg/m².
+        assert_eq!(specific_heat_capacity_by_mass(200.0, OpenOrNone), 80.0);
+        assert_eq!(specific_heat_capacity_by_mass(250.0, ClosedOrSuspended), 110.0);
+        assert_eq!(specific_heat_capacity_by_mass(750.0, OpenOrNone), 360.0);
+        assert_eq!(specific_heat_capacity_by_mass(751.0, ClosedOrSuspended), 250.0);
+    }
+
+    #[test]
+    fn table_e_5_mineral_wool_flakes() {
+        use crate::materials::{Ageing, InSituProduct, InSituSituation};
+        let flakes = Ageing::InSitu {
+            product: InSituProduct::FibresAndFlakes,
+            situation: InSituSituation::A,
+            practice_tested: false,
+        };
+        // 2022 p. 775: 1,05; 2023 p. 785: 1,00.
+        assert_eq!(v2022(|| flakes.factor()), 1.05);
+        assert_eq!(v2023(|| flakes.factor()), 1.00);
+    }
+
+    #[test]
+    fn table_14_4_maintenance_factor() {
+        use crate::lighting::ConstantIlluminance;
+        // 2022 p. 639 with (14.15) and F_CC = 1: 1 − ½·(1 − MF).
+        assert!((ConstantIlluminance::LinearFluorescent.compensation_factor() - 0.9).abs() < 1e-12);
+        assert!((ConstantIlluminance::LedL80.compensation_factor() - 0.85).abs() < 1e-12);
+    }
+}

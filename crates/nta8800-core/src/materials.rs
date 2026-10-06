@@ -123,7 +123,11 @@ impl Ageing {
                 practice_tested,
             } => {
                 let iso = match product {
-                    InSituProduct::FibresAndFlakes => 1.00,
+                    // Mineral-wool flakes 1,05 in NTA 8800:2022 (p. 775),
+                    // 1,00 from 2023 (p. 785).
+                    InSituProduct::FibresAndFlakes => {
+                        crate::norm_versions::profile().mineral_wool_flakes_ageing
+                    }
                     InSituProduct::EpsBeads => 1.05,
                     InSituProduct::Polyurethane if *practice_tested => 1.05,
                     InSituProduct::Polyurethane => 1.10,

@@ -1218,6 +1218,8 @@ impl SystemHeatPump {
             crate::norm_versions::HeatPumpSourceRoute::From20C2023 => {
                 self.source_from_15_c && !self.source_15_to_20_c
             }
+            // NTA 8800:2022 p. 94–96: 5.20 has no Q_HD;hp;in;bron.
+            crate::norm_versions::HeatPumpSourceRoute::None2022 => false,
         }
     }
 }
@@ -1517,6 +1519,16 @@ fn zone_terms(
                     format!("{prefix}emission.fans.count"),
                 ));
             }
+            // The NEN-EN 16430 assembly power is new in NTA 8800:2023
+            // (p. 286; 2022 p. 282).
+            if fans.tested_power_w.is_some()
+                && !crate::norm_versions::profile().tested_emission_fan_power
+            {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("{prefix}emission.fans.testedPowerW"),
+                ));
+            }
             if fans
                 .tested_power_w
                 .is_some_and(|power| !power.is_finite() || power < 0.0)
@@ -1686,6 +1698,15 @@ struct DistributionResult {
 
 fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<ChainIssue>) {
     let path = "distributionSystem";
+    if system
+        .design_temperature_class
+        .is_some_and(|class| !class.in_edition())
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.designTemperatureClass"),
+        ));
+    }
     if system.source_reference.trim().is_empty() {
         issues.push(issue(
             "source_reference_required",
@@ -3968,7 +3989,11 @@ fn generate_multiple(
     } else {
         total_power
     };
-    let scale = if set.added_preferred_generator {
+    // (9.58) has f_gebouw;si;H from NTA 8800:2023 (p. 309); 2022 p. 305
+    // relates the installed power alone to Φ_H;tot.
+    let scale = if set.added_preferred_generator
+        && crate::norm_versions::profile().preference_beta_building_share
+    {
         building_fraction
     } else {
         1.0
@@ -4859,6 +4884,15 @@ fn generate(
                 ));
                 return None;
             };
+            if generator
+                .design_temperature_class
+                .is_some_and(|class| !class.in_edition())
+            {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    "generator.designTemperatureClass",
+                ));
+            }
             if !issues.is_empty() {
                 return None;
             }
