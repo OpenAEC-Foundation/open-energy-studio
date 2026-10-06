@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, ReactNode } from 'react';
+import { normalizeProject } from '../core/energy/normalizeProject';
 import {
   IProject,
   IZone,
@@ -1055,8 +1056,76 @@ function ActiveDocumentBridge({ children }: { children: ReactNode }) {
   );
 }
 
+// ============================================================
+// Autosave: the open documents survive a reload or a crash of the tab
+// ============================================================
+
+const AUTOSAVE_KEY = 'oes.autosave.v1';
+
+interface AutosavedDocument {
+  id: string;
+  filePath: string | null;
+  project: IProject;
+  route: Route;
+  isDirty: boolean;
+}
+
+/** Off in unit tests: jsdom keeps localStorage between tests. */
+const autosaveEnabled = () => import.meta.env.MODE !== 'test' && typeof window !== 'undefined';
+
+function storage(): Storage | null {
+  try { return window.localStorage; } catch { return null; }
+}
+
+/** The documents of the last session, or the default document when there is none or it cannot be read. */
+export function restoreDocuments(): DocumentManagerState {
+  if (!autosaveEnabled()) return initialDocManagerState;
+  try {
+    const raw = storage()?.getItem(AUTOSAVE_KEY);
+    if (!raw) return initialDocManagerState;
+    const saved = JSON.parse(raw) as { documents: AutosavedDocument[]; activeDocumentId: string | null };
+    const documents: DocumentEntry[] = saved.documents.map((doc) => {
+      const project = normalizeProject(doc.project);
+      const state = createDocumentState(project);
+      const route = normalizeRoute(doc.route ?? state.route);
+      return { id: doc.id, filePath: doc.filePath, state: { ...state, route, viewMode: viewModeForRoute(route), isDirty: Boolean(doc.isDirty) } };
+    });
+    const active = documents.some((doc) => doc.id === saved.activeDocumentId) ? saved.activeDocumentId : documents[0]?.id ?? null;
+    return { documents, activeDocumentId: active };
+  } catch {
+    return initialDocManagerState;
+  }
+}
+
+function useAutosave(docState: DocumentManagerState) {
+  useEffect(() => {
+    if (!autosaveEnabled()) return undefined;
+    const timer = window.setTimeout(() => {
+      const payload = {
+        activeDocumentId: docState.activeDocumentId,
+        documents: docState.documents.map((doc): AutosavedDocument => ({
+          id: doc.id, filePath: doc.filePath, project: doc.state.project, route: doc.state.route, isDirty: doc.state.isDirty,
+        })),
+      };
+      try { storage()?.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* storage full or blocked */ }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [docState]);
+
+  // Unsaved work: the browser asks before the tab closes or reloads.
+  useEffect(() => {
+    if (!autosaveEnabled()) return undefined;
+    const dirty = docState.documents.some((doc) => doc.state.isDirty);
+    if (!dirty) return undefined;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [docState]);
+}
+
 export function EnergyProvider({ children }: { children: ReactNode }) {
-  const [docState, docDispatch] = useReducer(documentManagerReducer, initialDocManagerState);
+  const [docState, docDispatch] = useReducer(documentManagerReducer, undefined, restoreDocuments);
+  useAutosave(docState);
 
   return (
     <DocumentManagerContext.Provider value={{ docState, docDispatch }}>
