@@ -1,3 +1,4 @@
+import { CoolingEmission2023Fields } from './NtaEdition2023Fields';
 import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import {
@@ -178,6 +179,7 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
         ['unknown_or_other', t('nta.form.coolCtrl.unknown')], ['standalone_per_room', t('nta.form.coolCtrl.standalone')],
         ['central_with_room_control', t('nta.form.coolCtrl.central')]]} />
       <NumberField {...field} path={at('emission', 'fanCoilCount')} label={t('nta.form.coolingFanCoils')} />
+      <CoolingEmission2023Fields draft={draft} change={change} base={at('emission')} />
       <TextField {...field} path={at('emission', 'sourceReference')} label={t('nta.form.source')} />
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, at('distribution')) != null}

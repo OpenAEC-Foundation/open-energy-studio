@@ -79,4 +79,22 @@ describe('NTA 8800 editions', () => {
     expect(screen.queryByLabelText(label)).toBeNull();
     expect(screen.getByText(/only the 2023 edition has this input/)).toBeInTheDocument();
   });
+
+  it('offers the 2023 heating-emission description only for the 2023 edition', () => {
+    const project = createDefaultProject();
+    const emission = { system: 'floor_heating', balancing: 'none_or_unknown', control: 'individual_room_thermostats', sourceReference: '',
+      edition2023: { kind: { type: 'surface', control: 'room', system: 'floor_dry', insulation: 'unknown' } } };
+    const label = 'Emission per tables 9.2–9.10 of NTA 8800:2023';
+    const { unmount } = renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ normVersion: '2023', calculationScope: 'residential', emission } as never}
+      onSave={() => undefined} onCancel={() => undefined} />);
+    expect((screen.getByLabelText(label) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('System') as HTMLSelectElement).value).toBe('floor_dry');
+    unmount();
+    renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ normVersion: '2024', calculationScope: 'residential', emission } as never}
+      onSave={() => undefined} onCancel={() => undefined} />);
+    expect(screen.queryByLabelText(label)).toBeNull();
+    expect(screen.getByText(/only the 2023 edition has this input/)).toBeInTheDocument();
+  });
 });
