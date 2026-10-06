@@ -36,7 +36,7 @@ describe('TopBar', () => {
     renderWithProviders(<TopBar {...props()} />);
     expect(screen.getByTitle('Minimize')).toBeInTheDocument();
     expect(screen.getByTitle(/Maximize/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close' })).toHaveAttribute('title', 'Close');
+    expect(screen.getByRole('button', { name: 'Close', hidden: true })).toHaveAttribute('title', 'Close');
   });
 
   it('calls onNewProject and onOpenProject from the File menu', async () => {

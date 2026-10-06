@@ -12,6 +12,7 @@ import {
 import { useI18n } from '../../i18n/i18n';
 import { DocumentTabs } from '../DocumentTabs/DocumentTabs';
 import { Button, IconButton, Kbd } from '../ui';
+import { isTauri } from '@tauri-apps/api/core';
 import { version } from '../../../package.json';
 
 async function currentWindow() {
@@ -139,7 +140,7 @@ export function TopBar(props: TopBarProps) {
       )}
       <div className="top-bar-drag" data-tauri-drag-region />
 
-      <button type="button" className="top-bar-search" onClick={props.onOpenPalette} aria-keyshortcuts="Control+K"
+      <button type="button" className="top-bar-search" onClick={props.onOpenPalette} title={t('shell.search')} aria-keyshortcuts="Control+K"
         aria-haspopup="dialog">
         <Search aria-hidden="true" /><span>{t('shell.search')}</span><Kbd>Ctrl K</Kbd>
       </button>
@@ -179,7 +180,8 @@ export function TopBar(props: TopBarProps) {
         </>}
       </div>
 
-      <div className="top-bar-winctl">
+      {/* Window controls only exist in the desktop build; the browser has its own. */}
+      <div className="top-bar-winctl" hidden={!isTauri()}>
         <button type="button" title={t('shell.window.minimize')} aria-label={t('shell.window.minimize')} onClick={() => void minimizeWindow()}><Minus aria-hidden="true" /></button>
         <button type="button" title={t(maximized ? 'shell.window.restore' : 'shell.window.maximize')} aria-label={t(maximized ? 'shell.window.restore' : 'shell.window.maximize')}
           onClick={() => void toggleMaximize()}>{maximized ? <Copy aria-hidden="true" /> : <Square aria-hidden="true" />}</button>

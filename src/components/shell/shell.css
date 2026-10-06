@@ -430,3 +430,15 @@
 .nav-more summary::-webkit-details-marker { display: none; }
 .nav-more summary::before { content: '▸ '; }
 .nav-more[open] summary::before { content: '▾ '; }
+
+/* Tablet widths: keep the project tabs visible (close tab returns to the start screen). */
+.top-bar-winctl[hidden] { display: none; }
+@media (max-width: 1100px) {
+  .top-bar { gap: var(--space-2); }
+  .top-bar-app-name { display: none; }
+  .top-bar-search { width: 36px; flex: none; min-width: 0; padding: 0; justify-content: center; }
+  .top-bar-search span, .top-bar-search .ui-kbd { display: none; }
+  .top-bar .document-tab { max-width: 180px; }
+}
+/* The start screen has no navigation column at any width (the narrow-window rule above must not apply). */
+.app-shell.app-shell--empty { grid-template-columns: minmax(0, 1fr); }
