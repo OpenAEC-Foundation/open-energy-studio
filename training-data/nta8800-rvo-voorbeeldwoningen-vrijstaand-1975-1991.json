@@ -8,7 +8,7 @@
   "lossAreaRatio": 2.1825
  },
  "regression": {
-  "surveyHeatingNeedKwhPerM2": 154.02,
+  "surveyHeatingNeedKwhPerM2": 152.97,
   "performanceInputHeatingNeedKwhPerM2": 150.15,
   "standardInsulationKwhPerM2": 90.0
  },
