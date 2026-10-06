@@ -12,7 +12,7 @@ import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { Kbd, Tag } from '../ui';
 import { useMenu } from './TopBar';
-import { STEP_GROUPS, WORKFLOW_STEPS, TOOL_STEP, visibleSubs, type Route, type StepId } from '../../core/navigation/routes';
+import { WORKFLOW_STEPS, TOOL_STEP, type Route, type StepId } from '../../core/navigation/routes';
 import { isNewBuild, isSurveyProject, type StepStatus } from '../../core/nta/stepStatus';
 import type { IProject } from '../../core/energy/types';
 import type { ShellActions } from './ShellActions';
@@ -22,6 +22,62 @@ import {
 import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
 import { labelColor } from './pages/results/resultsData';
 import type { StoredSurvey } from '../../core/nta/SurveyTemplates';
+import { BuildNavList } from '../BuildFlow/BuildFlow';
+
+/** The pages outside the input flow of a new-build project, under "Overige onderdelen". */
+const BUILD_MORE: Array<{ route: Route; labelKey: string }> = [
+  { route: { step: 'building', sub: 'model3d' }, labelKey: 'nav.sub.building.model3d' },
+  { route: { step: 'installations', sub: 'systems' }, labelKey: 'build.more.systems' },
+  { route: { step: 'installations', sub: 'heatPumps' }, labelKey: 'nav.sub.installations.heatPumps' },
+  { route: { step: 'check', sub: 'input' }, labelKey: 'nav.sub.check.input' },
+  { route: { step: 'survey' }, labelKey: 'nav.step.survey' },
+  { route: { step: 'advice' }, labelKey: 'nav.step.advice' },
+  { route: { step: 'relabel' }, labelKey: 'nav.step.relabel' },
+];
+
+/** The input flow of a project without a basisopname, what comes after, and the other parts. */
+function BuildFlowNav({ route, statuses, navigate, t }: {
+  route: Route; statuses: Record<StepId, StepStatus>; navigate: ShellActions['navigate']; t: Translate;
+}) {
+  const isHere = (target: Route) => route.step === target.step && (target.sub == null || route.sub === target.sub);
+  const moreOpen = BUILD_MORE.some((item) => isHere(item.route));
+  return <>
+    <li className="nav-group-item">
+      <div className="nav-group" id="nav-group-input">{t('nav.group.input')}</div>
+      <ol aria-labelledby="nav-group-input" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <BuildNavList route={route} statuses={statuses} navigate={navigate} />
+      </ol>
+    </li>
+    <li className="nav-group-item">
+      <div className="nav-group" id="nav-group-after">{t('nav.survey.after')}</div>
+      <ol aria-labelledby="nav-group-after" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {WORKFLOW_STEPS.filter((step) => ['results', 'report', 'registration'].includes(step.id)).map((step) => {
+          const status = statuses[step.id];
+          const current = route.step === step.id;
+          return <li key={step.id}>
+            <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-step={step.id}
+              onClick={() => navigate({ step: step.id })}>
+              <StepBadge status={status} number={step.number} current={current} />
+              <span className="nav-step-label">{t(step.labelKey)}</span>
+              <span className="visually-hidden">, {stepStateText(t, status)}</span>
+            </button>
+          </li>;
+        })}
+      </ol>
+    </li>
+    <li className="nav-group-item">
+      <details className="nav-more" open={moreOpen}>
+        <summary className="nav-group">{t('nav.survey.more')}</summary>
+        <ul className="nav-subs">
+          {BUILD_MORE.map((item) => <li key={item.labelKey}>
+            <button type="button" className="nav-sub" aria-current={isHere(item.route) ? 'page' : undefined}
+              onClick={() => navigate(item.route)}>{t(item.labelKey)}</button>
+          </li>)}
+        </ul>
+      </details>
+    </li>
+  </>;
+}
 
 type Translate = (key: string, params?: Record<string, string>) => string;
 type StoredWithProgress = StoredSurvey & { progress?: SurveyProgress };
@@ -187,40 +243,7 @@ export function WorkflowNav({ project, route, statuses, floorAreaM2, actions }: 
 
       <ol className="nav-steps" ref={listRef} onKeyDown={onListKeyDown}>
         {survey && <SurveyNavList stored={survey} route={route} statuses={statuses} navigate={actions.navigate} t={t} />}
-        {!survey && STEP_GROUPS.map((group) => (
-          <li key={group.id} className="nav-group-item">
-            <div className="nav-group" id={`nav-group-${group.id}`}>{t(group.labelKey)}</div>
-            <ol aria-labelledby={`nav-group-${group.id}`} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {WORKFLOW_STEPS.filter((step) => step.group === group.id).map((step) => {
-                const status = statuses[step.id];
-                const current = route.step === step.id;
-                const count = status.errors > 0 ? status.errors : status.warnings;
-                return (
-                  <li key={step.id}>
-                    <button type="button" className={`nav-step${status.dimmed ? ' is-dimmed' : ''}`}
-                      aria-current={current ? 'page' : undefined} data-step={step.id} data-state={status.state}
-                      onClick={() => actions.navigate({ step: step.id })}>
-                      <StepBadge status={status} number={step.number} current={current} />
-                      <span className="nav-step-label">{t(step.labelKey)}</span>
-                      {count > 0 && <span className={`nav-count ${status.errors > 0 ? 'errors' : 'warnings'}`} aria-hidden="true">{count}</span>}
-                      <span className="visually-hidden">, {t('nav.stepNumber', { number: String(step.number) })}, {stepStateText(t, status)}</span>
-                    </button>
-                    {current && visibleSubs(step, project).length > 0 && (
-                      <ul className="nav-subs">
-                        {visibleSubs(step, project).map((sub) => (
-                          <li key={sub.id}>
-                            <button type="button" className="nav-sub" aria-current={route.sub === sub.id ? 'page' : undefined}
-                              onClick={() => actions.navigate({ step: step.id, sub: sub.id })}>{t(sub.labelKey)}</button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </li>
-        ))}
+        {!survey && <BuildFlowNav route={route} statuses={statuses} navigate={actions.navigate} t={t} />}
       </ol>
 
       <div className="nav-foot">

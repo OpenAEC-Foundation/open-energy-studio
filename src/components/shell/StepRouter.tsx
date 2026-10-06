@@ -35,6 +35,9 @@ import { DossierPage, ExportsPage, InputDossierPage, ReportPage } from './pages/
 import { ShellActionsProvider, type ShellActions } from './ShellActions';
 import { focusPathIn } from './focusPath';
 import { NtaApplyBar, NtaDraftNotice, NtaStepSections } from './NtaStepPage';
+import { BuildCheckPage, BuildFlowFrame, ProjectInfoQuestion } from '../BuildFlow/BuildFlow';
+import { buildFlowSteps, buildQuestionOf } from '../../core/navigation/buildFlow';
+import { isSurveyProject } from '../../core/nta/stepStatus';
 
 export { focusPathIn } from './focusPath';
 
@@ -73,17 +76,43 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
     <PageHeader route={route} title={extra?.title} lead={extra?.lead ?? t(`page.${route.step}.lead`)} actions={extra?.actions} />
     <SubTabs route={route} onSelect={navigateSub} />
   </>;
+  // Projects without a basisopname enter their input as a question flow (UI redesign 2026-10).
+  const flow = !isSurveyProject(project);
+  const flowQuestion = flow ? buildQuestionOf(route, buildFlowSteps(project)) : null;
   const dimmedBanner = status?.dimmed ? <Banner tone="info">{t('page.notApplicable')}</Banner> : null;
 
   let page: React.ReactNode;
   switch (route.step) {
     case 'project':
+      if (flow) {
+        page = <div className="page-body"><BuildFlowFrame route={route}>
+          <ProjectInfoQuestion />
+          <NtaStepSections route={route} />
+        </BuildFlowFrame></div>;
+        break;
+      }
       page = <>
         <ProjectOverview project={project} statuses={statuses} actions={actions} />
         <div className="page-body page-body--nta"><NtaStepSections route={route} /></div>
       </>;
       break;
     case 'building':
+      if (flowQuestion) {
+        page = <div className="page-body"><BuildFlowFrame route={route} toolbar={<>
+          <Button size="sm" variant="ghost" icon={<Box aria-hidden="true" />}
+            onClick={() => actions.navigate({ step: 'building', sub: 'model3d' })}>{t('building.open3d')}</Button>
+          <BuildingAddBar sub={route.sub} />
+        </>}>
+          {route.sub === 'envelope' && <><p className="survey-muted"><BuildingLead sub="envelope" /></p><EnvelopePage /></>}
+          {route.sub === 'zones' && <ZonesPage />}
+          {route.sub === 'constructions' && <ConstructionsPage />}
+          {route.sub === 'thermalBridges' && <ThermalBridgesPage />}
+          {route.sub === 'airTightness' && <AirTightnessPage />}
+          {route.sub === 'unheated' && <UnheatedSpacesPanel />}
+          <NtaStepSections route={route} />
+        </BuildFlowFrame></div>;
+        break;
+      }
       page = <>
         {header({
           lead: <BuildingLead sub={route.sub} />,
@@ -108,6 +137,12 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       </>;
       break;
     case 'installations':
+      if (flowQuestion) {
+        page = <div className="page-body"><BuildFlowFrame route={route} toolbar={<InstallationAddBar sub={route.sub} />}>
+          <ServicePage key={route.sub} sub={route.sub as ServiceId} focusPath={route.focusPath} />
+        </BuildFlowFrame></div>;
+        break;
+      }
       page = <>
         {header({
           lead: route.sub && route.sub !== 'systems' ? t(`lead.installations.${route.sub}`) : t('page.installations.lead'),
@@ -128,6 +163,10 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       </>;
       break;
     case 'check': {
+      if (flow && route.sub !== 'input') {
+        page = <div className="page-body"><BuildCheckPage statuses={statuses} /></div>;
+        break;
+      }
       const issues = kernelIssues(kernel?.settled);
       page = <>
         {header()}
@@ -219,7 +258,7 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
     <div className="step-page" ref={bodyRef} data-step={route.step} style={{ display: 'contents' }}>
       <ShellActionsProvider value={actions}>
         <ErrorBoundary resetKey={state.project}>{page}</ErrorBoundary>
-        <NtaApplyBar route={route} navigate={actions.navigate} />
+        {!flowQuestion && <NtaApplyBar route={route} navigate={actions.navigate} />}
       </ShellActionsProvider>
     </div>
   );

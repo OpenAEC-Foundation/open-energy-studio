@@ -1,0 +1,25 @@
+/* Input question flow of new build / NTA input (UI redesign 2026-10); builds on SurveyWizard.css. */
+.build-flow .survey-main { max-width: none; }
+.build-flow-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; }
+.build-flow-tools { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.build-flow-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.build-flow-body > .page-body { padding: 0; }
+.build-gauges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.build-gauges div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface-sunken); }
+.build-gauges dt { font-size: var(--fs-xs); color: var(--fg-2); }
+.build-gauges dd { margin: 0; font-family: var(--font-mono); font-size: 16px; }
+.build-gauges small { color: var(--fg-3); font-size: var(--fs-xs); }
+.build-project { display: flex; flex-direction: column; gap: var(--space-4); }
+.build-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.build-field { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); color: var(--fg-2); }
+.build-field--wide { grid-column: 1 / -1; }
+.build-field input, .build-field textarea {
+  font: inherit; font-size: var(--fs-md, 14px); color: var(--fg-1); background: var(--surface-sunken);
+  border: 1px solid var(--line); border-radius: var(--radius-md); padding: 9px 12px; min-height: 40px;
+}
+.build-field input:focus-visible, .build-field textarea:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--amber-600); }
+.build-subtitle { margin: 0; font-size: var(--fs-lg); font-weight: var(--weight-semibold); }
+.build-project .survey-choice { min-height: 96px; }
+.build-import { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: 0; color: var(--fg-3); font-size: var(--fs-sm); }
+.build-import svg { width: 14px; height: 14px; }
+@media (max-width: 720px) { .build-fields { grid-template-columns: minmax(0, 1fr); } }

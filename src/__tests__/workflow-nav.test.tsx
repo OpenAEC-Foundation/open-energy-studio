@@ -46,13 +46,13 @@ function Shell({ actions, route }: { actions: ShellActions; route?: Route }) {
 const route = () => JSON.parse(screen.getByTestId('route').textContent ?? '{}') as Route;
 
 describe('WorkflowNav', () => {
-  it('shows the numbered steps in their groups and no ribbon tabs', () => {
+  it('shows the input flow, what comes after and no ribbon tabs', () => {
     renderWithProviders(<Shell actions={makeActions()} />);
     const nav = screen.getByRole('navigation', { name: 'Workflow steps' });
-    for (const group of ['Input', 'Calculation', 'Existing building', 'Delivery']) expect(within(nav).getByText(group)).toBeInTheDocument();
+    expect(within(nav).getByText('Input')).toBeInTheDocument();
     const steps = within(nav).getAllByRole('button').filter((button) => button.classList.contains('nav-step') && button.dataset.step);
     expect(steps.map((button) => button.dataset.step)).toEqual([
-      'project', 'building', 'installations', 'check', 'results', 'survey', 'advice', 'relabel', 'report', 'registration',
+      'project', 'building', 'installations', 'check', 'results', 'report', 'registration',
     ]);
     expect(document.querySelector('.ribbon-tab, .ribbon-container')).toBeNull();
   });
@@ -64,11 +64,13 @@ describe('WorkflowNav', () => {
     const nav = screen.getByRole('navigation', { name: 'Workflow steps' });
     expect(within(nav).getByRole('button', { name: /^Project/ })).toHaveAttribute('aria-current', 'page');
     await user.click(within(nav).getByRole('button', { name: /^Building/ }));
-    expect(actions.navigate).toHaveBeenCalledWith({ step: 'building' });
+    expect(actions.navigate).toHaveBeenCalledWith({ step: 'building', sub: 'envelope' });
     expect(route()).toEqual({ step: 'building', sub: 'envelope' });
     expect(within(nav).getByRole('button', { name: /^Building/ })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('button', { name: /^Project/ })).not.toHaveAttribute('aria-current');
-    // The sub pages of the active step are listed below it.
+    // The questions of the active step are listed below it; the 3D model is under the other parts.
+    await user.click(within(nav).getByRole('button', { name: /Thermal bridges/ }));
+    expect(route()).toEqual({ step: 'building', sub: 'thermalBridges' });
     await user.click(within(nav).getByRole('button', { name: '3D model' }));
     expect(route()).toEqual({ step: 'building', sub: 'model3d' });
   });
@@ -81,7 +83,8 @@ describe('WorkflowNav', () => {
     await user.keyboard('{ArrowDown}');
     expect(within(nav).getByRole('button', { name: /^Building/ })).toHaveFocus();
     await user.keyboard('{End}');
-    expect(within(nav).getByRole('button', { name: /^Registration/ })).toHaveFocus();
+    const all = Array.from(nav.querySelectorAll<HTMLButtonElement>('ol.nav-steps button.nav-step, ol.nav-steps button.nav-sub'));
+    expect(all[all.length - 1]).toHaveFocus();
   });
 
   it('offers the calculators and exchange formats in the Tools menu', async () => {
@@ -135,8 +138,9 @@ describe('Step pages keep the ribbon actions', () => {
     const user = userEvent.setup();
     const actions = makeActions();
     renderWithProviders(<Shell actions={actions} route={{ step: 'project' }} />);
-    await user.click(screen.getByRole('button', { name: 'Project Info' }));
-    expect(actions.openDialog).toHaveBeenCalledWith('project-info');
+    // The project data are the first question of the flow, filled in on the page itself.
+    expect(screen.getByRole('heading', { level: 1, name: 'What kind of project is it?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Office/ })).toHaveAttribute('aria-pressed', 'false');
     await user.click(screen.getByRole('button', { name: 'UNIEC3 Import' }));
     expect(actions.importUNIEC3).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'VABI Import' }));
@@ -203,9 +207,9 @@ describe('Step pages keep the ribbon actions', () => {
     expect(screen.getByRole('row', { name: /Woonfunctie/ })).toHaveAttribute('data-path', 'zones[0]');
     unmount();
     renderWithProviders(<Shell actions={makeActions()} route={{ step: 'building', sub: 'constructions' }} />);
-    // The page title names the sub page (F7 fix), the section keeps its own heading.
-    expect(screen.getByRole('heading', { name: 'Constructions', level: 1 })).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { name: 'Constructions' })).toHaveLength(2);
+    // The page title is the question of the flow, the section keeps its own heading.
+    expect(screen.getByRole('heading', { name: 'Which constructions are used?', level: 1 })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: 'Constructions' })).toHaveLength(1);
   });
 
   it('Report: export, print, IFC and exchange exports', async () => {

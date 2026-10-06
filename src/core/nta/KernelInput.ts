@@ -35,7 +35,10 @@ export function nullPaths(value: unknown, prefix = ''): string[] {
 }
 
 /** The project as the kernel receives it: the NTA block without nulls. */
-export function kernelProject(project: IProject): IProject {
+export function kernelProject(input: IProject): IProject {
+  // The flow progress is app state: it must not change the input fingerprint.
+  const { workflowProgress: _progress, ...project } = input;
+  void _progress;
   return project.ntaCalculation
     ? { ...project, ntaCalculation: withoutNulls(project.ntaCalculation) }
     : project;

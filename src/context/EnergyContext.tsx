@@ -55,6 +55,7 @@ export type EnergyAction =
   | { type: 'SET_NTA_CALCULATION'; payload: IProject['ntaCalculation'] }
   | { type: 'SET_MAATWERKADVIES'; payload: IProject['maatwerkadvies'] }
   | { type: 'SET_BASISOPNAME'; payload: IProject['basisopname'] }
+  | { type: 'SET_WORKFLOW_PROGRESS'; payload: NonNullable<IProject['workflowProgress']> }
   // Zones
   | { type: 'ADD_ZONE'; payload: IZone }
   | { type: 'UPDATE_ZONE'; payload: { id: string; data: Partial<IZone> } }
@@ -268,7 +269,7 @@ export function createDefaultProject(): IProject {
 // Per-document state factory
 // ============================================================
 
-function createDocumentState(project: IProject): EnergyState {
+function createDocumentState(project: IProject, opened = false): EnergyState {
   return {
     project,
     result: null,
@@ -279,8 +280,9 @@ function createDocumentState(project: IProject): EnergyState {
     selectedItemType: null,
     isDirty: false,
     previewVisible: true,
-    // A project with a basisopname reopens on its Controle page: everything on one page.
-    route: isSurveyProject(project) ? normalizeRoute({ step: 'survey', sub: 'controle' }) : { step: 'project' },
+    // A project reopens on its Controle page: everything on one page. A new one starts at its first question.
+    route: isSurveyProject(project) ? normalizeRoute({ step: 'survey', sub: 'controle' })
+      : opened ? { step: 'check', sub: 'overview' } : { step: 'project' },
   };
 }
 
@@ -334,7 +336,7 @@ export function documentManagerReducer(
       const newDoc: DocumentEntry = {
         id: action.payload.id,
         filePath: action.payload.filePath,
-        state: createDocumentState(action.payload.project),
+        state: createDocumentState(action.payload.project, true),
       };
       return {
         documents: [...state.documents, newDoc],
@@ -436,6 +438,9 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
 
     case 'SET_MAATWERKADVIES':
       return { ...state, project: { ...state.project, maatwerkadvies: action.payload }, isDirty: true };
+
+    case 'SET_WORKFLOW_PROGRESS':
+      return { ...state, project: { ...state.project, workflowProgress: action.payload }, isDirty: true };
 
     case 'SET_BASISOPNAME':
       return { ...state, project: { ...state.project, basisopname: action.payload }, isDirty: true };

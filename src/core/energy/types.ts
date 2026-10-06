@@ -359,6 +359,8 @@ export interface IProject {
    */
   importLog?: ProjectImportRecord[];
   /** ISSO 82.1/75.1 basisopname (survey) kept with the project; not part of the label fingerprint. */
+  /** Progress of the input question flow (new build, NTA input); app-only, not sent to the kernel. */
+  workflowProgress?: { done?: string[]; skipped?: string[] };
   basisopname?: {
     kind: 'residential' | 'utility';
     survey: Record<string, unknown>;
