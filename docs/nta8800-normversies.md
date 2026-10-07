@@ -185,7 +185,7 @@ Het profiel van 2020+A1 is cumulatief op 2022: alles waarin 2022 van 2023 versch
 
 **Acceptatie met openbare rapporten.** Twee rapporten uit de periode van 2020+A1 rekenen in deze editie (zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md#a-b-en-d-in-hun-eigen-editie-7-oktober-2026)):
 - A (vrijstaand, plat dak, Uniec 3.0.16): 94,00 / 36,06 / 74,4 tegen 92,99 / 25,19 / 80,4. De PV-afronding van punt 68 geeft de 2 437 kWh van het rapport; het verschil in BENG 2 is 10.15 en 10.87.
-- D (vrijstaande vakantiewoning, Uniec 3.0.10.0): 82,49 / 38,42 / 83,4 tegen 86,72 / 39,19 / 83,5. Tapwater, ventilatoren en PV zijn gelijk; de hulpenergie van de warmtepomp bevestigt punt 74 (het rapport rekent A = 13,0 kWh, toestel vanaf 2015).
+- D (vrijstaande vakantiewoning, Uniec 3.0.10.0): 82,49 / 37,06 / 83,9 tegen 86,72 / 39,19 / 83,5. Tapwater, ventilatoren, PV en, met het installatiejaar 2021, de hulpenergie van de warmtepomp (A = 13,0 kWh, punt 74) zijn gelijk; het verschil zit in de lagere warmtevraag (overstek oostgevel niet te modelleren).
 
 ## Besluiten bij de invoering van 2023
 

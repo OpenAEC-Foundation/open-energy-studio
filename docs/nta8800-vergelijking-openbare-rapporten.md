@@ -123,7 +123,7 @@ Sinds de kern NTA 8800:2022 en 2020+A1 rekent, lopen A en D in 2020+A1 en B in 2
 |---|---|---|---|
 | A (2020+A1) | 92,99 / 25,19 / 80,4 | 94,00 / 35,15 / 74,9 | 94,00 / 36,06 / 74,4 |
 | B (2022) | 54,61 / 27,10 / 64,8 | 52,96 / 28,84 / 62,6 | 52,96 / 29,10 / 62,5 |
-| D (2020+A1) | 86,72 / 39,19 / 83,5 | – | 82,49 / 38,42 / 83,4 |
+| D (2020+A1) | 86,72 / 39,19 / 83,5 | – | 82,49 / 37,06 / 83,9 |
 
 **Invoer die de oudere edities anders vragen.**
 - (8.47): 2022 en 2020+A1 rekenen met de werkelijke hoogte h van de vloer boven maaiveld (2022 p. 236). A en B geven 0,10 m. Dat verandert BENG 1 niet op twee decimalen.
@@ -149,18 +149,18 @@ Per post, elektriciteit in kWh/jr (het rapport geeft primaire energie; gedeeld d
 | Post | Rapport | Kern | Verschil in BENG 2 |
 |---|---|---|---|
 | Warmtepomp verwarming (warmte) | 2 427 (12 136) | 2 312 (11 560) | −2,09 |
-| Hulpenergie verwarming | 46 | 119 | +1,33 |
+| Hulpenergie verwarming | 46 | 45 | −0,02 |
 | Tapwater | 3 552 | 3 552 | 0 |
 | Ventilatoren | 401 | 401 | 0 |
 | PV (op de meter) | 4 273 | 4 273 | 0 |
-| **BENG 2** | **39,19** | **38,42** | **−0,77** |
+| **BENG 2** | **39,19** | **37,06** | **−2,13** |
 
-- **Hulpenergie.** Het rapport rekent 9.85 met A = 13,0 kWh (toestel vanaf 2015): 13,0 + 0,132 × 2 427 / (0,4 × 24) = 46,4. De kern heeft geen bouwjaar in de warmtepompinvoer en neemt A = 87,6 (de interpretatie bij punt 74 in [nta8800-normversies.md](nta8800-normversies.md)). Met een bouwjaar vanaf 2015 verdwijnt deze post.
+- **Hulpenergie.** Het rapport rekent 9.85 met A = 13,0 kWh (toestel vanaf 2015): 13,0 + 0,132 × 2 427 / (0,4 × 24) = 46,4. De fixture geeft de warmtepomp het installatiejaar 2021 (`installationYear`); de kern neemt dan ook A = 13,0 en rekent 45 kWh op zijn eigen 2 312 kWh. Zonder installatiejaar zou de kern A = 87,6 nemen (vóór 2015 of onbekend, punt 74 in [nta8800-normversies.md](nta8800-normversies.md)): 119 kWh en BENG 2 38,42. Wat tegen het rapport overblijft, is de lagere warmtevraag uit BENG 1 (hieronder).
 - **Ventilatoren.** Tabel 11.23 geeft voor ventilatoren vanaf 2007 0,45 W/(m³/h). Met dat fabricagejaar (nieuwbouw 2021) is de uitkomst gelijk aan het rapport. Een eerste herbouw met een onbekend fabricagejaar nam de oudste rij (4,00 W/(m³/h) voor wisselstroom) en gaf 3 567 kWh; dat was een invoerfout in de herbouw, geen fout in de kern.
 - **Warmte en BENG 1.** De kern rekent 4,9 % minder behoefte (82,49 tegen 86,72) en daarom minder warmte. Het rapport geeft vier ramen op de oostgevel (9,84 m² glas) een constante overstek, maar niet de maat. De kern heeft één belemmering per zone en rekent hier met minimale belemmering. Een overstek op alle ramen (h_o;⊥ 1,0 tot 0,25) verhoogt BENG 1 met 3,2 tot 5,8; naar rato van het oostglas (9,84 van 14,64 m²) is dat +2,2 tot +3,9, het grootste deel van het verschil. Om dezelfde reden is TOjuli in de kern 0,67 tegen 0,29.
 - **Tabel 9.28.** De kern eiste voor de rij van tabel 9.28 een beproeving volgens NEN-EN 14511-2:2022. Dat is de gedateerde verwijzing van 2023 (p. 322). 2022 (p. 14, 316) en 2020+A1 (p. 15, 314) verwijzen naar NEN-EN 14511-2:2007. De kern volgt nu de verwijzing van de editie (`heat_pump_high_test_standard`).
 
-D in 2022 (alleen ter vergelijking; D valt in de periode van 2020+A1): 82,49 / 39,69 / 83,0. Het verschil met 2020+A1 is de hulpenergie van de warmtepomp: 2022 rekent een warmtepomp met de eigen constanten van 9.85 (A 43,8, punt 74).
+D in 2022 (alleen ter vergelijking; D valt in de periode van 2020+A1): 82,49 / 39,69 / 83,0. Het verschil met 2020+A1 is de hulpenergie van de warmtepomp: 2022 rekent een warmtepomp met de eigen constanten van 9.85 (A 43,8, punt 74), 2020+A1 met A 13,0 voor een toestel vanaf 2015.
 
 ### Gezochte rapporten (7 oktober 2026)
 

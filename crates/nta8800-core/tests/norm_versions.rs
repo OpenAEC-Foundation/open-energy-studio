@@ -411,11 +411,10 @@ fn edition_2020a1_is_calculated_but_not_registrable() {
     }
 }
 
-/// 2020+A1 against 2022 on the example projects. Both projects have a heat
-/// pump; the energy need, TOjuli and ambient heat stay the same and only
-/// the quantities fed by the auxiliary energy change: 9.85 has one forfait
-/// for all devices in 2020+A1 (p. 334–336) against own heat-pump constants
-/// from 2022 (p. 338).
+/// 2020+A1 against 2022 on the example projects. Both projects have a gas
+/// boiler; the energy need, TOjuli and ambient heat stay the same and only
+/// the quantities fed by the auxiliary energy of 9.85 change (2020+A1
+/// p. 334–336 against 2022 p. 338).
 #[test]
 fn example_projects_2020a1_differ_from_2022_only_where_the_editions_differ() {
     let run = |json, edition| assess_project_performance(&project_2020_compatible(json, edition));

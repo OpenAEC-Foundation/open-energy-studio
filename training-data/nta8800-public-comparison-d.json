@@ -555,7 +555,9 @@
               "measuredCop": 4.45
             }
           ]
-        }
+        },
+        "installationYear": 2021,
+        "installationYearReference": "nieuwbouw vakantiewoning, berekening 30-03-2021; rapport hulpenergie warmtepomp 46 kWh komt overeen met (9.85) A 13,0 kWh (vanaf 2015)"
       },
       "sourceSystem": "individual",
       "sourceSystemReference": "grondwater, bronsysteem onbekend"

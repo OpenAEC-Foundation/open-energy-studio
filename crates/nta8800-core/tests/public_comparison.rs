@@ -202,10 +202,11 @@ fn cases_a_and_b_under_their_own_editions() {
 /// Case D: a detached holiday home of 79,70 m², calculated on 30-03-2021
 /// with Uniec 3.0.10.0 (NTA 8800:2020+A1); published 86,72 / 39,19 / 83,5.
 /// Hot water (3 552 kWh), fans (401 kWh, table 11.23 from 2007) and PV
-/// (4 273 kWh on the meter) agree. The heat-pump auxiliary energy differs
-/// by the build year of 9.85 (report 46 kWh = A 13,0 from 2015; kernel
-/// 119 kWh = A 87,6, build year not in the input); BENG 1 is 4,9 % lower
-/// with the overhang of the east windows modelled as minimal obstruction.
+/// (4 273 kWh on the meter) agree. The heat-pump auxiliary energy follows
+/// 9.85 with A 13,0 for a device from 2015 (installation year 2021; the
+/// report's 46 kWh is that formula on its own 2 427 kWh); BENG 1 is 4,9 %
+/// lower with the overhang of the east windows modelled as minimal
+/// obstruction, which also carries BENG 2 below the report.
 #[test]
 fn case_d_under_nta_8800_2020_a1() {
     let value: Value = serde_json::from_str(include_str!(
@@ -214,16 +215,16 @@ fn case_d_under_nta_8800_2020_a1() {
     .unwrap();
     assert_eq!(value["ntaCalculation"]["normVersion"], "2020+A1");
     let (performance, indicators) = run_edition(&value, "2020+A1");
-    assert_indicators("D 2020+A1", indicators, [82.49, 38.42, 83.4]);
+    assert_indicators("D 2020+A1", indicators, [82.49, 37.06, 83.9]);
     let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
     assert!((pv - 4273.0).abs() < 1.0, "{pv}");
     assert!((used_kwh(&performance, "hotWater") - 3552.0).abs() < 1.0);
     assert!((used_kwh(&performance, "ventilation") - 401.0).abs() < 1.0);
-    // 9.85 with A 87,6 (2020 p. 334–336): 87,6 + 0,132 · E / (0,4 · 24).
+    // 9.85 with A 13,0 from 2015 (2020 p. 334–336): 13,0 + 0,132 · E / (0,4 · 24).
     let heating = used_kwh(&performance, "heating");
     let auxiliary = used_kwh(&performance, "auxiliary");
     assert!(
-        (auxiliary - (87.6 + 0.132 * heating / 9.6)).abs() < 0.5,
+        (auxiliary - (13.0 + 0.132 * heating / 9.6)).abs() < 0.5,
         "{auxiliary}"
     );
     // The report: 2 427 kWh for 12 136 kWh heat at COP 5,00.
