@@ -17,9 +17,45 @@ const SNAKE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
 /** A JSON-pointer-like or camelCase path literal, as passed next to a code. */
 const PATH_LITERAL = /^(?:[a-z][A-Za-z0-9]*[A-Z.\[][A-Za-z0-9.\[\]]*|)$/;
 
-/** Source text without test modules and line comments. */
+const TEST_ATTRIBUTE = '#[cfg(test)]';
+
+/**
+ * The source without the items marked `#[cfg(test)]`. Only the marked item goes: a
+ * test module, a test-only helper or a single statement in the middle of a file is
+ * cut up to its closing brace or semicolon, so production code after it is kept.
+ */
+function withoutTestItems(source: string): string {
+  let out = '';
+  let from = 0;
+  for (;;) {
+    const at = source.indexOf(TEST_ATTRIBUTE, from);
+    if (at < 0) return out + source.slice(from);
+    out += source.slice(from, at);
+    let i = at + TEST_ATTRIBUTE.length;
+    let depth = 0;
+    while (i < source.length) {
+      const ch = source[i];
+      if (ch === '"') {
+        i += 1;
+        while (i < source.length && source[i] !== '"') i += source[i] === '\\' ? 2 : 1;
+        i += 1;
+        continue;
+      }
+      i += 1;
+      if (ch === '{' || ch === '(' || ch === '[') depth += 1;
+      else if (ch === '}' || ch === ')' || ch === ']') {
+        depth -= 1;
+        if (depth <= 0 && ch === '}') break;
+        if (depth < 0) break;
+      } else if (ch === ';' && depth === 0) break;
+    }
+    from = i;
+  }
+}
+
+/** Source text without test items and line comments. */
 function productionSource(file: string): string {
-  return readFileSync(file, 'utf8').split('#[cfg(test)]')[0].replace(/\/\/[^\n]*/g, '');
+  return withoutTestItems(readFileSync(file, 'utf8').replace(/\/\/[^\n]*/g, ''));
 }
 
 /**

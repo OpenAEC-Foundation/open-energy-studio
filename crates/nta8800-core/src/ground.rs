@@ -69,7 +69,7 @@ pub struct SlabOnGround {
 pub struct HeatedBasement {
     /// z: actual depth of the floor below ground level, m; omit it when
     /// `wall_depths` gives the depth per wall part.
-    #[serde(default = "unset")]
+    #[serde(default = "unset", skip_serializing_if = "is_unset")]
     pub depth_m: f64,
     /// 8.42/D.12: depth z_j per wall part j along the perimeter; z is the
     /// length-weighted mean and Σℓ_j must equal the exposed perimeter.
@@ -91,6 +91,13 @@ pub struct BasementWallDepth {
 
 fn unset() -> f64 {
     f64::NAN
+}
+
+/// An unset depth (NaN, the depth then comes from `wall_depths`) stays out
+/// of the serialized input; written out it would trip the finite-number
+/// guard on the derived input.
+fn is_unset(value: &f64) -> bool {
+    value.is_nan()
 }
 
 impl HeatedBasement {
@@ -1067,5 +1074,27 @@ mod tests {
         basement.wall_depths[1].length_m = 10.0;
         basement.depth_m = 2.0;
         assert!(slab_on_ground_conductance(&floor).is_none());
+    }
+
+    /// A depth given per wall part leaves `depthM` unset (NaN); it must stay
+    /// out of the serialized input, or the derived project input carries a
+    /// NaN and the project is refused with `non_finite_result`.
+    #[test]
+    fn basement_with_wall_depths_serialises_without_depth() {
+        let basement: HeatedBasement = serde_json::from_value(serde_json::json!({
+            "wallDepths": [{"lengthM": 10.0, "depthM": 1.5}],
+            "wallResistanceM2kPerW": 2.5
+        }))
+        .unwrap();
+        assert!(basement.depth_m.is_nan());
+        let written = serde_json::to_value(&basement).unwrap();
+        assert!(written.get("depthM").is_none(), "{written}");
+        assert!(crate::finite::first_non_finite(&basement).is_none());
+        let again: HeatedBasement = serde_json::from_value(written).unwrap();
+        assert!(again.depth_m.is_nan());
+        // A given depth is still written.
+        let mut given = again;
+        given.depth_m = 2.0;
+        assert_eq!(serde_json::to_value(&given).unwrap()["depthM"], 2.0);
     }
 }
