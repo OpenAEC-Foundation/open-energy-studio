@@ -581,7 +581,7 @@ pub struct Window {
     pub tilt_deg: f64,
     /// Perpendicular `g_gl;n` (NEN-EN 410); may be omitted when
     /// `glazing.glazingType` gives the table 7.4 value.
-    #[serde(default = "nan_value")]
+    #[serde(default = "nan_value", skip_serializing_if = "is_nan_value")]
     pub g_perpendicular: f64,
     pub frame_fraction: f64,
     pub u_value_w_per_m2k: f64,
@@ -610,6 +610,12 @@ pub struct Window {
 
 fn nan_value() -> f64 {
     f64::NAN
+}
+
+/// An omitted `g_gl;n` (NaN, taken from `glazing.glazingType`) stays out of
+/// the serialized input, so the derived input passes the finite-number guard.
+fn is_nan_value(value: &f64) -> bool {
+    value.is_nan()
 }
 
 impl Window {
@@ -3995,5 +4001,18 @@ mod tests {
         );
         let july = &shaded_result.monthly[6];
         assert!(july.window_solar_cooling_kwh < july.window_solar_gains_kwh);
+    }
+
+    /// A window without `gPerpendicular` takes `g_gl;n` from the glazing
+    /// type (table 7.4); the unset NaN must stay out of the serialized input.
+    #[test]
+    fn window_without_g_perpendicular_serialises_without_it() {
+        let mut window = sample().windows[0].clone();
+        window.g_perpendicular = f64::NAN;
+        let written = serde_json::to_value(&window).unwrap();
+        assert!(written.get("gPerpendicular").is_none(), "{written}");
+        assert!(crate::finite::first_non_finite(&window).is_none());
+        let again: Window = serde_json::from_value(written).unwrap();
+        assert!(again.g_perpendicular.is_nan());
     }
 }

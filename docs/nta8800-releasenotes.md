@@ -2,6 +2,17 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 8 oktober 2026 — kelder met diepte per wanddeel rekent weer; dekking van alle opties
+
+- Een verwarmde kelder met de diepte per wanddeel (`groundFloors[].heatedBasement.wallDepths`, 8.42/D.12) zonder `depthM` gaf status `invalid` met `non_finite_result`. De lege `depthM` kwam als NaN in de afgeleide invoer. Hij blijft nu weg, net als de lege `reductionFactor` van 7 oktober.
+- Dezelfde vorm, nog zonder gevolg: een raam van de gebouwinvoer zonder `gPerpendicular` (g_gl;n uit tabel 7.4) schreef NaN weg. Ook die blijft nu weg.
+- 129 meldcodes hadden geen Nederlandse of Engelse tekst en verschenen als kale code. Het gaat vooral om bijlage P, tapwater, de tweede verwarmingssystemen en de rekenzones, bijvoorbeeld `zone_data_missing`, `heating_system_zone_unknown`, `table_p11_no_value` en `hot_water_heat_pump_class_exceeded`. De controle op teksten las elk bronbestand maar tot de eerste testregel (`#[cfg(test)]`). Een testhulp halverwege een bestand verborg zo de code erna, en codes via `ok_or("…")` vond zij niet. Alle codes hebben nu een tekst.
+- Nieuwe test `crates/nta8800-core/tests/option_coverage.rs` loopt elke optie van de invoer door, in alle vijf uitgaven:
+  - elke variant van elke keuzelijst: 1 203;
+  - elk optioneel veld, gevuld: 1 130;
+  - elk ingevuld optioneel veld, weggelaten: 299.
+  Ze worden niet met de hand bijgehouden; de invoertypen zelf noemen ze. Elke berekening rekent, of weigert met een benoemde code met tekst. Geen enkele valt om of geeft een niet-eindig getal. Een nieuwe variant of een nieuw veld valt er vanzelf onder.
+
 ## 7 oktober 2026 — openbare gevallen E en F met de belemmeringsmaten uit de uitdraai
 
 Geen wijziging in de kern. De Uniec-uitdraaien van E en F geven per zijbelemmering de hoogte, de afstand en de breedte, in een blok dat bij tekstextractie wegvalt. Met b_b = afstand / breedte (2020 p. 669, 2022 p. 673) staan die nu per raam in `windowObstructions`:

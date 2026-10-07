@@ -398,3 +398,103 @@ async fn cors_is_off_by_default_and_configurable() {
     let (_, headers, _) = send(app_with(config), other).await;
     assert!(headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
 }
+
+/// The option sweep of the kernel (crates/nta8800-core/tests/option_coverage.rs)
+/// through the HTTP layer, for a few options of each outcome and every
+/// edition: a calculated input answers 200 with a calculated status, a refused
+/// one 422 with at least one code, a malformed one 400 with the error
+/// envelope, and nothing answers 500 (non_finite_result, kernel_panic). The
+/// first two options are the two NaN refusals the sweep found.
+#[tokio::test]
+async fn option_sweep_keeps_the_http_error_model() {
+    let terraced = without_nulls(fixture("nta8800-example-terraced-dwelling.json"));
+    let mut options: Vec<(&str, Value)> = Vec::new();
+    let mut basement = terraced.clone();
+    basement["ntaCalculation"]["groundFloors"][0]["heatedBasement"] = json!({
+        "wallDepths": [{ "lengthM": 10.0, "depthM": 1.5 }],
+        "wallResistanceM2kPerW": 2.5
+    });
+    options.push(("heated basement with depth per wall part", basement));
+    let mut shutters = terraced.clone();
+    shutters["ntaCalculation"]["windowSolar"]["movableShading"] = json!({
+        "device": { "kind": "external_roller_shutter", "colour": "white" },
+        "control": "manual_residential",
+        "sourceReference": "table 7.5 device"
+    });
+    options.push(("table 7.5 shading device", shutters));
+    options.push((
+        "example office",
+        without_nulls(fixture("nta8800-example-office.json")),
+    ));
+    let mut unknown = terraced.clone();
+    unknown["ntaCalculation"]["generator"]["kind"] = json!("not_a_generator");
+    options.push(("unknown generator kind", unknown));
+    let mut without = terraced.clone();
+    without.as_object_mut().unwrap().remove("ntaCalculation");
+    options.push(("without ntaCalculation", without));
+    for (label, project) in options {
+        for edition in ["2025+C1", "2024", "2023", "2022", "2020+A1"] {
+            let mut project = project.clone();
+            if project.get("ntaCalculation").is_some() {
+                project["ntaCalculation"]["normVersion"] = json!(edition);
+            }
+            let (status, body) = post(
+                "/v1/nta8800/project/performance",
+                json!({ "project": project }),
+            )
+            .await;
+            let context = format!("{label} {edition}: {status} {body}");
+            match status {
+                StatusCode::OK => assert!(
+                    body["status"].as_str().unwrap().starts_with("calculated"),
+                    "{context}"
+                ),
+                StatusCode::UNPROCESSABLE_ENTITY => {
+                    // The refusal names its cause in the project gaps or, for
+                    // a route of the building calculation, in its issues.
+                    let codes: Vec<&Value> = ["/gaps", "/performance/issues"]
+                        .iter()
+                        .filter_map(|pointer| body.pointer(pointer).and_then(Value::as_array))
+                        .flatten()
+                        .map(|entry| &entry["code"])
+                        .collect();
+                    assert!(!codes.is_empty(), "{context}");
+                    assert!(
+                        codes.iter().all(|code| *code != "non_finite_result"),
+                        "{context}"
+                    );
+                }
+                _ => panic!("{context}"),
+            }
+        }
+    }
+    // A shape error of the survey (an unknown variant) is the error envelope.
+    for edition in ["2025+C1", "2020+A1"] {
+        let mut survey = fixture("nta8800-opname-1930-terraced.json");
+        survey["normVersion"] = json!(edition);
+        let (status, body) = post(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": survey.clone() }),
+        )
+        .await;
+        // An older edition may refuse a route of the survey, with its codes.
+        match status {
+            StatusCode::OK => {}
+            StatusCode::UNPROCESSABLE_ENTITY => assert!(
+                body["issues"]
+                    .as_array()
+                    .is_some_and(|issues| !issues.is_empty()),
+                "{edition}: {body}"
+            ),
+            _ => panic!("{edition}: {status} {body}"),
+        }
+        survey["dwelling"] = json!("not_a_dwelling");
+        let (status, body) = post(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": survey }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{edition}: {body}");
+        assert_envelope(&body, "invalid_request_shape");
+    }
+}
