@@ -8,6 +8,8 @@ Dit document beschrijft het versiebeleid dat BRL 9501 van 29-05-2026 in §4.3 (p
 
 Daarnaast behandelt het de registratie van de rekenkernversie bij RVO (§5.2, p. 9) en de bewaartermijn van oude versies (§5.3, p. 9). Dit is een werkdocument: het programma is niet geattesteerd.
 
+De [BRL 9501-gereedheid](nta8800-brl9501-gereedheid.md) loopt alle eisen van BRL 9501 na en geeft wat een attest nog tegenhoudt.
+
 ## Opbouw van het versienummer
 
 Een berekening draagt twee versienummers.
