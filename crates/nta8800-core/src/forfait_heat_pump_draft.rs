@@ -127,6 +127,13 @@ pub struct ForfaitHeatPumpDraftInput {
     /// efficiency replaces the table 9.27/9.28/9.29 value (§9.1, p. 285).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quality_declaration: Option<HeatPumpQualityDeclaration>,
+    /// Build year of the device. Only NTA 8800:2020+A1 uses it: the 9.85
+    /// forfait A is 13,0 kWh from 2015 and 87,6 kWh before or unknown
+    /// (2020 p. 336); later editions give heat pumps one A of 43,8 kWh.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installation_year: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installation_year_reference: Option<String>,
 }
 
 /// Declared values of a heat pump for space heating (§9.1, p. 285): the
@@ -414,6 +421,29 @@ pub fn assess_forfait_heat_pump_draft(
         issues.push(issue("source_required", "classificationSourceReference"));
     }
     issues.extend(source_classification_issues(input));
+    if input
+        .installation_year
+        .is_some_and(|year| !(1900..=2026).contains(&year))
+    {
+        issues.push(issue("installation_year_invalid", "installationYear"));
+    }
+    if input.installation_year.is_some()
+        && input
+            .installation_year_reference
+            .as_deref()
+            .map_or(true, |reference| reference.trim().is_empty())
+    {
+        issues.push(issue(
+            "installation_year_reference_required",
+            "installationYearReference",
+        ));
+    }
+    if input.installation_year.is_none() && input.installation_year_reference.is_some() {
+        issues.push(issue(
+            "installation_year_reference_without_year",
+            "installationYearReference",
+        ));
+    }
     let source_fallback_applied = source_fallback_applies(input);
     let source_fallback_reason = if input.source == TableSource::GroundOrGroundwaterUnknown {
         Some("ground_or_groundwater_unknown")
@@ -658,6 +688,8 @@ mod tests {
 
     fn example(scope: TableScope, source: TableSource, temp: f64) -> ForfaitHeatPumpDraftInput {
         ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope,

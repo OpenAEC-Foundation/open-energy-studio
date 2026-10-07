@@ -957,14 +957,17 @@ mod switch_points_2020 {
     fn heat_pumps_take_the_device_aux_forfait() {
         // 2020 p. 334–336: A 87,6, B 0,132, C 1,44/3,6, B_nom 24; 2022
         // p. 338: A 43,8, B 0,132, C 0,7, B_nom 3.
+        // 2020 p. 336: A 87,6 before 2015 or unknown, 13,0 from 2015.
         let aux = crate::space_heating_chain::heat_pump_forfait_auxiliary_kwh;
-        close(
-            v2020(|| aux(100.0)),
-            87.6 / 12.0 + 0.132 * 100.0 / (0.4 * 24.0),
-        );
-        close(
-            v2022(|| aux(100.0)),
-            43.8 / 12.0 + 0.132 * 100.0 / (0.7 * 3.0),
-        );
+        let gas = 0.132 * 100.0 / (0.4 * 24.0);
+        close(v2020(|| aux(100.0, None)), 87.6 / 12.0 + gas);
+        close(v2020(|| aux(100.0, Some(2014))), 87.6 / 12.0 + gas);
+        close(v2020(|| aux(100.0, Some(2015))), 13.0 / 12.0 + gas);
+        // From 2022 the heat-pump constants have no build year (2022
+        // p. 338; 2025+C1 p. 360): the year changes nothing.
+        let pump = 43.8 / 12.0 + 0.132 * 100.0 / (0.7 * 3.0);
+        close(v2022(|| aux(100.0, None)), pump);
+        close(v2022(|| aux(100.0, Some(2020))), pump);
+        close(aux(100.0, Some(2010)), pump);
     }
 }
