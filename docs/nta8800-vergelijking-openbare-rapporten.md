@@ -201,11 +201,10 @@ Per post, elektriciteit in kWh/jr:
 
 ### Gezochte rapporten (7 oktober 2026)
 
-Gezocht is op openbare BENG-rapporten bij vergunningen (repository.officiele-overheidspublicaties.nl, planviewer.nl, gemeentesites) met rekendata in de periodes van 2020+A1 en 2022. Gevonden en niet nagebouwd (het rapport van Boekel is sindsdien geval E):
+Gezocht is op openbare BENG-rapporten bij vergunningen (repository.officiele-overheidspublicaties.nl, planviewer.nl, gemeentesites) met rekendata in de periodes van 2020+A1 en 2022. Gevonden en niet nagebouwd (het rapport van Boekel is sindsdien geval E, dat van Kelperveen geval F):
 
 | Rapport | Periode | Waarom niet |
 |---|---|---|
-| [vrijstaande woning 209 m², Uniec 3.1.5.0, 31-01-2023](https://www.boekel.nl/data/downloadables/2/2/1/8/7564003_1675349122509_20230131-bb_beng_mpg-22-323.pdf) | 2022 | per raam verschillende belemmeringen (zij-, volledige en minimale belemmering), twee tapwatersystemen (warmtepomp en een close-in boiler van 7 l) en twee opwekkers met een energiefractie; de kern heeft één belemmering per zone, dus de herbouw zou de zonwinst sterk benaderen |
 | [vrijstaande woning 291 m², Vabi EPA, 1-8-2022](https://repository.officiele-overheidspublicaties.nl/externebijlagen/exb-2022-66238/1/bijlage/exb-2022-66238.pdf) | 2022 (rapportdatum) | ander programma en geen rekendatum in de uitdraai; editie niet vast te stellen |
 | [woongebouw met 28 appartementen, Uniec 3.1.3.1, 12-07-2022](https://www.schagen.nl/sites/default/files/2022-12/05%20Beng%20berekening.pdf) | 2022 | meerdere zones en woningen; herbouw uit de uitdraai vraagt veel aannames |
 | [woning, Uniec 3.2.4.1, 24-11-2023](https://www.boekel.nl/data/downloadables/5/7/7/3/8290459_1703078780501_2248-og10-beng-berekening-geanonimiseerd.pdf), [appartementen, Uniec 3.2.3.0, 9-11-2023](https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-31972/1/bijlage/06._2022288.beng.wd.b0.pdf), [woning, 23-2-2024](https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-13030/1/bijlage/23-73_BENG-berekening_28.pdf) | 2023 | niet in een van de gezochte edities |
