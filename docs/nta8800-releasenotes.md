@@ -2,6 +2,12 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 7 oktober 2026 — openbare gevallen E en F met de belemmeringsmaten uit de uitdraai
+
+Geen wijziging in de kern. De Uniec-uitdraaien van E en F geven per zijbelemmering de hoogte, de afstand en de breedte, in een blok dat bij tekstextractie wegvalt. Met b_b = afstand / breedte (2020 p. 669, 2022 p. 673) staan die nu per raam in `windowObstructions`:
+- F (2020+A1): acht ramen met zijbelemmering, twee daarvan met de koelvoorwaarde (≥ 2,5 m). 74,06 / 3,79 / 96,3 tegen gepubliceerd 74,69 / 2,59 / 97,5 (was 73,49 / 3,68 / 96,4 met minimale belemmering).
+- E (2022): de vier zijbelemmeringen krijgen hun eigen b_b in plaats van de aangenomen 0,5. 88,61 / 31,68 / 72,6 tegen gepubliceerd 86,82 / 28,89 / 74,1 (was 88,77 / 31,73 / 72,6).
+
 ## 7 oktober 2026 — bewijskoppelingen op id
 
 Geen wijziging in uitkomst of status. Een koppeling van een bewijsstuk of opnamefoto (`linkedPaths`) noemt een element nu bij zijn id: `/zones/@woonzone/surfaces/@gevel-noord`, `/basisopname/survey/pv/@pv-1`. Daardoor blijft de koppeling bij het element als een ander element wordt verwijderd of verschoven.

@@ -125,7 +125,7 @@ Sinds de kern NTA 8800:2022 en 2020+A1 rekent, lopen A en D in 2020+A1 en B in 2
 | A (2020+A1) | 92,99 / 25,19 / 80,4 | 94,00 / 35,15 / 74,9 | 94,00 / 36,06 / 74,4 |
 | B (2022) | 54,61 / 27,10 / 64,8 | 52,96 / 28,84 / 62,6 | 52,96 / 29,10 / 62,5 |
 | D (2020+A1) | 86,72 / 39,19 / 83,5 | – | 86,35 / 39,07 / 83,6 |
-| E (2022) | 86,82 / 28,89 / 74,1 | – | 88,77 / 31,73 / 72,6 |
+| E (2022) | 86,82 / 28,89 / 74,1 | – | 88,61 / 31,68 / 72,6 |
 
 **Invoer die de oudere edities anders vragen.**
 - (8.47): 2022 en 2020+A1 rekenen met de werkelijke hoogte h van de vloer boven maaiveld (2022 p. 236). A en B geven 0,10 m. Dat verandert BENG 1 niet op twee decimalen.
@@ -173,10 +173,10 @@ Per post, elektriciteit in kWh/jr (het rapport geeft primaire energie; gedeeld d
 
 D in 2022 (alleen ter vergelijking; D valt in de periode van 2020+A1): 86,35 / 41,79 / 82,6. Het verschil met 2020+A1 is de hulpenergie van de warmtepomp: 2022 rekent een warmtepomp met de eigen constanten van 9.85 (A 43,8, punt 74), 2020+A1 met A 13,0 voor een toestel vanaf 2015.
 
-**E in 2022.** Een vrijstaande woning van 209,40 m² met één rekenzone (Uniec 3.1.5.0, 31-01-2023, [rapport](https://www.boekel.nl/data/downloadables/2/2/1/8/7564003_1675349122509_20230131-bb_beng_mpg-22-323.pdf)). Gepubliceerd 86,82 / 28,89 / 74,1 en TOjuli 0 (actieve koeling). De kern: 88,77 / 31,73 / 72,6. De test is `case_e_under_nta_8800_2022`. Herbouw:
+**E in 2022.** Een vrijstaande woning van 209,40 m² met één rekenzone (Uniec 3.1.5.0, 31-01-2023, [rapport](https://www.boekel.nl/data/downloadables/2/2/1/8/7564003_1675349122509_20230131-bb_beng_mpg-22-323.pdf)). Gepubliceerd 86,82 / 28,89 / 74,1 en TOjuli 0 (actieve koeling). De kern: 88,61 / 31,68 / 72,6. De test is `case_e_under_nta_8800_2022`. Herbouw:
 - Vier gevels met elk hun constructies (spouwmuur Rc 5,99, betimmering 5,19, zijwang dakkapel 4,70), vier dakvlakken onder 50° (Rc 6,30) met dakramen, vloer op grond 139,08 m² (Rc 3,98), omtrek 65,53 m. De bruto gevelvlakken sluiten op de ramen (58,52 / 50,75 / 51,73 / 60,29 m²).
 - Geen lineaire bruggen in de uitdraai: de forfaitaire toeslag ΔU_for van 8.2/8.3. Zonder die toeslag gaf de herbouw 72,67 voor BENG 1.
-- Belemmering per raam (`windowObstructions`): zijbelemmering op D en L (voorgevel) en op I en H (noordgevel), volledige belemmering op F (13,19 m² oost) en G. De breedte van de zijbelemmeringen staat niet in de uitdraai; de fixture neemt b_b 0,5. Een breedte van 0,1 tot 2,0 verandert BENG 1 met ten hoogste 0,16. Voor de volledige belemmering neemt de fixture aan dat de koelvoorwaarden niet vaststaan (tabel 17.5); met de voorwaarden vervuld daalt BENG 1 met 1,10 en BENG 2 met 0,83.
+- Belemmering per raam (`windowObstructions`): zijbelemmering op D en L (voorgevel) en op I en H (noordgevel), volledige belemmering op F (13,19 m² oost) en G. De uitdraai geeft per zijbelemmering de hoogte, de afstand en de breedte, in een blok dat bij tekstextractie wegvalt maar in de opgemaakte pagina staat. Met b_b = afstand / breedte (2022 p. 673): D 3,31 / 1,10 = 3,01, L 2,33 / 1,75 = 1,33, I 4,61 / 12,85 = 0,36 en H 1,49 / 12,85 = 0,12, alle lager dan 2,5 m. Een eerdere versie van de fixture nam b_b 0,5 voor alle vier (88,77 / 31,73 / 72,6). Voor de volledige belemmering neemt de fixture aan dat de koelvoorwaarden niet vaststaan (tabel 17.5); met de voorwaarden vervuld daalt BENG 1 met 1,10 en BENG 2 met 0,83.
 - Lucht/waterwarmtepomp 9 kW met productspecifiek COP 4,15, energiefractie 0,992 en 281 kWh hulpenergie; aanvullende distributiepomp 164 W (EEI 0,23); 20,10 m geïsoleerde leiding buiten de verwarmde zone.
 - Twee tapwatersystemen, verdeeld met 13.19a: de warmtepomp (productspecifiek 1,60) op de badruimte, een kokendwaterkraan met een vat van 7 l (H 0,12 W/K) op het aanrecht. Het rapport geeft 2 962 en 625 kWh behoefte.
 - Ventilatie D.2 met wtw 0,893, volledige bypass met koudeterugwinning, ventilatoren 170,8 W met f 0,364; infiltratie gemeten 0,63.
@@ -187,7 +187,7 @@ Per post, elektriciteit in kWh/jr:
 
 | Post | Rapport | Kern |
 |---|---|---|
-| Verwarming | 3 915 | 4 018 |
+| Verwarming | 3 915 | 4 010 |
 | Hulpenergie verwarming | 341 | 342 |
 | Tapwater | 2 574 | 2 608 |
 | Koeling | 186 | 372 |
@@ -197,7 +197,7 @@ Per post, elektriciteit in kWh/jr:
 
 - Ventilatoren, PV en de hulpenergie van de verwarming zijn gelijk aan het rapport.
 - Koeling: de letterlijke lezing van 10.15 (zie de gevallen A–C) verdubbelt hier de koude-elektriciteit. Ook de hulpenergie van de koeling ligt hoger.
-- Verwarming en BENG 1 (+2,2 %): de aannames voor de belemmeringen en de forfaitaire toeslag, waarvan het rapport de uitkomst niet toont.
+- Verwarming en BENG 1 (+2,1 %): de aanname voor de volledige belemmering en de forfaitaire toeslag, waarvan het rapport de uitkomst niet toont.
 
 ### Gezochte rapporten (7 oktober 2026)
 
@@ -220,7 +220,8 @@ Een vrijstaande woning van 231,61 m² met twee bouwlagen, een kap met dakkapelle
 | | BENG 1 | BENG 2 | BENG 3 |
 |---|---|---|---|
 | Rapport | 74,69 | 2,59 | 97,5 |
-| Kern in 2020+A1 | 73,49 | 3,68 | 96,4 |
+| Kern in 2020+A1 | 74,06 | 3,79 | 96,3 |
+| Kern zonder belemmering per raam (eerste herbouw) | 73,49 | 3,68 | 96,4 |
 
 **Herbouw.**
 - Gevels NO en ZW 65,92 m² bruto, ZO en NW 47,17 m² (Rc 4,70); hellende daken NO en ZW 56,29 m² onder 35°, plat dak 63,80 m² en plat dak van de dakkapel 4,25 m² (Rc 6,30); dakkapelgevels en -wangen; vloer op grond 155,89 m² (Rc 3,70), z ≤ 0,3, h 0,00 m, omtrek 61,72 m (de funderingslengtes 01 en 02). Ramen U 1,4 / g 0,60, deuren U 1,6 / g 0. Alle lineaire bruggen per vlak zoals opgegeven. De opgetelde verliesoppervlakte is 567,70 m²; het rapport noemt 520,93 m² (compactheid 2,25). Dat verschil is niet te herleiden uit de uitdraai, maar A_ls telt alleen in de eis, niet in de indicatoren.
@@ -237,18 +238,18 @@ Per post, elektriciteit in kWh/jr (BENG 2-effect = verschil × 1,45 / 231,61):
 
 | Post | Rapport | Kern | Verschil in BENG 2 |
 |---|---|---|---|
-| Verwarming, warmtepomp en element (warmte) | 3 326 (13 864) | 3 243 (circa 13 530) | −0,52 |
+| Verwarming, warmtepomp en element (warmte) | 3 326 (13 864) | 3 265 (circa 13 620) | −0,39 |
 | Hulpenergie verwarming | 55 | 55 | 0 |
 | Tapwater | 3 157 | 3 157 | 0 |
 | Ventilatoren, met vorstbeveiliging | 987 | 987 | 0 |
-| Koeling, opwekker | 112 | 150 | +0,24 |
+| Koeling, opwekker | 112 | 146 | +0,22 |
 | Hulpenergie koeling | 1 | 88 | +0,54 |
 | PV (op de meter) | 7 226 | 7 094 | +0,83 |
-| **BENG 2** | **2,59** | **3,68** | **+1,09** |
+| **BENG 2** | **2,59** | **3,79** | **+1,20** |
 
 - **Verwarming en tapwater.** Beide rapportposten volgen uit de verklaarde rendementen met f_prac 0,95: 13 664 / (4,60 × 0,95) + 200 = 3 326 kWh en 5 849 / (1,95 × 0,95) = 3 157 kWh. De kern rekent zo ook; het verschil bij verwarming komt alleen uit de lagere warmtevraag.
 - **PV.** Uniec telt 24 × 360 Wp = 8 640 Wp. De kern volgt (16.4) met K_pk naar beneden afgerond op 5 W/m² (2020 p. 651): 190 × 44,64 = 8 482 Wp. Dat is ook het vermogen dat het energielabel in hetzelfde rapport noemt. Met 8 640 Wp geeft de kern precies de 7 226 kWh van het rapport. De tekst van 2020+A1 zegt dat het piekvermogen met (16.4) "kan" worden berekend; geval A (Uniec 3.0.16) volgde wel de afronding, geval F (Uniec 3.0.19.4) niet. De kern houdt de afronding van punt 68 aan.
 - **Koeling.** De kern rekent een netto koudebehoefte van 274 kWh met een afgifteverlies volgens 10.15 van 176 kWh (64 %). Het rapport noemt 337 kWh koude voor het systeem; bij dezelfde netto behoefte is dat een verlies van ongeveer 23 %. De hulpenergie is de regelenergie van 10.87 (87,6 kWh). Dit zijn de bekende vragen bij 10.15 en 10.87 (zie [nta8800-vragen-nen.md](nta8800-vragen-nen.md)).
-- **BENG 1.** De kern rekent 1,6 % minder (73,49 tegen 74,69), de netto warmtebehoefte 11 701 kWh tegen 12 055 kWh (52,05 kWh/m²). Negen ramen hebben in het rapport een zijbelemmering, links of rechts, waarvan de breedte niet in de uitdraai staat: twee op NO, vijf op ZW (onder meer de pui van 7,59 m²) en één op NW, samen 19,83 m² van 45,48 m² glas (44 %). De kern heeft één belemmering per zone en rekent met minimale belemmering. Een zijbelemmering op alle ramen verhoogt BENG 1 met 1,12 (relatieve breedte 1,0) tot 2,50 (0,5); naar rato van het belemmerde glas is dat +0,5 tot +1,1, het grootste deel van het verschil. TOjuli is 0, net als in het rapport (actieve koeling).
+- **BENG 1.** De kern rekent 0,8 % minder (74,06 tegen 74,69). Acht ramen hebben in het rapport een zijbelemmering: twee op NO, vijf op ZW (onder meer de pui van 7,59 m²) en één op NW, samen 19,83 m² van 45,48 m² glas (44 %). De uitdraai geeft per raam de hoogte, de afstand en de breedte, in een blok dat bij tekstextractie wegvalt. Met b_b = afstand / breedte (2020 p. 669) staan ze per raam in `windowObstructions`: V0.5 0,32 en V0.6 0,83 (beide ≥ 2,5 m hoog, dus met de koelvoorwaarde van p. 672), A0.4 0,37, A0.5 0,88, A0.6 1,83, A0.7b 2,44, A0.8 3,32 (< 2,5 m) en R0.1 0,12 (links, < 2,5 m). De eerste herbouw, van vóór de belemmering per raam, rekende met minimale belemmering: 73,49 / 3,68 / 96,4. TOjuli is 0, net als in het rapport (actieve koeling).
 
 **Gevonden fout in de kern.** De witte rolluiken zijn een apparaat uit tabel 7.5 (`movableShading.device`). Zonder eigen `reductionFactor` bleef dat veld NaN en kwam het zo in de afgeleide invoer, waarna de controle op eindige getallen de hele berekening weigerde (`non_finite_result`). Elk project met een zonwering uit tabel 7.5 of 7.6 kon daardoor niet rekenen. Het veld wordt nu weggelaten als het niet is opgegeven (test `shading_device_serialises_without_reduction_factor`).
