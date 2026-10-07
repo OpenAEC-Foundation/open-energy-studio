@@ -285,3 +285,89 @@ fn cases_b_and_c_under_nta_8800_2023() {
     assert!((c23[2] - 69.8).abs() <= 0.15, "{c23:?}");
     assert!((c23[0] - c.beng1).abs() <= 0.05, "{c23:?}");
 }
+
+/// Case F: a detached house of 231,61 m² with a pitched and a flat roof,
+/// calculated on 08-03-2022 with Uniec 3.0.19.4 (NTA 8800:2020+A1);
+/// published 74,69 / 2,59 / 97,5. Hot water (3 157 kWh: 5 849 kWh at COP
+/// 1,95 and f_prac 0,95), fans (987 kWh with frost protection), the heating
+/// pipe length (148,23 m forfait) and the declared heat-pump auxiliary
+/// energy (55 kWh) agree. What differs:
+/// - PV: Uniec counts 24 × 360 Wp = 8 640 Wp; the kernel takes (16.4) with
+///   K_pk floored to 190 W/m² (2020 p. 651), 8 482 Wp, the value the label
+///   page of the same report prints. Scaled to 8 640 Wp the kernel gives the
+///   report's 7 226 kWh.
+/// - Cooling: the literal 10.15 emission loss and the 10.87 control energy
+///   (87,6 kWh/year), the known interpretation questions.
+/// - BENG 1 is 1,6 % lower: nine windows have a side obstruction whose
+///   width is not in the printout; the kernel has one obstruction per zone
+///   and takes minimal obstruction.
+///
+/// The roller shutters are a table 7.5 device: before this case a device
+/// left `reductionFactor` NaN in the derived input and the finite-number
+/// guard refused every such project.
+#[test]
+fn case_f_under_nta_8800_2020_a1() {
+    let value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-f.json"
+    ))
+    .unwrap();
+    assert_eq!(value["ntaCalculation"]["normVersion"], "2020+A1");
+    let (performance, indicators) = run_edition(&value, "2020+A1");
+    assert_indicators("F 2020+A1", indicators, [73.49, 3.68, 96.4]);
+    assert!((used_kwh(&performance, "hotWater") - 3157.0).abs() < 1.0);
+    assert!((used_kwh(&performance, "ventilation") - 987.0).abs() < 1.0);
+    let heating = &performance["spaceHeating"];
+    assert_eq!(
+        heating["annualAuxiliaryElectricityKwh"].as_f64(),
+        Some(55.0)
+    );
+    let pipe = heating["distribution"]["pipeLengthM"].as_f64().unwrap();
+    assert!((pipe - 148.23).abs() < 0.01, "{pipe}");
+    // Declared COP 4,60 · f_prac 0,95 = 4,37 (report: 13 664 kWh / 4,37 +
+    // 200 kWh element = 3 326 kWh on 13 864 kWh heat; the kernel's heat is
+    // 2,4 % lower, see BENG 1).
+    assert_eq!(heating["generationEfficiency"].as_f64(), Some(4.37));
+    assert!((used_kwh(&performance, "heating") - 3242.7).abs() < 1.0);
+    let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
+    assert!((pv - 7093.7).abs() < 1.0, "{pv}");
+    assert!((pv * 8640.0 / (190.0 * 44.64) - 7226.0).abs() < 2.0, "{pv}");
+    // 10.87: 0,010 kW in every month with a cooling generator, plus the pump.
+    let cooling_auxiliary: f64 = performance["cooling"]["months"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|month| month["auxiliaryElectricityKwh"].as_f64().unwrap())
+        .sum();
+    assert!(
+        (87.6..89.0).contains(&cooling_auxiliary),
+        "{cooling_auxiliary}"
+    );
+    assert!((used_kwh(&performance, "cooling") - 150.0).abs() < 1.0);
+}
+
+/// A table 7.5/7.6 device leaves `reductionFactor` unset; it must not be
+/// written out as a non-finite number.
+#[test]
+fn shading_device_serialises_without_reduction_factor() {
+    use nta8800_core::solar_shading::MovableShading;
+    let shading: MovableShading = serde_json::from_value(serde_json::json!({
+        "device": {"kind": "external_roller_shutter", "colour": "white"},
+        "control": "manual_residential",
+        "sourceReference": "test"
+    }))
+    .unwrap();
+    let written = serde_json::to_value(&shading).unwrap();
+    assert!(written.get("reductionFactor").is_none(), "{written}");
+    let again: MovableShading = serde_json::from_value(written).unwrap();
+    assert!(again.reduction_factor.is_nan());
+    let declared: MovableShading = serde_json::from_value(serde_json::json!({
+        "reductionFactor": 0.3,
+        "control": "manual_residential",
+        "sourceReference": "test"
+    }))
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(&declared).unwrap()["reductionFactor"],
+        0.3
+    );
+}

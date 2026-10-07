@@ -844,7 +844,7 @@ impl ShadingControl {
 pub struct MovableShading {
     /// `F_c` (7.43), rounded up to two decimals; omitted when `device`
     /// gives the table 7.5/7.6 value.
-    #[serde(default = "nan")]
+    #[serde(default = "nan", skip_serializing_if = "is_nan")]
     pub reduction_factor: f64,
     /// Table 7.5/7.6 device; replaces `reductionFactor`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -855,6 +855,12 @@ pub struct MovableShading {
 
 fn nan() -> f64 {
     f64::NAN
+}
+
+/// A table 7.5/7.6 device leaves `reductionFactor` unset (NaN); writing it
+/// out would trip the finite-number guard on the derived input.
+fn is_nan(value: &f64) -> bool {
+    value.is_nan()
 }
 
 impl MovableShading {
