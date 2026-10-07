@@ -1417,7 +1417,7 @@ export const en: Record<string, string> = {
   'nta.form.ac.other': 'other (utility)',
   'nta.form.ac.capacity': 'Capacity evidence (§5.7.1)',
   'nta.form.ac.dynamic': 'dynamic cooling load',
-  'nta.form.ac.annexAa': 'annex AA (calculation via Advanced)',
+  'nta.form.ac.annexAa': 'annex AA (calculation per room)',
   'nta.form.ac.solar': 'limited solar gain',
   'nta.form.ac.criterion': 'Criterion',
   'nta.form.ac.smallWindows': 'A_w < 0,2·A_g',

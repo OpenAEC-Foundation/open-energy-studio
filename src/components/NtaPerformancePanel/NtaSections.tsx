@@ -23,6 +23,7 @@ import {
 } from './NtaAdvancedSections';
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { DynamicWindowsFields } from './NtaDynamicWindows';
+import { AnnexAaCalculationFields } from './NtaAnnexAaFields';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import { ExternalSupplyFields } from './NtaExternalSupply';
@@ -312,7 +313,7 @@ function GeneralSection(props: NtaSectionProps) {
 /**
  * Annex AA inputs that only the 2024 edition reads (INT-V1:2024): the effective
  * mass per m² and the roof area per room. The rest of the annex AA calculation
- * is entered in the JSON editor.
+ * is entered in `AnnexAaCalculationFields`.
  */
 export function AnnexAa2024Fields(props: NtaSectionProps) {
   const { t } = useI18n();
@@ -336,9 +337,8 @@ export function AnnexAa2024Fields(props: NtaSectionProps) {
       })}>{t('nta.form.remove')}</button>
     </p>;
   }
-  if (calculation == null || typeof calculation !== 'object') {
-    return <p className="nta-form-note" role="note">{t('ntaStep.annexAa.noCalculation')}</p>;
-  }
+  // Without a calculation, `AnnexAaCalculationFields` offers to add one.
+  if (calculation == null || typeof calculation !== 'object') return null;
   const rooms = (read(draft, [...base, 'rooms']) as Draft[] | undefined) ?? [];
   return <div className="nta-form-row" data-testid="nta-annex-aa-2024">
     <NumberField {...f} path={[...base, 'effectiveMassKgPerM2']} label={t('ntaStep.annexAa.effectiveMass')} optional />
@@ -369,7 +369,10 @@ function ActiveCoolingSection(props: NtaSectionProps) {
       {read(draft, ['activeCooling', 'capacity', 'method']) === 'solar_limitation' &&
         <SelectField {...f} path={['activeCooling', 'capacity', 'criterion']} label={t('nta.form.ac.criterion')} options={[
           ['small_window_area', t('nta.form.ac.smallWindows')], ['shaded_glazing', t('nta.form.ac.shaded')]]} />}
-      {read(draft, ['activeCooling', 'capacity', 'method']) === 'annex_aa' && <AnnexAa2024Fields {...props} />}
+      {read(draft, ['activeCooling', 'capacity', 'method']) === 'annex_aa' && <>
+        <AnnexAaCalculationFields draft={draft} change={change} project={props.project} />
+        <AnnexAa2024Fields {...props} />
+      </>}
       <TextField {...f} path={['activeCooling', 'capacity', 'sourceReference']} label={t('nta.form.source')} />
       <TextField {...f} path={['activeCooling', 'sourceReference']} label={t('nta.form.source')} />
     </>}

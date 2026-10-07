@@ -9,6 +9,17 @@ Geen wijziging in uitkomst of status. Wel nieuw in het dossier en de invoer:
 - Bronvelden, gebouwelementen en opname-onderdelen krijgen bewijs en foto's uit het bewijsregister. Een opnamefoto is een registeritem met `linkedPaths` `/basisopname/survey/...`; de opname zelf verandert niet.
 - **Overnemen in projectmodel** schrijft de uit de opname afgeleide NTA-invoer in het concept. Geometrie, de zonegegevens van een opname met meer zones en aanvullende verwarmingssystemen worden niet overgenomen. De gebruiker past het concept zelf toe.
 
+## 7 oktober 2026 — Bijlage AA als formulier (geen rekenwijziging)
+
+De berekening voor bijlage AA (`activeCooling.capacity.calculation`) vul je nu in een formulier in, onder Installaties › Koeling, in plaats van in de JSON-editor. Het formulier bevat:
+- een tabel met de ruimten;
+- per ruimte de ramen uit het project;
+- dupliceren en verwijderen van ruimten;
+- meldingen bij het veld, met de meldcodes van de kern;
+- een knop "JSON bekijken" voor wie de JSON zelf wil bewerken.
+
+Het invoerformaat is ongewijzigd en bestaande projecten rekenen hetzelfde. Er zijn drie nieuwe meldcodes, die alleen het formulier gebruikt: `annex_aa_construction_year_required`, `annex_aa_room_id_required` en `annex_aa_room_id_duplicate`.
+
 ## 6 oktober 2026 — NTA 8800:2020+A1
 
 De uitgave `"2020+A1"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2022, plus de punten 68–79 in docs/nta8800-normversies.md:
