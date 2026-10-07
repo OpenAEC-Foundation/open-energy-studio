@@ -5,7 +5,7 @@
  * register entry, so it lands in the dossier ZIP and its manifest.
  *
  * `EvidenceAttach` links by JSON pointer (`linkedPaths`): building elements
- * and survey items (photos). `EvidenceReferencePicker` fills a `…Reference`
+ * and survey items (photos), stored by element id where the element has one. `EvidenceReferencePicker` fills a `…Reference`
  * text with `evidence:<id>`: the source fields of the NTA input.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -15,7 +15,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import type { NtaEvidenceItem } from '../../core/nta/KernelClient';
 import { createEvidenceItem, loadEvidenceBytes } from '../../core/nta/Evidence';
 import {
-  evidenceForPointer, evidenceIdsIn, evidenceReference, isImageFile, linkEvidence, unlinkEvidence,
+  evidenceForPointer, evidenceIdsIn, evidenceReference, isImageFile, linkEvidence, stablePointer, unlinkEvidence,
 } from '../../core/nta/EvidenceLinks';
 import { FileButton } from '../ui';
 import './EvidenceLink.css';
@@ -99,10 +99,13 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
   pointer: string; title?: string; hint?: string; photo?: boolean;
 }) {
   const { t } = useI18n();
+  const { state: { project } } = useEnergy();
   const [evidence, setEvidence] = useEvidenceRegister();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const linked = evidenceForPointer(evidence, pointer);
+  // Stored by element id where the element has one, so the link follows it.
+  const stable = stablePointer(project, pointer);
+  const linked = evidenceForPointer(evidence, pointer, project);
   const others = evidence.filter((item) => !linked.includes(item) && (!photo || isImageFile(item.fileName)));
   const heading = title ?? (photo ? t('evidenceLink.photos') : t('evidenceLink.title'));
 
@@ -112,7 +115,7 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
     setError(null);
     try {
       const added = await addFiles(files, evidence, photo);
-      setEvidence([...evidence, ...added.map((item) => ({ ...item, linkedPaths: [pointer] }))]);
+      setEvidence([...evidence, ...added.map((item) => ({ ...item, linkedPaths: [stable] }))]);
     } catch {
       setError(t('evidenceLink.failed'));
     } finally {
@@ -131,7 +134,7 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
         ? <p className="evidence-link__none">{t('evidenceLink.none')}</p>
         : <ul className="evidence-link__list">
           {linked.map((item) => <ItemRow key={item.id} item={item}
-            onUnlink={() => setEvidence(unlinkEvidence(evidence, item.id, pointer))} />)}
+            onUnlink={() => setEvidence(unlinkEvidence(evidence, item.id, pointer, project))} />)}
         </ul>}
       <div className="evidence-link__actions">
         <FileButton label={photo ? t('evidenceLink.addPhoto') : t('evidenceLink.add')} status={busy ? t('evidenceLink.busy') : ''}
@@ -143,7 +146,7 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
             void onFiles(input.files).then(() => { input.value = ''; });
           }} />
         <LinkExisting options={others} label={t('evidenceLink.linkExisting')}
-          onLink={(id) => setEvidence(linkEvidence(evidence, id, pointer))} />
+          onLink={(id) => setEvidence(linkEvidence(evidence, id, stable))} />
       </div>
       {error && <p className="evidence-link__error" role="alert">{error}</p>}
     </div>

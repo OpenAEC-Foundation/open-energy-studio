@@ -16,7 +16,7 @@ import {
 import { KernelCode } from '../KernelCode/KernelCode';
 import { EvidenceAttach } from '../EvidenceLink/EvidenceLink';
 import { SurveyTakeoverAction } from './SurveyTakeoverAction';
-import { jsonPointer } from '../../core/nta/EvidenceLinks';
+import { jsonPointer, linksAfterRemoval } from '../../core/nta/EvidenceLinks';
 import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
@@ -681,6 +681,20 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
   const kind = stored.kind;
   const draft = stored.survey as Draft;
   const change: Change = (path, value) => save({ kind, survey: write(draft, path, value) });
+  // Removes a survey item and keeps the photo links of the other items on their item
+  // (items without an id are linked by position, so the ones after it move up).
+  const removeAt = (path: Path, index: number) => {
+    const next: StoredSurvey = { kind, survey: write(draft, path, list(draft, path).filter((_, item) => item !== index)) };
+    const registration = state.project.registration;
+    const evidence = registration?.evidence ?? [];
+    save(next);
+    if (evidence.length === 0) return;
+    const moved = linksAfterRemoval(evidence, state.project, { ...state.project, basisopname: next },
+      surveyPointer(path), index);
+    if (moved.some((item, position) => item !== evidence[position])) {
+      dispatch({ type: 'UPDATE_PROJECT_INFO', payload: { registration: { ...registration, evidence: moved } } });
+    }
+  };
   const field = { draft, onChange: change };
   const surfaces = list(draft, ['envelope', 'surfaces']);
   const windows = list(draft, ['envelope', 'windows']);
@@ -875,7 +889,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             <NumberField {...field} path={[...base, 'shading', 'overhangRelativeHeight']} label={t('opname.window.relativeHeight')} />}
           <SolarControlField draft={draft} base={base} change={change} t={t} />
           <SurveyPhotos path={base} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'windows'], windows.filter((_, item) => item !== index))} />
+          <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['envelope', 'windows'], index)} />
         </div>;
       })}
       <ListControls label={t('opname.addWindow')}
@@ -892,7 +906,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             options={opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single'])} />
           <TextField {...field} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} />
           <SurveyPhotos path={base} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'rooflights'], rooflights.filter((_, item) => item !== index))} />
+          <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['envelope', 'rooflights'], index)} />
         </div>;
       })}
       <ListControls label={t('opname.addRooflight')}
@@ -928,7 +942,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         <HeatingGeneratorFields draft={draft} path={['heating', 'additionalGenerators', index, 'generator']} change={change} t={t} />
         <NumberField {...field} path={['heating', 'additionalGenerators', index, 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
         <SurveyPhotos path={['heating', 'additionalGenerators', index]} />
-        <RemoveButton label={t('opname.remove')} onRemove={() => change(['heating', 'additionalGenerators'], heatingExtras.filter((_, item) => item !== index))} />
+        <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['heating', 'additionalGenerators'], index)} />
       </div>)}
       <ListControls label={t('opname.addGenerator')}
         onAdd={() => change(['heating', 'additionalGenerators'], [...heatingExtras, { generator: heatingGeneratorTemplate('boiler'), nominalPowerKw: 20 }])} />
@@ -957,7 +971,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         <HotWaterGeneratorFields draft={draft} path={['hotWater', 'additionalGenerators', index, 'generator']} kind={kind} change={change} t={t} />
         <NumberField {...field} path={['hotWater', 'additionalGenerators', index, 'nominalPowerKw']} label={t('opname.nominalPowerKw')} />
         <SurveyPhotos path={['hotWater', 'additionalGenerators', index]} />
-        <RemoveButton label={t('opname.remove')} onRemove={() => change(['hotWater', 'additionalGenerators'], hotWaterExtras.filter((_, item) => item !== index))} />
+        <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['hotWater', 'additionalGenerators'], index)} />
       </div>)}
       <ListControls label={t('opname.addGenerator')}
         onAdd={() => change(['hotWater', 'additionalGenerators'], [...hotWaterExtras, { generator: hotWaterGeneratorTemplate('electric_instantaneous'), nominalPowerKw: 10 }])} />
@@ -977,7 +991,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
           <CheckField {...field} path={[...base, 'alsoSpaceHeating']} label={t('opname.solar.alsoSpaceHeating')} />
           <TextField {...field} path={[...base, 'sourceReference']} label={t('opname.sourceReference')} />
           <SurveyPhotos path={base} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['hotWater', 'solar'], solar.filter((_, item) => item !== index))} />
+          <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['hotWater', 'solar'], index)} />
         </div>;
       })}
       <ListControls label={t('opname.addSolar')} onAdd={() => change(['hotWater', 'solar'], [...solar, solarTemplate(solar.length)])} />
@@ -1000,7 +1014,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
           <TextField {...field} path={[...base, 'sourceReference']} label={t('opname.sourceReference')} />
           <SurveyPhotos path={base} />
           <RemoveButton label={t('opname.remove')}
-            onRemove={() => change(['additionalHotWaterSystems'], hotWaterSystems.filter((_, item) => item !== index))} />
+            onRemove={() => removeAt(['additionalHotWaterSystems'], index)} />
         </div>;
       })}
       {kind === 'utility' && <ListControls label={t('opname.hotWater.addSystem')}
@@ -1097,7 +1111,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
             </select>
           </label>
           <SurveyPhotos path={base} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['pv'], pv.filter((_, item) => item !== index))} />
+          <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['pv'], index)} />
         </div>;
       })}
       <ListControls label={t('opname.addPv')} onAdd={() => change(['pv'], [...pv, pvTemplate(pv.length)])} />

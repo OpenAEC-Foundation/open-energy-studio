@@ -40,10 +40,10 @@ Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, vers
 
 Verwijs vanuit een bronveld naar een bewijsstuk met `evidence:<id>`. Dat hoeft niet met de hand:
 - **Bron & bewijs** onder elke invoersectie heeft per bronveld een keuzelijst met de bewijsstukken. Kiezen vult het bronveld met de verwijzing. Met **Bestand toevoegen** zet je een nieuw bestand in het register en koppel je het direct.
-- In de **inspector** heeft een geselecteerd gebouwelement (zone, vlak, raam, koudebrug) een blok **Bron & bewijs**. Daar koppel je een tekening, foto of verklaring aan dat element (`linkedPaths`, bijvoorbeeld `/zones/0/surfaces/2`).
+- In de **inspector** heeft een geselecteerd gebouwelement (zone, vlak, raam, koudebrug) een blok **Bron & bewijs**. Daar koppel je een tekening, foto of verklaring aan dat element (`linkedPaths`, bijvoorbeeld `/zones/@woonzone/surfaces/@gevel-noord`: zone en vlak op hun id). De koppeling blijft bij het element als je andere elementen verwijdert of verschuift. Een project uit een eerdere versie met koppelingen op positie (`/zones/0/surfaces/2`) krijgt bij het openen koppelingen op id.
 - In de **basisopname** heeft elk onderdeel een blok **Foto's** (zie [hoofdstuk 2](02-basisopname.md)).
 
-De **Checklist BRL 9500** toont per bewijsstuk de kolom **Onderbouwt**: de gekoppelde invoer, met een knop naar de stap waar die invoer staat. Een bewijsstuk zonder koppeling krijgt "niet gekoppeld". Wijst een bronveld naar een bewijsstuk dat niet meer in het register staat, dan meldt de pagina dat.
+De **Checklist BRL 9500** toont per bewijsstuk de kolom **Onderbouwt**: de gekoppelde invoer, met een knop naar de stap waar die invoer staat. Een bewijsstuk zonder koppeling krijgt "niet gekoppeld". Wijst een bronveld naar een bewijsstuk dat niet meer in het register staat, dan meldt de pagina dat. Hetzelfde geldt voor een koppeling naar een element of opname-onderdeel dat niet meer in het project staat; die koppeling krijgt "niet meer in het project".
 
 Bij herlabelen heeft een bewijsstuk een **rol bij herlabelen**:
 - offerte met opdracht;

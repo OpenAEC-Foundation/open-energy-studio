@@ -2,6 +2,15 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 7 oktober 2026 — bewijskoppelingen op id
+
+Geen wijziging in uitkomst of status. Een koppeling van een bewijsstuk of opnamefoto (`linkedPaths`) noemt een element nu bij zijn id: `/zones/@woonzone/surfaces/@gevel-noord`, `/basisopname/survey/pv/@pv-1`. Daardoor blijft de koppeling bij het element als een ander element wordt verwijderd of verschoven.
+- Een element zonder (unieke) id blijft op positie gekoppeld. Dat zijn de extra opwekkers en extra tapwatersystemen van de opname. Bij verwijderen in de opname schuiven de koppelingen van de onderdelen erna mee, en vervallen de koppelingen naar het verwijderde onderdeel.
+- Een project met koppelingen op positie krijgt bij het openen koppelingen op id. De omzetting is idempotent. Een koppeling die niet meer naar een element wijst, blijft ongewijzigd en wordt gemeld.
+- `supports` in `manifest.json` geeft de koppelingen in de vorm met id.
+- De Checklist BRL 9500 meldt koppelingen naar elementen die niet meer in het project staan.
+- Het bewijsregister valt buiten de invoervingerafdruk; de omzetting verandert die dus niet.
+
 ## 7 oktober 2026 — Bron & bewijs, opnamefoto's en overnemen in projectmodel
 
 Geen wijziging in uitkomst of status. Wel nieuw in het dossier en de invoer:

@@ -16,7 +16,9 @@ import { LazyPage, ReportView } from '../lazyPages';
 import { useDossier } from '../../ReportView/useDossier';
 import { Banner, Button, Card, EmptyState, Pill, StatusPill } from '../../ui';
 import type { ShellActions } from '../ShellActions';
-import { danglingEvidenceReferences, evidenceUsage, pointerToPath } from '../../../core/nta/EvidenceLinks';
+import {
+  danglingEvidenceReferences, evidenceUsage, pointerToPath, resolvePointer, unresolvedEvidenceLinks,
+} from '../../../core/nta/EvidenceLinks';
 import { routeForPath } from '../../../core/nta/gapRoutes';
 import './delivery.css';
 
@@ -77,6 +79,7 @@ export function DossierPage({ actions }: { actions: Pick<ShellActions, 'navigate
   const evidence = project.registration?.evidence ?? [];
   const usage = evidenceUsage(project);
   const dangling = danglingEvidenceReferences(project);
+  const unresolved = unresolvedEvidenceLinks(project);
   const overview = buildEpOnlineOverview(project, assessment);
   const yes = t('registration.page.yes');
   const no = t('registration.page.no');
@@ -139,6 +142,7 @@ export function DossierPage({ actions }: { actions: Pick<ShellActions, 'navigate
         onClick={() => actions.navigate({ step: 'registration', focusPath: 'registration.evidence' })}>
         {t('delivery.evidence.edit')}</Button>}>
       {dangling.length > 0 && <Banner tone="warn">{t('evidenceLink.dangling', { count: dangling.length })}</Banner>}
+      {unresolved.length > 0 && <Banner tone="warn">{t('evidenceLink.unresolved', { count: unresolved.length })}</Banner>}
       {evidence.length === 0
         ? <EmptyState title={t('delivery.evidence.empty')} />
         : (
@@ -162,10 +166,12 @@ export function DossierPage({ actions }: { actions: Pick<ShellActions, 'navigate
                       ? <Pill tone="warn">{t('evidenceLink.unused')}</Pill>
                       : <ul className="delivery-evidence-links">
                         {(usage.get(item.id) ?? []).map((pointer) => <li key={pointer}>
-                          <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm"
-                            onClick={() => actions.navigate(routeForPath(pointerToPath(pointer)))}>
-                            <code>{pointerToPath(pointer)}</code>
-                          </button>
+                          {resolvePointer(project, pointer) == null
+                            ? <><code>{pointerToPath(pointer)}</code> <Pill tone="warn">{t('evidenceLink.unresolvedItem')}</Pill></>
+                            : <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm"
+                              onClick={() => actions.navigate(routeForPath(pointerToPath(pointer, project)))}>
+                              <code>{pointerToPath(pointer)}</code>
+                            </button>}
                         </li>)}
                       </ul>}
                   </td>
