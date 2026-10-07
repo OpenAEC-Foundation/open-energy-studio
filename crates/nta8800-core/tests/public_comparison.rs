@@ -1,4 +1,4 @@
-//! Regression on fictionalised rebuilds of four public BENG reports
+//! Regression on fictionalised rebuilds of five public BENG reports
 //! (docs/nta8800-vergelijking-openbare-rapporten.md). The asserted values
 //! are this kernel's own results, recorded on 2026-10-05 after the input
 //! corrections of the line-by-line reconciliation and f_prac 0,95 on declared

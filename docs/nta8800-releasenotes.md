@@ -2,6 +2,14 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 7 oktober 2026 — Belemmering per raam
+
+- Nieuw in `ntaCalculation`: `windowObstructions`, een lijst van `{ windowId, obstruction, sourceReference }`. Een raam in deze lijst krijgt zijn eigen belemmeringssituatie van §17.3 (7.13 neemt F_sh;obst per raam, p. 183–184; 17.3.2 één situatie per raam). Ramen buiten de lijst houden `windowSolar.obstruction`.
+- Bestaande projecten rekenen hetzelfde. Een lijst die alleen de standaardsituatie herhaalt, geeft dezelfde getallen; een test bewaakt dat.
+- Nieuwe meldcodes: `window_obstruction_duplicate`, `window_obstruction_without_window` en `window_obstruction_reference_required`. Een ongeldige situatie meldt de bestaande codes (bijvoorbeeld `obstruction_geometry_invalid`) op het pad `ntaCalculation.windowObstructions[i].obstruction`; het raam rekent dan met de standaardsituatie.
+- Invoer: Gebouw › Schil › **Belemmering per raam**, een tabel met alle buitenramen ("Zoals project" of een eigen situatie). Verwijdert u een raam, dan verdwijnt ook zijn regel.
+- Openbaar geval D (2020+A1) heeft nu de overstek op het oostglas per raam: 86,35 / 39,07 / 83,6 tegen gepubliceerd 86,72 / 39,19 / 83,5 (was 82,49 / 37,06 / 83,9). Nieuw is geval E (vrijstaande woning, 2022) met belemmeringen per raam en twee tapwatersystemen: 88,77 / 31,73 / 72,6 tegen 86,82 / 28,89 / 74,1.
+
 ## 7 oktober 2026 — Bron & bewijs, opnamefoto's en overnemen in projectmodel
 
 Geen wijziging in uitkomst of status. Wel nieuw in het dossier en de invoer:
