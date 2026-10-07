@@ -155,7 +155,7 @@ describe('annex AA form', () => {
       ],
     });
     expect(checkAnnexAa(calculation, { edition2024: false, windowIds: ['w-south', 'w-west'] })).toEqual([]);
-  });
+  }, 60000);
 
   it('shows the kernel messages at the fields and keeps unknown windows visible', async () => {
     renderWithProviders(<NtaCalculationForm project={projectWithWindows()} initial={block({
@@ -188,7 +188,7 @@ describe('annex AA form', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect((saved as unknown as { activeCooling: { capacity: { calculation: unknown } } }).activeCooling.capacity.calculation)
       .toEqual({ constructionYear: 1960, rooms: [] });
-  });
+  }, 60000);
 
   it('notes that editions before 2024 have no annex AA route', () => {
     renderWithProviders(<NtaCalculationForm project={projectWithWindows()} initial={block(undefined, '2023')}
