@@ -67,7 +67,7 @@ De invoer van het NTA 8800-formulier staat verdeeld over de stappen waar hij inh
 - **Verwarming** is opgedeeld in Opwekking, Distributie, Afgifte, Regeling & BCRG, Hulpenergie en Zonneverwarming. Het overzicht van Installaties toont deze keten per verwarmingssysteem. Een groene stip betekent dat dat deel is ingevuld; klik op een deel om het te openen.
 - **Eén concept.** Wijzigingen in de NTA-invoer gaan eerst in een concept dat over alle stappen heen blijft bestaan. De **toepasbalk** onderaan toont hoeveel wijzigingen nog niet zijn toegepast, met **Ongedaan maken**, **Toepassen** en **Toepassen en verder**. Pas na Toepassen rekent de kern met de nieuwe invoer.
 - **Sluiten met een open concept.** Sluit je een projecttabblad terwijl het concept niet-toegepaste wijzigingen heeft, dan vraagt het programma eerst of je wilt sluiten zonder toe te passen. Daarna volgt, zoals altijd, de vraag om niet-opgeslagen wijzigingen op te slaan.
-- **Bron & bewijs** onder een sectie toont de bronvelden en het bewijs bij die sectie.
+- **Bron & bewijs** onder een sectie toont de bronvelden en het bewijs bij die sectie. Per bronveld kies je een bewijsstuk uit het register of voeg je een bestand toe; het bronveld krijgt dan `evidence:<id>` (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)).
 
 ## Controle en Ga naar
 

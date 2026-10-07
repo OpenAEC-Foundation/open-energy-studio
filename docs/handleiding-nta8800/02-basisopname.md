@@ -74,6 +74,31 @@ Elke zone moet zelf weer aan afb. 6.6 voldoen (`calculation_zone_criteria_not_me
 - **Oppervlak zwemzaal zonder zone** (`swimming_pool_zone_required`): bij meerdere sportzones moet de zone worden gekozen.
 - **Kleine oude gasmotor** (`gas_engine_small_old_no_table_row`): tabel 9.31 heeft hiervoor geen rij.
 
+## Foto's bij de opname
+
+Elk opname-onderdeel heeft een blok **Foto's**:
+- vlakken, ramen, lichtkoepels en PV-velden;
+- de opwekker van verwarming en tapwater, en extra opwekkers;
+- zonneboilers, ventilatie en koeling.
+
+**Foto toevoegen** opent de bestandskiezer; op een tablet of telefoon ook de camera. Elke foto gaat met zijn SHA-256 in het bewijsregister (soort *Detailfoto*). Hij wordt gekoppeld aan het onderdeel, bijvoorbeeld `/basisopname/survey/pv/0`. Met **Bestaand bewijsstuk koppelen** koppel je een foto die al in het register staat; met het kruisje ontkoppel je hem weer.
+
+De foto's gaan mee in de dossier-ZIP (BRL 9500 bijlage 3: leesbare foto's van typeaanduiding en maatvoering). In de browser blijven de bestanden alleen in deze sessie bewaard. Exporteer daarom het dossier voordat je het venster sluit. De desktopapp bewaart ze in de app-map.
+
+Een koppeling verwijst naar de positie van het onderdeel in de lijst. Verwijder je een onderdeel, dan wijst de koppeling van een volgend onderdeel naar de nieuwe positie. Controleer de koppelingen daarom in de kolom **Onderbouwt** van het bewijsregister.
+
+## Overnemen in projectmodel
+
+Na **Opname doorrekenen** staat in het resultaat de knop **Overnemen in projectmodel**. Die zet de NTA-invoer die de kern uit de opname afleidde in het concept van de NTA-invoer. Eerst toont een venster per invoer de huidige waarde en de waarde uit de opname.
+
+| Overgenomen | Niet overgenomen |
+|---|---|
+| verwarming (opwekker, distributie, afgifte, collectieve aansluiting), tapwater, koeling, ventilatie, PV, verlichting, BACS, gebruiksfunctie, setpoints, thermische massa en interne warmte | geometrie en oppervlakten: zones, vlakken en ramen blijven die van het projectmodel |
+| | bij een opname met meer rekenzones: de zonegegevens (setpoints, massa, interne warmte, ventilatie) |
+| | aanvullende verwarmingssystemen |
+
+**Overnemen in concept** past nog niets toe. De toepasbalk onderaan toont de wijzigingen, met **Ongedaan maken** en **Toepassen**. De normversie van het concept blijft staan.
+
 ## Invoergrenzen
 
 Beide opnames weigeren onmogelijke aantallen en maten:
