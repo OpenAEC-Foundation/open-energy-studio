@@ -544,6 +544,9 @@ function HeatingGeneratorFields({ draft, path, change, t }: { draft: Draft; path
       </>}
       {source === 'high_temperature' && <TextField {...field} path={[...path, 'sourceQualityDeclarationReference']}
         label={t('opname.heating.sourceQualityDeclaration')} />}
+      <NumberField {...field} path={[...path, 'manufactureYear']} label={t('opname.manufactureYear')} step="1" />
+      <NumberField {...field} path={[...path, 'installationYear']} label={t('opname.installationYear')} step="1" />
+      <p className="nta-form-note">{t('opname.heating.heatPumpYearNote')}</p>
       <p className="nta-form-note">{t('opname.heating.heatPumpNote')}</p>
     </>}
     {kind === 'local_fired' && <>

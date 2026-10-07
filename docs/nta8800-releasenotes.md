@@ -2,6 +2,13 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 8 oktober 2026 — geweigerde routes als invoergat; toesteljaar warmtepomp in de opname
+
+- **Geweigerde route als invoergat.** Weigerde de gebouwberekening een route (bijvoorbeeld `route_not_in_edition` voor LED vanaf 2017 of PV per paneel onder 2020+A1), dan gaf het project status `invalid` met een lege lijst invoergaten; de code stond alleen in `performance.issues`. Nu wordt elke melding van een niet-berekende gebouwberekening een invoergat op de projectinvoer die haar voedt, bijvoorbeeld `ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW` of `ntaCalculation.internalGains.lighting`. Het pad in de afgeleide invoer staat in `detail`. "Ga naar" opent zo de juiste stap en het juiste veld. De uitkomst van berekende projecten verandert niet.
+- **Labelfunctie.** `ntaCalculation.labelFunction` heeft een veld in de stap Project en een route voor "Ga naar"; een labelfunctie die niet bij het berekeningstype past (`label_function_scope_mismatch`) wees eerder naar het controleoverzicht.
+- **Controle.** De dekkingstest van alle opties (`option_coverage.rs`) eist nu ook dat een niet-berekend project minstens één invoergat heeft en dat elk pad een route heeft in `gapRoutes.ts`. Een service-test controleert het 422-antwoord met het invoergat.
+- **Opname, warmtepomp.** Het opnameformulier vraagt bij een warmtepomp het fabricagejaar en het installatiejaar. Alleen NTA 8800:2020+A1 gebruikt ze (hulpenergie, formule 9.85; volgorde volgens ISSO 82.1 p. 28).
+
 ## 8 oktober 2026 — kelder met diepte per wanddeel rekent weer; dekking van alle opties
 
 - Een verwarmde kelder met de diepte per wanddeel (`groundFloors[].heatedBasement.wallDepths`, 8.42/D.12) zonder `depthM` gaf status `invalid` met `non_finite_result`. De lege `depthM` kwam als NaN in de afgeleide invoer. Hij blijft nu weg, net als de lege `reductionFactor` van 7 oktober.
