@@ -343,9 +343,11 @@ fn cases_b_and_c_under_nta_8800_2023() {
 ///   report's 7 226 kWh.
 /// - Cooling: the literal 10.15 emission loss and the 10.87 control energy
 ///   (87,6 kWh/year), the known interpretation questions.
-/// - BENG 1 is 1,6 % lower: nine windows have a side obstruction whose
-///   width is not in the printout; the kernel has one obstruction per zone
-///   and takes minimal obstruction.
+/// - BENG 1 is 0,8 % lower. Eight windows have a side obstruction; the
+///   printout gives distance, width and height per window, so
+///   `windowObstructions` carries b_b = distance / width (2020 p. 669) and,
+///   for V0.5 and V0.6 (height ≥ 2,5 m), the cooling condition (p. 672).
+///   Without them (minimal obstruction) BENG 1 was 73,49.
 ///
 /// The roller shutters are a table 7.5 device: before this case a device
 /// left `reductionFactor` NaN in the derived input and the finite-number
@@ -358,7 +360,7 @@ fn case_f_under_nta_8800_2020_a1() {
     .unwrap();
     assert_eq!(value["ntaCalculation"]["normVersion"], "2020+A1");
     let (performance, indicators) = run_edition(&value, "2020+A1");
-    assert_indicators("F 2020+A1", indicators, [73.49, 3.68, 96.4]);
+    assert_indicators("F 2020+A1", indicators, [74.06, 3.79, 96.3]);
     assert!((used_kwh(&performance, "hotWater") - 3157.0).abs() < 1.0);
     assert!((used_kwh(&performance, "ventilation") - 987.0).abs() < 1.0);
     let heating = &performance["spaceHeating"];
@@ -370,9 +372,9 @@ fn case_f_under_nta_8800_2020_a1() {
     assert!((pipe - 148.23).abs() < 0.01, "{pipe}");
     // Declared COP 4,60 · f_prac 0,95 = 4,37 (report: 13 664 kWh / 4,37 +
     // 200 kWh element = 3 326 kWh on 13 864 kWh heat; the kernel's heat is
-    // 2,4 % lower, see BENG 1).
+    // 1,8 % lower, see BENG 1).
     assert_eq!(heating["generationEfficiency"].as_f64(), Some(4.37));
-    assert!((used_kwh(&performance, "heating") - 3242.7).abs() < 1.0);
+    assert!((used_kwh(&performance, "heating") - 3264.5).abs() < 1.0);
     let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
     assert!((pv - 7093.7).abs() < 1.0, "{pv}");
     assert!((pv * 8640.0 / (190.0 * 44.64) - 7226.0).abs() < 2.0, "{pv}");
@@ -387,7 +389,7 @@ fn case_f_under_nta_8800_2020_a1() {
         (87.6..89.0).contains(&cooling_auxiliary),
         "{cooling_auxiliary}"
     );
-    assert!((used_kwh(&performance, "cooling") - 150.0).abs() < 1.0);
+    assert!((used_kwh(&performance, "cooling") - 146.4).abs() < 1.0);
 }
 
 /// A table 7.5/7.6 device leaves `reductionFactor` unset; it must not be
@@ -416,3 +418,4 @@ fn shading_device_serialises_without_reduction_factor() {
         0.3
     );
 }
+
