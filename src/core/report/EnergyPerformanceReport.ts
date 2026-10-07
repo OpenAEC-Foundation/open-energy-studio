@@ -1,7 +1,9 @@
 import type { IProject } from '../energy/types';
 import type {
-  BuildingPerformanceAssessment, MonthlyDemandAssessment, NtaInterpretationGroup, ProjectPerformanceAssessment,
+  BuildingPerformanceAssessment, MonthlyDemandAssessment, NtaInterpretationGroup, NtaLabelStatements,
+  ProjectPerformanceAssessment,
 } from '../nta/KernelClient';
+import { attestMark, type AttestMark } from '../nta/Attest';
 import { kernelVerdict } from '../nta/KernelVerdict';
 import { nl } from '../../i18n/nl';
 import { escapeHtml } from './HtmlEscaping';
@@ -56,6 +58,8 @@ export interface ReportOptions {
   details?: Partial<Record<DetailSection, boolean>>;
   interpretations?: NtaInterpretationGroup[];
   generatedAt?: Date;
+  /** BRL 9501 attest number; defaults to the program's own (`softwareAttestNumber`). */
+  attestNumber?: string | null;
 }
 
 const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
@@ -175,7 +179,7 @@ function zonesOf(assessment: ProjectPerformanceAssessment, performance: Building
 
 /* ------------------------------------------------------------------ summary */
 
-function introduction(doc: ReportDocument, project: IProject, assessment: ProjectPerformanceAssessment, generatedAt: Date): string {
+function introduction(doc: ReportDocument, project: IProject, assessment: ProjectPerformanceAssessment, generatedAt: Date, attest: AttestMark): string {
   const derived = assessment.derivedInput as unknown as Loose | null;
   const scope = derived?.calculationScope === 'utility' ? 'utiliteitsbouw' : derived?.calculationScope === 'residential' ? 'woningbouw' : '—';
   const registration = project.registration;
@@ -188,7 +192,7 @@ function introduction(doc: ReportDocument, project: IProject, assessment: Projec
       <tr><th>Bepalingsmethode</th>${td(assessment.targetNormVersion)}<th>Rekenkern</th>${td(`Open Energy Studio, kernelversie ${assessment.kernelVersion}`)}</tr>
       <tr><th>Status</th>${td(STATUS[assessment.status] ?? assessment.status)}<th>Attest</th>${td(assessment.attestStatus === 'unattested' ? 'niet geattesteerd (BRL 9501)' : assessment.attestStatus)}</tr>
       <tr><th>Datum rapport</th><td>${dutchTimeHtml(generatedAt)}</td><th>Invoervingerafdruk</th><td><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>`)
-    + `<div class="notice"><strong>Onverifieerde berekening — geen officieel energielabel, niet geattesteerd.</strong>
+    + `<div class="notice"><strong>Onverifieerde berekening — geen officieel energielabel${attest.attested ? '' : ', niet geattesteerd'}.</strong>
       De uitkomsten komen uit de rekenkern van Open Energy Studio. Een energielabel wordt pas vastgesteld na registratie
       in EP-Online door een gecertificeerde adviseur met een BRL 9501-geattesteerd rekenprogramma.</div>`;
   return doc.chapter('inleiding', 'Inleiding', body);
@@ -214,7 +218,8 @@ function results(doc: ReportDocument, project: IProject, assessment: ProjectPerf
       <th>Hernieuwbaar aandeel (label)</th><td class="n">${n(performance.labelPrimaryFossilIndicatorKwhPerM2Year != null ? performance.labelRenewableSharePercent : performance.renewableSharePercent, 1)} %</td></tr>
     <tr><th>CO<sub>2</sub>-emissie</th><td class="n">${n(performance.co2KgPerM2, 1)} kg/m²·jr</td><th>Warmtebehoefte (5.3a)</th><td class="n">${n(performance.chapter5?.heatingNeedKwhPerM2, 2)} kWh/m²·jr</td></tr>
     ${elements ? Object.entries(elements).filter(([, value]) => value != null && typeof value !== 'object').map(([key, value]) =>
-      `<tr><th colspan="2">${escapeHtml(LABEL_ELEMENT[key] ?? key)}</th><td colspan="2">${escapeHtml(typeof value === 'number' ? n(value, 1) : value)}</td></tr>`).join('') : ''}`;
+      `<tr><th colspan="2">${escapeHtml(LABEL_ELEMENT[key] ?? key)}</th><td colspan="2">${escapeHtml(typeof value === 'number' ? n(value, 1) : value)}</td></tr>`).join('') : ''}
+    ${project.registration ? labelStatementRows(project.registration.labelStatements) : ''}`;
   const labelTable = doc.table('Indicatieve labelklasse en labelgegevens (Omgevingsregeling art. 5.11–5.13a)', '', labelRows);
   const warnings: Array<{ code: string; path: string; detail?: string | null }> = [...(assessment.warnings ?? []), ...(performance.warnings ?? [])];
   const warningTable = warnings.length
@@ -228,6 +233,21 @@ function results(doc: ReportDocument, project: IProject, assessment: ProjectPerf
   return doc.chapter('resultaten', 'Eisen en resultaten', resultTable + labelTable + a0Table + warningTable
     + `<p class="note">De gekozen lezingen van de rekenkern waar de norm meerdere uitleggen toelaat staan in de bijlage "Interpretaties".</p>`
     + (project.registration ? registrationSection(project.registration, assessment.registration, assessment.labelData?.general.constructionYear).replace(/<h2>Registratie<\/h2>/, '<h3>Registratie</h3>') : ''));
+}
+
+/** Omgevingsregeling art. 5.13a lid 1 onder k en l: the adviser's yes/no statements from the registration. */
+function labelStatementRows(statements: NtaLabelStatements | undefined): string {
+  const answer = (value: boolean | undefined) => (value === undefined ? 'niet beantwoord' : value ? 'ja' : 'nee');
+  return `<tr><th colspan="2">k. Reageert op externe signalen (verklaring adviseur)</th><td colspan="2">${answer(statements?.respondsToExternalSignals)}</td></tr>
+    <tr><th colspan="2">l. Afgiftesysteem ontworpen voor lage temperatuur (verklaring adviseur)</th><td colspan="2">${answer(statements?.lowTemperatureHeating)}</td></tr>`;
+}
+
+/**
+ * The slot of the NL-EPBD mark on the cover (BRL 9501 §8.4 opmerking, p. 15): only for an
+ * attested program. The official artwork replaces the placeholder text once licensed.
+ */
+function attestMarkSlot(attest: AttestMark): string {
+  return attest.markText ? `<div class="attest-mark" data-mark="nl-epbd">${escapeHtml(attest.markText)}</div>` : '';
 }
 
 const LABEL_ELEMENT: Record<string, string> = {
@@ -721,6 +741,7 @@ const STYLE = `
   tr.total th,tr.total td{font-weight:700;background:#f2f5f8}
   p.note{color:var(--muted);font-size:8.5pt;margin:1mm 0 0}
   .notice{border-left:4px solid #b45309;background:#fff8e7;padding:3mm 4mm;margin:4mm 0}
+  .attest-mark{display:inline-block;border:1px solid #1f3a5f;padding:2mm 4mm;margin-top:3mm;font-weight:600}
   .step{display:grid;grid-template-columns:30mm 1fr;gap:0 3mm;border-left:3px solid var(--accent);background:#f6f9fc;padding:1.5mm 3mm;margin:1.5mm 0;font-size:9.5pt}
   .step .label{grid-row:span 3;font-weight:600}
   .step .ref{grid-column:2;color:var(--muted);font-size:8.5pt}
@@ -749,15 +770,16 @@ function detailEnabled(options: ReportOptions, section: DetailSection): boolean 
  */
 export function generateEnergyPerformanceReportHTML(project: IProject, assessment: ProjectPerformanceAssessment, options: ReportOptions): string {
   const generatedAt = options.generatedAt ?? new Date();
+  const attest = options.attestNumber === undefined ? attestMark() : attestMark(options.attestNumber);
   const doc = new ReportDocument();
   const levelText = options.level === 'summary' ? 'samenvatting' : options.level === 'standard' ? 'standaard' : 'gedetailleerd';
   const runHeader = `<div class="run"><span>${escapeHtml(project.name || 'Project')} — Rapportage Energieprestatie (NTA 8800)</span>
-    <span>${escapeHtml(dutchTimestamp(generatedAt))} · kern ${escapeHtml(assessment.kernelVersion)}</span></div>`;
+    <span>${escapeHtml(dutchTimestamp(generatedAt))} · kern ${escapeHtml(assessment.kernelVersion)}${attest.attestNumber ? ` · attest ${escapeHtml(attest.attestNumber)}` : ''}</span></div>`;
   const cover = `<header class="cover"><h1>Rapportage Energieprestatie</h1><p class="sub">NTA 8800:2025+C1:2026 — ${escapeHtml(project.name || 'Project')}</p>
     <dl><dt>Adres</dt><dd>${escapeHtml([project.address, project.city].filter(Boolean).join(', ') || '—')}</dd>
     <dt>Rapportniveau</dt><dd>${levelText}</dd><dt>Datum</dt><dd>${dutchTimeHtml(generatedAt)}</dd>
-    <dt>Rekenkern</dt><dd>Open Energy Studio ${escapeHtml(assessment.kernelVersion)} (niet geattesteerd)</dd></dl></header>`;
-  let chapters = introduction(doc, project, assessment, generatedAt);
+    <dt>Rekenkern</dt><dd>Open Energy Studio ${escapeHtml(assessment.kernelVersion)} (${attest.attestNumber ? `BRL 9501-attest ${escapeHtml(attest.attestNumber)}` : 'niet geattesteerd'})</dd></dl>${attestMarkSlot(attest)}</header>`;
+  let chapters = introduction(doc, project, assessment, generatedAt, attest);
   const performance = assessment.performance;
   if (kernelVerdict(assessment) !== 'calculated' || !performance) {
     const reasons = [...assessment.gaps.map((gap) => `<tr>${dutchCodeCell(gap.code)}${td(gap.path)}<td>${dutchDetailHtml(gap.detail)}</td></tr>`),

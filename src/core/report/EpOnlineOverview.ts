@@ -76,7 +76,21 @@ export interface EpOnlineOverview {
   omitted: Array<{ field: EpOnlineField; reason: string }>;
   /** Fields the schema requires that the project does not supply yet. */
   missingRequired: EpOnlineField[];
+  /**
+   * The adviser's statements for label elements k and l (Omgevingsregeling art. 5.13a lid 1).
+   * The public export schema V4 has no fields for them, so they are listed apart; null is not
+   * answered.
+   */
+  labelStatements: {
+    note: string;
+    k_reageertOpExterneSignalen: boolean | null;
+    l_afgiftesysteemLageTemperatuur: boolean | null;
+  };
 }
+
+export const LABEL_STATEMENTS_NOTE =
+  'Verklaringen van de adviseur voor de labelelementen k en l (Omgevingsregeling art. 5.13a lid 1). '
+  + 'Het openbare exportschema EpbdExportTypesV4 heeft hier geen velden voor; ze staan daarom apart.';
 
 /** Fields with minOccurs 1 in the add group. */
 export const EP_ONLINE_REQUIRED: EpOnlineField[] = [
@@ -201,6 +215,11 @@ export function buildEpOnlineOverview(
     pandcertificaat: ordered,
     omitted,
     missingRequired: EP_ONLINE_REQUIRED.filter((field) => !(field in ordered)),
+    labelStatements: {
+      note: LABEL_STATEMENTS_NOTE,
+      k_reageertOpExterneSignalen: registration.labelStatements?.respondsToExternalSignals ?? null,
+      l_afgiftesysteemLageTemperatuur: registration.labelStatements?.lowTemperatureHeating ?? null,
+    },
   };
 }
 

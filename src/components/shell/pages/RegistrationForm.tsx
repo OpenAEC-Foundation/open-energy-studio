@@ -222,6 +222,30 @@ export function RegistrationForm() {
         </div>
       </Card>
 
+      <Card title={t('reg.labelStatements')} subtitle={t('reg.labelStatementsHint')} level={2}>
+        <div className="dialog-grid">
+          {(['respondsToExternalSignals', 'lowTemperatureHeating'] as const).map((key) => {
+            const answer = registration.labelStatements?.[key];
+            return (
+              <div key={key} className="dialog-field" data-path={`registration.labelStatements.${key}`}>
+                <label htmlFor={`reg-statement-${key}`}>{t(`reg.labelStatements.${key}`)}</label>
+                <select id={`reg-statement-${key}`} value={answer === undefined ? '' : answer ? 'yes' : 'no'}
+                  onChange={(e) => update({
+                    labelStatements: {
+                      ...registration.labelStatements,
+                      [key]: e.target.value === '' ? undefined : e.target.value === 'yes',
+                    },
+                  })}>
+                  <option value="">{t('reg.labelStatements.unanswered')}</option>
+                  <option value="yes">{t('common.yes')}</option>
+                  <option value="no">{t('common.no')}</option>
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
       <Card title={t('registration.form.software')} level={2}>
         <p className="registration-software" data-testid="reg-software" data-path="registration.software">
           {t('reg.software')}: {software.name} {software.version} — {software.attestNumber

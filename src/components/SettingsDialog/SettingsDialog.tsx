@@ -11,6 +11,7 @@ import type { Locale } from '../../i18n/i18n';
 import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS, type NormVersion } from '../../core/nta/KernelClient';
 import { readDefaultEdition, writeDefaultEdition } from '../../core/nta/defaultEdition';
 import { softwareIdentity } from '../../core/nta/Registration';
+import { attestMark } from '../../core/nta/Attest';
 import { DialogShell } from '../dialogs/DialogShell';
 import { Pill, Select, Switch } from '../ui';
 import './SettingsDialog.css';
@@ -144,6 +145,7 @@ export function SettingsDialog({ onClose, previewSetting }: SettingsDialogProps)
   };
 
   const software = softwareIdentity();
+  const attest = attestMark();
 
   const settingsFooter = (
     <div className="dialog-footer">
@@ -248,6 +250,9 @@ export function SettingsDialog({ onClose, previewSetting }: SettingsDialogProps)
                 <tr><td>{t('settings.edition.current')}</td><td>{t(`nta.edition.${DEFAULT_NORM_VERSION}`)}</td></tr>
               </tbody>
             </table>
+            {attest.markText && (
+              <div className="attest-mark" data-mark="nl-epbd" data-testid="attest-mark">{attest.markText}</div>
+            )}
             <p className="settings-hint">{t('settings.about.hint')}</p>
           </div>
         )}

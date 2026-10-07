@@ -4513,6 +4513,8 @@ export interface NtaRegistration {
   software?: NtaSoftwareIdentity;
   /** WLC-GWP result, required for new buildings > 1000 m² checked against the Bbl from 2028. */
   wlcGwp?: { valueKgCo2EqPerM2Year?: number; reportReference?: string };
+  /** The adviser's yes/no statements for label elements k and l (Omgevingsregeling art. 5.13a lid 1, since 29 May 2026). */
+  labelStatements?: NtaLabelStatements;
   /** Delivery: date of the toets Bbl it follows (YYYY-MM-DD); the WLC-GWP duty follows that check. */
   bblCheckDate?: string;
   /** A_g of the whole building when the calculation covers one dwelling (WLC-GWP threshold per building). */
@@ -5087,6 +5089,14 @@ export interface LabelData {
       lowTemperatureHeating: boolean | null;
     };
   } | null;
+}
+
+/** Omgevingsregeling art. 5.13a lid 1 onder k and l: statements of the adviser, not calculated. */
+export interface NtaLabelStatements {
+  /** k. The building can respond to external signals and adapt its energy use. */
+  respondsToExternalSignals?: boolean;
+  /** l. The heating distribution system is designed to work at low temperature. */
+  lowTemperatureHeating?: boolean;
 }
 
 export async function calculateProjectPerformanceWithRust(input: IProject): Promise<ProjectPerformanceAssessment> {
