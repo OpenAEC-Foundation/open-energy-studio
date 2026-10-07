@@ -1401,7 +1401,10 @@ fn annex_aa_zone_issues(input: &BuildingPerformanceInput) -> Vec<PerformanceIssu
         .iter()
         .map(|aa| (aa, "activeCooling.capacity.calculation".to_string()))
         .chain(zone_calculations.iter().enumerate().map(|(index, aa)| {
-            (aa, format!("activeCooling.capacity.zoneCalculations[{index}]"))
+            (
+                aa,
+                format!("activeCooling.capacity.zoneCalculations[{index}]"),
+            )
         }));
     let mut issues = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -7936,8 +7939,8 @@ mod tests {
     #[test]
     fn annex_aa_is_selected_per_cooled_zone() {
         use crate::annex_aa::{AnnexAaInput, AnnexAaRoom, AnnexAaWindow};
-        use crate::tojuli::CoolingCapacityEvidence;
         use crate::space_heating_chain::ChainZone;
+        use crate::tojuli::CoolingCapacityEvidence;
         let mut sample = input();
         sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
         let first = sample.space_heating.demand.zone_id.clone();
@@ -7996,10 +7999,16 @@ mod tests {
         );
         assert_eq!(both.status, "calculated_unverified", "{:?}", both.issues);
         assert_eq!(both.tojuli.len(), 2);
-        assert!(both.tojuli.iter().all(|zone| zone.max_tojuli_k == Some(0.0)));
+        assert!(both
+            .tojuli
+            .iter()
+            .all(|zone| zone.max_tojuli_k == Some(0.0)));
         assert!(both.tojuli.iter().all(|zone| zone.annex_aa.is_some()));
         // `calculation` may name one of the zones itself.
-        let mixed = run(Some(calculation(Some("z2"))), vec![calculation(Some(&first))]);
+        let mixed = run(
+            Some(calculation(Some("z2"))),
+            vec![calculation(Some(&first))],
+        );
         assert_eq!(mixed.status, "calculated_unverified", "{:?}", mixed.issues);
 
         // Without a zone id the calculation cannot be placed.
@@ -8016,10 +8025,7 @@ mod tests {
             "annex_aa_zone_unknown",
             "activeCooling.capacity.zoneCalculations[0].zoneId"
         ));
-        let twice = run(
-            None,
-            vec![calculation(Some("z2")), calculation(Some("z2"))],
-        );
+        let twice = run(None, vec![calculation(Some("z2")), calculation(Some("z2"))]);
         assert!(has(
             &twice,
             "annex_aa_zone_duplicate",
@@ -8048,7 +8054,11 @@ mod tests {
             source_reference: "design".into(),
         });
         let single = assess_building_performance(&single);
-        assert_eq!(single.status, "calculated_unverified", "{:?}", single.issues);
+        assert_eq!(
+            single.status, "calculated_unverified",
+            "{:?}",
+            single.issues
+        );
         assert_eq!(single.tojuli_max_k, Some(0.0));
     }
 

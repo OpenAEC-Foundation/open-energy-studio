@@ -3900,8 +3900,12 @@ mod tests {
         ]);
         let result = assess_project_performance(&value);
         assert!(
-            result.gaps.iter().any(|gap| gap.code == "source_reference_required"
-                && gap.path == "ntaCalculation.windowObstructions[0].obstruction.sourceReference"),
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "source_reference_required"
+                    && gap.path
+                        == "ntaCalculation.windowObstructions[0].obstruction.sourceReference"),
             "{:?}",
             result.gaps
         );
@@ -3921,8 +3925,11 @@ mod tests {
         value["ntaCalculation"]["windowSolar"]["obstruction"] = declared;
         let result = assess_project_performance(&value);
         assert!(
-            result.gaps.iter().any(|gap| gap.code == "source_reference_required"
-                && gap.path == "ntaCalculation.windowSolar.obstruction.sourceReference"),
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "source_reference_required"
+                    && gap.path == "ntaCalculation.windowSolar.obstruction.sourceReference"),
             "{:?}",
             result.gaps
         );
@@ -3934,9 +3941,7 @@ mod tests {
     /// outdoor air gets `window_obstruction_not_outdoor`.
     #[test]
     fn obstruction_for_an_existing_window_is_not_without_window() {
-        let entry = |id: &str| {
-            serde_json::json!({"windowId": id, "obstruction": {"method": "minimal"}, "sourceReference": "s"})
-        };
+        let entry = |id: &str| serde_json::json!({"windowId": id, "obstruction": {"method": "minimal"}, "sourceReference": "s"});
         let mut value = project();
         value["ntaCalculation"]["windowObstructions"] = serde_json::json!([entry("win-N")]);
         value["zones"][0]["surfaces"][0]["windows"][0]
@@ -3946,15 +3951,21 @@ mod tests {
         let result = assess_project_performance(&value);
         let codes: Vec<&str> = result.gaps.iter().map(|gap| gap.code).collect();
         assert!(codes.contains(&"window_data_missing"), "{codes:?}");
-        assert!(!codes.contains(&"window_obstruction_without_window"), "{codes:?}");
+        assert!(
+            !codes.contains(&"window_obstruction_without_window"),
+            "{codes:?}"
+        );
 
         let mut value = project();
         value["ntaCalculation"]["windowObstructions"] = serde_json::json!([entry("win-N")]);
         value["zones"][0]["surfaces"][0]["thermalBoundary"] = Value::from("unheated_space");
         let result = assess_project_performance(&value);
         assert!(
-            result.gaps.iter().any(|gap| gap.code == "window_obstruction_not_outdoor"
-                && gap.path == "ntaCalculation.windowObstructions[0].windowId"),
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "window_obstruction_not_outdoor"
+                    && gap.path == "ntaCalculation.windowObstructions[0].windowId"),
             "{:?}",
             result.gaps
         );

@@ -406,7 +406,10 @@ fn select_annex_aa<'a>(
         .map(|aa| (aa, "activeCooling.capacity.calculation".to_string()))
         .into_iter()
         .chain(zone_calculations.iter().enumerate().map(|(index, aa)| {
-            (aa, format!("activeCooling.capacity.zoneCalculations[{index}]"))
+            (
+                aa,
+                format!("activeCooling.capacity.zoneCalculations[{index}]"),
+            )
         }))
         .collect();
     if let Some(found) = all

@@ -484,9 +484,15 @@ pub fn assess_annex_aa(
         let room_path = format!("{path}.rooms[{index}]");
         // The per-room results (AA.9–AA.13) are reported by room id.
         if room.id.trim().is_empty() {
-            issues.push(issue("annex_aa_room_id_required", format!("{room_path}.id")));
+            issues.push(issue(
+                "annex_aa_room_id_required",
+                format!("{room_path}.id"),
+            ));
         } else if !room_ids.insert(room.id.trim()) {
-            issues.push(issue("annex_aa_room_id_duplicate", format!("{room_path}.id")));
+            issues.push(issue(
+                "annex_aa_room_id_duplicate",
+                format!("{room_path}.id"),
+            ));
         }
         if !(room.area_m2.is_finite() && room.area_m2 > 0.0) {
             issues.push(issue(
@@ -933,9 +939,12 @@ mod tests {
             .any(|item| item.code == "annex_aa_room_id_required" && item.path == "aa.rooms[1].id"));
         aa.rooms[1].id = "living".into();
         let twice = assess_annex_aa(&aa, &input, &demand, "aa").unwrap_err();
-        assert!(twice
-            .iter()
-            .any(|item| item.code == "annex_aa_room_id_duplicate" && item.path == "aa.rooms[1].id"));
+        assert!(
+            twice
+                .iter()
+                .any(|item| item.code == "annex_aa_room_id_duplicate"
+                    && item.path == "aa.rooms[1].id")
+        );
         aa.rooms[1].id = "bedroom".into();
         assert!(assess_annex_aa(&aa, &input, &demand, "aa").is_ok());
     }

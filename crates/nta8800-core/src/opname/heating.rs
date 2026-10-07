@@ -2097,13 +2097,20 @@ mod tests {
         let forfait = |version: NormVersion, installation_year: Option<i32>| {
             let mut recorder = Recorder::default();
             let derived = with_version(version, || {
-                derive_heating(&heating(pump(installation_year), Emitters::FloorHeating), 1998, &mut recorder)
+                derive_heating(
+                    &heating(pump(installation_year), Emitters::FloorHeating),
+                    1998,
+                    &mut recorder,
+                )
             });
             (derived.generator["forfait"].clone(), recorder)
         };
         let (known, _) = forfait(NormVersion::V2020A1, Some(2019));
         assert_eq!(known["installationYear"], 2019);
-        assert_eq!(known["installationYearReference"], "basisopname (ISSO 82.1 p. 28)");
+        assert_eq!(
+            known["installationYearReference"],
+            "basisopname (ISSO 82.1 p. 28)"
+        );
         let (unknown, recorder) = forfait(NormVersion::V2020A1, None);
         assert_eq!(unknown["installationYear"], 1998);
         assert!(recorder
