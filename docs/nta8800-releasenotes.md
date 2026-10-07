@@ -2,6 +2,17 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 8 oktober 2026 — bijlage AA per rekenzone, belemmerings- en bouwjaarcontroles
+
+- **Bijlage AA per gekoelde rekenzone** (2025+C1 p. 1135). Nieuw naast `activeCooling.capacity.calculation`: `zoneCalculations`, één berekening per gekoelde rekenzone met `zoneId`. Elke zone toetst haar eigen ruimten tegen haar eigen ramen. Met één gekoelde zone blijft de enkele berekening zonder `zoneId` werken; bestaande projecten met één zone rekenen hetzelfde. Een project met meer gekoelde zones gaf eerder altijd `annex_aa_window_unknown` en kon bijlage AA dus nooit halen.
+  - Nieuwe meldcodes: `annex_aa_zone_id_required`, `annex_aa_zone_unknown`, `annex_aa_zone_duplicate` en `annex_aa_zone_calculation_required`.
+  - De rekenkern weigert nu ook een lege of dubbele ruimtenaam (`annex_aa_room_id_required`, `annex_aa_room_id_duplicate`), zoals het formulier al deed.
+  - Formulier: bij meer dan één rekenzone een berekening per zone, met alleen de ramen van die zone. Een berekening zonder zone kan aan een zone worden toegewezen. De velden voor SWM en dakoppervlak volgen dezelfde editieregel als de kern.
+- **Belemmering met opgegeven factoren zonder bron.** Een belemmering per raam (`windowObstructions`) met methode `declared` en een lege `sourceReference` gaf status `invalid` zonder invoergat. Nu is het een gat `source_reference_required` op `ntaCalculation.windowObstructions[i].obstruction.sourceReference`; het raam rekent met de standaardsituatie. Voor `windowSolar.obstruction` staat het gat op `ntaCalculation.windowSolar.obstruction`.
+- **Belemmering voor een bestaand raam.** `window_obstruction_without_window` volgt alleen nog als geen raam die id heeft. Een raam dat niet meer aan buitenlucht grenst, krijgt `window_obstruction_not_outdoor`; een raam met onvolledige gegevens alleen zijn eigen gat `window_data_missing`.
+- **Installatiejaar.** De bovengrens is een vaste 2100 in plaats van 2026, zodat een toestel dat na het bouwen van de kern is geïnstalleerd geldig blijft (gasketel en warmtepomp). Het installatiejaar van een warmtepomp en de bron daarvan worden alleen onder 2020+A1 gecontroleerd, waar 9.85 ze gebruikt; onder een andere uitgave maakt een achtergebleven waarde de opwekker niet meer ongeldig.
+- **Opname, warmtepomp onder 2020+A1.** De opname geeft een warmtepomp het toesteljaar volgens ISSO 82.1 p. 28 (fabricagejaar, installatiejaar, anders het bouwjaar), zoals bij de gasketel (`manufactureYear`, `installationYear`). Onder 2022 en later blijft de afgeleide invoer gelijk.
+
 ## 7 oktober 2026 — openbare gevallen E en F met de belemmeringsmaten uit de uitdraai
 
 Geen wijziging in de kern. De Uniec-uitdraaien van E en F geven per zijbelemmering de hoogte, de afstand en de breedte, in een blok dat bij tekstextractie wegvalt. Met b_b = afstand / breedte (2020 p. 669, 2022 p. 673) staan die nu per raam in `windowObstructions`:
