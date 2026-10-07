@@ -60,4 +60,12 @@ describe('Obstruction per window', () => {
     const stale = screen.getByRole('group', { name: 'gone (not in the project)' });
     expect(within(stale).getByRole('button', { name: 'Remove' })).toBeTruthy();
   });
+
+  it('names a window that no longer borders outdoor air instead of calling it missing', () => {
+    renderWithProviders(<Harness initial={{ windowObstructions: [
+      { windowId: 'win-U', obstruction: { method: 'minimal' }, sourceReference: 'x' }] }} />);
+    const stale = screen.getByRole('group', { name: /^Raam berging \(no longer in an outdoor surface/ });
+    expect(stale.getAttribute('data-code')).toBe('window_obstruction_not_outdoor');
+    expect(within(stale).getByRole('button', { name: 'Remove' })).toBeTruthy();
+  });
 });

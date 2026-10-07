@@ -202,7 +202,7 @@ pub fn assess_boiler_forfait_draft(
     }
     if input
         .installation_year
-        .is_some_and(|year| !(1900..=2026).contains(&year))
+        .is_some_and(|year| !(1900..=crate::LATEST_PLAUSIBLE_YEAR).contains(&year))
     {
         issues.push(issue("installation_year_invalid", "installationYear"));
     }
@@ -554,6 +554,20 @@ mod tests {
             assess_boiler_forfait_monthly_draft(&input).status,
             "invalid"
         );
+        // No fixed "current year": a boiler installed after the kernel was
+        // built is a valid year; only implausible years are refused.
+        input.boiler.installation_year_reference = Some("commissioning certificate".into());
+        input.boiler.installation_year = Some(2027);
+        assert_eq!(
+            assess_boiler_forfait_monthly_draft(&input).status,
+            "diagnostic_valid"
+        );
+        input.boiler.installation_year = Some(crate::LATEST_PLAUSIBLE_YEAR + 1);
+        assert_eq!(
+            assess_boiler_forfait_monthly_draft(&input).status,
+            "invalid"
+        );
+        input.boiler.installation_year_reference = None;
         input.boiler.installation_year = None;
         input.boiler.pilot_flame_present = true;
         // §9.6.2.1: 695 kWh per year, by month length.

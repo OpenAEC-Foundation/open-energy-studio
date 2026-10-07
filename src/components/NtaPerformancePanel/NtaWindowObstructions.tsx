@@ -22,6 +22,12 @@ export function outdoorWindows(project: IProject) {
     .flatMap((surface) => surface.windows.map((window) => ({ window, surface }))));
 }
 
+/** A project window by id, whatever its surface borders. */
+function projectWindow(project: IProject, windowId: unknown) {
+  return project.zones.flatMap((zone) => zone.surfaces).flatMap((surface) => surface.windows)
+    .find((window) => window.id === windowId) ?? null;
+}
+
 /** The `windowObstructions` list after choosing `method` for one window; '' is "as the project". */
 export function withWindowObstruction(entries: Draft[], windowId: string, method: string): Draft[] {
   const index = entries.findIndex((entry) => entry.windowId === windowId);
@@ -70,9 +76,16 @@ export function WindowObstructionsFields({ draft, change, project }: SectionProp
     </table></div>
     {entries.map((entry, index) => {
       const found = windows.find(({ window }) => window.id === entry.windowId);
+      // A window that still exists but no longer borders outdoor air
+      // (`window_obstruction_not_outdoor`) is not "missing".
+      const elsewhere = found ? null : projectWindow(project, entry.windowId);
+      const note = elsewhere
+        ? t('nta.form.windowObstructions.notOutdoor')
+        : t('nta.form.windowObstructions.missing');
       return <fieldset key={`${String(entry.windowId)}-${index}`} className="nta-form-group"
-        data-path={`ntaCalculation.windowObstructions[${index}]`}>
-        <legend>{found ? label(found.window) : `${String(entry.windowId)} ${t('nta.form.windowObstructions.missing')}`}</legend>
+        data-path={`ntaCalculation.windowObstructions[${index}]`}
+        data-code={found ? undefined : elsewhere ? 'window_obstruction_not_outdoor' : 'window_obstruction_without_window'}>
+        <legend>{found ? label(found.window) : `${elsewhere ? label(elsewhere) : String(entry.windowId)} ${note}`}</legend>
         <WindowObstructionFields draft={draft} change={change} base={['windowObstructions', index, 'obstruction']} />
         <TextField draft={draft} onChange={change} path={['windowObstructions', index, 'sourceReference']} label={t('nta.form.source')} />
         {!found && <button type="button" onClick={() => change(['windowObstructions'], entries.filter((_, other) => other !== index))}>

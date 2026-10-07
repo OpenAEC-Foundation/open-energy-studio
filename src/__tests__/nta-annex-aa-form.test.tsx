@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultProject } from '../context/EnergyContext';
 import type { IProject } from '../core/energy/types';
 import {
-  annexAaTotals, checkAnnexAa, duplicateAnnexAaRoom, newAnnexAaCalculation, newAnnexAaRoom, uniqueRoomId,
+  annexAaCalculations, annexAaEditionRules, annexAaTotals, checkAnnexAa, duplicateAnnexAaRoom, newAnnexAaCalculation,
+  newAnnexAaRoom, uniqueRoomId,
 } from '../core/nta/annexAaForm';
 import { NtaCalculationForm } from '../components/NtaPerformancePanel/NtaCalculationForm';
 import { renderWithProviders, userEvent } from './test-utils';
@@ -195,4 +196,84 @@ describe('annex AA form', () => {
       onSave={() => undefined} onCancel={() => undefined} />);
     expect(within(screen.getByTestId('nta-annex-aa')).getByText(/route_not_in_edition/)).toBeInTheDocument();
   });
+});
+
+/** Two zones, each with one outdoor window. */
+function projectWithTwoZones(): IProject {
+  const project = projectWithWindows();
+  const first = project.zones[0];
+  first.surfaces[0].windows = [first.surfaces[0].windows[0]];
+  const second = structuredClone(first);
+  second.id = 'zone-2';
+  second.name = 'Zolder';
+  second.surfaces = [{
+    ...structuredClone(first.surfaces[0]), id: 'gevel-n', name: 'Gevel noord', orientation: 'N',
+    windows: [{ id: 'w-north', name: 'Raam noord', area: 2, uValue: 1.4, gValue: 0.6, orientation: 'N', surfaceId: 'gevel-n' }],
+  } as unknown as IProject['zones'][number]['surfaces'][number]];
+  project.zones = [first, second];
+  return project;
+}
+
+describe('annex AA per rekenzone', () => {
+  it('follows the kernel edition profile in one helper', () => {
+    expect(annexAaEditionRules('2025+C1')).toEqual({ route: true, monthly2024: false });
+    expect(annexAaEditionRules(undefined)).toEqual({ route: true, monthly2024: false });
+    expect(annexAaEditionRules('2024')).toEqual({ route: true, monthly2024: true });
+    // 2023, 2022 and 2020+A1 build on the 2024 method but have no annex AA route.
+    for (const edition of ['2023', '2022', '2020+A1']) expect(annexAaEditionRules(edition)).toEqual({ route: false, monthly2024: true });
+  });
+
+  it('lists the single and the per-zone calculations with their paths', () => {
+    const found = annexAaCalculations({
+      calculation: { constructionYear: 2000, rooms: [] },
+      zoneCalculations: [{ zoneId: 'zone-2', constructionYear: 2000, rooms: [] }, null],
+    });
+    expect(found.map((item) => [item.path.join('.'), item.zoneId])).toEqual([
+      ['activeCooling.capacity.calculation', null],
+      ['activeCooling.capacity.zoneCalculations.0', 'zone-2'],
+    ]);
+    expect(codes(checkAnnexAa({ constructionYear: null, rooms: [] }, {
+      edition2024: false, base: ['activeCooling', 'capacity', 'zoneCalculations', 1],
+    }))).toEqual([
+      'annex_aa_construction_year_required@activeCooling.capacity.zoneCalculations.1.constructionYear',
+      'annex_aa_room_required@activeCooling.capacity.zoneCalculations.1.rooms',
+    ]);
+  });
+
+  it('gives each zone its own calculation and only its own windows', async () => {
+    const user = userEvent.setup();
+    const project = projectWithTwoZones();
+    let saved: Record<string, unknown> | null = null;
+    renderWithProviders(<NtaCalculationForm project={project} initial={block(undefined)}
+      onSave={(next) => { saved = next; }} onCancel={() => undefined} />);
+    const zones = within(screen.getByTestId('nta-annex-aa-zones'));
+    const second = within(zones.getByTestId('nta-annex-aa-zone-zone-2'));
+    await user.click(second.getByRole('button', { name: 'Add annex AA calculation for Zolder' }));
+    await user.click(second.getByRole('button', { name: 'Add window' }));
+    // Only the north window of zone 2 is offered.
+    const options = second.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toHaveLength(1);
+    expect(options[0]).toMatch(/Raam noord/);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const capacity = (saved as unknown as { activeCooling: { capacity: Record<string, unknown> } }).activeCooling.capacity;
+    expect(capacity.calculation).toBeUndefined();
+    expect(capacity.zoneCalculations).toEqual([
+      expect.objectContaining({ zoneId: 'zone-2', rooms: [expect.objectContaining({ windows: [{ windowId: 'w-north' }] })] }),
+    ]);
+  }, 60000);
+
+  it('moves a calculation without zone to the chosen zone', async () => {
+    const user = userEvent.setup();
+    let saved: Record<string, unknown> | null = null;
+    const single = { constructionYear: 2010, rooms: [] };
+    renderWithProviders(<NtaCalculationForm project={projectWithTwoZones()} initial={block(single)}
+      onSave={(next) => { saved = next; }} onCancel={() => undefined} />);
+    const zones = within(screen.getByTestId('nta-annex-aa-zones'));
+    expect(zones.getByText(/without a calculation zone/)).toBeInTheDocument();
+    await user.click(zones.getByRole('button', { name: 'Assign to Zolder' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const capacity = (saved as unknown as { activeCooling: { capacity: Record<string, unknown> } }).activeCooling.capacity;
+    expect(capacity.calculation).toBeUndefined();
+    expect(capacity.zoneCalculations).toEqual([{ zoneId: 'zone-2', constructionYear: 2010, rooms: [] }]);
+  }, 60000);
 });

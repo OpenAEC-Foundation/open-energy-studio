@@ -394,6 +394,9 @@ export type OpnameHeatingGenerator =
     sourceTemperatureReference?: string | null;
     /** Quality declaration of a source of 20 °C or more (otherwise the groundwater row). */
     sourceQualityDeclarationReference?: string | null;
+    /** ISSO 82.1 p. 28, as for the boiler; only NTA 8800:2020+A1 uses the year (9.85). */
+    manufactureYear?: number | null;
+    installationYear?: number | null;
   }
   /** Table 9.3 / NTA table 9.25: local gas heating incl. pilot, oil heating or a steam boiler (0,65 with flue, 0,10 without). */
   | { kind: 'local_fired'; appliance: 'gas_heater' | 'oil_heater' | 'steam_boiler'; fuel?: 'natural_gas' | 'oil' | null; flueGasExhaust: boolean; electricityConnected?: boolean | null }
@@ -3598,7 +3601,7 @@ export interface NtaActiveCoolingEvidence {
     | 'external_cold_with_cooling_emitter' | 'split_units_in_every_habitable_room' | 'other_utility';
   capacity:
     | { method: 'dynamic_cooling_load'; sourceReference: string }
-    | { method: 'annex_aa'; calculation?: NtaAnnexAaInput | null; sourceReference: string }
+    | { method: 'annex_aa'; calculation?: NtaAnnexAaInput | null; zoneCalculations?: NtaAnnexAaInput[]; sourceReference: string }
     | { method: 'solar_limitation'; criterion: 'small_window_area' | 'shaded_glazing'; sourceReference: string };
   sourceReference: string;
 }
@@ -3661,6 +3664,8 @@ export interface NtaTojuliAssessment {
 
 /** Annex AA input per calculation zone (dwellings). */
 export interface NtaAnnexAaInput {
+  /** The cooled rekenzone; required when more than one zone is cooled (2025+C1 p. 1135). */
+  zoneId?: string;
   constructionYear: number;
   postInsulated?: boolean;
   /** B_C;inst;zi in kW; omit when every room has its own generator. */

@@ -1445,6 +1445,7 @@ export const nl: Record<string, string> = {
   'nta.form.windowObstructions.surface': "Vlak",
   'nta.form.windowObstructions.situation': "Belemmering",
   'nta.form.windowObstructions.same': "Zoals project",
+  'nta.form.windowObstructions.notOutdoor': "(ligt niet meer in een buitenvlak; de belemmering geldt niet)",
   'nta.form.windowObstructions.missing': "(niet in het project)",
   'nta.form.windowObstructions.remove': "Verwijder",
   'nta.form.frameFraction': 'Kozijnfractie F_F',

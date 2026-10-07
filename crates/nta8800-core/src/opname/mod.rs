@@ -1293,6 +1293,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         }
     }
 
@@ -1767,6 +1769,8 @@ mod tests {
             source_temperature_c: temperature,
             source_temperature_reference: Some("design data".into()),
             source_quality_declaration_reference: Some("declaration".into()),
+            manufacture_year: None,
+            installation_year: None,
         };
         survey.heating.generator = collective(
             heating::HeatPumpSource::Groundwater,
@@ -1911,6 +1915,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         // NTA p. 334: the table 9.27 GWP rows cover a collective building
         // installation only; an individual dwelling unit up to 25 kW has no

@@ -212,6 +212,13 @@ pub enum HeatingGenerator {
         /// Quality declaration of a source of 20 °C or more (WD 2025 p. 45).
         #[serde(default, rename = "sourceQualityDeclarationReference")]
         source_quality_declaration_reference: Option<String>,
+        /// Manufacture and installation year (ISSO 82.1 p. 28, as for the
+        /// boiler). Only NTA 8800:2020+A1 uses the year (9.85, A 87,6 or
+        /// 13,0 kWh); from 2022 heat pumps have constants without a year.
+        #[serde(default, rename = "manufactureYear")]
+        manufacture_year: Option<i32>,
+        #[serde(default, rename = "installationYear")]
+        installation_year: Option<i32>,
     },
     DistrictHeat,
     Electric {
@@ -1284,6 +1291,7 @@ fn convert_generator(
                 nominal_power_kw,
                 id,
                 reference,
+                construction_year,
                 recorder,
             );
             heat_pump_renewable = converted.heat_pump_renewable;
@@ -1438,6 +1446,7 @@ struct ConvertedHeatPump {
 /// - Gas-driven heat pumps (p. 109): the "GWP" rows of tables 9.27/9.29;
 ///   exhaust air, combined air and high-temperature sources are no option
 ///   (table 9.6 footnotes 4–6).
+#[allow(clippy::too_many_arguments)]
 fn convert_heat_pump(
     generator: &HeatingGenerator,
     design: DesignClass,
@@ -1445,6 +1454,7 @@ fn convert_heat_pump(
     nominal_power_kw: Option<f64>,
     id: &str,
     reference: &str,
+    construction_year: i32,
     recorder: &mut Recorder,
 ) -> ConvertedHeatPump {
     let HeatingGenerator::HeatPump {
@@ -1459,6 +1469,8 @@ fn convert_heat_pump(
         source_temperature_c,
         source_temperature_reference,
         source_quality_declaration_reference,
+        manufacture_year,
+        installation_year,
         ..
     } = generator
     else {
@@ -1746,6 +1758,21 @@ fn convert_heat_pump(
         "sourceCorrectionFactor": correction,
         "sourceCorrectionReference": correction_reference,
     });
+    // 9.85 of 2020+A1 (p. 334–336) takes A 13,0 kWh for a device from 2015;
+    // the year follows the boiler rule (manufacture, installation,
+    // construction year). Later editions have no year in 9.85, so the
+    // derived input stays as it was there.
+    if !crate::norm_versions::profile().heat_pump_aux_constants {
+        let year = super::general::device_year(
+            *manufacture_year,
+            *installation_year,
+            construction_year,
+            recorder,
+            "heating.generator",
+        );
+        forfait["installationYear"] = json!(year);
+        forfait["installationYearReference"] = json!("basisopname (ISSO 82.1 p. 28)");
+    }
     match capacity {
         Some(capacity) => {
             forfait["thermalCapacityKw"] = json!(capacity);
@@ -2045,6 +2072,57 @@ mod tests {
         assert!(derived.distribution_system.is_none());
     }
 
+    /// Under 2020+A1 the surveyed heat pump gets a year for 9.85 by the
+    /// boiler rule of ISSO 82.1 p. 28 (manufacture, installation, then
+    /// construction year); later editions have no year in 9.85.
+    #[test]
+    fn surveyed_heat_pump_year_follows_the_device_rule_under_2020a1() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let pump = |installation_year: Option<i32>| HeatingGenerator::HeatPump {
+            source: HeatPumpSource::OutdoorAir,
+            air_sink: false,
+            high_temperature: false,
+            capacity_kw: Some(6.0),
+            source_regeneration_factor: None,
+            high_efficiency_evidence: None,
+            drive: Default::default(),
+            groundwater_system: None,
+            collective_source_reference: None,
+            source_temperature_c: None,
+            source_temperature_reference: None,
+            source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year,
+        };
+        let forfait = |version: NormVersion, installation_year: Option<i32>| {
+            let mut recorder = Recorder::default();
+            let derived = with_version(version, || {
+                derive_heating(
+                    &heating(pump(installation_year), Emitters::FloorHeating),
+                    1998,
+                    &mut recorder,
+                )
+            });
+            (derived.generator["forfait"].clone(), recorder)
+        };
+        let (known, _) = forfait(NormVersion::V2020A1, Some(2019));
+        assert_eq!(known["installationYear"], 2019);
+        assert_eq!(
+            known["installationYearReference"],
+            "basisopname (ISSO 82.1 p. 28)"
+        );
+        let (unknown, recorder) = forfait(NormVersion::V2020A1, None);
+        assert_eq!(unknown["installationYear"], 1998);
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "device_year_from_construction_year"));
+        for version in [NormVersion::V2022, NormVersion::V2025C1] {
+            let (later, _) = forfait(version, Some(2019));
+            assert!(later.get("installationYear").is_none());
+        }
+    }
+
     #[test]
     fn design_class_follows_table_9_9() {
         let mut recorder = Recorder::default();
@@ -2061,6 +2139,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         assert_eq!(
             design_class(Emitters::FloorHeating, &hp, &mut recorder),
@@ -2132,6 +2212,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         let derived = derive_heating(&heating(hp, Emitters::Radiators), 2015, &mut recorder);
         assert_eq!(
