@@ -5064,6 +5064,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         let (input, _) = derive(&survey);
         let forfait = &input["spaceHeating"]["generator"]["forfait"];
@@ -5095,6 +5097,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         let (input, _) = derive(&survey);
         let generator = &input["spaceHeating"]["generator"];

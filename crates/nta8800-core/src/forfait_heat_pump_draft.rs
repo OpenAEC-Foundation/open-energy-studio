@@ -423,28 +423,34 @@ pub fn assess_forfait_heat_pump_draft(
         issues.push(issue("source_required", "classificationSourceReference"));
     }
     issues.extend(source_classification_issues(input));
-    if input
-        .installation_year
-        .is_some_and(|year| !(1900..=2026).contains(&year))
-    {
-        issues.push(issue("installation_year_invalid", "installationYear"));
-    }
-    if input.installation_year.is_some()
-        && input
-            .installation_year_reference
-            .as_deref()
-            .map_or(true, |reference| reference.trim().is_empty())
-    {
-        issues.push(issue(
-            "installation_year_reference_required",
-            "installationYearReference",
-        ));
-    }
-    if input.installation_year.is_none() && input.installation_year_reference.is_some() {
-        issues.push(issue(
-            "installation_year_reference_without_year",
-            "installationYearReference",
-        ));
+    // The installation year only enters 9.85 under NTA 8800:2020+A1 (A 87,6
+    // or 13,0 kWh, 2020 p. 334–336); from 2022 heat pumps have their own
+    // constants without a year. Where it changes nothing, a value left
+    // behind does not invalidate the generator.
+    if !crate::norm_versions::profile().heat_pump_aux_constants {
+        if input
+            .installation_year
+            .is_some_and(|year| !(1900..=crate::LATEST_PLAUSIBLE_YEAR).contains(&year))
+        {
+            issues.push(issue("installation_year_invalid", "installationYear"));
+        }
+        if input.installation_year.is_some()
+            && input
+                .installation_year_reference
+                .as_deref()
+                .map_or(true, |reference| reference.trim().is_empty())
+        {
+            issues.push(issue(
+                "installation_year_reference_required",
+                "installationYearReference",
+            ));
+        }
+        if input.installation_year.is_none() && input.installation_year_reference.is_some() {
+            issues.push(issue(
+                "installation_year_reference_without_year",
+                "installationYearReference",
+            ));
+        }
     }
     let source_fallback_applied = source_fallback_applies(input);
     let source_fallback_reason = if input.source == TableSource::GroundOrGroundwaterUnknown {

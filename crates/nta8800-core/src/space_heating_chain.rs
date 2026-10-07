@@ -5858,18 +5858,33 @@ mod tests {
 
     #[test]
     fn heat_pump_build_year_needs_a_reference() {
+        use crate::norm_versions::{with_version, NormVersion};
         let mut forfait = heat_pump();
         forfait.installation_year = Some(2016);
-        let codes = |input: &ForfaitHeatPumpDraftInput| {
-            crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(input)
-                .issues
-                .into_iter()
-                .map(|item| item.code)
-                .collect::<Vec<_>>()
+        let codes_in = |version: NormVersion, input: &ForfaitHeatPumpDraftInput| {
+            with_version(version, || {
+                crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(input)
+                    .issues
+                    .into_iter()
+                    .map(|item| item.code)
+                    .collect::<Vec<_>>()
+            })
         };
+        let codes = |input: &ForfaitHeatPumpDraftInput| codes_in(NormVersion::V2020A1, input);
         assert!(codes(&forfait).contains(&"installation_year_reference_required"));
+        // Under 2022 and later the year changes nothing (own constants of
+        // 9.85), so a value left behind does not invalidate the generator.
+        for version in [NormVersion::V2022, NormVersion::V2025C1] {
+            assert!(codes_in(version, &forfait).is_empty());
+        }
         forfait.installation_year = Some(1800);
         forfait.installation_year_reference = Some("type plate".into());
+        assert!(codes(&forfait).contains(&"installation_year_invalid"));
+        // No fixed "current year": a device installed after the kernel was
+        // built is still a valid year (the bound only catches typing errors).
+        forfait.installation_year = Some(2027);
+        assert!(codes(&forfait).is_empty(), "{:?}", codes(&forfait));
+        forfait.installation_year = Some(crate::LATEST_PLAUSIBLE_YEAR + 1);
         assert!(codes(&forfait).contains(&"installation_year_invalid"));
         forfait.installation_year = None;
         assert!(codes(&forfait).contains(&"installation_year_reference_without_year"));
