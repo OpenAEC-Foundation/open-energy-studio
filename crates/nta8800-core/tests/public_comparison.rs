@@ -236,6 +236,46 @@ fn case_d_under_nta_8800_2020_a1() {
     assert!((tojuli - 0.27).abs() < 0.005, "{tojuli}");
 }
 
+/// Case E: a detached house of 209,40 m², calculated on 31-01-2023 with
+/// Uniec 3.1.5.0 (NTA 8800:2022); published 86,82 / 28,89 / 74,1, TOjuli 0
+/// (active cooling). Obstructions differ per window: side obstructions on
+/// four windows (width not printed, b_b 0,5 assumed; 0,1–2,0 moves BENG 1 by
+/// at most 0,16) and full obstruction on two (cooling conditions not met,
+/// table 17.5). No linear bridges are printed, so ΔU_for applies. Two
+/// hot-water systems split the need by 13.19a: the heat pump serves the
+/// bathroom, a 7 l boiling-water boiler the kitchen. Fans (690 kWh), PV
+/// (3 543 kWh on the meter) and the heating auxiliary energy (341 kWh) agree.
+#[test]
+fn case_e_under_nta_8800_2022() {
+    let value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-e.json"
+    ))
+    .unwrap();
+    assert_eq!(value["ntaCalculation"]["normVersion"], "2022");
+    let obstructions = value["ntaCalculation"]["windowObstructions"]
+        .as_array()
+        .unwrap();
+    assert_eq!(obstructions.len(), 6);
+    let (performance, indicators) = run_edition(&value, "2022");
+    assert_indicators("E 2022", indicators, [88.77, 31.73, 72.6]);
+    assert!((used_kwh(&performance, "ventilation") - 690.0).abs() < 1.0);
+    let produced: f64 = performance["electricityBalance"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|month| month["producedKwh"].as_f64().unwrap())
+        .sum();
+    assert!((produced - 3543.0).abs() < 1.0, "{produced}");
+    let heating_auxiliary = performance["spaceHeating"]["annualAuxiliaryElectricityKwh"]
+        .as_f64()
+        .unwrap();
+    assert!(
+        (heating_auxiliary - 341.0).abs() < 1.0,
+        "{heating_auxiliary}"
+    );
+    assert_eq!(performance["tojuliMaxK"].as_f64(), Some(0.0));
+}
+
 /// Case C was calculated in NTA 8800:2023, case B in the 2022 period (2022
 /// equals 2023 for B, see above). Under 2023 the
 /// table 13.2 difference of case C disappears: η_W;em;k 0,55 for a kitchen
