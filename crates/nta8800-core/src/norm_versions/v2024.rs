@@ -128,4 +128,5 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     residential_actual_pipe_length: true,
     declared_exhaust_air_flow_route: true,
     cold_recovery_route: true,
+    heat_pump_high_test_standard: "NEN-EN 14511-2:2022",
 };

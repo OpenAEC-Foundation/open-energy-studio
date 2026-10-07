@@ -143,11 +143,12 @@ Bovenop de punten 1–48. Pagina's links uit NTA 8800:2022, rechts uit NTA 8800:
 | 64 | f_sto;dis;ls = 1,5 elektroboiler met geïsoleerde leiding | p. 550 | vervallen (p. 557–558) | `electricBoilerInsulatedPipe` (alleen 2022) |
 | 65 | ϑ_sto;amb met ventilatieretourluchtwarmtepomp (13.69a/13.137a) | bestaat niet (p. 557, 584) | p. 565, 592 | `storage_ambient_exhaust_air` |
 | 66 | C_W;mixed air (13.153b) | bestaat niet (p. 600–602) | p. 609–611 | `mixedAir` → `route_not_in_edition` |
+| 67a | Tabel 9.28 beproeving voor de hoge-COP-rij | NEN-EN 14511-2, gedateerd 2007 (p. 14, 316) | NEN-EN 14511-2:2022 (p. 322) | `heat_pump_high_test_standard`; een andere `testStandardEdition` → `high_test_standard_invalid` |
 | 67 | Tabel 14.4 onderhoudsfactor MF | 0,8 lineair TL / 0,7 led L80 met nieuwwaardecompensatie, F_C = 1 − ½(1 − MF) (p. 639) | MF = 1 (p. 649) | `lightingZones[].constantIlluminance` (alleen 2022) |
 
 Gelijk in 2022 en 2023, dus geen schakelpunt: tabellen 5.2/5.3 behalve flexmodus en biomassa, (P.25) met 8 800 (2022 p. 937; de deler 4 000 is die van 2020+A1, punt 70), tabel I.1 details 6, 7 en 17, de paneeltabellen I.13/I.14, de afgiftetabellen 9.2–9.10 en 10.2–10.5, tabel 11.5 (de rijkeuze bij een onbekend roostertype is invoer) en de bijlagen S–Z.
 
-**Acceptatie met een openbaar rapport.** Het openbare rapport r1 (woongebouw met 28 appartementen in Schagen, berekend volgens NTA 8800:2022) is niet nagebouwd. De rapport-PDF en het tekstuittreksel stonden alleen in een tijdelijke werkmap en waren bij de invoering niet meer beschikbaar. Daarnaast vraagt r1 een volledige meerzonige schematisering van 28 woningen uit een samenvatting zonder bouwkundige details; zo'n invoer zou grotendeels aannames zijn. De acceptatie van 2022 berust daarom op de schakelpunttests en de verschiltests hierboven. Een herbouw van r1 is een open punt.
+**Acceptatie met een openbaar rapport.** Openbaar rapport B (rijwoning, Uniec 3.1.6.2, berekend 22-03-2023) valt in de periode van 2022 en rekent nu in 2022: 52,96 / 29,10 / 62,5, gelijk aan 2023 (zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md#a-b-en-d-in-hun-eigen-editie-7-oktober-2026)). Het woongebouw met 28 appartementen in Schagen (r1) is niet nagebouwd: het vraagt een meerzonige schematisering van 28 woningen met veel aannames. Een tweede 2022-rapport (vrijstaande woning, 31-01-2023) is gevonden maar niet nagebouwd; de reden staat in de vergelijking.
 
 Geen invoer in de kern, dus niet omgeschakeld: de standaard voor woningisolatie (2023 p. 74; de hoofdstuk-5-indicatoren zijn in oudere uitgaven al `null`), gemeenschappelijke ruimten in woongebouwen en kelderkasten tot 4 m² (schematisering), het gecombineerde circulatiesysteem met cv-water (2022 p. 531–541), het keukenvat van 10 l (2023 p. 559, opnameregel) en ramen/deuren met minder dan 65 % glas (2023 p. 815–816).
 
@@ -182,7 +183,9 @@ Het profiel van 2020+A1 is cumulatief op 2022: alles waarin 2022 van 2023 versch
 - de tapwaterwarmtepomp met "type vóór 2021" (2020 p. 584–594) en de klasse-eis bij warmtepompen (2022 p. 607): de keuze van de methode is invoer;
 - de forfaitaire Ψ-voorwaarden (Rc ≥ 4,5 in 2020+A1, ≥ 4,7 in 2022, detail 1): de adviseur toetst de voorwaarde.
 
-**Acceptatie met een openbaar rapport.** Er is geen openbaar rapport in 2020+A1 nagebouwd (r4 stond alleen in een tijdelijke werkmap). De acceptatie berust op de schakelpunttests en de verschiltest hieronder.
+**Acceptatie met openbare rapporten.** Twee rapporten uit de periode van 2020+A1 rekenen in deze editie (zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md#a-b-en-d-in-hun-eigen-editie-7-oktober-2026)):
+- A (vrijstaand, plat dak, Uniec 3.0.16): 94,00 / 36,06 / 74,4 tegen 92,99 / 25,19 / 80,4. De PV-afronding van punt 68 geeft de 2 437 kWh van het rapport; het verschil in BENG 2 is 10.15 en 10.87.
+- D (vrijstaande vakantiewoning, Uniec 3.0.10.0): 82,49 / 38,42 / 83,4 tegen 86,72 / 39,19 / 83,5. Tapwater, ventilatoren en PV zijn gelijk; de hulpenergie van de warmtepomp bevestigt punt 74 (het rapport rekent A = 13,0 kWh, toestel vanaf 2015).
 
 ## Besluiten bij de invoering van 2023
 
@@ -240,7 +243,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2023`), `ventilation.rs`, `annex_p.rs` en `tojuli.rs`: per schakelpunt van 2023 de waarde met de pagina in beide uitgaven.
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2022`), `forfait_heat_pump_draft.rs`, `annex_p.rs`, `ground.rs`, `forfait_envelope.rs`, `lighting.rs` en `tests/norm_versions.rs` (`edition_2022_*`, `example_projects_2022_*`, `thermal_mass_by_kg_per_m2_is_a_2022_route`): de schakelpunten van 2022. Op de voorbeeldprojecten verandert in 2022 tegen 2023 niets: geen van beide heeft invoer op een route die verschilt.
 - `crates/nta8800-core/src/norm_versions/tests.rs` (`switch_points_2020`), `annex_p.rs` (restwarmte) en `tests/norm_versions.rs` (`edition_2020a1_*`, `example_projects_2020a1_*`): de schakelpunten van 2020+A1. De verschiltest zet de PV-paneelroute van de voorbeelden om naar een opgegeven K_pk van 200 W/m² met hetzelfde piekvermogen. Tegen 2022 veranderen in beide voorbeelden alleen de grootheden die de hulpenergie van de warmtepomp volgen (punt 74): primair fossiel, CO2 en het hernieuwbare aandeel. Behoefte, TOjuli en omgevingswarmte blijven gelijk.
-- `crates/nta8800-core/tests/public_comparison.rs`: de openbare gevallen B en C (gepubliceerd in 2023) in 2023; zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md).
+- `crates/nta8800-core/tests/public_comparison.rs`: de openbare gevallen B en C in 2023, A en D in 2020+A1 en B in 2022; zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md).
 - `crates/nta8800-service/tests/api.rs`: `supportedNormVersions` en een berekening in 2024 via HTTP.
 - Per route 2024 tegen 2025+C1 (verschil, stempel, status): `opname/mod.rs` en `opname/utility.rs` (`*_in_its_edition`), `maatwerkadvies.rs` (`variants_follow_the_base_edition`), `relabel.rs` (`relabel_keeps_the_original_edition`) en `registration.rs` (`relabel_in_the_original_edition_is_not_refused_as_legacy`).
 - `crates/nta8800-service/src/lib.rs`: `every_route_kind_takes_and_stamps_the_edition`, `every_post_operation_documents_norm_version` en de gelijktijdigheidstest `parallel_requests_keep_their_own_edition` (32 parallelle verzoeken, afwisselend 2024 en 2025+C1).

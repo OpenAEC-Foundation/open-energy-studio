@@ -25,6 +25,11 @@ Het invoerformaat is ongewijzigd en bestaande projecten rekenen hetzelfde. Er zi
 - De forfaitaire warmtepomp (`forfait` van `heat_pump_forfait` en `hybrid_heat_pump`) heeft een optioneel `installationYear` met `installationYearReference`. Onder NTA 8800:2020+A1 geeft een bouwjaar vanaf 2015 in (9.85) A = 13,0 kWh in plaats van 87,6 kWh (2020 p. 336). Andere uitgaven: geen verschil. Nieuwe meldingen zijn de bestaande codes `installation_year_invalid`, `installation_year_reference_required` en `installation_year_reference_without_year`.
 - Alle NTA-opdrachten van de desktop-app nemen een optioneel `normVersion`, met dezelfde regels als de service (één implementatie in `nta8800_core::norm_versions::request`): onbekend → `invalid_norm_version`; een invoer met een eigen uitgave krijgt de gevraagde uitgave en mag die niet tegenspreken (`norm_version_conflict`); diagnoses rekenen met de uitgave actief; het resultaat krijgt `normVersion`, `targetNormVersion` en in een oudere uitgave `calculated_legacy_edition`. De diagnosepanelen en de constructie-editor sturen de uitgave van het project mee. Resultaten in 2025+C1 zijn ongewijzigd.
 
+## 7 oktober 2026 — openbare rapporten in hun eigen editie
+
+- Tabel 9.28 (hoge-COP-rij van de forfaitaire warmtepomp): onder 2022 en 2020+A1 is de beproeving nu NEN-EN 14511-2:2007, de gedateerde verwijzing van die edities (2022 p. 14, 316; 2020 p. 15, 314). Eerder eiste de kern daar NEN-EN 14511-2:2022, die pas vanaf 2023 geldt (p. 322), en gaf `high_test_standard_invalid` op een correcte beproeving. Projecten onder 2023, 2024 en 2025+C1 zijn ongewijzigd.
+- Openbare rapporten in de editie van hun rekendatum: A en een nieuw geval D in 2020+A1, B in 2022 (docs/nta8800-vergelijking-openbare-rapporten.md). D (vrijstaande vakantiewoning, Uniec 3.0.10.0) komt overeen in tapwater, ventilatoren en PV; de hulpenergie van de warmtepomp bevestigt (9.85) met A 13,0 kWh vanaf 2015.
+
 ## 6 oktober 2026 — NTA 8800:2020+A1
 
 De uitgave `"2020+A1"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2022, plus de punten 68–79 in docs/nta8800-normversies.md:

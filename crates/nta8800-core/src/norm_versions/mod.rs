@@ -397,6 +397,8 @@ pub struct NormProfile {
     pub declared_exhaust_air_flow_route: bool,
     /// (11.106a): cold recovery through the heat exchanger with 100 % bypass.
     pub cold_recovery_route: bool,
+    /// Table 9.28: the dated NEN-EN 14511-2 the minimum COP is tested to.
+    pub heat_pump_high_test_standard: &'static str,
 }
 
 thread_local! {

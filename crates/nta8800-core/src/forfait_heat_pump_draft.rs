@@ -312,7 +312,9 @@ fn high_evidence_issues(input: &ForfaitHeatPumpDraftInput) -> Vec<TableIssue> {
             "highEfficiencyEvidence.testReportReference",
         ));
     }
-    if evidence.test_standard_edition != "NEN-EN 14511-2:2022" {
+    if evidence.test_standard_edition
+        != crate::norm_versions::profile().heat_pump_high_test_standard
+    {
         issues.push(issue(
             "high_test_standard_invalid",
             "highEfficiencyEvidence.testStandardEdition",
