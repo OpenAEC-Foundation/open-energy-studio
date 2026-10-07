@@ -776,18 +776,20 @@
         "obstruction": {
           "method": "side_obstruction",
           "side": "left",
-          "relativeWidth": 0.5
+          "relativeWidth": 3.009,
+          "coolingHeightCondition": false
         },
-        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): zijbelemmering left, breedte niet vermeld; b_b 0.5 aangenomen"
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam D: zijbelemmering links, hoogte < 2,5 m, afstand 3,31 m, breedte 1,1 m, hoek 72°; b_b = afstand / breedte (2022 p. 673)"
       },
       {
         "windowId": "VG-L",
         "obstruction": {
           "method": "side_obstruction",
           "side": "right",
-          "relativeWidth": 0.5
+          "relativeWidth": 1.331,
+          "coolingHeightCondition": false
         },
-        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): zijbelemmering right, breedte niet vermeld; b_b 0.5 aangenomen"
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam L: zijbelemmering rechts, hoogte < 2,5 m, afstand 2,33 m, breedte 1,75 m, hoek 53°; b_b = afstand / breedte (2022 p. 673)"
       },
       {
         "windowId": "AG-F",
@@ -802,18 +804,20 @@
         "obstruction": {
           "method": "side_obstruction",
           "side": "left",
-          "relativeWidth": 0.5
+          "relativeWidth": 0.359,
+          "coolingHeightCondition": false
         },
-        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): zijbelemmering left, breedte niet vermeld; b_b 0.5 aangenomen"
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam I: zijbelemmering links, hoogte < 2,5 m, afstand 4,61 m, breedte 12,85 m, hoek 20°; b_b = afstand / breedte (2022 p. 673)"
       },
       {
         "windowId": "LZG-H",
         "obstruction": {
           "method": "side_obstruction",
           "side": "left",
-          "relativeWidth": 0.5
+          "relativeWidth": 0.116,
+          "coolingHeightCondition": false
         },
-        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): zijbelemmering left, breedte niet vermeld; b_b 0.5 aangenomen"
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam H: zijbelemmering links, hoogte < 2,5 m, afstand 1,49 m, breedte 12,85 m, hoek 7°; b_b = afstand / breedte (2022 p. 673)"
       },
       {
         "windowId": "LZG-G",

@@ -239,9 +239,10 @@ fn case_d_under_nta_8800_2020_a1() {
 /// Case E: a detached house of 209,40 m², calculated on 31-01-2023 with
 /// Uniec 3.1.5.0 (NTA 8800:2022); published 86,82 / 28,89 / 74,1, TOjuli 0
 /// (active cooling). Obstructions differ per window: side obstructions on
-/// four windows (width not printed, b_b 0,5 assumed; 0,1–2,0 moves BENG 1 by
-/// at most 0,16) and full obstruction on two (cooling conditions not met,
-/// table 17.5). No linear bridges are printed, so ΔU_for applies. Two
+/// four windows, with b_b = distance / width from the printout (2022
+/// p. 673: D 3,01, L 1,33, I 0,36, H 0,12; all below 2,5 m), and full
+/// obstruction on two (no geometry printed; cooling conditions taken as not
+/// met, table 17.5). No linear bridges are printed, so ΔU_for applies. Two
 /// hot-water systems split the need by 13.19a: the heat pump serves the
 /// bathroom, a 7 l boiling-water boiler the kitchen. Fans (690 kWh), PV
 /// (3 543 kWh on the meter) and the heating auxiliary energy (341 kWh) agree.
@@ -257,7 +258,7 @@ fn case_e_under_nta_8800_2022() {
         .unwrap();
     assert_eq!(obstructions.len(), 6);
     let (performance, indicators) = run_edition(&value, "2022");
-    assert_indicators("E 2022", indicators, [88.77, 31.73, 72.6]);
+    assert_indicators("E 2022", indicators, [88.61, 31.68, 72.6]);
     assert!((used_kwh(&performance, "ventilation") - 690.0).abs() < 1.0);
     let produced: f64 = performance["electricityBalance"]
         .as_array()
