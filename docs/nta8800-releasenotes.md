@@ -2,6 +2,13 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 7 oktober 2026 — Bron & bewijs, opnamefoto's en overnemen in projectmodel
+
+Geen wijziging in uitkomst of status. Wel nieuw in het dossier en de invoer:
+- `manifest.json` van de dossier-ZIP heeft een inhoudsopgave van het bewijs (`evidence`). Die geeft per bewijsstuk het pad in de ZIP, de SHA-256 en de invoer die het onderbouwt (`supports`, JSON-pointers uit `linkedPaths` en uit `evidence:<id>`-bronverwijzingen).
+- Bronvelden, gebouwelementen en opname-onderdelen krijgen bewijs en foto's uit het bewijsregister. Een opnamefoto is een registeritem met `linkedPaths` `/basisopname/survey/...`; de opname zelf verandert niet.
+- **Overnemen in projectmodel** schrijft de uit de opname afgeleide NTA-invoer in het concept. Geometrie, de zonegegevens van een opname met meer zones en aanvullende verwarmingssystemen worden niet overgenomen. De gebruiker past het concept zelf toe.
+
 ## 6 oktober 2026 — NTA 8800:2020+A1
 
 De uitgave `"2020+A1"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2022, plus de punten 68–79 in docs/nta8800-normversies.md:

@@ -38,7 +38,14 @@ Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, vers
 - aanleverende partij en controlerende adviseur;
 - de JSON-paden die het bestand onderbouwt.
 
-Verwijs vanuit een bronveld naar een bewijsstuk met `evidence:<id>`. Bij herlabelen heeft een bewijsstuk een **rol bij herlabelen**:
+Verwijs vanuit een bronveld naar een bewijsstuk met `evidence:<id>`. Dat hoeft niet met de hand:
+- **Bron & bewijs** onder elke invoersectie heeft per bronveld een keuzelijst met de bewijsstukken. Kiezen vult het bronveld met de verwijzing. Met **Bestand toevoegen** zet je een nieuw bestand in het register en koppel je het direct.
+- In de **inspector** heeft een geselecteerd gebouwelement (zone, vlak, raam, koudebrug) een blok **Bron & bewijs**. Daar koppel je een tekening, foto of verklaring aan dat element (`linkedPaths`, bijvoorbeeld `/zones/0/surfaces/2`).
+- In de **basisopname** heeft elk onderdeel een blok **Foto's** (zie [hoofdstuk 2](02-basisopname.md)).
+
+De **Checklist BRL 9500** toont per bewijsstuk de kolom **Onderbouwt**: de gekoppelde invoer, met een knop naar de stap waar die invoer staat. Een bewijsstuk zonder koppeling krijgt "niet gekoppeld". Wijst een bronveld naar een bewijsstuk dat niet meer in het register staat, dan meldt de pagina dat.
+
+Bij herlabelen heeft een bewijsstuk een **rol bij herlabelen**:
 - offerte met opdracht;
 - gespecificeerde factuur van de verbetering op dit adres;
 - foto van PV of zonthermie met beschaduwing.
@@ -107,7 +114,7 @@ Kies **Rapport** → **Projectdossier exporteren (ZIP)**. De ZIP bevat:
 | `herlabel-origineel.oes.json` | het origineel, byte voor byte, bij herlabelen |
 | bewijsbestanden | uit het bewijsregister |
 | `dossier-checklist.json` | de volledigheidscontrole (BRL 9500 bijlage 3, p. 61–63) |
-| `manifest.json` | moment, projectnaam, kernversie met normversie en invoervingerafdruk, attestatus, per bestand pad, SHA-256 en grootte, het aantal ontbrekende bewijsstukken (`missingEvidence`) en de checklist |
+| `manifest.json` | moment, projectnaam, kernversie met normversie en invoervingerafdruk, attestatus, per bestand pad, SHA-256 en grootte, de inhoudsopgave van het bewijs (`evidence`: per bewijsstuk soort, bestandsnaam, SHA-256, datum, pad in de ZIP, controleur en de invoer die het onderbouwt), de ontbrekende bewijsstukken (`missingEvidence`) en de checklist |
 
 **Checklist.** De checklist hangt af van het doel, het opnametype, de representativiteit en herlabelen. Bij een basisopname toetst ze de redenen voor de toegepaste standaardwaarden. Rapport & dossier › Checklist BRL 9500 toont dezelfde checklist als de export. Terwijl de berekening loopt, staan punten op "bezig"; in een export komt die status nooit voor.
 

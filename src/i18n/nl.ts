@@ -6,6 +6,7 @@ import { buildingInstallLabelsNl } from './buildingInstallLabels';
 import { resultsLabelsNl } from './resultsLabels';
 import { ntaStepLabelsNl } from './ntaStepLabels';
 import { deliveryLabelsNl } from './deliveryLabels';
+import { evidenceLinkLabelsNl } from './evidenceLinkLabels';
 import { existingLabelsNl } from './existingLabels';
 
 export const nl: Record<string, string> = {
@@ -18,6 +19,7 @@ export const nl: Record<string, string> = {
   ...resultsLabelsNl,
   ...ntaStepLabelsNl,
   ...deliveryLabelsNl,
+  ...evidenceLinkLabelsNl,
   ...existingLabelsNl,
   // App
   'app.title': 'Open Energy Studio',
