@@ -20,6 +20,7 @@
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 
+pub mod request;
 mod v2020a1;
 mod v2022;
 mod v2023;

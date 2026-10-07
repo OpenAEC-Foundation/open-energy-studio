@@ -392,7 +392,7 @@ fn run_maatwerkadvies(body: &Value) -> Outcome {
 // ---------------------------------------------------------------- editions
 
 /// Request member that selects the NTA 8800 edition of any operation.
-pub const NORM_VERSION_MEMBER: &str = "normVersion";
+pub const NORM_VERSION_MEMBER: &str = norm_versions::request::NORM_VERSION_MEMBER;
 
 /// How an operation takes the edition of a request.
 enum EditionRoute {
@@ -457,20 +457,14 @@ fn edition_error(code: &str, message: String, path: String) -> Outcome {
     }
 }
 
+/// Refusal of a request's edition, as an error envelope.
+fn edition_refusal(error: norm_versions::request::EditionError) -> Outcome {
+    edition_error(error.code, error.message, error.path)
+}
+
 /// The request's `normVersion`, if any.
 fn requested_norm_version(body: &Value) -> Result<Option<NormVersion>, Outcome> {
-    match body.get(NORM_VERSION_MEMBER) {
-        None | Some(Value::Null) => Ok(None),
-        Some(value) => serde_json::from_value(value.clone())
-            .map(Some)
-            .map_err(|_| {
-                edition_error(
-                    "invalid_norm_version",
-                    format!("`normVersion` must be one of the edition identifiers, not {value}"),
-                    NORM_VERSION_MEMBER.into(),
-                )
-            }),
-    }
+    norm_versions::request::parse_requested(body.get(NORM_VERSION_MEMBER)).map_err(edition_refusal)
 }
 
 /// Writes `version` into the input's own edition slots, refusing a request
@@ -481,79 +475,18 @@ fn place_edition(
     version: NormVersion,
 ) -> Result<(), Outcome> {
     for (member, pointer) in slots {
-        let path = format!("{member}{}", pointer.replace('/', "."));
-        let Some(input) = body.get_mut(*member) else {
-            continue;
-        };
-        match input.pointer(pointer).filter(|value| !value.is_null()) {
-            Some(found) => {
-                let found: Option<NormVersion> = serde_json::from_value(found.clone()).ok();
-                if found != Some(version) {
-                    return Err(edition_error(
-                        "norm_version_conflict",
-                        format!(
-                            "`normVersion` {} differs from the edition in `{path}`",
-                            version.id()
-                        ),
-                        path,
-                    ));
-                }
-            }
-            // The default edition is the absent one: writing it would change
-            // the input's fingerprint and label-input hash.
-            None if version.is_default() => {}
-            None => {
-                let (parent, key) = pointer.rsplit_once('/').expect("slot pointer has a key");
-                match input.pointer_mut(parent).and_then(Value::as_object_mut) {
-                    Some(object) => {
-                        object.insert(key.to_string(), json!(version));
-                    }
-                    None => {
-                        return Err(edition_error(
-                            "norm_version_not_applicable",
-                            format!(
-                                "`normVersion` {} cannot be placed: `{path}` has no parent object",
-                                version.id()
-                            ),
-                            path,
-                        ))
-                    }
-                }
-            }
+        if let Some(input) = body.get_mut(*member) {
+            norm_versions::request::place_in(input, member, pointer, version)
+                .map_err(edition_refusal)?;
         }
     }
     Ok(())
 }
 
-/// Records the edition a result was calculated with: `normVersion` and
-/// `targetNormVersion` are added when the kernel did not set them, and a
-/// calculation in an older edition gets the legacy status (never
-/// registrable). Error envelopes stay as they are.
+/// Records the edition a result was calculated with (see
+/// [`norm_versions::request::stamp`]).
 fn stamp_edition(outcome: &mut Outcome, version: NormVersion) {
-    let Some(object) = outcome.body.as_object_mut() else {
-        return;
-    };
-    if object.contains_key("error") {
-        return;
-    }
-    let version = object
-        .get(NORM_VERSION_MEMBER)
-        .and_then(|value| serde_json::from_value::<NormVersion>(value.clone()).ok())
-        .unwrap_or(version);
-    object
-        .entry(NORM_VERSION_MEMBER)
-        .or_insert_with(|| json!(version));
-    object
-        .entry("targetNormVersion")
-        .or_insert_with(|| json!(version.label()));
-    if !version.registration_eligible() {
-        if object.get("status").and_then(Value::as_str) == Some("calculated_unverified") {
-            object.insert("status".into(), json!("calculated_legacy_edition"));
-        }
-        if object.contains_key("registrationEligible") {
-            object.insert("registrationEligible".into(), json!(false));
-        }
-    }
+    norm_versions::request::stamp(&mut outcome.body, version);
 }
 
 /// Runs an operation as the HTTP and MCP adapters do: with the request's
