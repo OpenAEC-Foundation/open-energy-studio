@@ -25,6 +25,8 @@ export const evidenceLinkLabelsNl: Record<string, string> = {
   'evidenceLink.supportsNone': 'nog niets',
   'evidenceLink.dangling': '{{count}} bronverwijzing(en) naar een bewijsstuk dat niet meer in het register staat',
   'evidenceLink.unused': 'niet gekoppeld',
+  'evidenceLink.unresolved': '{{count}} koppeling(en) naar een element of opname-item dat niet meer in het project staat',
+  'evidenceLink.unresolvedItem': 'niet meer in het project',
 
   'opname.takeover.button': 'Overnemen in projectmodel',
   'opname.takeover.title': 'Opname overnemen in het projectmodel',
@@ -67,6 +69,8 @@ export const evidenceLinkLabelsEn: Record<string, string> = {
   'evidenceLink.supportsNone': 'nothing yet',
   'evidenceLink.dangling': '{{count}} source reference(s) to evidence no longer in the register',
   'evidenceLink.unused': 'not linked',
+  'evidenceLink.unresolved': '{{count}} link(s) to an element or survey item no longer in the project',
+  'evidenceLink.unresolvedItem': 'no longer in the project',
 
   'opname.takeover.button': 'Take over into project model',
   'opname.takeover.title': 'Take the survey over into the project model',
