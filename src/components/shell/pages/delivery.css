@@ -91,3 +91,9 @@
 }
 .registration-form-dirty { margin-inline-end: auto; font-size: var(--fs-sm); color: var(--warn-text); }
 .registration-pending { margin: 0; font-size: var(--fs-sm); color: var(--fg-2); }
+
+.delivery-evidence-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

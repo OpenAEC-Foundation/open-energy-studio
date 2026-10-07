@@ -21,6 +21,7 @@ import { WORKFLOW_STEPS, type Route } from '../../core/navigation/routes';
 import type { IProject } from '../../core/energy/types';
 import { Banner, Button, Card, Segmented, Stepper, cx, type StepItem } from '../ui';
 import { focusPathIn } from './focusPath';
+import { EvidenceReferencePicker } from '../EvidenceLink/EvidenceLink';
 import { FieldPathPrefixProvider, read, Section, type Draft } from '../NtaPerformancePanel/NtaFormFields';
 import { NTA_PATH_PREFIX } from '../NtaPerformancePanel/NtaCalculationForm';
 import {
@@ -128,7 +129,9 @@ function ntaIssues(issues: StepIssue[]): Array<StepIssue & { focus: string }> {
 
 const within = (issue: { focus: string }, def: NtaSectionDef) => def.paths.some((own) => isPathWithin(issue.focus, prefixed(own)));
 
-function EvidenceBlock({ draft, def, container }: { draft: Draft; def: NtaSectionDef; container: () => HTMLElement | null }) {
+function EvidenceBlock({ draft, def, container, change }: {
+  draft: Draft; def: NtaSectionDef; container: () => HTMLElement | null; change?: NtaSectionProps['change'];
+}) {
   const { t } = useI18n();
   const items = sectionEvidence(draft, def);
   if (items.length === 0) return null;
@@ -154,6 +157,8 @@ function EvidenceBlock({ draft, def, container }: { draft: Draft; def: NtaSectio
               {item.filled
                 ? <span className="nta-evidence__value"><Paperclip aria-hidden="true" /> {String(value)}</span>
                 : <span className="nta-evidence__value">{t('ntaStep.evidence.missing')}</span>}
+              {change && <EvidenceReferencePicker path={item.path} value={value}
+                onChange={(next) => change(parseKernelPath(item.path), next)} />}
               <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => goTo(item.path)}
                 aria-label={`${t('ui.goTo')}: ${item.path}`}>
                 {t('ui.goTo')} <ArrowRight aria-hidden="true" />
@@ -172,13 +177,13 @@ function SectionBlock({ def, props, container }: { def: NtaSectionDef; props: Nt
   const [first, ...rest] = def.paths.map(prefixed);
   if (def.bare) return <div className="nta-step-section nta-step-section--bare" data-path={first} data-paths={rest.join(' ') || undefined}>
     <Component {...props} />
-    <EvidenceBlock draft={props.draft} def={def} container={container} />
+    <EvidenceBlock draft={props.draft} def={def} container={container} change={props.change} />
   </div>;
   return <div className="nta-step-section">
     <Section title={t(def.titleKey)} path={first} extraPaths={rest}>
       <Component {...props} />
     </Section>
-    <EvidenceBlock draft={props.draft} def={def} container={container} />
+    <EvidenceBlock draft={props.draft} def={def} container={container} change={props.change} />
   </div>;
 }
 

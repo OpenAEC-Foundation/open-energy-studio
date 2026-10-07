@@ -14,6 +14,7 @@ import { NumberInput, Select } from '../ui';
 import { ItemActions } from '../ItemActions/ItemActions';
 import { netArea, surfaceTilt } from './pages/BuildingPages';
 import { useShellActions } from './ShellActions';
+import { EvidenceAttach } from '../EvidenceLink/EvidenceLink';
 
 const ORIENTATIONS: Orientation[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'horizontal'];
 const BOUNDARIES: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
@@ -47,6 +48,19 @@ export function findBuildingElement(project: IProject, itemType: string | null, 
     }
   }
   return null;
+}
+
+/** JSON pointer of a found element in the project (`/zones/0/surfaces/2/windows/1`), for evidence links. */
+export function elementPointer(project: IProject, found: Found): string {
+  const zoneIndex = project.zones.indexOf(found.zone);
+  const zone = `/zones/${zoneIndex}`;
+  switch (found.type) {
+    case 'zone': return zone;
+    case 'surface': return `${zone}/surfaces/${found.zone.surfaces.indexOf(found.surface)}`;
+    case 'window': return `${zone}/surfaces/${found.zone.surfaces.indexOf(found.surface)}/windows/${found.surface.windows.indexOf(found.window)}`;
+    case 'thermalBridge': return `${zone}/thermalBridges/${found.zone.thermalBridges.indexOf(found.bridge)}`;
+    case 'pointBridge': return `${zone}/pointThermalBridges/${(found.zone.pointThermalBridges ?? []).indexOf(found.bridge)}`;
+  }
 }
 
 /** A label and its control; the control gets the label as its accessible name (the unit stays out of it). */
@@ -191,6 +205,7 @@ export function ElementInspector() {
         <ItemActions itemType={itemType} id={id} name={title} />
       </header>
       {body}
+      <EvidenceAttach pointer={elementPointer(project, found)} hint={t('evidenceLink.elementHint')} />
       <p className="element-inspector__hint">{t('inspector.inlineHint')}</p>
     </section>
   );
