@@ -1417,11 +1417,11 @@ fn annex_aa_zone_issues(input: &BuildingPerformanceInput) -> Vec<PerformanceIssu
             Some(zone) if !cooled.contains(&zone) => {
                 issues.push(issue("annex_aa_zone_unknown", format!("{path}.zoneId")))
             }
-            Some(zone) => {
-                if !seen.insert(zone) {
-                    issues.push(issue("annex_aa_zone_duplicate", format!("{path}.zoneId")));
-                }
+            // The first calculation of a zone counts; a second one is a duplicate.
+            Some(zone) if !seen.insert(zone) => {
+                issues.push(issue("annex_aa_zone_duplicate", format!("{path}.zoneId")))
             }
+            Some(_) => {}
         }
     }
     issues
