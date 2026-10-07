@@ -1415,7 +1415,7 @@ export const nl: Record<string, string> = {
   'nta.form.ac.other': 'overig (utiliteit)',
   'nta.form.ac.capacity': 'Bewijs capaciteit (§5.7.1)',
   'nta.form.ac.dynamic': 'dynamische koellastberekening',
-  'nta.form.ac.annexAa': 'bijlage AA (berekening via Geavanceerd)',
+  'nta.form.ac.annexAa': 'bijlage AA (berekening per ruimte)',
   'nta.form.ac.solar': 'beperkte zoninstraling',
   'nta.form.ac.criterion': 'Criterium',
   'nta.form.ac.smallWindows': 'A_w < 0,2·A_g',

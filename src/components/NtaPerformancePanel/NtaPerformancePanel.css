@@ -153,3 +153,47 @@ fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-siz
 .nta-form select { text-overflow: ellipsis; }
 
 .nta-performance-legacy { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 8px 12px; border-left: 4px solid var(--unverified); background: var(--unverified-subtle); }
+
+/* Annex AA: zone data, a room summary table, one card per room with its windows. */
+.nta-aa-field { display: grid; gap: 3px; align-content: start; min-width: 0; }
+.nta-aa-field > small:not(.nta-form-error) { color: var(--fg-3); }
+.nta-aa-summary { grid-column: 1 / -1; overflow-x: auto; }
+.nta-aa-summary table { border-collapse: collapse; min-width: 100%; font-variant-numeric: tabular-nums; }
+.nta-aa-summary caption { text-align: start; font-weight: 700; padding-bottom: var(--space-1); }
+.nta-aa-summary th, .nta-aa-summary td { padding: 4px 8px; border-bottom: 1px solid var(--line-subtle); text-align: end; }
+.nta-aa-summary thead th { color: var(--fg-2); font-weight: 600; font-size: var(--fs-xs); }
+.nta-aa-summary th[scope="row"], .nta-aa-summary thead th:first-child { text-align: start; }
+.nta-aa-summary a { color: var(--accent-text); }
+.nta-aa-totals { margin: var(--space-1) 0 0; color: var(--fg-2); }
+.nta-aa-room { scroll-margin-top: var(--space-8); }
+.nta-aa-windows {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+.nta-aa-windows > small { color: var(--fg-3); }
+.nta-aa-window {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(160px, 1fr) auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: end;
+}
+.nta-aa-window > .nta-aa-issue { grid-column: 1 / -1; }
+.nta-aa-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.nta-aa-json { grid-column: 1 / -1; display: grid; gap: var(--space-2); }
+.nta-aa-json textarea {
+  width: 100%;
+  font: var(--fs-xs)/1.4 var(--font-mono);
+  padding: var(--space-2);
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  resize: vertical;
+}
+@media (max-width: 640px) {
+  .nta-aa-window { grid-template-columns: 1fr; }
+}
