@@ -2,6 +2,11 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 7 oktober 2026 — zonwering uit tabel 7.5/7.6 rekent weer; openbaar geval F
+
+- Een beweegbare zonwering met een apparaat uit tabel 7.5 of 7.6 (`windowSolar.movableShading.device`, bijvoorbeeld rolluiken of screens) zonder eigen `reductionFactor` gaf status `invalid` met `non_finite_result`. Het lege veld kwam als NaN in de afgeleide invoer. Het veld wordt nu weggelaten. Zulke projecten rekenen nu; de F_c volgt uit de tabel (§7.5). Projecten met een opgegeven `reductionFactor` zijn ongewijzigd.
+- Nieuw openbaar vergelijkingsgeval F (vrijstaande woning, Uniec 3.0.19.4, NTA 8800:2020+A1), zie `docs/nta8800-vergelijking-openbare-rapporten.md`.
+
 ## 7 oktober 2026 — Bron & bewijs, opnamefoto's en overnemen in projectmodel
 
 Geen wijziging in uitkomst of status. Wel nieuw in het dossier en de invoer:
