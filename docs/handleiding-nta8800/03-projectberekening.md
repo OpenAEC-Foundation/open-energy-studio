@@ -49,7 +49,7 @@ Het formulier vraagt alleen wat het projectmodel nog niet heeft. De secties staa
 
 | Onderdeel | Inhoud | Normbasis |
 |---|---|---|
-| Algemeen | rekenscope (woningbouw of utiliteit), bouwjaar, bron A_g, gebruiksfunctie en woningtype, Bbl-functie, actieve koeling (systeem, capaciteitsbewijs of bijlage AA), vergunningaanvraag na 29 mei 2026, fossiele toestellen buiten de berekening | tabellen 7.13–7.15, §5.7.1, bijlage AA |
+| Algemeen | rekenscope (woningbouw of utiliteit), bouwjaar, bron A_g, gebruiksfunctie en woningtype, Bbl-functie, actieve koeling (systeem, capaciteitsbewijs of bijlage AA, zie [hieronder](#koelvermogen-volgens-bijlage-aa)), vergunningaanvraag na 29 mei 2026, fossiele toestellen buiten de berekening | tabellen 7.13–7.15, §5.7.1, bijlage AA |
 | Gebruiksfuncties met oppervlakte | functies voor gemengde rekenzones, Bbl-toets en labelklasse | §6.5.3, Bbl art. 4.149 lid 2 |
 | Setpoints (tabel 7.13) | verwarmings- en koelsetpoint; het formulier toetst per zone aan tabel 7.13 (gewogen bij meerdere functies), knop "Tabelwaarden gebruiken" | tabel 7.13 |
 | Thermische massa (tabel 7.10) | klasse vloer en wand, plafondkolom | tabellen 7.10–7.12 |
@@ -102,6 +102,34 @@ Per drager (warmte, warm tapwater, koude) kies je een route:
 - kwaliteitsverklaring;
 - gemeten stromen (P.6);
 - berekend systeem (P.7, P.9), met leidingdelen, opslag, opwekkers met prioriteit en hulpenergie.
+
+### Koelvermogen volgens bijlage AA
+
+Kies bij **Actieve koeling** als capaciteitsbewijs *bijlage AA (berekening per ruimte)*. Je vindt deze sectie onder Installaties › Koeling. Kies dan **Berekening bijlage AA toevoegen**. Het formulier vraagt het volgende:
+- **Gegevens van de rekenzone:**
+  - het bouwjaar voor tabel AA.2;
+  - of meer dan 50 % van A_in aantoonbaar na-geïsoleerd is;
+  - het vermogen van een centrale koelopwekker B_C;inst;zi. Laat dit veld leeg als elke ruimte een eigen opwekker heeft (AA.3.2.3).
+- **Per verblijfsruimte:**
+  - naam;
+  - vloeroppervlakte (m²);
+  - dicht buitenoppervlak van gevel en dak, op binnenmaat (m²);
+  - geïnstalleerd koelvermogen B_C;inst;zi,j (kW);
+  - of het een woonkamer, keuken of eetkamer is. Zulke ruimten hebben een dubbele interne last.
+- **Per ruimte de ramen.** Je kiest uit de buitenramen van het projectmodel. Een raam kan maar bij één ruimte horen, dus de keuzelijst toont alleen ramen die nog vrij zijn. U_w+shut (8.22) vul je alleen in als er zonwering volgens 7.6.6.1.4 is. Een leeg veld gebruikt de U_w van het raam. Een raam dat niet (meer) in het project staat, blijft zichtbaar met de aanduiding *niet in het project*.
+
+**Ruimten beheren.** Een overzichtstabel boven de ruimten toont per ruimte de oppervlakte, het vermogen en het aantal ramen. Onder de tabel staan de totalen.
+- **Ruimte toevoegen** maakt een lege ruimte.
+- **Dupliceren** maakt een kopie met een nieuwe naam. De ramen gaan niet mee, omdat de rekenkern een raam bij twee ruimten weigert.
+- **Ruimte verwijderen** haalt de ruimte weg.
+
+**Controle.** Het formulier controleert dezelfde punten als de rekenkern, met dezelfde meldcodes. Het toont een melding direct bij het veld: een ontbrekende oppervlakte, een negatief vermogen, een onbekend of dubbel toegekend raam, of een dubbele ruimtenaam. De toets AA.10–AA.13 zelf doet de rekenkern na **Toepassen**.
+
+**Edities.**
+- Onder de editie 2024 vraagt het formulier ook de specifiek werkzame massa SWM (50–100 kg/m²) en het dakoppervlak per ruimte.
+- De edities 2023, 2022 en 2020+A1 kennen bijlage AA niet als capaciteitsbewijs. Het formulier meldt dat.
+
+**JSON bekijken** toont de berekening als bewerkbare JSON. **JSON overnemen** neemt de JSON alleen over als die geldig is.
 
 ### Geavanceerd (JSON)
 
