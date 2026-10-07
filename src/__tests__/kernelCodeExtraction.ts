@@ -12,7 +12,7 @@ export function rustFiles(dir: string): string[] {
 }
 
 /** Callees whose string arguments are user-facing codes. */
-const CODE_CALLEE = /(issue|gap|warning|warn|finding|push|add|err|refuse|reject|fail)/i;
+const CODE_CALLEE = /(issue|gap|warning|warn|finding|push|add|err|refuse|reject|fail|ok_or)/i;
 const SNAKE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
 /** A JSON-pointer-like or camelCase path literal, as passed next to a code. */
 const PATH_LITERAL = /^(?:[a-z][A-Za-z0-9]*[A-Z.\[][A-Za-z0-9.\[\]]*|)$/;
