@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { BuildingFunction, INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseGasHeatPumpForfaitDraftWithRust, type GasHeatPumpForfaitDraftAssessment, type GasHeatPumpForfaitDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -30,6 +31,7 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
   const [result, setResult] = useState<GasHeatPumpForfaitDraftAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setError(null); };
   const source = sourceMap[pump.source];
@@ -68,7 +70,7 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
     const current = ++sequence.current;
     setError(null);
     try {
-      const assessment = await diagnoseGasHeatPumpForfaitDraftWithRust(input);
+      const assessment = await diagnoseGasHeatPumpForfaitDraftWithRust(input, edition);
       if (current !== sequence.current) return;
       setResult(assessment);
       if (assessment.status === 'invalid') setError(assessment.issues.map((issue) => issue.code).join(', '));

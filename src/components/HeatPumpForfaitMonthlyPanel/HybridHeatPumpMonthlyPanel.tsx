@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { INtaHeatPumpInput } from '../../core/energy/types';
 import {
   diagnoseBoilerForfaitDraftWithRust, diagnoseForfaitHeatPumpDraftWithRust, diagnoseHybridHeatPumpMonthlyDraftWithRust,
@@ -44,6 +45,7 @@ export function HybridHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setError(null); setLoading(false); };
   const updateMonth = (index: number, value: string) => {
@@ -68,7 +70,7 @@ export function HybridHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }
     const current = ++sequence.current;
     setLoading(true); setError(null); setResult(null);
     try {
-      const lookup = await diagnoseForfaitHeatPumpDraftWithRust(forfait);
+      const lookup = await diagnoseForfaitHeatPumpDraftWithRust(forfait, edition);
       if (lookup.status === 'invalid' || !lookup.correctedCop) {
         throw new Error(t('kernel.hybridDraft.lookupInvalid'));
       }
@@ -80,7 +82,7 @@ export function HybridHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }
         installationYear: boilerYear.trim() === '' ? null : Number(boilerYear),
         installationYearReference: boilerYear.trim() === '' ? null : boilerYearReference.trim(),
       };
-      const boilerLookup = await diagnoseBoilerForfaitDraftWithRust(boiler);
+      const boilerLookup = await diagnoseBoilerForfaitDraftWithRust(boiler, edition);
       if (boilerLookup.status === 'invalid' || !boilerLookup.generationEfficiency) {
         throw new Error(t('kernel.hybridDraft.boilerLookupInvalid'));
       }
@@ -106,7 +108,7 @@ export function HybridHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }
               efficiencyReference: `boiler_forfait_sha256:${boilerLookup.inputFingerprint}` },
           ],
         },
-      });
+      }, edition);
       if (sequence.current === current) { setResult(assessment); setLoading(false); }
     } catch (reason: unknown) {
       if (sequence.current === current) {

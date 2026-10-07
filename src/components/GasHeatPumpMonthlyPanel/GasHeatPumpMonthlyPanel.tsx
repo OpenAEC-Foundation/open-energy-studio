@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseGasCollectiveSourceDraftWithRust, diagnoseGasHeatPumpChainDraftWithRust, diagnoseGasHeatPumpMonthlyDraftWithRust, type GasCollectiveSourceDraftAssessment, type GasCollectiveSourceTemperatureClass, type GasHeatPumpChainDraftAssessment, type GasHeatPumpMonthlyDraftAssessment, type GasHeatPumpMonthlyDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -35,6 +36,7 @@ export function GasHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setChainResult(null); setSourceResult(null); setError(null); setLoading(false); };
   const diagnose = async (kind: 'monthly' | 'linked' | 'source' = 'monthly') => {
@@ -55,9 +57,9 @@ export function GasHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }) {
       const assessment = kind === 'source' && chain
         ? await diagnoseGasCollectiveSourceDraftWithRust({ chain, sourceTemperatureClass: temperatureClass,
           sourceTemperatureReference: temperatureReference.trim(), noQualityDeclarationConfirmed: noDeclaration,
-          noQualityDeclarationReference: declarationReference.trim() })
-        : kind === 'linked' && chain ? await diagnoseGasHeatPumpChainDraftWithRust(chain)
-          : await diagnoseGasHeatPumpMonthlyDraftWithRust(input);
+          noQualityDeclarationReference: declarationReference.trim() }, edition)
+        : kind === 'linked' && chain ? await diagnoseGasHeatPumpChainDraftWithRust(chain, edition)
+          : await diagnoseGasHeatPumpMonthlyDraftWithRust(input, edition);
       if (sequence.current !== current) return;
       setLoading(false);
       if (kind === 'source') setSourceResult(assessment as GasCollectiveSourceDraftAssessment);

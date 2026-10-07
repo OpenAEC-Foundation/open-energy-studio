@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseGasHeatPumpAuxDraftWithRust, type GasHeatPumpAuxDraftAssessment, type GasHeatPumpAuxDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -25,6 +26,7 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setError(null); setLoading(false); };
   const update = (values: string[], setter: (next: string[]) => void, index: number, value: string) => {
@@ -57,7 +59,7 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
     const current = ++sequence.current;
     setLoading(true); setError(null); setResult(null);
     try {
-      const assessment = await diagnoseGasHeatPumpAuxDraftWithRust(input);
+      const assessment = await diagnoseGasHeatPumpAuxDraftWithRust(input, edition);
       if (current !== sequence.current) return;
       setLoading(false); setResult(assessment);
       if (assessment.status === 'invalid') setError(assessment.issues.map((item) => item.code).join(', '));

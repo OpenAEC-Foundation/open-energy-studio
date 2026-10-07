@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseForfaitHeatPumpMonthlyDraftWithRust, type ForfaitHeatPumpMonthlyDraftAssessment, type ForfaitHeatPumpMonthlyDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -28,6 +29,7 @@ export function HeatPumpForfaitMonthlyPanel({ pump }: { pump: INtaHeatPumpInput 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setError(null); setLoading(false); };
   const updateMonth = (values: string[], setValues: (value: string[]) => void, index: number, value: string) => {
@@ -53,7 +55,7 @@ export function HeatPumpForfaitMonthlyPanel({ pump }: { pump: INtaHeatPumpInput 
     const current = ++sequence.current;
     setLoading(true); setError(null); setResult(null);
     try {
-      const assessment = await diagnoseForfaitHeatPumpMonthlyDraftWithRust(input);
+      const assessment = await diagnoseForfaitHeatPumpMonthlyDraftWithRust(input, edition);
       if (sequence.current === current) { setResult(assessment); setLoading(false); }
     } catch (reason: unknown) {
       if (sequence.current === current) {

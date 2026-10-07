@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { BuildingFunction, INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseForfaitHeatPumpDraftWithRust, type ForfaitHeatPumpDraftAssessment, type ForfaitHeatPumpDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -71,6 +72,7 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
 
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setError(null); setLoading(false); };
   const sourceQualityRelevant = source === 'collective20_to40_c' || source === 'collective_at_least40_c';
@@ -150,7 +152,7 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
     const current = ++sequence.current;
     setLoading(true); setError(null); setResult(null);
     try {
-      const assessment = await diagnoseForfaitHeatPumpDraftWithRust(input);
+      const assessment = await diagnoseForfaitHeatPumpDraftWithRust(input, edition);
       if (sequence.current === current) {
         setResult(assessment);
         setLoading(false);
