@@ -459,8 +459,50 @@
       "obstruction": {
         "method": "minimal"
       },
-      "sourceReference": "default F_F; report: constant overhang on the rear windows, geometry not given, modelled minimal"
+      "sourceReference": "default F_F; report: minimal obstruction on the front windows and the door"
     },
+    "windowObstructions": [
+      {
+        "windowId": "AG-A",
+        "obstruction": {
+          "method": "overhang",
+          "relativeHeight": 0.25
+        },
+        "sourceReference": "report: constante overstek on the rear (east) glazing, size not printed; h_o;⊥ 0,25 assumed (the class of h_o;⊥ ≤ 0,4 is the only one that gives the report's TOjuli 0,29 and BENG 1, see docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      {
+        "windowId": "AG-C",
+        "obstruction": {
+          "method": "overhang",
+          "relativeHeight": 0.25
+        },
+        "sourceReference": "report: constante overstek on the rear (east) glazing, size not printed; h_o;⊥ 0,25 assumed (the class of h_o;⊥ ≤ 0,4 is the only one that gives the report's TOjuli 0,29 and BENG 1, see docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      {
+        "windowId": "AG-B1",
+        "obstruction": {
+          "method": "overhang",
+          "relativeHeight": 0.25
+        },
+        "sourceReference": "report: constante overstek on the rear (east) glazing, size not printed; h_o;⊥ 0,25 assumed (the class of h_o;⊥ ≤ 0,4 is the only one that gives the report's TOjuli 0,29 and BENG 1, see docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      {
+        "windowId": "AG-B2",
+        "obstruction": {
+          "method": "overhang",
+          "relativeHeight": 0.25
+        },
+        "sourceReference": "report: constante overstek on the rear (east) glazing, size not printed; h_o;⊥ 0,25 assumed (the class of h_o;⊥ ≤ 0,4 is the only one that gives the report's TOjuli 0,29 and BENG 1, see docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      {
+        "windowId": "AG-glasdeur",
+        "obstruction": {
+          "method": "overhang",
+          "relativeHeight": 0.25
+        },
+        "sourceReference": "report: constante overstek on the rear (east) glazing, size not printed; h_o;⊥ 0,25 assumed (the class of h_o;⊥ ≤ 0,4 is the only one that gives the report's TOjuli 0,29 and BENG 1, see docs/nta8800-vergelijking-openbare-rapporten.md)"
+      }
+    ],
     "groundFloors": [
       {
         "surfaceId": "BG",

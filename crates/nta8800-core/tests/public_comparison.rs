@@ -204,9 +204,11 @@ fn cases_a_and_b_under_their_own_editions() {
 /// Hot water (3 552 kWh), fans (401 kWh, table 11.23 from 2007) and PV
 /// (4 273 kWh on the meter) agree. The heat-pump auxiliary energy follows
 /// 9.85 with A 13,0 for a device from 2015 (installation year 2021; the
-/// report's 46 kWh is that formula on its own 2 427 kWh); BENG 1 is 4,9 %
-/// lower with the overhang of the east windows modelled as minimal
-/// obstruction, which also carries BENG 2 below the report.
+/// report's 46 kWh is that formula on its own 2 427 kWh). The constant
+/// overhang on the east glazing (9,84 m², size not printed) is a
+/// per-window obstruction with h_o;⊥ 0,25: the class h_o;⊥ ≤ 0,4 of
+/// tables 17.8/17.9 is the only one that gives the report's TOjuli 0,29
+/// (kernel 0,27); BENG 1 is then 0,4 % and BENG 2 0,12 below the report.
 #[test]
 fn case_d_under_nta_8800_2020_a1() {
     let value: Value = serde_json::from_str(include_str!(
@@ -215,7 +217,7 @@ fn case_d_under_nta_8800_2020_a1() {
     .unwrap();
     assert_eq!(value["ntaCalculation"]["normVersion"], "2020+A1");
     let (performance, indicators) = run_edition(&value, "2020+A1");
-    assert_indicators("D 2020+A1", indicators, [82.49, 37.06, 83.9]);
+    assert_indicators("D 2020+A1", indicators, [86.35, 39.07, 83.6]);
     let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
     assert!((pv - 4273.0).abs() < 1.0, "{pv}");
     assert!((used_kwh(&performance, "hotWater") - 3552.0).abs() < 1.0);
@@ -228,7 +230,10 @@ fn case_d_under_nta_8800_2020_a1() {
         "{auxiliary}"
     );
     // The report: 2 427 kWh for 12 136 kWh heat at COP 5,00.
-    assert!((heating - 2312.1).abs() < 1.0, "{heating}");
+    assert!((heating - 2420.6).abs() < 1.0, "{heating}");
+    // The report: TOjuli 0,29; minimal obstruction on the east glazing gave 0,67.
+    let tojuli = performance["tojuli"][0]["maxTojuliK"].as_f64().unwrap();
+    assert!((tojuli - 0.27).abs() < 0.005, "{tojuli}");
 }
 
 /// Case C was calculated in NTA 8800:2023, case B in the 2022 period (2022
