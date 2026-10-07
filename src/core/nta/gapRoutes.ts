@@ -51,6 +51,7 @@ export const NTA_INPUT_ROUTES: Record<string, NtaTarget> = {
   internalGains: ['building', 'zones'],
   windowSolar: ['building', 'envelope'],
   dynamicWindows: ['building', 'envelope'],
+  windowObstructions: ['building', 'envelope'],
   surfaceTilts: ['building', 'envelope'],
   groundFloors: ['building', 'envelope'],
   unheatedSpaces: ['building', 'unheated'],

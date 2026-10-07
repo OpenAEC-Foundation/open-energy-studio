@@ -55,6 +55,7 @@ Het formulier vraagt alleen wat het projectmodel nog niet heeft. De secties staa
 | Thermische massa (tabel 7.10) | klasse vloer en wand, plafondkolom | tabellen 7.10–7.12 |
 | Interne warmtewinst | aantal woningen; bij utiliteit de tabelmethode of een opgegeven W/m² | 7.21–7.29, tabellen 7.2/7.3 |
 | Ramen (zonwinst) | kozijnfractie, belemmering, beweegbare zonwering (F_c, bediening) | §7.6, §17.3, 7.42/7.43 |
+| Belemmering per raam | per buitenraam "Zoals project" of een eigen situatie a–g of opgegeven factoren, met bron | 7.13, §17.3.2 |
 | Dynamische ramen (bijlage A) | per buitenraam methode A (toestanden met gewichten) of B, correctie stap 2 | bijlage A (p. 766–771) |
 | Aangrenzende onverwarmde serres (7.30b) | serre en de vlakken ervan | 7.30b |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |

@@ -21,7 +21,7 @@ use crate::monthly_demand::{
 };
 use crate::norm_versions::NormVersion;
 use crate::pv::PvSystem;
-use crate::solar_shading::{MovableShading, Obstruction};
+use crate::solar_shading::{validate_obstruction, MovableShading, Obstruction};
 use crate::space_cooling::CoolingSystem;
 use crate::space_heating_chain::{
     ChainZone, CollectiveConnection, Distribution, DistributionSystem, Generator,
@@ -60,6 +60,11 @@ pub struct NtaCalculationInput {
     /// weighting and optional step-2 correction factors.
     #[serde(default)]
     pub dynamic_windows: Vec<ProjectDynamicWindow>,
+    /// External obstruction per project window (7.13: `F_sh;obst;wi,k;mi`
+    /// per window, p. 183–184; 17.3.2: one situation per window). A window
+    /// not listed keeps `windowSolar.obstruction`.
+    #[serde(default)]
+    pub window_obstructions: Vec<ProjectWindowObstruction>,
     /// Humidifiers per zone (chapter 12).
     #[serde(default)]
     pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
@@ -214,6 +219,16 @@ pub struct SurfaceTilt {
 pub struct ProjectDynamicWindow {
     pub window_id: String,
     pub dynamic: crate::annex_a::DynamicTransparent,
+}
+
+/// Obstruction of one project window, replacing the project-wide
+/// `windowSolar.obstruction` for that window.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectWindowObstruction {
+    pub window_id: String,
+    pub obstruction: Obstruction,
+    pub source_reference: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -2901,6 +2916,26 @@ fn derive_input(
         }
     }
     let mut used_dynamic = HashSet::new();
+    let mut window_obstructions: HashMap<&str, (usize, &ProjectWindowObstruction)> = HashMap::new();
+    for (index, item) in nta.window_obstructions.iter().enumerate() {
+        let path = format!("ntaCalculation.windowObstructions[{index}]");
+        if window_obstructions
+            .insert(item.window_id.as_str(), (index, item))
+            .is_some()
+        {
+            gaps.push(gap(
+                "window_obstruction_duplicate",
+                format!("{path}.windowId"),
+            ));
+        }
+        if item.source_reference.trim().is_empty() {
+            gaps.push(gap(
+                "window_obstruction_reference_required",
+                format!("{path}.sourceReference"),
+            ));
+        }
+    }
+    let mut used_obstruction = HashSet::new();
     let mut loss_area = 0.0;
     let mut total_area = 0.0;
     let mut zones = Vec::new();
@@ -3048,6 +3083,29 @@ fn derive_input(
                 if dynamic.is_some() {
                     used_dynamic.insert(window_id.to_owned());
                 }
+                // A per-window obstruction replaces the project default; an
+                // invalid one is a gap at its own path and the window keeps
+                // the default, so the demand reports no second error.
+                let obstruction = match window_obstructions.get(window_id) {
+                    Some((index, item)) => {
+                        used_obstruction.insert(window_id.to_owned());
+                        let issues = validate_obstruction(&item.obstruction, tilt);
+                        for (code, suffix) in &issues {
+                            gaps.push(gap(
+                                code,
+                                format!(
+                                    "ntaCalculation.windowObstructions[{index}].obstruction{suffix}"
+                                ),
+                            ));
+                        }
+                        if issues.is_empty() {
+                            item.obstruction.clone()
+                        } else {
+                            nta.window_solar.obstruction.clone()
+                        }
+                    }
+                    None => nta.window_solar.obstruction.clone(),
+                };
                 windows.push(Window {
                     id: format!("window:{window_id}"),
                     area_m2: area,
@@ -3057,14 +3115,20 @@ fn derive_input(
                     frame_fraction: nta.window_solar.frame_fraction,
                     u_value_w_per_m2k: u_value,
                     forfait_delta_u_w_per_m2k: delta_u_forfait,
-                    obstruction: nta.window_solar.obstruction.clone(),
+                    obstruction,
                     movable_shading: nta.window_solar.movable_shading.clone(),
                     dynamic,
                     glazing: None,
-                    source_reference: format!(
-                        "project:window:{window_id}; {}",
-                        nta.window_solar.source_reference
-                    ),
+                    source_reference: match window_obstructions.get(window_id) {
+                        Some((_, item)) => format!(
+                            "project:window:{window_id}; {}; obstruction: {}",
+                            nta.window_solar.source_reference, item.source_reference
+                        ),
+                        None => format!(
+                            "project:window:{window_id}; {}",
+                            nta.window_solar.source_reference
+                        ),
+                    },
                 });
             }
             let gross = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
@@ -3233,6 +3297,14 @@ fn derive_input(
                 .and_then(|item| item.distribution.clone())
                 .unwrap_or_else(|| nta.distribution.clone()),
         });
+    }
+    for (index, item) in nta.window_obstructions.iter().enumerate() {
+        if !used_obstruction.contains(&item.window_id) {
+            gaps.push(gap(
+                "window_obstruction_without_window",
+                format!("ntaCalculation.windowObstructions[{index}].windowId"),
+            ));
+        }
     }
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
         if !used_dynamic.contains(&item.window_id) {
@@ -3636,6 +3708,129 @@ mod tests {
         };
         // H_D drops by 0,88 W/K in January (U 0,99 instead of 1,10).
         assert!(transmission(&result, 0) < transmission(&base, 0));
+    }
+
+    /// 7.13 (p. 183–184) takes `F_sh;obst;wi,k;mi` per window and 17.3.2
+    /// one situation per window: an overhang on win-S lowers its factor and
+    /// the heating gains, while win-N keeps the project default.
+    #[test]
+    fn window_obstruction_replaces_the_default_for_that_window_only() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([{
+            "windowId": "win-S",
+            "obstruction": {"method": "overhang", "relativeHeight": 0.5},
+            "sourceReference": "balcony above the south window"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        let south = find("window:win-S");
+        assert!(matches!(
+            south.obstruction,
+            Obstruction::Overhang { relative_height } if relative_height == 0.5
+        ));
+        assert!(south
+            .source_reference
+            .contains("balcony above the south window"));
+        assert!(matches!(
+            find("window:win-N").obstruction,
+            Obstruction::Minimal
+        ));
+        let factor = |window: &crate::monthly_demand::Window| {
+            crate::monthly_demand::window_obstruction(
+                window,
+                1,
+                crate::solar_shading::Balance::Heating,
+            )
+            .unwrap()
+        };
+        let base_demand = &base.derived_input.as_ref().unwrap().space_heating.demand;
+        let base_south = base_demand
+            .windows
+            .iter()
+            .find(|item| item.id == "window:win-S")
+            .unwrap();
+        assert!(factor(south) < factor(base_south));
+        let solar = |window: &crate::monthly_demand::Window| {
+            crate::monthly_demand::window_solar_kwh(
+                window,
+                1,
+                crate::solar_shading::Balance::Heating,
+            )
+        };
+        assert!(solar(south) < solar(base_south));
+    }
+
+    /// Listing a window with the same situation as the project default
+    /// changes nothing: projects without `windowObstructions` and projects
+    /// that repeat the default give identical results.
+    #[test]
+    fn window_obstruction_equal_to_the_default_changes_nothing() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([
+            {"windowId": "win-S", "obstruction": {"method": "minimal"}, "sourceReference": "survey"},
+            {"windowId": "win-N", "obstruction": {"method": "minimal"}, "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, base.status);
+        // Every number is equal; only the source references name the list.
+        fn numbers(value: Value) -> Value {
+            match value {
+                Value::String(_) => Value::Null,
+                Value::Array(items) => Value::Array(items.into_iter().map(numbers).collect()),
+                Value::Object(map) => Value::Object(
+                    map.into_iter()
+                        .map(|(key, item)| (key, numbers(item)))
+                        .collect(),
+                ),
+                other => other,
+            }
+        }
+        let json = |item: &ProjectPerformanceAssessment| {
+            numbers(serde_json::to_value(item.performance.as_ref().unwrap()).unwrap())
+        };
+        assert_eq!(json(&result), json(&base));
+    }
+
+    #[test]
+    fn window_obstruction_input_errors_are_gaps() {
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([
+            {"windowId": "win-S", "obstruction": {"method": "overhang", "relativeHeight": 0.5}, "sourceReference": "a"},
+            {"windowId": "win-S", "obstruction": {"method": "minimal"}, "sourceReference": "b"},
+            {"windowId": "missing", "obstruction": {"method": "minimal"}, "sourceReference": "c"},
+            {"windowId": "win-N", "obstruction": {"method": "overhang", "relativeHeight": -1.0}, "sourceReference": " "}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        for expected in [
+            (
+                "window_obstruction_duplicate",
+                "ntaCalculation.windowObstructions[1].windowId",
+            ),
+            (
+                "window_obstruction_without_window",
+                "ntaCalculation.windowObstructions[2].windowId",
+            ),
+            (
+                "obstruction_geometry_invalid",
+                "ntaCalculation.windowObstructions[3].obstruction.relativeHeight",
+            ),
+            (
+                "window_obstruction_reference_required",
+                "ntaCalculation.windowObstructions[3].sourceReference",
+            ),
+        ] {
+            assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
+        }
+        assert_eq!(result.status, "incomplete");
     }
 
     #[test]
