@@ -1161,7 +1161,7 @@
         "control": "manual_residential",
         "sourceReference": "openbare bron Uniec 3.0.19.4 printout (vrijstaande woning, berekend 08-03-2022): rolluiken (buiten), wit, op alle ramen"
       },
-      "sourceReference": "default F_F; openbare bron Uniec 3.0.19.4 printout (vrijstaande woning, berekend 08-03-2022): minimale belemmering, behalve zijbelemmering op 9 ramen (geometrie niet gegeven), hier minimaal"
+      "sourceReference": "default F_F; openbare bron Uniec 3.0.19.4 printout (vrijstaande woning, berekend 08-03-2022): minimale belemmering, behalve zijbelemmering op 8 ramen (windowObstructions, geometrie uit de uitdraai)"
     },
     "groundFloors": [
       {
@@ -1404,6 +1404,88 @@
         }
       },
       "equipmentReference": "openbare bron Uniec 3.0.19.4 printout (vrijstaande woning, berekend 08-03-2022): Nefit EnviLine A/W Monoblock 7.0 T-S"
-    }
+    },
+    "windowObstructions": [
+      {
+        "windowId": "V0.5",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.323,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam V0.5 (NO): zijbelemmering rechts, hoogte ≥ 2,5 m, afstand 0,97 m, breedte 3,0 m, hoek 18°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "V0.6",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.827,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam V0.6 (NO): zijbelemmering rechts, hoogte ≥ 2,5 m, afstand 2,48 m, breedte 3,0 m, hoek 40°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "A0.4",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.373,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam A0.4 (ZW): zijbelemmering rechts, hoogte < 2,5 m, afstand 1,12 m, breedte 3,0 m, hoek 20°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "A0.5",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.877,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam A0.5 (ZW): zijbelemmering rechts, hoogte < 2,5 m, afstand 2,63 m, breedte 3,0 m, hoek 41°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "A0.6",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 1.833,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam A0.6 (ZW): zijbelemmering rechts, hoogte < 2,5 m, afstand 5,5 m, breedte 3,0 m, hoek 61°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "A0.7b",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 2.437,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam A0.7b (ZW): zijbelemmering rechts, hoogte < 2,5 m, afstand 7,31 m, breedte 3,0 m, hoek 68°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "A0.8",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 3.323,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam A0.8 (ZW): zijbelemmering rechts, hoogte < 2,5 m, afstand 9,97 m, breedte 3,0 m, hoek 73°; b_b = afstand / breedte (2020+A1 p. 669)"
+      },
+      {
+        "windowId": "R0.1",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.12,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout, raam R0.1 (NW): zijbelemmering links, hoogte < 2,5 m, afstand 1,0 m, breedte 8,32 m, hoek 7°; b_b = afstand / breedte (2020+A1 p. 669)"
+      }
+    ]
   }
 }
