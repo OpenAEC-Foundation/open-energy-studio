@@ -419,4 +419,3 @@ fn shading_device_serialises_without_reduction_factor() {
         0.3
     );
 }
-
