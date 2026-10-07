@@ -25,6 +25,7 @@ import { NtaVentilationSection } from './NtaVentilationSection';
 import { DynamicWindowsFields } from './NtaDynamicWindows';
 import { WindowObstructionsFields } from './NtaWindowObstructions';
 import { AnnexAaCalculationFields } from './NtaAnnexAaFields';
+import { annexAaCalculations, annexAaEditionRules } from '../../core/nta/annexAaForm';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import { ExternalSupplyFields } from './NtaExternalSupply';
@@ -320,31 +321,41 @@ export function AnnexAa2024Fields(props: NtaSectionProps) {
   const { t } = useI18n();
   const { draft } = props;
   const f = fieldOf(props);
-  const base: Path = ['activeCooling', 'capacity', 'calculation'];
-  const calculation = read(draft, base);
-  if (read(draft, ['normVersion']) !== '2024') {
+  const rules = annexAaEditionRules(read(draft, ['normVersion']));
+  const calculations = annexAaCalculations(read(draft, ['activeCooling', 'capacity']));
+  if (!rules.monthly2024) {
     // Values left behind by a switch from the 2024 edition: offer to remove them.
-    const rooms = (read(draft, [...base, 'rooms']) as Draft[] | undefined) ?? [];
-    const stale = read(draft, [...base, 'effectiveMassKgPerM2']) != null || rooms.some((room) => room?.roofAreaM2 != null);
+    const stale = calculations.some(({ value }) => value.effectiveMassKgPerM2 != null
+      || ((value.rooms as Draft[] | undefined) ?? []).some((room) => room?.roofAreaM2 != null));
     if (!stale) return null;
     return <p className="nta-form-note nta-form-error" role="alert">
       {t('ntaStep.staleEdition', { field: t('ntaStep.annexAa.fields') })}{' '}
       <button type="button" onClick={() => props.update((current) => {
         const clone = structuredClone(current) as Draft;
-        const target = read(clone, base) as Draft;
-        delete target.effectiveMassKgPerM2;
-        for (const room of (target.rooms as Draft[] | undefined) ?? []) delete room.roofAreaM2;
+        for (const { path } of annexAaCalculations(read(clone, ['activeCooling', 'capacity']))) {
+          const target = read(clone, path) as Draft;
+          delete target.effectiveMassKgPerM2;
+          for (const room of (target.rooms as Draft[] | undefined) ?? []) delete room.roofAreaM2;
+        }
         return clone;
       })}>{t('nta.form.remove')}</button>
     </p>;
   }
+  // Older editions build on the 2024 method but have no annex AA route; the
+  // calculation form already says so.
+  if (!rules.route) return null;
   // Without a calculation, `AnnexAaCalculationFields` offers to add one.
-  if (calculation == null || typeof calculation !== 'object') return null;
-  const rooms = (read(draft, [...base, 'rooms']) as Draft[] | undefined) ?? [];
+  if (calculations.length === 0) return null;
   return <div className="nta-form-row" data-testid="nta-annex-aa-2024">
-    <NumberField {...f} path={[...base, 'effectiveMassKgPerM2']} label={t('ntaStep.annexAa.effectiveMass')} optional />
-    {rooms.map((room, index) => <NumberField key={String(room?.id ?? index)} {...f} path={[...base, 'rooms', index, 'roofAreaM2']}
-      label={t('ntaStep.annexAa.roofArea', { room: String(room?.id ?? index + 1) })} optional />)}
+    {calculations.map(({ path: base, zoneId, value }) => {
+      const rooms = (value.rooms as Draft[] | undefined) ?? [];
+      return <div key={base.join('.')} className="nta-form-row">
+        {zoneId != null && <strong>{t('ntaStep.annexAa.zone', { zone: zoneId })}</strong>}
+        <NumberField {...f} path={[...base, 'effectiveMassKgPerM2']} label={t('ntaStep.annexAa.effectiveMass')} optional />
+        {rooms.map((room, index) => <NumberField key={String(room?.id ?? index)} {...f} path={[...base, 'rooms', index, 'roofAreaM2']}
+          label={t('ntaStep.annexAa.roofArea', { room: String(room?.id ?? index + 1) })} optional />)}
+      </div>;
+    })}
     <p className="nta-form-note">{t('ntaStep.annexAa.note')}</p>
   </div>;
 }

@@ -9,6 +9,40 @@
 
 /** Draft path of the calculation inside `ntaCalculation`. */
 export const ANNEX_AA_PATH = ['activeCooling', 'capacity', 'calculation'] as const;
+/**
+ * Draft path of the per-zone calculations. Annex AA is determined per cooled
+ * rekenzone (NTA 8800:2025+C1 p. 1135); with more than one zone each
+ * calculation names its `zoneId`.
+ */
+export const ANNEX_AA_ZONES_PATH = ['activeCooling', 'capacity', 'zoneCalculations'] as const;
+
+/**
+ * The kernel's edition profile for annex AA (`norm_versions`): `route` is
+ * `annex_aa_route` (5.7.1 offers annex AA as capacity evidence: 2025+C1 and
+ * 2024), `monthly2024` is `AnnexAaVariant::Monthly2024` (SWM and roof areas:
+ * 2024 and the older editions that build on it). One helper so the form and
+ * its 2024 fields follow the same rule.
+ */
+export function annexAaEditionRules(edition: unknown): { route: boolean; monthly2024: boolean } {
+  const value = typeof edition === 'string' && edition !== '' ? edition : '2025+C1';
+  return { route: value === '2025+C1' || value === '2024', monthly2024: value !== '2025+C1' };
+}
+
+/** Every annex AA calculation in the capacity block with its draft path. */
+export function annexAaCalculations(capacity: unknown): Array<{ path: Array<string | number>; zoneId: string | null; value: Record<string, unknown> }> {
+  const block = capacity != null && typeof capacity === 'object' ? capacity as Record<string, unknown> : {};
+  const found: Array<{ path: Array<string | number>; zoneId: string | null; value: Record<string, unknown> }> = [];
+  const add = (value: unknown, path: Array<string | number>) => {
+    if (value == null || typeof value !== 'object' || Array.isArray(value)) return;
+    const zoneId = (value as { zoneId?: unknown }).zoneId;
+    found.push({ path, zoneId: typeof zoneId === 'string' && zoneId !== '' ? zoneId : null, value: value as Record<string, unknown> });
+  };
+  add(block.calculation, [...ANNEX_AA_PATH]);
+  if (Array.isArray(block.zoneCalculations)) {
+    block.zoneCalculations.forEach((value, index) => add(value, [...ANNEX_AA_ZONES_PATH, index]));
+  }
+  return found;
+}
 
 export interface AnnexAaWindowDraft {
   windowId: string;
@@ -28,6 +62,8 @@ export interface AnnexAaRoomDraft {
 }
 
 export interface AnnexAaDraft {
+  /** The rekenzone, when the project has more than one cooled zone. */
+  zoneId?: string;
   constructionYear: number | null;
   postInsulated?: boolean;
   generatorCapacityKw?: number | null;
@@ -103,13 +139,17 @@ const bareWindowId = (id: string) => id.replace(/^window:/, '');
  * plus the two members serde requires before it can check anything:
  * `constructionYear` and the room id.
  *
- * `edition2024` follows `AnnexAaVariant::Monthly2024`: SWM is required (50–100
- * kg/m²) and the roof area is allowed; in every other edition both are
- * `route_not_in_edition`. `windowIds` are the project's window ids; when
- * omitted, window ids are not checked.
+ * `edition2024` follows `AnnexAaVariant::Monthly2024` (`annexAaEditionRules`):
+ * SWM is required (50–100 kg/m²) and the roof area is allowed; in 2025+C1 both
+ * are `route_not_in_edition`. `windowIds` are the window ids of the zone the
+ * calculation belongs to; when omitted, window ids are not checked. `base` is
+ * the calculation's draft path (default `ANNEX_AA_PATH`).
  */
-export function checkAnnexAa(calculation: unknown, options: { edition2024: boolean; windowIds?: ReadonlyArray<string> }): AnnexAaFormIssue[] {
-  const base = [...ANNEX_AA_PATH];
+export function checkAnnexAa(
+  calculation: unknown,
+  options: { edition2024: boolean; windowIds?: ReadonlyArray<string>; base?: ReadonlyArray<string | number> },
+): AnnexAaFormIssue[] {
+  const base = [...(options.base ?? ANNEX_AA_PATH)];
   const issues: AnnexAaFormIssue[] = [];
   const push = (code: string, ...path: Array<string | number>) => issues.push({ code, path: [...base, ...path] });
   if (calculation == null || typeof calculation !== 'object') {

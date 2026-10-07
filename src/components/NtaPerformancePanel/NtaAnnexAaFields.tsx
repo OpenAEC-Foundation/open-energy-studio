@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import type { IProject } from '../../core/energy/types';
+import { useState, type ReactNode } from 'react';
+import type { IProject, IZone } from '../../core/energy/types';
 import {
-  ANNEX_AA_PATH, annexAaTotals, checkAnnexAa, duplicateAnnexAaRoom, newAnnexAaCalculation, newAnnexAaRoom,
-  windowsAssignedElsewhere, type AnnexAaFormIssue,
+  ANNEX_AA_PATH, ANNEX_AA_ZONES_PATH, annexAaEditionRules, annexAaTotals, checkAnnexAa, duplicateAnnexAaRoom,
+  newAnnexAaCalculation, newAnnexAaRoom, windowsAssignedElsewhere, type AnnexAaFormIssue,
 } from '../../core/nta/annexAaForm';
 import { formatKernelPath } from '../../core/nta/pathUtil';
 import { formatNumber, kernelCodeLabel } from '../../i18n/format';
@@ -11,8 +11,11 @@ import { CheckField, NumberField, read, TextField, useFieldPath, type Draft, typ
 
 // Annex AA (§5.7.1, cooling capacity evidence) as a form: the zone data, a
 // table of habitable rooms (add, duplicate, remove) and per room its project
-// windows. The 2024-only SWM and roof areas stay in `AnnexAa2024Fields`.
-// "JSON bekijken" shows the same block as editable JSON for advanced use.
+// windows. Annex AA is determined per cooled rekenzone (2025+C1 p. 1135): a
+// project with one zone keeps one calculation, a project with more zones gets
+// one calculation per zone (`zoneCalculations`, each with its `zoneId`), and
+// each zone offers only its own windows. The 2024-only SWM and roof areas stay
+// in `AnnexAa2024Fields`. "JSON bekijken" shows the block as editable JSON.
 
 interface AnnexAaProps {
   draft: Draft;
@@ -21,11 +24,11 @@ interface AnnexAaProps {
 }
 
 const BASE: Path = [...ANNEX_AA_PATH];
-/** Editions whose 5.7.1 has annex AA as capacity evidence (`annex_aa_route`). */
-const AA_EDITIONS = new Set(['2025+C1', '2024']);
+const ZONES: Path = [...ANNEX_AA_ZONES_PATH];
+const CAPACITY: Path = ['activeCooling', 'capacity'];
 
-function projectWindows(project: IProject) {
-  return project.zones.flatMap((zone) => zone.surfaces)
+function outdoorWindows(zones: IZone[]) {
+  return zones.flatMap((zone) => zone.surfaces)
     .filter((surface) => surface.thermalBoundary === 'outdoor')
     .flatMap((surface) => surface.windows);
 }
@@ -42,19 +45,82 @@ function IssueAt({ issues, path }: { issues: AnnexAaFormIssue[]; path: Path }) {
 }
 
 export function AnnexAaCalculationFields({ draft, change, project }: AnnexAaProps) {
+  const { t } = useI18n();
+  const rules = annexAaEditionRules(read(draft, ['normVersion']));
+  const notInEdition = !rules.route
+    && <p className="nta-form-note nta-form-error" role="note">{t('ntaStep.annexAa.notInEdition')}</p>;
+  const zones = project.zones;
+  if (zones.length <= 1) {
+    return <AnnexAaZoneForm draft={draft} change={change} base={BASE} windows={outdoorWindows(zones)}
+      monthly2024={rules.monthly2024} notice={notInEdition} onRemove={() => change(BASE, null)} />;
+  }
+
+  const capacity = (read(draft, CAPACITY) as Draft | undefined) ?? {};
+  const list = (read(draft, ZONES) as Draft[] | undefined) ?? [];
+  const single = read(draft, BASE);
+  const zoneName = (zone: IZone) => zone.name || zone.id;
+  // One change for the whole capacity block, so moving a calculation is atomic.
+  const setCapacity = (calculation: unknown, zoneCalculations: Draft[]) => {
+    const next: Draft = { ...capacity, zoneCalculations };
+    if (calculation == null) delete next.calculation;
+    else next.calculation = calculation;
+    change(CAPACITY, next);
+  };
+  const known = new Set(zones.map((zone) => zone.id));
+  const orphans = list.map((item, index) => ({ item, index })).filter(({ item }) => !known.has(String(item?.zoneId ?? '')));
+  return <div className="nta-form-group nta-aa" data-testid="nta-annex-aa-zones">
+    <p className="nta-form-note">{t('ntaStep.annexAa.perZone')}</p>
+    {notInEdition}
+    {single != null && typeof single === 'object' && read(draft, [...BASE, 'zoneId']) == null &&
+      <p className="nta-form-note nta-form-error" role="alert" data-code="annex_aa_zone_id_required">
+        {t('ntaStep.annexAa.unassigned')}{' '}
+        {zones.filter((zone) => !list.some((item) => item?.zoneId === zone.id)).map((zone) =>
+          <button key={zone.id} type="button" onClick={() => setCapacity(null, [...list, { zoneId: zone.id, ...(single as Draft) }])}>
+            {t('ntaStep.annexAa.assignToZone', { zone: zoneName(zone) })}</button>)}
+      </p>}
+    {zones.map((zone) => {
+      const index = list.findIndex((item) => item?.zoneId === zone.id);
+      return <section key={zone.id} className="nta-aa-zone" data-testid={`nta-annex-aa-zone-${zone.id}`}>
+        <h4>{t('ntaStep.annexAa.zone', { zone: zoneName(zone) })}</h4>
+        {index < 0
+          ? <button type="button" onClick={() => change(ZONES, [...list,
+            { zoneId: zone.id, ...newAnnexAaCalculation(read(draft, ['constructionYear'])) }])}>
+            {t('ntaStep.annexAa.startZone', { zone: zoneName(zone) })}</button>
+          : <AnnexAaZoneForm draft={draft} change={change} base={[...ZONES, index]} windows={outdoorWindows([zone])}
+            monthly2024={rules.monthly2024} onRemove={() => change(ZONES, list.filter((_, other) => other !== index))} />}
+      </section>;
+    })}
+    {orphans.map(({ item, index }) => <p key={index} className="nta-form-note nta-form-error" role="alert" data-code="annex_aa_zone_unknown">
+      {kernelCodeLabel(t, 'annex_aa_zone_unknown').text} ({String(item?.zoneId ?? '—')}){' '}
+      <button type="button" className="nta-form-remove"
+        onClick={() => change(ZONES, list.filter((_, other) => other !== index))}>{t('nta.form.remove')}</button>
+    </p>)}
+  </div>;
+}
+
+interface ZoneFormProps {
+  draft: Draft;
+  change: (path: Path, value: unknown) => void;
+  base: Path;
+  windows: ReturnType<typeof outdoorWindows>;
+  monthly2024: boolean;
+  notice?: ReactNode;
+  onRemove: () => void;
+}
+
+function AnnexAaZoneForm({ draft, change, base, windows, monthly2024, notice, onRemove }: ZoneFormProps) {
   const { t, locale } = useI18n();
   const [showJson, setShowJson] = useState(false);
+  const BASE = base;
   const field = { draft, onChange: change };
   const calculation = read(draft, BASE);
-  const edition = String(read(draft, ['normVersion']) ?? '2025+C1');
   const kernelPath = useFieldPath(BASE);
   const prefix = useFieldPath([]);
-  const windows = projectWindows(project);
 
   if (calculation == null || typeof calculation !== 'object') {
     return <div className="nta-form-group nta-aa" data-testid="nta-annex-aa" data-path={kernelPath ?? undefined}>
       <p className="nta-form-note">{t('ntaStep.annexAa.intro')}</p>
-      {!AA_EDITIONS.has(edition) && <p className="nta-form-note nta-form-error" role="note">{t('ntaStep.annexAa.notInEdition')}</p>}
+      {notice}
       <button type="button" onClick={() => change(BASE, newAnnexAaCalculation(read(draft, ['constructionYear'])))}>
         {t('ntaStep.annexAa.start')}
       </button>
@@ -62,7 +128,7 @@ export function AnnexAaCalculationFields({ draft, change, project }: AnnexAaProp
   }
 
   const rooms = (read(draft, [...BASE, 'rooms']) as Draft[] | undefined) ?? [];
-  const issues = checkAnnexAa(calculation, { edition2024: edition === '2024', windowIds: windows.map((window) => window.id) });
+  const issues = checkAnnexAa(calculation, { edition2024: monthly2024, windowIds: windows.map((window) => window.id), base: BASE });
   const totals = annexAaTotals(calculation);
   const windowName = (id: unknown) => {
     const bare = String(id ?? '').replace(/^window:/, '');
@@ -74,7 +140,7 @@ export function AnnexAaCalculationFields({ draft, change, project }: AnnexAaProp
   return <fieldset className="nta-form-group nta-aa" data-testid="nta-annex-aa" data-path={kernelPath ?? undefined}>
     <legend>{t('ntaStep.annexAa.title')}</legend>
     <p className="nta-form-note">{t('ntaStep.annexAa.intro')}</p>
-    {!AA_EDITIONS.has(edition) && <p className="nta-form-note nta-form-error" role="note">{t('ntaStep.annexAa.notInEdition')}</p>}
+    {notice}
 
     <div className="nta-aa-field">
       <NumberField {...field} path={[...BASE, 'constructionYear']} label={t('ntaStep.annexAa.constructionYear')} step="1" />
@@ -182,7 +248,7 @@ export function AnnexAaCalculationFields({ draft, change, project }: AnnexAaProp
       <button type="button" onClick={() => setRooms([...rooms, newAnnexAaRoom(rooms) as unknown as Draft])}>{t('ntaStep.annexAa.addRoom')}</button>
       <button type="button" onClick={() => setShowJson((shown) => !shown)} aria-expanded={showJson}>
         {showJson ? t('ntaStep.annexAa.hideJson') : t('ntaStep.annexAa.showJson')}</button>
-      <button type="button" className="nta-form-remove" onClick={() => change(BASE, null)}>{t('ntaStep.annexAa.removeCalculation')}</button>
+      <button type="button" className="nta-form-remove" onClick={onRemove}>{t('ntaStep.annexAa.removeCalculation')}</button>
     </div>
     {showJson && <AnnexAaJson value={calculation} onApply={(next) => change(BASE, next)} />}
   </fieldset>;
