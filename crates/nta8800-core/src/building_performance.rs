@@ -1371,6 +1371,59 @@ impl BuildingPerformanceInput {
 }
 
 /// §5.7.1 system class against the calculated cooling generators.
+/// Ids of the zones the active-cooling evidence covers (§10.2: the zones a
+/// calculated system serves, or every zone with declared cooling).
+fn actively_cooled_zone_ids(input: &BuildingPerformanceInput) -> Vec<&str> {
+    input
+        .zone_ids()
+        .into_iter()
+        .filter(|id| !input.has_cooling() || input.zone_cooled(id))
+        .collect()
+}
+
+/// Annex AA is determined per cooled rekenzone (2025+C1 p. 1135). With more
+/// than one cooled zone every calculation names its zone, once.
+fn annex_aa_zone_issues(input: &BuildingPerformanceInput) -> Vec<PerformanceIssue> {
+    let Some(ActiveCoolingEvidence {
+        capacity:
+            crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                calculation,
+                zone_calculations,
+                ..
+            },
+        ..
+    }) = &input.active_cooling
+    else {
+        return Vec::new();
+    };
+    let cooled = actively_cooled_zone_ids(input);
+    let calculations = calculation
+        .iter()
+        .map(|aa| (aa, "activeCooling.capacity.calculation".to_string()))
+        .chain(zone_calculations.iter().enumerate().map(|(index, aa)| {
+            (aa, format!("activeCooling.capacity.zoneCalculations[{index}]"))
+        }));
+    let mut issues = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for (aa, path) in calculations {
+        match aa.zone_id.as_deref() {
+            None if cooled.len() > 1 => {
+                issues.push(issue("annex_aa_zone_id_required", format!("{path}.zoneId")))
+            }
+            None => {}
+            Some(zone) if !cooled.contains(&zone) => {
+                issues.push(issue("annex_aa_zone_unknown", format!("{path}.zoneId")))
+            }
+            Some(zone) => {
+                if !seen.insert(zone) {
+                    issues.push(issue("annex_aa_zone_duplicate", format!("{path}.zoneId")));
+                }
+            }
+        }
+    }
+    issues
+}
+
 fn active_cooling_matches(
     system: crate::tojuli::ActiveCoolingSystem,
     cooling: &CoolingSystem,
@@ -2450,6 +2503,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             "activeCooling",
         ));
     }
+    issues.extend(annex_aa_zone_issues(input));
     if !input.lighting.is_empty() {
         if residential {
             // 14.2.1: W_L;spec = 0 for the indicators of dwellings.
@@ -3588,6 +3642,7 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
                         // Q_C;ls;rbl: chapter 10 has no recoverable cooling
                         // losses (L_C;zi = 0, pump heat goes to the load).
                         cooling_recoverable_july_kwh: 0.0,
+                        cooled_zone_count: actively_cooled_zone_ids(input).len(),
                     },
                 )
             })
@@ -7831,6 +7886,7 @@ mod tests {
         // so it stays undetermined instead of 0).
         let window = sample.space_heating.demand.windows[0].id.clone();
         let calculation = |area_m2: f64, window_id: String| crate::annex_aa::AnnexAaInput {
+            zone_id: None,
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(0.0),
@@ -7851,6 +7907,7 @@ mod tests {
         sample.active_cooling.as_mut().unwrap().capacity =
             crate::tojuli::CoolingCapacityEvidence::AnnexAa {
                 calculation: Some(calculation(2.0, window)),
+                zone_calculations: Vec::new(),
                 source_reference: "annex AA".into(),
             };
         let short = assess_building_performance(&sample);
@@ -7864,6 +7921,7 @@ mod tests {
         sample.active_cooling.as_mut().unwrap().capacity =
             crate::tojuli::CoolingCapacityEvidence::AnnexAa {
                 calculation: Some(calculation(40.0, "missing".into())),
+                zone_calculations: Vec::new(),
                 source_reference: "annex AA".into(),
             };
         let unknown = assess_building_performance(&sample);
@@ -7873,6 +7931,127 @@ mod tests {
             .iter()
             .any(|item| item.code == "annex_aa_window_unknown"));
     }
+    /// Annex AA is determined per cooled rekenzone (2025+C1 p. 1135): with two
+    /// cooled zones each zone takes the calculation that names it.
+    #[test]
+    fn annex_aa_is_selected_per_cooled_zone() {
+        use crate::annex_aa::{AnnexAaInput, AnnexAaRoom, AnnexAaWindow};
+        use crate::tojuli::CoolingCapacityEvidence;
+        use crate::space_heating_chain::ChainZone;
+        let mut sample = input();
+        sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
+        let first = sample.space_heating.demand.zone_id.clone();
+        let mut second = sample.space_heating.demand.clone();
+        second.zone_id = "z2".into();
+        sample.space_heating.additional_zones.push(ChainZone {
+            demand: second,
+            emission: sample.space_heating.emission.clone(),
+            distribution: sample.space_heating.distribution.clone(),
+        });
+        sample.total_usable_floor_area_m2 *= 2.0;
+        let window = sample.space_heating.demand.windows[0].id.clone();
+        let calculation = |zone_id: Option<&str>| AnnexAaInput {
+            zone_id: zone_id.map(Into::into),
+            construction_year: 2020,
+            post_insulated: false,
+            generator_capacity_kw: Some(100.0),
+            effective_mass_kg_per_m2: None,
+            rooms: vec![AnnexAaRoom {
+                id: "living".into(),
+                area_m2: 40.0,
+                living: true,
+                opaque_inner_area_m2: 20.0,
+                windows: vec![AnnexAaWindow {
+                    window_id: window.clone(),
+                    u_with_shutter_w_per_m2k: None,
+                }],
+                installed_capacity_kw: 100.0,
+                roof_area_m2: None,
+            }],
+        };
+        let run = |calculation: Option<AnnexAaInput>, zones: Vec<AnnexAaInput>| {
+            let mut sample = sample.clone();
+            sample.active_cooling = Some(ActiveCoolingEvidence {
+                system: crate::tojuli::ActiveCoolingSystem::ExternalColdWithCoolingEmitter,
+                capacity: CoolingCapacityEvidence::AnnexAa {
+                    calculation,
+                    zone_calculations: zones,
+                    source_reference: "annex AA".into(),
+                },
+                source_reference: "design".into(),
+            });
+            assess_building_performance(&sample)
+        };
+        let has = |result: &BuildingPerformanceAssessment, code: &str, path: &str| {
+            result
+                .issues
+                .iter()
+                .any(|item| item.code == code && item.path == path)
+        };
+
+        // One calculation per zone: both zones pass and TOjuli is 0.
+        let both = run(
+            None,
+            vec![calculation(Some(&first)), calculation(Some("z2"))],
+        );
+        assert_eq!(both.status, "calculated_unverified", "{:?}", both.issues);
+        assert_eq!(both.tojuli.len(), 2);
+        assert!(both.tojuli.iter().all(|zone| zone.max_tojuli_k == Some(0.0)));
+        assert!(both.tojuli.iter().all(|zone| zone.annex_aa.is_some()));
+        // `calculation` may name one of the zones itself.
+        let mixed = run(Some(calculation(Some("z2"))), vec![calculation(Some(&first))]);
+        assert_eq!(mixed.status, "calculated_unverified", "{:?}", mixed.issues);
+
+        // Without a zone id the calculation cannot be placed.
+        let unnamed = run(Some(calculation(None)), Vec::new());
+        assert!(has(
+            &unnamed,
+            "annex_aa_zone_id_required",
+            "activeCooling.capacity.calculation.zoneId"
+        ));
+        // A zone that is not cooled, or a zone named twice.
+        let unknown = run(None, vec![calculation(Some("zx"))]);
+        assert!(has(
+            &unknown,
+            "annex_aa_zone_unknown",
+            "activeCooling.capacity.zoneCalculations[0].zoneId"
+        ));
+        let twice = run(
+            None,
+            vec![calculation(Some("z2")), calculation(Some("z2"))],
+        );
+        assert!(has(
+            &twice,
+            "annex_aa_zone_duplicate",
+            "activeCooling.capacity.zoneCalculations[1].zoneId"
+        ));
+        // A cooled zone without its own calculation has no capacity proof.
+        let missing = run(None, vec![calculation(Some(&first))]);
+        assert_eq!(missing.tojuli[0].max_tojuli_k, Some(0.0));
+        assert!(missing.tojuli[1]
+            .issues
+            .iter()
+            .any(|item| item.code == "annex_aa_zone_calculation_required"
+                && item.path == "activeCooling.capacity.zoneCalculations"));
+
+        // One cooled zone keeps the single calculation without an id.
+        let mut single = sample.clone();
+        single.space_heating.additional_zones.clear();
+        single.total_usable_floor_area_m2 /= 2.0;
+        single.active_cooling = Some(ActiveCoolingEvidence {
+            system: crate::tojuli::ActiveCoolingSystem::ExternalColdWithCoolingEmitter,
+            capacity: CoolingCapacityEvidence::AnnexAa {
+                calculation: Some(calculation(None)),
+                zone_calculations: Vec::new(),
+                source_reference: "annex AA".into(),
+            },
+            source_reference: "design".into(),
+        });
+        let single = assess_building_performance(&single);
+        assert_eq!(single.status, "calculated_unverified", "{:?}", single.issues);
+        assert_eq!(single.tojuli_max_k, Some(0.0));
+    }
+
     #[test]
     fn review_fixes_bacs_on_district_heat_and_consistency_checks() {
         use crate::space_heating_chain::ExternalHeatGenerator;

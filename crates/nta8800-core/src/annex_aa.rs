@@ -217,6 +217,12 @@ pub struct AnnexAaRoom {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AnnexAaInput {
+    /// Rekenzone the calculation belongs to. Annex AA is determined per
+    /// cooled rekenzone (2025+C1 p. 1135), so a project with more than one
+    /// cooled zone gives one calculation per zone and names it here; a
+    /// single cooled zone may leave it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zone_id: Option<String>,
     pub construction_year: i32,
     /// More than 50 % of A_in demonstrably post-insulated (table AA.2).
     #[serde(default)]
@@ -472,9 +478,16 @@ pub fn assess_annex_aa(
         }
     }
     let mut assigned = std::collections::HashSet::new();
+    let mut room_ids = std::collections::HashSet::new();
     let mut rooms: Vec<(&AnnexAaRoom, Vec<(&Window, f64)>)> = Vec::new();
     for (index, room) in aa.rooms.iter().enumerate() {
         let room_path = format!("{path}.rooms[{index}]");
+        // The per-room results (AA.9–AA.13) are reported by room id.
+        if room.id.trim().is_empty() {
+            issues.push(issue("annex_aa_room_id_required", format!("{room_path}.id")));
+        } else if !room_ids.insert(room.id.trim()) {
+            issues.push(issue("annex_aa_room_id_duplicate", format!("{room_path}.id")));
+        }
         if !(room.area_m2.is_finite() && room.area_m2 > 0.0) {
             issues.push(issue(
                 "annex_aa_area_invalid",
@@ -743,6 +756,7 @@ mod tests {
 
     fn rooms(living_kw: f64) -> AnnexAaInput {
         AnnexAaInput {
+            zone_id: None,
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(1.5),
@@ -904,5 +918,25 @@ mod tests {
             .collect();
         assert!(codes.contains(&"annex_aa_window_unknown"));
         assert!(codes.contains(&"annex_aa_window_assigned_twice"));
+    }
+
+    /// The per-room results are reported by room id, so it is required and
+    /// unique within the calculation.
+    #[test]
+    fn room_ids_are_required_and_unique() {
+        let (input, demand) = zone();
+        let mut aa = rooms(2.0);
+        aa.rooms[1].id = " ".into();
+        let blank = assess_annex_aa(&aa, &input, &demand, "aa").unwrap_err();
+        assert!(blank
+            .iter()
+            .any(|item| item.code == "annex_aa_room_id_required" && item.path == "aa.rooms[1].id"));
+        aa.rooms[1].id = "living".into();
+        let twice = assess_annex_aa(&aa, &input, &demand, "aa").unwrap_err();
+        assert!(twice
+            .iter()
+            .any(|item| item.code == "annex_aa_room_id_duplicate" && item.path == "aa.rooms[1].id"));
+        aa.rooms[1].id = "bedroom".into();
+        assert!(assess_annex_aa(&aa, &input, &demand, "aa").is_ok());
     }
 }
