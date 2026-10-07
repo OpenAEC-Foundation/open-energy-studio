@@ -81,11 +81,11 @@ Elk opname-onderdeel heeft een blok **Foto's**:
 - de opwekker van verwarming en tapwater, en extra opwekkers;
 - zonneboilers, ventilatie en koeling.
 
-**Foto toevoegen** opent de bestandskiezer; op een tablet of telefoon ook de camera. Elke foto gaat met zijn SHA-256 in het bewijsregister (soort *Detailfoto*). Hij wordt gekoppeld aan het onderdeel, bijvoorbeeld `/basisopname/survey/pv/0`. Met **Bestaand bewijsstuk koppelen** koppel je een foto die al in het register staat; met het kruisje ontkoppel je hem weer.
+**Foto toevoegen** opent de bestandskiezer; op een tablet of telefoon ook de camera. Elke foto gaat met zijn SHA-256 in het bewijsregister (soort *Detailfoto*). Hij wordt gekoppeld aan het onderdeel, bijvoorbeeld `/basisopname/survey/pv/@pv-1` (het PV-veld met id `pv-1`). Met **Bestaand bewijsstuk koppelen** koppel je een foto die al in het register staat; met het kruisje ontkoppel je hem weer.
 
 De foto's gaan mee in de dossier-ZIP (BRL 9500 bijlage 3: leesbare foto's van typeaanduiding en maatvoering). In de browser blijven de bestanden alleen in deze sessie bewaard. Exporteer daarom het dossier voordat je het venster sluit. De desktopapp bewaart ze in de app-map.
 
-Een koppeling verwijst naar de positie van het onderdeel in de lijst. Verwijder je een onderdeel, dan wijst de koppeling van een volgend onderdeel naar de nieuwe positie. Controleer de koppelingen daarom in de kolom **Onderbouwt** van het bewijsregister.
+Een koppeling verwijst naar het id van het onderdeel, zoals de id van een vlak, raam, lichtkoepel, PV-veld of zonneboiler. Verwijder of verplaats je een ander onderdeel, dan blijft de foto bij zijn eigen onderdeel. Extra opwekkers en extra tapwatersystemen hebben geen id; daar verwijst de koppeling naar de positie in de lijst. Verwijder je zo'n onderdeel met de knop in de opname, dan schuiven de koppelingen van de onderdelen erna mee. De koppelingen naar het verwijderde onderdeel vervallen; de foto's blijven in het register als "niet gekoppeld".
 
 ## Overnemen in projectmodel
 
