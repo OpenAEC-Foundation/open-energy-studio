@@ -48,5 +48,9 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     mixed_air_route: false,
     // Table 14.4 MF (2022 p. 639; 2023 p. 649: MF = 1).
     lighting_maintenance_factor: true,
+    // Table 9.28 refers to NEN-EN 14511-2, dated 2007 in the normative
+    // references (2022 p. 14, 316; 2023 p. 322: NEN-EN 14511-2:2022).
+    // 2020+A1 is the same (2020 p. 15, 314).
+    heat_pump_high_test_standard: "NEN-EN 14511-2:2007",
     ..super::v2023::PROFILE
 };

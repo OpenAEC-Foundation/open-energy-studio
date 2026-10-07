@@ -848,6 +848,61 @@ mod switch_points_2022 {
         assert!((ConstantIlluminance::LinearFluorescent.compensation_factor() - 0.9).abs() < 1e-12);
         assert!((ConstantIlluminance::LedL80.compensation_factor() - 0.85).abs() < 1e-12);
     }
+
+    #[test]
+    fn table_9_28_test_standard_is_the_dated_reference_of_the_edition() {
+        use crate::forfait_heat_pump_draft::{
+            assess_forfait_heat_pump_draft, ForfaitHeatPumpDraftInput,
+        };
+        // Table 9.28 refers to NEN-EN 14511-2: dated 2007 in the normative
+        // references of 2022 (p. 14, 316) and 2020+A1 (p. 15, 314), 2022
+        // from 2023 (p. 322).
+        let input = |edition: &str| -> ForfaitHeatPumpDraftInput {
+            serde_json::from_value(serde_json::json!({
+                "generatorId": "hp",
+                "classificationSourceReference": "test",
+                "scope": "residential_at_most25_kw",
+                "source": "groundwater_below15_c",
+                "sink": "hydronic",
+                "designSupplyTemperatureC": 35,
+                "sourceCorrectionFactor": 1.0,
+                "sourceCorrectionReference": "test",
+                "rowVariant": "table_9_28_high_efficiency",
+                "highEfficiencyEvidence": {
+                    "productReference": "test",
+                    "testReportReference": "test",
+                    "testStandardEdition": edition,
+                    "points": [
+                        {"condition": "w10_w45", "measuredCop": 3.8},
+                        {"condition": "w10_w35", "measuredCop": 4.45}
+                    ]
+                }
+            }))
+            .unwrap()
+        };
+        let refused = |version, edition: &str| {
+            with_version(version, || {
+                assess_forfait_heat_pump_draft(&input(edition))
+                    .issues
+                    .iter()
+                    .any(|issue| issue.code == "high_test_standard_invalid")
+            })
+        };
+        for version in [NormVersion::V2022, NormVersion::V2020A1] {
+            assert!(!refused(version, "NEN-EN 14511-2:2007"));
+            assert!(refused(version, "NEN-EN 14511-2:2022"));
+        }
+        for version in [NormVersion::V2023, NormVersion::V2024, NormVersion::V2025C1] {
+            assert!(refused(version, "NEN-EN 14511-2:2007"));
+            assert!(!refused(version, "NEN-EN 14511-2:2022"));
+        }
+        assert_eq!(
+            with_version(NormVersion::V2020A1, || {
+                assess_forfait_heat_pump_draft(&input("NEN-EN 14511-2:2007")).corrected_cop
+            }),
+            Some(5.0)
+        );
+    }
 }
 
 /// NTA 8800:2020+A1 against 2022: each value with the page of both editions.

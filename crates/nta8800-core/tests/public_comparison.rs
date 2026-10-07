@@ -112,6 +112,119 @@ fn one_dwelling_over_two_zones_shares_its_occupants() {
     );
 }
 
+fn run_edition(value: &Value, edition: &str) -> (Value, [f64; 3]) {
+    let mut value = value.clone();
+    value["ntaCalculation"]["normVersion"] = Value::from(edition);
+    let result = assess_project_performance(&value);
+    assert_eq!(
+        result.status, "calculated_legacy_edition",
+        "{edition}: {:?}",
+        result.gaps
+    );
+    let performance = serde_json::to_value(result.performance.as_ref().unwrap()).unwrap();
+    let read = |key: &str| performance.pointer(key).and_then(Value::as_f64).unwrap();
+    let indicators = [
+        read("/needIndicatorKwhPerM2Year"),
+        read("/primaryFossilIndicatorKwhPerM2Year"),
+        read("/renewableSharePercent"),
+    ];
+    (performance, indicators)
+}
+
+fn used_kwh(performance: &Value, service: &str) -> f64 {
+    performance["energyByService"]["annual"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["service"] == service)
+        .map(|row| row["usedKwh"].as_f64().unwrap())
+        .sum()
+}
+
+fn assert_indicators(name: &str, actual: [f64; 3], expected: [f64; 3]) {
+    let tolerance = [0.05, 0.05, 0.15];
+    for i in 0..3 {
+        assert!(
+            (actual[i] - expected[i]).abs() <= tolerance[i],
+            "{name} BENG {}: {actual:?}",
+            i + 1
+        );
+    }
+}
+
+/// Case A was calculated on 13-04-2021 (Uniec 3.0.16), in the designation
+/// period of NTA 8800:2020+A1; case B on 22-03-2023 (Uniec 3.1.6.2), in that
+/// of NTA 8800:2022. Under their own editions:
+/// - 2022 and 2020+A1 take the real height h of (8.47) (2022 p. 236); both
+///   reports give 0,10 m for the floor above the crawlspace.
+/// - 2020+A1 has no actual pipe length for dwellings (2020 p. 292); the
+///   48,84 m of A is the forfait length of the report ("leidinggegevens
+///   onbekend"), which 9.36 reproduces.
+/// - 2020+A1 (16.4, p. 651) floors K_pk to 5 W/m²: 325 Wp on 9 panels of
+///   15,21 m² together gives 192,3 → 190 W/m², the 2 437 kWh of the report.
+/// A: 2024 35,15 → 2020+A1 36,06 (+0,56 PV, +0,36 the 2023 switch points of
+/// emission and ΔT_C;fan); B: 2022 equals 2023, 29,10. What remains against
+/// the reports is 10.15, 10.87 and the rest
+/// (docs/nta8800-vergelijking-openbare-rapporten.md).
+#[test]
+fn cases_a_and_b_under_their_own_editions() {
+    let with_height = |json: &str| {
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        value["ntaCalculation"]["groundFloors"][0]["below"]["wallHeightAboveGroundM"] =
+            Value::from(0.10);
+        value
+    };
+    let mut a = with_height(CASES[0].json);
+    a["ntaCalculation"]["distributionSystem"]
+        .as_object_mut()
+        .unwrap()
+        .remove("actualPipeLengthM")
+        .expect("A gives the forfait length");
+    a["ntaCalculation"]["pvSystems"][0]["peakPower"] = serde_json::json!({
+        "method": "declared_specific",
+        "peakPowerWPerM2": 325.0 / 1.69,
+        "panelAreaM2": 15.21
+    });
+    let (a20, a20_indicators) = run_edition(&a, "2020+A1");
+    assert_indicators("A 2020+A1", a20_indicators, [94.0, 36.06, 74.4]);
+    // 15,21 m² × 190 W/m²: the report's 2 437 kWh within the rounding.
+    let pv = a20["pvSystems"][0]["annualKwh"].as_f64().unwrap();
+    assert!((pv - 2437.0).abs() < 5.0, "{pv}");
+
+    let b = with_height(CASES[1].json);
+    // The same as under 2023 (`cases_b_and_c_under_nta_8800_2023`): h 0,10
+    // instead of the fixed 0,125 m changes nothing at two decimals.
+    let (_, b22) = run_edition(&b, "2022");
+    assert_indicators("B 2022", b22, [52.96, 29.10, 62.5]);
+}
+
+/// Case D: a detached holiday home of 79,70 m², calculated on 30-03-2021
+/// with Uniec 3.0.10.0 (NTA 8800:2020+A1); published 86,72 / 39,19 / 83,5.
+/// Hot water (3 552 kWh), fans (401 kWh, table 11.23 from 2007) and PV
+/// (4 273 kWh on the meter) agree. The heat-pump auxiliary energy differs
+/// by the build year of 9.85 (report 46 kWh = A 13,0 from 2015; kernel
+/// 119 kWh = A 87,6, build year not in the input); BENG 1 is 4,9 % lower
+/// with the overhang of the east windows modelled as minimal obstruction.
+#[test]
+fn case_d_under_nta_8800_2020_a1() {
+    let value: Value =
+        serde_json::from_str(include_str!("../../../training-data/nta8800-public-comparison-d.json"))
+            .unwrap();
+    assert_eq!(value["ntaCalculation"]["normVersion"], "2020+A1");
+    let (performance, indicators) = run_edition(&value, "2020+A1");
+    assert_indicators("D 2020+A1", indicators, [82.49, 38.42, 83.4]);
+    let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
+    assert!((pv - 4273.0).abs() < 1.0, "{pv}");
+    assert!((used_kwh(&performance, "hotWater") - 3552.0).abs() < 1.0);
+    assert!((used_kwh(&performance, "ventilation") - 401.0).abs() < 1.0);
+    // 9.85 with A 87,6 (2020 p. 334–336): 87,6 + 0,132 · E / (0,4 · 24).
+    let heating = used_kwh(&performance, "heating");
+    let auxiliary = used_kwh(&performance, "auxiliary");
+    assert!((auxiliary - (87.6 + 0.132 * heating / 9.6)).abs() < 0.5, "{auxiliary}");
+    // The report: 2 427 kWh for 12 136 kWh heat at COP 5,00.
+    assert!((heating - 2312.1).abs() < 1.0, "{heating}");
+}
+
 /// Cases B and C were published in NTA 8800:2023. Under that edition the
 /// table 13.2 difference of case C disappears: η_W;em;k 0,55 for a kitchen
 /// pipe of at most 10 mm inner diameter (2023 p. 533) instead of 0,43
