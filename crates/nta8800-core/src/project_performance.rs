@@ -2936,6 +2936,38 @@ fn derive_input(
         }
     }
     let mut used_obstruction = HashSet::new();
+    // Every window id of the project and whether it sits in an outdoor
+    // surface, so a per-window obstruction is only "without window" when the
+    // id names no window at all.
+    let mut project_windows: HashMap<&str, bool> = HashMap::new();
+    for surface in project.zones.iter().flat_map(|zone| &zone.surfaces) {
+        let outdoor = matches!(
+            surface
+                .get("thermalBoundary")
+                .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok()),
+            Some(ThermalBoundary::Outdoor)
+        );
+        for window in surface
+            .get("windows")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(id) = window.get("id").and_then(Value::as_str) {
+                *project_windows.entry(id).or_insert(false) |= outdoor;
+            }
+        }
+    }
+    // The project-wide obstruction: errors that do not depend on the tilt at
+    // its own path, once; a situation that needs a vertical window at the
+    // first non-vertical window that takes the default.
+    for (code, suffix) in validate_obstruction(&nta.window_solar.obstruction, 90.0) {
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowSolar.obstruction{suffix}"),
+        ));
+    }
+    let mut default_tilt_reported = false;
     let mut loss_area = 0.0;
     let mut total_area = 0.0;
     let mut zones = Vec::new();
@@ -3104,7 +3136,21 @@ fn derive_input(
                             nta.window_solar.obstruction.clone()
                         }
                     }
-                    None => nta.window_solar.obstruction.clone(),
+                    None => {
+                        if !default_tilt_reported
+                            && validate_obstruction(&nta.window_solar.obstruction, tilt)
+                                .iter()
+                                .any(|(code, _)| *code == "obstruction_situation_requires_vertical")
+                        {
+                            default_tilt_reported = true;
+                            gaps.push(InputGap {
+                                code: "obstruction_situation_requires_vertical",
+                                path: "ntaCalculation.windowSolar.obstruction.method".into(),
+                                detail: Some(format!("window {window_id} (tilt {tilt}°)")),
+                            });
+                        }
+                        nta.window_solar.obstruction.clone()
+                    }
                 };
                 windows.push(Window {
                     id: format!("window:{window_id}"),
@@ -3299,12 +3345,19 @@ fn derive_input(
         });
     }
     for (index, item) in nta.window_obstructions.iter().enumerate() {
-        if !used_obstruction.contains(&item.window_id) {
-            gaps.push(gap(
-                "window_obstruction_without_window",
-                format!("ntaCalculation.windowObstructions[{index}].windowId"),
-            ));
+        if used_obstruction.contains(&item.window_id) {
+            continue;
         }
+        // A window with incomplete data already has its own gap.
+        let code = match project_windows.get(item.window_id.as_str()) {
+            None => "window_obstruction_without_window",
+            Some(false) => "window_obstruction_not_outdoor",
+            Some(true) => continue,
+        };
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowObstructions[{index}].windowId"),
+        ));
     }
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
         if !used_dynamic.contains(&item.window_id) {
@@ -3831,6 +3884,84 @@ mod tests {
             assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
         }
         assert_eq!(result.status, "incomplete");
+    }
+
+    /// Declared obstruction factors need a source; a blank one is a gap at
+    /// the input path (per window, with the default kept for that window, and
+    /// for the project-wide obstruction), not only an issue deep in the demand.
+    #[test]
+    fn declared_obstruction_without_source_is_a_gap() {
+        let declared = serde_json::json!({
+            "method": "declared", "heating": vec![0.9; 12], "cooling": vec![0.8; 12], "sourceReference": " "
+        });
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([
+            {"windowId": "win-S", "obstruction": declared, "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert!(
+            result.gaps.iter().any(|gap| gap.code == "source_reference_required"
+                && gap.path == "ntaCalculation.windowObstructions[0].obstruction.sourceReference"),
+            "{:?}",
+            result.gaps
+        );
+        assert_eq!(result.status, "incomplete");
+        // One gap: the window keeps the project default, so the demand
+        // reports no second error elsewhere.
+        assert_eq!(
+            result
+                .gaps
+                .iter()
+                .filter(|gap| gap.code == "source_reference_required")
+                .count(),
+            1
+        );
+
+        let mut value = project();
+        value["ntaCalculation"]["windowSolar"]["obstruction"] = declared;
+        let result = assess_project_performance(&value);
+        assert!(
+            result.gaps.iter().any(|gap| gap.code == "source_reference_required"
+                && gap.path == "ntaCalculation.windowSolar.obstruction.sourceReference"),
+            "{:?}",
+            result.gaps
+        );
+        assert_ne!(result.status, "calculated_unverified");
+    }
+
+    /// "Without window" only for an id that names no window: a window with
+    /// incomplete data has its own gap, and a window that no longer borders
+    /// outdoor air gets `window_obstruction_not_outdoor`.
+    #[test]
+    fn obstruction_for_an_existing_window_is_not_without_window() {
+        let entry = |id: &str| {
+            serde_json::json!({"windowId": id, "obstruction": {"method": "minimal"}, "sourceReference": "s"})
+        };
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([entry("win-N")]);
+        value["zones"][0]["surfaces"][0]["windows"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("gValue");
+        let result = assess_project_performance(&value);
+        let codes: Vec<&str> = result.gaps.iter().map(|gap| gap.code).collect();
+        assert!(codes.contains(&"window_data_missing"), "{codes:?}");
+        assert!(!codes.contains(&"window_obstruction_without_window"), "{codes:?}");
+
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([entry("win-N")]);
+        value["zones"][0]["surfaces"][0]["thermalBoundary"] = Value::from("unheated_space");
+        let result = assess_project_performance(&value);
+        assert!(
+            result.gaps.iter().any(|gap| gap.code == "window_obstruction_not_outdoor"
+                && gap.path == "ntaCalculation.windowObstructions[0].windowId"),
+            "{:?}",
+            result.gaps
+        );
+        assert!(result
+            .gaps
+            .iter()
+            .all(|gap| gap.code != "window_obstruction_without_window"));
     }
 
     #[test]

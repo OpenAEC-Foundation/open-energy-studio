@@ -678,12 +678,18 @@ pub fn validate_obstruction(
             }
         }
         Obstruction::Declared {
-            heating, cooling, ..
+            heating,
+            cooling,
+            source_reference,
         } => {
             if [heating, cooling].iter().any(|values| {
                 values.len() != 12 || values.iter().any(|value| !(0.0..=1.0).contains(value))
             }) {
                 issues.push(("window_obstruction_factor_invalid", ""));
+            }
+            // Declared factors come from elsewhere (§17.3.8): name the source.
+            if source_reference.trim().is_empty() {
+                issues.push(("source_reference_required", ".sourceReference"));
             }
         }
     }

@@ -1783,18 +1783,9 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             ));
         }
         check_forfait_delta_u(window.forfait_delta_u_w_per_m2k, &path, issues);
+        // Includes the source of declared factors (`source_reference_required`).
         for (code, suffix) in validate_obstruction(&window.obstruction, window.tilt_deg) {
             issues.push(issue(code, format!("{path}.obstruction{suffix}")));
-        }
-        if let Obstruction::Declared {
-            source_reference, ..
-        } = &window.obstruction
-        {
-            check_reference(
-                source_reference,
-                format!("{path}.obstruction.sourceReference"),
-                issues,
-            );
         }
         if let Some(shading) = &window.movable_shading {
             if shading.device.is_some() && shading.reduction_factor.is_finite() {

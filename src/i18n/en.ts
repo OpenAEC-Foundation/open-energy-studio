@@ -1445,6 +1445,7 @@ export const en: Record<string, string> = {
   'nta.form.windowObstructions.surface': "Surface",
   'nta.form.windowObstructions.situation': "Obstruction",
   'nta.form.windowObstructions.same': "As project",
+  'nta.form.windowObstructions.notOutdoor': "(no longer in an outdoor surface; the obstruction does not apply)",
   'nta.form.windowObstructions.missing': "(not in the project)",
   'nta.form.windowObstructions.remove': "Remove",
   'nta.form.frameFraction': 'Frame fraction F_F',
