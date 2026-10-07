@@ -17,7 +17,7 @@ import { routeForPath } from '../../../../core/nta/gapRoutes';
 import { kernelIssues } from '../../../../core/nta/stepStatus';
 import { summarizeServiceEnergy } from '../../../../core/nta/ServiceEnergy';
 import {
-  fetchKernelInterpretations, type NtaInterpretationGroup, type ProjectPerformanceAssessment,
+  fetchKernelInterpretations, legacyEdition, type NtaInterpretationGroup, type ProjectPerformanceAssessment,
 } from '../../../../core/nta/KernelClient';
 import type { Route } from '../../../../core/navigation/routes';
 import { ResultsView } from '../../../ResultsView/ResultsView';
@@ -56,6 +56,8 @@ export function ResultsDashboard({ sub, onNavigate }: { sub: string | undefined;
     <div className={stale ? 'results-dash results-dash--stale' : 'results-dash'} data-testid="results-dashboard">
       {stale && <StaleBanner>{t('results.dash.stale')}</StaleBanner>}
       <Banner tone="unv" title={t('results.dash.unverifiedTitle')}>{t('results.dash.unverifiedText')}</Banner>
+      {legacyEdition(assessment) && <Banner tone="warn" role="note" title={t('nta.edition.legacyTitle')}>
+        {t('nta.edition.legacyBody', { edition: assessment.targetNormVersion })}</Banner>}
       <div className="results-dash__body" aria-busy={stale}>
         {(sub ?? 'overview') === 'overview' && <Overview assessment={assessment} onNavigate={onNavigate} />}
         {sub === 'services' && <ServicesTab assessment={assessment} />}
