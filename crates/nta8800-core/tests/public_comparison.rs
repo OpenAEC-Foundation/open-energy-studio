@@ -1,4 +1,4 @@
-//! Regression on fictionalised rebuilds of three public BENG reports
+//! Regression on fictionalised rebuilds of four public BENG reports
 //! (docs/nta8800-vergelijking-openbare-rapporten.md). The asserted values
 //! are this kernel's own results, recorded on 2026-10-05 after the input
 //! corrections of the line-by-line reconciliation and f_prac 0,95 on declared
@@ -162,6 +162,7 @@ fn assert_indicators(name: &str, actual: [f64; 3], expected: [f64; 3]) {
 ///   onbekend"), which 9.36 reproduces.
 /// - 2020+A1 (16.4, p. 651) floors K_pk to 5 W/m²: 325 Wp on 9 panels of
 ///   15,21 m² together gives 192,3 → 190 W/m², the 2 437 kWh of the report.
+///
 /// A: 2024 35,15 → 2020+A1 36,06 (+0,56 PV, +0,36 the 2023 switch points of
 /// emission and ΔT_C;fan); B: 2022 equals 2023, 29,10. What remains against
 /// the reports is 10.15, 10.87 and the rest
@@ -207,9 +208,10 @@ fn cases_a_and_b_under_their_own_editions() {
 /// with the overhang of the east windows modelled as minimal obstruction.
 #[test]
 fn case_d_under_nta_8800_2020_a1() {
-    let value: Value =
-        serde_json::from_str(include_str!("../../../training-data/nta8800-public-comparison-d.json"))
-            .unwrap();
+    let value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-d.json"
+    ))
+    .unwrap();
     assert_eq!(value["ntaCalculation"]["normVersion"], "2020+A1");
     let (performance, indicators) = run_edition(&value, "2020+A1");
     assert_indicators("D 2020+A1", indicators, [82.49, 38.42, 83.4]);
@@ -220,12 +222,16 @@ fn case_d_under_nta_8800_2020_a1() {
     // 9.85 with A 87,6 (2020 p. 334–336): 87,6 + 0,132 · E / (0,4 · 24).
     let heating = used_kwh(&performance, "heating");
     let auxiliary = used_kwh(&performance, "auxiliary");
-    assert!((auxiliary - (87.6 + 0.132 * heating / 9.6)).abs() < 0.5, "{auxiliary}");
+    assert!(
+        (auxiliary - (87.6 + 0.132 * heating / 9.6)).abs() < 0.5,
+        "{auxiliary}"
+    );
     // The report: 2 427 kWh for 12 136 kWh heat at COP 5,00.
     assert!((heating - 2312.1).abs() < 1.0, "{heating}");
 }
 
-/// Cases B and C were published in NTA 8800:2023. Under that edition the
+/// Case C was calculated in NTA 8800:2023, case B in the 2022 period (2022
+/// equals 2023 for B, see above). Under 2023 the
 /// table 13.2 difference of case C disappears: η_W;em;k 0,55 for a kitchen
 /// pipe of at most 10 mm inner diameter (2023 p. 533) instead of 0,43
 /// (2024 p. 527) lowers BENG 2 by 1,35 kWh/(m²·jr). The other 2023 switch

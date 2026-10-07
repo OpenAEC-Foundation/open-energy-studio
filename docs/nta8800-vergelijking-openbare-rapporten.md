@@ -1,18 +1,21 @@
 # Vergelijking met openbare BENG-rapporten — 5 oktober 2026
 
-Dit is **geen officiële referentietoets**. Drie openbaar gepubliceerde BENG-rapporten zijn in de app nagebouwd en met de rekenkern doorgerekend. Die rapporten zijn gemaakt met geattesteerde software (Uniec) onder oudere NTA 8800-edities. Verschillen zijn daarom deels verwacht. De officiële toetsing voor BRL 9501 loopt via ISSO-publicatie 54 versie 5.0:2026, die niet openbaar is.
+Dit is **geen officiële referentietoets**. Vier openbaar gepubliceerde BENG-rapporten zijn in de app nagebouwd en met de rekenkern doorgerekend. Die rapporten zijn gemaakt met geattesteerde software (Uniec) onder oudere NTA 8800-edities. Verschillen zijn daarom deels verwacht. De officiële toetsing voor BRL 9501 loopt via ISSO-publicatie 54 versie 5.0:2026, die niet openbaar is.
 
-De herbouwde invoer staat als fictieve, geanonimiseerde fixtures in `training-data/nta8800-public-comparison-{a,b,c}.json`. Adressen en namen zijn verwijderd. De test `crates/nta8800-core/tests/public_comparison.rs` legt de huidige uitkomsten vast als regressie; de gepubliceerde waarden zijn alleen context.
+De herbouwde invoer staat als fictieve, geanonimiseerde fixtures in `training-data/nta8800-public-comparison-{a,b,c,d}.json`. Adressen en namen zijn verwijderd. De test `crates/nta8800-core/tests/public_comparison.rs` legt de huidige uitkomsten vast als regressie; de gepubliceerde waarden zijn alleen context.
 
 ## Bronnen
 
-| Geval | Bron | Software en NTA-editie |
+| Geval | Bron | Software, rekendatum en NTA-editie |
 |---|---|---|
-| A | [openbaar rapport A (vrijstaande woning, plat dak)](https://www.starlinehome.nl/uploads/20210923-Beng_berekening_21.164_002.pdf) | Uniec 3.0.16 (2021), NTA 8800:2020 |
-| B | [openbaar rapport B (rijwoning)](https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-415/1/bijlage/26.2220837_-_Rap._BENG-berekening.pdf) | Uniec 3.1.6.2 (2023), NTA 8800:2022 |
-| C | [openbaar rapport C (vrijstaande woning, twee zones)](https://www.oud-osdorp.nl/wp-content/uploads/2024/03/Rap.-BENG-berekening-V1.0_18-03-2024.pdf) | Uniec 3.2.7.0 (2024), NTA 8800:2023 |
+| A | [openbaar rapport A (vrijstaande woning, plat dak)](https://www.starlinehome.nl/uploads/20210923-Beng_berekening_21.164_002.pdf) | Uniec 3.0.16, 13-04-2021, NTA 8800:2020+A1 |
+| B | [openbaar rapport B (rijwoning)](https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-415/1/bijlage/26.2220837_-_Rap._BENG-berekening.pdf) | Uniec 3.1.6.2, 22-03-2023, NTA 8800:2022 |
+| C | [openbaar rapport C (vrijstaande woning, twee zones)](https://www.oud-osdorp.nl/wp-content/uploads/2024/03/Rap.-BENG-berekening-V1.0_18-03-2024.pdf) | Uniec 3.2.7.0, 18-03-2024, NTA 8800:2023 |
+| D | [openbaar rapport D (vrijstaande vakantiewoning met kap)](https://www.planviewer.nl/imro/files/NL.IMRO.1640.OV22HoHouterhof8-VG01/b_NL.IMRO.1640.OV22HoHouterhof8-VG01_bd1.pdf) | Uniec 3.0.10.0, 30-03-2021, NTA 8800:2020+A1 |
 
-Twee andere rapporten zijn niet gebruikt: een woongebouw met 28 appartementen in meerdere zones, en een verhalend rapport zonder volledige invoerlijst.
+De rapporten noemen de editie niet zelf. De editie volgt uit de rekendatum en de aanwijzingsperiode (`NormVersion::designation_period`): 2020+A1 tot 1 juni 2022, 2022 tot 1 juli 2023, 2023 tot 1 juli 2024. De Uniec-versie past daarbij (3.0 voor 2020+A1, 3.1 voor 2022, 3.2 voor 2023).
+
+Andere gevonden rapporten zijn niet nagebouwd (zie [Gezochte rapporten](#gezochte-rapporten-7-oktober-2026)).
 
 ## Uitkomsten
 
@@ -92,7 +95,7 @@ Na de twee correcties (invoer en f_prac) blijft over, in BENG 2 kWh/(m²·jr): A
 
 ### B en C in de editie 2023
 
-B en C zijn gepubliceerd volgens NTA 8800:2023. De kern rekent die editie nu ook (`normVersion: "2023"`, zie [nta8800-normversies.md](nta8800-normversies.md)). Uitkomsten BENG 1 / BENG 2 / BENG 3:
+C is berekend volgens NTA 8800:2023; B valt in de periode van 2022 (zie [A, B en D in hun eigen editie](#a-b-en-d-in-hun-eigen-editie-7-oktober-2026)). 2022 verschilt voor B niet van 2023. De kern rekent 2023 nu ook (`normVersion: "2023"`, zie [nta8800-normversies.md](nta8800-normversies.md)). Uitkomsten BENG 1 / BENG 2 / BENG 3:
 
 | Geval | Rapport | Kern 2024 | Kern 2023 |
 |---|---|---|---|
@@ -112,6 +115,65 @@ De test staat in `crates/nta8800-core/tests/public_comparison.rs` (`cases_b_and_
 
 De vragen over 10.15 en 10.87 staan in [nta8800-vragen-nen.md](nta8800-vragen-nen.md).
 
+## A, B en D in hun eigen editie (7 oktober 2026)
+
+Sinds de kern NTA 8800:2022 en 2020+A1 rekent, lopen A en D in 2020+A1 en B in 2022. De test is `cases_a_and_b_under_their_own_editions` en `case_d_under_nta_8800_2020_a1` in `crates/nta8800-core/tests/public_comparison.rs`. BENG 1 / BENG 2 / BENG 3:
+
+| Geval | Rapport | Kern 2024 | Kern in de eigen editie |
+|---|---|---|---|
+| A (2020+A1) | 92,99 / 25,19 / 80,4 | 94,00 / 35,15 / 74,9 | 94,00 / 36,06 / 74,4 |
+| B (2022) | 54,61 / 27,10 / 64,8 | 52,96 / 28,84 / 62,6 | 52,96 / 29,10 / 62,5 |
+| D (2020+A1) | 86,72 / 39,19 / 83,5 | – | 82,49 / 38,42 / 83,4 |
+
+**Invoer die de oudere edities anders vragen.**
+- (8.47): 2022 en 2020+A1 rekenen met de werkelijke hoogte h van de vloer boven maaiveld (2022 p. 236). A en B geven 0,10 m. Dat verandert BENG 1 niet op twee decimalen.
+- 2020+A1 kent geen werkelijke leidinglengte bij woningen (punt 77). De 48,84 m van A is de forfaitaire lengte die Uniec bij "leidinggegevens onbekend" toont; 9.36 geeft dezelfde lengte (BENG 2 35,15 → 35,14 in 2024).
+- 2020+A1 rondt K_pk af naar beneden op 5 W/m² (punt 68). A: 325 Wp op 9 panelen van samen 15,21 m² is 192,3 → 190 W/m²; de kern geeft dan de 2 437 kWh van het rapport. In 2024 telde de kern 2 467 kWh.
+
+**A in 2020+A1.** BENG 2 stijgt van 35,15 naar 36,06: +0,56 door de PV-afronding (de versiepost van de tabel hierboven verdwijnt) en +0,36 door de schakelpunten van 2023 (afgifte verwarming en koeling, ΔT_C;fan), die ook in 2022 en 2020+A1 gelden. De overige punten van 2020+A1 raken A niet: de warmtepomp heeft een gedeclareerde hulpenergie, dus punt 74 speelt niet. Wat tegen het rapport overblijft, is 10.15 (+8,55), 10.87 (+1,66) en de rest.
+
+**B in 2022.** Gelijk aan 2023 (29,10): geen van de punten 49–67 raakt B. De luchtwarmtepomp levert 45 °C, onder de grens van 55 °C van punt 49.
+
+**D in 2020+A1.** Een vrijstaande vakantiewoning ("andere logiesfunctie", woningbouw volgens tabel 6.1) van 79,70 m² met één rekenzone. Het rapport is een volledige Uniec-uitdraai. Herbouw:
+- Gevels W en O 47,33 m² bruto, N en Z 23,75 m² (Rc 4,70); twee dakvlakken van 47,48 m² onder 30° (Rc 6,30); vloer op grond 82,23 m² (Rc 3,70), omtrek 40,09 m (de funderingslengtes). Ramen U 1,4 / g 0,60, deur U 1,6. Lineaire bruggen per vlak zoals opgegeven.
+- Massa: "dragend metselwerk met massieve betonnen vloeren", tabel 7.10 rij > 750 kg/m² (`massKgPerM2` 800).
+- Infiltratie forfaitair: de kern geeft 1,4 × 0,7 × 1,0 = 0,98 dm³/(s·m²), gelijk aan q_v10;lea;ref van het rapport.
+- Grondwaterwarmtepomp "voldoet aan tabel 9.28", 35 °C, COP 5,00: de rij van tabel 9.28 met c_bron 1. Het rapport geeft geen meetwaarden; de fixture zet ze net boven het minimum van tabel 9.28.
+- Vloerverwarming in een vertrek van 4–6 m (afgifteroute voor hoge ruimten, 5,0 m), regeling in het hoofdvertrek.
+- Ventilatie C.2c met forfaitaire ventilatoren, geïnstalleerde capaciteit 117 dm³/s.
+- Elektrische boiler van 200 l, label C, met geïsoleerde warme aansluiting: f_sto;dis;ls 1,5 (2020 p. 545, punt 64).
+- 17 PV-panelen van 350 Wp, west, 30°. Het paneeloppervlak staat niet in het rapport; de fixture neemt 1,75 m² (200 W/m²), zodat de afronding van punt 68 niets afhaalt.
+
+Per post, elektriciteit in kWh/jr (het rapport geeft primaire energie; gedeeld door 1,45):
+
+| Post | Rapport | Kern | Verschil in BENG 2 |
+|---|---|---|---|
+| Warmtepomp verwarming (warmte) | 2 427 (12 136) | 2 312 (11 560) | −2,09 |
+| Hulpenergie verwarming | 46 | 119 | +1,33 |
+| Tapwater | 3 552 | 3 552 | 0 |
+| Ventilatoren | 401 | 401 | 0 |
+| PV (op de meter) | 4 273 | 4 273 | 0 |
+| **BENG 2** | **39,19** | **38,42** | **−0,77** |
+
+- **Hulpenergie.** Het rapport rekent 9.85 met A = 13,0 kWh (toestel vanaf 2015): 13,0 + 0,132 × 2 427 / (0,4 × 24) = 46,4. De kern heeft geen bouwjaar in de warmtepompinvoer en neemt A = 87,6 (de interpretatie bij punt 74 in [nta8800-normversies.md](nta8800-normversies.md)). Met een bouwjaar vanaf 2015 verdwijnt deze post.
+- **Ventilatoren.** Tabel 11.23 geeft voor ventilatoren vanaf 2007 0,45 W/(m³/h). Met dat fabricagejaar (nieuwbouw 2021) is de uitkomst gelijk aan het rapport. Een eerste herbouw met een onbekend fabricagejaar nam de oudste rij (4,00 W/(m³/h) voor wisselstroom) en gaf 3 567 kWh; dat was een invoerfout in de herbouw, geen fout in de kern.
+- **Warmte en BENG 1.** De kern rekent 4,9 % minder behoefte (82,49 tegen 86,72) en daarom minder warmte. Het rapport geeft vier ramen op de oostgevel (9,84 m² glas) een constante overstek, maar niet de maat. De kern heeft één belemmering per zone en rekent hier met minimale belemmering. Een overstek op alle ramen (h_o;⊥ 1,0 tot 0,25) verhoogt BENG 1 met 3,2 tot 5,8; naar rato van het oostglas (9,84 van 14,64 m²) is dat +2,2 tot +3,9, het grootste deel van het verschil. Om dezelfde reden is TOjuli in de kern 0,67 tegen 0,29.
+- **Tabel 9.28.** De kern eiste voor de rij van tabel 9.28 een beproeving volgens NEN-EN 14511-2:2022. Dat is de gedateerde verwijzing van 2023 (p. 322). 2022 (p. 14, 316) en 2020+A1 (p. 15, 314) verwijzen naar NEN-EN 14511-2:2007. De kern volgt nu de verwijzing van de editie (`heat_pump_high_test_standard`).
+
+D in 2022 (alleen ter vergelijking; D valt in de periode van 2020+A1): 82,49 / 39,69 / 83,0. Het verschil met 2020+A1 is de hulpenergie van de warmtepomp: 2022 rekent een warmtepomp met de eigen constanten van 9.85 (A 43,8, punt 74).
+
+### Gezochte rapporten (7 oktober 2026)
+
+Gezocht is op openbare BENG-rapporten bij vergunningen (repository.officiele-overheidspublicaties.nl, planviewer.nl, gemeentesites) met rekendata in de periodes van 2020+A1 en 2022. Gevonden en niet nagebouwd:
+
+| Rapport | Periode | Waarom niet |
+|---|---|---|
+| [vrijstaande woning 209 m², Uniec 3.1.5.0, 31-01-2023](https://www.boekel.nl/data/downloadables/2/2/1/8/7564003_1675349122509_20230131-bb_beng_mpg-22-323.pdf) | 2022 | per raam verschillende belemmeringen (zij-, volledige en minimale belemmering), twee tapwatersystemen (warmtepomp en een close-in boiler van 7 l) en twee opwekkers met een energiefractie; de kern heeft één belemmering per zone, dus de herbouw zou de zonwinst sterk benaderen |
+| [vrijstaande woning 232 m², Uniec 3.0.19.4, 08-03-2022](https://www.planviewer.nl/imro/files/NL.IMRO.1640.OV22KoKelperveen24-VG01/b_NL.IMRO.1640.OV22KoKelperveen24-VG01_bd10.pdf) | 2020+A1 | niet meer nagebouwd binnen deze ronde; een kandidaat voor een volgend geval |
+| [vrijstaande woning 291 m², Vabi EPA, 1-8-2022](https://repository.officiele-overheidspublicaties.nl/externebijlagen/exb-2022-66238/1/bijlage/exb-2022-66238.pdf) | 2022 (rapportdatum) | ander programma en geen rekendatum in de uitdraai; editie niet vast te stellen |
+| [woongebouw met 28 appartementen, Uniec 3.1.3.1, 12-07-2022](https://www.schagen.nl/sites/default/files/2022-12/05%20Beng%20berekening.pdf) | 2022 | meerdere zones en woningen; herbouw uit de uitdraai vraagt veel aannames |
+| [woning, Uniec 3.2.4.1, 24-11-2023](https://www.boekel.nl/data/downloadables/5/7/7/3/8290459_1703078780501_2248-og10-beng-berekening-geanonimiseerd.pdf), [appartementen, Uniec 3.2.3.0, 9-11-2023](https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-31972/1/bijlage/06._2022288.beng.wd.b0.pdf), [woning, 23-2-2024](https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-13030/1/bijlage/23-73_BENG-berekening_28.pdf) | 2023 | niet in een van de gezochte edities |
+
 ## Conclusie
 
-Geen van de verschillen wijst op een formulefout in de kern. Na correctie van de invoer en f_prac zijn de resterende verschillen herleid tot twee bewuste letterlijke lezingen van de norm (10.15 en 10.87), drie versieverschillen tussen de edities en een klein bouwfysisch restant. De gebruikte standaardwaarden per geval staan als bronvermelding (`sourceReference`) in de fixtures.
+Geen van de verschillen wijst op een formulefout in de rekenformules van de kern. Eén editieregel is rechtgezet: de beproevingsnorm bij tabel 9.28 in 2022 en 2020+A1. Na correctie van de invoer en f_prac zijn de resterende verschillen herleid tot twee bewuste letterlijke lezingen van de norm (10.15 en 10.87), drie versieverschillen tussen de edities en een klein bouwfysisch restant. De gebruikte standaardwaarden per geval staan als bronvermelding (`sourceReference`) in de fixtures.
