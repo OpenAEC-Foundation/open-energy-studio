@@ -34,6 +34,7 @@ export const NTA_INPUT_ROUTES: Record<string, NtaTarget> = {
   areaSourceReference: ['project'],
   usageFunction: ['project'],
   dwellingType: ['project'],
+  labelFunction: ['project'],
   bblFunction: ['project'],
   zebHeatDeliveryTemperature: ['project'],
   permitApplicationAfter20260529: ['project'],

@@ -2877,6 +2877,7 @@ export const nl: Record<string, string> = {
   'nta.form.constructionYear': "Bouwjaar van het gebouw (leeg: uit de registratie of de ventilatiesectie)",
   'nta.form.fossilOutside': "Fossiele gebouwgebonden toestellen buiten de berekening (§5.5.7)",
   'nta.form.functions': "Gebruiksfuncties met oppervlakte",
+  'nta.form.labelFunction': "Labelfunctie van het gebouw (§5.3.1)",
   'nta.form.labelFunctions': "Labelfunctie (§5.3.1)",
   'nta.form.labelFunctions.add': "Labelfunctie toevoegen",
   'nta.form.bblFunctions': "Bbl-gebruiksfunctie (art. 4.149 lid 2)",

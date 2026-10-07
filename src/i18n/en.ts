@@ -2877,6 +2877,7 @@ export const en: Record<string, string> = {
   'nta.form.constructionYear': "Building construction year (empty: from the registration or the ventilation section)",
   'nta.form.fossilOutside': "Fossil building-bound appliances outside the calculation (§5.5.7)",
   'nta.form.functions': "Use functions with area",
+  'nta.form.labelFunction': "Label function of the building (§5.3.1)",
   'nta.form.labelFunctions': "Label function (§5.3.1)",
   'nta.form.labelFunctions.add': "Add label function",
   'nta.form.bblFunctions': "Bbl use function (art. 4.149(2))",
