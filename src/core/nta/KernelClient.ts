@@ -969,6 +969,9 @@ export interface ForfaitHeatPumpDraftInput {
   sourceQualityDeclarationReference?: string | null;
   /** §9.1 (p. 285): a quality declaration (e.g. BCRG) replacing the table COP. */
   qualityDeclaration?: HeatPumpQualityDeclaration | null;
+  /** NTA 8800:2020+A1 (9.85, p. 336): build year of the device; A 13,0 kWh from 2015. */
+  installationYear?: number | null;
+  installationYearReference?: string | null;
 }
 
 /** Declared heat-pump values for space heating (kwaliteitsverklaring, §9.1). */

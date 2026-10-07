@@ -1,5 +1,6 @@
 import { useI18n } from '../../i18n/i18n';
 import { ElectricBoilerInsulatedPipe2022Field } from './NtaEdition2022Fields';
+import { HeatPumpInstallationYear2020Field } from './NtaEdition2020Fields';
 import type { IProject } from '../../core/energy/types';
 import {
   additionalHotWaterGeneratorTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
@@ -134,6 +135,8 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
     {kind === 'local_heater' && <LocalHeaterFields draft={draft} change={change} base={base} />}
     {kind === 'forfait_heater' && <ForfaitHeaterFields draft={draft} change={change} base={base} />}
     {heatPumpNote && (kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
+    {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') &&
+      <HeatPumpInstallationYear2020Field draft={draft} change={change} base={at('forfait')} />}
     {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     {kind === 'heat_pump_forfait' && <HeatPumpDeclarationFields draft={draft} change={change} base={at('forfait', 'qualityDeclaration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
