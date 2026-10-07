@@ -5218,6 +5218,8 @@ mod tests {
         let mut sample = input();
         sample.norm_version = NormVersion::V2024;
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -5309,6 +5311,8 @@ mod tests {
         use crate::annex_p::SourceTemperatureClass;
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -5386,6 +5390,8 @@ mod tests {
     fn heat_pump_ambient_heat_counts_as_renewable() {
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -6340,6 +6346,8 @@ mod tests {
         use crate::domestic_hot_water::HotWaterGenerator;
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -6789,6 +6797,8 @@ mod tests {
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,
             forfait: crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+                installation_year: None,
+                installation_year_reference: None,
                 generator_id: "hp".into(),
                 classification_source_reference: "system design".into(),
                 scope: crate::forfait_heat_pump_draft::TableScope::UtilityCollectiveOrOver25Kw,
@@ -7501,6 +7511,8 @@ mod tests {
         system.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,
             forfait: crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+                installation_year: None,
+                installation_year_reference: None,
                 generator_id: "hp".into(),
                 classification_source_reference: "system design".into(),
                 scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -7562,6 +7574,8 @@ mod tests {
         use crate::space_heating_chain::ChainZone;
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,

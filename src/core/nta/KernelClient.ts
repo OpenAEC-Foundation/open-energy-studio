@@ -185,15 +185,15 @@ export interface DeclaredHeatingTableAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseDeclaredHeatingTableWithRust(input: DeclaredHeatingTableInput): Promise<DeclaredHeatingTableAssessment> {
+export async function diagnoseDeclaredHeatingTableWithRust(input: DeclaredHeatingTableInput, normVersion?: NormVersion | null): Promise<DeclaredHeatingTableAssessment> {
   if (isTauri()) {
-    return invoke<DeclaredHeatingTableAssessment>('diagnose_declared_heating_table', { input });
+    return invoke<DeclaredHeatingTableAssessment>('diagnose_declared_heating_table', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/declared-heating-table/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<DeclaredHeatingTableAssessment>;
   }
@@ -223,15 +223,15 @@ export interface DeclaredDhwAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseDeclaredDhwWithRust(input: INtaHeatPumpInput): Promise<DeclaredDhwAssessment> {
+export async function diagnoseDeclaredDhwWithRust(input: INtaHeatPumpInput, normVersion?: NormVersion | null): Promise<DeclaredDhwAssessment> {
   if (isTauri()) {
-    return invoke<DeclaredDhwAssessment>('diagnose_declared_dhw', { input });
+    return invoke<DeclaredDhwAssessment>('diagnose_declared_dhw', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/declared-dhw/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<DeclaredDhwAssessment>;
   }
@@ -273,15 +273,15 @@ export interface FinalEnergyDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseFinalEnergyDraftWithRust(input: FinalEnergyDraftInput): Promise<FinalEnergyDraftAssessment> {
+export async function diagnoseFinalEnergyDraftWithRust(input: FinalEnergyDraftInput, normVersion?: NormVersion | null): Promise<FinalEnergyDraftAssessment> {
   if (isTauri()) {
-    return invoke<FinalEnergyDraftAssessment>('diagnose_final_energy_draft', { input });
+    return invoke<FinalEnergyDraftAssessment>('diagnose_final_energy_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/energy/final-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<FinalEnergyDraftAssessment>;
   }
@@ -340,15 +340,15 @@ export interface EpusDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseEpusDraftWithRust(input: EpusDraftInput): Promise<EpusDraftAssessment> {
+export async function diagnoseEpusDraftWithRust(input: EpusDraftInput, normVersion?: NormVersion | null): Promise<EpusDraftAssessment> {
   if (isTauri()) {
-    return invoke<EpusDraftAssessment>('diagnose_epus_draft', { input });
+    return invoke<EpusDraftAssessment>('diagnose_epus_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/energy/epus-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<EpusDraftAssessment>;
   }
@@ -751,15 +751,15 @@ export interface MonthlyDemandAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function calculateMonthlyDemandWithRust(input: MonthlyDemandInput): Promise<MonthlyDemandAssessment> {
+export async function calculateMonthlyDemandWithRust(input: MonthlyDemandInput, normVersion?: NormVersion | null): Promise<MonthlyDemandAssessment> {
   if (isTauri()) {
-    return invoke<MonthlyDemandAssessment>('calculate_monthly_demand', { input });
+    return invoke<MonthlyDemandAssessment>('calculate_monthly_demand', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/demand/monthly/calculate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<MonthlyDemandAssessment>;
   }
@@ -815,15 +815,15 @@ export interface BacsDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseBacsDraftWithRust(input: BacsDraftInput): Promise<BacsDraftAssessment> {
+export async function diagnoseBacsDraftWithRust(input: BacsDraftInput, normVersion?: NormVersion | null): Promise<BacsDraftAssessment> {
   if (isTauri()) {
-    return invoke<BacsDraftAssessment>('diagnose_bacs_draft', { input });
+    return invoke<BacsDraftAssessment>('diagnose_bacs_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/energy/bacs-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<BacsDraftAssessment>;
   }
@@ -866,15 +866,15 @@ export interface IndicatorsDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseIndicatorsDraftWithRust(input: IndicatorsDraftInput): Promise<IndicatorsDraftAssessment> {
+export async function diagnoseIndicatorsDraftWithRust(input: IndicatorsDraftInput, normVersion?: NormVersion | null): Promise<IndicatorsDraftAssessment> {
   if (isTauri()) {
-    return invoke<IndicatorsDraftAssessment>('diagnose_indicators_draft', { input });
+    return invoke<IndicatorsDraftAssessment>('diagnose_indicators_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/energy/indicators-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<IndicatorsDraftAssessment>;
   }
@@ -913,15 +913,15 @@ export interface HeatingAuxDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseHeatingAuxDraftWithRust(input: HeatingAuxDraftInput): Promise<HeatingAuxDraftAssessment> {
+export async function diagnoseHeatingAuxDraftWithRust(input: HeatingAuxDraftInput, normVersion?: NormVersion | null): Promise<HeatingAuxDraftAssessment> {
   if (isTauri()) {
-    return invoke<HeatingAuxDraftAssessment>('diagnose_heating_aux_draft', { input });
+    return invoke<HeatingAuxDraftAssessment>('diagnose_heating_aux_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/heating-aux-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<HeatingAuxDraftAssessment>;
   }
@@ -969,6 +969,9 @@ export interface ForfaitHeatPumpDraftInput {
   sourceQualityDeclarationReference?: string | null;
   /** §9.1 (p. 285): a quality declaration (e.g. BCRG) replacing the table COP. */
   qualityDeclaration?: HeatPumpQualityDeclaration | null;
+  /** NTA 8800:2020+A1 (9.85, p. 336): build year of the device; A 13,0 kWh from 2015. */
+  installationYear?: number | null;
+  installationYearReference?: string | null;
 }
 
 /** Declared heat-pump values for space heating (kwaliteitsverklaring, §9.1). */
@@ -1005,15 +1008,15 @@ export interface ForfaitHeatPumpDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseForfaitHeatPumpDraftWithRust(input: ForfaitHeatPumpDraftInput): Promise<ForfaitHeatPumpDraftAssessment> {
+export async function diagnoseForfaitHeatPumpDraftWithRust(input: ForfaitHeatPumpDraftInput, normVersion?: NormVersion | null): Promise<ForfaitHeatPumpDraftAssessment> {
   if (isTauri()) {
-    return invoke<ForfaitHeatPumpDraftAssessment>('diagnose_forfait_heat_pump_draft', { input });
+    return invoke<ForfaitHeatPumpDraftAssessment>('diagnose_forfait_heat_pump_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/forfait-cop-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<ForfaitHeatPumpDraftAssessment>;
   }
@@ -1055,11 +1058,11 @@ export interface GasHeatPumpForfaitDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpForfaitDraftWithRust(input: GasHeatPumpForfaitDraftInput): Promise<GasHeatPumpForfaitDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpForfaitDraftAssessment>('diagnose_gas_heat_pump_forfait_draft', { input });
+export async function diagnoseGasHeatPumpForfaitDraftWithRust(input: GasHeatPumpForfaitDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpForfaitDraftAssessment> {
+  if (isTauri()) return invoke<GasHeatPumpForfaitDraftAssessment>('diagnose_gas_heat_pump_forfait_draft', { input, ...editionArgs(normVersion) });
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/gas-forfait-cop-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     if (!response.ok) throw new Error(`Gas heat pump diagnostic: HTTP ${response.status}`);
     return response.json() as Promise<GasHeatPumpForfaitDraftAssessment>;
@@ -1103,11 +1106,11 @@ export interface GasHeatPumpAuxDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpAuxDraftWithRust(input: GasHeatPumpAuxDraftInput): Promise<GasHeatPumpAuxDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpAuxDraftAssessment>('diagnose_gas_heat_pump_aux_draft', { input });
+export async function diagnoseGasHeatPumpAuxDraftWithRust(input: GasHeatPumpAuxDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpAuxDraftAssessment> {
+  if (isTauri()) return invoke<GasHeatPumpAuxDraftAssessment>('diagnose_gas_heat_pump_aux_draft', { input, ...editionArgs(normVersion) });
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/gas-aux-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     const assessment = await response.json() as GasHeatPumpAuxDraftAssessment;
     if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas auxiliary diagnostic: HTTP ${response.status}`);
@@ -1152,11 +1155,11 @@ export interface GasHeatPumpMonthlyDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpMonthlyDraftWithRust(input: GasHeatPumpMonthlyDraftInput): Promise<GasHeatPumpMonthlyDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpMonthlyDraftAssessment>('diagnose_gas_heat_pump_monthly_draft', { input });
+export async function diagnoseGasHeatPumpMonthlyDraftWithRust(input: GasHeatPumpMonthlyDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpMonthlyDraftAssessment> {
+  if (isTauri()) return invoke<GasHeatPumpMonthlyDraftAssessment>('diagnose_gas_heat_pump_monthly_draft', { input, ...editionArgs(normVersion) });
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/gas-forfait-monthly-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     const assessment = await response.json() as GasHeatPumpMonthlyDraftAssessment;
     if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas monthly diagnostic: HTTP ${response.status}`);
@@ -1195,11 +1198,11 @@ export interface GasHeatPumpChainDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpChainDraftWithRust(input: GasHeatPumpChainDraftInput): Promise<GasHeatPumpChainDraftAssessment> {
-  if (isTauri()) return invoke<GasHeatPumpChainDraftAssessment>('diagnose_gas_heat_pump_chain_draft', { input });
+export async function diagnoseGasHeatPumpChainDraftWithRust(input: GasHeatPumpChainDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpChainDraftAssessment> {
+  if (isTauri()) return invoke<GasHeatPumpChainDraftAssessment>('diagnose_gas_heat_pump_chain_draft', { input, ...editionArgs(normVersion) });
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/gas-chain-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     const assessment = await response.json() as GasHeatPumpChainDraftAssessment;
     if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas chain diagnostic: HTTP ${response.status}`);
@@ -1238,11 +1241,11 @@ export interface GasCollectiveSourceDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasCollectiveSourceDraftWithRust(input: GasCollectiveSourceDraftInput): Promise<GasCollectiveSourceDraftAssessment> {
-  if (isTauri()) return invoke<GasCollectiveSourceDraftAssessment>('diagnose_gas_collective_source_draft', { input });
+export async function diagnoseGasCollectiveSourceDraftWithRust(input: GasCollectiveSourceDraftInput, normVersion?: NormVersion | null): Promise<GasCollectiveSourceDraftAssessment> {
+  if (isTauri()) return invoke<GasCollectiveSourceDraftAssessment>('diagnose_gas_collective_source_draft', { input, ...editionArgs(normVersion) });
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/gas-collective-source-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     const assessment = await response.json() as GasCollectiveSourceDraftAssessment;
     if (!response.ok && assessment.status !== 'invalid') throw new Error(`Gas collective source diagnostic: HTTP ${response.status}`);
@@ -1349,15 +1352,16 @@ export interface ForfaitHeatPumpMonthlyDraftAssessment {
 
 export async function diagnoseForfaitHeatPumpMonthlyDraftWithRust(
   input: ForfaitHeatPumpMonthlyDraftInput,
+  normVersion?: NormVersion | null,
 ): Promise<ForfaitHeatPumpMonthlyDraftAssessment> {
   if (isTauri()) {
-    return invoke<ForfaitHeatPumpMonthlyDraftAssessment>('diagnose_forfait_heat_pump_monthly_draft', { input });
+    return invoke<ForfaitHeatPumpMonthlyDraftAssessment>('diagnose_forfait_heat_pump_monthly_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/forfait-monthly-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<ForfaitHeatPumpMonthlyDraftAssessment>;
   }
@@ -1412,13 +1416,14 @@ export interface GeneratorDispatchDraftAssessment {
 
 export async function diagnoseGeneratorDispatchDraftWithRust(
   input: GeneratorDispatchDraftInput,
+  normVersion?: NormVersion | null,
 ): Promise<GeneratorDispatchDraftAssessment> {
   if (isTauri()) {
-    return invoke<GeneratorDispatchDraftAssessment>('diagnose_generator_dispatch_draft', { input });
+    return invoke<GeneratorDispatchDraftAssessment>('diagnose_generator_dispatch_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heating/generator-dispatch-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<GeneratorDispatchDraftAssessment>;
   }
@@ -1461,11 +1466,11 @@ export interface BoilerForfaitMonthlyDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseBoilerForfaitDraftWithRust(input: BoilerForfaitDraftInput): Promise<BoilerForfaitDraftAssessment> {
-  if (isTauri()) return invoke<BoilerForfaitDraftAssessment>('diagnose_boiler_forfait_draft', { input });
+export async function diagnoseBoilerForfaitDraftWithRust(input: BoilerForfaitDraftInput, normVersion?: NormVersion | null): Promise<BoilerForfaitDraftAssessment> {
+  if (isTauri()) return invoke<BoilerForfaitDraftAssessment>('diagnose_boiler_forfait_draft', { input, ...editionArgs(normVersion) });
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/boilers/forfait-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<BoilerForfaitDraftAssessment>;
   }
@@ -1503,13 +1508,14 @@ export interface HybridHeatPumpMonthlyDraftAssessment {
 
 export async function diagnoseHybridHeatPumpMonthlyDraftWithRust(
   input: HybridHeatPumpMonthlyDraftInput,
+  normVersion?: NormVersion | null,
 ): Promise<HybridHeatPumpMonthlyDraftAssessment> {
   if (isTauri()) {
-    return invoke<HybridHeatPumpMonthlyDraftAssessment>('diagnose_hybrid_heat_pump_monthly_draft', { input });
+    return invoke<HybridHeatPumpMonthlyDraftAssessment>('diagnose_hybrid_heat_pump_monthly_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/hybrid-monthly-draft/diagnose', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<HybridHeatPumpMonthlyDraftAssessment>;
   }
@@ -1533,15 +1539,15 @@ export interface HeatingAuxMeasuredDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseHeatingAuxMeasuredDraftWithRust(input: HeatingAuxMeasuredDraftInput): Promise<HeatingAuxMeasuredDraftAssessment> {
+export async function diagnoseHeatingAuxMeasuredDraftWithRust(input: HeatingAuxMeasuredDraftInput, normVersion?: NormVersion | null): Promise<HeatingAuxMeasuredDraftAssessment> {
   if (isTauri()) {
-    return invoke<HeatingAuxMeasuredDraftAssessment>('diagnose_heating_aux_measured_draft', { input });
+    return invoke<HeatingAuxMeasuredDraftAssessment>('diagnose_heating_aux_measured_draft', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heat-pumps/heating-aux-measured-draft/diagnose', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<HeatingAuxMeasuredDraftAssessment>;
   }
@@ -2332,15 +2338,14 @@ export interface EnvelopeAssessment {
 
 /** Construction U/Rc values in `normVersion` (absent: the current edition). */
 export async function calculateConstructionsWithRust(input: EnvelopeInput, normVersion?: NormVersion | null): Promise<EnvelopeAssessment> {
-  const edition = normVersion && normVersion !== DEFAULT_NORM_VERSION ? normVersion : undefined;
   if (isTauri()) {
-    return invoke<EnvelopeAssessment>('calculate_constructions', { input, normVersion: edition });
+    return invoke<EnvelopeAssessment>('calculate_constructions', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/constructions/calculate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(edition ? { input, normVersion: edition } : { input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<EnvelopeAssessment>;
   }
@@ -2552,15 +2557,15 @@ export interface VentilationAssessment {
   referenceVerified: false;
 }
 
-export async function calculateVentilationWithRust(input: VentilationInput): Promise<VentilationAssessment> {
+export async function calculateVentilationWithRust(input: VentilationInput, normVersion?: NormVersion | null): Promise<VentilationAssessment> {
   if (isTauri()) {
-    return invoke<VentilationAssessment>('calculate_ventilation', { input });
+    return invoke<VentilationAssessment>('calculate_ventilation', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/ventilation/calculate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<VentilationAssessment>;
   }
@@ -3098,15 +3103,15 @@ export async function assessUtilitySurveyWithRust(survey: UtilitySurvey): Promis
   throw new Error('Rust basic survey is available in the desktop app and local development server.');
 }
 
-export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
+export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput, normVersion?: NormVersion | null): Promise<SpaceHeatingChainAssessment> {
   if (isTauri()) {
-    return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input });
+    return invoke<SpaceHeatingChainAssessment>('calculate_space_heating_chain', { input, ...editionArgs(normVersion) });
   }
   if (import.meta.env.DEV) {
     const response = await fetch('/api/v1/nta8800/heating/space-heating-chain/calculate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, ...editionArgs(normVersion) }),
     });
     return response.json() as Promise<SpaceHeatingChainAssessment>;
   }
@@ -4270,6 +4275,15 @@ export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
 export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
 /** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
 export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024', '2023', '2022', '2020+A1'];
+
+/**
+ * The `normVersion` member of a diagnostic call (desktop command or HTTP
+ * body): the kernel runs it with that edition active. The current edition
+ * is the absent one.
+ */
+export function editionArgs(normVersion?: NormVersion | null): { normVersion?: NormVersion } {
+  return normVersion && normVersion !== DEFAULT_NORM_VERSION ? { normVersion } : {};
+}
 
 export interface NtaCalculationInput {
   /** Edition to calculate in; older editions give `calculated_legacy_edition`, never registrable. */

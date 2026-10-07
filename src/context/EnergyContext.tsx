@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import type { NormVersion } from '../core/nta/KernelClient';
 import {
   IProject,
   IZone,
@@ -1070,6 +1071,11 @@ export function useEnergy() {
     throw new Error('useEnergy must be used within an EnergyProvider with an active document');
   }
   return context;
+}
+
+/** The project's NTA 8800 edition (`ntaCalculation.normVersion`); null outside a document or for the current one. */
+export function useProjectEdition(): NormVersion | null {
+  return useContext(EnergyContext)?.state.project.ntaCalculation?.normVersion ?? null;
 }
 
 export function useDocumentManager() {

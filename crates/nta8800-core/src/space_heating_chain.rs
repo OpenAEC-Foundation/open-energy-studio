@@ -2212,12 +2212,22 @@ pub fn other_generator_auxiliary_kwh(
 }
 
 /// 9.85 with the forfait constants for an individual electric heat pump.
-pub fn heat_pump_forfait_auxiliary_kwh(electricity_kwh: f64) -> f64 {
-    if !crate::norm_versions::profile().heat_pump_aux_constants {
+/// `installation_year` only matters under NTA 8800:2020+A1.
+pub fn heat_pump_forfait_auxiliary_kwh(
+    electricity_kwh: f64,
+    installation_year: Option<u16>,
+) -> f64 {
+    let profile = crate::norm_versions::profile();
+    if !profile.heat_pump_aux_constants {
         // NTA 8800:2020+A1 9.6.8.1.1.2.1 (p. 334–336): heat pumps take the
-        // device forfait A 87,6 kWh (build year not given: "voor 2015 of
-        // onbekend"), B 0,132 kW, C 1,44/3,6 and B_nom 24 kW.
-        return 87.6 / 12.0 + 0.132 * electricity_kwh / (1.44 / 3.6 * 24.0);
+        // device forfait A 87,6 kWh for a build year before 2015 or unknown,
+        // 13,0 kWh from 2015, B 0,132 kW, C 1,44/3,6 and B_nom 24 kW.
+        let annual_fixed = if installation_year.is_some_and(|year| year >= 2015) {
+            profile.device_aux_a_from_2015_kwh
+        } else {
+            87.6
+        };
+        return annual_fixed / 12.0 + 0.132 * electricity_kwh / (1.44 / 3.6 * 24.0);
     }
     HEAT_PUMP_AUX_A_KWH / 12.0
         + HEAT_PUMP_AUX_B_KW * electricity_kwh / (HEAT_PUMP_AUX_C * HEAT_PUMP_AUX_B_NOM_KW)
@@ -4677,7 +4687,12 @@ fn generate(
                 Some(
                     electricity
                         .iter()
-                        .map(|(_, kwh)| heat_pump_forfait_auxiliary_kwh(*kwh))
+                        .map(|(_, kwh)| {
+                            heat_pump_forfait_auxiliary_kwh(
+                                *kwh,
+                                generator.forfait.installation_year,
+                            )
+                        })
                         .collect(),
                 )
             };
@@ -4734,6 +4749,7 @@ fn generate(
                             .map_or(0.0, |item| item.electricity_kwh),
                         None => heat_pump_forfait_auxiliary_kwh(
                             pump_month.generator_input_electricity_kwh,
+                            generator.forfait.installation_year,
                         ),
                     };
                     row.auxiliary_electricity_kwh = boiler_month
@@ -5254,6 +5270,8 @@ mod tests {
 
     fn heat_pump() -> ForfaitHeatPumpDraftInput {
         ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: TableScope::ResidentialAtMost25Kw,
@@ -5804,6 +5822,57 @@ mod tests {
         let jan = &result.monthly[0];
         assert!((jan.generator_electricity_kwh - jan.generator_output_kwh / cop).abs() < 1e-9);
         assert_eq!(result.annual_natural_gas_kwh, Some(0.0));
+    }
+
+    #[test]
+    fn heat_pump_build_year_sets_the_2020a1_device_forfait() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let run = |year: Option<u16>, version: NormVersion| {
+            let mut input = boiler_chain();
+            let mut forfait = heat_pump();
+            forfait.installation_year = year;
+            forfait.installation_year_reference = year.map(|_| "type plate".into());
+            input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+                regeneration: None,
+                forfait,
+                source_system: SourceSystem::Individual,
+                source_system_reference: "own outdoor unit".into(),
+                auxiliary_measurements: None,
+                auxiliary: None,
+            });
+            let result = with_version(version, || assess_space_heating_chain(&input));
+            assert!(result.issues.is_empty(), "{:?}", result.issues);
+            result.monthly[0].auxiliary_electricity_kwh.unwrap()
+                - result.monthly[0].distribution_auxiliary_electricity_kwh
+        };
+        // 2020 p. 336: A 13,0 kWh from 2015 instead of 87,6 kWh per year.
+        let unknown = run(None, NormVersion::V2020A1);
+        let recent = run(Some(2016), NormVersion::V2020A1);
+        assert!((unknown - recent - (87.6 - 13.0) / 12.0).abs() < 1e-9);
+        assert!((run(Some(2014), NormVersion::V2020A1) - unknown).abs() < 1e-12);
+        // The heat-pump constants of 2022 and later have no build year.
+        assert!(
+            (run(Some(2016), NormVersion::V2022) - run(None, NormVersion::V2022)).abs() < 1e-12
+        );
+    }
+
+    #[test]
+    fn heat_pump_build_year_needs_a_reference() {
+        let mut forfait = heat_pump();
+        forfait.installation_year = Some(2016);
+        let codes = |input: &ForfaitHeatPumpDraftInput| {
+            crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(input)
+                .issues
+                .into_iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        assert!(codes(&forfait).contains(&"installation_year_reference_required"));
+        forfait.installation_year = Some(1800);
+        forfait.installation_year_reference = Some("type plate".into());
+        assert!(codes(&forfait).contains(&"installation_year_invalid"));
+        forfait.installation_year = None;
+        assert!(codes(&forfait).contains(&"installation_year_reference_without_year"));
     }
 
     fn annex_q_chain() -> SpaceHeatingChainInput {
@@ -7156,7 +7225,7 @@ mod tests {
         let jan = &result.monthly[0];
         let expected = 43.8 / 12.0 + 0.132 * jan.generator_electricity_kwh / (0.7 * 3.0);
         assert!((jan.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
-        assert!((heat_pump_forfait_auxiliary_kwh(0.0) - 3.65).abs() < 1e-12);
+        assert!((heat_pump_forfait_auxiliary_kwh(0.0, None) - 3.65).abs() < 1e-12);
 
         let Generator::HeatPumpForfait(generator) = &mut input.generator else {
             unreachable!()

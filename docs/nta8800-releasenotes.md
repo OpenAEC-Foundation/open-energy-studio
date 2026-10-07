@@ -20,6 +20,11 @@ De berekening voor bijlage AA (`activeCooling.capacity.calculation`) vul je nu i
 
 Het invoerformaat is ongewijzigd en bestaande projecten rekenen hetzelfde. Er zijn drie nieuwe meldcodes, die alleen het formulier gebruikt: `annex_aa_construction_year_required`, `annex_aa_room_id_required` en `annex_aa_room_id_duplicate`.
 
+## 7 oktober 2026 — bouwjaar warmtepomp en uitgave in de desktop-app
+
+- De forfaitaire warmtepomp (`forfait` van `heat_pump_forfait` en `hybrid_heat_pump`) heeft een optioneel `installationYear` met `installationYearReference`. Onder NTA 8800:2020+A1 geeft een bouwjaar vanaf 2015 in (9.85) A = 13,0 kWh in plaats van 87,6 kWh (2020 p. 336). Andere uitgaven: geen verschil. Nieuwe meldingen zijn de bestaande codes `installation_year_invalid`, `installation_year_reference_required` en `installation_year_reference_without_year`.
+- Alle NTA-opdrachten van de desktop-app nemen een optioneel `normVersion`, met dezelfde regels als de service (één implementatie in `nta8800_core::norm_versions::request`): onbekend → `invalid_norm_version`; een invoer met een eigen uitgave krijgt de gevraagde uitgave en mag die niet tegenspreken (`norm_version_conflict`); diagnoses rekenen met de uitgave actief; het resultaat krijgt `normVersion`, `targetNormVersion` en in een oudere uitgave `calculated_legacy_edition`. De diagnosepanelen en de constructie-editor sturen de uitgave van het project mee. Resultaten in 2025+C1 zijn ongewijzigd.
+
 ## 6 oktober 2026 — NTA 8800:2020+A1
 
 De uitgave `"2020+A1"` rekent nu (eerder `edition_not_implemented`). Het profiel is cumulatief op 2022, plus de punten 68–79 in docs/nta8800-normversies.md:

@@ -22,7 +22,7 @@ Elke ingang van de kern rekent in een gekozen uitgave en zet die op de uitkomst 
 | Basisopname woning/utiliteit (`assess_residential_survey`, `assess_utility_survey`) | `normVersion` van de opname; de app neemt de uitgave van het project | `calculated_legacy_edition`, waarschuwing `survey_protocol_edition_differs` |
 | Maatwerkadvies (`assess_maatwerkadvies`) | de basissituatie: `ntaCalculation.normVersion` van het project of `normVersion` van de gebouwinvoer | `calculated_legacy_edition` als alle varianten rekenen; een maatregel die de uitgave wijzigt, is ongeldig (`measure_changes_norm_version`) |
 | Herlabelen (`assess_relabel`) | `ntaCalculation.normVersion` van het **oorspronkelijke** project | een andere uitgave in het huidige project is *niet toegestaan* (6b-achtig, eigen cluster) |
-| Constructies en diagnoses (API, MCP; constructies ook in de desktop-app) | verzoeklid `normVersion`; de kern rekent met die uitgave actief | `calculated_unverified` wordt `calculated_legacy_edition` |
+| Constructies en diagnoses (API, MCP en desktop-app) | verzoeklid `normVersion`; de kern rekent met die uitgave actief. De diagnosepanelen en de constructie-editor sturen de uitgave van het project mee | `calculated_unverified` wordt `calculated_legacy_edition` |
 | Referentiegevallen | het geval zelf (alleen 2025+C1) | `normVersion` ≠ `2025+C1` geeft `norm_version_not_applicable` |
 | Label-invoer-hash | — (hangt niet van de uitgave af) | ongewijzigd |
 
@@ -170,7 +170,7 @@ Het profiel van 2020+A1 is cumulatief op 2022: alles waarin 2022 van 2023 versch
 | 78 | (13.148a) debiet uit een kwaliteitsverklaring | bestaat niet (p. 590) | p. 594 | `declaredFlowM3PerH` → `route_not_in_edition`; de eis uit opmerking 3 vervalt |
 | 79 | (11.106a) koudeterugwinning met 100 % bypass | bestaat niet (p. 476) | p. 479 | `bypass.coldRecoveryEvidence` → `route_not_in_edition` |
 
-**Interpretatie bij punt 74.** De warmtepompinvoer van de kern heeft geen bouwjaar. Onder 2020+A1 krijgt een warmtepomp daarom A = 87,6 kWh ("vóór 2015 of onbekend"). Een gasketel met `installationYear` vanaf 2015 krijgt 13,0 kWh.
+**Punt 74, bouwjaar warmtepomp.** De forfaitaire warmtepompinvoer heeft een optioneel `installationYear` met `installationYearReference` (dezelfde controles als bij de gasketel: 1900–2026, bron verplicht). Onder 2020+A1 geeft een bouwjaar vanaf 2015 A = 13,0 kWh, anders of zonder bouwjaar A = 87,6 kWh ("vóór 2015 of onbekend", 2020 p. 336). Vanaf 2022 hebben warmtepompen eigen constanten zonder bouwjaar (2022 p. 338; 2025+C1 p. 360); daar verandert het bouwjaar niets. Het formulier vraagt het bouwjaar alleen onder 2020+A1 en biedt een achtergebleven waarde onder een andere uitgave ter verwijdering aan. Een gasketel met `installationYear` vanaf 2015 krijgt onder 2020+A1 13,0 kWh.
 
 **Niet omgeschakeld (geen invoer of geen route in de kern):**
 - de indicator E_wePRenTot (2022 p. 72) bestaat in 2020+A1 niet; de kern geeft hem alleen in het hoofdstuk-5-blok van 2025+C1, dat in oudere uitgaven `null` is;

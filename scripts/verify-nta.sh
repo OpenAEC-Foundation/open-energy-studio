@@ -44,6 +44,9 @@ fi
 step "Tauri check"
 cargo check --locked --manifest-path src-tauri/Cargo.toml --quiet
 
+step "Tauri command tests"
+cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --quiet
+
 step "TypeScript"
 npx tsc --noEmit
 

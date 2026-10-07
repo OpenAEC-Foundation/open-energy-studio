@@ -126,4 +126,21 @@ describe('NTA 8800 editions', () => {
     expect(screen.queryByLabelText(illuminance)).toBeNull();
     expect(screen.getAllByText(/only the 2022 and 2020\+A1 editions have this input/)).toHaveLength(3);
   });
+
+  it('offers the heat-pump build year only for the 2020+A1 edition and flags a value left behind', () => {
+    const project = createDefaultProject();
+    const initial = {
+      calculationScope: 'residential',
+      generator: { kind: 'heat_pump_forfait', forfait: { generatorId: 'hp', installationYear: 2016, installationYearReference: 'type plate' } },
+    };
+    const year = 'Heat-pump build year (NTA 8800:2020+A1 formula 9.85: A = 13.0 kWh from 2015, otherwise 87.6 kWh)';
+    const { unmount } = renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ ...initial, normVersion: '2020+A1' } as never} onSave={() => undefined} onCancel={() => undefined} />);
+    expect((screen.getByLabelText(year) as HTMLInputElement).value).toBe('2016');
+    unmount();
+    renderWithProviders(<NtaCalculationForm project={project}
+      initial={{ ...initial, normVersion: '2022' } as never} onSave={() => undefined} onCancel={() => undefined} />);
+    expect(screen.queryByLabelText(year)).toBeNull();
+    expect(screen.getByText(/only the 2020\+A1 edition uses this input/)).toBeInTheDocument();
+  });
 });
