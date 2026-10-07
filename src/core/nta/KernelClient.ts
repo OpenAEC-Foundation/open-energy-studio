@@ -4304,6 +4304,8 @@ export interface NtaCalculationInput {
   };
   /** Annex A dynamic transparent elements per project window id. */
   dynamicWindows?: Array<{ windowId: string; dynamic: NtaDynamicTransparent }>;
+  /** External obstruction per project window; others keep `windowSolar.obstruction`. */
+  windowObstructions?: Array<{ windowId: string; obstruction: NtaObstruction; sourceReference: string }>;
   groundFloors: Array<{
     surfaceId: string;
     exposedPerimeterM: number;

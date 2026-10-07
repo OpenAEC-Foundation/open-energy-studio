@@ -883,11 +883,13 @@ export function CoolingPerformanceFields({ draft, change, base }: SectionProps &
   </>;
 }
 
-/** §17.3 window obstruction situations a–g (`windowSolar.obstruction`). */
-export function WindowObstructionFields({ draft, change }: SectionProps) {
+/**
+ * §17.3 window obstruction situations a–g, at `windowSolar.obstruction` or
+ * at one entry of `windowObstructions`.
+ */
+export function WindowObstructionFields({ draft, change, base = ['windowSolar', 'obstruction'] }: SectionProps & { base?: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
-  const base: Path = ['windowSolar', 'obstruction'];
   const method = read(draft, [...base, 'method']);
   return <>
     <SelectField {...field} path={[...base, 'method']} label={t('nta.form.obstruction')} options={[
