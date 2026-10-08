@@ -24,6 +24,16 @@ Twee nieuwe invoerroutes. Projecten zonder deze invoer rekenen precies als voorh
   - A: BENG 2 35,15 → 34,37 (2025+C1) en 36,06 → 35,29 (2020+A1).
   - G: 65,67 / 30,89 / 71,8 → 65,42 / 29,71 / 72,1; het rapport geeft 64,52 / 29,44 / 70,6.
 
+### 9 oktober 2026 — numerieke fuzz van de projectinvoer; rendementen die op 0 afronden, c_source buiten bijlage V en onmogelijke fabricagejaren geweigerd
+
+Invoer die eerder rekende of als niet-eindig resultaat werd geweigerd, krijgt nu een invoergat met een eigen code. Bestaande projecten met geldige invoer rekenen hetzelfde.
+
+- **Gedeclareerd tapwaterrendement onder één afrondingsstap.** §13.8.4.7.2 (p. 640) rondt een gedeclareerde waarde naar beneden af op 0,05 (elektrisch) of 0,025 (gas). Een warmtepomp met een gedeclareerde waarde onder 0,05 kwam zo op 0 uit; de energie-inzet deelde door nul en het project werd geweigerd met `non_finite_result`. Nu volgt `hot_water_efficiency_invalid` op `hotWater.generator.declared.value` (warmtepomp onder 0,05; gastoestel en indirect verwarmd toestel onder 0,025). Elke opwekker die op een rendement van 0 uitkomt (ook de meetroute volgens NEN-EN 16147) wordt geweigerd in plaats van door te rekenen.
+- **Gedeclareerd opwekkingsrendement van een warmtepomp voor verwarming** onder 0,05 rondt (§9.1, p. 285) ook op 0 af. Het gaf de misleidende melding `cop_overflow` op de bronfactor; nu `heat_pump_declared_efficiency_invalid` op `qualityDeclaration.generationEfficiency`.
+- **Bronfactor c_source** van een elektrische warmtepomp op bodem of grondwater: bijlage V (tabel V.1, p. 1114) kent alleen 1,00, 1,02 en 1,04. Elke andere positieve waarde werd aanvaard (ook 10¹²); nu `source_correction_invalid`, zoals al bij tapwater en de gasabsorptiewarmtepomp.
+- **Fabricagejaar** van ventilatoren (tabel 11.23, p. 519, en tabel 11.20) en van de warmteterugwinunit: een jaar buiten 1900–2100 (bijvoorbeeld −1) koos stilzwijgend de oudste rij. Nu `manufacture_year_invalid`; leeg blijft "onbekend". De tekst van `installation_year_invalid` noemt nu ook de grens 2100 in plaats van 2026.
+- **Nieuwe test `crates/nta8800-core/tests/numeric_fuzz.rs`** naast de optiedekking. Elk getal in de voorbeeldprojecten en de openbare gevallen A–H (1 724 getallen op 117 posities) krijgt randwaarden: 0, −0, −1, de tegengestelde waarde, 10⁻¹², 10¹², 10³⁰⁰, een breuk voor een geheel getal en de randen die de naam aangeeft (jaar, fractie, hoek, temperatuur). Daarnaast 200 vaste willekeurige combinaties (factor 0,5–2) en monotonie: hogere U of infiltratie of lagere Rc verlaagt de warmtebehoefte nooit. Elke berekening rekent plausibel (behoefte niet negatief, aandeel hernieuwbaar volgens (5.3)) of weigert met een benoemde code en een invoergat met route; samen 7 689 berekeningen in vijf uitgaven.
+
 ### 9 oktober 2026 — invoergaten van geweigerde routes per zone, raam en systeem; strengere controle van de releasenotes (geen rekenwijziging)
 
 Uitkomsten, status en meldcodes veranderen niet; alleen het pad van een invoergat en de controles rond de vrijgave.

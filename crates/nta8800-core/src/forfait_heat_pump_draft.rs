@@ -574,10 +574,13 @@ pub fn assess_forfait_heat_pump_draft(
                 TableSource::Ground | TableSource::GroundwaterBelow15C
             );
         if correction_required {
-            if input
-                .source_correction_factor
-                .map_or(true, |value| !value.is_finite() || value <= 0.0)
-            {
+            // Bijlage V (tables V.1/V.3, 2025+C1 p. 1114): c_source is 1,00,
+            // 1,02 or 1,04; any other value is no annex V outcome.
+            if input.source_correction_factor.map_or(true, |value| {
+                ![1.00, 1.02, 1.04]
+                    .iter()
+                    .any(|allowed| (value - allowed).abs() < 1e-9)
+            }) {
                 issues.push(issue("source_correction_invalid", "sourceCorrectionFactor"));
             }
             if input
@@ -612,8 +615,10 @@ pub fn assess_forfait_heat_pump_draft(
                         "qualityDeclaration.declarationReference",
                     ));
                 }
+                // Rounded down to a multiple of 0,05 below (§9.1): a value
+                // under one step would become 0.
                 if !declaration.generation_efficiency.is_finite()
-                    || declaration.generation_efficiency <= 0.0
+                    || declaration.generation_efficiency < 0.05
                     || declaration.generation_efficiency > 15.0
                 {
                     issues.push(issue(
@@ -1075,6 +1080,61 @@ mod tests {
         assert!(assess_forfait_heat_pump_draft(&input)
             .corrected_cop
             .is_none());
+        // Bijlage V (p. 1114): only 1,00, 1,02 and 1,04 are annex V outcomes.
+        let codes = |input: &ForfaitHeatPumpDraftInput| -> Vec<String> {
+            assess_forfait_heat_pump_draft(input)
+                .issues
+                .into_iter()
+                .map(|item| item.code.to_string())
+                .collect()
+        };
+        for invalid in [1.1, 1.03, 0.5, 1e12] {
+            input.source_correction_factor = Some(invalid);
+            assert!(
+                codes(&input).contains(&"source_correction_invalid".to_string()),
+                "{invalid}"
+            );
+        }
+        input.source_correction_factor = Some(1.02);
+        assert!(
+            (assess_forfait_heat_pump_draft(&input)
+                .corrected_cop
+                .unwrap()
+                - 4.08)
+                .abs()
+                < 1e-9
+        );
+    }
+
+    /// §9.1 (p. 285) rounds a declared value down to 0,05: a value under one
+    /// step would become 0 and is refused.
+    #[test]
+    fn declared_efficiency_below_one_rounding_step_is_refused() {
+        let mut input = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            35.0,
+        );
+        let declare = |input: &mut ForfaitHeatPumpDraftInput, value: f64| {
+            input.quality_declaration = Some(HeatPumpQualityDeclaration {
+                declaration_reference: "BCRG 0000/03".into(),
+                generation_efficiency: value,
+                energy_fraction: None,
+                auxiliary_kwh_per_year: None,
+            });
+        };
+        declare(&mut input, 0.04);
+        let result = assess_forfait_heat_pump_draft(&input);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "heat_pump_declared_efficiency_invalid"));
+        assert!(result.corrected_cop.is_none());
+        declare(&mut input, 0.05);
+        assert_eq!(
+            assess_forfait_heat_pump_draft(&input).corrected_cop,
+            Some(0.05)
+        );
     }
 
     #[test]

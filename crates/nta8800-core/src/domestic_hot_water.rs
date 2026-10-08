@@ -2577,7 +2577,9 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
         HotWaterGenerator::GasAppliance { declared, .. }
         | HotWaterGenerator::IndirectBoiler { declared, .. } => {
             if let Some(item) = declared {
-                if !positive(item.value) || item.value > 1.2 {
+                // Rounded down to a multiple of 0,025 (§13.8.4.7.2): below one
+                // step the value would become 0.
+                if !positive(item.value) || item.value < 0.025 || item.value > 1.2 {
                     issues.push((
                         "hot_water_efficiency_invalid",
                         format!("{prefix}.declared.value"),
@@ -2600,7 +2602,9 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
             ..
         } => {
             if let Some(item) = declared {
-                if !positive(item.value) || item.value > 10.0 {
+                // Rounded down to a multiple of 0,05 (§13.8.4.7.2): below one
+                // step the value would become 0.
+                if !positive(item.value) || item.value < 0.05 || item.value > 10.0 {
                     issues.push((
                         "hot_water_efficiency_invalid",
                         format!("{prefix}.declared.value"),
@@ -2823,7 +2827,24 @@ fn emission_efficiency(system: &HotWaterSystem) -> f64 {
 
 /// Generation efficiency (before `f_prac`), `f_prac`, and an issue code when
 /// the generator cannot serve the annual demand.
+///
+/// The measured and declared routes round their value down (to 0,025 for gas,
+/// 0,05 for electric, §13.8.4.7.2); a value below one step rounds to 0, which
+/// no generator can have and which would divide the carrier input by zero.
+/// Such an efficiency is refused with `hot_water_efficiency_invalid`.
 fn generation(
+    generator: &HotWaterGenerator,
+    annual_output_kwh: f64,
+) -> Result<(f64, f64), &'static str> {
+    let (efficiency, practical) = generation_values(generator, annual_output_kwh)?;
+    if efficiency > 0.0 && efficiency.is_finite() && practical > 0.0 {
+        Ok((efficiency, practical))
+    } else {
+        Err("hot_water_efficiency_invalid")
+    }
+}
+
+fn generation_values(
     generator: &HotWaterGenerator,
     annual_output_kwh: f64,
 ) -> Result<(f64, f64), &'static str> {
@@ -6320,5 +6341,52 @@ mod tests {
         assert!((practical - 0.95).abs() < 1e-12);
         let (classed, _) = generation(&declared(Some(ApplicationClass::Class4)), 2067.0).unwrap();
         assert!(classed < plain);
+    }
+
+    /// §13.8.4.7.2 (p. 640) rounds a declared value down to 0,05 (electric)
+    /// or 0,025 (gas). A value below one step would become 0 and divide the
+    /// carrier input by zero; it is refused, and `generation` never hands
+    /// out a zero efficiency.
+    #[test]
+    fn declared_value_below_one_rounding_step_is_refused() {
+        let heat_pump = |value: f64| HotWaterGenerator::HeatPump {
+            exhaust_air_source: false,
+            source_correction: None,
+            measured_class: None,
+            outdoor_air_fraction: None,
+            same_ground_source: false,
+            declared: Some(DeclaredEfficiency {
+                value,
+                source_reference: "BCRG 0000/01".into(),
+            }),
+        };
+        let codes = |generator: &HotWaterGenerator| -> Vec<&'static str> {
+            generator_issues(generator, "hotWater.generator")
+                .into_iter()
+                .map(|(code, _)| code)
+                .collect()
+        };
+        assert!(codes(&heat_pump(0.04)).contains(&"hot_water_efficiency_invalid"));
+        assert!(!codes(&heat_pump(0.05)).contains(&"hot_water_efficiency_invalid"));
+        assert_eq!(
+            generation(&heat_pump(1e-12), 2067.0),
+            Err("hot_water_efficiency_invalid")
+        );
+        let indirect = |value: f64| HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: Some(DeclaredEfficiency {
+                value,
+                source_reference: "BCRG 0000/02".into(),
+            }),
+            pilot_flame: false,
+        };
+        assert!(codes(&indirect(0.02)).contains(&"hot_water_efficiency_invalid"));
+        assert_eq!(
+            generation(&indirect(0.02), 2067.0),
+            Err("hot_water_efficiency_invalid")
+        );
     }
 }
