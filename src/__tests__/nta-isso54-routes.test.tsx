@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import type { IProject } from '../core/energy/types';
@@ -22,7 +22,7 @@ const project = {
   heatingSystems: [], ventilationSystems: [], coolingSystems: [], hotWaterSystems: [], solarPV: [], solarThermal: [], constructions: [],
 } as unknown as IProject;
 
-function Harness({ initial = {}, children }: { initial?: Draft; children: (draft: Draft, change: (path: Path, value: unknown) => void) => JSX.Element }) {
+function Harness({ initial = {}, children }: { initial?: Draft; children: (draft: Draft, change: (path: Path, value: unknown) => void) => ReactElement }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const change = (path: Path, value: unknown) => setDraft((current) => write(current, path, value));
   return <form aria-label="test">
