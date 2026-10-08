@@ -1572,6 +1572,9 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             current,
             manufacture_year,
         } => {
+            if !manufacture_year_valid(*manufacture_year) {
+                issues.push(issue("manufacture_year_invalid", "fans.manufactureYear"));
+            }
             if *current == FanCurrent::Ac && manufacture_year.is_some_and(|y| y > 2006) {
                 issues.push(issue("forfait_fan_ac_after_2006_unsupported", "fans"));
             }
@@ -1603,6 +1606,17 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
                         "fan_power_invalid",
                         format!("fans.fans[{index}].power"),
                     ));
+                }
+                if let FanPower::Motor {
+                    manufacture_year, ..
+                } = &fan.power
+                {
+                    if !manufacture_year_valid(*manufacture_year) {
+                        issues.push(issue(
+                            "manufacture_year_invalid",
+                            format!("fans.fans[{index}].power.manufactureYear"),
+                        ));
+                    }
                 }
             }
             if !(*building_share > 0.0 && *building_share <= 1.0) {
@@ -1638,6 +1652,16 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
     issues
 }
 
+/// A manufacture year picks a row of tables 11.20 (motor efficiency), 11.23
+/// (forfait fan power) and the heat-recovery rule of 11.2.6; a year outside
+/// 1900 to `LATEST_PLAUSIBLE_YEAR` is no real appliance and would silently
+/// take the oldest or newest row. Absent means unknown.
+fn manufacture_year_valid(year: Option<i32>) -> bool {
+    year.map_or(true, |year| {
+        (1900..=i32::from(crate::LATEST_PLAUSIBLE_YEAR)).contains(&year)
+    })
+}
+
 fn validate_unit(
     unit: &SystemUnit,
     path: &str,
@@ -1663,6 +1687,12 @@ fn validate_unit(
             issues.push(issue(
                 "heat_recovery_requires_balanced_ventilation",
                 rpath.clone(),
+            ));
+        }
+        if !manufacture_year_valid(recovery.manufacture_year) {
+            issues.push(issue(
+                "manufacture_year_invalid",
+                format!("{rpath}.manufactureYear"),
             ));
         }
         match &recovery.efficiency {
@@ -3477,6 +3507,76 @@ mod tests {
 
     fn close(a: f64, b: f64, tolerance: f64) {
         assert!((a - b).abs() <= tolerance, "{a} vs {b}");
+    }
+
+    /// A manufacture year picks the row of table 11.23 (forfait fans, p. 519),
+    /// table 11.20 (motor efficiency) and the 2010 rule of the heat-recovery
+    /// unit; a year that no appliance can have (−1, 2101) is refused instead
+    /// of silently taking the oldest or newest row. Absent stays "unknown".
+    #[test]
+    fn manufacture_year_outside_1900_to_2100_is_refused() {
+        let codes = |input: &VentilationInput| -> Vec<(String, String)> {
+            validate_ventilation(input)
+                .into_iter()
+                .map(|item| (item.code.to_string(), item.path))
+                .collect()
+        };
+        let year = |input: &VentilationInput, path: &str| {
+            codes(input).contains(&("manufacture_year_invalid".to_string(), path.to_string()))
+        };
+        let mut input = dwelling(SystemVariant::D2);
+        for (value, refused) in [
+            (-1, true),
+            (1899, true),
+            (1900, false),
+            (2100, false),
+            (2101, true),
+        ] {
+            input.fans = Fans::Forfait {
+                current: FanCurrent::Dc,
+                manufacture_year: Some(value),
+            };
+            assert_eq!(year(&input, "fans.manufactureYear"), refused, "{value}");
+        }
+        input.fans = Fans::Forfait {
+            current: FanCurrent::Dc,
+            manufacture_year: None,
+        };
+        assert!(!year(&input, "fans.manufactureYear"));
+        input.fans = Fans::Declared {
+            fans: vec![Fan {
+                id: "f1".into(),
+                power: FanPower::Motor {
+                    motor_power_w: 50.0,
+                    manufacture_year: Some(-1),
+                    electrical_input_w: None,
+                },
+            }],
+            control: FanControl::ResidentialTable,
+            building_share: 1.0,
+            source_reference: "plate".into(),
+        };
+        assert!(year(&input, "fans.fans[0].power.manufactureYear"));
+        if let VentilationSystem::Single { unit } = &mut input.system {
+            unit.heat_recovery = Some(HeatRecovery {
+                efficiency: HeatRecoveryEfficiency::Table {
+                    exchanger: HeatExchanger::CounterFlowPlastic,
+                },
+                bypass: Bypass::Full {
+                    cold_recovery_evidence: None,
+                },
+                layout: UnitLayout::Central,
+                constant_volume_control: false,
+                supply_duct_length_m: None,
+                supply_duct_insulation: DuctInsulation::Insulated,
+                manufacture_year: Some(-1),
+                equipment_reference: "unit".into(),
+            });
+        }
+        assert!(codes(&input)
+            .iter()
+            .any(|(code, path)| code == "manufacture_year_invalid"
+                && path.ends_with("heatRecovery.manufactureYear")));
     }
 
     #[test]
