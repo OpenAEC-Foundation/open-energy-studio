@@ -1034,10 +1034,11 @@ mod tests {
         assert!(report.errors.is_empty(), "{}", report.errors[0].error);
         assert!(failing.is_empty(), "{failing:?}");
         assert!(report.numeric_comparison_passed);
-        assert_eq!(report.cases.len(), 21);
+        assert_eq!(report.cases.len(), 23);
         // Every edition the kernel calculates in is exercised.
         for edition in [
             "NTA 8800:2025+C1:2026",
+            "NTA 8800:2024 met INT-V1:2024",
             "NTA 8800:2023",
             "NTA 8800:2022",
             "NTA 8800:2020+A1:2020",
