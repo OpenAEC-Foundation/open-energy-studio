@@ -2394,6 +2394,8 @@ export interface VentilationSystemUnit {
     coolingCoil?: boolean;
   };
   equipmentReference: string;
+  /** f_ctrl from a kwaliteitsverklaring, replacing table 11.5 (not on the E.1 decentral part). */
+  declaredControlFactor?: { value: number; declarationReference: string } | null;
 }
 
 /** Chapter 11 input for one zone; see crates/nta8800-core/src/ventilation.rs. */
@@ -4315,6 +4317,8 @@ export interface NtaCalculationInput {
   dynamicWindows?: Array<{ windowId: string; dynamic: NtaDynamicTransparent }>;
   /** External obstruction per project window; others keep `windowSolar.obstruction`. */
   windowObstructions?: Array<{ windowId: string; obstruction: NtaObstruction; sourceReference: string }>;
+  /** Movable shading per project window (absent: none on that window); others keep `windowSolar.movableShading`. */
+  windowShadings?: Array<{ windowId: string; movableShading?: NtaMovableShading | null; sourceReference: string }>;
   groundFloors: Array<{
     surfaceId: string;
     exposedPerimeterM: number;
