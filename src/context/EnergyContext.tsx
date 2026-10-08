@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback, ReactNode } from 'react';
 import { normalizeProject } from '../core/energy/normalizeProject';
+import { applyWindowTypes, detachWindowType } from '../core/energy/windowTypes';
 import type { NormVersion } from '../core/nta/KernelClient';
 import {
   IProject,
@@ -9,7 +10,7 @@ import {
   IThermalBridge,
   IPointThermalBridge,
   IAirTightness,
-  IConstruction,
+  IConstruction, IWindowType,
   IHeatingSystem,
   IVentilationSystem,
   ICoolingSystem,
@@ -80,6 +81,9 @@ export type EnergyAction =
   // Air tightness (per zone)
   | { type: 'UPDATE_AIR_TIGHTNESS'; payload: { zoneId: string; airTightness: IAirTightness } }
   // Constructions
+  | { type: 'ADD_WINDOW_TYPE'; payload: IWindowType }
+  | { type: 'UPDATE_WINDOW_TYPE'; payload: { id: string; data: Partial<IWindowType> } }
+  | { type: 'DELETE_WINDOW_TYPE'; payload: string }
   | { type: 'ADD_CONSTRUCTION'; payload: IConstruction }
   | { type: 'UPDATE_CONSTRUCTION'; payload: { id: string; data: Partial<IConstruction> } }
   | { type: 'DELETE_CONSTRUCTION'; payload: string }
@@ -658,6 +662,21 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
     // ----------------------------------------------------------
     // Constructions
     // ----------------------------------------------------------
+
+    // Window types: a change of the type is written through to every window that refers to it.
+    case 'ADD_WINDOW_TYPE':
+      return { ...state, project: { ...state.project, windowTypes: [...(state.project.windowTypes ?? []), action.payload] }, isDirty: true };
+
+    case 'UPDATE_WINDOW_TYPE': {
+      const { id, data } = action.payload;
+      const windowTypes = (state.project.windowTypes ?? []).map((item) => (item.id === id ? withoutUndefined({ ...item, ...data }) : item));
+      return { ...state, project: applyWindowTypes({ ...state.project, windowTypes }, id), isDirty: true };
+    }
+
+    case 'DELETE_WINDOW_TYPE': {
+      const windowTypes = (state.project.windowTypes ?? []).filter((item) => item.id !== action.payload);
+      return { ...state, project: detachWindowType({ ...state.project, windowTypes }, action.payload), isDirty: true };
+    }
 
     case 'ADD_CONSTRUCTION':
       return {

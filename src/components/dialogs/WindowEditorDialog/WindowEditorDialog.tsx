@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IWindow, Orientation } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { resolveWindow } from '../../../core/energy/windowTypes';
 
 interface WindowEditorDialogProps {
   editId?: string | null;
@@ -41,6 +42,23 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
   const [uValue, setUValue] = useState(existingWindow?.uValue ?? 1.0);
   const [gValue, setGValue] = useState(existingWindow?.gValue ?? 0.5);
   const [orientation, setOrientation] = useState<Orientation>(existingWindow?.orientation ?? 'S');
+  const [typeId, setTypeId] = useState(existingWindow?.typeId ?? '');
+  const [count, setCount] = useState(existingWindow?.count ?? 1);
+  const windowTypes = project.windowTypes ?? [];
+  const type = windowTypes.find((item) => item.id === typeId);
+  const pickType = (id: string) => {
+    setTypeId(id);
+    const picked = windowTypes.find((item) => item.id === id);
+    if (!picked) return;
+    setUValue(picked.uValue);
+    setGValue(picked.gValue);
+    if (picked.unitArea != null) setArea(Number((count * picked.unitArea).toFixed(3)));
+  };
+  const pickCount = (value: number) => {
+    const next = Math.max(1, Math.round(value) || 1);
+    setCount(next);
+    if (type?.unitArea != null) setArea(Number((next * type.unitArea).toFixed(3)));
+  };
   const [zoneId, setZoneId] = useState(existingZoneId ?? (project.zones[0]?.id ?? ''));
   const [surfaceId, setSurfaceId] = useState(existingSurfaceId ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,11 +95,12 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
           zoneId: existingZoneId,
           surfaceId: existingSurfaceId,
           windowId: existingWindow.id,
-          data: { name, area, uValue, gValue, orientation },
+          data: { ...resolveWindow({ ...existingWindow, name, area, uValue, gValue, orientation, typeId: typeId || undefined, count: typeId ? count : undefined }, type),
+            typeId: typeId || undefined, count: typeId ? count : undefined },
         },
       });
     } else {
-      const window: IWindow = {
+      const window: IWindow = resolveWindow({
         id: crypto.randomUUID(),
         name,
         area,
@@ -89,7 +108,8 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
         gValue,
         orientation,
         surfaceId,
-      };
+        ...(typeId ? { typeId, count } : {}),
+      }, type);
       dispatch({ type: 'ADD_WINDOW', payload: { zoneId, surfaceId, window } });
     }
     onClose();
@@ -114,6 +134,20 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
           {errors.name && <span className="field-error-text">{errors.name}</span>}
         </div>
 
+        {windowTypes.length > 0 && <div className="dialog-field">
+          <label htmlFor={`${fieldId}-type`}>{t('dialog.window.type')}</label>
+          <select id={`${fieldId}-type`} value={typeId} onChange={(e) => pickType(e.target.value)}>
+            <option value="">{t('dialog.window.typeNone')}</option>
+            {windowTypes.map((item) => <option key={item.id} value={item.id}>{item.name} · U {item.uValue} · g {item.gValue}</option>)}
+          </select>
+          {type && <span className="dialog-hint">{t('dialog.window.typeHint')}</span>}
+        </div>}
+
+        {type && <div className="dialog-field">
+          <label htmlFor={`${fieldId}-count`}>{t('dialog.window.count')}</label>
+          <input id={`${fieldId}-count`} type="number" min={1} step={1} value={count} onChange={(e) => pickCount(parseFloat(e.target.value))} />
+        </div>}
+
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-2`}>{t('dialog.window.area')}</label>
           <input id={`${fieldId}-2`}
@@ -121,6 +155,7 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
             min={0}
             step={0.01}
             value={area}
+            disabled={type?.unitArea != null}
             onChange={(e) => setArea(parseFloat(e.target.value) || 0)}
           />
         </div>
@@ -132,6 +167,7 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
             min={0}
             step={0.01}
             value={uValue}
+            disabled={!!type}
             onChange={(e) => setUValue(parseFloat(e.target.value) || 0)}
           />
         </div>
@@ -144,6 +180,7 @@ export function WindowEditorDialog({ editId, onClose }: WindowEditorDialogProps)
             max={1}
             step={0.01}
             value={gValue}
+            disabled={!!type}
             onChange={(e) => setGValue(parseFloat(e.target.value) || 0)}
           />
         </div>

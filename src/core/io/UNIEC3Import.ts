@@ -20,7 +20,7 @@
  */
 import { strFromU8 } from 'fflate';
 import type {
-  CoolingSystemType, HeatingSystemType, HotWaterSystemType, IConstruction, IHeatingSystem, IProject, ISurface, IWindow, IZone,
+  CoolingSystemType, HeatingSystemType, HotWaterSystemType, IConstruction, IHeatingSystem, IProject, ISurface, IWindow, IWindowType, IZone,
   Orientation, ProjectImportRecord, SurfaceType, ThermalBoundary, VentilationType,
 } from '../energy/types';
 import type { NtaMovableShading, NtaObstruction, NtaShadeColour } from '../nta/KernelClient';
@@ -183,11 +183,20 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
     constructions.push(construction);
     constructionByGuid.set(lib.NTAEntityDataId, construction);
   }
-  const windowTypes = new Map(ofType('LIBCONSTRT').map((lib, index) => [lib.NTAEntityDataId, {
-    name: text(lib, 'LIBCONSTRT_OMSCHR') ?? `Kozijn ${index + 1}`,
-    door: text(lib, 'LIBCONSTRT_TYPE') === 'TRANSTYPE_DEUR',
-    u: number(lib, 'LIBCONSTRT_U'), g: number(lib, 'LIBCONSTRT_G'), unitArea: number(lib, 'LIBCONSTRT_AC'),
-  }]));
+  const windowTypeList: IWindowType[] = [];
+  const windowTypes = new Map(ofType('LIBCONSTRT').map((lib, index) => {
+    const typeName = text(lib, 'LIBCONSTRT_OMSCHR') ?? `Kozijn ${index + 1}`;
+    const u = number(lib, 'LIBCONSTRT_U');
+    const g = number(lib, 'LIBCONSTRT_G');
+    const unitArea = number(lib, 'LIBCONSTRT_AC');
+    if (u === undefined || g === undefined) note(`Kozijntype "${typeName}": U of g ontbreekt in het bestand; 1,5 / 0,5 ingevuld, aanvullen.`);
+    const type: IWindowType = {
+      id: `wt-${index + 1}`, name: typeName, kind: text(lib, 'LIBCONSTRT_TYPE') === 'TRANSTYPE_DEUR' ? 'door' : 'window',
+      uValue: u ?? 1.5, gValue: g ?? 0.5, ...(unitArea !== undefined ? { unitArea } : {}),
+    };
+    windowTypeList.push(type);
+    return [lib.NTAEntityDataId, type];
+  }));
 
   // ── Air tightness and height ──
   const infil = ofType('INFIL')[0];
@@ -249,9 +258,11 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
         const count = number(row, 'CONSTRT_AANT') ?? 1;
         const rowArea = number(row, 'CONSTRT_OPP') ?? (kind?.unitArea !== undefined ? round(kind.unitArea * count) : 0);
         if (!kind) note(`Vlak "${surfaceName}": kozijnrij zonder bekend kozijntype; U 1,5 en g 0,5 ingevuld, controleer.`);
-        const windowName = `${kind?.name ?? 'Kozijn'}${count > 1 ? ` ×${count}` : ''}${kind?.door ? ' (deur)' : ''}`;
-        if (count > 1) note(`Vlak "${surfaceName}": ${count} stuks "${kind?.name ?? 'kozijn'}" als één raam van ${rowArea} m² ingelezen.`);
-        windows.push({ id: windowId, name: windowName, area: rowArea, uValue: kind?.u ?? 1.5, gValue: kind?.g ?? 0.5, orientation: orientation ?? 'S', surfaceId });
+        const windowName = kind?.name ?? 'Kozijn';
+        windows.push({
+          id: windowId, name: windowName, area: rowArea, uValue: kind?.uValue ?? 1.5, gValue: kind?.gValue ?? 0.5, orientation: orientation ?? 'S', surfaceId,
+          ...(kind ? { typeId: kind.id, count } : {}),
+        });
         const obstruction = obstructionOf(text(row, 'CONSTRT_BESCH'));
         if (obstruction) obstructions.push({ windowId, obstruction });
         else if (text(row, 'CONSTRT_BESCH')) note(`Raam "${windowName}" op "${surfaceName}": beschaduwing ${text(row, 'CONSTRT_BESCH')} niet overgenomen; vul de belemmering in.`);
@@ -283,6 +294,7 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
   const project: IProject = {
     id: crypto.randomUUID(), name, description: '', buildingFunction: residential ? 'residential' : 'other', address: '', city: '',
     zones, heatingSystems: [], ventilationSystems: [], coolingSystems: [], hotWaterSystems: [], ntaHeatPumps: [], solarPV: [], solarThermal: [], constructions,
+    ...(windowTypeList.length > 0 ? { windowTypes: windowTypeList } : {}),
   };
   for (const installation of ofType('INSTALLATIE')) {
     const kind = text(installation, 'INSTALL_TYPE') ?? '';

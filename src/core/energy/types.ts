@@ -62,11 +62,26 @@ export interface IConstruction {
 export interface IWindow {
   id: string;
   name: string;
-  area: number;           // m²
-  uValue: number;         // W/(m²·K)  (Uw)
-  gValue: number;         // ZTA / g-value  (-)
+  area: number;           // m²  (resolved: count × unitArea when the type gives one)
+  uValue: number;         // W/(m²·K)  (Uw; from the type when typeId is set)
+  gValue: number;         // ZTA / g-value  (-; from the type when typeId is set)
   orientation: Orientation;
   surfaceId: string;      // parent surface
+  /** Window type this window refers to (src/core/energy/windowTypes.ts); absent: own values. */
+  typeId?: string;
+  /** Number of identical units of the type on this surface. */
+  count?: number;
+}
+
+/** A named window, door or panel type (kozijntype): U, g and an area per unit; windows refer to it. */
+export interface IWindowType {
+  id: string;
+  name: string;
+  kind: 'window' | 'door' | 'panel';
+  uValue: number;         // W/(m²·K)
+  gValue: number;         // (-)
+  /** Area of one unit, m²; a window with a count takes count × unitArea. */
+  unitArea?: number;
 }
 
 // ------------------------------------------------------------
@@ -348,6 +363,8 @@ export interface IProject {
   solarPV: ISolarPV[];
   solarThermal: ISolarThermal[];
   constructions: IConstruction[];
+  /** Window types (kozijntypen) the windows refer to; absent in older projects. */
+  windowTypes?: IWindowType[];
   /** NTA 8800 inputs the legacy model does not hold, each with a source reference. */
   ntaCalculation?: NtaCalculationInput;
   /** Registration data of the EP report (BRL 9500 §4.2.5); part of the input fingerprint. */

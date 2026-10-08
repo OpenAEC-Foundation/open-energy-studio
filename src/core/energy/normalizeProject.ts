@@ -82,8 +82,15 @@ export function normalizeProject(project: IProject): IProject {
     const layers = list(construction.layers, `constructions[${index}].layers`);
     return layers === construction.layers ? construction : { ...construction, layers };
   });
+  const windowTypes = raw.windowTypes === undefined ? undefined : list(raw.windowTypes, 'windowTypes').map((type, index) => {
+    nonNegative(type.uValue, `windowTypes[${index}].uValue`);
+    nonNegative(type.gValue, `windowTypes[${index}].gValue`);
+    nonNegative(type.unitArea, `windowTypes[${index}].unitArea`);
+    return type;
+  });
   const normalized: IProject = {
     ...project,
+    ...(windowTypes !== undefined && windowTypes !== raw.windowTypes ? { windowTypes } : {}),
     name: text(raw.name, 'name'),
     description: text(raw.description, 'description'),
     address: text(raw.address, 'address'),

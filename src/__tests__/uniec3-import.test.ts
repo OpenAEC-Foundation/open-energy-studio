@@ -66,12 +66,15 @@ describe('Uniec3 export import', () => {
     expect(windows).toHaveLength(10);
     const west = byName('Gevel West').windows;
     expect(west.map((window) => [window.name, window.area, window.uValue, window.gValue])).toEqual([
-      ['A', 1.8, 1, 0.4], ['B', 4.69, 0.88, 0.4], ['I (deur)', 2.45, 1.5, 0],
+      ['A', 1.8, 1, 0.4], ['B', 4.69, 0.88, 0.4], ['I', 2.45, 1.5, 0],
     ]);
     const rooflights = byName('Dak Oost Lang').windows;
     expect(rooflights).toHaveLength(1);
-    expect(rooflights[0]).toMatchObject({ name: 'Dakraam ×2', area: 2.4, uValue: 0.7, gValue: 0.5, orientation: 'E' });
-    expect(notes.some((line) => line.includes('2 stuks "Dakraam"'))).toBe(true);
+    expect(rooflights[0]).toMatchObject({ name: 'Dakraam', count: 2, area: 2.4, uValue: 0.7, gValue: 0.5, orientation: 'E' });
+    // The library rows are window types; the door is a door type.
+    expect(project.windowTypes).toHaveLength(9);
+    expect(project.windowTypes!.find((type) => type.id === rooflights[0].typeId)).toMatchObject({ name: 'Dakraam', kind: 'window', unitArea: 1.2 });
+    expect(project.windowTypes!.find((type) => type.id === west[2].typeId)).toMatchObject({ name: 'I', kind: 'door', uValue: 1.5, gValue: 0 });
     // Obstruction and movable shading per window go to the NTA block; the door has neither.
     expect(nta.windowObstructions).toHaveLength(9);
     expect(nta.windowObstructions.find((item) => item.windowId === west[0].id)?.obstruction).toEqual({ method: 'minimal' });

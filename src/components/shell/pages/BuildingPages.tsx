@@ -16,10 +16,11 @@ import { formatKernelPath } from '../../../core/nta/pathUtil';
 import { routeForPath } from '../../../core/nta/gapRoutes';
 import { kernelIssues } from '../../../core/nta/stepStatus';
 import { formatNumber } from '../../../i18n/format';
-import type { DialogType, IConstruction, IProject, ISurface, IWindow, IZone, Orientation, SurfaceType } from '../../../core/energy/types';
+import type { DialogType, IConstruction, IProject, ISurface, IWindow, IWindowType, IZone, Orientation, SurfaceType } from '../../../core/energy/types';
 import { Banner, Button, Card, DataTable, IssueList, NumberInput, Pill, Segmented, type Column } from '../../ui';
 import { ItemActions } from '../../ItemActions/ItemActions';
 import { ELEMENT_KINDS, elementRcActions, sharedConstruction, sharedWindowU, surfacesOf } from '../../../core/energy/elementRc';
+import { WINDOW_KINDS, newWindowTypeId, windowTypeUsage } from '../../../core/energy/windowTypes';
 import { useShellActions } from '../ShellActions';
 import { routeLabel } from '../PageHeader';
 
@@ -160,10 +161,11 @@ export function EnvelopePage() {
   const columns: Array<Column<EnvelopeRow>> = [
     {
       key: 'name', header: t('properties.name'), render: (row) => row.kind === 'window'
-        ? <span className="envelope-child"><span className="envelope-child__mark" aria-hidden="true" />{row.window!.name}</span>
+        ? <span className="envelope-child"><span className="envelope-child__mark" aria-hidden="true" />{row.window!.name}{(row.window!.count ?? 1) > 1 ? ` ×${row.window!.count}` : ''}</span>
         : row.surface.name,
     },
-    { key: 'type', header: t('properties.type'), render: (row) => row.kind === 'window' ? t('envelope.window') : t(`surfaceType.${row.surface.type}`) },
+    { key: 'type', header: t('properties.type'), render: (row) => row.kind === 'window'
+      ? t(`windowKind.${(project.windowTypes ?? []).find((item) => item.id === row.window!.typeId)?.kind ?? 'window'}`) : t(`surfaceType.${row.surface.type}`) },
     { key: 'boundary', header: t('envelope.boundary'), render: (row) => row.kind === 'window' ? '' : boundary(row.surface) },
     {
       key: 'orientation', header: t('properties.orientation'), render: (row) => row.kind === 'window' ? '—'
@@ -173,7 +175,7 @@ export function EnvelopePage() {
     { key: 'area', header: t('envelope.grossArea'), unit: 'm²', numeric: true, render: (row) => n(row.kind === 'window' ? row.window!.area : row.surface.area) },
     {
       key: 'construction', header: t('envelope.construction'), render: (row) => row.kind === 'window'
-        ? `U_w ${n(row.window!.uValue, 1)} · g ${n(row.window!.gValue, 2)}`
+        ? `${(project.windowTypes ?? []).find((item) => item.id === row.window!.typeId)?.name ?? ''} U_w ${n(row.window!.uValue, 1)} · g ${n(row.window!.gValue, 2)}`.trim()
         : (constructions.get(row.surface.constructionId)?.name ?? <Pill tone="warn">{t('envelope.noConstruction')}</Pill>),
     },
     {
@@ -383,10 +385,54 @@ function ElementRcFields() {
       <div className="element-rc">
         <CommitNumber label={t('constructions.elementRc.windows')} value={windowU}
           placeholder={windows.length === 0 ? t('constructions.elementRc.none') : t('constructions.elementRc.mixed')}
-          onCommit={(u) => { if (u > 0) windows.forEach(({ zoneId, surfaceId, window }) => dispatch({ type: 'UPDATE_WINDOW', payload: { zoneId, surfaceId, windowId: window.id, data: { uValue: u } } })); }} />
+          onCommit={(u) => {
+            if (u <= 0) return;
+            // Typed windows follow their type; the rest get the value directly.
+            (project.windowTypes ?? []).forEach((type) => dispatch({ type: 'UPDATE_WINDOW_TYPE', payload: { id: type.id, data: { uValue: u } } }));
+            windows.filter(({ window }) => !window.typeId).forEach(({ zoneId, surfaceId, window }) =>
+              dispatch({ type: 'UPDATE_WINDOW', payload: { zoneId, surfaceId, windowId: window.id, data: { uValue: u } } }));
+          }} />
         <small className="envelope-meta">{t('constructions.elementRc.windowCount', { count: windows.length })}</small>
       </div>
     </div></div>
+  </Card>;
+}
+
+/** The window types (kozijntypen): one row per type, edited in place; a type in use cannot be removed. */
+function WindowTypesCard() {
+  const { t } = useI18n();
+  const { state, dispatch } = useEnergy();
+  const { project } = state;
+  const types = project.windowTypes ?? [];
+  const update = (id: string, data: Partial<IWindowType>) => dispatch({ type: 'UPDATE_WINDOW_TYPE', payload: { id, data } });
+  const add = () => dispatch({ type: 'ADD_WINDOW_TYPE', payload: {
+    id: newWindowTypeId(project), name: `${t('windowKind.window')} ${types.length + 1}`, kind: 'window', uValue: 1.1, gValue: 0.5,
+  } });
+  return <Card level={2} title={t('constructions.windowTypes.title')} subtitle={t('constructions.windowTypes.lead')} flush
+    actions={<Button size="sm" icon={<Plus aria-hidden="true" />} onClick={add}>{t('constructions.windowTypes.add')}</Button>}>
+    {types.length === 0 ? <p className="page-lead" style={{ padding: '12px 16px' }}>{t('constructions.windowTypes.empty')}</p>
+      : <table className="window-types" aria-label={t('constructions.windowTypes.title')}>
+        <thead><tr>
+          <th scope="col">{t('constructions.windowTypes.name')}</th><th scope="col">{t('constructions.windowTypes.kind')}</th>
+          <th scope="col">U (W/m²K)</th><th scope="col">g (-)</th><th scope="col">{t('constructions.windowTypes.unitArea')}</th>
+          <th scope="col">{t('constructions.windowTypes.usedBy')}</th><th scope="col"><span className="visually-hidden">{t('envelope.actions')}</span></th>
+        </tr></thead>
+        <tbody>{types.map((type) => {
+          const used = windowTypeUsage(project, type.id);
+          return <tr key={type.id} data-path={`windowTypes[${types.indexOf(type)}]`}>
+            <td><input type="text" aria-label={t('constructions.windowTypes.name')} value={type.name} onChange={(event) => update(type.id, { name: event.target.value })} /></td>
+            <td><select aria-label={t('constructions.windowTypes.kind')} value={type.kind} onChange={(event) => update(type.id, { kind: event.target.value as IWindowType['kind'] })}>
+              {WINDOW_KINDS.map((kind) => <option key={kind} value={kind}>{t(`windowKind.${kind}`)}</option>)}
+            </select></td>
+            <td><CommitNumber label="U" value={type.uValue} onCommit={(uValue) => update(type.id, { uValue })} /></td>
+            <td><CommitNumber label="g" value={type.gValue} onCommit={(gValue) => update(type.id, { gValue })} /></td>
+            <td><CommitNumber label={t('constructions.windowTypes.unitArea')} value={type.unitArea ?? null} onCommit={(unitArea) => update(type.id, { unitArea })} /></td>
+            <td>{used}</td>
+            <td><Button size="sm" variant="ghost" disabled={used > 0} title={used > 0 ? t('constructions.windowTypes.inUse') : undefined}
+              onClick={() => dispatch({ type: 'DELETE_WINDOW_TYPE', payload: type.id })}>{t('constructions.windowTypes.delete')}</Button></td>
+          </tr>;
+        })}</tbody>
+      </table>}
   </Card>;
 }
 
@@ -408,6 +454,7 @@ export function ConstructionsPage() {
   ];
   return (<>
     <ElementRcFields />
+    <WindowTypesCard />
     <Card level={2} title={t('browser.constructions')} flush actions={actions
       ? <Button size="sm" variant="ghost" onClick={() => actions.navigate({ step: 'tool', sub: 'uvalue' })}>{t('constructions.openCalculator')}</Button>
       : undefined}>
