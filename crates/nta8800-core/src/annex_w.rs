@@ -189,27 +189,7 @@ pub fn validate_booster(pump: &BoosterHeatPump, path: &str) -> Vec<BoosterIssue>
             );
         }
     }
-    if let BoosterHeatSource::CollectiveGenerator {
-        generation_efficiency,
-        source_reference,
-        ..
-    } = &pump.heat_source
-    {
-        if !(generation_efficiency.is_finite() && *generation_efficiency > 0.0) {
-            push(
-                &mut issues,
-                "booster_source_efficiency_invalid",
-                format!("{path}.heatSource.generationEfficiency"),
-            );
-        }
-        if source_reference.trim().is_empty() {
-            push(
-                &mut issues,
-                "source_reference_required",
-                format!("{path}.heatSource.sourceReference"),
-            );
-        }
-    }
+    validate_heat_source(&pump.heat_source, path, &mut issues);
     if pump.test_report_reference.trim().is_empty() {
         push(
             &mut issues,
@@ -218,6 +198,124 @@ pub fn validate_booster(pump: &BoosterHeatPump, path: &str) -> Vec<BoosterIssue>
         );
     }
     issues
+}
+
+fn validate_heat_source(source: &BoosterHeatSource, path: &str, issues: &mut Vec<BoosterIssue>) {
+    if let BoosterHeatSource::CollectiveGenerator {
+        generation_efficiency,
+        source_reference,
+        ..
+    } = source
+    {
+        if !(generation_efficiency.is_finite() && *generation_efficiency > 0.0) {
+            push(
+                issues,
+                "booster_source_efficiency_invalid",
+                format!("{path}.heatSource.generationEfficiency"),
+            );
+        }
+        if source_reference.trim().is_empty() {
+            push(
+                issues,
+                "source_reference_required",
+                format!("{path}.heatSource.sourceReference"),
+            );
+        }
+    }
+}
+
+/// 13.8.4.4 forfait booster heat pump (13.162/13.163, 2025+C1 p. 631–633,
+/// 2022 p. 607–609): without annex W measurements the heat from the heating
+/// system and the electricity follow from forfait values on the design
+/// supply temperature of that heating system. The forfait route cannot take
+/// heat from the cooling system (note 1).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BoosterForfait {
+    /// Design supply temperature of the heating system that feeds the
+    /// booster, °C; `None` when unknown (η_gen;hj 1,15 and COP 3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub design_supply_temperature_c: Option<f64>,
+    pub heat_source: BoosterHeatSource,
+    pub source_reference: String,
+}
+
+/// 13.162/13.163: the forfait values hold at 24 °C and 40 °C, are
+/// interpolated between and extrapolated from 20 °C to 44 °C, and keep the
+/// 20 °C or 44 °C value beyond.
+fn booster_forfait_value(at_24: f64, at_40: f64, temperature: f64) -> f64 {
+    let temperature = temperature.clamp(20.0, 44.0);
+    at_24 + (temperature - 24.0) * (at_40 - at_24) / 16.0
+}
+
+impl BoosterForfait {
+    /// η_gen;hj of 13.162: 1,15 at 24 °C and 1,05 at 40 °C; 1,15 unknown.
+    pub fn heat_efficiency(&self) -> f64 {
+        self.design_supply_temperature_c
+            .map_or(1.15, |temperature| {
+                booster_forfait_value(1.15, 1.05, temperature)
+            })
+    }
+
+    /// COP_W;BWP of 13.163: 3 at 24 °C and 4 at 40 °C; 3 unknown.
+    pub fn cop(&self) -> f64 {
+        self.design_supply_temperature_c.map_or(3.0, |temperature| {
+            booster_forfait_value(3.0, 4.0, temperature)
+        })
+    }
+}
+
+pub fn validate_booster_forfait(pump: &BoosterForfait, path: &str) -> Vec<BoosterIssue> {
+    let mut issues = Vec::new();
+    if pump
+        .design_supply_temperature_c
+        .is_some_and(|value| !(value.is_finite() && value > 0.0 && value <= 100.0))
+    {
+        push(
+            &mut issues,
+            "booster_supply_temperature_invalid",
+            format!("{path}.designSupplyTemperatureC"),
+        );
+    }
+    validate_heat_source(&pump.heat_source, path, &mut issues);
+    if pump.source_reference.trim().is_empty() {
+        push(
+            &mut issues,
+            "source_reference_required",
+            format!("{path}.sourceReference"),
+        );
+    }
+    issues
+}
+
+/// 13.162/13.163 per month for the generator output `Q_W;gen;gi;out;mi`
+/// (kWh) with `c_W;gen` of class 4 (13.8.4.7.3, table 13.27) and
+/// `f_prac;gi` 1,0 for the forfait. The forfait leaves no recoverable loss
+/// (Q_sto;ls 0 under 13.164); call after [`validate_booster_forfait`].
+pub fn calculate_booster_forfait(
+    pump: &BoosterForfait,
+    output_kwh: &[f64; 12],
+    class_correction: f64,
+) -> [BoosterMonth; 12] {
+    let cop = pump.cop();
+    let efficiency = pump.heat_efficiency();
+    std::array::from_fn(|index| {
+        let output = output_kwh[index];
+        if output <= 0.0 || class_correction <= 0.0 {
+            return BoosterMonth {
+                cop,
+                ..BoosterMonth::default()
+            };
+        }
+        BoosterMonth {
+            cop,
+            // (13.163) with f_prac;gi = 1,0.
+            electricity_kwh: output / (cop * class_correction),
+            // (13.162).
+            heating_system_heat_kwh: output / (efficiency * class_correction),
+            ..BoosterMonth::default()
+        }
+    })
 }
 
 /// W.14: COP at a test temperature for the actual annual quantity.
@@ -336,6 +434,63 @@ pub fn booster_cooling_indication(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn forfait(temperature: Option<f64>) -> BoosterForfait {
+        BoosterForfait {
+            design_supply_temperature_c: temperature,
+            heat_source: BoosterHeatSource::HeatingSystem,
+            source_reference: "collective 45/40".into(),
+        }
+    }
+
+    #[test]
+    fn booster_forfait_values_follow_13_162_and_13_163() {
+        // 2025+C1 p. 632–633 (2022 p. 608–609): η_gen;hj 1,15 at 24 °C and
+        // 1,05 at 40 °C, COP 3 and 4; interpolated between, extrapolated to
+        // 20 and 44 °C, held beyond; unknown temperature 1,15 and 3.
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-12;
+        assert!(close(forfait(Some(24.0)).heat_efficiency(), 1.15));
+        assert!(close(forfait(Some(40.0)).heat_efficiency(), 1.05));
+        assert!(close(forfait(Some(32.0)).heat_efficiency(), 1.10));
+        assert!(close(forfait(Some(44.0)).heat_efficiency(), 1.025));
+        assert!(close(forfait(Some(60.0)).heat_efficiency(), 1.025));
+        assert!(close(forfait(Some(15.0)).heat_efficiency(), 1.175));
+        assert!(close(forfait(None).heat_efficiency(), 1.15));
+        assert!(close(forfait(Some(24.0)).cop(), 3.0));
+        assert!(close(forfait(Some(40.0)).cop(), 4.0));
+        assert!(close(forfait(Some(45.0)).cop(), 4.25));
+        assert!(close(forfait(Some(10.0)).cop(), 2.75));
+        assert!(close(forfait(None).cop(), 3.0));
+    }
+
+    #[test]
+    fn booster_forfait_months_use_class_correction_without_losses() {
+        // (13.162)/(13.163) with c_W;gen 0,75 and f_prac;gi 1,0; the forfait
+        // has no standing loss and no cooling heat (13.164, note 1).
+        let pump = forfait(Some(40.0));
+        let mut output = [0.0; 12];
+        output[0] = 300.0;
+        let months = calculate_booster_forfait(&pump, &output, 0.75);
+        assert!((months[0].electricity_kwh - 300.0 / (4.0 * 0.75)).abs() < 1e-9);
+        assert!((months[0].heating_system_heat_kwh - 300.0 / (1.05 * 0.75)).abs() < 1e-9);
+        assert_eq!(months[0].standing_loss_heat_kwh, 0.0);
+        assert_eq!(months[0].cooling_heat_kwh, 0.0);
+        assert_eq!(months[1].electricity_kwh, 0.0);
+        let mut invalid = forfait(Some(f64::NAN));
+        invalid.source_reference = " ".into();
+        let codes: Vec<_> = validate_booster_forfait(&invalid, "generator")
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                "booster_supply_temperature_invalid",
+                "source_reference_required"
+            ]
+        );
+        assert!(validate_booster_forfait(&pump, "generator").is_empty());
+    }
 
     #[test]
     fn booster_cooling_indication_follows_w4_to_w7() {

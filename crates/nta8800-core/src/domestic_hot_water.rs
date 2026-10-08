@@ -46,7 +46,8 @@
 //! test reports are evaluated in [`crate::hot_water_tests`].
 
 use crate::annex_w::{
-    calculate_booster, validate_booster, BoosterHeatPump, BoosterHeatSource, BoosterSourceCarrier,
+    calculate_booster, calculate_booster_forfait, validate_booster, validate_booster_forfait,
+    BoosterForfait, BoosterHeatPump, BoosterHeatSource, BoosterMonth, BoosterSourceCarrier,
 };
 use crate::building_performance::Carrier;
 use crate::climate::{MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
@@ -782,6 +783,9 @@ pub enum HotWaterGenerator {
     /// Annex W booster heat pump on a collective heating system: source
     /// heat from that system plus electricity.
     BoosterHeatPump(Box<BoosterHeatPump>),
+    /// §13.8.4.4 booster heat pump with the forfait values of 13.162/13.163
+    /// instead of annex W measurements.
+    BoosterHeatPumpForfait(Box<BoosterForfait>),
     /// §13.8.4.2: tested with 24-hour measurements at two tapping
     /// profiles (NEN-EN 13203-2 or NEN-EN 16147), 13.153a–13.160a.
     MeasuredTwoProfiles(Box<TwoProfileTest>),
@@ -1704,17 +1708,20 @@ impl HotWaterGenerator {
                 HotWaterCarrier::Fuel(if *oil { Carrier::Oil } else { Carrier::Gas })
             }
             HotWaterGenerator::ExternalHeat => HotWaterCarrier::DistrictHeat,
-            HotWaterGenerator::BoosterHeatPump(pump) => match &pump.heat_source {
-                BoosterHeatSource::ExternalHeat => HotWaterCarrier::DistrictHeat,
-                BoosterHeatSource::HeatingSystem => HotWaterGenerator::HeatingSystem.carrier(),
-                BoosterHeatSource::CollectiveGenerator { carrier, .. } => {
-                    HotWaterCarrier::Fuel(match carrier {
-                        BoosterSourceCarrier::Gas => Carrier::Gas,
-                        BoosterSourceCarrier::Oil => Carrier::Oil,
-                        BoosterSourceCarrier::Electricity => Carrier::El,
-                    })
+            HotWaterGenerator::BoosterHeatPump(_)
+            | HotWaterGenerator::BoosterHeatPumpForfait(_) => {
+                match booster_heat_source(self).unwrap() {
+                    BoosterHeatSource::ExternalHeat => HotWaterCarrier::DistrictHeat,
+                    BoosterHeatSource::HeatingSystem => HotWaterGenerator::HeatingSystem.carrier(),
+                    BoosterHeatSource::CollectiveGenerator { carrier, .. } => {
+                        HotWaterCarrier::Fuel(match carrier {
+                            BoosterSourceCarrier::Gas => Carrier::Gas,
+                            BoosterSourceCarrier::Oil => Carrier::Oil,
+                            BoosterSourceCarrier::Electricity => Carrier::El,
+                        })
+                    }
                 }
-            },
+            }
             HotWaterGenerator::MeasuredTwoProfiles(test) if !test.electric() => {
                 HotWaterCarrier::Fuel(Carrier::Gas)
             }
@@ -2701,6 +2708,11 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
                 issues.push((found.code, found.path.replacen("generator", prefix, 1)));
             }
         }
+        HotWaterGenerator::BoosterHeatPumpForfait(pump) => {
+            for found in validate_booster_forfait(pump, "generator") {
+                issues.push((found.code, found.path.replacen("generator", prefix, 1)));
+            }
+        }
         HotWaterGenerator::MeasuredTwoProfiles(test) => {
             issues.extend(test.issues(prefix));
         }
@@ -3005,7 +3017,9 @@ fn generation_values(
         }
         HotWaterGenerator::ExternalHeat => Ok((1.0, 1.0)),
         // Annex W per month; see the month loop.
-        HotWaterGenerator::BoosterHeatPump(_) => Ok((1.0, 1.0)),
+        HotWaterGenerator::BoosterHeatPump(_) | HotWaterGenerator::BoosterHeatPumpForfait(_) => {
+            Ok((1.0, 1.0))
+        }
         // 13.157 needs the appliance's own output (see the booking); here
         // the system total serves the ordering and single-unit reporting.
         HotWaterGenerator::MeasuredTwoProfiles(test) => Ok((
@@ -3134,6 +3148,7 @@ fn category(generator: &HotWaterGenerator) -> u8 {
         | HotWaterGenerator::IndirectHeatPump { .. }
         | HotWaterGenerator::HeatPumpSeries { .. }
         | HotWaterGenerator::BoosterHeatPump(_)
+        | HotWaterGenerator::BoosterHeatPumpForfait(_)
         | HotWaterGenerator::Chp(_) => 1,
         _ => 2,
     }
@@ -3163,6 +3178,32 @@ struct Booking {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// The heat source of an annex W or forfait booster heat pump.
+fn booster_heat_source(generator: &HotWaterGenerator) -> Option<&BoosterHeatSource> {
+    match generator {
+        HotWaterGenerator::BoosterHeatPump(pump) => Some(&pump.heat_source),
+        HotWaterGenerator::BoosterHeatPumpForfait(pump) => Some(&pump.heat_source),
+        _ => None,
+    }
+}
+
+/// Booster heat pump per month: annex W, or the forfait of 13.162/13.163
+/// with `c_W;gen` of class 4 (table 13.27) on the annual gross demand.
+fn booster_months(
+    generator: &HotWaterGenerator,
+    outputs: &[f64; 12],
+    annual_total: f64,
+) -> Option<[BoosterMonth; 12]> {
+    match generator {
+        HotWaterGenerator::BoosterHeatPump(pump) => Some(calculate_booster(pump, outputs)),
+        HotWaterGenerator::BoosterHeatPumpForfait(pump) => {
+            let class = heat_pump_class_correction(ApplicationClass::Class4, annual_total)?;
+            Some(calculate_booster_forfait(pump, outputs, class))
+        }
+        _ => None,
+    }
+}
+
 fn book_generator(
     generator: &HotWaterGenerator,
     system: &HotWaterSystem,
@@ -3357,10 +3398,12 @@ fn book_generator(
     // Annex W: the carrier input is the heat drawn from the collective
     // heating system (W.2) divided by its generation efficiency; the BWP
     // electricity (W.1) is auxiliary energy.
-    if let HotWaterGenerator::BoosterHeatPump(pump) = generator {
-        let booster = calculate_booster(pump, outputs);
-        let from_heating_system = matches!(pump.heat_source, BoosterHeatSource::HeatingSystem);
-        let source_efficiency = match &pump.heat_source {
+    if let (Some(booster), Some(heat_source)) = (
+        booster_months(generator, outputs, annual_total),
+        booster_heat_source(generator),
+    ) {
+        let from_heating_system = matches!(heat_source, BoosterHeatSource::HeatingSystem);
+        let source_efficiency = match heat_source {
             BoosterHeatSource::ExternalHeat | BoosterHeatSource::HeatingSystem => 1.0,
             BoosterHeatSource::CollectiveGenerator {
                 generation_efficiency,
@@ -3813,8 +3856,8 @@ struct Dispatch {
 fn ordering_efficiency(unit: &Unit<'_>, outputs: &[f64; 12], annual_total: f64) -> f64 {
     match unit.generator {
         // Annex W: COP_W;BWP of the booster on the system output.
-        HotWaterGenerator::BoosterHeatPump(pump) => {
-            let months = calculate_booster(pump, outputs);
+        HotWaterGenerator::BoosterHeatPump(_) | HotWaterGenerator::BoosterHeatPumpForfait(_) => {
+            let months = booster_months(unit.generator, outputs, annual_total).unwrap_or_default();
             let weight: f64 = outputs.iter().sum();
             if weight > 0.0 {
                 months
@@ -4679,6 +4722,44 @@ mod tests {
         assert_eq!(jan.carrier_input_kwh, 0.0);
         assert!((jan.heating_system_load_kwh - booster[0].heating_system_heat_kwh).abs() < 1e-9);
         assert!(jan.auxiliary_electricity_kwh >= booster[0].electricity_kwh);
+    }
+
+    #[test]
+    fn forfait_booster_heat_pump_books_13_162_and_13_163() {
+        // §13.8.4.4 without annex W data (2025+C1 p. 631–633, 2022
+        // p. 607–609): heat from the heating system Q/(η_gen;hj·c_W;gen) and
+        // electricity Q/(COP·c_W;gen) with class 4 of table 13.27; unknown
+        // supply temperature: η 1,15 and COP 3.
+        let pump = BoosterForfait {
+            design_supply_temperature_c: None,
+            heat_source: BoosterHeatSource::HeatingSystem,
+            source_reference: "collectieve ketel".into(),
+        };
+        let input = system(HotWaterGenerator::BoosterHeatPumpForfait(Box::new(
+            pump.clone(),
+        )));
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert_eq!(jan.carrier_input_kwh, 0.0);
+        assert!(jan.heating_system_load_kwh > 0.0);
+        let class = jan.generator_output_kwh / (1.15 * jan.heating_system_load_kwh);
+        assert!((0.45..=1.0).contains(&class), "{class}");
+        assert!(jan.auxiliary_electricity_kwh >= jan.generator_output_kwh / (3.0 * class) - 1e-9);
+        // From a collective gas boiler the heat becomes gas input.
+        let mut gas = pump;
+        gas.heat_source = BoosterHeatSource::CollectiveGenerator {
+            generation_efficiency: 0.9,
+            carrier: BoosterSourceCarrier::Gas,
+            source_reference: "collectieve HR107".into(),
+        };
+        let input = system(HotWaterGenerator::BoosterHeatPumpForfait(Box::new(gas)));
+        assert_eq!(input.carrier(), HotWaterCarrier::Fuel(Carrier::Gas));
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert!(
+            (jan.carrier_input_kwh * 0.9 * 1.15 * class - jan.generator_output_kwh).abs() < 1e-6
+        );
     }
 
     #[test]
