@@ -40,6 +40,24 @@ describe('refused routes as project gaps', () => {
     expect(routeForPath('ntaCalculation.labelFunction')).toMatchObject({ step: 'project' });
   });
 
+  it('routes the per-zone, per-window and per-system paths of refused routes', () => {
+    // Kernel test refusal_paths_follow_zones_floors_and_systems.
+    expect(routeForPath('ntaCalculation.zoneData[1].emission.fans'))
+      .toMatchObject({ step: 'installations', sub: 'heating' });
+    expect(routeForPath('ntaCalculation.zoneData[1].distribution'))
+      .toMatchObject({ step: 'installations', sub: 'heating' });
+    expect(routeForPath('ntaCalculation.zoneData[1].internalGains.lighting'))
+      .toMatchObject({ step: 'building', sub: 'zones' });
+    expect(routeForPath('ntaCalculation.windowObstructions[0].obstruction.method'))
+      .toMatchObject({ step: 'building', sub: 'envelope' });
+    expect(routeForPath('zones[1].surfaces[2].windows[0].gValue'))
+      .toMatchObject({ step: 'building', sub: 'envelope' });
+    expect(routeForPath('ntaCalculation.additionalHeatingSystems[0].identicalSystems'))
+      .toMatchObject({ step: 'installations', sub: 'heating' });
+    expect(routeForPath('ntaCalculation.groundFloors[1].heatedBasement'))
+      .toMatchObject({ step: 'building', sub: 'envelope' });
+  });
+
   it('lands "Ga naar" on the label function field', async () => {
     const route = routeForPath('ntaCalculation.labelFunction');
     renderWithProviders(<Harness initial={route} />);

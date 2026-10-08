@@ -1541,15 +1541,20 @@ fn chain_path(
         None => format!("ntaCalculation.{block}{rest}"),
     };
     match member {
-        "generator" | "distributionSystem" | "humidifiers" => own(member),
-        "collectiveConnection" | "identicalSystems" => format!("ntaCalculation.{member}{rest}"),
+        // An additional heating system has its own generator, distribution,
+        // humidifiers, collective connection and number of identical systems.
+        "generator"
+        | "distributionSystem"
+        | "humidifiers"
+        | "collectiveConnection"
+        | "identicalSystems" => own(member),
         "demand" | "emission" | "distribution" => {
-            zone_path(member, rest, &chain.demand.zone_id, project_value)
+            zone_path(member, rest, &chain.demand, project_value)
         }
         "additionalZones" => match index.and_then(|index| chain.additional_zones.get(index)) {
             Some(zone) => {
                 let (part, _, rest) = split_member(rest.strip_prefix('.').unwrap_or(rest));
-                zone_path(part, rest, &zone.demand.zone_id, project_value)
+                zone_path(part, rest, &zone.demand, project_value)
             }
             None => "zones".to_string(),
         },
@@ -1560,50 +1565,190 @@ fn chain_path(
 }
 
 /// Path of a zone part of the chain (`demand`, `emission`, `distribution`)
-/// in the zone with `zone_id`.
-fn zone_path(part: &str, rest: &str, zone_id: &str, project_value: &Value) -> String {
-    let index_of = |list: &str| {
-        project_value
-            .pointer(list)
-            .and_then(Value::as_array)
-            .and_then(|items| {
-                items.iter().position(|item| {
-                    item.get("zoneId")
-                        .or_else(|| item.get("id"))
-                        .and_then(Value::as_str)
-                        == Some(zone_id)
-                })
-            })
-    };
-    let zone = index_of("/zones")
+/// of the zone `demand` was derived for. A part the zone takes from its
+/// `zoneData` entry maps there, the rest to the project block, mirroring
+/// `derive_input`; ground floors and windows map by id to their source.
+fn zone_path(
+    part: &str,
+    rest: &str,
+    demand: &crate::monthly_demand::MonthlyDemandInput,
+    project_value: &Value,
+) -> String {
+    let zone_id = demand.zone_id.as_str();
+    let zone_index = project_value
+        .get("zones")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .position(|item| item.get("id").and_then(Value::as_str) == Some(zone_id))
+        });
+    let zone = zone_index
         .map(|index| format!("zones[{index}]"))
         .unwrap_or_else(|| "zones".to_string());
+    let zone_data = project_value
+        .pointer("/ntaCalculation/zoneData")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .position(|item| item.get("zoneId").and_then(Value::as_str) == Some(zone_id))
+        });
+    // The entry of this zone has the member (not absent, not null).
+    let zone_has = |member: &str| {
+        zone_data
+            .and_then(|index| {
+                project_value.pointer(&format!("/ntaCalculation/zoneData/{index}/{member}"))
+            })
+            .is_some_and(|value| !value.is_null())
+    };
+    let per_zone = |member: &str, tail: &str, from_zone: bool| match (zone_data, from_zone) {
+        (Some(index), true) => format!("ntaCalculation.zoneData[{index}].{member}{tail}"),
+        _ => format!("ntaCalculation.{member}{tail}"),
+    };
     match part {
-        "emission" | "distribution" => format!("ntaCalculation.{part}{rest}"),
+        "emission" | "distribution" => per_zone(part, rest, zone_has(part)),
         "demand" => {
-            let (field, _, tail) = split_member(rest.strip_prefix('.').unwrap_or(rest));
+            let (field, index, tail) = split_member(rest.strip_prefix('.').unwrap_or(rest));
+            let indexed = match index {
+                Some(index) => format!("[{index}]{tail}"),
+                None => tail.to_string(),
+            };
             match field {
-                // Per-zone NTA data where the project has it, else the block.
-                "ventilation" | "ventilationFlows" | "verticalPipes" => {
-                    match index_of("/ntaCalculation/zoneData") {
-                        Some(index) => format!("ntaCalculation.zoneData[{index}].{field}{tail}"),
-                        None => format!("ntaCalculation.{field}{tail}"),
-                    }
+                // Taken from the zone entry whenever the zone has one.
+                "ventilation" | "ventilationFlows" | "sunrooms" | "internalGains"
+                | "functionAreas" => per_zone(field, &indexed, zone_data.is_some()),
+                // Taken from the zone entry only when it gives them.
+                "thermalMass" | "setpoints" | "usageFunction" => {
+                    per_zone(field, &indexed, zone_has(field))
                 }
-                "internalGains" | "thermalMass" | "setpoints" | "dwellingType" => {
-                    format!("ntaCalculation.{field}{tail}")
-                }
-                // The window list of the demand is built from all outdoor
-                // windows; their solar data sit in one block.
-                "windows" => "ntaCalculation.windowSolar".to_string(),
-                "transmission" => match tail.strip_prefix(".groundFloors") {
-                    Some(floor) => format!("ntaCalculation.groundFloors{floor}"),
-                    None => format!("{zone}.surfaces"),
+                // A zone that overrides the usage function brings its own
+                // dwelling type.
+                "dwellingType" => per_zone(
+                    field,
+                    &indexed,
+                    zone_has("usageFunction") || zone_has("dwellingType"),
+                ),
+                "windows" => match index.and_then(|index| demand.windows.get(index)) {
+                    Some(window) => window_source_path(window, tail, project_value),
+                    None => "ntaCalculation.windowSolar".to_string(),
                 },
+                "transmission" => {
+                    transmission_path(tail, demand, &zone, &per_zone, &zone_has, project_value)
+                }
                 _ => zone,
             }
         }
         _ => zone,
+    }
+}
+
+/// Path of a transmission issue: a ground floor maps by its surface id to
+/// `ntaCalculation.groundFloors`, vertical pipes to where the zone takes
+/// them from, the rest to the surfaces of the zone.
+fn transmission_path(
+    tail: &str,
+    demand: &crate::monthly_demand::MonthlyDemandInput,
+    zone: &str,
+    per_zone: &dyn Fn(&str, &str, bool) -> String,
+    zone_has: &dyn Fn(&str) -> bool,
+    project_value: &Value,
+) -> String {
+    let (member, index, rest) = split_member(tail.strip_prefix('.').unwrap_or(tail));
+    match member {
+        "groundFloors" => {
+            let floor = match (&demand.transmission, index) {
+                (crate::monthly_demand::Transmission::Components(components), Some(index)) => {
+                    components.ground_floors.get(index)
+                }
+                _ => None,
+            };
+            let project_index = floor.and_then(|floor| {
+                project_value
+                    .pointer("/ntaCalculation/groundFloors")
+                    .and_then(Value::as_array)
+                    .and_then(|items| {
+                        items.iter().position(|item| {
+                            item.get("surfaceId").and_then(Value::as_str) == Some(floor.id.as_str())
+                        })
+                    })
+            });
+            match project_index {
+                Some(index) => format!("ntaCalculation.groundFloors[{index}]{rest}"),
+                None => "ntaCalculation.groundFloors".to_string(),
+            }
+        }
+        "verticalPipes" => {
+            let indexed = match index {
+                Some(index) => format!("[{index}]{rest}"),
+                None => rest.to_string(),
+            };
+            per_zone(member, &indexed, zone_has(member))
+        }
+        _ => format!("{zone}.surfaces"),
+    }
+}
+
+/// Path of an issue on a derived window (`window:<id>`): the obstruction of
+/// that window or the project default, its annex A data, the solar block,
+/// or the window itself in the zone surfaces.
+fn window_source_path(
+    window: &crate::monthly_demand::Window,
+    tail: &str,
+    project_value: &Value,
+) -> String {
+    let window_id = window.id.strip_prefix("window:").unwrap_or(&window.id);
+    let (field, _, rest) = split_member(tail.strip_prefix('.').unwrap_or(tail));
+    let listed = |list: &str| {
+        project_value
+            .pointer(&format!("/ntaCalculation/{list}"))
+            .and_then(Value::as_array)
+            .and_then(|items| {
+                items.iter().position(|item| {
+                    item.get("windowId").and_then(Value::as_str) == Some(window_id)
+                })
+            })
+    };
+    let project_window = || {
+        let zones = project_value.get("zones").and_then(Value::as_array)?;
+        for (zone_index, zone) in zones.iter().enumerate() {
+            let surfaces = zone.get("surfaces").and_then(Value::as_array);
+            for (surface_index, surface) in surfaces.into_iter().flatten().enumerate() {
+                let windows = surface.get("windows").and_then(Value::as_array);
+                for (index, item) in windows.into_iter().flatten().enumerate() {
+                    if item.get("id").and_then(Value::as_str) == Some(window_id) {
+                        return Some(format!(
+                            "zones[{zone_index}].surfaces[{surface_index}].windows[{index}]"
+                        ));
+                    }
+                }
+            }
+        }
+        None
+    };
+    match field {
+        "obstruction" => match listed("windowObstructions") {
+            Some(index) => format!("ntaCalculation.windowObstructions[{index}].obstruction{rest}"),
+            None => format!("ntaCalculation.windowSolar.obstruction{rest}"),
+        },
+        "dynamic" => match listed("dynamicWindows") {
+            Some(index) => format!("ntaCalculation.dynamicWindows[{index}].dynamic{rest}"),
+            None => "ntaCalculation.dynamicWindows".to_string(),
+        },
+        "frameFraction" | "movableShading" => format!("ntaCalculation.windowSolar.{field}{rest}"),
+        // The window's own data in the project model.
+        "areaM2" | "uValueWPerM2k" | "gPerpendicular" | "" => {
+            let member = match field {
+                "areaM2" => ".area",
+                "uValueWPerM2k" => ".uValue",
+                "gPerpendicular" => ".gValue",
+                _ => "",
+            };
+            project_window()
+                .map(|path| format!("{path}{member}"))
+                .unwrap_or_else(|| "ntaCalculation.windowSolar".to_string())
+        }
+        _ => "ntaCalculation.windowSolar".to_string(),
     }
 }
 
@@ -5373,6 +5518,186 @@ mod tests {
         assert!(plausibility_warnings(&dwelling).is_empty());
     }
 
+    /// Review 9 October 2026: a refused route in the second zone, or in an
+    /// additional heating system, has to land on the project input that
+    /// feeds it, not on the first zone's or the project's.
+    #[test]
+    fn refusal_paths_follow_zones_floors_and_systems() {
+        let mut value = project();
+        let mut second = value["zones"][0].clone();
+        second["id"] = Value::from("z2");
+        second["floorArea"] = Value::from(50.0);
+        for surface in second["surfaces"].as_array_mut().unwrap() {
+            let id = surface["id"].as_str().unwrap().to_owned();
+            surface["id"] = Value::from(format!("{id}-2"));
+            surface["zoneId"] = Value::from("z2");
+            for window in surface["windows"].as_array_mut().unwrap() {
+                let window_id = window["id"].as_str().unwrap().to_owned();
+                window["id"] = Value::from(format!("{window_id}-2"));
+            }
+        }
+        for bridge in second["thermalBridges"].as_array_mut().unwrap() {
+            bridge["id"] = Value::from("tb1-2");
+            bridge["zoneId"] = Value::from("z2");
+        }
+        value["zones"].as_array_mut().unwrap().push(second);
+        let block = &mut value["ntaCalculation"];
+        // z1 takes emission and thermal mass from the project block, z2 from
+        // its own entry; both have their own internal gains.
+        let mut z1 = serde_json::json!({
+            "zoneId": "z1",
+            "verticalPipes": [],
+            "ventilationFlows": block["ventilationFlows"].clone(),
+            "internalGains": block["internalGains"].clone()
+        });
+        let mut z2 = z1.clone();
+        z2["zoneId"] = Value::from("z2");
+        z2["emission"] = block["emission"].clone();
+        z2["thermalMass"] = block["thermalMass"].clone();
+        z1["zoneId"] = Value::from("z1");
+        block["zoneData"] = serde_json::json!([z1, z2]);
+        block["surfaceTilts"].as_array_mut().unwrap().push(
+            serde_json::json!({"surfaceId": "roof-2", "tiltDeg": 45.0, "sourceReference": "copy"}),
+        );
+        // The floor of z2 is listed first, so its derived index (0 in z2)
+        // differs from its project index (0 here, z1's floor at 1).
+        let mut floor = block["groundFloors"][0].clone();
+        floor["surfaceId"] = Value::from("floor-2");
+        block["groundFloors"]
+            .as_array_mut()
+            .unwrap()
+            .insert(0, floor);
+        let window_two = value["zones"][1]["surfaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .find_map(|(surface, item)| {
+                item["windows"]
+                    .as_array()
+                    .filter(|windows| !windows.is_empty())
+                    .map(|windows| (surface, windows[0]["id"].as_str().unwrap().to_owned()))
+            })
+            .unwrap();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([{
+            "windowId": window_two.1,
+            "obstruction": {"method": "minimal"},
+            "sourceReference": "test"
+        }]);
+        let mut gaps = Vec::new();
+        let derived = derive_input(&value, &mut gaps).unwrap_or_else(|| panic!("{gaps:?}"));
+        assert_eq!(
+            derived.space_heating.additional_zones[0].demand.zone_id,
+            "z2"
+        );
+        let floor_z1 = value["ntaCalculation"]["groundFloors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|item| item["surfaceId"] != "floor-2")
+            .unwrap();
+        let window_in_z2 = derived.space_heating.additional_zones[0]
+            .demand
+            .windows
+            .iter()
+            .position(|item| item.id == format!("window:{}", window_two.1))
+            .unwrap();
+        for (path, expected) in [
+            (
+                "spaceHeating.additionalZones[0].demand.transmission.groundFloors[0].heatedBasement"
+                    .to_string(),
+                "ntaCalculation.groundFloors[0].heatedBasement".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.groundFloors[0].heatedBasement".to_string(),
+                format!("ntaCalculation.groundFloors[{floor_z1}].heatedBasement"),
+            ),
+            (
+                "spaceHeating.additionalZones[0].emission.fans".to_string(),
+                "ntaCalculation.zoneData[1].emission.fans".to_string(),
+            ),
+            (
+                "spaceHeating.emission.fans".to_string(),
+                "ntaCalculation.emission.fans".to_string(),
+            ),
+            (
+                "spaceHeating.additionalZones[0].demand.internalGains.lighting".to_string(),
+                "ntaCalculation.zoneData[1].internalGains.lighting".to_string(),
+            ),
+            (
+                "spaceHeating.demand.internalGains.lighting".to_string(),
+                "ntaCalculation.zoneData[0].internalGains.lighting".to_string(),
+            ),
+            (
+                "spaceHeating.additionalZones[0].demand.thermalMass".to_string(),
+                "ntaCalculation.zoneData[1].thermalMass".to_string(),
+            ),
+            (
+                "spaceHeating.demand.thermalMass".to_string(),
+                "ntaCalculation.thermalMass".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.verticalPipes[0]".to_string(),
+                "ntaCalculation.zoneData[0].verticalPipes[0]".to_string(),
+            ),
+            (
+                format!("spaceHeating.additionalZones[0].demand.windows[{window_in_z2}].obstruction.method"),
+                "ntaCalculation.windowObstructions[0].obstruction.method".to_string(),
+            ),
+            (
+                format!("spaceHeating.additionalZones[0].demand.windows[{window_in_z2}].gPerpendicular"),
+                format!("zones[1].surfaces[{}].windows[0].gValue", window_two.0),
+            ),
+            (
+                "spaceHeating.demand.windows[0].obstruction".to_string(),
+                "ntaCalculation.windowSolar.obstruction".to_string(),
+            ),
+            (
+                "spaceHeating.demand.windows[0].frameFraction".to_string(),
+                "ntaCalculation.windowSolar.frameFraction".to_string(),
+            ),
+        ] {
+            assert_eq!(project_path_for_derived(&path, &derived, &value), expected, "{path}");
+        }
+        // An additional heating system serving z2 has its own collective
+        // connection and number of identical systems.
+        value["ntaCalculation"]["additionalHeatingSystems"] = serde_json::json!([{
+            "zoneIds": ["z2"],
+            "generator": value["ntaCalculation"]["generator"].clone(),
+            "identicalSystems": 2
+        }]);
+        let mut gaps = Vec::new();
+        let derived = derive_input(&value, &mut gaps).unwrap_or_else(|| panic!("{gaps:?}"));
+        for (path, expected) in [
+            (
+                "additionalHeatingSystems[0].identicalSystems",
+                "ntaCalculation.additionalHeatingSystems[0].identicalSystems",
+            ),
+            (
+                "additionalHeatingSystems[0].collectiveConnection.x",
+                "ntaCalculation.additionalHeatingSystems[0].collectiveConnection.x",
+            ),
+            (
+                "additionalHeatingSystems[0].demand.transmission.groundFloors[0]",
+                "ntaCalculation.groundFloors[0]",
+            ),
+            (
+                "additionalHeatingSystems[0].emission.fans",
+                "ntaCalculation.zoneData[1].emission.fans",
+            ),
+            (
+                "spaceHeating.identicalSystems",
+                "ntaCalculation.identicalSystems",
+            ),
+        ] {
+            assert_eq!(
+                project_path_for_derived(path, &derived, &value),
+                expected,
+                "{path}"
+            );
+        }
+    }
+
     #[test]
     fn two_zones_need_zone_data_and_sum_areas() {
         let mut value = project();
@@ -5982,8 +6307,8 @@ mod refusal_gaps {
                 format!("zones[{zone_index}].surfaces"),
             ),
             (
-                "spaceHeating.demand.windows[1].gValue",
-                "ntaCalculation.windowSolar".to_string(),
+                "spaceHeating.demand.windows[1].movableShading",
+                "ntaCalculation.windowSolar.movableShading".to_string(),
             ),
             (
                 "hotWater.generator",

@@ -13,6 +13,21 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — invoergaten van geweigerde routes per zone, raam en systeem; strengere controle van de releasenotes (geen rekenwijziging)
+
+Uitkomsten, status en meldcodes veranderen niet; alleen het pad van een invoergat en de controles rond de vrijgave.
+
+- **Invoergaten in projecten met meer zones.** Een geweigerde route in de tweede zone kwam terecht bij de eerste zone of het projectblok. Nu volgt het pad de afleiding:
+  - een vloer op grond via zijn oppervlak-id naar `ntaCalculation.groundFloors[i]` (eerder via de volgorde binnen de zone, wat bij meer zones of een andere volgorde een andere vloer aanwees);
+  - afgifte, distributie, interne warmtelast, thermische massa, setpoints, woningtype, zonnekamers en verticale leidingen naar `ntaCalculation.zoneData[k]` als die zone ze daar zelf opgeeft, anders naar het projectblok;
+  - een raam naar zijn eigen belemmering (`windowObstructions`), zijn bijlage A-gegevens (`dynamicWindows`), het blok `windowSolar` of het raam zelf in de zone (oppervlak, U, g);
+  - de collectieve aansluiting en het aantal identieke systemen van een extra verwarmingssysteem naar `ntaCalculation.additionalHeatingSystems[i]`.
+  
+  "Ga naar" brengt je daarmee naar het juiste veld. Afgifte en distributie per zone gaan naar *Installaties › Verwarming*, zonnekamers per zone naar *Onverwarmde ruimten*.
+- **Controle van de releasenotes.** Een kop boven de eerste versiesectie die bijna een item was (en-streepje of koppelteken, maand met hoofdletter of afgekort, ISO-datum, `####`, of een bestand met CRLF-regeleinden) werd overgeslagen, zodat een uitkomstwijziging zonder ophoging door de gate kwam. Nu is elke kop daar een structuurkop, een item in exact de vorm `### <d> <maand> <jjjj> — <titel>` of een subkop van een item; al het andere is een fout. Alleen het exacte slot "(geen rekenwijziging)" maakt een item vrij.
+- **Vrijgave.** `scripts/release-nta.sh` vergelijkt de uitgebrachte versiesecties met de vorige vrijgavetag (`check-released`): een item dat achteraf in een uitgebrachte sectie wordt gezet, stopt de vrijgave. De releasenotes worden pas na de gate en de build gecommit; mislukt een vrijgave vóór de tag, dan gaat het archief opzij en kan de vrijgave opnieuw.
+- **Handleiding.** Een link met een stuurteken (zoals `java<tab>script:`) wordt niet meer als link getoond.
+
 ### 9 oktober 2026 — procedures voor het kwaliteitssysteem (geen rekenwijziging)
 
 - **Nieuwe map `docs/kwaliteit/`** met concepten die de attesthouder alleen nog hoeft in te vullen en vast te stellen (BRL 9501 hoofdstuk 5 en 6, taken C2, C3, C4 en C6):

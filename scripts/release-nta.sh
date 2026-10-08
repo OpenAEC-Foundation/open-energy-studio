@@ -4,15 +4,21 @@
 #   scripts/release-nta.sh [--dry-run] [--skip-gate] [--skip-build] [--date yyyy-mm-dd]
 #
 # A release:
-#  1. checks the release notes against KERNEL_VERSION and moves the
-#     unreleased items under "Rekenkern <KERNEL_VERSION>" (one commit);
+#  1. checks the release notes against KERNEL_VERSION and, against the notes
+#     of the previous release tag, that no released section was changed; it
+#     prepares the released notes (unreleased items under "Rekenkern
+#     <KERNEL_VERSION>") in the archive, without touching the worktree yet;
 #  2. runs the full gate (scripts/verify-nta.sh), keeping its log and the
 #     reference-suite report;
 #  3. builds the desktop packages (Tauri, .deb) offline;
 #  4. exports the user manual as one HTML file (and a PDF when chromium or
 #     wkhtmltopdf is installed), stamped with both versions (BRL 9501 §4.4);
-#  5. writes the leveringsdocument, a manifest and SHA256SUMS;
-#  6. creates the annotated git tag oes-v<program>-kernel-v<kernel>.
+#  5. only then commits the released notes (one commit), so a failing gate or
+#     build leaves no release commit behind;
+#  6. writes the leveringsdocument, a manifest and SHA256SUMS;
+#  7. creates the annotated git tag oes-v<program>-kernel-v<kernel>.
+# When a release fails before its tag, its archive is moved aside to
+# release/<tag>.mislukt-<time>/ so the release can simply be run again.
 # Everything lands in release/<tag>/ (ignored by git). Nothing is pushed:
 # publishing the tag and the archive is a separate, manual step.
 #
@@ -73,9 +79,26 @@ if [[ $dry_run -eq 0 ]]; then
 fi
 rm -rf "$archive"
 mkdir -p "$archive"
+tagged=0
+on_exit() {
+  local status=$?
+  if [[ $status -ne 0 && $dry_run -eq 0 && $tagged -eq 0 && -d "$archive" ]]; then
+    local aside
+    aside="${archive}.mislukt-$(date +%Y%m%d-%H%M%S)"
+    mv "$archive" "$aside"
+    printf 'Vrijgave mislukt; het archief staat apart in %s.\n' "$aside" >&2
+  fi
+}
+trap on_exit EXIT
 
 step "release notes against KERNEL_VERSION ${kernel_version}"
 node scripts/nta-kernel-version.mjs check
+# Released sections are history: compare them with the previous release tag.
+previous_tag="$(git tag -l 'oes-v*-kernel-v*' --sort=-creatordate | head -n 1)"
+if [[ -n "$previous_tag" ]] && git cat-file -e "${previous_tag}:docs/nta8800-releasenotes.md" 2>/dev/null; then
+  git show "${previous_tag}:docs/nta8800-releasenotes.md" > "$archive/releasenotes-vorige-vrijgave.md"
+  node scripts/nta-kernel-version.mjs check-released "$archive/releasenotes-vorige-vrijgave.md"
+fi
 # Unreleased items move under a new section only with a new kernel version;
 # a program release without one (UI or report only) leaves them unreleased.
 read -r unreleased new_kernel < <(node --input-type=module -e "
@@ -84,33 +107,29 @@ read -r unreleased new_kernel < <(node --input-type=module -e "
   const notes = parseReleaseNotes(readFileSync('docs/nta8800-releasenotes.md', 'utf8'));
   console.log(notes.unreleased.length, compareVersions('$kernel_version', notes.sections[0].version) > 0 ? 1 : 0);
 ")
+notes_to_commit=0
 if [[ "$unreleased" -gt 0 && "$new_kernel" -eq 0 ]]; then
   printf 'Rekenkern %s is al uitgebracht: %s onuitgebrachte items blijven onder "Onuitgebracht" staan.\n' \
     "$kernel_version" "$unreleased"
   cp docs/nta8800-releasenotes.md "$archive/releasenotes.md"
 elif [[ "$unreleased" -gt 0 ]]; then
+  # The released notes are prepared in the archive; the worktree changes only
+  # after the gate and the build (step 5).
+  cp docs/nta8800-releasenotes.md "$archive/releasenotes-voor.md"
+  node --input-type=module -e "
+    import { releaseNotes, dutchDate } from './scripts/nta-kernel-version.mjs';
+    import { readFileSync, writeFileSync } from 'node:fs';
+    const text = readFileSync('docs/nta8800-releasenotes.md', 'utf8');
+    writeFileSync('$archive/releasenotes.md', releaseNotes(text, '$kernel_version', dutchDate('$release_date')));
+  "
   if [[ $dry_run -eq 1 ]]; then
-    cp docs/nta8800-releasenotes.md "$archive/releasenotes-voor.md"
-    node --input-type=module -e "
-      import { releaseNotes, dutchDate } from './scripts/nta-kernel-version.mjs';
-      import { readFileSync, writeFileSync } from 'node:fs';
-      const text = readFileSync('docs/nta8800-releasenotes.md', 'utf8');
-      writeFileSync('$archive/releasenotes.md', releaseNotes(text, '$kernel_version', dutchDate('$release_date')));
-    "
     printf 'Proef: %s onuitgebrachte items zouden onder Rekenkern %s komen (%s/releasenotes.md).\n' \
       "$unreleased" "$kernel_version" "$archive"
   else
-    node scripts/nta-kernel-version.mjs release "$release_date"
-    git add docs/nta8800-releasenotes.md
-    git commit -q -m "Release NTA kernel ${kernel_version} (program ${program_version})"
-    cp docs/nta8800-releasenotes.md "$archive/releasenotes.md"
+    notes_to_commit=1
   fi
 else
   cp docs/nta8800-releasenotes.md "$archive/releasenotes.md"
-fi
-commit="$(git rev-parse HEAD)"
-if [[ -n "$(git status --porcelain)" ]]; then
-  commit="${commit} (met lokale wijzigingen)"
 fi
 
 if [[ $skip_gate -eq 1 ]]; then
@@ -162,6 +181,18 @@ fi
 manual_args=()
 for file in "${manual_files[@]}"; do manual_args+=(--manual "$file"); done
 
+if [[ $notes_to_commit -eq 1 ]]; then
+  step "releasenotes: onuitgebrachte items onder Rekenkern ${kernel_version} (commit)"
+  cp "$archive/releasenotes.md" docs/nta8800-releasenotes.md
+  node scripts/nta-kernel-version.mjs check
+  git add docs/nta8800-releasenotes.md
+  git commit -q -m "Release NTA kernel ${kernel_version} (program ${program_version})"
+fi
+commit="$(git rev-parse HEAD)"
+if [[ -n "$(git status --porcelain)" ]]; then
+  commit="${commit} (met lokale wijzigingen)"
+fi
+
 step "leveringsdocument"
 node scripts/nta-leveringsdocument.mjs --out "$archive/leveringsdocument.md" \
   --commit "$commit" --tag "$tag" --date "$release_date" "${manual_args[@]}" "${packages[@]}"
@@ -191,5 +222,6 @@ if [[ $dry_run -eq 1 ]]; then
 else
   step "tag ${tag}"
   git tag -a "$tag" -m "Open Energy Studio ${program_version}, NTA kernel ${kernel_version}"
+  tagged=1
   printf 'Vrijgave klaar in %s. De tag is lokaal; publiceren gaat apart (git push origin %s).\n' "$archive" "$tag"
 fi
