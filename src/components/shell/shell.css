@@ -445,3 +445,9 @@
 /* The page itself never scrolls sideways, also not by focus() or scrollIntoView (overflow: hidden still allows that). */
 html, body { overflow: clip; }
 .app-shell { overflow: clip; }
+
+/* Home button and project name in the top bar (one project at a time, feedback 8 Oct 2026). */
+.top-bar-home { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.top-bar-home svg { width: 15px; height: 15px; }
+.top-bar-project { margin-left: 12px; font-weight: 600; font-size: var(--fs-sm); color: var(--fg-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.nav-step-note { margin: -2px 0 4px 38px; font-size: var(--fs-2xs, 11px); color: var(--warn-text); }

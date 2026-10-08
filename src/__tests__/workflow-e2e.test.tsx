@@ -75,6 +75,13 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** A workflow step by its label ("2 Building, to do") and optionally one of its pages ("· Calculation zones"). */
 async function openStep(user: User, step: string, sub?: string) {
+  // Results and report are one step; its two pages are listed under it.
+  if (step === 'Results' || step === 'Report & dossier') {
+    await user.click(within(nav()).getByRole('button', { name: /^Results and report, / }));
+    await user.click(within(nav()).getByRole('button', { name: step }));
+    if (sub) await user.click(main().getByRole('button', { name: new RegExp(escape(sub) + '$') }));
+    return;
+  }
   await user.click(within(nav()).getByRole('button', { name: new RegExp(`${escape(step)}, `) }));
   if (!sub) return;
   // Flow steps list their questions in the navigation; Report & dossier has its pages as tabs on the page.
@@ -100,7 +107,8 @@ async function openProjectFile(user: User, project: unknown, name = 'project.oes
   });
   await user.keyboard('{Control>}o{/Control}');
   click.mockRestore();
-  await waitFor(() => expect(screen.getAllByRole('button', { name: /^Close tab/ })).toHaveLength(2));
+  // One project at a time: the opened project replaces the open one.
+  await waitFor(() => expect(document.querySelector('.top-bar-project')?.textContent ?? '').not.toMatch(/Untitled/));
 }
 
 async function openExample(user: User, project: Record<string, unknown> = terracedProject) {
@@ -140,7 +148,7 @@ describe('workflow end to end, default edition', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.keyboard('{Control>}n{/Control}');
-    expect(screen.getByRole('button', { name: 'Close tab: Untitled 1' })).toBeInTheDocument();
+    expect(document.querySelector('.top-bar-project')).toHaveTextContent('Untitled 1');
     expect(within(nav()).getByRole('button', { name: /^Project/ })).toHaveAttribute('aria-current', 'page');
     await kernelRuns(1);
     expect(lastNta()).toBeUndefined();

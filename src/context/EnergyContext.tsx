@@ -327,8 +327,9 @@ export function documentManagerReducer(
         filePath: null,
         state: createDocumentState(action.payload.project),
       };
+      // One project at a time (feedback 8 Oct 2026); the one it replaces stays in the project library.
       return {
-        documents: [...state.documents, newDoc],
+        documents: [newDoc],
         activeDocumentId: newDoc.id,
       };
     }
@@ -346,7 +347,7 @@ export function documentManagerReducer(
         state: createDocumentState(action.payload.project, true),
       };
       return {
-        documents: [...state.documents, newDoc],
+        documents: [newDoc],
         activeDocumentId: newDoc.id,
       };
     }
@@ -1208,8 +1209,15 @@ function useAutosave(docState: DocumentManagerState) {
   if (saved.current === null) saved.current = new Map(docState.documents.map((doc) => [doc.id, doc]));
   // The project library keeps a card and a snapshot per project, also after the document closes.
   const inLibrary = useRef(new Map<string, IProject>());
+  const previousDocs = useRef(docState.documents);
   useEffect(() => {
     if (!autosaveEnabled()) return undefined;
+    const store = storage();
+    const gone = previousDocs.current.filter((doc) => !docState.documents.some((item) => item.id === doc.id));
+    previousDocs.current = docState.documents;
+    if (store && gone.length > 0) {
+      inLibrary.current = saveDocumentsToLibrary(store, gone.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current);
+    }
     const timer = window.setTimeout(() => {
       const store = storage();
       if (store && saved.current) saved.current = saveTo(store, docState, saved.current);

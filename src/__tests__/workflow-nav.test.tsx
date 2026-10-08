@@ -46,14 +46,14 @@ function Shell({ actions, route }: { actions: ShellActions; route?: Route }) {
 const route = () => JSON.parse(screen.getByTestId('route').textContent ?? '{}') as Route;
 
 describe('WorkflowNav', () => {
-  it('shows the input flow, what comes after and no ribbon tabs', () => {
+  it('shows one numbered sequence, the other parts under More and no ribbon tabs', () => {
     renderWithProviders(<Shell actions={makeActions()} />);
     const nav = screen.getByRole('navigation', { name: 'Workflow steps' });
-    expect(within(nav).getByText('Input')).toBeInTheDocument();
     const steps = within(nav).getAllByRole('button').filter((button) => button.classList.contains('nav-step') && button.dataset.step);
     expect(steps.map((button) => button.dataset.step)).toEqual([
-      'project', 'building', 'installations', 'check', 'results', 'report', 'registration',
+      'project', 'building', 'installations', 'check', 'results', 'registration',
     ]);
+    expect(within(nav).getByText('More')).toBeInTheDocument();
     expect(document.querySelector('.ribbon-tab, .ribbon-container')).toBeNull();
   });
 

@@ -4,7 +4,7 @@
  * sub pages. The footer holds the compact Gereedschap menu (calculators,
  * exchange formats, feedback) and Instellingen — there is no tab strip of tools.
  */
-import { useRef, type KeyboardEvent } from 'react';
+import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import {
   BookOpen, Box, Calculator, Check, ChevronRight, Download, Flame, MessageSquare, SlidersHorizontal, Upload, Wrench,
 } from 'lucide-react';
@@ -12,30 +12,44 @@ import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { Kbd, Tag } from '../ui';
 import { useMenu } from './TopBar';
-import { HELP_TOOL_SUBS, WORKFLOW_STEPS, TOOL_STEP, type Route, type StepId } from '../../core/navigation/routes';
+import { HELP_TOOL_SUBS, TOOL_STEP, type Route, type StepId } from '../../core/navigation/routes';
 import { isNewBuild, isSurveyProject, type StepStatus } from '../../core/nta/stepStatus';
 import type { IProject } from '../../core/energy/types';
 import type { ShellActions } from './ShellActions';
-import {
-  questionForPath, questionKey, questionState, stepState, surveySteps, stepForKind, type SurveyProgress,
-} from '../../core/survey/surveyFlow';
+import { questionForPath, questionKey, questionState, stepState, surveySteps, stepForKind, type SurveyProgress } from '../../core/survey/surveyFlow';
+import { defaultsWithoutReason } from '../../core/survey/surveyRegistration';
 import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
 import { labelColor } from './pages/results/resultsData';
 import type { StoredSurvey } from '../../core/nta/SurveyTemplates';
 import { BuildNavList } from '../BuildFlow/BuildFlow';
 
-/** The pages outside the input flow of a new-build project, under "Overige onderdelen". */
+/** What is not part of the numbered sequence of a new-build project (feedback 8 Oct 2026: "hoofdmenu erg warrig"). */
 const BUILD_MORE: Array<{ route: Route; labelKey: string }> = [
   { route: { step: 'building', sub: 'model3d' }, labelKey: 'nav.sub.building.model3d' },
-  { route: { step: 'installations', sub: 'systems' }, labelKey: 'build.more.systems' },
-  { route: { step: 'installations', sub: 'heatPumps' }, labelKey: 'nav.sub.installations.heatPumps' },
-  { route: { step: 'check', sub: 'input' }, labelKey: 'nav.sub.check.input' },
-  { route: { step: 'survey' }, labelKey: 'nav.step.survey' },
   { route: { step: 'advice' }, labelKey: 'nav.step.advice' },
-  { route: { step: 'relabel' }, labelKey: 'nav.step.relabel' },
 ];
 
-/** The input flow of a project without a basisopname, what comes after, and the other parts. */
+/** One step of the numbered sequence after the input steps. */
+function SequenceStep({ number, labelKey, target, current, status, onClick, t, note, children }: {
+  number: number; labelKey: string; target: string; current: boolean; status: 'complete' | 'errors' | 'todo';
+  onClick: () => void; t: Translate; note?: string; children?: ReactNode;
+}) {
+  const badge = status === 'complete' ? 'complete' : status === 'errors' ? 'errors' : current ? 'current' : 'todo';
+  return <li>
+    <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-step={target} onClick={onClick}>
+      <span className={`nav-step-no ${badge}`} aria-hidden="true">{badge === 'complete' ? <Check /> : badge === 'errors' ? '!' : number}</span>
+      <span className="nav-step-label">{t(labelKey)}</span>
+      <span className="visually-hidden">, {t(status === 'complete' ? 'nav.state.complete' : status === 'errors' ? 'nav.state.attention' : 'nav.state.todo')}</span>
+    </button>
+    {note && <p className="nav-step-note">{note}</p>}
+    {current && children}
+  </li>;
+}
+
+const stepStatusOf = (status: StepStatus | undefined): 'complete' | 'errors' | 'todo' =>
+  status?.state === 'complete' ? 'complete' : status?.state === 'errors' ? 'errors' : 'todo';
+
+/** The input flow of a new-build project, results and registration, and the few other parts. */
 function BuildFlowNav({ route, statuses, navigate, t }: {
   route: Route; statuses: Record<StepId, StepStatus>; navigate: ShellActions['navigate']; t: Translate;
 }) {
@@ -43,31 +57,26 @@ function BuildFlowNav({ route, statuses, navigate, t }: {
   const moreOpen = BUILD_MORE.some((item) => isHere(item.route));
   return <>
     <li className="nav-group-item">
-      <div className="nav-group" id="nav-group-input">{t('nav.group.input')}</div>
-      <ol aria-labelledby="nav-group-input" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <ol aria-label={t('nav.sequence')} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         <BuildNavList route={route} statuses={statuses} navigate={navigate} />
-      </ol>
-    </li>
-    <li className="nav-group-item">
-      <div className="nav-group" id="nav-group-after">{t('nav.survey.after')}</div>
-      <ol aria-labelledby="nav-group-after" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {WORKFLOW_STEPS.filter((step) => ['results', 'report', 'registration'].includes(step.id)).map((step) => {
-          const status = statuses[step.id];
-          const current = route.step === step.id;
-          return <li key={step.id}>
-            <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-step={step.id}
-              onClick={() => navigate({ step: step.id })}>
-              <StepBadge status={status} number={step.number} current={current} />
-              <span className="nav-step-label">{t(step.labelKey)}</span>
-              <span className="visually-hidden">, {stepStateText(t, status)}</span>
-            </button>
-          </li>;
-        })}
+        <SequenceStep number={5} labelKey="nav.step.resultsReport" target="results" t={t}
+          current={route.step === 'results' || route.step === 'report'} status={stepStatusOf(statuses.results)}
+          onClick={() => navigate({ step: 'results' })}>
+          <ul className="nav-subs">
+            {(['results', 'report'] as const).map((step) => <li key={step}>
+              <button type="button" className="nav-sub" aria-current={route.step === step ? 'page' : undefined}
+                onClick={() => navigate({ step })}>{t(`nav.step.${step}`)}</button>
+            </li>)}
+          </ul>
+        </SequenceStep>
+        <SequenceStep number={6} labelKey="nav.step.registration" target="registration" t={t}
+          current={route.step === 'registration'} status={stepStatusOf(statuses.registration)}
+          onClick={() => navigate({ step: 'registration' })} />
       </ol>
     </li>
     <li className="nav-group-item">
       <details className="nav-more" open={moreOpen}>
-        <summary className="nav-group">{t('nav.survey.more')}</summary>
+        <summary className="nav-group">{t('nav.more')}</summary>
         <ul className="nav-subs">
           {BUILD_MORE.map((item) => <li key={item.labelKey}>
             <button type="button" className="nav-sub" aria-current={isHere(item.route) ? 'page' : undefined}
@@ -94,7 +103,11 @@ function SurveyCardStatus({ stored, t }: { stored: StoredWithProgress; t: Transl
   </div>;
 }
 
-/** The steps of the basisopname with their state, the questions of the current step, and what comes after. */
+/**
+ * The numbered sequence of a basisopname project (feedback 8 Oct 2026):
+ * Opname (its parts only while you are in it), Controle, Label en rapport,
+ * Maatwerkadvies and Registratie; Herlabelen under "Meer".
+ */
 function SurveyNavList({ stored, route, statuses, navigate, t }: {
   stored: StoredWithProgress; route: Route; statuses: Record<StepId, StepStatus>;
   navigate: ShellActions['navigate']; t: Translate;
@@ -102,71 +115,83 @@ function SurveyNavList({ stored, route, statuses, navigate, t }: {
   const assessment = useSurveyAssessment();
   const result = currentResult(assessment, stored);
   const steps = surveySteps(stored.kind);
+  const inputSteps = steps.filter((step) => !step.special);
   const currentStep = route.step === 'survey' ? stepForKind(route.sub, stored.kind) : null;
+  const inInput = route.step === 'survey' && currentStep != null && currentStep !== 'controle' && currentStep !== 'label';
   const issues = (id: string) => result?.issues.filter((item) => questionForPath(item.path, stored).step === id).length ?? 0;
-  const workflowStep = (step: typeof WORKFLOW_STEPS[number]) => {
-    const status = statuses[step.id];
-    const current = route.step === step.id;
-    return <li key={step.id}>
-      <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-step={step.id}
-        onClick={() => navigate({ step: step.id })}>
-        <StepBadge status={status} number={step.number} current={current} />
-        <span className="nav-step-label">{t(step.labelKey)}</span>
-        <span className="visually-hidden">, {stepStateText(t, status)}</span>
-      </button>
-    </li>;
-  };
+  const inputErrors = inputSteps.reduce((sum, step) => sum + issues(step.id), 0);
+  const inputDone = inputSteps.every((step) => stepState(step, stored.progress) === 'done');
+  const firstOpen = inputSteps.find((step) => stepState(step, stored.progress) !== 'done') ?? inputSteps[0];
+  const reasonsMissing = result ? defaultsWithoutReason(stored, result) : 0;
+  const blocked = !result?.performance || (result?.issues.length ?? 0) > 0;
+  const checkDone = Boolean(stored.progress?.done?.includes('controle'));
   return <>
     <li className="nav-group-item">
-      <div className="nav-group" id="nav-group-survey">{t('nav.survey.steps')}</div>
-      <ol aria-labelledby="nav-group-survey" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {steps.map((step, index) => {
-          const state = stepState(step, stored.progress);
-          const errors = issues(step.id);
-          const current = currentStep === step.id;
-          const badge = state === 'done' ? 'complete' : state === 'skipped' ? 'skipped' : errors > 0 ? 'errors' : current ? 'current' : 'todo';
-          const stateText = state === 'done' ? t('nav.state.complete') : state === 'skipped' ? t('nav.state.skipped')
-            : state === 'partial' ? t('nav.state.partial') : t('nav.state.todo');
-          return <li key={step.id}>
-            <button type="button" className="nav-step" aria-current={current ? 'page' : undefined} data-survey-step={step.id}
-              data-state={state} onClick={() => navigate({ step: 'survey', sub: step.id })}>
-              <span className={`nav-step-no ${badge}`} aria-hidden="true">
-                {state === 'done' ? <Check /> : state === 'skipped' ? '↷' : index + 1}
-              </span>
-              <span className="nav-step-label">{t(step.labelKey)}</span>
-              {errors > 0 && <span className="nav-count errors" aria-hidden="true">{errors}</span>}
-              {errors === 0 && state === 'skipped' && <span className="nav-later" aria-hidden="true">{t('survey.open.skipped')}</span>}
-              <span className="visually-hidden">, {stateText}{errors > 0 ? `, ${t('nav.state.errors', { count: String(errors) })}` : ''}</span>
-            </button>
-            {current && step.questions.length > 1 && <ul className="nav-subs">
-              {step.questions.map((question) => {
-                const answered = questionState(stored.progress, questionKey(step.id, question.id));
-                const here = (route.question ?? step.questions[0].id) === question.id;
-                return <li key={question.id}>
-                  <button type="button" className={`nav-sub nav-question nav-question--${answered}`} aria-current={here ? 'step' : undefined}
-                    onClick={() => navigate({ step: 'survey', sub: step.id, question: question.id })}>
-                    <span className="nav-question-mark" aria-hidden="true">{answered === 'done' ? '✓' : answered === 'skipped' ? '↷' : here ? '›' : '·'}</span>
-                    {t(`survey.navQuestion.${step.id}.${question.id}`)}
-                  </button>
-                </li>;
-              })}
-            </ul>}
-          </li>;
-        })}
+      <ol aria-label={t('nav.sequence')} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <li>
+          <button type="button" className="nav-step" aria-current={inInput ? 'page' : undefined} data-step="survey-input"
+            onClick={() => navigate({ step: 'survey', sub: firstOpen.id })}>
+            <span className={`nav-step-no ${inputDone && inputErrors === 0 ? 'complete' : inputErrors > 0 ? 'errors' : inInput ? 'current' : 'todo'}`} aria-hidden="true">
+              {inputDone && inputErrors === 0 ? <Check /> : inputErrors > 0 ? '!' : 1}
+            </span>
+            <span className="nav-step-label">{t('nav.survey.steps')}</span>
+            {inputErrors > 0 && <span className="nav-count errors" aria-hidden="true">{inputErrors}</span>}
+            <span className="visually-hidden">, {t(inputDone ? 'nav.state.complete' : 'nav.state.todo')}</span>
+          </button>
+          {inInput && <ul className="nav-subs">
+            {inputSteps.map((step) => {
+              const state = stepState(step, stored.progress);
+              const errors = issues(step.id);
+              const here = currentStep === step.id;
+              return <li key={step.id}>
+                <button type="button" className={`nav-sub nav-question nav-question--${state === 'done' ? 'done' : state === 'skipped' ? 'skipped' : 'todo'}`}
+                  aria-current={here ? 'step' : undefined} data-survey-step={step.id} data-state={state}
+                  onClick={() => navigate({ step: 'survey', sub: step.id })}>
+                  <span className="nav-question-mark" aria-hidden="true">{state === 'done' ? '✓' : state === 'skipped' ? '↷' : here ? '›' : '·'}</span>
+                  {t(step.labelKey)}
+                  {errors > 0 && <span className="nav-count errors" aria-hidden="true">{errors}</span>}
+                </button>
+                {here && step.questions.length > 1 && <ul className="nav-subs">
+                  {step.questions.map((question) => {
+                    const answered = questionState(stored.progress, questionKey(step.id, question.id));
+                    const at = (route.question ?? step.questions[0].id) === question.id;
+                    return <li key={question.id}>
+                      <button type="button" className={`nav-sub nav-question nav-question--${answered}`} aria-current={at ? 'step' : undefined}
+                        onClick={() => navigate({ step: 'survey', sub: step.id, question: question.id })}>
+                        <span className="nav-question-mark" aria-hidden="true">{answered === 'done' ? '✓' : answered === 'skipped' ? '↷' : at ? '›' : '·'}</span>
+                        {t(`survey.navQuestion.${step.id}.${question.id}`)}
+                      </button>
+                    </li>;
+                  })}
+                </ul>}
+              </li>;
+            })}
+          </ul>}
+        </li>
+        <SequenceStep number={2} labelKey="survey.step.controle" target="survey-check" t={t}
+          current={route.step === 'survey' && currentStep === 'controle'}
+          status={(result?.issues.length ?? 0) > 0 ? 'errors' : checkDone && result?.performance ? 'complete' : 'todo'}
+          note={reasonsMissing > 0 ? t('nav.survey.reasonsMissing', { count: String(reasonsMissing) }) : undefined}
+          onClick={() => navigate({ step: 'survey', sub: 'controle' })} />
+        <SequenceStep number={3} labelKey="survey.step.label" target="survey-label" t={t}
+          current={(route.step === 'survey' && currentStep === 'label') || route.step === 'report'}
+          status={blocked ? 'todo' : 'complete'}
+          onClick={() => navigate({ step: 'survey', sub: 'label' })} />
+        <SequenceStep number={4} labelKey="nav.step.advice" target="advice" t={t}
+          current={route.step === 'advice'} status={stepStatusOf(statuses.advice)}
+          onClick={() => navigate({ step: 'advice' })} />
+        <SequenceStep number={5} labelKey="nav.step.registration" target="registration" t={t}
+          current={route.step === 'registration'} status={stepStatusOf(statuses.registration)}
+          onClick={() => navigate({ step: 'registration' })} />
       </ol>
     </li>
     <li className="nav-group-item">
-      <div className="nav-group" id="nav-group-after">{t('nav.survey.after')}</div>
-      <ol aria-labelledby="nav-group-after" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {WORKFLOW_STEPS.filter((step) => ['advice', 'relabel', 'report', 'registration'].includes(step.id)).map(workflowStep)}
-      </ol>
-    </li>
-    <li className="nav-group-item">
-      <details className="nav-more" open={['project', 'building', 'installations', 'check', 'results'].includes(route.step)}>
-        <summary className="nav-group">{t('nav.survey.more')}</summary>
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {WORKFLOW_STEPS.filter((step) => ['project', 'building', 'installations', 'check', 'results'].includes(step.id)).map(workflowStep)}
-        </ol>
+      <details className="nav-more" open={route.step === 'relabel'}>
+        <summary className="nav-group">{t('nav.more')}</summary>
+        <ul className="nav-subs">
+          <li><button type="button" className="nav-sub" aria-current={route.step === 'relabel' ? 'page' : undefined}
+            onClick={() => navigate({ step: 'relabel' })}>{t('nav.step.relabel')}</button></li>
+        </ul>
       </details>
     </li>
   </>;
@@ -179,18 +204,6 @@ export interface WorkflowNavProps {
   floorAreaM2?: number | null;
   actions: Pick<ShellActions, 'navigate' | 'openSettings' | 'openFeedback' | 'exportUNIEC3' | 'importUNIEC3'
     | 'exportVABI' | 'importVABI' | 'exportModelIFC'>;
-}
-
-function StepBadge({ status, number, current }: { status: StepStatus; number: number; current: boolean }) {
-  const kind = status.state === 'complete' ? 'complete'
-    : status.state === 'errors' ? 'errors'
-      : status.state === 'warnings' ? 'warnings'
-        : current ? 'current' : status.state === 'dimmed' ? 'dimmed' : 'todo';
-  return (
-    <span className={`nav-step-no ${kind}`} aria-hidden="true">
-      {kind === 'complete' ? <Check /> : number}
-    </span>
-  );
 }
 
 /** Screen-reader text of a step status, e.g. "2 aandachtspunt(en)". */

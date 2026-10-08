@@ -236,17 +236,17 @@ describe('Dutch value texts', () => {
 
 
 describe('opening a project in the browser', () => {
-  it('opens a project without a saved location as a new document', () => {
+  it('opens one project at a time and reuses the document of the same file', () => {
     const project = createDefaultProject();
     const one = documentManagerReducer({ documents: [], activeDocumentId: null },
       { type: 'DOC_OPEN', payload: { id: 'a', project, filePath: null } });
     const two = documentManagerReducer(one, { type: 'DOC_OPEN', payload: { id: 'b', project, filePath: null } });
-    expect(two.documents.map((doc) => doc.id)).toEqual(['a', 'b']);
+    expect(two.documents.map((doc) => doc.id)).toEqual(['b']);
     expect(two.activeDocumentId).toBe('b');
     const same = documentManagerReducer(
       documentManagerReducer(two, { type: 'DOC_OPEN', payload: { id: 'c', project, filePath: '/x.oes.json' } }),
       { type: 'DOC_OPEN', payload: { id: 'd', project, filePath: '/x.oes.json' } },
     );
-    expect(same.documents.map((doc) => doc.id)).toEqual(['a', 'b', 'c']);
+    expect(same.documents.map((doc) => doc.id)).toEqual(['c']);
   });
 });

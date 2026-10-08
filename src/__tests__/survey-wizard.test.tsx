@@ -32,6 +32,7 @@ function Shell() {
   const wired: ShellActions = { ...actions(), navigate: (target) => dispatch({ type: 'NAVIGATE', payload: target }) };
   const statuses = stepStatuses(state.project, null);
   return <>
+    <button type="button" onClick={() => wired.navigate({ step: 'survey' })}>Start the basic survey</button>
     <WorkflowNav project={state.project} route={state.route} statuses={statuses} actions={wired} />
     <main><StepRouter project={state.project} route={state.route} statuses={statuses} actions={wired} /></main>
     <output data-testid="state">{JSON.stringify({ route: state.route, survey: state.project.basisopname ?? null })}</output>
@@ -108,8 +109,7 @@ describe('survey wizard', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ issues: [], appliedDefaults: [], warnings: [] }) }));
     const user = userEvent.setup();
     renderWithProviders(<Shell />);
-    const nav = screen.getByRole('navigation', { name: 'Workflow steps' });
-    await user.click(within(nav).getByRole('button', { name: /Basic survey|Basisopname/ }));
+    await user.click(screen.getByRole('button', { name: 'Start the basic survey' }));
     await user.click(screen.getByRole('button', { name: /Existing dwelling/ }));
     expect(snapshot().route).toMatchObject({ step: 'survey', sub: 'woning' });
     // The first question is the address of the project (ISSO opnameformulier §1).
@@ -151,10 +151,9 @@ describe('survey wizard', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ issues: [], appliedDefaults: [], warnings: [] }) }));
     const user = userEvent.setup();
     renderWithProviders(<Shell />);
-    const nav = screen.getByRole('navigation', { name: 'Workflow steps' });
-    await user.click(within(nav).getByRole('button', { name: /Basic survey|Basisopname/ }));
+    await user.click(screen.getByRole('button', { name: 'Start the basic survey' }));
     await user.click(screen.getByRole('button', { name: /Existing dwelling/ }));
-    await user.click(document.querySelector<HTMLButtonElement>('[data-survey-step="controle"]')!);
+    await user.click(document.querySelector<HTMLButtonElement>('[data-step="survey-check"]')!);
     expect(screen.getByRole('heading', { level: 1, name: 'Is everything right?' })).toBeInTheDocument();
     const heating = screen.getByRole('region', { name: 'Heating' });
     await user.click(within(heating).getByRole('button', { name: 'Edit' }));
