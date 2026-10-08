@@ -22,7 +22,7 @@ const CASES: [Case; 3] = [
         json: include_str!("../../../training-data/nta8800-public-comparison-a.json"),
         name: "A (published 92,99 / 25,19 / 80,4)",
         beng1: 94.0,
-        beng2: 35.15,
+        beng2: 34.37,
         beng3: 74.9,
     },
     Case {
@@ -163,8 +163,9 @@ fn assert_indicators(name: &str, actual: [f64; 3], expected: [f64; 3]) {
 /// - 2020+A1 (16.4, p. 651) floors K_pk to 5 W/m²: 325 Wp on 9 panels of
 ///   15,21 m² together gives 192,3 → 190 W/m², the 2 437 kWh of the report.
 ///
-/// A: 2024 35,15 → 2020+A1 36,06 (+0,56 PV, +0,36 the 2023 switch points of
-/// emission and ΔT_C;fan); B: 2022 equals 2023, 29,10. What remains against
+/// A: 2024 34,37 → 2020+A1 35,29 (+0,56 PV, +0,36 the 2023 switch points of
+/// emission and ΔT_C;fan; both with the declared f_ctrl 0,50 of the report);
+/// B: 2022 equals 2023, 29,10. What remains against
 /// the reports is 10.15, 10.87 and the rest
 /// (docs/nta8800-vergelijking-openbare-rapporten.md).
 #[test]
@@ -187,7 +188,7 @@ fn cases_a_and_b_under_their_own_editions() {
         "panelAreaM2": 15.21
     });
     let (a20, a20_indicators) = run_edition(&a, "2020+A1");
-    assert_indicators("A 2020+A1", a20_indicators, [94.0, 36.06, 74.4]);
+    assert_indicators("A 2020+A1", a20_indicators, [94.0, 35.29, 74.4]);
     // 15,21 m² × 190 W/m²: the report's 2 437 kWh within the rounding.
     let pv = a20["pvSystems"][0]["annualKwh"].as_f64().unwrap();
     assert!((pv - 2437.0).abs() < 5.0, "{pv}");
@@ -429,16 +430,16 @@ fn shading_device_serialises_without_reduction_factor() {
 /// p. 521–522), 856 · (1,28 + 0,01 · 369,10) = 4 255 kWh, and f_sto;dis;ls 2
 /// for both vessels (all connections insulated; an electric boiler without
 /// test data, 2024 p. 552–553). What differs, as BENG 2 (Δ kWh · 1,45 / A_g):
-/// - Heating +381 kWh (+1,50): the report takes the product f_ctrl 0,51 of a
-///   BCRG declaration for the C.4c unit; the kernel has no declared f_ctrl
-///   and takes table 11.5 (0,59 for C.4c). With 0,52 (C.4b) the heating
-///   drops 203 kWh. The rest is the heat need: three windows with "overige
-///   belemmering" without geometry (§17.3.2g, heating table 17.13) and the
-///   screens on the roof window, which the kernel cannot give one window.
-/// - Heating auxiliary +24 kWh (+0,09).
-/// - Cooling −37 kWh (−0,15): the literal 10.15 emission loss (5 886 kWh
-///   cold against 4 157) and the 10.84 regeneration surcharge (ground not
-///   shown above 0 °C) nearly cancel.
+/// - The C.4c unit has the declared f_ctrl 0,51 of its BCRG
+///   gelijkwaardigheidsverklaring (instead of table 11.5: 0,59), and the
+///   roof window its dark external screens (table 7.5, per window), as in
+///   the report.
+/// - Heating +149 kWh (+0,59): the heat need of three windows with
+///   "overige belemmering" without geometry (§17.3.2g, heating table 17.13).
+/// - Heating auxiliary about +10 kWh (+0,04).
+/// - Cooling with its auxiliary about −90 kWh (−0,35): the literal 10.15
+///   emission loss and the 10.84 regeneration surcharge (ground not shown
+///   above 0 °C).
 #[test]
 fn case_g_under_nta_8800_2024() {
     let value: Value = serde_json::from_str(include_str!(
@@ -447,13 +448,13 @@ fn case_g_under_nta_8800_2024() {
     .unwrap();
     assert_eq!(value["ntaCalculation"]["normVersion"], "2024");
     let (performance, indicators) = run_edition(&value, "2024");
-    assert_indicators("G 2024", indicators, [65.67, 30.89, 71.8]);
+    assert_indicators("G 2024", indicators, [65.42, 29.71, 72.1]);
     assert!((used_kwh(&performance, "ventilation") - 300.4).abs() < 1.0);
     let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
     assert!((pv - 4164.0).abs() < 1.0, "{pv}");
     let heating = &performance["spaceHeating"];
     assert_eq!(heating["generationEfficiency"].as_f64(), Some(4.25));
-    assert!((used_kwh(&performance, "heating") - 4747.2).abs() < 1.0);
+    assert!((used_kwh(&performance, "heating") - 4515.1).abs() < 1.0);
     let need = performance["hotWater"]["annualNetNeedKwh"]
         .as_f64()
         .unwrap();
