@@ -1,0 +1,294 @@
+{
+  "suiteId": "rvo-voorbeeldwoningen",
+  "description": "Zes RVO-voorbeeldwoningen met de typering van RVO (U-waarden van RVO, ΔU_for 0). Per woning de gedocumenteerde band van ±6 % rond Q_H,nd van RVO, en de vastgelegde uitkomst van deze kern binnen 0,5 %. Geen officiële referentietoets.",
+  "cases": [
+    {
+      "caseId": "rvo-tussenwoning-1965-1974-band",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-tussenwoning-1965-1974.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 141.92,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd tegen Q_H,nd van RVO (validatietool NTA 8800:2022)",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.06
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-tussenwoning-1965-1974-regressie",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-tussenwoning-1965-1974.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 146.0,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd, vastgelegde uitkomst van deze rekenkern",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.005
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-hoekwoning-1946-1964-band",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-hoekwoning-1946-1964.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 208.22,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd tegen Q_H,nd van RVO (validatietool NTA 8800:2022)",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.06
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-hoekwoning-1946-1964-regressie",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-hoekwoning-1946-1964.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 219.09,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd, vastgelegde uitkomst van deze rekenkern",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.005
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-vrijstaand-1975-1991-band",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-vrijstaand-1975-1991.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 157.33,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd tegen Q_H,nd van RVO (validatietool NTA 8800:2022)",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.06
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-vrijstaand-1975-1991-regressie",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-vrijstaand-1975-1991.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 150.15,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd, vastgelegde uitkomst van deze rekenkern",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.005
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-twee-onder-een-kap-1992-2005-band",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-twee-onder-een-kap-1992-2005.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 107.98,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd tegen Q_H,nd van RVO (validatietool NTA 8800:2022)",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.06
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-twee-onder-een-kap-1992-2005-regressie",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-twee-onder-een-kap-1992-2005.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 104.86,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd, vastgelegde uitkomst van deze rekenkern",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.005
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-portiekwoning-1965-1974-band",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-portiekwoning-1965-1974.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 90.73,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd tegen Q_H,nd van RVO (validatietool NTA 8800:2022)",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.06
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-portiekwoning-1965-1974-regressie",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-portiekwoning-1965-1974.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 93.88,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd, vastgelegde uitkomst van deze rekenkern",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.005
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-galerijwoning-1975-1991-band",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-galerijwoning-1975-1991.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 70.0,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd tegen Q_H,nd van RVO (validatietool NTA 8800:2022)",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.06
+        }
+      ]
+    },
+    {
+      "caseId": "rvo-galerijwoning-1975-1991-regressie",
+      "normVersion": "2025+C1",
+      "inputKind": "buildingPerformance",
+      "projectFile": "../nta8800-rvo-voorbeeldwoningen-galerijwoning-1975-1991.json",
+      "projectPointer": "/performanceInput",
+      "source": {
+        "publisher": "RVO, Voorbeeldwoningen 2022 bestaande bouw",
+        "documentId": "https://www.rvo.nl/onderwerpen/wetten-en-regels-gebouwen/voorbeeldwoningen-bestaande-bouw",
+        "edition": "Voorbeeldwoningen 2022, validatietool NTA 8800:2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen",
+        "independentReviewer": "geen: typering en band volgens docs/nta8800-vergelijking-rvo-voorbeeldwoningen.md"
+      },
+      "expected": [
+        {
+          "path": "chapter5HeatingNeed",
+          "value": 68.69,
+          "unit": "kWh/m2.year",
+          "normReference": "5.3a E_H;nd, vastgelegde uitkomst van deze rekenkern",
+          "absoluteTolerance": 0.0,
+          "relativeTolerance": 0.005
+        }
+      ]
+    }
+  ]
+}

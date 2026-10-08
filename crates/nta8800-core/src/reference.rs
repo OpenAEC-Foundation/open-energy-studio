@@ -1,6 +1,7 @@
 //! Administrative checks for independent reference cases.
 //! Completeness of a manifest never proves that its expected values are correct.
 
+use crate::norm_versions::{self, NormVersion};
 use crate::{assess_json, input_fingerprint, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,13 +11,46 @@ use std::collections::HashSet;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReferenceCase {
     pub case_id: String,
+    /// The edition the expected values belong to: a label as stamped on
+    /// results (`NTA 8800:2022`) or an input id (`2022`). The input must
+    /// carry the same edition, so the case calculates in it.
     pub norm_version: String,
+    /// What `project` holds; absent is a project file (`ntaCalculation`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_kind: Option<ReferenceInputKind>,
     pub project: Value,
     pub source: ReferenceSource,
     pub expected: Vec<ExpectedMetric>,
     /// Optional comparison of the calculated, unregistered label class.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_label_class: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReferenceInputKind {
+    /// A project file, calculated with `assess_project_performance`; its
+    /// edition is `ntaCalculation.normVersion`.
+    Project,
+    /// A building-performance input, calculated with
+    /// `assess_building_performance`; its edition is `normVersion`.
+    BuildingPerformance,
+}
+
+impl ReferenceInputKind {
+    fn edition_pointer(self) -> &'static str {
+        match self {
+            ReferenceInputKind::Project => "/ntaCalculation/normVersion",
+            ReferenceInputKind::BuildingPerformance => "/normVersion",
+        }
+    }
+}
+
+/// The edition named by a manifest: an edition label or an input id.
+pub fn reference_edition(norm_version: &str) -> Option<NormVersion> {
+    NormVersion::ALL
+        .into_iter()
+        .find(|version| version.label() == norm_version || version.id() == norm_version)
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -37,12 +71,30 @@ pub struct ExpectedMetric {
     pub unit: String,
     pub norm_reference: String,
     pub absolute_tolerance: f64,
+    /// Band as a fraction of the expected value (0,01 is 1 %). With both
+    /// tolerances the wider one applies, as test sets give a percentage
+    /// per subtest next to an absolute floor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relative_tolerance: Option<f64>,
+}
+
+impl ExpectedMetric {
+    /// The band this metric is judged against: the wider of the absolute
+    /// tolerance and the relative tolerance times |expected|.
+    pub fn applied_tolerance(&self) -> f64 {
+        let relative = self
+            .relative_tolerance
+            .map_or(0.0, |fraction| fraction * self.value.abs());
+        self.absolute_tolerance.max(relative)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReferenceAudit {
     pub case_id: String,
+    /// Label of the case's edition; the kernel's own edition when the
+    /// manifest names none it knows.
     pub target_norm_version: &'static str,
     pub manifest_fingerprint: String,
     pub manifest_complete: bool,
@@ -67,6 +119,8 @@ pub struct ReferenceIssue {
 pub struct ReferenceComparison {
     pub status: &'static str,
     pub case_id: String,
+    /// Label of the edition the case was calculated in.
+    pub target_norm_version: &'static str,
     pub manifest_fingerprint: String,
     pub input_fingerprint: Option<String>,
     pub calculation_available: bool,
@@ -96,6 +150,10 @@ pub struct MetricComparison {
     pub unit: String,
     pub absolute_difference: f64,
     pub absolute_tolerance: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relative_tolerance: Option<f64>,
+    /// The band actually applied: the wider of both tolerances.
+    pub applied_tolerance: f64,
     pub within_tolerance: bool,
 }
 
@@ -106,6 +164,7 @@ fn metric_unit(path: &str) -> Option<&'static str> {
         "beng1" | "beng2" | "labelPrimaryFossil" => return Some("kWh/m2.year"),
         "beng3" | "labelRenewableShare" => return Some("%"),
         "tojuliMax" => return Some("K"),
+        "chapter5HeatingNeed" => return Some("kWh/m2.year"),
         "annualPrimaryFossil" | "annualRenewablePrimary" => return Some("kWh"),
         "annualCO2" => return Some("kg CO2eq"),
         _ => {}
@@ -182,6 +241,12 @@ fn actual_metric(
         }
         "labelRenewableShare" => return result.label_renewable_share_percent,
         "tojuliMax" => return result.tojuli_max_k,
+        "chapter5HeatingNeed" => {
+            return result
+                .chapter5
+                .as_ref()
+                .map(|indicators| indicators.heating_need_kwh_per_m2);
+        }
         "annualPrimaryFossil" => return result.annual_primary_fossil_kwh,
         "annualRenewablePrimary" => return result.annual_renewable_primary_kwh,
         "annualCO2" => return result.annual_co2_kg,
@@ -281,6 +346,7 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     let mut result = ReferenceComparison {
         status: "invalid_case",
         case_id: audit.case_id,
+        target_norm_version: audit.target_norm_version,
         manifest_fingerprint: audit.manifest_fingerprint,
         input_fingerprint: audit.input_fingerprint,
         calculation_available: false,
@@ -312,19 +378,41 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     if !result.issues.is_empty() {
         return result;
     }
-    let assessment = crate::project_performance::assess_project_performance(&case.project);
-    result.input_fingerprint = Some(assessment.input_fingerprint);
-    if assessment.status != "calculated_unverified" {
+    let calculated = match case.input_kind.unwrap_or(ReferenceInputKind::Project) {
+        ReferenceInputKind::Project => {
+            let assessment = crate::project_performance::assess_project_performance(&case.project);
+            result.input_fingerprint = Some(assessment.input_fingerprint);
+            // An older edition calculates with the legacy status; the
+            // comparison is the same, a registration is never implied.
+            if matches!(
+                assessment.status,
+                "calculated_unverified" | "calculated_legacy_edition"
+            ) {
+                assessment.performance
+            } else {
+                None
+            }
+        }
+        ReferenceInputKind::BuildingPerformance => {
+            match serde_json::from_value::<crate::building_performance::BuildingPerformanceInput>(
+                case.project.clone(),
+            ) {
+                Ok(input) => {
+                    let assessment =
+                        crate::building_performance::assess_building_performance(&input);
+                    (assessment.status == "calculated_unverified").then_some(assessment)
+                }
+                Err(_) => None,
+            }
+        }
+    };
+    let Some(performance) = calculated else {
         result.status = "calculation_unavailable";
         result.issues.push(issue(
             "project_calculation_unavailable",
             "project",
             "Project does not yield a complete unverified Rust calculation",
         ));
-        return result;
-    }
-    let Some(performance) = assessment.performance else {
-        result.status = "calculation_unavailable";
         return result;
     };
     result.calculation_available = true;
@@ -349,6 +437,7 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
             ));
             return result;
         }
+        let applied_tolerance = expected.applied_tolerance();
         metrics.push(MetricComparison {
             path: expected.path.clone(),
             expected: expected.value,
@@ -356,7 +445,9 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
             unit: expected.unit.clone(),
             absolute_difference: difference,
             absolute_tolerance: expected.absolute_tolerance,
-            within_tolerance: difference <= expected.absolute_tolerance,
+            relative_tolerance: expected.relative_tolerance,
+            applied_tolerance,
+            within_tolerance: difference <= applied_tolerance,
         });
     }
     if let Some(expected) = case.expected_label_class {
@@ -409,12 +500,27 @@ pub fn audit_reference_case(case: ReferenceCase) -> ReferenceAudit {
             "Reference case ID is required",
         ));
     }
-    if case.norm_version != TARGET_NORM_VERSION {
-        issues.push(issue(
+    let kind = case.input_kind.unwrap_or(ReferenceInputKind::Project);
+    let edition = reference_edition(&case.norm_version);
+    match edition {
+        None => issues.push(issue(
             "norm_version_mismatch",
             "normVersion",
             "Reference case targets a different NTA edition",
-        ));
+        )),
+        // The input itself selects the edition it calculates in; a case
+        // whose input names another edition would compare across editions.
+        Some(version)
+            if norm_versions::request::edition_at(&case.project, kind.edition_pointer())
+                != version =>
+        {
+            issues.push(issue(
+                "norm_version_mismatch",
+                format!("project{}", kind.edition_pointer().replace('/', ".")),
+                "Reference input calculates in a different NTA edition than the case",
+            ))
+        }
+        Some(_) => {}
     }
     for (field, value) in [
         ("publisher", &case.source.publisher),
@@ -485,30 +591,57 @@ pub fn audit_reference_case(case: ReferenceCase) -> ReferenceAudit {
                 "Absolute tolerance must be finite and nonnegative",
             ));
         }
-    }
-    let input_fingerprint = match assess_json(case.project) {
-        Ok(assessment) => {
-            if assessment.status == "invalid" {
-                issues.push(issue(
-                    "project_input_invalid",
-                    "project",
-                    "Reference project fails structural validation",
-                ));
-            }
-            Some(assessment.input_fingerprint)
-        }
-        Err(_) => {
+        if metric
+            .relative_tolerance
+            .is_some_and(|fraction| !fraction.is_finite() || !(0.0..=1.0).contains(&fraction))
+        {
             issues.push(issue(
-                "project_shape_invalid",
-                "project",
-                "Reference project shape cannot be parsed",
+                "metric_tolerance_invalid",
+                format!("{path}.relativeTolerance"),
+                "Relative tolerance must be a finite fraction between 0 and 1",
             ));
-            None
         }
+    }
+    let input_fingerprint = match kind {
+        ReferenceInputKind::BuildingPerformance => {
+            match serde_json::from_value::<crate::building_performance::BuildingPerformanceInput>(
+                case.project.clone(),
+            ) {
+                Ok(_) => Some(input_fingerprint(&case.project)),
+                Err(_) => {
+                    issues.push(issue(
+                        "project_shape_invalid",
+                        "project",
+                        "Reference project shape cannot be parsed",
+                    ));
+                    None
+                }
+            }
+        }
+        ReferenceInputKind::Project => match assess_json(case.project) {
+            Ok(assessment) => {
+                if assessment.status == "invalid" {
+                    issues.push(issue(
+                        "project_input_invalid",
+                        "project",
+                        "Reference project fails structural validation",
+                    ));
+                }
+                Some(assessment.input_fingerprint)
+            }
+            Err(_) => {
+                issues.push(issue(
+                    "project_shape_invalid",
+                    "project",
+                    "Reference project shape cannot be parsed",
+                ));
+                None
+            }
+        },
     };
     ReferenceAudit {
         case_id: case.case_id,
-        target_norm_version: TARGET_NORM_VERSION,
+        target_norm_version: edition.map_or(TARGET_NORM_VERSION, NormVersion::label),
         manifest_fingerprint,
         manifest_complete: issues.is_empty(),
         reference_verified: false,
@@ -533,6 +666,7 @@ mod tests {
         ReferenceCase {
             case_id: "synthetic-comparison".into(),
             norm_version: TARGET_NORM_VERSION.into(),
+            input_kind: None,
             project,
             source: ReferenceSource {
                 publisher: "synthetic internal test".into(),
@@ -547,6 +681,7 @@ mod tests {
                 unit: unit.into(),
                 norm_reference: "internal arithmetic test".into(),
                 absolute_tolerance: 0.0,
+                relative_tolerance: None,
             }],
             expected_label_class: None,
         }
@@ -637,6 +772,7 @@ mod tests {
             unit: "%".into(),
             norm_reference: "internal test".into(),
             absolute_tolerance: 0.0,
+            relative_tolerance: None,
         });
         let pass = compare_reference_case(case.clone());
         assert_eq!(pass.status, "compared_pass");
@@ -707,6 +843,7 @@ mod tests {
             unit: "kWh".into(),
             norm_reference: "internal test".into(),
             absolute_tolerance: 0.0,
+            relative_tolerance: None,
         });
         let pass = compare_reference_case(case.clone());
         assert_eq!(pass.status, "compared_pass");
@@ -904,5 +1041,112 @@ mod tests {
         let changed = audit_reference_case(serde_json::from_value(source_changed).unwrap());
         assert_eq!(changed.input_fingerprint, project_fingerprint);
         assert_ne!(changed.manifest_fingerprint, manifest_fingerprint);
+    }
+
+    fn synthetic_project() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn relative_tolerance_widens_the_band_and_the_wider_applies() {
+        let project = synthetic_project();
+        let beng2 = crate::project_performance::assess_project_performance(&project)
+            .performance
+            .unwrap()
+            .primary_fossil_indicator_kwh_per_m2_year
+            .unwrap();
+        // 1 % above the result: outside an absolute band of 0, inside 1 %.
+        let off = beng2 * 1.01;
+        let mut case = comparison_case(project, "beng2", off, "kWh/m2.year");
+        assert_eq!(compare_reference_case(case.clone()).status, "compared_fail");
+        case.expected[0].relative_tolerance = Some(0.0101);
+        let pass = compare_reference_case(case.clone());
+        assert_eq!(pass.status, "compared_pass", "{:?}", pass.issues);
+        let metric = &pass.metrics[0];
+        assert!((metric.applied_tolerance - 0.0101 * off).abs() < 1e-12);
+        assert_eq!(metric.relative_tolerance, Some(0.0101));
+        // An absolute tolerance wider than the relative band wins.
+        case.expected[0].relative_tolerance = Some(0.0001);
+        case.expected[0].absolute_tolerance = 1.0;
+        let wide = compare_reference_case(case.clone());
+        assert_eq!(wide.status, "compared_pass");
+        assert_eq!(wide.metrics[0].applied_tolerance, 1.0);
+        // Without a relative tolerance the manifest and its fingerprint are
+        // those of before relative tolerances existed.
+        let plain =
+            serde_json::to_value(comparison_case(json!({}), "beng2", 1.0, "kWh/m2.year")).unwrap();
+        assert!(plain["expected"][0].get("relativeTolerance").is_none());
+        assert!(plain.get("inputKind").is_none());
+    }
+
+    #[test]
+    fn relative_tolerance_must_be_a_fraction() {
+        for bad in [-0.01, 1.5, f64::NAN] {
+            let mut case = comparison_case(project(), "beng1", 1.0, "kWh/m2.year");
+            case.expected[0].relative_tolerance = Some(bad);
+            let audit = audit_reference_case(case);
+            assert!(!audit.manifest_complete, "{bad}");
+            assert!(audit
+                .issues
+                .iter()
+                .any(|issue| issue.path == "expected[0].relativeTolerance"));
+        }
+    }
+
+    #[test]
+    fn older_edition_compares_in_that_edition_only() {
+        // Public case E is a project calculated in NTA 8800:2022.
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-public-comparison-e.json"
+        ))
+        .unwrap();
+        assert_eq!(project["ntaCalculation"]["normVersion"], "2022");
+        let beng1 = crate::project_performance::assess_project_performance(&project)
+            .performance
+            .unwrap()
+            .need_indicator_kwh_per_m2_year
+            .unwrap();
+        let mut case = comparison_case(project.clone(), "beng1", beng1, "kWh/m2.year");
+        // The kernel's own edition does not match an input in 2022.
+        let mismatch = audit_reference_case(case.clone());
+        assert!(mismatch
+            .issues
+            .iter()
+            .any(|issue| issue.code == "norm_version_mismatch"
+                && issue.path == "project.ntaCalculation.normVersion"));
+        for label in ["NTA 8800:2022", "2022"] {
+            case.norm_version = label.into();
+            let pass = compare_reference_case(case.clone());
+            assert_eq!(pass.status, "compared_pass", "{label}: {:?}", pass.issues);
+            assert_eq!(pass.target_norm_version, "NTA 8800:2022");
+            assert!(!pass.reference_verified);
+        }
+        case.norm_version = "NTA 8800:2019".into();
+        assert!(!audit_reference_case(case).manifest_complete);
+    }
+
+    #[test]
+    fn building_performance_input_compares_the_chapter_five_need() {
+        let doc: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-rvo-voorbeeldwoningen-tussenwoning-1965-1974.json"
+        ))
+        .unwrap();
+        let input = doc["performanceInput"].clone();
+        let recorded = doc["regression"]["performanceInputHeatingNeedKwhPerM2"]
+            .as_f64()
+            .unwrap();
+        let mut case = comparison_case(input, "chapter5HeatingNeed", recorded, "kWh/m2.year");
+        case.input_kind = Some(ReferenceInputKind::BuildingPerformance);
+        case.expected[0].relative_tolerance = Some(0.005);
+        let audit = audit_reference_case(case.clone());
+        assert!(audit.manifest_complete, "{:?}", audit.issues);
+        let pass = compare_reference_case(case.clone());
+        assert_eq!(pass.status, "compared_pass", "{:?}", pass.issues);
+        // A project file under the building kind does not parse.
+        case.project = project();
+        assert!(!audit_reference_case(case).manifest_complete);
     }
 }
