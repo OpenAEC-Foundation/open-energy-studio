@@ -5885,6 +5885,1080 @@
       }
     },
     {
+      "caseId": "isso54-v2-EPW301a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-301a, p. 31",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW301b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/emission",
+          "value": {
+            "emitter": "fan_coil_or_rac_on_ceiling",
+            "balancing": "none_or_unknown",
+            "control": "standalone_per_room",
+            "sourceReference": "ISSO 54 v2.0 EP-W301b p. 31: ventilatorconvector aan plafond, automatisch per ruimte",
+            "edition2023": {
+              "control": "room",
+              "certifiedControl": false,
+              "balancing": "none_or_unknown",
+              "roomAutomation": "standalone"
+            }
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/designTemperature",
+          "value": "t12_to16"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-301b, p. 31",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW301d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/emission",
+          "value": {
+            "emitter": "fan_coil_or_rac_on_outer_wall",
+            "balancing": "dynamic",
+            "control": "standalone_per_room",
+            "sourceReference": "ISSO 54 v2.0 EP-W301d p. 31: ventilatorconvector aan buitenmuur, 8 W totaal (10.18: 1 convector), automatisch per ruimte met handmatig overrulen en adaptief, dynamisch gebalanceerd met dynamische groepen",
+            "edition2023": {
+              "control": "room",
+              "certifiedControl": false,
+              "balancing": "dynamic_or_direct_expansion",
+              "roomAutomation": "network_with_override_and_adaptive"
+            },
+            "fanCoilCount": 1
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/designTemperature",
+          "value": "t12_to18"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-301d, p. 31",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW302a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/cooling/distribution/unconditionedPipeLengthM"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-302a, p. 32",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW302b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/unconditionedPipeLengthM",
+          "value": 20.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/fittingsInsulated",
+          "value": false
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-302b, p. 32",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW302c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/cooling/distribution/unconditionedPipeLengthM"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pipe",
+          "value": {
+            "kind": "uninsulated"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/fittingsInsulated",
+          "value": false
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-302c, p. 32",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW302d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/cooling/distribution/unconditionedPipeLengthM"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/labelPowerKw",
+          "value": 0.05
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/energyEfficiencyIndex",
+          "value": 0.3
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-302d, p. 32",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW303a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "absorption_table10_30",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W303a p. 32: gasgestookte absorptiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/generators",
+          "value": [
+            {
+              "id": "koeling",
+              "generator": {
+                "kind": "gas_absorption"
+              },
+              "equipmentReference": "ISSO 54 v2.0 EP-W303a p. 32: met gas aangedreven absorptiekoelmachine"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-303a, p. 32",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW303b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "absorption_table10_30",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W303b p. 33: absorptiekoelmachine op externe warmtelevering"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/generators",
+          "value": [
+            {
+              "id": "koeling",
+              "generator": {
+                "kind": "absorption_external_heat"
+              },
+              "equipmentReference": "ISSO 54 v2.0 EP-W303b p. 33: absorptie op externe warmtelevering"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-303b, p. 33",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW303e",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/generators",
+          "value": [
+            {
+              "id": "koeling",
+              "generator": {
+                "kind": "compression",
+                "declared": {
+                  "value": 4.2,
+                  "sourceReference": "ISSO 54 v2.0 EP-W303e p. 33: EER 4,2 gemeten volgens NEN-EN 14825"
+                }
+              },
+              "equipmentReference": "ISSO 54 v2.0 EP-W303e p. 33: compressiekoelmachine"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-303e, p. 33",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
       "caseId": "isso54-v2-EPU001",
       "normVersion": "2022",
       "projectFile": "../isso54/EPU001.json",
@@ -7933,6 +9007,331 @@
       "source": {
         "publisher": "ISSO / InstallQ (CCvD)",
         "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-602i, p. 51",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU401a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/emission",
+          "value": {
+            "emitter": "wall_cooling",
+            "balancing": "none_or_unknown",
+            "control": "standalone_per_room",
+            "sourceReference": "ISSO 54 v2.0 EP-U401a p. 48: wandkoeling, automatisch per ruimte met handmatig overrulen",
+            "edition2023": {
+              "control": "room",
+              "certifiedControl": false,
+              "balancing": "none_or_unknown",
+              "roomAutomation": "standalone_with_manual_override"
+            }
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-401a, p. 48",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU402a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pipeLengthM",
+          "value": 80.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/unconditionedPipeLengthM",
+          "value": 0.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/maxPipeLengthM",
+          "value": 40.0
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-402a, p. 48",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU403a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/generators",
+          "value": [
+            {
+              "id": "koeling",
+              "generator": {
+                "kind": "gas_engine_compression",
+                "gasEngine": {
+                  "powerKw": 30.0,
+                  "builtAfter2006": true
+                }
+              },
+              "equipmentReference": "ISSO 54 v2.0 EP-U403a p. 48: gasmotoraangedreven compressiekoelmachine, mechanisch vermogen 30 kW"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-403a, p. 48",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU301a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/emission/edition2023/kind",
+          "value": {
+            "type": "high_room",
+            "heightM": 10.0,
+            "emitter": "floor_minimal_insulation_up_to10_cm",
+            "control": "controlled"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-301a, p. 46",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU302a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/actualPipeLengthM",
+          "value": 80.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/unheatedPipeLengthM",
+          "value": 0.0
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-302a, p. 46",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU302b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/constructionYear",
+          "value": 1950
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/constructionYear",
+          "value": 1950
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans/manufactureYear",
+          "value": 1950
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/installationYear",
+          "value": 1950
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/pipeTransmittance/insulation",
+          "value": {
+            "state": "insulated",
+            "period": "from1995"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pipe",
+          "value": {
+            "kind": "insulated_from1995"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-302b, p. 46",
         "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
         "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
         "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"

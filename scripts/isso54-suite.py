@@ -939,6 +939,261 @@ UTILITY_CASES = [
 ]
 
 
+# --- Cooling (EP-W3xx p. 31-32, EP-U4xx p. 48) ---
+# NTA 8800:2022 has the cooling emission tables 10.2-10.5 of 2023 (p. 354-356;
+# the kernel's `edition2023` block). The reference cooling of the dwelling is
+# that of EP-U001: floor cooling, balancing and control unknown, insulated
+# pipes, a pump, no heat meter, an individual electric compression chiller.
+COOL = f"{NTA}/cooling"
+
+
+def cooling_emission(emitter, room_automation="unknown", control="unknown_or_other", balancing="none_or_unknown", row2023="none_or_unknown", room_control="central", fans=0, why=""):
+    body = {
+        "emitter": emitter,
+        "balancing": balancing,
+        "control": control,
+        "sourceReference": why,
+        "edition2023": {"control": room_control, "certifiedControl": False, "balancing": row2023, "roomAutomation": room_automation},
+    }
+    if fans:
+        body["fanCoilCount"] = fans
+    return setp(f"{COOL}/emission", body)
+
+
+def cooling_pump(dwelling, **extra):
+    body = {"hydraulicallyBalanced": False, "floorCount": 2, "heatMeter": False, "individualDwellingInstallation": dwelling, "sourceReference": "pomp aanwezig, gegevens onbekend"}
+    body.update(extra)
+    return body
+
+
+def cooling_distribution(design="t17_to21", pipe="insulated_from1995", fittings=True, unconditioned=0.0, dwelling=False, why="", **extra):
+    body = {"designTemperature": design, "pipe": {"kind": pipe}, "fittingsInsulated": fittings, "pump": cooling_pump(dwelling), "sourceReference": why}
+    if unconditioned is not None:
+        body["unconditionedPipeLengthM"] = unconditioned
+    body.update(extra)
+    return setp(f"{COOL}/distribution", body)
+
+
+def cooling_generators(*generators):
+    return setp(f"{COOL}/generators", list(generators))
+
+
+def chiller(kind_body, gen_id="koeling", capacity=None, why=""):
+    body = {"id": gen_id, "generator": kind_body, "equipmentReference": why}
+    if capacity is not None:
+        body["capacityKw"] = capacity
+    return body
+
+
+def active(system, why):
+    return setp(
+        f"{NTA}/activeCooling",
+        {"system": system, "capacity": {"method": "dynamic_cooling_load", "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"}, "sourceReference": why},
+    )
+
+
+# EP-W301a: the cooled reference dwelling (p. 31). Design 12/16 per the test;
+# table 10.8 note 2 (2022 p. 361) prescribes 17/21 for floor cooling only, as
+# at EP-U001.
+W301A = [
+    active("compression_table10_29", "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"),
+    setp(
+        COOL,
+        {
+            "emission": {
+                "emitter": "floor_cooling",
+                "balancing": "none_or_unknown",
+                "control": "unknown_or_other",
+                "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend",
+            },
+            "distribution": {
+                "designTemperature": "t17_to21",
+                "pipe": {"kind": "insulated_from1995"},
+                "fittingsInsulated": True,
+                "pump": cooling_pump(True),
+                "unconditionedPipeLengthM": 0.0,
+                "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter",
+            },
+            "generators": [chiller({"kind": "compression"}, why="ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine")],
+        },
+    ),
+]
+
+CASES += [
+    ("EPW301a", 31, W301A),
+    # EP-W301b: fan coils on the ceiling, automatic control per room (p. 31).
+    # Radiant 17/21 no longer applies: the test's 12/16 design is used. The
+    # number of fan coils is not given (n_fan 0, 10.18).
+    (
+        "EPW301b",
+        31,
+        W301A
+        + [
+            cooling_emission("fan_coil_or_rac_on_ceiling", room_automation="standalone", control="standalone_per_room", room_control="room", why="ISSO 54 v2.0 EP-W301b p. 31: ventilatorconvector aan plafond, automatisch per ruimte"),
+            setp(f"{COOL}/distribution/designTemperature", "t12_to16"),
+        ],
+    ),
+    # EP-W301d: fan coils on the outer wall, 8 W in total, network control with
+    # override and adaptive control, dynamic balancing with dynamic groups,
+    # design 12/18 (p. 31). 10.18 uses 10 W per fan coil: one fan coil.
+    (
+        "EPW301d",
+        31,
+        W301A
+        + [
+            cooling_emission(
+                "fan_coil_or_rac_on_outer_wall",
+                room_automation="network_with_override_and_adaptive",
+                control="standalone_per_room",
+                balancing="dynamic",
+                row2023="dynamic_or_direct_expansion",
+                room_control="room",
+                fans=1,
+                why="ISSO 54 v2.0 EP-W301d p. 31: ventilatorconvector aan buitenmuur, 8 W totaal (10.18: 1 convector), automatisch per ruimte met handmatig overrulen en adaptief, dynamisch gebalanceerd met dynamische groepen",
+            ),
+            setp(f"{COOL}/distribution/designTemperature", "t12_to18"),
+        ],
+    ),
+    # EP-W302a-d: cooling distribution (p. 32).
+    ("EPW302a", 32, W301A + [remove(f"{COOL}/distribution/unconditionedPipeLengthM")]),
+    ("EPW302b", 32, W301A + [setp(f"{COOL}/distribution/unconditionedPipeLengthM", 20.0), setp(f"{COOL}/distribution/fittingsInsulated", False)]),
+    (
+        "EPW302c",
+        32,
+        W301A
+        + [
+            remove(f"{COOL}/distribution/unconditionedPipeLengthM"),
+            setp(f"{COOL}/distribution/pipe", {"kind": "uninsulated"}),
+            setp(f"{COOL}/distribution/fittingsInsulated", False),
+        ],
+    ),
+    (
+        "EPW302d",
+        32,
+        W301A
+        + [
+            remove(f"{COOL}/distribution/unconditionedPipeLengthM"),
+            setp(f"{COOL}/distribution/pump/labelPowerKw", 0.05),
+            setp(f"{COOL}/distribution/pump/energyEfficiencyIndex", 0.3),
+        ],
+    ),
+    # EP-W303a/b/e: cooling generators (p. 32-33; tables 10.29/10.30).
+    (
+        "EPW303a",
+        32,
+        W301A
+        + [
+            active("absorption_table10_30", "ISSO 54 v2.0 EP-W303a p. 32: gasgestookte absorptiekoelmachine"),
+            cooling_generators(chiller({"kind": "gas_absorption"}, why="ISSO 54 v2.0 EP-W303a p. 32: met gas aangedreven absorptiekoelmachine")),
+        ],
+    ),
+    (
+        "EPW303b",
+        33,
+        W301A
+        + [
+            active("absorption_table10_30", "ISSO 54 v2.0 EP-W303b p. 33: absorptiekoelmachine op externe warmtelevering"),
+            cooling_generators(chiller({"kind": "absorption_external_heat"}, why="ISSO 54 v2.0 EP-W303b p. 33: absorptie op externe warmtelevering")),
+        ],
+    ),
+    # EP-W303e: EER 4,2 measured per NEN-EN 14825 without part-load points;
+    # entered as a declared efficiency (§10.1) in place of table 10.29.
+    (
+        "EPW303e",
+        33,
+        W301A
+        + [
+            cooling_generators(
+                chiller(
+                    {"kind": "compression", "declared": {"value": 4.2, "sourceReference": "ISSO 54 v2.0 EP-W303e p. 33: EER 4,2 gemeten volgens NEN-EN 14825"}},
+                    why="ISSO 54 v2.0 EP-W303e p. 33: compressiekoelmachine",
+                )
+            )
+        ],
+    ),
+]
+
+UCOOL = f"{NTA}/cooling"
+UTILITY_CASES += [
+    # EP-U401a: wall cooling (radiant, 17/21 per table 10.8), automatic per
+    # room with manual override (p. 48).
+    (
+        "EPU401a",
+        48,
+        [
+            cooling_emission(
+                "wall_cooling",
+                room_automation="standalone_with_manual_override",
+                control="standalone_per_room",
+                room_control="room",
+                why="ISSO 54 v2.0 EP-U401a p. 48: wandkoeling, automatisch per ruimte met handmatig overrulen",
+            )
+        ],
+    ),
+    # EP-U402a: 80 m of cooling pipe, none in unconditioned spaces, L_max 40 m
+    # (p. 48).
+    (
+        "EPU402a",
+        48,
+        [
+            setp(f"{UCOOL}/distribution/pipeLengthM", 80.0),
+            setp(f"{UCOOL}/distribution/unconditionedPipeLengthM", 0.0),
+            setp(f"{UCOOL}/distribution/pump/maxPipeLengthM", 40.0),
+        ],
+    ),
+    # EP-U403a: gas-engine compression, 30 kW mechanical (p. 48; table 10.29
+    # with table 9.31, built after 2006: construction year 2021).
+    (
+        "EPU403a",
+        48,
+        [
+            cooling_generators(
+                chiller(
+                    {"kind": "gas_engine_compression", "gasEngine": {"powerKw": 30.0, "builtAfter2006": True}},
+                    why="ISSO 54 v2.0 EP-U403a p. 48: gasmotoraangedreven compressiekoelmachine, mechanisch vermogen 30 kW",
+                )
+            )
+        ],
+    ),
+    # EP-U301a: a room height of 10 m (p. 46), floor heating with minimum
+    # insulation within 10 cm: table 9.8/9.10 row (2022 9.3.3.7).
+    (
+        "EPU301a",
+        46,
+        [
+            setp(
+                f"{NTA}/emission/edition2023/kind",
+                {"type": "high_room", "heightM": 10.0, "emitter": "floor_minimal_insulation_up_to10_cm", "control": "controlled"},
+            )
+        ],
+    ),
+    # EP-U302a: 80 m heating pipe, none in unheated spaces (p. 46). L_max 40 m
+    # only matters for a calculated pump; the boiler pump is in 9.85.
+    (
+        "EPU302a",
+        46,
+        [
+            setp(f"{NTA}/distributionSystem/actualPipeLengthM", 80.0),
+            setp(f"{NTA}/distributionSystem/unheatedPipeLengthM", 0.0),
+        ],
+    ),
+    # EP-U302b: construction year 1950, heating and cooling pipes insulated in
+    # 2000 (p. 46).
+    (
+        "EPU302b",
+        46,
+        [
+            setp(f"{NTA}/constructionYear", 1950),
+            setp(f"{VENT}/constructionYear", 1950),
+            setp(f"{VENT}/fans/manufactureYear", 1950),
+            setp(f"{BOILER}/installationYear", 1950),
+            setp(f"{NTA}/distributionSystem/pipeTransmittance/insulation", {"state": "insulated", "period": "from1995"}),
+            setp(f"{UCOOL}/distribution/pipe", {"kind": "insulated_from1995"}),
+        ],
+    ),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
