@@ -24,7 +24,7 @@ De pdf wordt niet in de repository opgenomen. De invoer is in eigen woorden geco
 | Referentiekantoor EP-U001 (EP-W001 als kantoor met koeling) | `training-data/isso54/EPU001.json` |
 | Deeltesten als patch op de referentie | `training-data/reference-suites/isso54-v2.json`, gegenereerd door `scripts/isso54-suite.py` |
 | Uitvoering in elke gate | `reference_gate` via `scripts/verify-nta.sh` (alle suites in `training-data/reference-suites/`) |
-| Oordeel zonder verwachtingen | Een run met alleen deze suite vergelijkt niets: het rapport zegt "geen vergelijking (0 vergeleken, 115 zonder verwachting)" en de afsluitcode is 3, niet 0. In de gate lopen de openbare gevallen en de RVO-woningen mee; die vergelijken wel. |
+| Oordeel zonder verwachtingen | Een run met alleen deze suite vergelijkt niets: het rapport zegt "geen vergelijking (0 vergeleken, 199 zonder verwachting)" en de afsluitcode is 3, niet 0. In de gate lopen de openbare gevallen en de RVO-woningen mee; die vergelijken wel. |
 
 - **Patches.** Een deeltest verandert een of enkele kenmerken van de referentie. De suite geeft daarom per deeltest een `projectPatch` (`set`/`remove` op een JSON-pointer) op het referentieproject, in plaats van een volledig projectbestand. Een patch waarvan het doel ontbreekt, laat de gate falen, dus een wijziging van de referentie kan een deeltest niet stilletjes leegmaken.
 - **Zonder verwachting.** Zonder bijlage 2 heeft elke deeltest een blok `pending` in plaats van `expected`:
@@ -72,10 +72,42 @@ Deze keuzes volgen uit de testbeschrijving of uit NTA 8800:2022. Ze zijn het eer
 - **EP-W204a, EP-W204e.** Bij warmtelevering en een biomassaketel hoort de distributiepomp niet bij de hulpenergie van 9.85. De pomp is berekend (9.41–9.51) met onbekend vermogen en EEI.
 - **EP-U601/602.** Het lampvermogen is één groep (14.9, tabel 14.2). Nieuwwaardecompensatie is tabel 14.4 van 2022 (`constantIlluminance`). EP-U602a "centraal aan" is handbediend met centrale aanschakeling.
 - **EP-U002j.** 30 % kantoor en 70 % overige bijeenkomst in één rekenzone. Ventilatie, tapwater en verlichting zijn per oppervlak verdeeld. De gebruiksfunctie van de zone, voor setpoints en interne warmte, is de grootste: overige bijeenkomst.
+- **Referenties: geen leidingen in onverwarmde ruimten.** EP-W001 en EP-U001 noemen geen verwarmingsleidingen door onverwarmde ruimten, maar de codering liet `unheatedPipeLengthM` leeg. Dan neemt 9.36 15 % van de lengte als onverwarmd. Gecorrigeerd naar 0 (9 oktober 2026): BENG 2 van EP-W001 daalt van 105,18 naar 105,07. EP-W202a (lengte onbekend) is nu de variant met 15 %.
+- **EP-W201b–d.** Rij van de overtemperatuur in tabel 9.3 (2022 p. 273) naar de gemiddelde watertemperatuur min 20 °C: 55/47 is 31 K (rij 30 K), 50/42 is 26 K (rij 30 K), 90/70 is 60 K. Bij convectoren met boosterventilatoren de rij "radiatoren met ventilator". De 40 W per ventilator vraagt de route van NEN-EN 16430, die NTA 8800:2022 niet kent (schakelpunt 56): gerekend is met 10 W per ventilator uit tabel 9.11. De gemiddelde ontwerptemperatuur van de ketel volgt de ontwerpklasse.
+- **Ventilatie EP-W101c, r, s, w.**
+  - EP-W101c: het bouwjaar 1985 werkt volgens de test op infiltratie, de ventilatoren en de isolatieperiode van de verwarmingsleidingen (1980–1995), niet op de ketel.
+  - EP-W101r: verklaring van 85 % met dissipatie verdisconteerd, als NEN-EN 13141-7. EP-W101s: 85 % volgens NEN-EN 13142, zonder dissipatie.
+  - EP-W101w: E.1 met D.5b op 40 m² en C.1 op 30 m² verblijfsgebied, zonder bypass, zonder passieve koeling via het systeem.
+- **EP-W102b.** q_v;inst 60 dm³/s natuurlijke toevoer, waarvan 30 dm³/s (108 m³/h) voorverwarmd.
+- **EP-W103a/b.** De vier ramen van de zuidgevel, elk 2,5 m² netto (8,33 m² × 0,30 gaas), openingshoek 90°, middens op 1,2 m en 3,9 m, openingshoogte 2 m. De voorwaarden van 11.2.3.3 (inbraak, insecten, regen) zijn als vervuld aangenomen; de test noemt ze niet.
+- **Raamposities EP-W008–W010.** Uit de figuren 2–6: ramen van 3,0 × 2,0 m, borstwering 0,5 m, verdiepingshoogte 2,7 m, horizontaal 0,5–3,5 m en 4,5–7,5 m. Raammiddens op 1,5 m en 4,2 m. `raam-zuid-1`/`-3` zijn als de linker ramen (beneden, boven) genomen, `-2`/`-4` als de rechter. Links en rechts zijn gezien van binnen naar buiten (west is rechts).
+  - EP-W008a–c: overstek direct boven elk raam, h_o = 1,0 / diepte (2022 p. 672).
+  - EP-W008d/e: het doorlopende dak (5,4 m) over de linker 4 m dekt alleen de linker ramen.
+  - EP-W009a/b: b_b = 1,5 / diepte aan de westzijde (rechts). EP-W009c–f: één belemmering aan de oostzijde (links), 0,5 m naast de rechter ramen: b_b = 2,0 / diepte rechts en 6,0 / diepte links (p. 673).
+  - EP-W010: h_b = (h − raammidden) / x (p. 671); boven het midden van een raam is er geen belemmering (minimaal). De koelvoorwaarden van tabel 17.14 noemt de test niet, dus tabel 17.5 bij EP-W010e.
+- **Koeling EP-W301–303.** De gekoelde referentiewoning neemt de koeling van EP-U001 over: vloerkoeling, inregeling en regeling onbekend, geïsoleerde leidingen, pomp, geen warmtemeter, individuele compressiekoelmachine, 17/21 (tabel 10.8 opmerking 2).
+  - De afgiftetabellen zijn die van 2023 (2022 p. 354–356). EP-W301b/d: ventilatorconvectoren, dus 12/16 (b) en 12/18 (d). Het aantal convectoren van EP-W301b is niet gegeven (n_fan 0); bij EP-W301d is 8 W één convector van 10 W (10.18).
+  - EP-W303e: EER 4,2 gemeten volgens NEN-EN 14825 zonder deellastpunten, ingevoerd als opgegeven rendement (§10.1) in plaats van tabel 10.29.
+- **Appartement (EP-W202f, EP-W205, EP-W302f, EP-W402).** De referentiewoning als hoekappartement op de bovenste verdieping van een gebouw van 4 woningen en 4 bouwlagen, 10,8 m hoog: de begane-grondvloer vervalt, infiltratie tabel 11.14 "gestapeld, hoek, boven", woningtype woongebouw. Het collectieve vloeroppervlak is 4 × 96 m² (EP-W205c: 10 woningen).
+  - EP-W205: de HR107 is als voorkeursopwekker genomen (9.6.1), de VR-ketels daarna, elk 10 kW.
+  - EP-W402: de afleverset van de test hoort bij warmtelevering (§13.4.2) en is bij een ketel niet ingevoerd; zo ook bij EP-U502a.
+- **EP-W204b/i.** Warmtelevering met een kwaliteitsverklaring (bijlage P): f_P 0,5, f_Pren 0,3, K_CO2 0,1, b gemeten (`measuredOnly`), i berekend. De distributiepomp valt buiten 9.85 en is berekend.
+- **EP-W204f/g.** Micro-WKK onder 2 kW (tabel 9.31; elke waarde tot 2 kW is dezelfde rij). Het thermisch vermogen voor 9.91 is niet gegeven: 6 kW aangenomen (fictief, als zodanig vermeld).
+- **EP-W203g.** Lucht/luchtwarmtepomp met luchtverwarming: geen watergedragen distributie, distributieverlies 0.
+- **EP-W406.**
+  - d, u, v: ventilatiewarmtepomp van 2 kW met C1. Bij v ook voor verwarming (f_combi 1 in oktober–maart, 13.144a). Afvoerlucht telt niet als hernieuwbare bron (5.37), dus BENG 3 is 0.
+  - m, n: twee tapwatersystemen verdeeld naar aangesloten keukens en badkamers (13.19a). Bij n is het tweede toestel "gesloten toestel met Gaskeur en CW4" als waterverwarmer met Gaskeur CW gelezen.
+- **Utiliteit.**
+  - EP-U201/203: recirculatie verlaagt de buitenlucht, niet het toerental: tabel 11.22 "overige" (f_regfan 1). EP-U203b: motor 80 W met gemeten U·I·e = 220 × 0,6 × 1 = 132 W (11.136).
+  - EP-U302a: L_max 40 m geldt alleen voor een berekende pomp; de ketelpomp valt onder 9.85. EP-U302b: het bouwjaar 1950 werkt volgens de test ook op de hulpenergie van de ketel.
+  - EP-U303g: WKK van 20–200 kW elektrisch (100 kW als klassewaarde), 45/40 als lage temperatuur.
+  - EP-U401a: wandkoeling is stralingskoeling, dus 17/21. EP-U403a: gasmotor van 30 kW, gebouwd na 2006.
+  - EP-U502b: L_max 40 m heeft geen invoer bij de circulatiepomp (13.39).
+  - EP-U503a: tien douches, waarvan 2 met verticale en 4 met horizontale douche-WTW, collectieve opstelling ("gedeelde units", tabel 13.8), toewijzing onbekend (p. 564).
 
 ## Stand van de codering
 
-115 van de 266 deeltesten uit bijlage 1 zijn gecodeerd: 86 voor woningen en 29 voor utiliteit (9 oktober 2026; eerst 52). Elke gecodeerde deeltest rekent in de gate. Bij de open deeltesten heeft de kern in vrijwel alle gevallen de route al. Ze zijn nog niet gecodeerd, omdat geometrie of productgegevens uit de beschrijving moeten worden afgeleid.
+199 van de 266 deeltesten uit bijlage 1 zijn gecodeerd: 149 voor woningen en 50 voor utiliteit (9 oktober 2026; eerst 52, daarna 115). Elke gecodeerde deeltest rekent in de gate. Bij de open deeltesten heeft de kern in vrijwel alle gevallen de route al. Ze zijn nog niet gecodeerd, omdat geometrie of productgegevens uit de beschrijving moeten worden afgeleid.
 
 EP-W003c (rolluik met extra warmteweerstand) en EP-W016 (deuren) waren te controleren. Beide routes bestaan: `window_u` rekent U_W+shut (8.22/8.23) en de deur (8.20, 8.18/8.19) als rekenhulp, en het project neemt de uitkomst als U-waarde van het raam of de deur. Ze zijn gecodeerd.
 
@@ -94,55 +126,55 @@ De 11 realistische gebouwen (EPWRealB01 tot en met EPWRealD05 en EPURealB01) zij
 | EPW005 | Thermische massa | 3 | a, b, c | – |  |
 | EPW006 | Begrenzing begane grondvloer | 8 | – | a, b, c, d, e, f, g, h | route aanwezig voor kruipruimte (a–e), deels ingegraven gevels (f, g) en AOR (h); geometrie en kruipruimtegegevens nog te coderen |
 | EPW007 | Infiltratie | 3 | a, b, c | – |  |
-| EPW008 | Overstek | 5 | – | a, b, c, d, e | overstekken per raam (`windowObstructions`): hoeken uit de figuren 2–3 nog af te leiden |
-| EPW009 | Zijbelemmeringen | 6 | – | a, b, c, d, e, f | zijbelemmeringen per raam (`windowObstructions`): hoeken uit figuur 4 nog af te leiden |
-| EPW010 | Belemmering | 5 | – | a, b, c, d, e | belemmering (`windowSolar.obstruction`): nog te coderen |
-| EPW011 | Zonwering | 2 | – | a, b | beweegbare zonwering (tabel 7.5/7.6): nog te coderen |
+| EPW008 | Overstek | 5 | a, b, c, d, e | – |  |
+| EPW009 | Zijbelemmeringen | 6 | a, b, c, d, e, f | – |  |
+| EPW010 | Belemmering | 5 | a, b, c, d, e | – |  |
+| EPW011 | Zonwering | 2 | – | a, b | a: verstrooiende zonwering met g_gl,alt en g_gl,dif (7.41); b: glas uit een kwaliteitsverklaring met g per hoek. De kern rekent 7.41 in hoofdstuk 7, maar de projectinvoer geeft geen glasgegevens per raam door. Route op projectniveau ontbreekt |
 | EPW012 | Zonwering en oriëntatie | 6 | a, b, c, d, e, f | – |  |
 | EPW013 | Gebruiksoppervlak | 5 | – | a, b, c, d, e | andere gebruiksoppervlakte: geometrie nog te coderen |
 | EPW014 | Dakvorm | 1 | – | a | hellend dak (`surfaceTilts`): nog te coderen |
 | EPW015 | Vertikale leidingen | 2 | a, b | – |  |
 | EPW016 | Deuren | 3 | a, b, c | – |  |
-| EPW101 | Ventilatiesysteem | 23 | a, b, d, e, f, g, h, i, j, k, l, m, n, o, p, q, t, u, v | c, r, s, w | c: B1 met bouwjaar 1985 en wisselstroomventilatoren; r/s: WTW-rendement uit een verklaring (EN 13141-7 / EN 13142); w: E.1 met twee delen. Routes aanwezig, nog te coderen |
-| EPW102 | Voorverwarming nat. toev.vent. | 2 | – | a, b | voorverwarming natuurlijke toevoer (`grillePreheating`): nog te coderen |
-| EPW103 | Zomernachtventilatie | 3 | – | a, b, c | zomernachtventilatie (`ventilativeCooling`) met doorlaten en hoogten: nog te coderen |
+| EPW101 | Ventilatiesysteem | 23 | a t/m w (alle) | – |  |
+| EPW102 | Voorverwarming nat. toev.vent. | 2 | a, b | – |  |
+| EPW103 | Zomernachtventilatie | 3 | a, b | c | c: dubbelzijdig, met twee ramen verplaatst naar de oostgevel (nieuwe geometrie): nog te coderen |
 | EPW104 | Ventilatie overig | 6 | – | a, b, c, d, f, g | open verbrandingstoestellen, badgeiser, ventilatorvermogen, D.4a in een meergezinswoning: routes aanwezig, nog te coderen |
-| EPW201 | Afgifte | 5 | a, e | b, c, d | b: radiatoren met netwerkregeling; c/d: convectoren met boosterventilatoren (`emission.fans`): nog te coderen |
-| EPW202 | Distributie | 6 | – | a, b, c, d, e, f | leidingen in onverwarmde ruimten, pomp, leidingen in de constructie (e: te controleren), collectieve ketel (f): nog te coderen |
-| EPW203 | Opwekking | 16 | a, b, c, d, e, f, h, i, p | g, j, l, m, n, o, q | g: lucht/lucht-warmtepomp met luchtverwarming; j: ketel met kwaliteitsverklaring (productwaarden, bijlage M); l, m, n: twee rekenzones met hybride opwekking; o: luchtverwarmer met recirculatieventilatoren; q: kwaliteitsverklaring uit bijlage 5 (niet in bezit). Routes aanwezig, nog te coderen |
-| EPW204 | Opwekking2 | 9 | a, c, e | b, d, f, g, h, i | b, i: warmtelevering met kwaliteitsverklaring (`externalSupply`); d: niet te coderen, zie boven; f, g, h: micro-WKK. Nog te coderen |
-| EPW205 | Opwekking gemeenschappelijk | 2 | – | a, c | collectieve opwekking: nog te coderen |
+| EPW201 | Afgifte | 5 | a, b, c, d, e | – |  |
+| EPW202 | Distributie | 6 | a, b, c, d, f | e | e: leidingen in de constructie; Ψ uit de geometrie (9.4.2), de kern neemt alleen een opgegeven Ψ. Nog te berekenen en te coderen |
+| EPW203 | Opwekking | 16 | a, b, c, d, e, f, g, h, i, p | j, l, m, n, o, q | j: ketel met kwaliteitsverklaring (rendement en A/B/C van 9.85): de kern kent de productwaarden van bijlage M, niet deze verklaring; l, m, n: twee rekenzones met hybride opwekking; o: luchtverwarmer met axiale en radiale recirculatieventilatoren; q: kwaliteitsverklaring uit bijlage 5 (niet in bezit) |
+| EPW204 | Opwekking2 | 9 | a, b, c, e, f, g, i | d, h | d: niet te coderen, zie boven; h: micro-WKK met gemeten ε_th en ε_el: tabel 9.31 heeft geen invoer voor opgegeven waarden, methode 1 vraagt NEN-EN 50465-meetwaarden |
+| EPW205 | Opwekking gemeenschappelijk | 2 | a, c | – |  |
 | EPW206 | Opwekking woongebouw | 3 | – | a, b, c | opwekking in een woongebouw: nog te coderen |
-| EPW301 | Afgifte | 3 | – | a, b, d | koeling: de referentiewoning heeft geen koeling; af te leiden van EP-U001, nog te coderen |
-| EPW302 | Distributie | 6 | – | a, b, c, d, e, f | koeldistributie: nog te coderen |
-| EPW303 | Opwekking | 5 | – | a, b, c, d, e | koelopwekking: nog te coderen |
+| EPW301 | Afgifte | 3 | a, b, d | – |  |
+| EPW302 | Distributie | 6 | a, b, c, d, f | e | e: leidingen in de constructie (Ψ uit de geometrie, 10.24–10.26): nog te berekenen en te coderen |
+| EPW303 | Opwekking | 5 | a, b, e | c, d | c, d: vrije koeling met koudeopslag naast compressie, met een warmtepomp op dezelfde bron en regeneratie: routes aanwezig, nog te coderen |
 | EPW401 | Afgifte | 2 | a, b | – |  |
-| EPW402 | Distributie | 7 | – | a, b, c, d, e, f, g | tapwaterdistributie en circulatie: nog te coderen |
+| EPW402 | Distributie | 7 | a, b, c, d, e, g | f | f: leidingen in de constructie (Ψ uit de geometrie): nog te berekenen en te coderen |
 | EPW403 | Douche WTW | 4 | a, b, c, d | – |  |
 | EPW404 | Voorraadvat | 4 | a, b, c, d | – |  |
 | EPW405 | Zonneboiler | 6 | a, b, c, d, e, f | – |  |
-| EPW406 | Opwekking | 21 | a, b, c, g, q | d, e, f, i, j, k, l, m, n, o, p, t, u, v, w, x | ventilatiewarmtepompen (d, o, p, u–x, deels met verklaringen uit bijlagen 6 en 7, niet in bezit), biomassa (e, l), warmtelevering (f), woongebouw met booster (i–k), twee installaties (m, n), warmtepomp met ketel (t): routes aanwezig, nog te coderen |
+| EPW406 | Opwekking | 21 | a, b, c, d, e, f, g, m, n, q, u, v | i, j, k, l, o, p, t, w, x | i–k: woongebouw met boosterwarmtepomp (bijlage W); l: biomassa die niet aan bijlage R voldoet (geen route, zie EP-W204d); o, p: warmtepompboiler met kwaliteitsverklaring; t: warmtepomp met ketel en een opgegeven aandeel; w, x: verklaringen uit bijlagen 6 en 7 (niet in bezit). Routes deels aanwezig, nog te coderen |
 | EPW407 | Opwekking gemeensch./woong. | 9 | – | a, b, c, d, e, f, g, h, i | collectieve tapwateropwekking: nog te coderen |
 | EPW501 | PV-panelen | 4 | a, b, c, d | – |  |
 | EPU001 | Referentie | 1 | EPU001 | – |  |
 | EPU002 | Gebruiksfunctie | 10 | a, b, c, d, e, f, g, h, i, j | – |  |
 | EPU102 | Zonwering | 3 | a, b, c | – |  |
-| EPU201 | Ventilatiesysteem | 2 | – | a, c | geïnstalleerde capaciteit en recirculatie: nog te coderen |
+| EPU201 | Ventilatiesysteem | 2 | a, c | – |  |
 | EPU202 | AHU | 3 | – | a, b, c | luchtbehandelingskast in een groter gebouw (8 bouwlagen, nieuwe geometrie): nog te coderen |
-| EPU203 | Ventilatoren | 3 | – | a, b, c | ventilatorvermogen en terugregeling: nog te coderen |
-| EPU301 | Afgifte | 1 | – | a | hoge ruimte (10 m, `edition2023` high_room): nog te coderen |
-| EPU302 | Distributie | 2 | – | a, b | leidinglengte en bouwjaar 1950: nog te coderen |
-| EPU303 | Opwekking | 7 | a, b, c, d, e | f, g | gasmotorwarmtepomp (f) en WKK 20–200 kW (g): nog te coderen |
-| EPU401 | Afgifte | 1 | – | a | koelafgifte: nog te coderen |
-| EPU402 | Distributie | 1 | – | a | koeldistributie: nog te coderen |
-| EPU403 | Opwekking | 1 | – | a | koelopwekking: nog te coderen |
-| EPU501 | Afgifte | 1 | – | a | tapwaterafgifte: nog te coderen |
-| EPU502 | Distributie | 3 | – | a, b, c | tapwaterdistributie: nog te coderen |
-| EPU503 | Douche wtw | 1 | – | EPU503 | douche-WTW: nog te coderen |
-| EPU504 | Opwekking | 1 | – | EPU504 | tapwateropwekking: nog te coderen |
+| EPU203 | Ventilatoren | 3 | a, b, c | – |  |
+| EPU301 | Afgifte | 1 | a | – |  |
+| EPU302 | Distributie | 2 | a, b | – |  |
+| EPU303 | Opwekking | 7 | a, b, c, d, e, f, g | – |  |
+| EPU401 | Afgifte | 1 | a | – |  |
+| EPU402 | Distributie | 1 | a | – |  |
+| EPU403 | Opwekking | 1 | a | – |  |
+| EPU501 | Afgifte | 1 | a | – |  |
+| EPU502 | Distributie | 3 | a, b | c | c: groter sportgebouw (32 x 24 m, nieuwe geometrie): nog te coderen |
+| EPU503 | Douche wtw | 1 | EPU503 | – |  |
+| EPU504 | Opwekking | 1 | EPU504 | – |  |
 | EPU601 | Vermogen | 3 | a, b, c | – |  |
 | EPU602 | Regeling | 9 | a, b, c, d, e, f, i | g, h | g, h: de test geeft de daglichtfactoren F_D;S, F_D;dayl en F_D direct; de kern leidt ze af uit de sectorgeometrie (14.25–14.42) en kent geen invoer van opgegeven daglichtfactoren. Niet te coderen zonder geometrie |
-| EPU701 | Bevochtiging | 4 | – | a, b, c, d | bevochtiging (`humidification`): nog te coderen |
+| EPU701 | Bevochtiging | 4 | a, b, c | d | d: gebaseerd op EP-U202a (luchtbehandelingskast in een groter gebouw): nog te coderen |
 | EPWReal/EPUReal | Realistische gebouwen | 11 | – | alle | invoer in bijlagen 3A–3K, niet in bezit |
 
 ## Versie 5.0:2026 inpluggen

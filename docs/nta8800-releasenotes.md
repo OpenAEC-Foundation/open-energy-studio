@@ -13,6 +13,14 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — ISSO 54: 199 deeltesten gecodeerd (geen rekenwijziging)
+
+- **84 deeltesten erbij,** nu 199 van de 266 (149 woning, 50 utiliteit). Alle rekenen in de gate, zonder verwachting.
+  - Woning: koeling (EP-W301a/b/d, W302a–d/f, W303a/b/e), afgifte en distributie verwarming (W201b–d, W202a–d/f), ventilatie (W101c/r/s/w, W102a/b, W103a/b), opwekking (W203g, W204b/f/g/i, W205a/c), tapwater (W402a–e/g, W406d/e/f/m/n/u/v) en overstekken en belemmeringen (W008a–e, W009a–f, W010a–e).
+  - Utiliteit: ventilatie (EP-U201a/c, U203a–c), verwarming (U301a, U302a/b, U303f/g), koeling (U401a, U402a, U403a), tapwater (U501a, U502a/b, U503a, U504a) en bevochtiging (U701a–c).
+- **Referenties zonder leidingen in onverwarmde ruimten.** EP-W001 en EP-U001 noemen geen verwarmingsleidingen door onverwarmde ruimten, maar de codering liet `unheatedPipeLengthM` leeg, zodat 9.36 15 % als onverwarmd nam. Nu 0. Dit verandert alleen de vastgelegde uitkomsten van de ISSO-gevallen (EP-W001 BENG 2 105,18 → 105,07), niet de rekenkern.
+- Interpretaties en de nog open deeltesten staan in de [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md).
+
 ### 9 oktober 2026 — ISSO 54: 115 deeltesten gecodeerd; zonneboiler met geïntegreerde naverwarming
 
 - **Zonneboiler met geïntegreerde naverwarming.** Een indirect gestookt vat (ketel of warmtepomp) die het back-updeel van een zonneboilervat verwarmt, vroeg een eigen voorraadvat (`hot_water_storage_required`). §13.6.2 (2025+C1 p. 566, 2022 p. 547) zegt dat het verlies van het vat en het naverwarmerdeel bij een zonne-energiesysteem volgens 13.7 gaat. Bij een zonneboiler met `integrated_backup` voor tapwater is een apart vat nu niet meer vereist. Bij een voorverwarmer blijft het vat van de ketel nodig.
