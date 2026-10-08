@@ -503,7 +503,7 @@ pub struct SystemUnit {
     /// waarde, 2025+C1 p. 7; table 11.5 p. 460). It enters 11.48/11.49 as
     /// f_ctrl;tabel 11.5, and in E.1 (11.51/11.52) as f_ctrl;overig.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub declared_control_factor: Option<DeclaredControlFactor>,
+    pub declared_control_factor: Option<Box<DeclaredControlFactor>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -4016,10 +4016,10 @@ mod tests {
         let table = calculate_ventilation(&dwelling(SystemVariant::C4c)).unwrap();
         let mut declared = dwelling(SystemVariant::C4c);
         if let VentilationSystem::Single { unit } = &mut declared.system {
-            unit.declared_control_factor = Some(DeclaredControlFactor {
+            unit.declared_control_factor = Some(Box::new(DeclaredControlFactor {
                 value: 0.51,
                 declaration_reference: "BCRG gelijkwaardigheidsverklaring".into(),
-            });
+            }));
         }
         assert!(validate_ventilation(&declared).is_empty());
         let result = calculate_ventilation(&declared).unwrap();
@@ -4041,10 +4041,10 @@ mod tests {
     fn declared_control_factor_is_validated() {
         let mut input = dwelling(SystemVariant::C4c);
         if let VentilationSystem::Single { unit } = &mut input.system {
-            unit.declared_control_factor = Some(DeclaredControlFactor {
+            unit.declared_control_factor = Some(Box::new(DeclaredControlFactor {
                 value: f64::NAN,
                 declaration_reference: " ".into(),
-            });
+            }));
         }
         let issues = validate_ventilation(&input);
         let found: Vec<_> = issues.iter().map(|i| (i.code, i.path.as_str())).collect();
@@ -4058,10 +4058,10 @@ mod tests {
         )));
         for value in [0.0, -0.1, 2.5] {
             if let VentilationSystem::Single { unit } = &mut input.system {
-                unit.declared_control_factor = Some(DeclaredControlFactor {
+                unit.declared_control_factor = Some(Box::new(DeclaredControlFactor {
                     value,
                     declaration_reference: "verklaring".into(),
-                });
+                }));
             }
             assert!(validate_ventilation(&input)
                 .iter()
