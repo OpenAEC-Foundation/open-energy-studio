@@ -72,7 +72,9 @@ fn declared_window_shading() -> (&'static str, Value) {
     ))
     .unwrap();
     let shading = &mut value["ntaCalculation"]["windowShadings"][0]["movableShading"];
-    let object = shading.as_object_mut().expect("case G has a window shading");
+    let object = shading
+        .as_object_mut()
+        .expect("case G has a window shading");
     object.remove("device");
     object.insert("reductionFactor".into(), Value::from(0.25));
     ("public-comparison-g (declared F_c per window)", value)

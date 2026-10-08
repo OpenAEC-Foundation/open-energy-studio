@@ -508,7 +508,11 @@ mod tests {
         let mut input = sample();
         for valid in [20.5, 42.5, 50.0, 80.0, 100.0] {
             input.average_design_emission_temperature_c = valid;
-            assert_eq!(assess_boiler_forfait_draft(&input).status, "diagnostic_valid", "{valid}");
+            assert_eq!(
+                assess_boiler_forfait_draft(&input).status,
+                "diagnostic_valid",
+                "{valid}"
+            );
         }
         for invalid in [-30.0, -1.0, 0.0, 20.0, 100.5, 120.0, f64::NAN] {
             input.average_design_emission_temperature_c = invalid;
