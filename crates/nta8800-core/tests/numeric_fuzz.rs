@@ -60,7 +60,74 @@ fn fixtures() -> Vec<(&'static str, Value)> {
     .into_iter()
     .map(|(name, json)| (name, serde_json::from_str(json).unwrap()))
     .chain(std::iter::once(declared_window_shading()))
+    .chain(isso54_routes())
     .collect()
+}
+
+/// The routes added for ISSO 54 v2.0, with the test's own values, so their
+/// numeric leaves are fuzzed too: 7.41 per window (EP-W011a), declared 9.85
+/// constants (EP-W203j), a calculated Ψ of an embedded hot-water pipe
+/// (13.28, EP-W402f), declared CHP factors (EP-W204h) and a calculated Ψ of
+/// an embedded cooling pipe (10.25, EP-W302e).
+fn isso54_routes() -> Vec<(&'static str, Value)> {
+    let embedded = serde_json::json!({
+        "method": "insulated_embedded", "pipeOuterDiameterM": 0.02, "insulatedDiameterM": 0.04,
+        "insulationLambdaWPerMK": 0.04, "embeddingLambdaWPerMK": 2.0, "depthM": 0.03
+    });
+    let mut boiler: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-example-terraced-dwelling.json"
+    ))
+    .unwrap();
+    let nta = &mut boiler["ntaCalculation"];
+    nta["windowGlazings"] = serde_json::json!([{
+        "windowId": "win-S",
+        "glazing": {"diffusing": {"gAltitude45": 0.045, "gDiffuse": 0.2, "sourceReference": "ISO 15099"}},
+        "sourceReference": "EP-W011a"
+    }]);
+    nta["generator"]["declaredAuxiliaryConstants"] = serde_json::json!({
+        "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+        "declarationReference": "EP-W203j"
+    });
+    nta["hotWater"]["circulation"] = serde_json::json!({
+        "insulation": "mm15", "calculatedPsi": embedded, "fittingsInsulated": true,
+        "floorCount": 2, "pump": {"control": "uncontrolled_or_unknown"},
+        "sourceReference": "EP-W402f"
+    });
+    let mut chp = boiler.clone();
+    chp["ntaCalculation"]["generator"] = serde_json::json!({
+        "kind": "chp",
+        "chp": {"powerKw": 1.0, "builtAfter2006": true, "hreDeclared": true, "lowTemperature": true},
+        "declaredEfficiencies": {"thermal": 0.8, "electric": 0.12, "declarationReference": "EP-W204h"},
+        "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": 5.0, "sourceReference": "plate"},
+        "equipmentReference": "micro-CHP"
+    });
+    // A CHP's 9.91 auxiliary energy excludes the pump; the pipes are
+    // embedded in the construction (9.34, EP-W202e).
+    let mut embedded_heating = embedded.clone();
+    embedded_heating["method"] = Value::from("insulated_embedded");
+    chp["ntaCalculation"]["distributionSystem"] = serde_json::json!({
+        "designTemperatureClass": "35_30", "installation": "individual",
+        "usageFunction": "residential", "connectedStoreys": 2,
+        "pipeTransmittance": embedded_heating, "valvesInsulated": true,
+        "unheatedPipeLengthM": 0.0,
+        "pump": {"method": "calculated", "heatMeterPresent": false, "sourceReference": "design"},
+        "sourceReference": "EP-W202e"
+    });
+    let mut cooling: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-c.json"
+    ))
+    .unwrap();
+    cooling["ntaCalculation"]["cooling"]["distribution"]["pipe"] = serde_json::json!({
+        "kind": "calculated", "geometry": embedded, "sourceReference": "EP-W302e"
+    });
+    vec![
+        (
+            "example-terraced-dwelling (ISSO 54 glazing, boiler, circulation)",
+            boiler,
+        ),
+        ("example-terraced-dwelling (ISSO 54 declared CHP)", chp),
+        ("public-comparison-c (calculated cooling-pipe Ψ)", cooling),
+    ]
 }
 
 /// Case G with its roof-window screen given as a declared `F_c` instead of
@@ -78,6 +145,45 @@ fn declared_window_shading() -> (&'static str, Value) {
     object.remove("device");
     object.insert("reductionFactor".into(), Value::from(0.25));
     ("public-comparison-g (declared F_c per window)", value)
+}
+
+/// The ISSO 54 route fixtures calculate as given in 2025+C1, and in every
+/// other edition where their base fixture calculates (the bases carry
+/// edition-specific gaps such as the per-panel PV of 2020+A1), so the fuzz
+/// starts from calculating inputs on these routes.
+#[test]
+fn isso54_route_fixtures_calculate() {
+    let status = |value: &Value, edition: &str| {
+        let mut input = value.clone();
+        input["ntaCalculation"]["normVersion"] = Value::from(edition);
+        let result = nta8800_core::project_performance::assess_project_performance(&input);
+        (
+            result.status.starts_with("calculated"),
+            format!("{} {:?}", result.status, result.gaps),
+        )
+    };
+    let bases: [Value; 3] = [
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap(),
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap(),
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-public-comparison-c.json"
+        ))
+        .unwrap(),
+    ];
+    for ((name, value), base) in isso54_routes().into_iter().zip(&bases) {
+        for edition in ["2025+C1", "2024", "2023", "2022", "2020+A1"] {
+            let (calculated, detail) = status(&value, edition);
+            if edition == "2025+C1" || status(base, edition).0 {
+                assert!(calculated, "{name} {edition}: {detail}");
+            }
+        }
+    }
 }
 
 /// A numeric leaf: its pointer, its value and whether it is an integer.
@@ -561,6 +667,12 @@ fn every_number_at_its_edges_calculates_plausibly_or_refuses_with_a_routed_gap()
     for required in [
         "/ntaCalculation/ventilation/system/unit/declaredControlFactor/value",
         "/ntaCalculation/windowShadings/*/movableShading/reductionFactor",
+        "/ntaCalculation/windowGlazings/*/glazing/diffusing/gAltitude45",
+        "/ntaCalculation/generator/declaredAuxiliaryConstants/c",
+        "/ntaCalculation/generator/declaredEfficiencies/thermal",
+        "/ntaCalculation/hotWater/circulation/calculatedPsi/depthM",
+        "/ntaCalculation/cooling/distribution/pipe/geometry/depthM",
+        "/ntaCalculation/distributionSystem/pipeTransmittance/depthM",
     ] {
         assert!(
             occurrences.contains_key(required),

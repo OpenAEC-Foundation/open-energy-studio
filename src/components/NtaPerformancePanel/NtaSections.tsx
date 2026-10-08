@@ -25,6 +25,8 @@ import { NtaVentilationSection } from './NtaVentilationSection';
 import { DynamicWindowsFields } from './NtaDynamicWindows';
 import { WindowObstructionsFields } from './NtaWindowObstructions';
 import { WindowShadingsFields } from './NtaWindowShadings';
+import { WindowGlazingsFields } from './NtaWindowGlazings';
+import { CirculationPsiFields } from './NtaPipeGeometry';
 import { AnnexAaCalculationFields } from './NtaAnnexAaFields';
 import { annexAaCalculations, annexAaEditionRules } from '../../core/nta/annexAaForm';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
@@ -673,6 +675,7 @@ function HotWaterSection(props: NtaSectionProps) {
     <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
     <HotWaterGeneratorsFields draft={draft} change={change} />
     <HotWaterStorageFields draft={draft} change={change} />
+    <CirculationPsiFields draft={draft} change={change} />
     <TextField {...f} path={['hotWater', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
   </>;
 }
@@ -751,6 +754,9 @@ export const NTA_SECTIONS: NtaSectionDef[] = [
   { id: 'windowShadings', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowShadings.title',
     Component: ({ draft, change, project }) => <WindowShadingsFields draft={draft} change={change} project={project} />,
     paths: ['windowShadings'] },
+  { id: 'windowGlazings', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowGlazings.title',
+    Component: ({ draft, change, project }) => <WindowGlazingsFields draft={draft} change={change} project={project} />,
+    paths: ['windowGlazings'] },
   { id: 'dynamicWindows', step: 'building', sub: 'envelope', titleKey: 'nta.form.dynamic.title', Component: DynamicWindowsSection,
     paths: ['dynamicWindows'], advanced: true },
   { id: 'sunrooms', step: 'building', sub: 'unheated', titleKey: 'nta.form.sunroom.title',

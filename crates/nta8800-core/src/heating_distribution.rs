@@ -306,8 +306,6 @@ impl PipeTransmittance {
     /// building on the system, `shared_with_hot_water` selects the collective
     /// heating-and-hot-water rows of table 9.16. `None` for invalid geometry.
     pub fn value(&self, connected_area_m2: f64, shared_with_hot_water: bool) -> Option<f64> {
-        let positive =
-            |values: &[f64]| values.iter().all(|value| value.is_finite() && *value > 0.0);
         match *self {
             Self::Forfait { insulation } => {
                 let uninsulated = if shared_with_hot_water {
@@ -334,6 +332,99 @@ impl PipeTransmittance {
                     PipeInsulation::Uninsulated | PipeInsulation::Unknown => uninsulated,
                 })
             }
+            Self::InsulatedInAir {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                surface_coefficient,
+            } => PipeGeometry::InsulatedInAir {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                surface_coefficient,
+            }
+            .psi(),
+            Self::InsulatedEmbedded {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                embedding_lambda,
+                depth_m,
+            } => PipeGeometry::InsulatedEmbedded {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                embedding_lambda,
+                depth_m,
+            }
+            .psi(),
+            Self::Uninsulated {
+                inner_diameter_m,
+                outer_diameter_m,
+                pipe_lambda,
+                surface_coefficient,
+            } => PipeGeometry::Uninsulated {
+                inner_diameter_m,
+                outer_diameter_m,
+                pipe_lambda,
+                surface_coefficient,
+            }
+            .psi(),
+        }
+    }
+}
+
+/// Pipe geometry for a calculated `Ψ`: 9.33–9.35 (heating, 2025+C1
+/// p. 311–312), 10.24–10.26 (cooling, p. 384–385) and 13.27–13.29 (hot
+/// water, p. 551) are the same three formulas.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PipeGeometry {
+    /// Insulated pipe surrounded by air (9.33/10.24/13.27).
+    InsulatedInAir {
+        #[serde(rename = "pipeOuterDiameterM")]
+        pipe_outer_diameter_m: f64,
+        #[serde(rename = "insulatedDiameterM")]
+        insulated_diameter_m: f64,
+        #[serde(rename = "insulationLambdaWPerMK")]
+        insulation_lambda: f64,
+        #[serde(default, rename = "surfaceCoefficientWPerM2K")]
+        surface_coefficient: Option<f64>,
+    },
+    /// Insulated pipe embedded in the construction (9.34/10.25/13.28).
+    InsulatedEmbedded {
+        #[serde(rename = "pipeOuterDiameterM")]
+        pipe_outer_diameter_m: f64,
+        #[serde(rename = "insulatedDiameterM")]
+        insulated_diameter_m: f64,
+        #[serde(rename = "insulationLambdaWPerMK")]
+        insulation_lambda: f64,
+        #[serde(rename = "embeddingLambdaWPerMK")]
+        embedding_lambda: f64,
+        #[serde(rename = "depthM")]
+        depth_m: f64,
+    },
+    /// Uninsulated pipe (9.35/10.26/13.29).
+    Uninsulated {
+        #[serde(rename = "innerDiameterM")]
+        inner_diameter_m: f64,
+        #[serde(rename = "outerDiameterM")]
+        outer_diameter_m: f64,
+        #[serde(rename = "pipeLambdaWPerMK")]
+        pipe_lambda: f64,
+        #[serde(default, rename = "surfaceCoefficientWPerM2K")]
+        surface_coefficient: Option<f64>,
+    },
+}
+
+impl PipeGeometry {
+    /// `Ψ` in W/(m·K); `None` for invalid geometry (non-positive values,
+    /// an outer diameter below the inner one, or for 9.34 a depth with
+    /// `4·z ≤ d_a`, where the logarithm would not be positive).
+    pub fn psi(&self) -> Option<f64> {
+        let positive =
+            |values: &[f64]| values.iter().all(|value| value.is_finite() && *value > 0.0);
+        match *self {
             Self::InsulatedInAir {
                 pipe_outer_diameter_m: di,
                 insulated_diameter_m: da,

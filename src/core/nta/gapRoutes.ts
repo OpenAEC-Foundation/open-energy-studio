@@ -57,6 +57,7 @@ export const NTA_INPUT_ROUTES: Record<string, NtaTarget> = {
   dynamicWindows: ['building', 'envelope'],
   windowObstructions: ['building', 'envelope'],
   windowShadings: ['building', 'envelope'],
+  windowGlazings: ['building', 'envelope'],
   surfaceTilts: ['building', 'envelope'],
   groundFloors: ['building', 'envelope'],
   unheatedSpaces: ['building', 'unheated'],

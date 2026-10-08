@@ -129,7 +129,7 @@ De 11 realistische gebouwen (EPWRealB01 tot en met EPWRealD05 en EPURealB01) zij
 | EPW008 | Overstek | 5 | a, b, c, d, e | – |  |
 | EPW009 | Zijbelemmeringen | 6 | a, b, c, d, e, f | – |  |
 | EPW010 | Belemmering | 5 | a, b, c, d, e | – |  |
-| EPW011 | Zonwering | 2 | – | a, b | a: verstrooiende zonwering met g_gl,alt en g_gl,dif (7.41); b: glas uit een kwaliteitsverklaring met g per hoek. De kern rekent 7.41 in hoofdstuk 7, maar de projectinvoer geeft geen glasgegevens per raam door. Route op projectniveau ontbreekt |
+| EPW011 | Zonwering | 2 | – | a, b | route nu aanwezig: `ntaCalculation.windowGlazings` geeft per raam de waarden van 7.41 (a: g_gl,alt 0,045 en g_gl,dif 0,2), een glastype van tabel 7.4 of vaste lamellen; nog te coderen. b vraagt de waarden uit de kwaliteitsverklaring van figuur 7 en U_w volgens 8.15 |
 | EPW012 | Zonwering en oriëntatie | 6 | a, b, c, d, e, f | – |  |
 | EPW013 | Gebruiksoppervlak | 5 | – | a, b, c, d, e | andere gebruiksoppervlakte: geometrie nog te coderen |
 | EPW014 | Dakvorm | 1 | – | a | hellend dak (`surfaceTilts`): nog te coderen |
@@ -140,16 +140,16 @@ De 11 realistische gebouwen (EPWRealB01 tot en met EPWRealD05 en EPURealB01) zij
 | EPW103 | Zomernachtventilatie | 3 | a, b | c | c: dubbelzijdig, met twee ramen verplaatst naar de oostgevel (nieuwe geometrie): nog te coderen |
 | EPW104 | Ventilatie overig | 6 | – | a, b, c, d, f, g | open verbrandingstoestellen, badgeiser, ventilatorvermogen, D.4a in een meergezinswoning: routes aanwezig, nog te coderen |
 | EPW201 | Afgifte | 5 | a, b, c, d, e | – |  |
-| EPW202 | Distributie | 6 | a, b, c, d, f | e | e: leidingen in de constructie; Ψ uit de geometrie (9.4.2), de kern neemt alleen een opgegeven Ψ. Nog te berekenen en te coderen |
-| EPW203 | Opwekking | 16 | a, b, c, d, e, f, g, h, i, p | j, l, m, n, o, q | j: ketel met kwaliteitsverklaring (rendement en A/B/C van 9.85): de kern kent de productwaarden van bijlage M, niet deze verklaring; l, m, n: twee rekenzones met hybride opwekking; o: luchtverwarmer met axiale en radiale recirculatieventilatoren; q: kwaliteitsverklaring uit bijlage 5 (niet in bezit) |
-| EPW204 | Opwekking2 | 9 | a, b, c, e, f, g, i | d, h | d: niet te coderen, zie boven; h: micro-WKK met gemeten ε_th en ε_el: tabel 9.31 heeft geen invoer voor opgegeven waarden, methode 1 vraagt NEN-EN 50465-meetwaarden |
+| EPW202 | Distributie | 6 | a, b, c, d, f | e | e: route nu aanwezig: Ψ uit de geometrie met 9.34 (`pipeTransmittance` `insulated_embedded`); nog te coderen |
+| EPW203 | Opwekking | 16 | a, b, c, d, e, f, g, h, i, p | j, l, m, n, o, q | j: route nu aanwezig: A, B, C en B_nom van 9.85 uit de kwaliteitsverklaring (`declaredAuxiliaryConstants`, §9.1); nog te coderen. l, m, n: twee rekenzones met hybride opwekking; o: luchtverwarmer met axiale en radiale recirculatieventilatoren; q: kwaliteitsverklaring uit bijlage 5 (niet in bezit) |
+| EPW204 | Opwekking2 | 9 | a, b, c, e, f, g, i | d, h | d: niet te coderen, zie boven; h: route nu aanwezig: ε_chp;th en ε_chp;el uit de kwaliteitsverklaring in plaats van tabel 9.31 (`declaredEfficiencies`, §9.1); nog te coderen |
 | EPW205 | Opwekking gemeenschappelijk | 2 | a, c | – |  |
 | EPW206 | Opwekking woongebouw | 3 | – | a, b, c | opwekking in een woongebouw: nog te coderen |
 | EPW301 | Afgifte | 3 | a, b, d | – |  |
-| EPW302 | Distributie | 6 | a, b, c, d, f | e | e: leidingen in de constructie (Ψ uit de geometrie, 10.24–10.26): nog te berekenen en te coderen |
+| EPW302 | Distributie | 6 | a, b, c, d, f | e | e: route nu aanwezig: Ψ uit de geometrie met 10.25 (`pipe` `calculated`); nog te coderen |
 | EPW303 | Opwekking | 5 | a, b, e | c, d | c, d: vrije koeling met koudeopslag naast compressie, met een warmtepomp op dezelfde bron en regeneratie: routes aanwezig, nog te coderen |
 | EPW401 | Afgifte | 2 | a, b | – |  |
-| EPW402 | Distributie | 7 | a, b, c, d, e, g | f | f: leidingen in de constructie (Ψ uit de geometrie): nog te berekenen en te coderen |
+| EPW402 | Distributie | 7 | a, b, c, d, e, g | f | f: route nu aanwezig: Ψ uit de geometrie met 13.28 (`circulation.calculatedPsi`); nog te coderen |
 | EPW403 | Douche WTW | 4 | a, b, c, d | – |  |
 | EPW404 | Voorraadvat | 4 | a, b, c, d | – |  |
 | EPW405 | Zonneboiler | 6 | a, b, c, d, e, f | – |  |

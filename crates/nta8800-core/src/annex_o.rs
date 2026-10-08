@@ -280,6 +280,76 @@ pub fn auxiliary_constants(
     })
 }
 
+/// §9.1 (2025+C1 p. 285): the constants A, B and C of 9.85 and the
+/// nominal load B_nom from a quality declaration, replacing the 9.85
+/// forfait (p. 359–360) without the annex O component measurements.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeclaredAuxiliaryConstants {
+    /// A, kWh per year.
+    pub a_kwh: f64,
+    /// B, kW.
+    pub b_kw: f64,
+    /// C = 1,0·m_b (9.88), 0 < C ≤ 1.
+    pub c: f64,
+    /// B_nom, kW.
+    pub nominal_load_kw: f64,
+    pub declaration_reference: String,
+}
+
+/// Rounds a declared value down to `decimals` places (§9.1, p. 285: as
+/// many decimals as the replaced forfait value shows).
+fn round_down(value: f64, decimals: i32) -> f64 {
+    let scale = 10f64.powi(decimals);
+    (value * scale + 1e-9).floor() / scale
+}
+
+/// §9.1 declared constants for 9.85. A and C are rounded down to one
+/// decimal and B to three, the places of the forfait values 87,6/43,8,
+/// 0,4/0,7 and 0,132 (p. 360); B_nom is the appliance's own nominal load
+/// and is used as declared.
+pub fn declared_auxiliary_constants(
+    d: &DeclaredAuxiliaryConstants,
+    path: &str,
+) -> Result<AuxiliaryConstants, Vec<AnnexOIssue>> {
+    let mut issues = Vec::new();
+    if d.declaration_reference.trim().is_empty() {
+        issues.push(issue(
+            "source_reference_required",
+            format!("{path}.declarationReference"),
+        ));
+    }
+    let a = round_down(d.a_kwh, 1);
+    let b = round_down(d.b_kw, 3);
+    let c = round_down(d.c, 1);
+    if !(d.a_kwh.is_finite() && d.a_kwh >= 0.0) {
+        issues.push(issue("auxiliary_constant_invalid", format!("{path}.aKwh")));
+    }
+    if !(d.b_kw.is_finite() && d.b_kw >= 0.0) {
+        issues.push(issue("auxiliary_constant_invalid", format!("{path}.bKw")));
+    }
+    if !(d.c.is_finite() && d.c <= 1.0 && c > 0.0) {
+        issues.push(issue("auxiliary_constant_invalid", format!("{path}.c")));
+    }
+    if !(d.nominal_load_kw.is_finite() && d.nominal_load_kw > 0.0) {
+        issues.push(issue(
+            "nominal_load_invalid",
+            format!("{path}.nominalLoadKw"),
+        ));
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    Ok(AuxiliaryConstants {
+        mean_on_time_s: 0.0,
+        mean_modulation: c,
+        a_kwh: a,
+        b_kw: b,
+        c,
+        nominal_load_kw: d.nominal_load_kw,
+    })
+}
+
 /// 9.85 for one month: `1,0·(A·N/12 + B·E_H;ci/(C·B_nom))`, N = 1.
 pub fn monthly_auxiliary_kwh(constants: &AuxiliaryConstants, carrier_input_kwh: f64) -> f64 {
     constants.a_kwh / 12.0

@@ -16,7 +16,10 @@ use crate::annex_m::{
 use crate::annex_n::{
     heater_month, resolve_heater, validate_local_heater, HeaterMonth, LocalHeater,
 };
-use crate::annex_o::{auxiliary_constants, monthly_auxiliary_kwh, AppliancePowerMeasurements};
+use crate::annex_o::{
+    auxiliary_constants, declared_auxiliary_constants, monthly_auxiliary_kwh,
+    AppliancePowerMeasurements, DeclaredAuxiliaryConstants,
+};
 use crate::annex_q::{
     calculate_annex_q, validate_annex_q, AnnexQContext, AnnexQHeatPump, AnnexQResult, AnnexQSource,
     DemandClass,
@@ -440,10 +443,42 @@ pub struct ChpGenerator {
     /// Method 1 (9.6.6.2): NEN-EN 50465 test values of a micro-CHP.
     #[serde(default)]
     pub method1: Option<crate::micro_chp::MicroChp>,
+    /// Method 2 with ε_chp;th and ε_chp;el from a quality declaration
+    /// instead of table 9.31 (§9.1, 2025+C1 p. 285; table 9.31 p. 343).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_efficiencies: Option<DeclaredChpEfficiencies>,
     /// 9.6.8.2 (9.91) inputs.
     #[serde(default)]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
     pub equipment_reference: String,
+}
+
+/// Annual mean conversion factors of a CHP on gross calorific value from
+/// a quality declaration (§9.1), replacing the table 9.31 row.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeclaredChpEfficiencies {
+    /// ε_chp;th.
+    pub thermal: f64,
+    /// ε_chp;el.
+    pub electric: f64,
+    pub declaration_reference: String,
+}
+
+impl DeclaredChpEfficiencies {
+    /// §9.1 (p. 285): rounded down to the two decimals of table 9.31;
+    /// `None` when either factor is outside (0, 1] or together above 1.
+    pub fn factors(&self) -> Option<(f64, f64)> {
+        let round = |value: f64| (value * 100.0 + 1e-9).floor() / 100.0;
+        let (thermal, electric) = (round(self.thermal), round(self.electric));
+        (self.thermal.is_finite()
+            && self.electric.is_finite()
+            && thermal > 0.0
+            && self.thermal <= 1.0
+            && self.electric >= 0.0
+            && self.thermal + self.electric <= 1.0)
+            .then_some((thermal, electric))
+    }
 }
 
 /// 9.6.1: generators with their preference and nominal power.
@@ -832,6 +867,10 @@ pub struct GasBoilerGenerator {
     /// constants A, B and C of 9.85 (9.86–9.90); absent means the forfait.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary_measurements: Option<AppliancePowerMeasurements>,
+    /// Individual appliances: A, B, C and B_nom of 9.85 from a quality
+    /// declaration (§9.1); exclusive with `auxiliaryMeasurements`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_auxiliary_constants: Option<DeclaredAuxiliaryConstants>,
     /// Collective boilers: 9.91 inputs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
@@ -4331,9 +4370,31 @@ fn generate(
             match (&generator.chp, &generator.method1) {
                 (Some(class), None) => {
                     validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
-                    let Some((thermal, electric)) = class.factors() else {
+                    let Some(table) = class.factors() else {
                         issues.push(issue("chp_class_invalid", "generator.chp"));
                         return None;
+                    };
+                    // §9.1: a quality declaration replaces the table row.
+                    let (thermal, electric) = match &generator.declared_efficiencies {
+                        None => table,
+                        Some(declared) => {
+                            if declared.declaration_reference.trim().is_empty() {
+                                issues.push(issue(
+                                    "source_reference_required",
+                                    "generator.declaredEfficiencies.declarationReference",
+                                ));
+                            }
+                            match declared.factors() {
+                                Some(factors) => factors,
+                                None => {
+                                    issues.push(issue(
+                                        "chp_declared_efficiency_invalid",
+                                        "generator.declaredEfficiencies",
+                                    ));
+                                    return None;
+                                }
+                            }
+                        }
                     };
                     if !issues.is_empty() {
                         return None;
@@ -4355,6 +4416,12 @@ fn generate(
                     }
                 }
                 (None, Some(product)) => {
+                    if generator.declared_efficiencies.is_some() {
+                        issues.push(issue(
+                            "chp_declared_efficiency_method1",
+                            "generator.declaredEfficiencies",
+                        ));
+                    }
                     issues.extend(
                         crate::micro_chp::validate_micro_chp(product, "generator.method1")
                             .into_iter()
@@ -4483,6 +4550,35 @@ fn generate(
                 } else {
                     // Annex O and 9.86–9.88 instead of the 9.85 forfait.
                     match auxiliary_constants(measurements, "generator.auxiliaryMeasurements") {
+                        Ok(constants) => {
+                            for row in monthly.iter_mut() {
+                                row.auxiliary_electricity_kwh =
+                                    Some(monthly_auxiliary_kwh(&constants, row.natural_gas_kwh));
+                            }
+                        }
+                        Err(found) => {
+                            issues.extend(found.into_iter().map(|item| issue(item.code, item.path)))
+                        }
+                    }
+                }
+            }
+            if let Some(declared) = &generator.declared_auxiliary_constants {
+                if collective {
+                    issues.push(issue(
+                        "boiler_auxiliary_measurements_individual_only",
+                        "generator.declaredAuxiliaryConstants",
+                    ));
+                } else if generator.auxiliary_measurements.is_some() {
+                    issues.push(issue(
+                        "boiler_auxiliary_declared_and_measured",
+                        "generator.declaredAuxiliaryConstants",
+                    ));
+                } else {
+                    // §9.1 quality declaration instead of the 9.85 forfait.
+                    match declared_auxiliary_constants(
+                        declared,
+                        "generator.declaredAuxiliaryConstants",
+                    ) {
                         Ok(constants) => {
                             for row in monthly.iter_mut() {
                                 row.auxiliary_electricity_kwh =
@@ -5454,6 +5550,7 @@ mod tests {
         };
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: None,
             method1: Some(product.clone()),
             auxiliary: None,
@@ -5579,6 +5676,7 @@ mod tests {
     fn chp_generator_follows_9_65_and_16_12() {
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
@@ -7042,6 +7140,164 @@ mod tests {
         assert!((jan.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
     }
 
+    /// §9.1 (2025+C1 p. 285) with 9.85 (p. 359–360): the ISSO 54 EP-W203j
+    /// declaration A 10 kWh, B 0,12 kW, C 0,3 and B_nom 20 kW replaces the
+    /// forfait constants: W = A/12 + B·E/(C·B_nom).
+    #[test]
+    fn individual_boiler_auxiliary_from_declared_constants() {
+        let declared = json!({
+            "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+            "declarationReference": "HR107 kwaliteitsverklaring"
+        });
+        let mut input = boiler_chain();
+        let Generator::GasBoiler(boiler) = &mut input.generator else {
+            unreachable!()
+        };
+        boiler.declared_auxiliary_constants = Some(serde_json::from_value(declared).unwrap());
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        for row in &result.monthly {
+            let expected = 10.0 / 12.0 + 0.12 * row.natural_gas_kwh / (0.3 * 20.0);
+            assert!((row.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
+        }
+
+        // Rounded down to the decimals of the forfait values (§9.1):
+        // A 10,07 → 10,0; B 0,1209 → 0,120; C 0,39 → 0,3.
+        let constants = declared_auxiliary_constants(
+            &serde_json::from_value(json!({
+                "aKwh": 10.07, "bKw": 0.1209, "c": 0.39, "nominalLoadKw": 20.5,
+                "declarationReference": "x"
+            }))
+            .unwrap(),
+            "a",
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                constants.a_kwh,
+                constants.b_kw,
+                constants.c,
+                constants.nominal_load_kw
+            ),
+            (10.0, 0.12, 0.3, 20.5)
+        );
+
+        // Invalid values and the combination with annex O measurements.
+        for (field, bad) in [
+            ("c", 0.04),
+            ("c", 1.2),
+            ("bKw", -1.0),
+            ("nominalLoadKw", 0.0),
+        ] {
+            let mut item = json!({
+                "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+                "declarationReference": "x"
+            });
+            item[field] = json!(bad);
+            let found = declared_auxiliary_constants(&serde_json::from_value(item).unwrap(), "a")
+                .unwrap_err();
+            assert!(
+                found.iter().any(|issue| issue.path == format!("a.{field}")),
+                "{field}: {found:?}"
+            );
+        }
+        let mut input = boiler_chain();
+        let Generator::GasBoiler(boiler) = &mut input.generator else {
+            unreachable!()
+        };
+        boiler.declared_auxiliary_constants = Some(
+            serde_json::from_value(json!({
+                "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+                "declarationReference": " "
+            }))
+            .unwrap(),
+        );
+        let result = assess_space_heating_chain(&input);
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.code == "source_reference_required"
+                && issue.path == "generator.declaredAuxiliaryConstants.declarationReference"));
+    }
+
+    /// §9.1 with method 2 (9.65, table 9.31, 2025+C1 p. 342–343): the
+    /// ISSO 54 EP-W204h declaration ε_th 0,8 and ε_el 0,12 replaces the
+    /// "P_el ≤ 2 kW volgens HRe" row (0,83/0,10).
+    #[test]
+    fn chp_declared_efficiencies_replace_table_9_31() {
+        let mut input = boiler_chain();
+        let chp = |declared: Option<DeclaredChpEfficiencies>| {
+            Generator::Chp(ChpGenerator {
+                declared_efficiencies: declared,
+                chp: Some(crate::space_cooling::ChpClass {
+                    power_kw: 1.0,
+                    built_after_2006: true,
+                    hre_declared: true,
+                    low_temperature: true,
+                }),
+                method1: None,
+                auxiliary: Some(OtherGeneratorAuxiliary {
+                    electrically_connected_devices: 1,
+                    nominal_power_kw: Some(5.0),
+                    source_reference: "datasheet".into(),
+                }),
+                equipment_reference: "micro-CHP".into(),
+            })
+        };
+        input.distribution_system = Some(system(calculated_pump()));
+        input.generator = chp(Some(DeclaredChpEfficiencies {
+            thermal: 0.8,
+            electric: 0.12,
+            declaration_reference: "HRe kwaliteitsverklaring".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.8).abs() < 1e-9);
+        assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.12 / 0.8).abs() < 1e-9);
+        assert_eq!(result.generation_efficiency, Some(0.8));
+
+        // Rounded down to two decimals; refused outside (0, 1] or above 1
+        // together.
+        let factors = |thermal: f64, electric: f64| {
+            DeclaredChpEfficiencies {
+                thermal,
+                electric,
+                declaration_reference: "x".into(),
+            }
+            .factors()
+        };
+        assert_eq!(factors(0.806, 0.129), Some((0.8, 0.12)));
+        assert_eq!(factors(0.0, 0.1), None);
+        assert_eq!(factors(0.95, 0.1), None);
+        assert_eq!(factors(0.8, -0.1), None);
+        input.generator = chp(Some(DeclaredChpEfficiencies {
+            thermal: 1.2,
+            electric: 0.1,
+            declaration_reference: " ".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        let codes: Vec<&str> = result.issues.iter().map(|issue| issue.code).collect();
+        assert!(
+            codes.contains(&"chp_declared_efficiency_invalid"),
+            "{codes:?}"
+        );
+        assert!(codes.contains(&"source_reference_required"), "{codes:?}");
+
+        // Without a declaration the table row stays: identical results.
+        input.generator = chp(None);
+        let table = assess_space_heating_chain(&input);
+        assert_eq!(table.generation_efficiency, Some(0.83));
+    }
+
     fn other_aux(devices: u32, power: Option<f64>) -> Option<OtherGeneratorAuxiliary> {
         Some(OtherGeneratorAuxiliary {
             electrically_connected_devices: devices,
@@ -7393,6 +7649,7 @@ mod tests {
         // §9.1: one pump per dwelling, sized on the dwelling's share.
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,

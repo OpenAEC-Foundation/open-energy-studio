@@ -1,3 +1,4 @@
+import { DeclaredAuxiliaryConstantsFields, DeclaredChpEfficienciesFields } from './NtaPipeGeometry';
 import { useI18n } from '../../i18n/i18n';
 import { ElectricBoilerInsulatedPipe2022Field } from './NtaEdition2022Fields';
 import { HeatPumpInstallationYear2020Field } from './NtaEdition2020Fields';
@@ -93,7 +94,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <p className="nta-form-note">{t('nta.form.externalNote')}</p>
     </>}
     {kind === 'electric_resistance' && <TextField {...field} path={at('equipmentReference')} label={t('nta.form.source')} />}
-    {kind === 'chp' && <ChpClassFields draft={draft} change={change} base={base} lowTemperature />}
+    {kind === 'chp' && <ChpClassFields draft={draft} change={change} base={base} lowTemperature declared />}
     {kind === 'gas_heat_pump' && <>
       <SelectField {...field} path={at('table')} label={t('nta.form.gasHp.table')} options={[
         ['residential_at_most25_kw', t('nta.form.gasHp.table.residential')],
@@ -125,7 +126,10 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <TextField {...field} path={at('auxiliary', 'sourceReference')} label={t('nta.form.auxSource')} />
       <p className="nta-form-note">{t('nta.form.distributionSystemNote')}</p>
     </>}
-    {kind === 'gas_boiler' && <BoilerForfaitFields draft={draft} change={change} base={at('boiler')} />}
+    {kind === 'gas_boiler' && <>
+      <BoilerForfaitFields draft={draft} change={change} base={at('boiler')} />
+      <DeclaredAuxiliaryConstantsFields draft={draft} change={change} base={at('declaredAuxiliaryConstants')} />
+    </>}
     {kind === 'heat_pump_annex_q' && <>
       <AnnexQHeatPumpFields draft={draft} change={change} base={base} />
       {read(draft, at('heatPump', 'source')) === 'brine_water' &&
@@ -217,7 +221,8 @@ function RegenerationFields({ draft, change, base }: SectionProps & { base: Path
 }
 
 /** Building CHP: table 9.31 class (method 2) or measured micro-CHP (method 1, 9.6.6.2). */
-function ChpClassFields({ draft, change, base, lowTemperature = false }: SectionProps & { base: Path; lowTemperature?: boolean }) {
+function ChpClassFields({ draft, change, base, lowTemperature = false, declared = false }:
+  SectionProps & { base: Path; lowTemperature?: boolean; declared?: boolean }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
   const method1 = read(draft, [...base, 'method1']) != null;
@@ -225,6 +230,7 @@ function ChpClassFields({ draft, change, base, lowTemperature = false }: Section
     ...(read(draft, base) as Draft),
     chp: measured ? null : chpClassTemplate(),
     method1: measured ? microChpTemplate() : null,
+    ...(declared ? { declaredEfficiencies: null } : {}),
   });
   return <>
     <label>{t('nta.form.chp.method')}
@@ -235,7 +241,10 @@ function ChpClassFields({ draft, change, base, lowTemperature = false }: Section
     </label>
     {method1
       ? <MicroChpFields draft={draft} change={change} base={[...base, 'method1']} />
-      : <ChpTableFields draft={draft} change={change} base={base} lowTemperature={lowTemperature} />}
+      : <>
+        <ChpTableFields draft={draft} change={change} base={base} lowTemperature={lowTemperature} />
+        {declared && <DeclaredChpEfficienciesFields draft={draft} change={change} base={[...base, 'declaredEfficiencies']} />}
+      </>}
     <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
     <p className="nta-form-note">{t('nta.form.chp.note')}</p>
   </>;
