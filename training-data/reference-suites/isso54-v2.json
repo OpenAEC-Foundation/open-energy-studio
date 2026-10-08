@@ -12740,6 +12740,2329 @@
       }
     },
     {
+      "caseId": "isso54-v2-EPW002a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/constructionId",
+          "value": "c-dak"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/1/constructionId",
+          "value": "c-dak"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/0/uValue",
+          "value": 5.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/0/gValue",
+          "value": 0.85
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/1/uValue",
+          "value": 5.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/1/gValue",
+          "value": 0.85
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/2/uValue",
+          "value": 5.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/2/gValue",
+          "value": 0.85
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/3/uValue",
+          "value": 5.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows/3/gValue",
+          "value": 0.85
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/constructions",
+          "value": [
+            {
+              "id": "c-gevel",
+              "name": "Gevel Rc 0.85",
+              "layers": [],
+              "rcValue": 0.85,
+              "uValue": 0.98
+            },
+            {
+              "id": "c-dak",
+              "name": "Dak Rc 0.22",
+              "layers": [],
+              "rcValue": 0.22,
+              "uValue": 2.778
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/constructionYear",
+          "value": 1964
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 0.32
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W002a: vloer op grond Rc 0.15"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/pipeTransmittance/insulation/period",
+          "value": "before1980_or_unknown"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/constructionYear",
+          "value": 1964
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans/manufactureYear",
+          "value": 1964
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-002a, p. 7",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW002b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/constructionId",
+          "value": "c-dak"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/1/constructionId",
+          "value": "c-dak"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/constructionId",
+          "value": "c-gevel"
+        },
+        {
+          "op": "set",
+          "pointer": "/constructions",
+          "value": [
+            {
+              "id": "c-gevel",
+              "name": "Gevel Rc 2.5",
+              "layers": [],
+              "rcValue": 2.5,
+              "uValue": 0.375
+            },
+            {
+              "id": "c-dak",
+              "name": "Dak Rc 2.5",
+              "layers": [],
+              "rcValue": 2.5,
+              "uValue": 0.379
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/constructionYear",
+          "value": 1995
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 2.67
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W002b: vloer op grond Rc 2.5"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/constructionYear",
+          "value": 1995
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans/manufactureYear",
+          "value": 1995
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-002b, p. 7",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW002c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/thermalBridges",
+          "value": [
+            {
+              "id": "tb-hoeken",
+              "name": "hoeken psi 0.1",
+              "psiValue": 0.1,
+              "length": 21.6,
+              "zoneId": "epw001-zone",
+              "thermalBoundary": "outdoor"
+            },
+            {
+              "id": "tb-dak-gevel",
+              "name": "dak-gevel psi 0.04",
+              "psiValue": 0.04,
+              "length": 28.0,
+              "zoneId": "epw001-zone",
+              "thermalBoundary": "outdoor"
+            },
+            {
+              "id": "tb-kozijn-gevel",
+              "name": "kozijn-gevel psi 0.05",
+              "psiValue": 0.05,
+              "length": 40.0,
+              "zoneId": "epw001-zone",
+              "thermalBoundary": "outdoor"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/edgeThermalBridges/method",
+          "value": "detailed"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/edgeThermalBridges/bridges",
+          "value": [
+            {
+              "lengthM": 28.0,
+              "psiWPerMk": -0.18,
+              "sourceReference": "ISSO 54 v2.0 EP-W002c p. 7: aansluiting vloer-gevel psi -0,18 W/mK, 28 m"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-002c, p. 7",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW006a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 0.32
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W006a p. 8: vloer Rc 0,15 boven kruipruimte, Rbf 6.0, ventilatieopeningen 0.0012 m2/m, h 0.0 m"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/below",
+          "value": {
+            "kind": "crawlspace",
+            "floorResistanceM2kPerW": 6.0,
+            "depthClass": "other",
+            "wallResistanceM2kPerW": 6.0,
+            "wallUValueWPerM2k": 0.162,
+            "ventilationOpeningM2PerM": 0.0012,
+            "wallHeightAboveGroundM": 0.0
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/floorAboveCrawlspace",
+          "value": true
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-006a, p. 8",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW006b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 0.32
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W006b p. 8: vloer Rc 0,15 boven kruipruimte, Rbf 3.5, ventilatieopeningen 0.0012 m2/m, h 0.0 m"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/below",
+          "value": {
+            "kind": "crawlspace",
+            "floorResistanceM2kPerW": 3.5,
+            "depthClass": "other",
+            "wallResistanceM2kPerW": 6.0,
+            "wallUValueWPerM2k": 0.162,
+            "ventilationOpeningM2PerM": 0.0012,
+            "wallHeightAboveGroundM": 0.0
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/floorAboveCrawlspace",
+          "value": true
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-006b, p. 8",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW006c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 0.32
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W006c p. 8: vloer Rc 0,15 boven kruipruimte, Rbf 0.0, ventilatieopeningen 0.0012 m2/m, h 0.0 m"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/below",
+          "value": {
+            "kind": "crawlspace",
+            "floorResistanceM2kPerW": 0.0,
+            "depthClass": "other",
+            "wallResistanceM2kPerW": 6.0,
+            "wallUValueWPerM2k": 0.162,
+            "ventilationOpeningM2PerM": 0.0012,
+            "wallHeightAboveGroundM": 0.0
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/floorAboveCrawlspace",
+          "value": true
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-006c, p. 8",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW006d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 0.32
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W006d p. 8: vloer Rc 0,15 boven kruipruimte, Rbf 6.0, ventilatieopeningen 0.0012 m2/m, h 0.25 m"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/below",
+          "value": {
+            "kind": "crawlspace",
+            "floorResistanceM2kPerW": 6.0,
+            "depthClass": "other",
+            "wallResistanceM2kPerW": 6.0,
+            "wallUValueWPerM2k": 0.162,
+            "ventilationOpeningM2PerM": 0.0012,
+            "wallHeightAboveGroundM": 0.25
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/floorAboveCrawlspace",
+          "value": true
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-006d, p. 8",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW006e",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/constructionResistanceM2kPerW",
+          "value": 0.32
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W006e p. 8: vloer Rc 0,15 boven kruipruimte, Rbf 6.0, ventilatieopeningen 0.0006 m2/m, h 0.25 m"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/below",
+          "value": {
+            "kind": "crawlspace",
+            "floorResistanceM2kPerW": 6.0,
+            "depthClass": "other",
+            "wallResistanceM2kPerW": 6.0,
+            "wallUValueWPerM2k": 0.162,
+            "ventilationOpeningM2PerM": 0.0006,
+            "wallHeightAboveGroundM": 0.25
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/floorAboveCrawlspace",
+          "value": true
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-006e, p. 9",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW006g",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces",
+          "value": [
+            {
+              "id": "dak",
+              "name": "Dak (plat)",
+              "type": "roof",
+              "thermalBoundary": "outdoor",
+              "area": 48.0,
+              "orientation": "horizontal",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            },
+            {
+              "id": "bg-vloer",
+              "name": "Begane-grondvloer op grond",
+              "type": "floor",
+              "thermalBoundary": "ground",
+              "area": 48.0,
+              "orientation": "horizontal",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            },
+            {
+              "id": "gevel-zuid",
+              "name": "Gevel zuid",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 43.2,
+              "orientation": "S",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": [
+                {
+                  "id": "raam-zuid-1",
+                  "name": "Raam zuid 1",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                },
+                {
+                  "id": "raam-zuid-2",
+                  "name": "Raam zuid 2",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                },
+                {
+                  "id": "raam-zuid-3",
+                  "name": "Raam zuid 3",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                },
+                {
+                  "id": "raam-zuid-4",
+                  "name": "Raam zuid 4",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                }
+              ]
+            },
+            {
+              "id": "gevel-oost",
+              "name": "Gevel oost",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 32.4,
+              "orientation": "E",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            },
+            {
+              "id": "gevel-west",
+              "name": "Gevel west",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 32.4,
+              "orientation": "W",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/sourceReference",
+          "value": "ISSO 54 v2.0 EP-W006g p. 8: dijkwoning, vloer en noordgevel volledig tegen grond (8.42/D.12)"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/heatedBasement",
+          "value": {
+            "wallDepths": [
+              {
+                "lengthM": 8.0,
+                "depthM": 5.4
+              },
+              {
+                "lengthM": 6.0,
+                "depthM": 0.0
+              },
+              {
+                "lengthM": 8.0,
+                "depthM": 0.0
+              },
+              {
+                "lengthM": 6.0,
+                "depthM": 0.0
+              }
+            ],
+            "wallResistanceM2kPerW": 6.0
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-006g, p. 9",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW013a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 192.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 518.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/area",
+          "value": 96.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/1/area",
+          "value": 96.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 86.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 86.4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0 EP-W013: Ag 192.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/exposedPerimeterM",
+          "value": 44.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 192.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 192.0
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-013a, p. 16",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW013b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 192.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 518.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/area",
+          "value": 96.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/1/area",
+          "value": 96.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 86.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 86.4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0 EP-W013: Ag 192.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/internalGains/dwellingCount",
+          "value": 4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/internalGains/sourceReference",
+          "value": "4 woningen"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/exposedPerimeterM",
+          "value": 44.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 192.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 192.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/dwellingCount",
+          "value": 4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/dwellingCount",
+          "value": 4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/sourceReference",
+          "value": "4 woningen"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-013b, p. 16",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW013c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 24.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 64.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/height",
+          "value": 2.7
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/area",
+          "value": 24.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/1/area",
+          "value": 24.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 10.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 10.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 16.2
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 16.2
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0 EP-W013: Ag 24.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/exposedPerimeterM",
+          "value": 20.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/connectedStoreys",
+          "value": 1
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/verticalPipes/0/storeys",
+          "value": 1
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 24.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 24.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 2.7
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-013c, p. 16",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW013d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 960.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 2592.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/height",
+          "value": 54.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 432.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-9",
+              "name": "Raam zuid 9",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-10",
+              "name": "Raam zuid 10",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-11",
+              "name": "Raam zuid 11",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-12",
+              "name": "Raam zuid 12",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-13",
+              "name": "Raam zuid 13",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-14",
+              "name": "Raam zuid 14",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-15",
+              "name": "Raam zuid 15",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-16",
+              "name": "Raam zuid 16",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-17",
+              "name": "Raam zuid 17",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-18",
+              "name": "Raam zuid 18",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-19",
+              "name": "Raam zuid 19",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-20",
+              "name": "Raam zuid 20",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-21",
+              "name": "Raam zuid 21",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-22",
+              "name": "Raam zuid 22",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-23",
+              "name": "Raam zuid 23",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-24",
+              "name": "Raam zuid 24",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-25",
+              "name": "Raam zuid 25",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-26",
+              "name": "Raam zuid 26",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-27",
+              "name": "Raam zuid 27",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-28",
+              "name": "Raam zuid 28",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-29",
+              "name": "Raam zuid 29",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-30",
+              "name": "Raam zuid 30",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-31",
+              "name": "Raam zuid 31",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-32",
+              "name": "Raam zuid 32",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-33",
+              "name": "Raam zuid 33",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-34",
+              "name": "Raam zuid 34",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-35",
+              "name": "Raam zuid 35",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-36",
+              "name": "Raam zuid 36",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-37",
+              "name": "Raam zuid 37",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-38",
+              "name": "Raam zuid 38",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-39",
+              "name": "Raam zuid 39",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-40",
+              "name": "Raam zuid 40",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 432.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 324.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 324.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0 EP-W013: Ag 960.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/dwellingType",
+          "value": "apartment_building"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/internalGains/dwellingCount",
+          "value": 10
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/internalGains/sourceReference",
+          "value": "10 woningen"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 960.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 960.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/dwellingCount",
+          "value": 10
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/apartmentBuilding",
+          "value": true
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 54.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/infiltration/buildingType",
+          "value": "multi_storey_whole_building"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/dwellingCount",
+          "value": 10
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/sourceReference",
+          "value": "10 woningen"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-013d, p. 17",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW013e",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces",
+          "value": [
+            {
+              "id": "dak",
+              "name": "Dak (plat)",
+              "type": "roof",
+              "thermalBoundary": "outdoor",
+              "area": 48.0,
+              "orientation": "horizontal",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            },
+            {
+              "id": "gevel-zuid",
+              "name": "Gevel zuid",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 43.2,
+              "orientation": "S",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": [
+                {
+                  "id": "raam-zuid-1",
+                  "name": "Raam zuid 1",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                },
+                {
+                  "id": "raam-zuid-2",
+                  "name": "Raam zuid 2",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                },
+                {
+                  "id": "raam-zuid-3",
+                  "name": "Raam zuid 3",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                },
+                {
+                  "id": "raam-zuid-4",
+                  "name": "Raam zuid 4",
+                  "area": 6.0,
+                  "uValue": 1.8,
+                  "gValue": 0.7,
+                  "orientation": "S",
+                  "surfaceId": "gevel-zuid"
+                }
+              ]
+            },
+            {
+              "id": "gevel-noord",
+              "name": "Gevel noord",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 43.2,
+              "orientation": "N",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            },
+            {
+              "id": "gevel-oost",
+              "name": "Gevel oost",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 32.4,
+              "orientation": "E",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            },
+            {
+              "id": "gevel-west",
+              "name": "Gevel west",
+              "type": "wall",
+              "thermalBoundary": "outdoor",
+              "area": 32.4,
+              "orientation": "W",
+              "constructionId": "c-rc6",
+              "zoneId": "epw001-zone",
+              "windows": []
+            }
+          ]
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/groundFloors"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/dwellingType",
+          "value": "apartment_building"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/apartmentBuilding",
+          "value": true
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 10.8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/infiltration/buildingType",
+          "value": "storey_end_top"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 54.0
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-013e, p. 17",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW014a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 403.2
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/name",
+          "value": "Lessenaarsdak 45 graden op het zuiden"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/area",
+          "value": 67.9
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/orientation",
+          "value": "S"
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 91.2
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 50.4
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 50.4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 11.4
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/infiltration/buildingType",
+          "value": "pitched_roof_detached"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/surfaceTilts",
+          "value": [
+            {
+              "surfaceId": "dak",
+              "tiltDeg": 45.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W014a p. 18: dakhelling 45 graden"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-014a, p. 18",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW103c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/windows",
+          "value": [
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "E",
+              "surfaceId": "gevel-oost"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "E",
+              "surfaceId": "gevel-oost"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/ventilativeCooling",
+          "value": {
+            "openings": [
+              {
+                "id": "raam-1",
+                "area": {
+                  "method": "opening_angle",
+                  "maxNetAreaM2": 2.5,
+                  "maxAngleDeg": 90.0
+                },
+                "centreHeightM": 1.2,
+                "openingHeightM": 2.0,
+                "azimuthDeg": 180.0,
+                "tiltDeg": 90.0
+              },
+              {
+                "id": "raam-2",
+                "area": {
+                  "method": "opening_angle",
+                  "maxNetAreaM2": 2.5,
+                  "maxAngleDeg": 90.0
+                },
+                "centreHeightM": 1.2,
+                "openingHeightM": 2.0,
+                "azimuthDeg": 90.0,
+                "tiltDeg": 90.0
+              },
+              {
+                "id": "raam-3",
+                "area": {
+                  "method": "opening_angle",
+                  "maxNetAreaM2": 2.5,
+                  "maxAngleDeg": 90.0
+                },
+                "centreHeightM": 3.9,
+                "openingHeightM": 2.0,
+                "azimuthDeg": 180.0,
+                "tiltDeg": 90.0
+              },
+              {
+                "id": "raam-4",
+                "area": {
+                  "method": "opening_angle",
+                  "maxNetAreaM2": 2.5,
+                  "maxAngleDeg": 90.0
+                },
+                "centreHeightM": 3.9,
+                "openingHeightM": 2.0,
+                "azimuthDeg": 90.0,
+                "tiltDeg": 90.0
+              }
+            ],
+            "operation": "manual",
+            "conditionsEvidence": "ISSO 54 v2.0 EP-W103c p. 22: zomernachtventilatie dubbelzijdig (zuid en oost), handbediend; voorwaarden 11.2.3.3 als vervuld aangenomen"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-103c, p. 22",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
       "caseId": "isso54-v2-EPU001",
       "normVersion": "2022",
       "projectFile": "../isso54/EPU001.json",
