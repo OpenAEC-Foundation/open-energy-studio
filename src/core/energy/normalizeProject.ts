@@ -39,6 +39,14 @@ export function normalizeProject(project: IProject): IProject {
     changed = true;
     return '';
   };
+  // Project-model numbers the NTA calculation does not read still feed the editor, the simplified
+  // engine and the exports; a negative or non-finite value there is a broken file, not an input.
+  const nonNegative = (value: unknown, path: string) => {
+    if (value == null) return;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`Invalid project: ${path} must be a non-negative finite number`);
+    }
+  };
   const raw = project as Partial<IProject>;
   const zones = list(raw.zones, 'zones').map((zone: IZone, zoneIndex) => {
     const surfaces = list(zone.surfaces, `zones[${zoneIndex}].surfaces`).map((surface: ISurface, surfaceIndex) => {
@@ -61,11 +69,16 @@ export function normalizeProject(project: IProject): IProject {
       || airTightness.qv10 <= 0) {
       throw new Error(`Invalid project: zones[${zoneIndex}].airTightness.qv10 must be a positive finite number`);
     }
+    for (const field of ['floorArea', 'volume', 'height'] as const) {
+      nonNegative(zone[field], `zones[${zoneIndex}].${field}`);
+    }
     const same = surfaces.every((surface, index) => surface === zone.surfaces?.[index])
       && thermalBridges === zone.thermalBridges && airTightness === zone.airTightness;
     return same ? zone : { ...zone, surfaces, thermalBridges, airTightness };
   });
   const constructions = list(raw.constructions, 'constructions').map((construction: IConstruction, index) => {
+    nonNegative(construction.rcValue, `constructions[${index}].rcValue`);
+    nonNegative(construction.uValue, `constructions[${index}].uValue`);
     const layers = list(construction.layers, `constructions[${index}].layers`);
     return layers === construction.layers ? construction : { ...construction, layers };
   });
@@ -76,7 +89,14 @@ export function normalizeProject(project: IProject): IProject {
     address: text(raw.address, 'address'),
     city: text(raw.city, 'city'),
     zones,
-    heatingSystems: list(raw.heatingSystems, 'heatingSystems'),
+    heatingSystems: list(raw.heatingSystems, 'heatingSystems').map((system, index) => {
+      nonNegative(system.cop, `heatingSystems[${index}].cop`);
+      if (typeof system.coverageFraction === 'number' && system.coverageFraction > 1) {
+        throw new Error(`Invalid project: heatingSystems[${index}].coverageFraction must lie between 0 and 1`);
+      }
+      nonNegative(system.coverageFraction, `heatingSystems[${index}].coverageFraction`);
+      return system;
+    }),
     ventilationSystems: list(raw.ventilationSystems, 'ventilationSystems'),
     coolingSystems: list(raw.coolingSystems, 'coolingSystems'),
     hotWaterSystems: list(raw.hotWaterSystems, 'hotWaterSystems'),

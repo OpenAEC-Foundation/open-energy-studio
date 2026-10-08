@@ -138,7 +138,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
             min={0}
             step={0.01}
             value={cop}
-            onChange={(e) => setCop(parseFloat(e.target.value) || 0)}
+            onChange={(e) => { const value = parseFloat(e.target.value) || 0; if (Number.isFinite(value) && value >= 0) setCop(value); }}
           />
         </div>
 
@@ -150,7 +150,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
             max={100}
             step={1}
             value={coveragePercent}
-            onChange={(e) => setCoveragePercent(parseFloat(e.target.value) || 0)}
+            onChange={(e) => { const value = parseFloat(e.target.value) || 0; if (Number.isFinite(value) && value >= 0 && value <= 100) setCoveragePercent(value); }}
           />
         </div>
         {isHeatPumpType(type) && <>
