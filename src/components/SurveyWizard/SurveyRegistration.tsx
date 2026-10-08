@@ -148,9 +148,12 @@ export function SurveyRegistration({ actions }: { actions: Pick<ShellActions, 'n
             <select value={messageType}
               onChange={(event) => set({ messageType: event.target.value as NonNullable<NtaRegistration['messageType']>, relabel: undefined })}>
               <option value="regular">{t('reg.messageType.regular')}</option>
+              <option value="relabel">{t('reg.messageType.relabel')}</option>
               <option value="replacement">{t('reg.messageType.replacement')}</option>
             </select>
           </label>
+          {messageType === 'relabel' && <p className="nta-form-note">{t('surveyReg.relabelNote')}{' '}
+            <button type="button" className="btn" onClick={() => actions.navigate({ step: 'relabel' } as Route)}>{t('surveyReg.toRelabel')}</button></p>}
           {messageType === 'replacement' && field('replacedEpOnlineNumber')}
           {field('registrationDate', 'date')}
         </div></div>

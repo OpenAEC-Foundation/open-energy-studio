@@ -28,8 +28,8 @@
       "project": {
         "zones": [
           {
-            "floorArea": 100.0,
-            "offset": -0.0,
+            "floorArea": 100,
+            "offset": 0,
             "u": 0.25
           }
         ]
@@ -43,7 +43,7 @@
         "b": 1e-6,
         "c": 0.00001,
         "d": 1e+21,
-        "e": 1.5e+16,
+        "e": 15000000000000000,
         "f": 123456789.125,
         "g": -0.5,
         "h": 4503599627370496
@@ -70,6 +70,61 @@
         "é": "één\ttab \"quote\" \\ back\u0001"
       },
       "sha256": "04006aab94b5276914380343e42cef441029976c5b4fc1a6b3f35dc071b0b77e"
+    },
+    {
+      "name": "survey project: the survey answers without the reasons for defaults",
+      "project": {
+        "basisopname": {
+          "kind": "residential",
+          "progress": {
+            "woning": "done"
+          },
+          "survey": {
+            "constructionYear": 2006,
+            "envelope": {
+              "surfaces": [
+                {
+                  "element": "roof",
+                  "id": "dak",
+                  "insulation": {
+                    "kind": "thickness",
+                    "thicknessMm": 120
+                  }
+                }
+              ]
+            },
+            "inklapRedenen": {
+              "heating.generator": "niet zichtbaar"
+            },
+            "pv": []
+          },
+          "surveyDate": "2021-04-24"
+        },
+        "buildingFunction": "residential",
+        "registration": {
+          "purpose": "existing_building",
+          "surveyDate": "2021-04-24"
+        },
+        "zones": []
+      },
+      "sha256": "de8a73eff0aa4dfc7bad86bc828ae067d9dbb508310be827a4d0af6765541b68"
+    },
+    {
+      "name": "new build: the survey kept with the project is not label input",
+      "project": {
+        "basisopname": {
+          "kind": "residential",
+          "survey": {
+            "constructionYear": 2006
+          }
+        },
+        "buildingFunction": "residential",
+        "registration": {
+          "purpose": "delivery"
+        },
+        "zones": []
+      },
+      "sha256": "a08cc051f0b5614bbfa29d83f6238466845f72b9e42fd42a2f66a8a8e6fe23c7"
     }
   ],
   "description": "Shared cases for the relabel label-input hash: the kernel (relabel.rs) and the app (Registration.ts labelInputSha256) must both give `sha256` for `project`. Regenerate the hashes with LABEL_HASH_WRITE_FIXTURE=1 cargo test label_input_hash_matches_the_shared_cases."

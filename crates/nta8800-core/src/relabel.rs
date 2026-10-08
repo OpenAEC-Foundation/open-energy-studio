@@ -152,6 +152,8 @@ const SYSTEM_KEYS: &[&str] = &[
     "source",
     "sink",
     "systemType",
+    // Survey: the ventilation system (natural, C, D, ...).
+    "principle",
 ];
 
 const INSTALLATION_MARKERS: &[&str] = &[
@@ -209,6 +211,8 @@ const PRODUCTION_GEOMETRY_KEYS: &[&str] = &[
     "collectorAreaM2",
     "collectorArea",
     "peakPower",
+    // Survey: PV panel area.
+    "panelAreaM2",
 ];
 
 /// Project blocks that are not label input: the maatwerkadvies and the
@@ -220,7 +224,43 @@ const NON_LABEL_BLOCKS: &[&str] = &["registration", "maatwerkadvies", "basisopna
 
 /// Window and glazing properties: one-to-one replacement of glazing (6a,
 /// W p. 67, U p. 58).
-const GLAZING_KEYS: &[&str] = &["gValue", "gGl", "gglN", "gPerpendicular", "frameFraction"];
+const GLAZING_KEYS: &[&str] = &[
+    "gValue",
+    "gGl",
+    "gglN",
+    "gPerpendicular",
+    "frameFraction",
+    // Survey: glass and frame kind of a window or door.
+    "glass",
+    "frame",
+];
+
+/// The basic survey of a project whose label input it is: an existing
+/// building (not new build) without NTA input of its own (no zones, no NTA
+/// block), as the app's question flow makes it. Its answers are what a
+/// relabel compares and hashes; the reasons for defaults (`inklapRedenen`)
+/// explain the survey and are left out.
+pub fn survey_label_input(project: &Value) -> Option<Value> {
+    let purpose = project
+        .pointer("/registration/purpose")
+        .and_then(Value::as_str);
+    if matches!(purpose, Some("delivery" | "bbl_check")) {
+        return None;
+    }
+    let own_input = project
+        .get("zones")
+        .and_then(Value::as_array)
+        .is_some_and(|zones| !zones.is_empty())
+        || project
+            .get("ntaCalculation")
+            .is_some_and(|nta| !nta.is_null());
+    if own_input {
+        return None;
+    }
+    let mut survey = project.pointer("/basisopname/survey")?.clone();
+    survey.as_object_mut()?.remove("inklapRedenen");
+    Some(survey)
+}
 
 /// Keys of the share a generator covers; with an added generator they
 /// follow the system change and need review.
@@ -574,6 +614,17 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
     };
     let mut changes = Vec::new();
     diff(scheme, "", Some(original), Some(current), &mut changes);
+    // A survey project: its label input is the survey.
+    let (survey_before, survey_after) = (survey_label_input(original), survey_label_input(current));
+    if survey_before.is_some() || survey_after.is_some() {
+        diff(
+            scheme,
+            "/basisopname/survey",
+            survey_before.as_ref(),
+            survey_after.as_ref(),
+            &mut changes,
+        );
+    }
     review_shares_next_to_added_generators(&mut changes);
     let survey_date = |project: &Value| project.pointer("/registration/surveyDate").cloned();
     let (before, after) = (survey_date(original), survey_date(current));
@@ -705,9 +756,17 @@ fn canonical_number(text: &str) -> String {
 /// `training-data/nta8800-label-hash-cases.json` holds shared cases.
 pub fn label_input_hash(project: &Value) -> String {
     let mut input = without_null_members(project);
+    let survey = survey_label_input(&input);
     if let Value::Object(map) = &mut input {
         for block in NON_LABEL_BLOCKS {
             map.remove(*block);
+        }
+        // A survey project: the survey answers are label input.
+        if let Some(survey) = survey {
+            map.insert(
+                "basisopname".into(),
+                serde_json::json!({ "survey": survey }),
+            );
         }
     }
     let mut text = String::new();
@@ -798,6 +857,79 @@ mod tests {
         ] {
             assert_eq!(verdict(&result, path), RelabelVerdict::Review, "{path}");
         }
+    }
+
+    #[test]
+    fn survey_projects_compare_their_survey_answers() {
+        let survey = json!({
+            "envelope": {
+                "surfaces": [{"id": "dak", "element": "roof", "grossAreaM2": 40,
+                    "insulation": {"kind": "none_or_unknown"}}],
+                "windows": [{"id": "r1", "surfaceId": "gevel", "areaM2": 9, "glass": "double", "frame": "wood_or_plastic"}]
+            },
+            "heating": {"generator": {"kind": "boiler", "boilerType": "hr107"}, "emitters": "radiators", "control": "unknown"},
+            "ventilation": {"principle": "natural"},
+            "pv": [{"id": "pv1", "panelAreaM2": 8, "azimuthDeg": 180, "tiltDeg": 30}],
+            "inklapRedenen": {"heating.generator": "typeplaat onleesbaar"}
+        });
+        let original = json!({"buildingFunction": "residential", "zones": [],
+            "basisopname": {"kind": "residential", "survey": survey}});
+        let mut current = original.clone();
+        let s = &mut current["basisopname"]["survey"];
+        s["envelope"]["surfaces"][0]["insulation"] =
+            json!({"kind": "thickness", "thicknessMm": 120});
+        s["envelope"]["windows"][0]["glass"] = json!("hr_plus_plus");
+        s["heating"]["control"] = json!("weather_compensated");
+        s["ventilation"]["principle"] = json!("mechanical_exhaust");
+        s["pv"][0]["panelAreaM2"] = json!(16);
+        s["inklapRedenen"] = json!({});
+        let result = assess_relabel(&original, &current);
+        let verdict = |path: &str| {
+            result
+                .changes
+                .iter()
+                .find(|change| change.path == format!("/basisopname/survey{path}"))
+                .map(|change| change.verdict)
+        };
+        assert_eq!(
+            verdict("/envelope/surfaces/0/insulation/kind"),
+            Some(RelabelVerdict::Allowed)
+        );
+        assert_eq!(
+            verdict("/envelope/surfaces/0/insulation/thicknessMm"),
+            Some(RelabelVerdict::Allowed)
+        );
+        assert_eq!(
+            verdict("/envelope/windows/0/glass"),
+            Some(RelabelVerdict::Allowed)
+        );
+        assert_eq!(verdict("/heating/control"), Some(RelabelVerdict::Allowed));
+        assert_eq!(
+            verdict("/ventilation/principle"),
+            Some(RelabelVerdict::NotAllowed)
+        );
+        assert_eq!(verdict("/pv/0/panelAreaM2"), Some(RelabelVerdict::Review));
+        assert!(result
+            .changes
+            .iter()
+            .all(|change| !change.path.contains("inklapRedenen")));
+        assert!(!result.allowed);
+        assert_ne!(
+            result.original_label_input_hash,
+            result.current_label_input_hash
+        );
+        // The reasons for defaults are not label input.
+        let mut reasons = original.clone();
+        reasons["basisopname"]["survey"]["inklapRedenen"] = json!({});
+        assert_eq!(label_input_hash(&original), label_input_hash(&reasons));
+        // New build: the survey kept with the project is not label input.
+        let mut delivery = current.clone();
+        delivery["registration"] = json!({"purpose": "delivery"});
+        let mut delivery_original = original.clone();
+        delivery_original["registration"] = json!({"purpose": "delivery"});
+        assert!(assess_relabel(&delivery_original, &delivery)
+            .changes
+            .is_empty());
     }
 
     #[test]

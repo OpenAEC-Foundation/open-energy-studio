@@ -304,3 +304,16 @@
 .survey-reg-evidence > summary { cursor: pointer; font-weight: 600; }
 .survey-reg-evidence[open] > summary { margin-bottom: 10px; }
 .survey-registration .survey-aside .btn { margin: 8px 0 6px; }
+
+/* Herlabelen of a survey project (feedback 8 Oct 2026). */
+.survey-relabel-file { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.survey-relabel-chip { flex: none; min-width: 92px; text-align: center; font-size: var(--fs-xs, 11px); padding: 2px 8px; border-radius: 999px; }
+.survey-relabel-chip--allowed { background: var(--ok-subtle); color: var(--ok-text); }
+.survey-relabel-chip--not_allowed { background: var(--error-subtle); color: var(--error-text); }
+.survey-relabel-chip--review { background: var(--warn-subtle); color: var(--warn-text); }
+.survey-relabel-rows .survey-reg-text small { display: block; margin-left: 0; }
+.survey-relabel-note { font-style: italic; }
+.survey-relabel-role { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: var(--fs-sm); }
+.survey-relabel-label { font-family: var(--font-display, inherit); font-size: 28px; font-weight: 700; }
+.survey-relabel-check li { padding: 5px 0; }
+.survey-relabel .survey-aside .btn { margin-top: 8px; }

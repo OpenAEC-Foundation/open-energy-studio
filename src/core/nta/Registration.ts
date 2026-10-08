@@ -223,11 +223,31 @@ function canonicalJson(value: unknown): string {
  */
 export async function labelInputSha256(project: object): Promise<string> {
   const rest: Record<string, unknown> = { ...(project as Record<string, unknown>) };
+  // A survey project: the survey answers are label input.
+  const survey = surveyLabelInput(rest);
   delete rest.registration;
   delete rest.maatwerkadvies;
   delete rest.basisopname;
   delete rest.importLog;
+  if (survey) rest.basisopname = { survey };
   return sha256Hex(utf8.encode(canonicalJson(rest)));
+}
+
+/**
+ * The survey of a project whose label input it is (`survey_label_input` in
+ * relabel.rs): an existing building without NTA input of its own; the
+ * reasons for defaults are left out.
+ */
+export function surveyLabelInput(project: Record<string, unknown>): Record<string, unknown> | null {
+  const purpose = (project.registration as { purpose?: string } | undefined)?.purpose;
+  if (purpose === 'delivery' || purpose === 'bbl_check') return null;
+  const zones = project.zones;
+  if ((Array.isArray(zones) && zones.length > 0) || project.ntaCalculation != null) return null;
+  const survey = (project.basisopname as { survey?: unknown } | undefined)?.survey;
+  if (survey == null || typeof survey !== 'object' || Array.isArray(survey)) return null;
+  const { inklapRedenen: _reasons, ...rest } = survey as Record<string, unknown>;
+  void _reasons;
+  return rest;
 }
 
 /** Relabel fields required since 3 October 2026 (BRL 9500-W §4.2.3–4.2.4, p. 23–24). */

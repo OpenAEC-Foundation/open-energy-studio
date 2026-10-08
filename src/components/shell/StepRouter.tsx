@@ -25,6 +25,7 @@ import { SurveyReport } from '../SurveyWizard/SurveyReport';
 import { SurveyMwa } from '../SurveyWizard/SurveyMwa';
 import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
+import { SurveyRelabel } from '../SurveyWizard/SurveyRelabel';
 import { Building3DView, HeatPumpSizingCalculator, LazyPage, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
 import { PageHeader, SubTabs, routeLabel } from './PageHeader';
 import { ProjectOverview } from './pages/ProjectOverview';
@@ -217,6 +218,11 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       page = <>{header()}<div className="page-body">{dimmedBanner}<MaatwerkadviesPanel tab={route.sub as MwaTab | undefined} /></div></>;
       break;
     case 'relabel':
+      // A basisopname project compares its survey with the original label's survey.
+      if (!flow) {
+        page = <div className="page-body"><SurveyRelabel actions={actions} /></div>;
+        break;
+      }
       page = <>{header()}<div className="page-body">{dimmedBanner}<RelabelPanel /></div></>;
       break;
     case 'report':

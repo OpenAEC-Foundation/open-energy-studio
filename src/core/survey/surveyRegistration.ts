@@ -28,11 +28,13 @@ export function surveyTakeovers(project: IProject): Partial<NtaRegistration> {
   const year = (stored?.survey as { constructionYear?: unknown } | undefined)?.constructionYear;
   const registration = project.registration ?? {};
   const surveying = registration.surveyingAdvisor;
+  // A relabel keeps the original survey date (BRL 9500-W §4.2.4); this survey is the improvement's.
+  const relabel = registration.messageType === 'relabel';
   return {
     purpose: 'existing_building',
     surveyType: 'basic',
     ...(typeof year === 'number' ? { constructionYear: year } : {}),
-    ...(stored?.surveyDate ? { surveyDate: stored.surveyDate } : {}),
+    ...(stored?.surveyDate ? (relabel ? { improvementDate: stored.surveyDate } : { surveyDate: stored.surveyDate }) : {}),
     // The surveying adviser registers, unless another one is named.
     ...(!registration.registeringAdvisor?.name && surveying?.name ? { registeringAdvisor: { ...surveying } } : {}),
   };
