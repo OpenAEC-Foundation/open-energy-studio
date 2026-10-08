@@ -4568,6 +4568,11 @@ export async function assessMaatwerkadviesWithRust(project: IProject, definition
   return kernelCall<MaatwerkadviesAssessment>('assess_maatwerkadvies', '/api/v1/nta8800/maatwerkadvies', { input });
 }
 
+/** The maatwerkadvies of a ready kernel input (e.g. a survey project on its derived building input). */
+export async function assessMaatwerkadviesInputWithRust(input: Record<string, unknown>): Promise<MaatwerkadviesAssessment> {
+  return kernelCall<MaatwerkadviesAssessment>('assess_maatwerkadvies', '/api/v1/nta8800/maatwerkadvies', { input });
+}
+
 export interface RegistrationAssessment {
   source: string;
   /** Effective message type (`messageType`, else `relabel`). */

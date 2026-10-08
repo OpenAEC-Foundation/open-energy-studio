@@ -22,6 +22,7 @@ import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel'
 import { ResultsDashboard } from './pages/results/ResultsDashboard';
 import { SurveyWizard } from '../SurveyWizard/SurveyWizard';
 import { SurveyReport } from '../SurveyWizard/SurveyReport';
+import { SurveyMwa } from '../SurveyWizard/SurveyMwa';
 import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import { Building3DView, HeatPumpSizingCalculator, LazyPage, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
@@ -208,6 +209,11 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       </>;
       break;
     case 'advice':
+      // A basisopname project takes its measures as changes to the survey.
+      if (!flow) {
+        page = <div className="page-body">{dimmedBanner}<SurveyMwa route={route} navigate={actions.navigate} /></div>;
+        break;
+      }
       page = <>{header()}<div className="page-body">{dimmedBanner}<MaatwerkadviesPanel tab={route.sub as MwaTab | undefined} /></div></>;
       break;
     case 'relabel':

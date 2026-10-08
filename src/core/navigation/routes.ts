@@ -91,6 +91,7 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
   {
     id: 'advice', number: 7, group: 'existing', labelKey: 'nav.step.advice', slug: 'maatwerkadvies', subs: [
       { id: 'measures', labelKey: 'nav.sub.advice.measures' },
+      { id: 'packages', labelKey: 'nav.sub.advice.packages' },
       { id: 'use', labelKey: 'nav.sub.advice.use' },
       { id: 'passport', labelKey: 'nav.sub.advice.passport' },
       { id: 'advice', labelKey: 'nav.sub.advice.advice' },

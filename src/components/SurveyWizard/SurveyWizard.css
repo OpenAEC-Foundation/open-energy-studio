@@ -251,3 +251,27 @@
 .survey-report-band i { display: inline-block; width: 20px; height: 20px; border-radius: 5px; background: #F59E0B; }
 .survey-report-band b { font-size: 14px; }
 .survey-report-band span { margin-left: auto; font-size: 11px; color: #D4D4D8; font-family: var(--font-ui); }
+
+/* Maatwerkadvies of a survey project. */
+.mwa-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.mwa-step { font: inherit; font-size: var(--fs-sm); padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; }
+.mwa-step--on { border-color: var(--amber-600); color: var(--fg-1); background: var(--surface-selected); }
+.mwa-kinds { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.mwa-kind { min-height: 0; flex-direction: row; align-items: center; padding: 10px 12px; }
+.mwa-kind .survey-choice-icon { width: 32px; height: 32px; }
+.mwa-kind .survey-choice-icon svg { width: 18px; height: 18px; }
+.mwa-kind .survey-choice-title { font-size: var(--fs-md, 14px); }
+.mwa-measure { gap: var(--space-2); }
+.mwa-measure-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.mwa-name { flex: 1 1 220px; font: inherit; font-weight: var(--weight-semibold); font-size: var(--fs-lg); color: var(--fg-1); background: transparent; border: 0; border-bottom: 1px dashed var(--line); padding: 2px 0; }
+.mwa-effect { font-size: var(--fs-sm); color: #6EE7A0; font-variant-numeric: tabular-nums; }
+.mwa-effect--none { color: var(--fg-3); }
+.mwa-measure-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.mwa-measure-actions .btn:only-child { margin-left: auto; }
+.mwa-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.mwa-path-row { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); }
+.mwa-path-row .survey-label { min-width: 52px; font-size: 15px; padding: 2px 8px; }
+.mwa-todo { margin: 0; padding-left: 18px; font-size: var(--fs-sm); line-height: 1.6; color: var(--fg-2); }
+.mwa-advice .survey-choice-title { display: flex; align-items: center; gap: 8px; }
+.mwa-advice .survey-label { font-size: 14px; padding: 1px 8px; min-width: 0; }
+.mwa-advice .survey-choice[aria-checked='true'] { border: 2px solid var(--amber-600); background: var(--surface-selected); }
