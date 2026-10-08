@@ -368,7 +368,7 @@
       "obstruction": {
         "method": "minimal"
       },
-      "sourceReference": "default F_F; openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): minimale belemmering tenzij per raam anders (windowObstructions); screens op het dakraam niet ingevoerd (geen zonwering per raam)"
+      "sourceReference": "default F_F; openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): minimale belemmering tenzij per raam anders (windowObstructions); geen zonwering tenzij per raam anders (windowShadings)"
     },
     "windowObstructions": [
       {
@@ -636,7 +636,11 @@
         "unit": {
           "variant": "c4c",
           "ducts": "unknown",
-          "equipmentReference": "Itho Daalderop CVE/CVD ECO Optima 2 GG met CO2 in woonkamer en hoofdslaapkamer + zr-roosters (product f_ctrl 0,51 in het rapport; de kern rekent tabel 11.5)"
+          "equipmentReference": "Itho Daalderop CVE/CVD ECO Optima 2 GG met CO2 in woonkamer en hoofdslaapkamer + zr-roosters",
+          "declaredControlFactor": {
+            "value": 0.51,
+            "declarationReference": "BCRG gecontroleerde gelijkwaardigheidsverklaring 20201914GG (20191290GGVNWB), Itho CVE/CVD ECO Optima2 GG, C.4c, f_ctrl 0,51 (bijlage bij de Uniec 3.3.5.0 printout, 29-04-2025)"
+          }
         }
       },
       "installedCapacity": {
@@ -755,6 +759,20 @@
           "kitchens": 1
         },
         "equipmentReference": "openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): kokendwatertoestel elektrisch forfaitair"
+      }
+    ],
+    "windowShadings": [
+      {
+        "windowId": "DR",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "dark"
+          },
+          "control": "manual_residential",
+          "sourceReference": "screen (buiten), zwart, antraciet, donkerbruin; handbediend (tabel 7.5)"
+        },
+        "sourceReference": "openbare bron Uniec 3.3.5.0 printout (29-04-2025): bouwkundige zonwering alleen op het dakraam velux -62 (1,51 m2, W, 45 graden)"
       }
     ]
   }

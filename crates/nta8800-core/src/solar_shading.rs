@@ -869,6 +869,26 @@ fn is_nan(value: &f64) -> bool {
     value.is_nan()
 }
 
+/// Checks of a movable shading that do not depend on the building function
+/// or the edition: the factor of 7.43 (0..1, or a table 7.5/7.6 device but
+/// not both) and its source. Codes with the path suffix below the shading.
+pub fn validate_movable_shading(shading: &MovableShading) -> Vec<(&'static str, &'static str)> {
+    let mut issues = Vec::new();
+    if shading.device.is_some() && shading.reduction_factor.is_finite() {
+        issues.push((
+            "window_shading_factor_declared_and_table",
+            ".reductionFactor",
+        ));
+    }
+    if shading.device.is_none() && !(0.0..=1.0).contains(&shading.reduction_factor) {
+        issues.push(("window_shading_factor_invalid", ".reductionFactor"));
+    }
+    if shading.source_reference.trim().is_empty() {
+        issues.push(("source_reference_required", ".sourceReference"));
+    }
+    issues
+}
+
 impl MovableShading {
     /// `F_c` of 7.43: table 7.5/7.6 for a `device`, otherwise the given
     /// value rounded up to two decimals.

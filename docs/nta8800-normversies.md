@@ -184,7 +184,7 @@ Het profiel van 2020+A1 is cumulatief op 2022: alles waarin 2022 van 2023 versch
 - de forfaitaire Ψ-voorwaarden (Rc ≥ 4,5 in 2020+A1, ≥ 4,7 in 2022, detail 1): de adviseur toetst de voorwaarde.
 
 **Acceptatie met openbare rapporten.** Twee rapporten uit de periode van 2020+A1 rekenen in deze editie (zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md#a-b-en-d-in-hun-eigen-editie-7-oktober-2026)):
-- A (vrijstaand, plat dak, Uniec 3.0.16): 94,00 / 36,06 / 74,4 tegen 92,99 / 25,19 / 80,4. De PV-afronding van punt 68 geeft de 2 437 kWh van het rapport; het verschil in BENG 2 is 10.15 en 10.87.
+- A (vrijstaand, plat dak, Uniec 3.0.16): 94,00 / 35,29 / 74,4 (met de gedeclareerde f_ctrl 0,50 van het rapport, sinds 9 oktober 2026; daarvoor 36,06) tegen 92,99 / 25,19 / 80,4. De PV-afronding van punt 68 geeft de 2 437 kWh van het rapport; het verschil in BENG 2 is 10.15 en 10.87.
 - D (vrijstaande vakantiewoning, Uniec 3.0.10.0): 86,35 / 39,07 / 83,6 tegen 86,72 / 39,19 / 83,5. Tapwater, ventilatoren, PV en, met het installatiejaar 2021, de hulpenergie van de warmtepomp (A = 13,0 kWh, punt 74) zijn gelijk; de overstek op het oostglas is een belemmering per raam (h_o;⊥ 0,25 aangenomen).
 - E (vrijstaande woning, Uniec 3.1.5.0, 2022): 88,61 / 31,68 / 72,6 tegen 86,82 / 28,89 / 74,1, met belemmeringen per raam en twee tapwatersystemen; zie [nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md).
 

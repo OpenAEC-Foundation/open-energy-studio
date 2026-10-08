@@ -21,7 +21,9 @@ use crate::monthly_demand::{
 };
 use crate::norm_versions::NormVersion;
 use crate::pv::PvSystem;
-use crate::solar_shading::{validate_obstruction, MovableShading, Obstruction};
+use crate::solar_shading::{
+    validate_movable_shading, validate_obstruction, MovableShading, Obstruction,
+};
 use crate::space_cooling::CoolingSystem;
 use crate::space_heating_chain::{
     ChainZone, CollectiveConnection, Distribution, DistributionSystem, Generator,
@@ -65,6 +67,12 @@ pub struct NtaCalculationInput {
     /// not listed keeps `windowSolar.obstruction`.
     #[serde(default)]
     pub window_obstructions: Vec<ProjectWindowObstruction>,
+    /// Movable sun shading per project window (7.6.6.1.4: g_gl;wi;mi of
+    /// 7.42 and F_c of 7.43 per window wi, 2025+C1 p. 196–198). A listed
+    /// window takes its own `movableShading` (absent: none); a window not
+    /// listed keeps `windowSolar.movableShading`.
+    #[serde(default)]
+    pub window_shadings: Vec<ProjectWindowShading>,
     /// Humidifiers per zone (chapter 12).
     #[serde(default)]
     pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
@@ -228,6 +236,18 @@ pub struct ProjectDynamicWindow {
 pub struct ProjectWindowObstruction {
     pub window_id: String,
     pub obstruction: Obstruction,
+    pub source_reference: String,
+}
+
+/// Movable shading of one project window, replacing the project-wide
+/// `windowSolar.movableShading` for that window.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectWindowShading {
+    pub window_id: String,
+    /// `None`: this window has no movable shading, whatever the default.
+    #[serde(default)]
+    pub movable_shading: Option<MovableShading>,
     pub source_reference: String,
 }
 
@@ -1735,7 +1755,11 @@ fn window_source_path(
             Some(index) => format!("ntaCalculation.dynamicWindows[{index}].dynamic{rest}"),
             None => "ntaCalculation.dynamicWindows".to_string(),
         },
-        "frameFraction" | "movableShading" => format!("ntaCalculation.windowSolar.{field}{rest}"),
+        "movableShading" => match listed("windowShadings") {
+            Some(index) => format!("ntaCalculation.windowShadings[{index}].movableShading{rest}"),
+            None => format!("ntaCalculation.windowSolar.movableShading{rest}"),
+        },
+        "frameFraction" => format!("ntaCalculation.windowSolar.{field}{rest}"),
         // The window's own data in the project model.
         "areaM2" | "uValueWPerM2k" | "gPerpendicular" | "" => {
             let member = match field {
@@ -3220,6 +3244,23 @@ fn derive_input(
         .collect();
     let delta_u_forfait = forfait_bridge_route(&project, &nta, &constructions, gaps);
     let mut used_ground = HashSet::new();
+    let mut window_shadings: HashMap<&str, (usize, &ProjectWindowShading)> = HashMap::new();
+    for (index, item) in nta.window_shadings.iter().enumerate() {
+        let path = format!("ntaCalculation.windowShadings[{index}]");
+        if window_shadings
+            .insert(item.window_id.as_str(), (index, item))
+            .is_some()
+        {
+            gaps.push(gap("window_shading_duplicate", format!("{path}.windowId")));
+        }
+        if item.source_reference.trim().is_empty() {
+            gaps.push(gap(
+                "window_shading_reference_required",
+                format!("{path}.sourceReference"),
+            ));
+        }
+    }
+    let mut used_shading = HashSet::new();
     let mut dynamic_windows: HashMap<&str, &crate::annex_a::DynamicTransparent> = HashMap::new();
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
         let path = format!("ntaCalculation.dynamicWindows[{index}]");
@@ -3231,7 +3272,11 @@ fn derive_input(
         }
         // §A.2 (p. 767): movable shading of a dynamic window belongs in its
         // states; the project-wide 7.42 shading would count it twice.
-        if nta.window_solar.movable_shading.is_some() {
+        let shaded = match window_shadings.get(item.window_id.as_str()) {
+            Some((_, own)) => own.movable_shading.is_some(),
+            None => nta.window_solar.movable_shading.is_some(),
+        };
+        if shaded {
             gaps.push(gap("window_dynamic_and_shading_exclusive", path.clone()));
         }
         for issue in item.dynamic.validate(&format!("{path}.dynamic")) {
@@ -3475,6 +3520,46 @@ fn derive_input(
                         nta.window_solar.obstruction.clone()
                     }
                 };
+                // A per-window entry replaces the project-wide shading.
+                // An invalid one is a gap at its own path and the window
+                // keeps the default, as for obstructions.
+                let shading = match window_shadings.get(window_id) {
+                    Some((index, item)) => {
+                        used_shading.insert(window_id.to_owned());
+                        let issues = item
+                            .movable_shading
+                            .as_ref()
+                            .map(validate_movable_shading)
+                            .unwrap_or_default();
+                        for (code, suffix) in &issues {
+                            gaps.push(gap(
+                                code,
+                                format!(
+                                    "ntaCalculation.windowShadings[{index}].movableShading{suffix}"
+                                ),
+                            ));
+                        }
+                        if issues.is_empty() {
+                            item.movable_shading.clone()
+                        } else {
+                            nta.window_solar.movable_shading.clone()
+                        }
+                    }
+                    None => nta.window_solar.movable_shading.clone(),
+                };
+                let mut source_reference = match window_obstructions.get(window_id) {
+                    Some((_, item)) => format!(
+                        "project:window:{window_id}; {}; obstruction: {}",
+                        nta.window_solar.source_reference, item.source_reference
+                    ),
+                    None => format!(
+                        "project:window:{window_id}; {}",
+                        nta.window_solar.source_reference
+                    ),
+                };
+                if let Some((_, item)) = window_shadings.get(window_id) {
+                    source_reference.push_str(&format!("; shading: {}", item.source_reference));
+                }
                 windows.push(Window {
                     id: format!("window:{window_id}"),
                     area_m2: area,
@@ -3485,19 +3570,10 @@ fn derive_input(
                     u_value_w_per_m2k: u_value,
                     forfait_delta_u_w_per_m2k: delta_u_forfait,
                     obstruction,
-                    movable_shading: nta.window_solar.movable_shading.clone(),
+                    movable_shading: shading,
                     dynamic,
                     glazing: None,
-                    source_reference: match window_obstructions.get(window_id) {
-                        Some((_, item)) => format!(
-                            "project:window:{window_id}; {}; obstruction: {}",
-                            nta.window_solar.source_reference, item.source_reference
-                        ),
-                        None => format!(
-                            "project:window:{window_id}; {}",
-                            nta.window_solar.source_reference
-                        ),
-                    },
+                    source_reference,
                 });
             }
             let gross = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
@@ -3680,6 +3756,21 @@ fn derive_input(
         gaps.push(gap(
             code,
             format!("ntaCalculation.windowObstructions[{index}].windowId"),
+        ));
+    }
+    for (index, item) in nta.window_shadings.iter().enumerate() {
+        if used_shading.contains(&item.window_id) {
+            continue;
+        }
+        // A window with incomplete data already has its own gap.
+        let code = match project_windows.get(item.window_id.as_str()) {
+            None => "window_shading_without_window",
+            Some(false) => "window_shading_not_outdoor",
+            Some(true) => continue,
+        };
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowShadings[{index}].windowId"),
         ));
     }
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
@@ -4169,6 +4260,126 @@ mod tests {
             numbers(serde_json::to_value(item.performance.as_ref().unwrap()).unwrap())
         };
         assert_eq!(json(&result), json(&base));
+    }
+
+    /// 7.42/7.43 (2025+C1 p. 196–198) give g_gl and F_c per window wi:
+    /// screens on win-S only lower its cooling gains, win-N keeps the project
+    /// default (none), and an entry without `movableShading` removes the
+    /// project-wide shading from that window.
+    #[test]
+    fn window_shading_replaces_the_default_for_that_window_only() {
+        let shading = serde_json::json!({
+            "reductionFactor": 0.2, "control": "manual_residential", "sourceReference": "screen"
+        });
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([{
+            "windowId": "win-S", "movableShading": shading, "sourceReference": "screens on the south window"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        assert!(find("window:win-S").movable_shading.is_some());
+        assert!(find("window:win-S")
+            .source_reference
+            .contains("screens on the south window"));
+        assert!(find("window:win-N").movable_shading.is_none());
+        let cooling = |item: &ProjectPerformanceAssessment| {
+            item.performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|month| month.cooling.gains_kwh)
+                .sum::<f64>()
+        };
+        assert!(cooling(&result) < cooling(&base));
+
+        // Project-wide shading, removed again for win-N.
+        let mut value = project();
+        value["ntaCalculation"]["windowSolar"]["movableShading"] = shading.clone();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([{
+            "windowId": "win-N", "sourceReference": "no screen on the north window"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        assert!(find("window:win-S").movable_shading.is_some());
+        assert!(find("window:win-N").movable_shading.is_none());
+    }
+
+    /// Projects without `windowShadings`, and projects that repeat the
+    /// project default per window, give identical numbers.
+    #[test]
+    fn window_shading_equal_to_the_default_changes_nothing() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([
+            {"windowId": "win-S", "sourceReference": "survey"},
+            {"windowId": "win-N", "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, base.status);
+        fn numbers(value: Value) -> Value {
+            match value {
+                Value::String(_) => Value::Null,
+                Value::Array(items) => Value::Array(items.into_iter().map(numbers).collect()),
+                Value::Object(map) => Value::Object(
+                    map.into_iter()
+                        .map(|(key, item)| (key, numbers(item)))
+                        .collect(),
+                ),
+                other => other,
+            }
+        }
+        let json = |item: &ProjectPerformanceAssessment| {
+            numbers(serde_json::to_value(item.performance.as_ref().unwrap()).unwrap())
+        };
+        assert_eq!(json(&result), json(&base));
+    }
+
+    #[test]
+    fn window_shading_input_errors_are_gaps() {
+        let mut value = project();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([
+            {"windowId": "win-S", "sourceReference": "a"},
+            {"windowId": "win-S", "sourceReference": "b"},
+            {"windowId": "missing", "sourceReference": "c"},
+            {"windowId": "win-N", "movableShading": {
+                "reductionFactor": 1.5, "control": "manual_residential", "sourceReference": "x"
+            }, "sourceReference": " "}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        for expected in [
+            (
+                "window_shading_duplicate",
+                "ntaCalculation.windowShadings[1].windowId",
+            ),
+            (
+                "window_shading_without_window",
+                "ntaCalculation.windowShadings[2].windowId",
+            ),
+            (
+                "window_shading_reference_required",
+                "ntaCalculation.windowShadings[3].sourceReference",
+            ),
+            (
+                "window_shading_factor_invalid",
+                "ntaCalculation.windowShadings[3].movableShading.reductionFactor",
+            ),
+        ] {
+            assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
+        }
+        assert_ne!(result.status, "calculated_unverified");
     }
 
     #[test]

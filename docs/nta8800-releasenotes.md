@@ -13,6 +13,17 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — gedeclareerde f_ctrl en zonwering per raam
+
+Twee nieuwe invoerroutes. Projecten zonder deze invoer rekenen precies als voorheen.
+
+- **Gedeclareerde f_ctrl** (`ventilation.system.unit.declaredControlFactor`: `value` en `declarationReference`). Een kwaliteitsverklaring van het toegepaste ventilatiesysteem, zoals een BCRG-gelijkwaardigheidsverklaring, mag de rekenwaarde van tabel 11.5 vervangen (2025+C1 p. 7 en p. 460). De waarde geldt als f_ctrl;tabel 11.5 in 11.48/11.49, bij E.1 als f_ctrl;overig. Nieuwe meldcodes: `declared_control_factor_invalid` (niet groter dan 0 of boven 2) en `declared_control_factor_not_applicable` (op het decentrale deel van E.1).
+- **Zonwering per raam** (`windowShadings`: per raam `windowId`, `movableShading` en `sourceReference`). 7.42 en 7.43 gelden per raam (2025+C1 p. 196–198). Een raam in de lijst krijgt zijn eigen zonwering of geen; de andere ramen houden `windowSolar.movableShading`. Nieuwe meldcodes: `window_shading_duplicate`, `window_shading_without_window`, `window_shading_not_outdoor` en `window_shading_reference_required`; een ongeldige F_c of een lege bron is een invoergat op het eigen pad.
+- **Formulier:** een vinkje "Gedeclareerde f_ctrl" bij het ventilatiesysteem en een tabel "Zonwering per raam" onder Gebouw › Schil & ramen.
+- **Openbare gevallen:** A rekent met de f_ctrl 0,50 en G met de f_ctrl 0,51 en de screens op het dakraam, zoals de rapporten.
+  - A: BENG 2 35,15 → 34,37 (2025+C1) en 36,06 → 35,29 (2020+A1).
+  - G: 65,67 / 30,89 / 71,8 → 65,42 / 29,71 / 72,1; het rapport geeft 64,52 / 29,44 / 70,6.
+
 ### 9 oktober 2026 — invoergaten van geweigerde routes per zone, raam en systeem; strengere controle van de releasenotes (geen rekenwijziging)
 
 Uitkomsten, status en meldcodes veranderen niet; alleen het pad van een invoergat en de controles rond de vrijgave.

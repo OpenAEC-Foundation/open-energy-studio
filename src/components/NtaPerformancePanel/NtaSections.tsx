@@ -24,6 +24,7 @@ import {
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { DynamicWindowsFields } from './NtaDynamicWindows';
 import { WindowObstructionsFields } from './NtaWindowObstructions';
+import { WindowShadingsFields } from './NtaWindowShadings';
 import { AnnexAaCalculationFields } from './NtaAnnexAaFields';
 import { annexAaCalculations, annexAaEditionRules } from '../../core/nta/annexAaForm';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
@@ -747,6 +748,9 @@ export const NTA_SECTIONS: NtaSectionDef[] = [
   { id: 'windowObstructions', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowObstructions.title',
     Component: ({ draft, change, project }) => <WindowObstructionsFields draft={draft} change={change} project={project} />,
     paths: ['windowObstructions'] },
+  { id: 'windowShadings', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowShadings.title',
+    Component: ({ draft, change, project }) => <WindowShadingsFields draft={draft} change={change} project={project} />,
+    paths: ['windowShadings'] },
   { id: 'dynamicWindows', step: 'building', sub: 'envelope', titleKey: 'nta.form.dynamic.title', Component: DynamicWindowsSection,
     paths: ['dynamicWindows'], advanced: true },
   { id: 'sunrooms', step: 'building', sub: 'unheated', titleKey: 'nta.form.sunroom.title',
