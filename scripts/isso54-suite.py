@@ -2029,6 +2029,81 @@ CASES += [
 ]
 
 
+# --- EP-W008/EP-W009: overhangs and side obstructions per window (p. 10-13) ---
+# Window positions of figures 2-5: 3,0 x 2,0 m, sills at 0,5 m and 3,2 m,
+# horizontally 0,5-3,5 m and 4,5-7,5 m of the 8 m facade. raam-zuid-1/3 are
+# taken as the left windows (lower, upper), raam-zuid-2/4 as the right ones.
+# h_o (2022 p. 672): height from the window centre to the underside of the
+# overhang over its depth. b_b (p. 673): distance parallel to the window from
+# the centre to the far point P over the distance perpendicular to it.
+# Left/right is seen from inside, looking out of the south facade (west is
+# right, east is left).
+LEFT = ["raam-zuid-1", "raam-zuid-3"]
+RIGHT = ["raam-zuid-2", "raam-zuid-4"]
+
+
+def per_window(test_id, page, entries):
+    return setp(
+        f"{NTA}/windowObstructions",
+        [{"windowId": window_id, "obstruction": body, "sourceReference": f"ISSO 54 v2.0 {test_id} p. {page}: {why}"} for window_id, body, why in entries],
+    )
+
+
+def overhang_all(test_id, depth):
+    relative = round(1.0 / depth, 4)
+    return per_window(
+        test_id,
+        10,
+        [(w, {"method": "overhang", "relativeHeight": relative}, f"overstek direct boven elk raam, diepte {depth} m: h_o = 1,0/{depth} = {relative}") for w in LEFT + RIGHT],
+    )
+
+
+def roof_overhang(test_id, depth):
+    """Fig. 3: the roof (5,4 m) continues over the left 4 m: only the left
+    windows are covered; centres 1,5 m and 4,2 m."""
+    entries = []
+    for window_id, centre in (("raam-zuid-1", 1.5), ("raam-zuid-3", 4.2)):
+        relative = round((5.4 - centre) / depth, 4)
+        entries.append((window_id, {"method": "overhang", "relativeHeight": relative}, f"dakoverstek diepte {depth} m over 4 m vanaf links, raammidden {centre} m: h_o = {relative}"))
+    return per_window(test_id, 11, entries)
+
+
+def side_all(test_id, depth):
+    relative = round(1.5 / depth, 4)
+    return per_window(
+        test_id,
+        12,
+        [(w, {"method": "side_obstruction", "side": "right", "relativeWidth": relative}, f"zijbelemmering aan de westzijde tegen het raam, diepte {depth} m: b_b = 1,5/{depth} = {relative}") for w in LEFT + RIGHT],
+    )
+
+
+def east_obstruction(test_id, depth):
+    """Fig. 5: one obstruction at the east edge, 0,5 m from the right
+    windows; the far point is 2,0 m from the right and 6,0 m from the left
+    window centres."""
+    entries = []
+    for windows, distance in ((RIGHT, 2.0), (LEFT, 6.0)):
+        relative = round(distance / depth, 4)
+        for window_id in windows:
+            entries.append((window_id, {"method": "side_obstruction", "side": "left", "relativeWidth": relative}, f"zijbelemmering oostzijde, diepte {depth} m: b_b = {distance}/{depth} = {relative}"))
+    return per_window(test_id, 12, entries)
+
+
+CASES += [
+    ("EPW008a", 10, [overhang_all("EP-W008a", 5.0)]),
+    ("EPW008b", 10, [overhang_all("EP-W008b", 1.8)]),
+    ("EPW008c", 10, [overhang_all("EP-W008c", 2.2)]),
+    ("EPW008d", 11, [roof_overhang("EP-W008d", 2.2)]),
+    ("EPW008e", 11, [roof_overhang("EP-W008e", 5.0)]),
+    ("EPW009a", 12, [side_all("EP-W009a", 0.6)]),
+    ("EPW009b", 12, [side_all("EP-W009b", 2.0)]),
+    ("EPW009c", 12, [east_obstruction("EP-W009c", 0.6)]),
+    ("EPW009d", 12, [east_obstruction("EP-W009d", 1.2)]),
+    ("EPW009e", 12, [east_obstruction("EP-W009e", 2.4)]),
+    ("EPW009f", 12, [east_obstruction("EP-W009f", 6.0)]),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
