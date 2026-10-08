@@ -1,6 +1,6 @@
 {
   "suiteId": "openbare-gevallen",
-  "description": "Herbouwde openbare BENG-rapporten A–G. Verwacht is de vastgelegde uitkomst van deze rekenkern (regressie, banden als in crates/nta8800-core/tests/public_comparison.rs); de gepubliceerde waarden staan er ter vergelijking bij en beslissen niets. Geen officiële referentietoets.",
+  "description": "Herbouwde openbare BENG-rapporten A–H. Verwacht is de vastgelegde uitkomst van deze rekenkern (regressie, banden als in crates/nta8800-core/tests/public_comparison.rs); de gepubliceerde waarden staan er ter vergelijking bij en beslissen niets. Geen officiële referentietoets.",
   "cases": [
     {
       "caseId": "openbaar-a-2025c1",
@@ -530,8 +530,7 @@
           "value": 80.63,
           "unit": "kWh/m2.year",
           "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
-          "absoluteTolerance": 0.05,
-          "relativeTolerance": 0.001
+          "absoluteTolerance": 0.05
         },
         {
           "path": "beng3",

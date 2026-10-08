@@ -20,11 +20,11 @@ const project = {
   heatingSystems: [], ventilationSystems: [], coolingSystems: [], hotWaterSystems: [], solarPV: [], solarThermal: [], constructions: [],
 } as unknown as IProject;
 
-function Shadings({ initial = {} }: { initial?: Draft }) {
+function Shadings({ initial = {}, inProject = project }: { initial?: Draft; inProject?: IProject }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const change = (path: Path, value: unknown) => setDraft((current) => write(current, path, value));
   return <form aria-label="test">
-    <WindowShadingsFields draft={draft} change={change} project={project} />
+    <WindowShadingsFields draft={draft} change={change} project={inProject} />
     <output data-testid="draft">{JSON.stringify(draft)}</output>
   </form>;
 }
@@ -103,5 +103,23 @@ describe('Declared f_ctrl', () => {
         change={() => undefined} path={['ventilation', 'system', 'decentral']} />
     </form>);
     expect(screen.queryByLabelText('Declared f_ctrl (quality declaration)')).toBeNull();
+  });
+});
+
+describe('windowShadings for a window that changed boundary', () => {
+  it('names a window that no longer borders outdoor air instead of calling it missing', () => {
+    const moved = {
+      ...project,
+      zones: [{ ...project.zones[0], surfaces: [...project.zones[0].surfaces,
+        { id: 'bg', name: 'Berging', type: 'wall', thermalBoundary: 'unheated_space', area: 8, orientation: 'N', constructionId: 'c', zoneId: 'z1',
+          windows: [{ id: 'win-U', name: 'Raam berging', area: 1, uValue: 1.4, gValue: 0.6, orientation: 'N', surfaceId: 'bg' }] }] }],
+    } as unknown as IProject;
+    renderWithProviders(<Shadings inProject={moved} initial={{ windowShadings: [
+      { windowId: 'win-U', sourceReference: 'x' }, { windowId: 'gone', sourceReference: 'y' }] }} />);
+    const stale = screen.getByRole('group', { name: /^Raam berging \(no longer in an outdoor surface/ });
+    expect(stale.getAttribute('data-code')).toBe('window_shading_not_outdoor');
+    expect(within(stale).getByRole('button', { name: 'Remove' })).toBeTruthy();
+    const gone = screen.getByRole('group', { name: 'gone (not in the project)' });
+    expect(gone.getAttribute('data-code')).toBe('window_shading_without_window');
   });
 });

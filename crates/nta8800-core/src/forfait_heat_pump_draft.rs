@@ -198,6 +198,53 @@ pub struct TableIssue {
     pub path: &'static str,
 }
 
+/// The checks of a quality declaration (§9.1, p. 285), shared by the
+/// hydronic table route and the air-to-air route: a reference is required,
+/// the value is rounded down to a multiple of 0,05 (a value under one step
+/// would become 0) and the optional fraction and auxiliary energy must be
+/// physical.
+fn validate_quality_declaration(
+    declaration: Option<&HeatPumpQualityDeclaration>,
+    issues: &mut Vec<TableIssue>,
+) {
+    let Some(declaration) = declaration else {
+        return;
+    };
+    if declaration.declaration_reference.trim().is_empty() {
+        issues.push(issue(
+            "source_required",
+            "qualityDeclaration.declarationReference",
+        ));
+    }
+    if !declaration.generation_efficiency.is_finite()
+        || declaration.generation_efficiency < 0.05
+        || declaration.generation_efficiency > 15.0
+    {
+        issues.push(issue(
+            "heat_pump_declared_efficiency_invalid",
+            "qualityDeclaration.generationEfficiency",
+        ));
+    }
+    if declaration
+        .energy_fraction
+        .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
+    {
+        issues.push(issue(
+            "heat_pump_declared_fraction_invalid",
+            "qualityDeclaration.energyFraction",
+        ));
+    }
+    if declaration
+        .auxiliary_kwh_per_year
+        .is_some_and(|value| !value.is_finite() || value < 0.0)
+    {
+        issues.push(issue(
+            "heat_pump_declared_auxiliary_invalid",
+            "qualityDeclaration.auxiliaryKwhPerYear",
+        ));
+    }
+}
+
 fn issue(code: &'static str, path: &'static str) -> TableIssue {
     TableIssue { code, path }
 }
@@ -519,6 +566,7 @@ pub fn assess_forfait_heat_pump_draft(
     let mut selected_band = None;
     let mut table_cop = None;
     let mut corrected_cop = None;
+    validate_quality_declaration(input.quality_declaration.as_ref(), &mut issues);
     if input.sink == TableSink::IndoorAir {
         if input.source != TableSource::OutdoorAir {
             issues.push(issue("air_to_air_source_unsupported", "source"));
@@ -536,13 +584,13 @@ pub fn assess_forfait_heat_pump_draft(
             ));
         }
         if issues.is_empty() {
+            // A valid declaration replaces the forfait 2,8, rounded down to a
+            // multiple of 0,05 (§9.1, p. 285); an invalid one is an issue
+            // above, never a silent fallback to the forfait.
             table_cop = Some(
                 input
                     .quality_declaration
                     .as_ref()
-                    .filter(|item| {
-                        item.generation_efficiency.is_finite() && item.generation_efficiency > 0.0
-                    })
                     .map_or(2.8, |item| round_down_to(item.generation_efficiency, 0.05)),
             );
             corrected_cop = table_cop;
@@ -608,43 +656,6 @@ pub fn assess_forfait_heat_pump_draft(
                     high_row_values(input.source).and_then(|row| row.get(index).copied())
                 }
             };
-            if let Some(declaration) = &input.quality_declaration {
-                if declaration.declaration_reference.trim().is_empty() {
-                    issues.push(issue(
-                        "source_required",
-                        "qualityDeclaration.declarationReference",
-                    ));
-                }
-                // Rounded down to a multiple of 0,05 below (§9.1): a value
-                // under one step would become 0.
-                if !declaration.generation_efficiency.is_finite()
-                    || declaration.generation_efficiency < 0.05
-                    || declaration.generation_efficiency > 15.0
-                {
-                    issues.push(issue(
-                        "heat_pump_declared_efficiency_invalid",
-                        "qualityDeclaration.generationEfficiency",
-                    ));
-                }
-                if declaration
-                    .energy_fraction
-                    .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
-                {
-                    issues.push(issue(
-                        "heat_pump_declared_fraction_invalid",
-                        "qualityDeclaration.energyFraction",
-                    ));
-                }
-                if declaration
-                    .auxiliary_kwh_per_year
-                    .is_some_and(|value| !value.is_finite() || value < 0.0)
-                {
-                    issues.push(issue(
-                        "heat_pump_declared_auxiliary_invalid",
-                        "qualityDeclaration.auxiliaryKwhPerYear",
-                    ));
-                }
-            }
             // §9.1 (p. 285): a declared value replaces the table cell and is
             // rounded down to a multiple of 0,05 for electric generators.
             let selected_value = match &input.quality_declaration {
@@ -1135,6 +1146,59 @@ mod tests {
             assess_forfait_heat_pump_draft(&input).corrected_cop,
             Some(0.05)
         );
+    }
+
+    /// Review 3: the air-to-air route used a quality declaration without any
+    /// of the §9.1 checks (p. 285). A blank reference, a value under one
+    /// rounding step, an absurd value and a negative value are now issues,
+    /// and an invalid declaration never falls back silently to the forfait.
+    #[test]
+    fn air_to_air_declaration_gets_the_same_checks() {
+        let mut input = example(
+            TableScope::ResidentialAtMost25Kw,
+            TableSource::OutdoorAir,
+            45.0,
+        );
+        input.sink = TableSink::IndoorAir;
+        input.design_supply_temperature_c = None;
+        let declare = |input: &mut ForfaitHeatPumpDraftInput, reference: &str, value: f64| {
+            input.quality_declaration = Some(HeatPumpQualityDeclaration {
+                declaration_reference: reference.into(),
+                generation_efficiency: value,
+                energy_fraction: None,
+                auxiliary_kwh_per_year: None,
+            });
+        };
+        let codes = |input: &ForfaitHeatPumpDraftInput| {
+            let result = assess_forfait_heat_pump_draft(input);
+            (
+                result
+                    .issues
+                    .iter()
+                    .map(|item| item.code)
+                    .collect::<Vec<_>>(),
+                result.corrected_cop,
+            )
+        };
+        declare(&mut input, "", 4.0);
+        let (issues, cop) = codes(&input);
+        assert!(issues.contains(&"source_required"), "{issues:?}");
+        assert!(cop.is_none());
+        for value in [0.03, 1e6, -1.0] {
+            declare(&mut input, "BCRG 0000/04", value);
+            let (issues, cop) = codes(&input);
+            assert!(
+                issues.contains(&"heat_pump_declared_efficiency_invalid"),
+                "{value}: {issues:?}"
+            );
+            assert!(cop.is_none(), "{value}");
+        }
+        declare(&mut input, "BCRG 0000/04", 4.12);
+        let (issues, cop) = codes(&input);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert!((cop.unwrap() - 4.10).abs() < 1e-9);
+        input.quality_declaration = None;
+        assert_eq!(codes(&input), (Vec::new(), Some(2.8)));
     }
 
     #[test]

@@ -23,7 +23,7 @@ export function outdoorWindows(project: IProject) {
 }
 
 /** A project window by id, whatever its surface borders. */
-function projectWindow(project: IProject, windowId: unknown) {
+export function projectWindow(project: IProject, windowId: unknown) {
   return project.zones.flatMap((zone) => zone.surfaces).flatMap((surface) => surface.windows)
     .find((window) => window.id === windowId) ?? null;
 }

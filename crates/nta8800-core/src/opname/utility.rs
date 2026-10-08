@@ -2369,6 +2369,14 @@ fn ventilation_value(
     if combined.is_some() && vent.principle == VentilationPrinciple::Balanced {
         recorder.issue("combined_other_part_not_balanced", "ventilation.combined");
     }
+    // An entered unit year outside the range of tables 11.20/11.23 is refused
+    // here, at the survey field, instead of deep in the derived input.
+    if !crate::ventilation::manufacture_year_valid(vent.unit_manufacture_year) {
+        recorder.issue(
+            "manufacture_year_invalid",
+            "ventilation.unitManufactureYear",
+        );
+    }
     let mut recovery = None;
     if vent.principle == VentilationPrinciple::Balanced || combined.is_some() {
         let exchanger = match vent.heat_recovery {
@@ -2630,14 +2638,18 @@ fn ventilation_value(
     // Table 11.15: fan manufacture year unknown → construction year. This
     // specific rule takes precedence over the general installation-year
     // fallback (and is the conservative one).
+    // A construction year before EARLIEST_MANUFACTURE_YEAR falls in the same
+    // (oldest) rows of tables 11.20 and 11.23 as that year (2025+C1 p. 516,
+    // p. 519), so the substitute is clamped to it rather than refused.
     let fan_year = vent.unit_manufacture_year.unwrap_or_else(|| {
+        let substitute = year.max(crate::ventilation::EARLIEST_MANUFACTURE_YEAR);
         recorder.record(
             "fan_year_unknown_construction_year",
             "ventilation.fans",
-            year.to_string(),
+            substitute.to_string(),
             "ISSO 75.1 p. 154 (table 11.15; specific rule over p. 30)",
         );
-        year
+        substitute
     });
     let current = match vent.motor.unwrap_or(MotorAnswer::Unknown) {
         MotorAnswer::Ac => "ac",
@@ -6472,6 +6484,33 @@ mod tests {
             true
         );
         assert!(applied(&recorder, "ahu_cooling_from_direct_expansion"));
+    }
+
+    /// Review 3: a utility building from before 1900 with an unknown fan year
+    /// gets the clamped substitute 1900 (tables 11.20 and 11.23 have the same
+    /// oldest row, 2025+C1 p. 516, p. 519), which the kernel accepts.
+    #[test]
+    fn utility_survey_before_1900_clamps_the_substituted_fan_year() {
+        let mut survey = fixture("1985");
+        survey.construction_year = 1899;
+        survey.ventilation.principle = VentilationPrinciple::MechanicalExtract;
+        survey.ventilation.unit_manufacture_year = None;
+        survey.ventilation.ahu = None;
+        let (input, _) = derive(&survey);
+        let ventilation = &input["spaceHeating"]["demand"]["ventilation"];
+        assert_eq!(ventilation["fans"]["manufactureYear"], 1900);
+        let parsed: crate::ventilation::VentilationInput =
+            serde_json::from_value(ventilation.clone()).expect("kernel input");
+        assert!(crate::ventilation::validate_ventilation(&parsed).is_empty());
+        // An entered unit year outside the tables is refused at the survey field.
+        survey.ventilation.unit_manufacture_year = Some(1850);
+        let mut recorder = Recorder::default();
+        let _ = derive_utility_input(&survey, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|issue| issue.code == "manufacture_year_invalid"
+                && issue.path == "ventilation.unitManufactureYear"));
     }
 
     #[test]

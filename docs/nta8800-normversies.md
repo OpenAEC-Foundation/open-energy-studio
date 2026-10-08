@@ -235,6 +235,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - **W.3-plafond** (2025+C1 p. 1126): de formule geeft bij kleinere hoeveelheden al een lagere COP.
 - **Biomassagrens:** 500 kW in 2024 en 2025+C1 (2024 p. 92–95); 100 kW in 2023 (punt 30).
 - **Bijlage AB** en de nieuwe indicatoren: alleen 2025+C1; in 2024 zijn ze `null`.
+- **c_source van bijlage V** (gecontroleerd 9 oktober 2026): tabel V.1 (1,00 / 1,02 / 1,04 naar de mate van regeneratie) en tabel V.3 (1,00 recirculatie, 1,04 doublet) hebben dezelfde getallen in 2020+A1 (p. 1069 en 1072), 2022, 2023, 2024 en 2025+C1 (p. 1114). De kern laat daarom in elke uitgave alleen 1,00, 1,02 en 1,04 toe; er is geen schakelpunt.
 
 ## Tests
 

@@ -13,6 +13,14 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — derde review: opname vóór 1900, lucht/lucht-warmtepomp, zonwering per raam
+
+- **Opname van vóór 1900 met mechanische ventilatie rekent weer.** Bij een onbekend fabricagejaar van de ventilator vult de opname het bouwjaar in (tabel 11.15). Sinds de ondergrens 1900 voor het fabricagejaar weigerde de kern dan een bouwjaar van 1800–1899 (`manufacture_year_invalid`). De opname neemt nu het bouwjaar, maar niet vroeger dan 1900. Dat verandert de uitkomst niet: tabel 11.20 en 11.23 zetten elk jaar tot en met 1900 in hun oudste rij (2025+C1 p. 516, 519). Een ingevuld fabricagejaar buiten 1900–2100 geeft nu `manufacture_year_invalid` op het opnameveld `ventilation.unitManufactureYear`, in plaats van diep in de afgeleide invoer.
+- **Kwaliteitsverklaring van een lucht/lucht-warmtepomp wordt gecontroleerd.** Bij afgifte aan de binnenlucht ging de verklaring zonder de controles van §9.1 (p. 285) de berekening in: een lege bron werd geaccepteerd, een waarde onder 0,05 gaf COP 0, 10⁶ werd COP 10⁶ en −1 werd stil de forfaitaire 2,8. Nu gelden dezelfde controles als bij waterzijdige afgifte (`source_required`, `heat_pump_declared_efficiency_invalid`, `heat_pump_declared_fraction_invalid`, `heat_pump_declared_auxiliary_invalid`). Een geldige verklaring rekent als voorheen.
+- **Zonwering per raam, raam niet meer aan buitenlucht:** het formulier noemt het raam bij naam met "niet meer in een buitenvlak" en de code `window_shading_not_outdoor`, zoals de kern, in plaats van "ontbreekt".
+- **Referentiesuite:** de band van BENG 2 bij geval H is weer ±0,05, zoals in `public_comparison.rs` (de relatieve band verbreedde hem tot ±0,08). De kop noemt A–H.
+- **Bijlage V in 2020+A1 gecontroleerd:** tabel V.1 en V.3 hebben dezelfde getallen als in de latere uitgaven (2020+A1 p. 1069, 1072); de toegestane c_source 1,00 / 1,02 / 1,04 geldt dus in elke uitgave.
+
 ### 9 oktober 2026 — bronfactor gaswarmtepomp, ontwerpafgiftetemperatuur ketel en negatieve projectgegevens
 
 Invoer die eerder rekende, wordt nu geweigerd. Geldige projecten rekenen als voorheen.
