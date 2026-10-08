@@ -1,7 +1,7 @@
 import type { IProject } from '../../core/energy/types';
 import { useI18n } from '../../i18n/i18n';
 import { NumberField, read, TextField, type Draft, type Path } from './NtaFormFields';
-import { outdoorWindows } from './NtaWindowObstructions';
+import { outdoorWindows, projectWindow } from './NtaWindowObstructions';
 
 // Movable sun shading per project window (`windowShadings`): 7.42/7.43 give
 // g_gl and F_c per window. A listed window takes its own shading (or none);
@@ -108,12 +108,18 @@ export function WindowShadingsFields({ draft, change, project }: SectionProps & 
     </table></div>
     {entries.map((entry, index) => {
       const found = windows.find(({ window }) => window.id === entry.windowId);
+      // A window that still exists but no longer borders outdoor air
+      // (`window_shading_not_outdoor`) is not "missing".
+      const elsewhere = found ? null : projectWindow(project, entry.windowId);
+      const note = elsewhere
+        ? t('nta.form.windowObstructions.notOutdoor')
+        : t('nta.form.windowObstructions.missing');
       const shading = entry.movableShading as Draft | undefined;
       const base: Path = ['windowShadings', index, 'movableShading'];
       return <fieldset key={`${String(entry.windowId)}-${index}`} className="nta-form-group"
         data-path={`ntaCalculation.windowShadings[${index}]`}
-        data-code={found ? undefined : 'window_shading_without_window'}>
-        <legend>{found ? label(found.window) : `${String(entry.windowId)} ${t('nta.form.windowObstructions.missing')}`}</legend>
+        data-code={found ? undefined : elsewhere ? 'window_shading_not_outdoor' : 'window_shading_without_window'}>
+        <legend>{found ? label(found.window) : `${elsewhere ? label(elsewhere) : String(entry.windowId)} ${note}`}</legend>
         {shading && <>
           <label data-path={`ntaCalculation.windowShadings[${index}].movableShading.device`}>{t('nta.form.windowShadings.device')}
             <select value={deviceValue(shading.device)}
