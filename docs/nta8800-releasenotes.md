@@ -23,6 +23,16 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
   - [archiefbeleid](kwaliteit/archiefbeleid.md) (§5.3, §6.2–6.3): bewaartermijnen, twee kopieën, integriteitscontrole en het terughalen van een oude versie.
 - De [gereedheidsanalyse](nta8800-brl9501-gereedheid.md) telt nu 6 voldaan, 14 deels, 6 open, 7 extern en 1 n.v.t.
 
+### 9 oktober 2026 — luchtspouw dunner dan 20 mm rekent; rekenkern 0.3.0
+
+- **Dunne luchtspouw** (tabel C.3/C.4, voetnoot c en e, p. 782 en 784). Een niet-geventileerde luchtspouw dunner dan 20 mm zonder werkzame reflecterende laag gaf `air_cavity_below_20_mm_unsupported`. Hij rekent nu met bijlage D.2 van NEN-EN-ISO 6946:2017 en de parameters van voetnoot e: ε1 = ε2 = 0,9 en h_r0 bij 10 °C. Onder 20 mm bepaalt de geleiding van stilstaande lucht (λ 0,025 W/(m·K) gedeeld door de dikte) de convectieve term. De waarde wordt afgerond op 2 decimalen, net als de tabelwaarden. Voorbeelden, horizontale warmtestroom: 5 mm 0,11, 10 mm 0,15, 15 mm 0,17 (m²·K)/W.
+  - **Controle.** Dezelfde methode geeft elke waarde van tabel C.3 en C.4 terug, ook de waarden tussen haakjes (ε2 = 0,1) en de geleidingstak van de neerwaartse rijen van 20 tot 50 mm. Test `d2_method_reproduces_tables_c3_and_c4`.
+  - **Nog geweigerd.** Een zwak geventileerde dunne spouw en een dunne spouw met een werkzame reflecterende laag houden `air_cavity_below_20_mm_unsupported`: voetnoot c dekt alleen spouwen zonder reflecterende folie, en C.12 vraagt een tabelwaarde voor zwakke ventilatie. Een sterk geventileerde dunne spouw rekent zoals een dikkere (C.3.3). Een dikte van 0 of minder geeft nu `thickness_invalid`.
+  - **Alle uitgaven.** Voetnoot c en de waarden van tabel C.3/C.4 zijn gelijk in 2020+A1 (p. 749–751), 2022 (p. 754–756), 2023 (p. 764–766), 2024 (p. 762–764) en 2025+C1; er is geen schakelpunt.
+  - **Effect.** Projecten die eerder rekenden, veranderen niet. Een constructie die eerder werd geweigerd, rekent nu. Daarom is `KERNEL_VERSION` verhoogd naar 0.3.0.
+- **Optiedekking.** De sweep `option_coverage.rs` loopt nu ook de constructies en schildelen door (route `assess_envelope`, onder elke uitgave met `with_version`), plus vier dunne-spouwgevallen. Totaal 9 000 berekeningen zonder fout; alle codes hebben een tekst.
+- **Uurklimaat 17.3.8** blijft als opgegeven factoren. De uitgebreide methode vraagt de uurwaarden van NEN 5060:2018+A1:2021 (zonnestand, totale straling en het deel direct plus circumsolair, per uur); die norm is niet beschikbaar. Zie [verificatiestatus](nta8800-verificatiestatus.md).
+
 ### 9 oktober 2026 — handleiding in de app en bij elke vrijgave (geen rekenwijziging)
 
 - **Handleiding in de app** (BRL 9501 §4.4, taak B7). *Gereedschap › Handleiding* toont de gebruikershandleiding uit `docs/handleiding-nta8800/`. De hoofdstukken en afbeeldingen zitten in de build, dus de desktop-app toont ze ook offline. Links tussen hoofdstukken blijven in de viewer; verwijzingen naar andere documenten tonen hun pad. Naast de inhoud staan de programmaversie, de rekenkernversie waarvoor de handleiding is nagelopen en de rekenkern van deze installatie; verschillen die, dan meldt de viewer dat.

@@ -39,7 +39,7 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 
 | Eis (BRL 9501) | Inhoud in eigen woorden | Status | Bewijs in de repo | Wat ontbreekt |
 |---|---|---|---|---|
-| §4.1.1, p. 7 | De energieprestatie wordt volledig volgens NTA 8800 berekend, nauwkeurig genoeg volgens ISSO 54. | deels | De volledige keten van hoofdstuk 5 tot en met 17 en de bijlagen zit in de kern ([reikwijdte](handleiding-nta8800/01-reikwijdte-en-status.md)). Elke route is onafhankelijk herberekend ([verificatiestatus](nta8800-verificatiestatus.md)). De optiedekkingstest draait elke invoeroptie in vijf uitgaven (`tests/option_coverage.rs`, 7 650 runs). Zes openbare rapporten zijn nagerekend ([vergelijking](nta8800-vergelijking-openbare-rapporten.md)). Status `calculated_unverified`. | Toetsing tegen ISSO 54 versie 5.0. Twee routes blijven open: het uurklimaat van 17.3.8 en ISO 6946 tabel 8. Twee interpretaties wijken af van Uniec: 10.15 en 10.87 bij koeling ([vragen aan NEN](nta8800-vragen-nen.md)). |
+| §4.1.1, p. 7 | De energieprestatie wordt volledig volgens NTA 8800 berekend, nauwkeurig genoeg volgens ISSO 54. | deels | De volledige keten van hoofdstuk 5 tot en met 17 en de bijlagen zit in de kern ([reikwijdte](handleiding-nta8800/01-reikwijdte-en-status.md)). Elke route is onafhankelijk herberekend ([verificatiestatus](nta8800-verificatiestatus.md)). De optiedekkingstest draait elke invoeroptie in vijf uitgaven (`tests/option_coverage.rs`, 9 000 runs, ook de constructies). Zes openbare rapporten zijn nagerekend ([vergelijking](nta8800-vergelijking-openbare-rapporten.md)). Status `calculated_unverified`. | Toetsing tegen ISSO 54 versie 5.0. Eén route blijft open: het uurklimaat van 17.3.8 (NEN 5060-uurwaarden). Dunne spouwen onder 20 mm rekenen sinds 9 oktober 2026 met D.2 van NEN-EN-ISO 6946 (voetnoot c en e van tabel C.3/C.4); alleen zwak geventileerde of reflecterende dunne spouwen blijven een R-invoer. Twee interpretaties wijken af van Uniec: 10.15 en 10.87 bij koeling ([vragen aan NEN](nta8800-vragen-nen.md)). |
 | §4.1.1, p. 7 | De uitvoer van de indicatoren voldoet aan ISSO 54 en §4.3. | deels / extern | Het rekenrapport heeft een samenvatting, standaard- en detailniveau tot op rekenniveau (`src/core/report/EnergyPerformanceReport.ts`). Het bevat de labelgegevens (`label_data.rs`) en de bijlage "Interpretaties" (`kernel_interpretations()`). | De uitvoereisen van ISSO 54 versie 5.0 zijn niet ingezien en kunnen dus niet worden afgevinkt. |
 | §4.1.2, p. 7 | Deelgebied 2: de energiestromen van besparingsmaatregelen worden nauwkeurig genoeg berekend, inclusief het renovatiepaspoort. | deels | `crates/nta8800-core/src/maatwerkadvies.rs`, de afstemming op het werkelijke gebruik (ISSO 82.2/75.2) en `renovation_passport` met schema W en U ([attestdossier](nta8800-attestdossier.md), MWA-tabel). | De ISSO 54-tests voor deelgebied 2 en hun uitkomsten. Lokale klimaatdata (NEN 5060-uurwaarden) ontbreken voor de afstemming. |
 | §4.1.3, p. 7 | Deelgebied 3: financiële kengetallen, met de gebruikte invoer bij de uitkomsten. | n.v.t. | Het deelgebied is uitgesteld (§2.1). Er is al een NCW en terugverdientijd per pakket, met een verplichte `costSource` per maatregel. | Het rekenmodel van ISSO-rapport 110293 is niet beschikbaar. Pas nodig als het deelgebied wordt ingevoerd. |
@@ -150,7 +150,7 @@ Afgerond op 8 oktober 2026: B1–B5 (gebouwd, zie de rijen) en B6, B8 en B9 (✔
 | **E2** XSD voor aanlevering en registratie bij EP-Online, en de eHerkenningseisen | RVO, EP-Online-team | §4.3.1. Ook nodig voor §5.4 en voor de registratie van labels door certificaathouders. |
 | **E3** Antwoord over 10.15, 10.87 en f_prac | NEN | De koelroute wijkt af van Uniec en raakt waarschijnlijk de 1 %-grens bij BENG 2 ([vragen aan NEN](nta8800-vragen-nen.md)). |
 | **E4** Een attesteringsinstelling | aangewezen instelling met InstallQ-overeenkomst | §3.6: toelatingsonderzoek, overeenkomst en afgifte. |
-| **E5** Uurklimaat 17.3.8 en ISO 6946 tabel 8 | NEN / normtekst | Twee routes zijn nog niet volledig; zie de [verificatiestatus](nta8800-verificatiestatus.md). |
+| **E5** Uurklimaat 17.3.8 | NEN 5060:2018+A1:2021 (uurwaarden) | De uitgebreide beschaduwingsmethode vraagt per uur zonnestand en straling (direct plus circumsolair); de kern aanvaardt nu opgegeven factoren. ISO 6946 tabel 8 is sinds 9 oktober 2026 geen blokkade meer: de kern rekent dunne spouwen met D.2. Zie de [verificatiestatus](nta8800-verificatiestatus.md). |
 | **E6** ISSO-rapport 110293 (kostenmodel) | ISSO | Alleen voor deelgebied 3 en de NCW-regels van het maatwerkadvies. |
 
 ### (c) Organisatorisch
@@ -177,7 +177,7 @@ Afgerond op 8 oktober 2026: B1–B5 (gebouwd, zie de rijen) en B6, B8 en B9 (✔
 7. **C2:** het kwaliteitshandboek met de wijzigings-, release- en meldprocedures (organisatorisch; concept klaar 9 oktober 2026, vaststelling door de organisatie).
 8. ~~**B4 + B5:** een releasearchief en het leveringsdocument~~ (gebouwd 8 oktober 2026; de bewaarplaats van de archieven is organisatorisch).
 9. **C1 + C3 + C4:** KvK, klachtenprocedure, register van licentiehouders (organisatorisch; C3 en C4 als concept klaar 9 oktober 2026).
-10. **E5:** het uurklimaat 17.3.8 en ISO 6946 tabel 8 (extern).
+10. **E5:** het uurklimaat 17.3.8 (extern; ISO 6946 tabel 8 is opgelost).
 
 ## Telling
 

@@ -46,11 +46,21 @@ Status: **ongeverifieerd**. Er zijn nog geen referentiegevallen vergeleken.
 
 ## Niet ondersteund (expliciete foutcode)
 
-- Luchtlagen dunner dan 20 mm, behalve via bijlage F (`air_cavity_below_20_mm_unsupported`). Tabel C.3/C.4 voetnoot c (p. 784) geeft zelf geen waarden. De voetnoot verwijst naar tabel 8 en bijlage D van NEN-EN-ISO 6946:2017, die niet in de NTA staan. Zo'n spouw voer je in als `resistance`-laag met een R_cav die volgens NEN-EN-ISO 6946 is berekend, met bron. Luchtlagen dikker dan 300 mm (`air_cavity_above_300_mm_requires_heat_balance`).
+- Luchtlagen dunner dan 20 mm die zwak geventileerd zijn of een werkzame reflecterende laag hebben (`air_cavity_below_20_mm_unsupported`). Voetnoot c van tabel C.3/C.4 (p. 782 en 784) dekt alleen spouwen zonder reflecterende folie, en C.12 vraagt een tabelwaarde voor zwakke ventilatie. Zo'n spouw voer je in als `resistance`-laag met een R_cav volgens NEN-EN-ISO 6946, met bron. Een niet-geventileerde dunne spouw zonder reflecterende laag rekent de kern zelf: zie *Dunne luchtspouw* hieronder. Luchtlagen dikker dan 300 mm (`air_cavity_above_300_mm_requires_heat_balance`).
 - Afschotdaken met een helling boven 5 % (`tapered_roof_above_5_percent_requires_numerical_method`).
 - Numerieke 2D- en 3D-berekeningen (§8.6). De kern verwerkt alleen de resulterende L_2D/L_3D (8.25–8.29) of L_C (8.5). Vliesgevels (NEN-EN-ISO 12631), bedrijfsdeuren (NEN-EN 12428) en dakkoepels (NEN-EN 1873) worden als opgegeven productwaarde ingevoerd.
 - Bijlage J (statistische bepaling van gedeclareerde waarden) en de grafische schematiseringsregels van bijlage K. A_T, A_con, ℓ_gl en A_fr worden als invoer gevraagd.
 - Paneeldiktes onder 10 mm, en boven 300 mm bij panelen die niet aan buitenlucht grenzen (tabel I.16) (`panel_thickness_outside_table`). Boven 300 mm aan buitenlucht rekent de kern met de formule achter tabel I.15 (I.4, I.1, 25 % kozijn met U_fr;for, ψ = 0, p. 837–838); die formule reproduceert de tabelrij van 300 mm.
+
+## Dunne luchtspouw (onder 20 mm)
+
+Tabel C.3/C.4 begint bij 20 mm. Voetnoot c (2025+C1 p. 782 en 784) verwijst voor dunnere spouwen naar NEN-EN-ISO 6946:2017; voetnoot e schrijft voor dat Rcav van een spouw zonder reflecterende folie volgens D.2 van die norm wordt bepaald met ε1 = ε2 = 0,9 en h_r0 bij 10 °C. De kern doet dat (`thin_cavity_resistance`):
+
+- R = 1 / (h_a + E · h_r0), met E = 1 / (1/ε1 + 1/ε2 − 1) en h_r0 = 4σT³ bij 283,15 K;
+- h_a is het grootste van de convectieve waarde en de geleiding van stilstaande lucht 0,025/d: horizontaal max(1,25; 0,025/d), omhoog max(1,95; 0,025/d), omlaag max(0,12·d^−0,44; 0,025/d);
+- afgerond op 2 decimalen, zoals de tabelwaarden.
+
+Controle: dezelfde formule geeft alle waarden van tabel C.3 en C.4 terug, ook die tussen haakjes (ε2 = 0,1) en de neerwaartse rijen 20–50 mm, waar de geleidingsterm bepaalt (test `d2_method_reproduces_tables_c3_and_c4`). Vanaf 20 mm blijft de kern de tabelwaarden gebruiken. Voorbeelden horizontaal: 5 mm 0,11; 10 mm 0,15; 15 mm 0,17 (m²·K)/W. Voetnoot c en de tabellen zijn gelijk in alle uitgaven vanaf 2020+A1.
 
 ## Validatieregels (foutcodes)
 
