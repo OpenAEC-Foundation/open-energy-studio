@@ -25,10 +25,10 @@ describe('maatwerkadvies editor review fixes (merge 02fafc5)', () => {
     await user.click(await screen.findByRole('button', { name: 'Start tailored advice' }));
     await user.click(screen.getByRole('button', { name: 'Add measure' }));
     expect(screen.getByTestId('mwa-investment-zero-m1')).toHaveTextContent('The investment is 0 €');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Measure type' }), 'pv');
+    await user.selectOptions(screen.getByLabelText('Measure type'), 'pv');
     expect(screen.getByTestId('mwa-template-problems-m1')).toHaveTextContent('Enter the peak power of every PV system.');
-    await user.clear(screen.getByRole('spinbutton', { name: 'Investment [€]' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Investment [€]' }), '5000');
+    await user.clear(screen.getByLabelText('Investment [€]'));
+    await user.type(screen.getByLabelText('Investment [€]'), '5000');
     expect(screen.queryByTestId('mwa-investment-zero-m1')).toBeNull();
   }, 60000);
 
@@ -43,7 +43,7 @@ describe('maatwerkadvies editor review fixes (merge 02fafc5)', () => {
       }],
     };
     renderWithProviders(<NtaLightingSection draft={draft} change={() => {}} project={dwelling} />);
-    expect(screen.getByRole('combobox', { name: 'Daylight' })).toBeDisabled();
+    expect(screen.getByLabelText('Daylight')).toBeDisabled();
     expect(screen.getByText(/F_D = 1 \(14\.24, p\. 667\)/)).toBeInTheDocument();
     expect(screen.getByText(/F_o;D = F_o;N = 1 \(14\.16\/14\.17, p\. 664\)/)).toBeInTheDocument();
   });

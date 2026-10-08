@@ -23,17 +23,17 @@ describe('survey heat-pump years', () => {
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
     // The boiler has its manufacture year, but no installation year field.
-    expect(screen.getAllByRole('spinbutton', { name: 'Manufacture year' })).toHaveLength(1);
-    expect(screen.queryByRole('spinbutton', { name: 'Installation year' })).toBeNull();
+    expect(screen.getAllByLabelText('Manufacture year')).toHaveLength(1);
+    expect(screen.queryByLabelText('Installation year')).toBeNull();
 
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Generator' })[0], 'heat_pump');
+    await user.selectOptions(screen.getAllByLabelText('Generator')[0], 'heat_pump');
     expect(screen.getByText(/Only NTA 8800:2020\+A1 uses the device year of a heat pump/)).toBeInTheDocument();
-    await user.type(screen.getByRole('spinbutton', { name: 'Manufacture year' }), '2016');
-    await user.type(screen.getByRole('spinbutton', { name: 'Installation year' }), '2017');
+    await user.type(screen.getByLabelText('Manufacture year'), '2016');
+    await user.type(screen.getByLabelText('Installation year'), '2017');
     expect(generatorOf()).toMatchObject({ kind: 'heat_pump', manufactureYear: 2016, installationYear: 2017 });
 
     // Another generator kind drops the heat-pump fields.
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Generator' })[0], 'gas_air_heater');
+    await user.selectOptions(screen.getAllByLabelText('Generator')[0], 'gas_air_heater');
     expect(generatorOf()).not.toHaveProperty('installationYear');
   }, 60000);
 });

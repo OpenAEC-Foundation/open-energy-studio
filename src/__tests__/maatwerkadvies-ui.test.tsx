@@ -27,7 +27,7 @@ describe('maatwerkadvies panel', () => {
     await user.click(screen.getByRole('button', { name: 'Start tailored advice' }));
     await user.click(screen.getByRole('button', { name: 'Add measure' }));
     await user.click(screen.getByRole('button', { name: 'Add package' }));
-    await user.click(screen.getByRole('checkbox', { name: 'm1' }));
+    await user.click(screen.getByLabelText('m1'));
     const stored = JSON.parse(screen.getByTestId('mwa').textContent ?? 'null');
     expect(stored.measures).toHaveLength(1);
     expect(stored.packages[0].measureIds).toEqual(['m1']);

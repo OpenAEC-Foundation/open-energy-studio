@@ -6,7 +6,7 @@ De basisopname is werkstap 6 **Basisopname** (groep *Bestaande bouw*). Er zijn t
 
 Na het starten loop je de opname door met de voortgangslijst links: Algemeen, (alleen utiliteit) Rekenzones, Thermische schil, Verwarming, Warm tapwater, Ventilatie, Koeling, Zonnestroom (PV) en **Uitkomst & forfaitair**. **Vorige** en **Volgende** gaan een onderdeel terug of verder. **Opname verwijderen** haalt de opname uit het project.
 
-De opname wordt bij het project bewaard (blok `basisopname`). De kern zet de opname om in NTA 8800-invoer en rekent die door met **Opname doorrekenen**, in de uitgave van NTA 8800 die het project gebruikt (zie [hoofdstuk 8](08-versies-en-verwijzingen.md)). Na het doorrekenen toont de voortgangslijst per onderdeel het aantal fouten. De uitkomst zelf (status, uitgave, label en BENG 1–3, de toegepaste standaardwaarden en de meldingen) staat onder **Uitkomst & forfaitair**. Die uitkomst staat los van de projectberekening: het is een aparte, op de opname gebaseerde uitkomst.
+De opname wordt bij het project bewaard (blok `basisopname`). De kern zet de opname om in NTA 8800-invoer en rekent die door met **Opname doorrekenen**, in de uitgave van NTA 8800 die het project gebruikt (zie [hoofdstuk 8](08-versies-en-verwijzingen.md)). Na het doorrekenen toont de voortgangslijst per onderdeel het aantal fouten. Bovenaan het onderdeel waar je staat verschijnt meteen de uitkomst: de status, het indicatieve label en EP₂, de fouten van dat onderdeel met **Ga naar het veld**, en hoeveel fouten er in andere onderdelen staan. **Volledige uitkomst** opent **Uitkomst & forfaitair**. De kaart *Uitkomst opname* rechts toont hetzelfde in het kort, met **Overnemen in projectmodel**. De volledige uitkomst (status, uitgave, label en BENG 1–3, de toegepaste standaardwaarden en alle meldingen) staat onder **Uitkomst & forfaitair**. Die uitkomst staat los van de projectberekening: het is een aparte, op de opname gebaseerde uitkomst.
 
 **Volgorde van bronnen.** Volgens het wijzigingsdocument v1.1 (p. 6) zitten de wijzigingen daarvan in de 7e druk. Waar de bronnen verschillen, geldt daarom de 7e druk met het erratum. De keuzes per tabel staan in [`docs/nta8800-basisopname.md`](../nta8800-basisopname.md).
 
@@ -91,7 +91,7 @@ Een koppeling verwijst naar het id van het onderdeel, zoals de id van een vlak, 
 
 ## Overnemen in projectmodel
 
-Na **Opname doorrekenen** staat onder Uitkomst & forfaitair de knop **Overnemen in projectmodel**. Hij werkt alleen bij een berekende opname met afgeleide NTA-invoer; anders vraagt de knop eerst de opname door te rekenen. Die zet de NTA-invoer die de kern uit de opname afleidde in het concept van de NTA-invoer. Eerst toont een venster per invoer de huidige waarde en de waarde uit de opname.
+Na **Opname doorrekenen** staat de knop **Overnemen in projectmodel** onder Uitkomst & forfaitair en in de kaart *Uitkomst opname* naast elk onderdeel. Hij werkt alleen bij een berekende opname met afgeleide NTA-invoer; anders vraagt de knop eerst de opname door te rekenen. Die zet de NTA-invoer die de kern uit de opname afleidde in het concept van de NTA-invoer. Eerst toont een venster per invoer de huidige waarde en de waarde uit de opname.
 
 | Overgenomen | Niet overgenomen |
 |---|---|

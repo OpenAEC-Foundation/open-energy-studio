@@ -29,9 +29,9 @@ describe('basisopname panel', () => {
     expect(stored()?.kind).toBe('residential');
 
     // Heating: CHP with a diesel engine and a peak boiler.
-    const generators = screen.getAllByRole('combobox', { name: 'Generator' });
+    const generators = screen.getAllByLabelText('Generator');
     await user.selectOptions(generators[0], 'chp');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Prime mover' }), 'diesel_engine');
+    await user.selectOptions(screen.getByLabelText('Prime mover'), 'diesel_engine');
     await user.click(screen.getAllByRole('button', { name: 'Add generator' })[0]);
     let survey = stored()!.survey;
     expect(survey.heating.generator).toEqual({ kind: 'chp', electricalPowerKw: 20, engine: 'diesel_engine' });
@@ -40,17 +40,17 @@ describe('basisopname panel', () => {
     ]);
 
     // Hot water: collective, solar water heater and PV with a roof edge.
-    await user.click(screen.getByRole('checkbox', { name: 'Collective hot-water system' }));
+    await user.click(screen.getByLabelText('Collective hot-water system'));
     await user.click(screen.getByRole('button', { name: 'Add solar water heater' }));
     await user.click(screen.getByRole('button', { name: 'Add PV system' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Obstruction (§15.4.7)' }), 'roof_edge');
+    await user.selectOptions(screen.getByLabelText('Obstruction (§15.4.7)'), 'roof_edge');
     survey = stored()!.survey;
     expect(survey.hotWater.collective).toEqual({});
     expect(survey.hotWater.solar[0]).toMatchObject({ id: 'zb1', collector: 'glazed', orientation: 'south' });
     expect(survey.pv[0].shading).toEqual({ method: 'roof_edge', heightM: 1, distanceM: 0.5 });
 
     // Vertical pipes: explicitly none.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Vertical pipes (§7.2.4)' }), 'none');
+    await user.selectOptions(screen.getByLabelText('Vertical pipes (§7.2.4)'), 'none');
     expect(stored()!.survey.verticalPipes).toEqual([]);
   }, 60000);
 
@@ -60,15 +60,15 @@ describe('basisopname panel', () => {
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
 
     // ISSO 82.1 tables 11.4–11.6.
-    await user.click(screen.getByRole('checkbox', { name: 'Controls established (tables 11.4–11.6)' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'CO₂ measurement' }), 'living_room_and_main_bedroom');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'CO₂ control' }), 'extract');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Zoning' }), 'true');
-    await user.type(screen.getByRole('textbox', { name: 'Evidence for the controls' }), 'datasheet');
+    await user.click(screen.getByLabelText('Controls established (tables 11.4–11.6)'));
+    await user.selectOptions(screen.getByLabelText('CO₂ measurement'), 'living_room_and_main_bedroom');
+    await user.selectOptions(screen.getByLabelText('CO₂ control'), 'extract');
+    await user.selectOptions(screen.getByLabelText('Zoning'), 'true');
+    await user.type(screen.getByLabelText('Evidence for the controls'), 'datasheet');
     // §11.3.6 and §11.3.7.
-    await user.click(screen.getByRole('checkbox', { name: 'Combined system E (decentral heat recovery in part of the zone)' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Grilles with electric heating strips (§11.3.7)' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Maximum temperature rise, K' }), '8');
+    await user.click(screen.getByLabelText('Combined system E (decentral heat recovery in part of the zone)'));
+    await user.click(screen.getByLabelText('Grilles with electric heating strips (§11.3.7)'));
+    await user.type(screen.getByLabelText('Maximum temperature rise, K'), '8');
     let survey = stored()!.survey;
     expect(survey.ventilation.controls).toEqual({
       evidenceReference: 'datasheet', co2Measurement: 'living_room_and_main_bedroom', co2Control: 'extract', zoning: true,
@@ -77,11 +77,11 @@ describe('basisopname panel', () => {
     expect(survey.ventilation.grilleHeatingStrips).toEqual({ sourceReference: '', maxTemperatureRiseK: 8 });
 
     // p. 94: product g for solar-control glass.
-    await user.click(screen.getAllByRole('checkbox', { name: 'Solar-control glass or film with product data' })[0]);
-    await user.type(screen.getByRole('spinbutton', { name: 'g-value from the product data' }), '0.3');
+    await user.click(screen.getAllByLabelText('Solar-control glass or film with product data')[0]);
+    await user.type(screen.getByLabelText('g-value from the product data'), '0.3');
     // Table 9.9 / erratum §4.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Design temperature class (table 9.9)' }), 'c90_70');
-    await user.type(screen.getByRole('textbox', { name: 'Controlled declaration for a heat pump above 70 °C' }), 'BCRG 1');
+    await user.selectOptions(screen.getByLabelText('Design temperature class (table 9.9)'), 'c90_70');
+    await user.type(screen.getByLabelText('Controlled declaration for a heat pump above 70 °C'), 'BCRG 1');
     survey = stored()!.survey;
     expect(survey.envelope.windows[0].solarControl).toEqual({ gValue: 0.3, sourceReference: '' });
     expect(survey.heating.designClass).toBe('c90_70');
@@ -92,16 +92,16 @@ describe('basisopname panel', () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
-    const generator = () => screen.getAllByRole('combobox', { name: 'Generator' })[0];
+    const generator = () => screen.getAllByLabelText('Generator')[0];
 
     // Collective groundwater doublet with a gas-absorption heat pump.
     await user.selectOptions(generator(), 'heat_pump');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Drive' }), 'gas_absorption');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'groundwater');
-    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
-    await user.type(screen.getByRole('textbox', { name: 'Evidence of the collective source' }), 'invoice');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Groundwater source system (unknown: recirculation)' }), 'doublet');
-    await user.type(screen.getByRole('spinbutton', { name: 'Source temperature, °C (unknown: ground)' }), '11');
+    await user.selectOptions(screen.getByLabelText('Drive'), 'gas_absorption');
+    await user.selectOptions(screen.getByLabelText('Source'), 'groundwater');
+    await user.click(screen.getByLabelText('Collective heat-pump source (invoices or design data)'));
+    await user.type(screen.getByLabelText('Evidence of the collective source'), 'invoice');
+    await user.selectOptions(screen.getByLabelText('Groundwater source system (unknown: recirculation)'), 'doublet');
+    await user.type(screen.getByLabelText('Source temperature, °C (unknown: ground)'), '11');
     expect(stored()!.survey.heating.generator).toMatchObject({
       kind: 'heat_pump', drive: 'gas_absorption', source: 'groundwater', collectiveSourceReference: 'invoice',
       groundwaterSystem: 'doublet', sourceTemperatureC: 11,
@@ -109,25 +109,25 @@ describe('basisopname panel', () => {
 
     // Local gas heating without a flue, and gas air heaters.
     await user.selectOptions(generator(), 'local_fired');
-    await user.click(screen.getByRole('checkbox', { name: 'With flue-gas exhaust' }));
+    await user.click(screen.getByLabelText('With flue-gas exhaust'));
     expect(stored()!.survey.heating.generator).toEqual({
       kind: 'local_fired', appliance: 'gas_heater', flueGasExhaust: false, electricityConnected: null,
     });
     await user.selectOptions(generator(), 'gas_air_heater');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Air heater type' }), 'hr107');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Pilot flame (unknown: yes)' }), 'false');
+    await user.selectOptions(screen.getByLabelText('Air heater type'), 'hr107');
+    await user.selectOptions(screen.getByLabelText('Pilot flame (unknown: yes)'), 'false');
     expect(stored()!.survey.heating.generator).toEqual({
       kind: 'gas_air_heater', heaterType: 'hr107', pilotFlame: false, count: null,
     });
 
     // One-pipe loop with insulated pipes from 1990.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Distribution system (unknown: two-pipe)' }), 'one_pipe');
-    const count = screen.getByRole('spinbutton', { name: 'Emitters on the one-pipe loop' });
+    await user.selectOptions(screen.getByLabelText('Distribution system (unknown: two-pipe)'), 'one_pipe');
+    const count = screen.getByLabelText('Emitters on the one-pipe loop');
     await user.clear(count);
     await user.type(count, '8');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Pipes insulated (unknown: no)' }), 'true');
-    await user.type(screen.getByRole('spinbutton', { name: 'Year of insulation (unknown: construction year)' }), '1990');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Valves and brackets insulated (unknown: no)' }), 'true');
+    await user.selectOptions(screen.getByLabelText('Pipes insulated (unknown: no)'), 'true');
+    await user.type(screen.getByLabelText('Year of insulation (unknown: construction year)'), '1990');
+    await user.selectOptions(screen.getByLabelText('Valves and brackets insulated (unknown: no)'), 'true');
     const heating = stored()!.survey.heating;
     expect(heating.distributionType).toEqual({ kind: 'one_pipe', emitterCount: 8 });
     expect(heating.pipeInsulation).toEqual({ insulated: true, insulationYear: 1990, fittingsInsulated: true });
@@ -137,17 +137,17 @@ describe('basisopname panel', () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
-    const generator = () => screen.getAllByRole('combobox', { name: 'Generator' })[0];
+    const generator = () => screen.getAllByLabelText('Generator')[0];
 
     // A collective groundwater source, then an air source: the water-only
     // answers go (collective_source_water_based_only otherwise).
     await user.selectOptions(generator(), 'heat_pump');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'groundwater');
-    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
-    await user.type(screen.getByRole('textbox', { name: 'Evidence of the collective source' }), 'invoice');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Groundwater source system (unknown: recirculation)' }), 'doublet');
-    await user.type(screen.getByRole('spinbutton', { name: 'Source temperature, °C (unknown: ground)' }), '11');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'outdoor_air');
+    await user.selectOptions(screen.getByLabelText('Source'), 'groundwater');
+    await user.click(screen.getByLabelText('Collective heat-pump source (invoices or design data)'));
+    await user.type(screen.getByLabelText('Evidence of the collective source'), 'invoice');
+    await user.selectOptions(screen.getByLabelText('Groundwater source system (unknown: recirculation)'), 'doublet');
+    await user.type(screen.getByLabelText('Source temperature, °C (unknown: ground)'), '11');
+    await user.selectOptions(screen.getByLabelText('Source'), 'outdoor_air');
     let heatPump = stored()!.survey.heating.generator;
     expect(heatPump.source).toBe('outdoor_air');
     expect(heatPump).not.toHaveProperty('collectiveSourceReference');
@@ -155,20 +155,20 @@ describe('basisopname panel', () => {
     expect(heatPump).not.toHaveProperty('sourceTemperatureC');
 
     // Unticking the collective source of surface water drops its temperature.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source' }), 'surface_water');
-    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Source temperature, °C (unknown: ground)' }), '9');
-    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (invoices or design data)' }));
+    await user.selectOptions(screen.getByLabelText('Source'), 'surface_water');
+    await user.click(screen.getByLabelText('Collective heat-pump source (invoices or design data)'));
+    await user.type(screen.getByLabelText('Source temperature, °C (unknown: ground)'), '9');
+    await user.click(screen.getByLabelText('Collective heat-pump source (invoices or design data)'));
     heatPump = stored()!.survey.heating.generator;
     expect(heatPump).not.toHaveProperty('collectiveSourceReference');
     expect(heatPump).not.toHaveProperty('sourceTemperatureC');
 
     // A steam boiler's fuel goes with the appliance (local_heater_fuel_contradiction otherwise).
     await user.selectOptions(generator(), 'local_fired');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Appliance' }), 'steam_boiler');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Fuel' }), 'oil');
+    await user.selectOptions(screen.getByLabelText('Appliance'), 'steam_boiler');
+    await user.selectOptions(screen.getByLabelText('Fuel'), 'oil');
     expect(stored()!.survey.heating.generator.fuel).toBe('oil');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Appliance' }), 'oil_heater');
+    await user.selectOptions(screen.getByLabelText('Appliance'), 'oil_heater');
     const local = stored()!.survey.heating.generator;
     expect(local.appliance).toBe('oil_heater');
     expect(local).not.toHaveProperty('fuel');
@@ -178,9 +178,9 @@ describe('basisopname panel', () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Building type' }), 'floating');
-    await user.click(screen.getByRole('checkbox', { name: 'New berth from 2018' }));
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Boundary' })[0], 'sunroom');
+    await user.selectOptions(screen.getByLabelText('Building type'), 'floating');
+    await user.click(screen.getByLabelText('New berth from 2018'));
+    await user.selectOptions(screen.getAllByLabelText('Boundary')[0], 'sunroom');
     await user.click(screen.getByRole('button', { name: 'Add rooflight with quality declaration' }));
     const survey = stored()!.survey;
     expect(survey.envelope.buildingKind).toEqual({ kind: 'floating', newBerthSince2018: true });
@@ -193,8 +193,8 @@ describe('basisopname panel', () => {
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
     await user.click(screen.getByRole('button', { name: 'Add hot-water system' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Served function' }), 'assembly_without_day_care');
-    await user.click(screen.getByRole('checkbox', { name: 'Heating connected (reheating coil)' }));
+    await user.selectOptions(screen.getByLabelText('Served function'), 'assembly_without_day_care');
+    await user.click(screen.getByLabelText('Heating connected (reheating coil)'));
     const survey = stored()!.survey;
     expect(survey.additionalHotWaterSystems[0]).toMatchObject({
       generator: { kind: 'electric_instantaneous' }, showerHeatRecovery: 'none',
@@ -209,18 +209,16 @@ describe('basisopname panel', () => {
     await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
 
     // §7.1.7, p. 65 and afb. 6.6.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Fossil-fuel installations on the plot (§7.1.7)' }), 'true');
-    await user.type(screen.getByRole('spinbutton', { name: 'Sport halls without the swimming-pool room, A_g m² (p. 65)' }), '450');
-    await user.click(screen.getByRole('checkbox', { name: 'Residence areas openly connected (afb. 6.6)' }));
+    await user.selectOptions(screen.getByLabelText('Fossil-fuel installations on the plot (§7.1.7)'), 'true');
+    await user.type(screen.getByLabelText('Sport halls without the swimming-pool room, A_g m² (p. 65)'), '450');
+    await user.click(screen.getByLabelText('Residence areas openly connected (afb. 6.6)'));
     // Tables 11.9–11.13 and §11.4.1.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat recovery (table 11.9)' }), 'cold_storage_with_ahu');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Duct airtightness (table 11.13; unknown: 1,1)' }), 'luka_d');
-    await user.type(screen.getByRole('spinbutton', { name: 'Installed ventilation capacity, dm³/s (§11.4.1; unknown: regulatory)' }), '1500');
-    await user.selectOptions(screen.getByRole('combobox', {
-      name: 'Outside connection of the heat recovery (table 11.10; unknown: not insulated)',
-    }), 'specified');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Constant-volume control at all flows (table 11.11)' }), 'false');
-    await user.type(screen.getByRole('spinbutton', { name: "Partial bypass, % (table 11.12; unknown: 'unknown')" }), '40');
+    await user.selectOptions(screen.getByLabelText('Heat recovery (table 11.9)'), 'cold_storage_with_ahu');
+    await user.selectOptions(screen.getByLabelText('Duct airtightness (table 11.13; unknown: 1,1)'), 'luka_d');
+    await user.type(screen.getByLabelText('Installed ventilation capacity, dm³/s (§11.4.1; unknown: regulatory)'), '1500');
+    await user.selectOptions(screen.getByLabelText('Outside connection of the heat recovery (table 11.10; unknown: not insulated)'), 'specified');
+    await user.selectOptions(screen.getByLabelText('Constant-volume control at all flows (table 11.11)'), 'false');
+    await user.type(screen.getByLabelText("Partial bypass, % (table 11.12; unknown: 'unknown')"), '40');
     let survey = stored()!.survey;
     expect(survey.fossilFuelOnPlot).toBe(true);
     expect(survey.sportHallAreaM2).toBe(450);
@@ -233,13 +231,13 @@ describe('basisopname panel', () => {
     expect(survey.ventilation.controls).toBeUndefined();
 
     // Table 10.2, §10.4.1 and §10.3.2.
-    await user.click(screen.getByRole('checkbox', { name: 'Building-bound cooling system present' }));
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Cooling generator' })[0], 'gas_engine_compression');
-    await user.type(screen.getByRole('spinbutton', { name: 'Electric power of the gas engine, kW' }), '50');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Direct expansion (§10.4.1)' }), 'air_handling_unit');
+    await user.click(screen.getByLabelText('Building-bound cooling system present'));
+    await user.selectOptions(screen.getAllByLabelText('Cooling generator')[0], 'gas_engine_compression');
+    await user.type(screen.getByLabelText('Electric power of the gas engine, kW'), '50');
+    await user.selectOptions(screen.getByLabelText('Direct expansion (§10.4.1)'), 'air_handling_unit');
     const addButtons = screen.getAllByRole('button', { name: 'Add generator' });
     await user.click(addButtons[addButtons.length - 1]);
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Cooling generator' })[1], 'aquifer_from2013');
+    await user.selectOptions(screen.getAllByLabelText('Cooling generator')[1], 'aquifer_from2013');
     survey = stored()!.survey;
     expect(survey.cooling).toMatchObject({
       generator: 'gas_engine_compression', gasEngine: { electricPowerKw: 50 }, directExpansion: 'air_handling_unit',
@@ -248,14 +246,14 @@ describe('basisopname panel', () => {
 
     // §10.4.1: switching to water-based clears the hidden direct-expansion
     // answer; table 10.10 L_max and the table 10.11 a declaration.
-    await user.click(screen.getByRole('checkbox', { name: 'Water-based distribution' }));
+    await user.click(screen.getByLabelText('Water-based distribution'));
     survey = stored()!.survey;
     expect(survey.cooling.waterBased).toBe(true);
     expect(survey.cooling.directExpansion).toBeUndefined();
-    expect(screen.queryByRole('textbox', { name: /NEN-EN 14336/ })).toBeNull();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Hydronic balancing (table 10.6)' }), 'dynamic');
-    await user.type(screen.getByRole('textbox', { name: /NEN-EN 14336/ }), 'inregelrapport');
-    await user.type(screen.getByRole('spinbutton', { name: /Maximum supply-pipe length L_max/ }), '80');
+    expect(screen.queryByLabelText(/NEN-EN 14336/)).toBeNull();
+    await user.selectOptions(screen.getByLabelText('Hydronic balancing (table 10.6)'), 'dynamic');
+    await user.type(screen.getByLabelText(/NEN-EN 14336/), 'inregelrapport');
+    await user.type(screen.getByLabelText(/Maximum supply-pipe length L_max/), '80');
     survey = stored()!.survey;
     expect(survey.cooling).toMatchObject({
       balanced: 'dynamic', balancingEvidenceReference: 'inregelrapport', maxPipeLengthM: 80,
@@ -266,16 +264,16 @@ describe('basisopname panel', () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Building-bound cooling system present' }));
+    await user.click(screen.getByLabelText('Building-bound cooling system present'));
     let survey = stored()!.survey;
     expect(survey.coolingPresent).toBe(true);
     expect(survey.cooling).toMatchObject({ generator: 'room_air_conditioner', emitter: 'split_indoor_units_on_wall', waterBased: false });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Cooling generator' }), 'closed_ground_loop');
-    await user.click(screen.getByRole('checkbox', { name: 'Collective cooling generator (several dwellings)' }));
+    await user.selectOptions(screen.getByLabelText('Cooling generator'), 'closed_ground_loop');
+    await user.click(screen.getByLabelText('Collective cooling generator (several dwellings)'));
     survey = stored()!.survey;
     expect(survey.cooling.generator).toBe('closed_ground_loop');
     expect(survey.coolingCollective).toBe(true);
-    await user.click(screen.getByRole('checkbox', { name: 'Building-bound cooling system present' }));
+    await user.click(screen.getByLabelText('Building-bound cooling system present'));
     survey = stored()!.survey;
     expect(survey.cooling).toBeNull();
     expect(survey.coolingPresent).toBe(false);
@@ -298,7 +296,7 @@ describe('basisopname panel', () => {
     expect(await screen.findByText('ISSO 82.1 p. 113 (table 9.7)')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/nta8800/opname/utility', expect.anything());
     expect(screen.getByText('C')).toBeInTheDocument();
-    await user.type(screen.getByRole('textbox', { name: 'Reason for the forfait heating.generator.engine' }), 'plate missing');
+    await user.type(screen.getByLabelText('Reason for the forfait heating.generator.engine'), 'plate missing');
     expect(stored()!.survey.inklapRedenen).toEqual({ 'heating.generator.engine': 'plate missing' });
     // The result stays while the reason is typed.
     expect(screen.getByText('ISSO 82.1 p. 113 (table 9.7)')).toBeInTheDocument();
@@ -309,49 +307,47 @@ describe('basisopname panel', () => {
     renderWithProviders(<Editor />);
     await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
     // No zone selector on surfaces while the building is one zone.
-    expect(screen.queryAllByRole('combobox', { name: 'Calculation zone' })).toHaveLength(0);
+    expect(screen.queryAllByLabelText('Calculation zone')).toHaveLength(0);
 
     await user.click(screen.getByRole('button', { name: 'Add calculation zone' }));
     await user.click(screen.getByRole('button', { name: 'Add calculation zone' }));
     expect(stored()!.survey.zones).toEqual([{ id: 'zone1', functions: [] }, { id: 'zone2', functions: [] }]);
-    const zoneNames = screen.getAllByRole('textbox', { name: 'Zone name' });
+    const zoneNames = screen.getAllByLabelText('Zone name');
     await user.clear(zoneNames[0]);
     await user.type(zoneNames[0], 'kantoor');
     // The building's use functions are editable in General (ISSO 75.1 §7.2.1).
     expect(screen.getByRole('group', { name: 'Use functions of the building' })).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Add function' })[1]);
-    const area = screen.getByRole('spinbutton', { name: 'A_g in this zone, m²' });
+    const area = screen.getByLabelText('A_g in this zone, m²');
     await user.clear(area);
     await user.type(area, '1200');
     expect(stored()!.survey.zones[0]).toEqual({ id: 'kantoor', functions: [{ function: 'office', areaM2: 1200 }] });
 
     // Surfaces: a zone, or split over all zones by A_g.
-    const surfaceZones = screen.getAllByRole('combobox', { name: 'Calculation zone' });
+    const surfaceZones = screen.getAllByLabelText('Calculation zone');
     expect(surfaceZones).toHaveLength(6);
     await user.selectOptions(surfaceZones[0], 'zone2');
     expect(stored()!.survey.envelope.surfaces[0].zoneId).toBe('zone2');
     await user.selectOptions(surfaceZones[0], '');
     expect(stored()!.survey.envelope.surfaces[0].zoneId).toBeNull();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Calculation zone of lighting zone kantoren' }), 'kantoor');
+    await user.selectOptions(screen.getByLabelText('Calculation zone of lighting zone kantoren'), 'kantoor');
     expect(stored()!.survey.lighting[0].zoneId).toBe('kantoor');
 
     // Renaming a zone moves its references along (p. 147 and p. 65 fields per zone).
-    await user.type(screen.getAllByRole('textbox', { name: 'Zone name' })[0], 'x');
+    await user.type(screen.getAllByLabelText('Zone name')[0], 'x');
     expect(stored()!.survey.lighting[0].zoneId).toBe('kantoorx');
-    await user.type(screen.getAllByRole('spinbutton', {
-      name: "Installed ventilation capacity of this zone, dm³/s (p. 147; empty: share of the building's capacity by A_g)",
-    })[0], '800');
-    await user.type(screen.getAllByRole('spinbutton', { name: 'Swimming-pool room in this zone, m² (p. 65)' })[1], '120');
+    await user.type(screen.getAllByLabelText("Installed ventilation capacity of this zone, dm³/s (p. 147; empty: share of the building's capacity by A_g)")[0], '800');
+    await user.type(screen.getAllByLabelText('Swimming-pool room in this zone, m² (p. 65)')[1], '120');
     expect(stored()!.survey.zones[0].installedCapacityDm3PerS).toBe(800);
     expect(stored()!.survey.zones[1].swimmingPoolAreaM2).toBe(120);
 
     // Removing a zone clears the references to it.
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Calculation zone' })[0], 'zone2');
+    await user.selectOptions(screen.getAllByLabelText('Calculation zone')[0], 'zone2');
     await user.click(screen.getAllByRole('button', { name: 'Remove zone' })[1]);
     expect(stored()!.survey.zones).toHaveLength(1);
     expect(stored()!.survey.envelope.surfaces[0].zoneId).toBeNull();
     expect(stored()!.survey.lighting[0].zoneId).toBe('kantoorx');
-    expect(screen.queryAllByRole('combobox', { name: 'Calculation zone' })).toHaveLength(0);
+    expect(screen.queryAllByLabelText('Calculation zone')).toHaveLength(0);
   }, 60000);
 
   it('does not show an assessment for a survey changed during the request', async () => {
@@ -365,8 +361,8 @@ describe('basisopname panel', () => {
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
     await user.click(screen.getByRole('button', { name: 'Calculate survey' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    await user.clear(screen.getByRole('spinbutton', { name: 'Construction year' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Construction year' }), '2000');
+    await user.clear(screen.getByLabelText('Construction year'));
+    await user.type(screen.getByLabelText('Construction year'), '2000');
     await act(async () => resolveResponse({ json: async () => ({
       status: 'calculated_unverified', appliedDefaults: [], warnings: [], issues: [],
       performance: { indicativeLabelClass: 'A' }, referenceVerified: false,

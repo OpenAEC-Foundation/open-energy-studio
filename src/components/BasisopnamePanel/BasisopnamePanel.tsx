@@ -643,6 +643,40 @@ export function surveySectionForPath(path: string | null | undefined): SurveySec
   }
 }
 
+/**
+ * Feedback after "Opname doorrekenen" in the section the user is on: the
+ * status, the issues of this section with "Ga naar", and the way to the full
+ * outcome. Without it a calculation from Algemeen showed nothing in the page.
+ */
+function SectionOutcome({ result, section, goTo, showResult }: {
+  result: OpnameAssessment; section: SurveySection; goTo: (path: string) => void; showResult: () => void;
+}) {
+  const { t, locale } = useI18n();
+  const here = result.issues.filter((item) => surveySectionForPath(item.path) === section);
+  const label = result.performance?.indicativeLabelClass;
+  const ep = result.performance?.primaryFossilIndicatorKwhPerM2Year;
+  return <div className="opname-section-outcome" role="status" aria-label={t('opname.sectionOutcome')}>
+    <p>
+      <strong>{t('opname.sectionOutcome.calculated')}</strong>{' '}
+      {t(`opname.statusValue.${result.status}`, { defaultValue: result.status })}
+      {label != null && <> · {t('opname.label')} <strong>{label}</strong></>}
+      {ep != null && <> · {formatNumber(ep, locale, 1)} {t('unit.kwhPerM2Year')} EP₂</>}
+    </p>
+    {here.length === 0
+      ? <p className="nta-form-note">{t('opname.sectionOutcome.none', { section: t(`opname.section.${section}`) })}</p>
+      : <ul className="opname-issues">
+        {here.map((item, index) => <li key={index}>
+          <KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} />{' '}
+          <button type="button" className="btn btn-sm opname-goto" onClick={() => goTo(item.path)}>
+            {t('opname.sectionOutcome.field')}</button>
+        </li>)}
+      </ul>}
+    {result.issues.length > here.length && <p className="nta-form-note">
+      {t('opname.sectionOutcome.elsewhere', { count: result.issues.length - here.length })}</p>}
+    <button type="button" className="btn btn-sm" onClick={showResult}>{t('opname.sectionOutcome.show')}</button>
+  </div>;
+}
+
 interface BasisopnamePanelProps {
   /** Wizard mode (shell step): only this section, with the progress list and result card. */
   section?: SurveySection;
@@ -774,6 +808,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
     <div className="opname-main">
     <h2>{t('opname.title')} — {t(`opname.kind.${kind}`)}</h2>
     <p className="nta-form-note">{t('opname.scope')}</p>
+    {wizard && section && section !== 'result' && result && <SectionOutcome result={result} section={section}
+      goTo={goTo} showResult={() => onSection?.('result')} />}
 
     <FieldPathPrefixProvider value="basisopname">
     <div className="nta-form">
@@ -1222,6 +1258,8 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         {result.appliedDefaults.length > 0 && <p className="opname-aside-defaults">
           {t('opname.resultCard.defaults', { count: result.appliedDefaults.length })}</p>}
         <button type="button" className="btn btn-sm" onClick={() => onSection?.('result')}>{t('opname.resultCard.details')}</button>
+        {/* The card's primary action (ontwerp §587–594); on the outcome page it sits with the details. */}
+        {section !== 'result' && <SurveyTakeoverAction result={result} />}
       </> : <p className="nta-form-note">{t('opname.progress.notCalculated')}</p>}
       <div className="opname-actions">
         <button type="button" className="btn btn-primary" disabled={busy} onClick={() => { void run(); }}>{t('opname.calculate')}</button>

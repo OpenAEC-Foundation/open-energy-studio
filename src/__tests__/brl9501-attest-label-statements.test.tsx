@@ -111,12 +111,8 @@ describe('label elements k and l (Omgevingsregeling art. 5.13a lid 1)', () => {
   it('stores the answers from the registration form', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
-    await user.selectOptions(screen.getByRole('combobox', {
-      name: 'k. Can the building respond to external signals and adapt its energy use?',
-    }), 'no');
-    await user.selectOptions(screen.getByRole('combobox', {
-      name: 'l. Is the heating distribution system designed for low temperature?',
-    }), 'yes');
+    await user.selectOptions(screen.getByLabelText('k. Can the building respond to external signals and adapt its energy use?'), 'no');
+    await user.selectOptions(screen.getByLabelText('l. Is the heating distribution system designed for low temperature?'), 'yes');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const stored = JSON.parse(screen.getByTestId('registration').textContent ?? 'null');
     expect(stored.labelStatements).toEqual({ respondsToExternalSignals: false, lowTemperatureHeating: true });
