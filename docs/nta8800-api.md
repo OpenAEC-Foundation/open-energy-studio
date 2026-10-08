@@ -22,13 +22,17 @@ cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
 | `--cors-origin ORIGIN` (herhaalbaar, `*` voor alles) | `OES_API_CORS_ORIGINS` (kommagescheiden) | geen CORS |
 | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` (1–1024) |
 | `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | aantal processorkernen (1–1024): zoveel berekeningen lopen tegelijk, de rest wacht |
-| `--calculation-timeout-s N` | `OES_API_CALCULATION_TIMEOUT_S` | `120` (1–86400): langste wachttijd op een rekenplaats plus de berekening zelf |
+| `--max-waiting N` | `OES_API_MAX_WAITING` | twee keer het aantal rekenplaatsen (0–65536): zoveel verzoeken mogen op een rekenplaats wachten; een verzoek daarboven krijgt meteen 503 `server_busy`, nog voordat de body is gelezen |
+| `--queue-timeout-s N` | `OES_API_QUEUE_TIMEOUT_S` | `30` (1–86400): langste wachttijd op een rekenplaats; daarna 503 `server_busy` en er start geen berekening |
+| `--calculation-timeout-s N` | `OES_API_CALCULATION_TIMEOUT_S` | `120` (1–86400): langste duur van de berekening zelf, gerekend vanaf het moment dat zij een rekenplaats krijgt |
 | `--log` / `--no-log` | `OES_API_LOG` (`1`/`0`) | aan: één regel per verzoek op stderr |
 | `--version` | | drukt de versie-informatie af en stopt |
 
 Een vlag wint van de omgevingsvariabele. Op een niet-loopback-adres meldt de server een waarschuwing: de API heeft geen authenticatie en is bedoeld voor lokaal gebruik. SIGINT en SIGTERM stoppen netjes: de server neemt geen nieuwe verbindingen meer aan en laat lopende verzoeken afmaken.
 
-Het geheugen van een berekening groeit ongeveer evenredig met het aantal rekenzones (circa 0,7 MB per zone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties)). `--max-calculations` begrenst daarmee het geheugen van de service. Na de tijdslimiet krijgt de client 503; een berekening die al loopt, maakt de service op de achtergrond af en houdt zolang haar rekenplaats bezet.
+Het geheugen van een berekening groeit ongeveer evenredig met het aantal rekenzones (circa 0,7 MB per zone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties)). `--max-calculations` begrenst het geheugen van de lopende berekeningen. Een wachtend verzoek houdt zijn ingelezen body vast; `--max-waiting` begrenst daarom de wachtrij, en het verzoek wordt toegelaten of geweigerd voordat de body wordt gelezen. Samen begrenzen ze de request-bodies tot `(max-calculations + max-waiting) × body-limit`.
+
+De wachttijd en de berekening hebben elk hun eigen tijdslimiet. Een verzoek dat binnen `--queue-timeout-s` geen rekenplaats krijgt, krijgt 503 `server_busy` en start geen berekening; een verzoek dat lang heeft gewacht, krijgt dus nooit een berekening die meteen weer wordt afgebroken. Een berekening die langer duurt dan `--calculation-timeout-s`, geeft 503 `calculation_timeout`; de service maakt haar op de achtergrond af en houdt zolang haar rekenplaats bezet. Elke 503 heeft een `Retry-After`-header: een kwart van de rekentijdslimiet, tussen 1 en 60 seconden.
 
 De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desktop-app roept de kern rechtstreeks aan en gebruikt de API niet.
 
@@ -59,7 +63,7 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
 | 422 | De kern weigert of kan niet afmaken (status `invalid`, `incomplete`, `derived_input_rejected`, `invalid_case`, …) | de **beoordeling zelf**, met `status`, `gaps` en `issues`; bij een diagnose in een editie zonder profiel de foutenvelop `edition_not_implemented` |
 | 500 | Uitkomst achtergehouden (`non_finite_result`) of kernfout (`kernel_panic`) | foutenvelop |
 | 501 | Alleen de verouderde route `/v1/nta8800/calculate` | foutenvelop |
-| 503 | Geen rekenplaats vrij binnen de tijdslimiet (`server_busy`) of de berekening duurde langer dan de tijdslimiet (`calculation_timeout`) | foutenvelop |
+| 503 | Wachtrij vol of geen rekenplaats vrij binnen de wachttijdslimiet (`server_busy`), of de berekening duurde langer dan de rekentijdslimiet (`calculation_timeout`) | foutenvelop, met `Retry-After` |
 
 De foutenvelop:
 

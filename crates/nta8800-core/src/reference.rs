@@ -486,11 +486,7 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     result.calculation_available = true;
     if case.pending.is_some() {
         for (index, metric) in pending_metrics.iter().enumerate() {
-            match record_pending_metric(
-                metric,
-                index,
-                actual_metric(&performance, &metric.path),
-            ) {
+            match record_pending_metric(metric, index, actual_metric(&performance, &metric.path)) {
                 Ok(recorded) => result.recorded.push(recorded),
                 Err(failure) => {
                     result.status = "calculation_unavailable";

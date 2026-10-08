@@ -1119,9 +1119,8 @@ mod tests {
         assert!(text
             .contains("| pending-case | NTA 8800:2025+C1:2026 | geen verwachting | `beng2` | – |"));
         assert!(text.contains("| Zonder verwachting | 1 gevallen"));
-        assert!(text.contains(
-            "| Vergelijking | geen vergelijking (0 vergeleken, 1 zonder verwachting) |"
-        ));
+        assert!(text
+            .contains("| Vergelijking | geen vergelijking (0 vergeleken, 1 zonder verwachting) |"));
 
         // With one compared case next to it, the run has a verdict again.
         let mixed = run_with(
@@ -1131,7 +1130,10 @@ mod tests {
         );
         assert_eq!(mixed.comparison_verdict, "passed", "{}", mixed.errors.len());
         assert!(mixed.numeric_comparison_passed);
-        assert_eq!((mixed.compared_cases, mixed.pending_expectation_cases), (1, 1));
+        assert_eq!(
+            (mixed.compared_cases, mixed.pending_expectation_cases),
+            (1, 1)
+        );
         assert!(markdown(&mixed)
             .contains("| Vergelijking | geslaagd (1 vergeleken, 1 zonder verwachting) |"));
 

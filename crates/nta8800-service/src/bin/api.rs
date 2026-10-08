@@ -93,7 +93,9 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
             .parse()
             .ok()
             .filter(|n: &usize| *n <= 65_536)
-            .ok_or(format!("invalid number of waiting requests {waiting} (0–65536)"))?,
+            .ok_or(format!(
+                "invalid number of waiting requests {waiting} (0–65536)"
+            ))?,
     };
     let queue_timeout: u64 = queue_timeout
         .parse()
