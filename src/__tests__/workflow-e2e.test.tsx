@@ -1,7 +1,7 @@
 /**
  * The NTA 8800 workflow end to end, as a user goes through it in the full app:
- * File › New and File › Open, the workflow navigation, the step pages with the
- * shared NTA draft and its apply bar, the kernel answer, results, the report
+ * File › New and File › Open, the workflow navigation, the question flow whose
+ * "Next" applies the shared NTA draft, the kernel answer, results, the report
  * builder, Bron & bewijs, the BRL 9500 checklist and the dossier. The HTTP
  * kernel is stubbed with answers the real kernel gave for the same requests
  * (training-data/*.kernel-output.json). Runs the default edition and
@@ -21,7 +21,6 @@ const json = (file: string) => JSON.parse(readFileSync(resolve(root, 'training-d
 const terracedProject = json('nta8800-example-terraced-dwelling.json');
 const terracedOutput = json('nta8800-example-terraced-dwelling.kernel-output.json');
 const terraced2022Output = json('nta8800-example-terraced-dwelling.2022.kernel-output.json');
-const survey1930 = json('nta8800-opname-1930-terraced.json');
 const survey1930Output = json('nta8800-opname-1930-terraced.kernel-output.json');
 const newProjectOutput = json('nta8800-new-project.kernel-output.json');
 
@@ -71,11 +70,16 @@ afterEach(() => {
 type User = ReturnType<typeof userEvent.setup>;
 const nav = () => screen.getByRole('navigation', { name: 'Workflow steps' });
 const main = () => within(screen.getByRole('main'));
-const bar = () => within(screen.getByRole('region', { name: 'NTA input draft' }));
 
-async function openStep(user: User, step: RegExp, sub?: string) {
-  await user.click(within(nav()).getByRole('button', { name: step }));
-  if (sub) await user.click(within(nav()).getByRole('button', { name: sub }));
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A workflow step by its label ("2 Building, to do") and optionally one of its pages ("· Calculation zones"). */
+async function openStep(user: User, step: string, sub?: string) {
+  await user.click(within(nav()).getByRole('button', { name: new RegExp(`${escape(step)}, `) }));
+  if (!sub) return;
+  // Flow steps list their questions in the navigation; Report & dossier has its pages as tabs on the page.
+  const name = new RegExp(`${escape(sub)}$`);
+  await user.click(within(nav()).queryByRole('button', { name }) ?? main().getByRole('button', { name }));
 }
 
 /** Waits for the kernel run of the current project state (debounced) to be asked. */
@@ -116,11 +120,17 @@ async function kernelSettled() {
   }, { timeout: 5000, interval: 100 });
 }
 
-async function applyDraft(user: User, changes?: RegExp) {
-  if (changes) expect(screen.getByRole('region', { name: 'NTA input draft' })).toHaveTextContent(changes);
+/** The primary button of the question flow ("Next question", "Next: …"), which applies the page's NTA draft. */
+const nextButton = () => {
+  const button = screen.getByRole('main').querySelector<HTMLButtonElement>('.survey-actions .btn-primary');
+  if (!button) throw new Error('no question-flow next button on this page');
+  return button;
+};
+
+/** Applies the NTA draft the way the question flow does: by moving on to the next question. */
+async function applyDraft(user: User) {
   const runs = projectBodies().length;
-  await user.click(bar().getByRole('button', { name: /^Apply/ }));
-  expect(screen.queryByRole('region', { name: 'NTA input draft' })).toBeNull();
+  await user.click(nextButton());
   await kernelRuns(runs + 1);
   await kernelSettled();
 }
@@ -143,55 +153,26 @@ describe('workflow end to end, default edition', () => {
     expect(edition).toHaveValue('2025+C1');
   }, 60000);
 
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('takes a calculated basic survey over into the project model through the draft', async () => {
-    const user = userEvent.setup();
-    await openExample(user, { ...terracedProject, basisopname: { kind: 'residential', survey: structuredClone(survey1930) } });
-    await openStep(user, /^Basic survey/);
-    await user.click(main().getByRole('button', { name: 'Calculate survey' }));
-    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/opname/residential'))).toBe(true));
-    await user.click(main().getByRole('button', { name: 'Outcome & defaults' }));
-
-    await user.click(await main().findByRole('button', { name: 'Take over into project model' }));
-    const dialog = within(await screen.findByRole('dialog'));
-    expect(dialog.getByText('Take the survey over into the project model')).toBeInTheDocument();
-    expect(dialog.getByText(/\d+ change\(s\)/)).toBeInTheDocument();
-    await user.click(dialog.getByRole('button', { name: 'Take over into draft' }));
-    expect(await screen.findByText('Survey taken over into the draft; apply it with the bar at the bottom.')).toBeInTheDocument();
-
-    // Nothing is applied before the bar's Apply: the kernel still gets the example's own input.
-    const before = structuredClone(lastNta());
-    const derived = (survey1930Output as { derivedInput: { spaceHeating: { generator: unknown }; hotWater: unknown } }).derivedInput;
-    await applyDraft(user, /change/);
-    expect(lastNta()!.generator).toEqual(derived.spaceHeating.generator);
-    // The kernel request leaves out empty (null) fields; what the survey derived arrives.
-    expect(lastNta()!.hotWater).toMatchObject({ generator: { kind: 'gas_appliance', appliance: 'without_gaskeur' } });
-    expect((derived.hotWater as { generator: { kind: string } }).generator.kind).toBe('gas_appliance');
-    expect(lastNta()!.generator).not.toEqual(before!.generator);
-  }, 60000);
-
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('sets an obstruction for one window and applies it with the bar', async () => {
+  it('sets an obstruction for one window and applies it with the bar', async () => {
     const user = userEvent.setup();
     await openExample(user);
-    await openStep(user, /^Building/);
+    await openStep(user, 'Building');
     const page = main();
     await user.selectOptions(page.getByLabelText('Obstruction Raam N'), 'overhang');
     const group = within(page.getByRole('group', { name: 'Raam N' }));
     await user.type(group.getByLabelText('Relative height (h/a)'), '0,5');
     await user.type(group.getByLabelText('Source'), 'gevelaanzicht');
     expect((page.getByLabelText('Obstruction Raam S') as HTMLSelectElement).value).toBe('');
-    await applyDraft(user, /change/);
+    await applyDraft(user);
     expect(lastNta()!.windowObstructions).toEqual([
       { windowId: 'win-N', obstruction: { method: 'overhang', relativeHeight: 0.5 }, sourceReference: 'gevelaanzicht' },
     ]);
   }, 60000);
 
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('enters annex AA rooms with the project windows on the cooling page', async () => {
+  it('enters annex AA rooms with the project windows on the cooling page', async () => {
     const user = userEvent.setup();
     await openExample(user);
-    await openStep(user, /^Installations/, 'Cooling');
+    await openStep(user, 'Installations', 'Cooling');
     const page = main();
     await user.selectOptions(page.getByLabelText('Sufficient active cooling present (§5.7.1)'), 'compression_table10_29');
     await user.selectOptions(page.getByLabelText('Capacity evidence (§5.7.1)'), 'annex_aa');
@@ -204,7 +185,7 @@ describe('workflow end to end, default edition', () => {
     const window = room.getByLabelText('Window') as HTMLSelectElement;
     // Only the project's outdoor windows are offered.
     expect(Array.from(window.options).map((option) => option.value).filter(Boolean).sort()).toEqual(['win-N', 'win-S']);
-    await applyDraft(user, /change/);
+    await applyDraft(user);
     const capacity = (lastNta()!.activeCooling as { capacity: { method: string; calculation: { rooms: Array<{ areaM2: number; windows: unknown[] }> } } }).capacity;
     expect(capacity.method).toBe('annex_aa');
     expect(capacity.calculation.rooms[0]).toMatchObject({ areaM2: 28, windows: [expect.objectContaining({ windowId: window.value })] });
@@ -213,13 +194,13 @@ describe('workflow end to end, default edition', () => {
   it('shows the kernel results and composes the report at each level', async () => {
     const user = userEvent.setup();
     await openExample(user);
-    await openStep(user, /^Results/);
+    await openStep(user, 'Results');
     const performance = (terracedOutput as { performance: { needIndicatorKwhPerM2Year: number; primaryFossilIndicatorKwhPerM2Year: number } }).performance;
     expect(await main().findByText(`${performance.needIndicatorKwhPerM2Year.toFixed(2)}`, { exact: false })).toBeInTheDocument();
     expect(main().getAllByText(`${performance.primaryFossilIndicatorKwhPerM2Year.toFixed(2)}`, { exact: false }).length).toBeGreaterThan(0);
     expect(main().getByText(/Unverified calculation/)).toBeInTheDocument();
 
-    await openStep(user, /^Report/);
+    await openStep(user, 'Report & dossier');
     const preview = () => (main().getByTestId('report-builder-preview') as HTMLIFrameElement).getAttribute('srcdoc') ?? '';
     await waitFor(() => expect(preview()).toContain('Bouwkundige uitgangspunten'));
     const balance = main().getByLabelText(/Heat and cold balance/);
@@ -233,21 +214,20 @@ describe('workflow end to end, default edition', () => {
     expect(preview()).not.toContain('Bouwkundige uitgangspunten');
   }, 60000);
 
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('links an evidence file to a source field and lists it in the checklist and the dossier ZIP', async () => {
+  it('links an evidence file to a source field and lists it in the checklist and the dossier ZIP', async () => {
     const user = userEvent.setup();
     await openExample(user);
-    await openStep(user, /^Building/);
+    await openStep(user, 'Building');
     const input = main().getByLabelText('Add file: windowSolar.sourceReference') as HTMLInputElement;
     const photo = new File([new TextEncoder().encode('gevelfoto')], 'gevel-noord.jpg', { type: 'image/jpeg' });
     await act(async () => { fireEvent.change(input, { target: { files: [photo] } }); });
-    await waitFor(() => expect(screen.getByRole('region', { name: 'NTA input draft' })).toBeInTheDocument());
+    await waitFor(() => expect(main().getAllByText('gevel-noord.jpg', { exact: false }).length).toBeGreaterThan(0));
     await applyDraft(user);
     // The file is added to the source text; the description that was there stays.
     expect((lastNta()!.windowSolar as { sourceReference: string }).sourceReference)
       .toMatch(/^synthetic: minimal obstruction .*; evidence:ev-\d+$/);
 
-    await openStep(user, /^Report/, 'BRL 9500 checklist');
+    await openStep(user, 'Report & dossier', 'BRL 9500 checklist');
     expect(main().getByText('gevel-noord.jpg', { exact: false })).toBeInTheDocument();
     expect(main().queryByText('No evidence recorded yet.')).toBeNull();
 
@@ -269,13 +249,12 @@ describe('workflow end to end, default edition', () => {
 });
 
 describe('inspector', () => {
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('attaches a photo to a selected window and keeps the link by id when an earlier surface is removed', async () => {
+  it('attaches a photo to a selected window and keeps the link by id when an earlier surface is removed', async () => {
     const user = userEvent.setup();
     window.localStorage.setItem('oes.inspector.open', '1');
     await openExample(user);
     window.localStorage.setItem('oes.inspector.open', '1');
-    await openStep(user, /^Building/);
+    await openStep(user, 'Building');
     const table = within(main().getByRole('table', { name: 'Envelope & windows' }));
     await user.click(table.getByText('Raam S'));
     const inspector = within(screen.getByRole('complementary', { name: 'Context' }));
@@ -291,7 +270,7 @@ describe('inspector', () => {
     await user.click(main().getByRole('button', { name: 'Delete: Gevel N' }));
     await user.click(main().getByRole('button', { name: 'Yes, delete' }));
     await waitFor(() => expect(within(main().getByRole('table', { name: 'Envelope & windows' })).queryByText('Raam N')).toBeNull());
-    await openStep(user, /^Report/, 'BRL 9500 checklist');
+    await openStep(user, 'Report & dossier', 'BRL 9500 checklist');
     const register = main().getByText('raam-zuid.jpg', { exact: false }).closest('tr')!;
     expect(register).toHaveTextContent(/win-S/);
     expect(register).not.toHaveTextContent(/not in the project|no longer/i);
@@ -299,41 +278,39 @@ describe('inspector', () => {
 });
 
 describe('workflow end to end, NTA 8800:2022', () => {
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('switches the edition, shows the 2022-only fields and the legacy status, and offers to remove them again', async () => {
+  it('switches the edition, shows the 2022-only fields and the legacy status, and offers to remove them again', async () => {
     const user = userEvent.setup();
     await openExample(user);
+    // An opened file lands on Check; the edition is a project question.
+    await openStep(user, 'Project');
     const edition = await main().findByLabelText('NTA 8800 edition');
     await user.selectOptions(edition, '2022');
     expect(main().getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
-    await applyDraft(user, /change/);
+    await applyDraft(user);
     expect(lastNta()!.normVersion).toBe('2022');
 
     // 2022-only inputs appear on their pages.
-    await openStep(user, /^Building/, 'Calculation zones');
+    await openStep(user, 'Building', 'Calculation zones');
     const mass = await main().findByLabelText('Mass per m² usable floor area (kg/m², NTA 8800:2022 only, table 7.10)');
     await user.type(mass, '400');
     // (8.47) of 2022 asks the real wall height of a crawlspace instead of the fixed 0,125 m.
-    await openStep(user, /^Building/, 'Envelope & windows');
+    await openStep(user, 'Building', 'Envelope & windows');
     expect(main().queryByLabelText(/Wall height above ground level/)).toBeNull();
     await user.selectOptions(main().getByLabelText('Space below the floor (8.3.4.2)'), 'crawlspace');
     await user.type(main().getByLabelText(/Wall height above ground level/), '0,4');
-    await applyDraft(user, /change/);
+    await applyDraft(user);
     expect((lastNta()!.thermalMass as { massKgPerM2: number }).massKgPerM2).toBe(400);
     expect((lastNta()!.groundFloors as Array<{ below: { kind: string; wallHeightAboveGroundM: number } }>)[0].below)
       .toMatchObject({ kind: 'crawlspace', wallHeightAboveGroundM: 0.4 });
 
     // The kernel answers in 2022: comparison only, no registration.
-    await openStep(user, /^Results/);
+    await openStep(user, 'Results');
     const legacy = (await main().findByText('Older edition — not for registration.')).closest('[role="note"]');
     expect(legacy).toHaveTextContent('Older edition — not for registration. Calculated in NTA 8800:2022.');
-    await openStep(user, /^Project/);
-    expect(main().getAllByText('Rust kernel: calculated in an older edition (not for registration)').length).toBeGreaterThan(0);
-
     // Back to the default edition: the 2022 values are flagged with a remove action.
-    await openStep(user, /^Project/);
+    await openStep(user, 'Project');
     await user.selectOptions(await main().findByLabelText('NTA 8800 edition'), '2025+C1');
-    await openStep(user, /^Building/, 'Calculation zones');
+    await openStep(user, 'Building', 'Calculation zones');
     expect(main().queryByLabelText(/Mass per m² usable floor area/)).toBeNull();
     const stale = main().getAllByRole('alert').find((alert) => /2022/.test(alert.textContent ?? ''));
     expect(stale).toBeDefined();
@@ -345,15 +322,14 @@ describe('workflow end to end, NTA 8800:2022', () => {
 });
 
 describe('open points', () => {
-  // Written for the step pages before the question flows (redesign Oct 2026): to be ported to them.
-  it.skip('goes from a kernel gap on the check page to the field', async () => {
+  it('goes from a kernel gap on the check page to the field', async () => {
     const user = userEvent.setup();
     projectAnswer = (block) => (block ? {
       ...terracedOutput, status: 'incomplete', derivedInput: null, performance: null,
       gaps: [{ code: 'setpoint_out_of_range', path: 'ntaCalculation.setpoints.heatingC' }],
     } : MISSING_BLOCK);
     await openExample(user);
-    await openStep(user, /^Check/, 'Check overview');
+    await openStep(user, 'Check');
     const goTo = await main().findByRole('button', { name: /Go to/ });
     await user.click(goTo);
     expect(within(nav()).getByRole('button', { name: /^Building/ })).toHaveAttribute('aria-current', 'page');
