@@ -90,5 +90,28 @@ Daarnaast zijn er:
 - **Geen testset.** De ISSO 54-testset versie 5.0:2026 met verwachte uitkomsten is nog niet ingezien. Overeenstemming binnen de bandbreedtes is dus nog niet aangetoond (§4.2, p. 7).
 - **Geen registratiebestand.** Registratie in EP-Online is niet mogelijk zonder het uploadformaat van RVO en een attest.
 - **Open interpretatie koeling.** De koelroute volgt 10.15 en 10.87 letterlijk. Dat wijkt af van ten minste één ander programma, zie de vragen aan NEN.
-- **Onvolledige routes.** Het uurklimaat van 17.3.8 en tabel 8 van ISO 6946 zijn niet volledig ([verificatiestatus](nta8800-verificatiestatus.md)).
+- **Onvolledige routes.** Het uurklimaat van 17.3.8 ontbreekt (daarvoor zijn de uurwaarden van NEN 5060 nodig). Dunne spouwen onder 20 mm rekenen via D.2, behalve zwak geventileerde spouwen en spouwen met reflecterende folie ([verificatiestatus](nta8800-verificatiestatus.md)).
 - **Wat er nog openstaat voor het attest.** De volledige lijst staat in de [BRL 9501-gereedheid](nta8800-brl9501-gereedheid.md).
+
+## 8. Grenzen en prestaties
+
+Gemeten op 9 oktober 2026 (rekenkern 0.3.0, release-build, 8 kernen) met `crates/nta8800-core/tests/large_projects.rs`. Die test maakt deterministisch grote projecten:
+- **utiliteit:** openbaar geval H (2 rekenzones, 18 ramen) n keer herhaald, met nieuwe ids voor elke kopie;
+- **woningen:** de voorbeeld-rijwoning als n woningen van elk één rekenzone, met `dwellingCount` = n (6.2b, p. 160).
+
+| Project | Zones | Ramen | Rekentijd | Uitvoer (JSON) | Piekgeheugen testproces |
+|---|---:|---:|---:|---:|---:|
+| utiliteit | 2 | 18 | 18 ms | 206 kB | 12 MB |
+| utiliteit | 20 | 180 | 70 ms | 1,5 MB | 23 MB |
+| utiliteit | 40 | 360 | 144 ms | 2,9 MB | 38 MB |
+| utiliteit | 80 | 720 | 314 ms | 5,8 MB | 65 MB |
+| utiliteit | 200 | 1 800 | 759 ms | 14 MB | 142 MB |
+| woningen | 50 | 100 | 94 ms | 2,7 MB | – |
+| woningen | 200 | 400 | 412 ms | 10 MB | – |
+
+- **Lineair.** Rekentijd, uitvoer en geheugen groeien evenredig met het aantal zones: ongeveer 4 ms, 72 kB uitvoer en 0,7 MB geheugen per utiliteitszone. Er is geen kwadratisch gedrag gevonden. Van de 904 ms voor 200 zones gaat 553 ms naar de gebouwberekening zelf; de rest is afleiding, controle en de eindige-getallencontrole van de uitkomst. Er was dus geen algoritmische correctie nodig.
+- **Uitkomst bij schalen.** Een gebouw dat n keer herhaald wordt, houdt dezelfde energiebehoefte per m² (BENG 1). Verwarming, ventilatie en verlichting worden precies n keer zo groot. Tapwater, koeling en hulpenergie groeien minder, omdat ze vaste posten per systeem hebben (het verlies van het voorraadvat, de 87,6 kWh regelenergie van 10.87). De test controleert dit.
+- **Invoergrootte.** Een utiliteitszone is ongeveer 11 kB invoer. De standaardlimiet van de HTTP-API (16 MB) laat dus ruwweg 1 500 zones toe. Geëxtrapoleerd kost zo'n verzoek ongeveer 7 s en 1 GB geheugen.
+- **HTTP-API.** De API begrenst daarom het aantal gelijktijdige berekeningen (`--max-calculations`, standaard het aantal kernen) en de tijd per verzoek (`--calculation-timeout-s`, standaard 120 s). Daarna volgt 503 met `server_busy` of `calculation_timeout` (zie [HTTP-API](nta8800-api.md)). Wie de API buiten de eigen computer aanbiedt, stelt beide en `--body-limit-mb` lager in.
+- **Interface.** In de jsdom-testomgeving tekent de pagina Schil van een project met 40 zones en 360 ramen in ongeveer 3 s (0,4 s bij 2 zones), de overige invoer- en resultaatpagina's in minder dan 0,3 s. Ook dit groeit lineair. Een echte browser is sneller dan jsdom. De test `src/__tests__/large-project-ui.test.tsx` bewaakt dit met een ruime tijdsgrens.
+- **Zelf meten.** `cargo test --release --offline --test large_projects -- --ignored --nocapture` in `crates/nta8800-core` drukt de tabel hierboven af.

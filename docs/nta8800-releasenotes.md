@@ -22,6 +22,13 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
   
   De gate rekent ze alle door. De verwachte uitkomsten (bijlage 2 van ISSO 54) zijn niet in bezit. De codering, de interpretaties en de open deeltesten staan in [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md).
 
+### 9 oktober 2026 — grote projecten: metingen, rekenplaatsen en tijdslimiet in de API (geen rekenwijziging)
+
+- **Grote projecten gemeten.** Nieuwe test `crates/nta8800-core/tests/large_projects.rs` maakt projecten tot 200 utiliteitszones (1 800 ramen) en 200 woningen. Ze rekenen allemaal, met eindige uitkomsten. Rekentijd, uitvoer en geheugen groeien lineair: ongeveer 4 ms, 72 kB en 0,7 MB per zone, en 0,76 s voor 200 zones. Er was geen algoritmische correctie nodig, dus de uitkomsten blijven gelijk.
+- **Controle bij schalen.** Een n keer herhaald gebouw houdt dezelfde BENG 1, en verwarming, ventilatie en verlichting worden precies n keer zo groot. Zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties).
+- **HTTP-API.** Nieuwe opties `--max-calculations` (standaard het aantal kernen) en `--calculation-timeout-s` (standaard 120 s). Verzoeken boven het aantal rekenplaatsen wachten. Na de tijdslimiet volgt 503 met de nieuwe codes `server_busy` of `calculation_timeout`, in de gewone foutenvelop. Zo kan een groot verzoek (16 MB is ongeveer 1 500 zones) de service niet onbeperkt geheugen laten gebruiken.
+- **Interface.** Nieuwe test `src/__tests__/large-project-ui.test.tsx`: de invoerpagina's van een project met 40 zones en 360 ramen, en alle resultaattabbladen van een antwoord met 40 zones, tekenen binnen een ruime tijdsgrens.
+
 ### 9 oktober 2026 — derde review: opname vóór 1900, lucht/lucht-warmtepomp, zonwering per raam
 
 - **Opname van vóór 1900 met mechanische ventilatie rekent weer.** Bij een onbekend fabricagejaar van de ventilator vult de opname het bouwjaar in (tabel 11.15). Sinds de ondergrens 1900 voor het fabricagejaar weigerde de kern dan een bouwjaar van 1800–1899 (`manufacture_year_invalid`). De opname neemt nu het bouwjaar, maar niet vroeger dan 1900. Dat verandert de uitkomst niet: tabel 11.20 en 11.23 zetten elk jaar tot en met 1900 in hun oudste rij (2025+C1 p. 516, 519). Een ingevuld fabricagejaar buiten 1900–2100 geeft nu `manufacture_year_invalid` op het opnameveld `ventilation.unitManufactureYear`, in plaats van diep in de afgeleide invoer.
