@@ -7,7 +7,9 @@
 //! with the commit, `KERNEL_VERSION`, the edition per case and the SHA-256 of
 //! every input and output: the test record of BRL 9501 §6.2–6.3.
 
-use nta8800_core::reference::{compare_reference_case, ReferenceCase, ReferenceComparison};
+use nta8800_core::reference::{
+    compare_reference_case, comparison_status_acceptable, ReferenceCase, ReferenceComparison,
+};
 use nta8800_core::{KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -219,6 +221,9 @@ struct GateReport {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suites: Vec<SuiteRecord>,
     numeric_comparison_passed: bool,
+    /// Cases calculated without expected values (`pending_expectation`):
+    /// they pass the run but prove nothing about the result.
+    pending_expectation_cases: usize,
     /// None means that no independently agreed coverage plan was supplied.
     planned_coverage_passed: Option<bool>,
     /// SHA-256 of the exact plan bytes, for release-level traceability only.
@@ -386,7 +391,10 @@ fn push_case(
     let input_sha256 =
         sha256(&serde_json::to_vec(&resolved.case).expect("reference case serializes"));
     let comparison = compare_reference_case(resolved.case);
-    report.numeric_comparison_passed &= comparison.status == "compared_pass";
+    report.numeric_comparison_passed &= comparison_status_acceptable(comparison.status);
+    if comparison.status == "pending_expectation" {
+        report.pending_expectation_cases += 1;
+    }
     let output_sha256 =
         sha256(&serde_json::to_vec(&comparison).expect("reference comparison serializes"));
     let published = published_comparisons(&comparison, resolved.published);
@@ -409,6 +417,7 @@ fn run_with(paths: &[PathBuf], suites: &[PathBuf], plan_path: Option<&Path>) -> 
         commit: None,
         suites: Vec::new(),
         numeric_comparison_passed: !paths.is_empty() || !suites.is_empty(),
+        pending_expectation_cases: 0,
         planned_coverage_passed: None,
         coverage_plan_fingerprint: None,
         reference_verified: false,
@@ -556,6 +565,12 @@ fn markdown(report: &GateReport) -> String {
         verdict(report.numeric_comparison_passed),
         report.cases.len()
     ));
+    if report.pending_expectation_cases > 0 {
+        out.push_str(&format!(
+            "| Zonder verwachting | {} gevallen (alleen doorgerekend, geen oordeel) |\n",
+            report.pending_expectation_cases
+        ));
+    }
     if let Some(passed) = report.planned_coverage_passed {
         out.push_str(&format!("| Dekkingsplan | {} |\n", verdict(passed)));
     }
@@ -573,7 +588,21 @@ fn markdown(report: &GateReport) -> String {
     out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for case in &report.cases {
         let comparison = &case.comparison;
-        if comparison.metrics.is_empty() {
+        for metric in &comparison.recorded {
+            let band = match metric.relative_tolerance {
+                Some(fraction) => format!("{} %", number(fraction * 100.0)),
+                None => number(metric.absolute_tolerance),
+            };
+            out.push_str(&format!(
+                "| {} | {} | geen verwachting | `{}` | – | {} | – | {} |\n",
+                comparison.case_id,
+                comparison.target_norm_version,
+                metric.path,
+                number(metric.actual),
+                band
+            ));
+        }
+        if comparison.metrics.is_empty() && comparison.recorded.is_empty() {
             out.push_str(&format!(
                 "| {} | {} | {} | – | – | – | – | – |\n",
                 comparison.case_id, comparison.target_norm_version, comparison.status

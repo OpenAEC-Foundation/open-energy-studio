@@ -20,10 +20,55 @@ pub struct ReferenceCase {
     pub input_kind: Option<ReferenceInputKind>,
     pub project: Value,
     pub source: ReferenceSource,
+    /// Empty only for a case with `pending` expectations.
+    #[serde(default)]
     pub expected: Vec<ExpectedMetric>,
     /// Optional comparison of the calculated, unregistered label class.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_label_class: Option<String>,
+    /// A test-set case whose expected values are not (yet) in hand, such as
+    /// ISSO 54 without its results document: the case is calculated and
+    /// the named metrics are recorded without a verdict. It must calculate;
+    /// it can never pass a comparison.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<PendingExpectations>,
+}
+
+/// The metrics a pending case records, with the band they will be judged
+/// against once the expected values are supplied (then they move to
+/// `expected`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PendingExpectations {
+    /// Why the expected values are missing, e.g. the results document of
+    /// the test set is not in hand.
+    pub reason: String,
+    pub metrics: Vec<PendingMetric>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PendingMetric {
+    pub path: String,
+    pub unit: String,
+    pub norm_reference: String,
+    #[serde(default)]
+    pub absolute_tolerance: f64,
+    /// The band of the test set as a fraction (ISSO 54: 0,01).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relative_tolerance: Option<f64>,
+}
+
+/// A metric calculated for a pending case: no expectation, no verdict.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordedMetric {
+    pub path: String,
+    pub actual: f64,
+    pub unit: String,
+    pub absolute_tolerance: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relative_tolerance: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -127,9 +172,18 @@ pub struct ReferenceComparison {
     pub reference_verified: bool,
     pub attest_status: &'static str,
     pub metrics: Vec<MetricComparison>,
+    /// The metrics of a pending case (status `pending_expectation`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub recorded: Vec<RecordedMetric>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label_class: Option<LabelClassComparison>,
     pub issues: Vec<ReferenceIssue>,
+}
+
+/// Statuses that do not fail a batch: a passed comparison, or a pending
+/// case that calculated and recorded every named metric.
+pub fn comparison_status_acceptable(status: &str) -> bool {
+    matches!(status, "compared_pass" | "pending_expectation")
 }
 
 #[derive(Debug, Serialize)]
@@ -353,24 +407,39 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
         reference_verified: false,
         attest_status: "unattested",
         metrics: Vec::new(),
+        recorded: Vec::new(),
         label_class: None,
         issues: audit.issues,
     };
     if !audit.manifest_complete {
         return result;
     }
-    for (index, metric) in case.expected.iter().enumerate() {
-        let unit = metric_unit(&metric.path);
+    let pending_metrics = case.pending.as_ref().map_or(&[][..], |item| &item.metrics);
+    let named = case
+        .expected
+        .iter()
+        .enumerate()
+        .map(|(index, metric)| (format!("expected[{index}]"), &metric.path, &metric.unit))
+        .chain(
+            pending_metrics
+                .iter()
+                .enumerate()
+                .map(|(index, metric)| {
+                    (format!("pending.metrics[{index}]"), &metric.path, &metric.unit)
+                }),
+        );
+    for (at, path, unit_given) in named {
+        let unit = metric_unit(path);
         if unit.is_none() {
             result.issues.push(issue(
                 "metric_path_unsupported",
-                format!("expected[{index}].path"),
+                format!("{at}.path"),
                 "Only allowlisted numeric performance output paths can be compared",
             ));
-        } else if unit != Some(metric.unit.as_str()) {
+        } else if unit != Some(unit_given.as_str()) {
             result.issues.push(issue(
                 "metric_unit_mismatch",
-                format!("expected[{index}].unit"),
+                format!("{at}.unit"),
                 "Metric unit does not match the kernel output unit",
             ));
         }
@@ -416,6 +485,29 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
         return result;
     };
     result.calculation_available = true;
+    if case.pending.is_some() {
+        for (index, metric) in pending_metrics.iter().enumerate() {
+            let Some(actual) = actual_metric(&performance, &metric.path) else {
+                result.status = "calculation_unavailable";
+                result.issues.push(issue(
+                    "metric_calculation_unavailable",
+                    format!("pending.metrics[{index}].path"),
+                    "Requested metric is unavailable for this project",
+                ));
+                result.recorded.clear();
+                return result;
+            };
+            result.recorded.push(RecordedMetric {
+                path: metric.path.clone(),
+                actual,
+                unit: metric.unit.clone(),
+                absolute_tolerance: metric.absolute_tolerance,
+                relative_tolerance: metric.relative_tolerance,
+            });
+        }
+        result.status = "pending_expectation";
+        return result;
+    }
     let mut metrics = Vec::with_capacity(case.expected.len());
     for (index, expected) in case.expected.iter().enumerate() {
         let Some(actual) = actual_metric(&performance, &expected.path) else {
@@ -537,12 +629,72 @@ pub fn audit_reference_case(case: ReferenceCase) -> ReferenceAudit {
             ));
         }
     }
-    if case.expected.is_empty() {
-        issues.push(issue(
+    match &case.pending {
+        None if case.expected.is_empty() => issues.push(issue(
             "expected_metrics_required",
             "expected",
             "Independent expected values are required",
-        ));
+        )),
+        None => {}
+        // A pending case records, it never compares: expected values or a
+        // label class next to it would make its status ambiguous.
+        Some(_) if !case.expected.is_empty() || case.expected_label_class.is_some() => {
+            issues.push(issue(
+                "pending_with_expected_values",
+                "pending",
+                "A pending case gives no expected values; move the metrics to expected",
+            ))
+        }
+        Some(pending) => {
+            if pending.reason.trim().is_empty() {
+                issues.push(issue(
+                    "pending_reason_required",
+                    "pending.reason",
+                    "A pending case states why its expected values are missing",
+                ));
+            }
+            if pending.metrics.is_empty() {
+                issues.push(issue(
+                    "pending_metrics_required",
+                    "pending.metrics",
+                    "A pending case names the metrics it records",
+                ));
+            }
+            let mut paths = HashSet::new();
+            for (index, metric) in pending.metrics.iter().enumerate() {
+                let path = format!("pending.metrics[{index}]");
+                if metric.path.trim().is_empty() || !paths.insert(metric.path.as_str()) {
+                    issues.push(issue(
+                        "metric_path_invalid",
+                        format!("{path}.path"),
+                        "Metric paths must be nonempty and unique",
+                    ));
+                }
+                if metric.norm_reference.trim().is_empty() {
+                    issues.push(issue(
+                        "metric_norm_reference_required",
+                        format!("{path}.normReference"),
+                        "Metric requires an exact norm reference",
+                    ));
+                }
+                if !metric.absolute_tolerance.is_finite() || metric.absolute_tolerance < 0.0 {
+                    issues.push(issue(
+                        "metric_tolerance_invalid",
+                        format!("{path}.absoluteTolerance"),
+                        "Absolute tolerance must be finite and nonnegative",
+                    ));
+                }
+                if metric.relative_tolerance.is_some_and(|fraction| {
+                    !fraction.is_finite() || !(0.0..=1.0).contains(&fraction)
+                }) {
+                    issues.push(issue(
+                        "metric_tolerance_invalid",
+                        format!("{path}.relativeTolerance"),
+                        "Relative tolerance must be a finite fraction between 0 and 1",
+                    ));
+                }
+            }
+        }
     }
     if let Some(expected) = &case.expected_label_class {
         if expected.trim() != expected || crate::label_class::class_rank(expected).is_none() {
@@ -684,6 +836,7 @@ mod tests {
                 relative_tolerance: None,
             }],
             expected_label_class: None,
+            pending: None,
         }
     }
 
@@ -1148,5 +1301,102 @@ mod tests {
         // A project file under the building kind does not parse.
         case.project = project();
         assert!(!audit_reference_case(case).manifest_complete);
+    }
+
+    fn pending_case(project: Value) -> ReferenceCase {
+        let mut case = comparison_case(project, "beng2", 0.0, "kWh/m2.year");
+        case.expected.clear();
+        case.pending = Some(PendingExpectations {
+            reason: "results document of the test set not in hand".into(),
+            metrics: vec![
+                PendingMetric {
+                    path: "beng1".into(),
+                    unit: "kWh/m2.year".into(),
+                    norm_reference: "BENG 1 (5.3)".into(),
+                    absolute_tolerance: 0.0,
+                    relative_tolerance: Some(0.01),
+                },
+                PendingMetric {
+                    path: "beng2".into(),
+                    unit: "kWh/m2.year".into(),
+                    norm_reference: "BENG 2 (5.2)".into(),
+                    absolute_tolerance: 0.0,
+                    relative_tolerance: Some(0.01),
+                },
+            ],
+        });
+        case
+    }
+
+    #[test]
+    fn pending_case_records_without_a_verdict_and_must_calculate() {
+        let project: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-project-performance-synthetic.json"
+        ))
+        .unwrap();
+        let case = pending_case(project);
+        let audit = audit_reference_case(case.clone());
+        assert!(audit.manifest_complete, "{:?}", audit.issues);
+        let recorded = compare_reference_case(case.clone());
+        assert_eq!(recorded.status, "pending_expectation", "{:?}", recorded.issues);
+        assert!(comparison_status_acceptable(recorded.status));
+        assert!(recorded.metrics.is_empty());
+        assert_eq!(recorded.recorded.len(), 2);
+        assert_eq!(recorded.recorded[1].path, "beng2");
+        assert!(recorded.recorded[1].actual.is_finite());
+        assert_eq!(recorded.recorded[1].relative_tolerance, Some(0.01));
+        assert!(!recorded.reference_verified);
+
+        // A pending case that does not calculate fails like any other.
+        let mut unavailable = case.clone();
+        unavailable.project = project();
+        let failed = compare_reference_case(unavailable);
+        assert_eq!(failed.status, "calculation_unavailable");
+        assert!(!comparison_status_acceptable(failed.status));
+        assert!(failed.recorded.is_empty());
+
+        // An output path outside the allowlist is refused before calculating.
+        let mut unsupported = case.clone();
+        unsupported.pending.as_mut().unwrap().metrics[0].path = "name".into();
+        assert_eq!(compare_reference_case(unsupported).status, "invalid_case");
+    }
+
+    #[test]
+    fn pending_case_rejects_expected_values_and_incomplete_pending_blocks() {
+        let codes = |case: ReferenceCase| -> Vec<&'static str> {
+            audit_reference_case(case)
+                .issues
+                .into_iter()
+                .map(|issue| issue.code)
+                .collect()
+        };
+        let mut with_expected = pending_case(project());
+        with_expected.expected = comparison_case(project(), "beng2", 1.0, "kWh/m2.year").expected;
+        assert!(codes(with_expected).contains(&"pending_with_expected_values"));
+        let mut with_class = pending_case(project());
+        with_class.expected_label_class = Some("A".into());
+        assert!(codes(with_class).contains(&"pending_with_expected_values"));
+
+        let mut blank = pending_case(project());
+        let pending = blank.pending.as_mut().unwrap();
+        pending.reason = " ".into();
+        pending.metrics[1].path = "beng1".into();
+        pending.metrics[0].relative_tolerance = Some(1.5);
+        let found = codes(blank);
+        for code in [
+            "pending_reason_required",
+            "metric_path_invalid",
+            "metric_tolerance_invalid",
+        ] {
+            assert!(found.contains(&code), "{code}: {found:?}");
+        }
+        let mut empty = pending_case(project());
+        empty.pending.as_mut().unwrap().metrics.clear();
+        assert!(codes(empty).contains(&"pending_metrics_required"));
+
+        // Without a pending block, an empty expectation list stays refused.
+        let mut neither = pending_case(project());
+        neither.pending = None;
+        assert!(codes(neither).contains(&"expected_metrics_required"));
     }
 }
