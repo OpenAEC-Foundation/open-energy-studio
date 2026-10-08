@@ -566,6 +566,10 @@ pub enum UtilityHotWaterGenerator {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UtilityHotWater {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: UtilityHotWaterGenerator,
     /// Mean draw-off length, m; `None` unknown (> 3 m, p. 177).
     #[serde(default)]
@@ -602,6 +606,10 @@ pub struct UtilityHotWater {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UtilityAdditionalHotWater {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: UtilityHotWaterGenerator,
     #[serde(default)]
     pub nominal_power_kw: Option<f64>,
@@ -2944,6 +2952,7 @@ fn hot_water_value(
     let mut system = match shared {
         Some(generator) => derive_hot_water(
             &SurveyHotWater {
+                id: None,
                 generator,
                 served: TapsServed::KitchenAndBathroom,
                 kitchen_length_m: None,
@@ -3381,6 +3390,29 @@ fn lighting_value(
 }
 
 fn validate(survey: &UtilitySurvey, recorder: &mut Recorder) {
+    // Ids of the lists without a natural key (evidence and photo links).
+    super::validate_item_ids(
+        survey.heating.additional_generators.iter().map(|item| item.id.as_deref()),
+        "heating.additionalGenerators",
+        recorder,
+    );
+    super::validate_item_ids(
+        survey.hot_water.additional_generators.iter().map(|item| item.id.as_deref()),
+        "hotWater.additionalGenerators",
+        recorder,
+    );
+    super::validate_item_ids(
+        survey.additional_hot_water_systems.iter().map(|item| item.id.as_deref()),
+        "additionalHotWaterSystems",
+        recorder,
+    );
+    for (index, system) in survey.additional_hot_water_systems.iter().enumerate() {
+        super::validate_item_ids(
+            system.additional_generators.iter().map(|item| item.id.as_deref()),
+            &format!("additionalHotWaterSystems[{index}].additionalGenerators"),
+            recorder,
+        );
+    }
     if survey.id.trim().is_empty() {
         recorder.issue("survey_id_required", "id");
     }
@@ -4629,6 +4661,7 @@ mod tests {
             };
             survey.heating.additional_generators =
                 vec![super::super::heating::AdditionalHeatingGenerator {
+                    id: None,
                     generator: super::super::heating::HeatingGenerator::Boiler {
                         boiler_type: super::super::heating::BoilerType::Hr107,
                         pilot_flame: Some(false),
@@ -4712,6 +4745,7 @@ mod tests {
         survey.hot_water.storage.clear();
         survey.hot_water.nominal_power_kw = Some(30.0);
         survey.hot_water.additional_generators = vec![UtilityAdditionalHotWater {
+            id: None,
             generator: UtilityHotWaterGenerator::ElectricInstantaneous,
             nominal_power_kw: Some(10.0),
         }];
@@ -4748,6 +4782,7 @@ mod tests {
             low_temperature: false,
         };
         survey.heating.additional_generators = vec![AdditionalHeatingGenerator {
+            id: None,
             generator: HeatingGenerator::Boiler {
                 boiler_type: BoilerType::Hr107,
                 pilot_flame: Some(false),

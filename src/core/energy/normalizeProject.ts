@@ -1,5 +1,5 @@
 import type { IConstruction, IProject, ISurface, IZone } from './types';
-import { migrateEvidenceLinks } from '../nta/EvidenceLinks';
+import { migrateEvidenceLinks, withSurveyItemIds } from '../nta/EvidenceLinks';
 
 /**
  * Fills the arrays the editor relies on when a project file left them out
@@ -84,6 +84,7 @@ export function normalizeProject(project: IProject): IProject {
     solarThermal: list(raw.solarThermal, 'solarThermal'),
     constructions,
   };
-  // Evidence links of older projects named elements by position; they become id-based.
-  return migrateEvidenceLinks(changed ? normalized : project);
+  // Evidence links of older projects named elements by position; they become id-based. Survey
+  // lists that had no ids get them first, so their links can follow too.
+  return migrateEvidenceLinks(withSurveyItemIds(changed ? normalized : project));
 }

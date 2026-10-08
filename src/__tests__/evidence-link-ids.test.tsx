@@ -7,8 +7,8 @@ import type { NtaEvidenceItem } from '../core/nta/KernelClient';
 import { clearSessionEvidence } from '../core/nta/Evidence';
 import { normalizeProject } from '../core/energy/normalizeProject';
 import {
-  danglingEvidenceReferences, evidenceUsage, linksAfterRemoval, migrateEvidenceLinks, pointerToPath, resolvePointer,
-  stablePointer, unresolvedEvidenceLinks,
+  danglingEvidenceReferences, evidenceUsage, freshItemId, linksAfterRemoval, migrateEvidenceLinks, pointerToPath,
+  resolvePointer, stablePointer, unresolvedEvidenceLinks, withSurveyItemIds,
 } from '../core/nta/EvidenceLinks';
 import { routeForPath } from '../core/nta/gapRoutes';
 import { EvidenceAttach } from '../components/EvidenceLink/EvidenceLink';
@@ -98,12 +98,38 @@ describe('id-based evidence links', () => {
     const evidence = opened.registration!.evidence!;
     // Duplicates that name the same element collapse into one link.
     expect(evidence[0].linkedPaths).toEqual(['/zones/@berging/surfaces/@dak']);
+    // The survey's further generator gets an id on load, and its link follows it.
+    expect((opened.basisopname!.survey.heating as { additionalGenerators: Array<{ id?: string }> }).additionalGenerators[0].id).toBe('opwekker-1');
     expect(evidence[1].linkedPaths).toEqual([
-      '/basisopname/survey/pv/@pv-2', '/basisopname/survey/heating/additionalGenerators/0', '/zones/9',
+      '/basisopname/survey/pv/@pv-2', '/basisopname/survey/heating/additionalGenerators/@opwekker-1', '/zones/9',
     ]);
     expect(evidence[2]).toBe(old.registration!.evidence![2]);
     expect(normalizeProject(opened)).toBe(opened);
     expect(migrateEvidenceLinks(opened)).toBe(opened);
+  });
+
+  it('gives the survey lists without ids an id on load and keeps the ids already there', () => {
+    const old = project([], {
+      basisopname: {
+        kind: 'utility',
+        survey: {
+          heating: { additionalGenerators: [{ id: 'opwekker-2', generator: { kind: 'boiler' } }, { generator: { kind: 'boiler' } }] },
+          hotWater: { additionalGenerators: [{ generator: { kind: 'electric_instantaneous' } }] },
+          additionalHotWaterSystems: [{ generator: { kind: 'electric_boiler' }, additionalGenerators: [{ generator: { kind: 'none' } }] }],
+        },
+      },
+    });
+    const opened = withSurveyItemIds(old);
+    const s = opened.basisopname!.survey as Record<string, any>;
+    // The fresh id skips the one the first generator already has.
+    expect(s.heating.additionalGenerators.map((item: { id: string }) => item.id)).toEqual(['opwekker-2', 'opwekker-3']);
+    expect(s.hotWater.additionalGenerators[0].id).toBe('tapwateropwekker-1');
+    expect(s.additionalHotWaterSystems[0].id).toBe('tapwatersysteem-1');
+    expect(s.additionalHotWaterSystems[0].additionalGenerators[0].id).toBe('tapwateropwekker-1');
+    expect(withSurveyItemIds(opened)).toBe(opened);
+    expect(withSurveyItemIds(project([]))).toEqual(project([]));
+    expect(freshItemId([{ id: 'opwekker-2' }, {}], 'opwekker')).toBe('opwekker-3');
+    expect(freshItemId([], 'opwekker')).toBe('opwekker-1');
   });
 
   it('moves the position links of a removed survey item up and drops the links to it', () => {

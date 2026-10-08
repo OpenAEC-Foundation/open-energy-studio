@@ -10,9 +10,11 @@ import { EVIDENCE_REFERENCE_PREFIX } from './Evidence';
  *
  * A linked pointer names an array element by its `id` where it has one
  * (`/zones/@woonzone/surfaces/@gevel-noord`), so a link stays on its element
- * when other elements are removed or reordered. Elements without an id (the
- * extra generators of the survey) keep their position; removing one through
- * `linksAfterRemoval` moves the links of the elements after it.
+ * when other elements are removed or reordered. The survey's further
+ * generators and hot-water systems get an id when added or when an older
+ * project is opened (`withSurveyItemIds`). An element without a unique id
+ * keeps its position; removing one through `linksAfterRemoval` moves the
+ * links of the elements after it.
  */
 
 /** Prefix of a pointer segment that names an array element by its `id` (`/zones/@woonzone`). */
@@ -198,6 +200,62 @@ export function unresolvedEvidenceLinks(project: IProject): Array<{ pointer: str
  * become id-based (`/zones/@woonzone/surfaces/@gevel-noord`). Idempotent; a
  * project without such links is returned as it is.
  */
+/** The first `<prefix>-<n>` that no element of `list` uses as its id, for an element being added. */
+export function freshItemId(list: unknown[], prefix: string): string {
+  const used = new Set(list.map(elementId).filter((id): id is string => id != null));
+  let n = list.length + 1;
+  while (used.has(`${prefix}-${n}`)) n += 1;
+  return `${prefix}-${n}`;
+}
+
+/** Gives every element of `list` without an id a fresh one; the same array when all have one. */
+function withIds(list: unknown, prefix: string): unknown {
+  if (!Array.isArray(list) || list.every((item) => item == null || typeof item !== 'object' || elementId(item) != null)) return list;
+  const next: unknown[] = [];
+  list.forEach((item, index) => {
+    if (item == null || typeof item !== 'object' || elementId(item) != null) {
+      next.push(item);
+      return;
+    }
+    // Ids of the elements still to come stay reserved, so a fresh id never takes one of them.
+    next.push({ ...(item as Record<string, unknown>), id: freshItemId([...next, ...list.slice(index + 1)], prefix) });
+  });
+  return next;
+}
+
+/**
+ * Survey lists that older projects stored without ids (further heating and hot-water generators,
+ * further hot-water systems) get one, so links to their items can be id-based (`/…/@id`).
+ * The kernel ignores the ids in the calculation. Returns the same project when nothing is added.
+ */
+export function withSurveyItemIds(project: IProject): IProject {
+  const survey = project.basisopname?.survey;
+  if (survey == null || typeof survey !== 'object') return project;
+  let changed = false;
+  const set = (value: Record<string, unknown>, key: string, prefix: string) => {
+    const next = withIds(value[key], prefix);
+    if (next === value[key]) return value;
+    changed = true;
+    return { ...value, [key]: next };
+  };
+  let next: Record<string, unknown> = survey;
+  for (const [block, prefix] of [['heating', 'opwekker'], ['hotWater', 'tapwateropwekker']] as const) {
+    const value = next[block];
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+      const updated = set(value as Record<string, unknown>, 'additionalGenerators', prefix);
+      if (updated !== value) next = { ...next, [block]: updated };
+    }
+  }
+  next = set(next, 'additionalHotWaterSystems', 'tapwatersysteem');
+  const systems = next.additionalHotWaterSystems;
+  if (Array.isArray(systems)) {
+    const updated = systems.map((system) => (system != null && typeof system === 'object' && !Array.isArray(system)
+      ? set(system as Record<string, unknown>, 'additionalGenerators', 'tapwateropwekker') : system));
+    if (updated.some((system, index) => system !== systems[index])) next = { ...next, additionalHotWaterSystems: updated };
+  }
+  return changed ? { ...project, basisopname: { ...project.basisopname!, survey: next } } : project;
+}
+
 export function migrateEvidenceLinks(project: IProject): IProject {
   const evidence = project.registration?.evidence;
   if (!Array.isArray(evidence)) return project;
