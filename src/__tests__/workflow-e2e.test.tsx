@@ -108,7 +108,7 @@ async function openProjectFile(user: User, project: unknown, name = 'project.oes
   await user.keyboard('{Control>}o{/Control}');
   click.mockRestore();
   // One project at a time: the opened project replaces the open one.
-  await waitFor(() => expect(document.querySelector('.top-bar-project')?.textContent ?? '').not.toMatch(/Untitled/));
+  await waitFor(() => expect(document.querySelector('.nav-project-name')?.textContent ?? '').not.toMatch(/Untitled/));
 }
 
 async function openExample(user: User, project: Record<string, unknown> = terracedProject) {
@@ -148,7 +148,7 @@ describe('workflow end to end, default edition', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.keyboard('{Control>}n{/Control}');
-    expect(document.querySelector('.top-bar-project')).toHaveTextContent('Untitled 1');
+    expect(document.querySelector('.nav-project-name')).toHaveTextContent('Untitled 1');
     expect(within(nav()).getByRole('button', { name: /^Project/ })).toHaveAttribute('aria-current', 'page');
     await kernelRuns(1);
     expect(lastNta()).toBeUndefined();

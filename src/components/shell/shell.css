@@ -446,8 +446,10 @@
 html, body { overflow: clip; }
 .app-shell { overflow: clip; }
 
-/* Home button and project name in the top bar (one project at a time, feedback 8 Oct 2026). */
-.top-bar-home { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
-.top-bar-home svg { width: 15px; height: 15px; }
-.top-bar-project { margin-left: 12px; font-weight: 600; font-size: var(--fs-sm); color: var(--fg-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
 .nav-step-note { margin: -2px 0 4px 38px; font-size: var(--fs-2xs, 11px); color: var(--warn-text); }
+
+/* The brand is the way to the main menu. */
+button.top-bar-brand { background: none; border: 0; padding: 4px 6px; margin: -4px -6px; border-radius: 8px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.top-bar-brand:hover:not(:disabled) { background: var(--bg-hover, rgba(255,255,255,0.06)); }
+button.top-bar-brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.top-bar-brand:disabled { cursor: default; }

@@ -10,16 +10,6 @@ import {
   Settings, Square, Copy, Upload, X, XSquare,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
-import { Home as HomeIcon } from 'lucide-react';
-import { useDocumentManager } from '../../context/EnergyContext';
-
-/** The name of the open project (one project at a time), marked when it has unsaved changes. */
-function ProjectTitle() {
-  const { docState } = useDocumentManager();
-  const doc = docState.documents.find((item) => item.id === docState.activeDocumentId);
-  if (!doc) return null;
-  return <span className="top-bar-project" title={doc.state.project.name}>{doc.state.isDirty ? '• ' : ''}{doc.state.project.name}</span>;
-}
 import type { NewProjectKind } from '../WelcomeScreen/WelcomeScreen';
 import { Button, IconButton, Kbd } from '../ui';
 import { isTauri } from '@tauri-apps/api/core';
@@ -140,21 +130,16 @@ export function TopBar(props: TopBarProps) {
 
   return (
     <header className="top-bar" onMouseDown={onMouseDown} onDoubleClick={onDoubleClick}>
-      <div className="top-bar-brand" data-tauri-drag-region>
+      {/* Logo and name lead to the main menu, the project library (feedback 8 Oct 2026). */}
+      <button type="button" className="top-bar-brand" onClick={props.onShowLibrary} disabled={!props.onShowLibrary}
+        aria-label={t('shell.home')} title={t('shell.home')}>
         <span className="top-bar-logo" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 10.5 12 3l9 7.5" /><path d="M5 9v11h14V9" /><path d="M13 10.5l-3 4h4l-3 4" />
           </svg>
         </span>
         <span className="top-bar-app-name">{t('app.title')}<small>{t('shell.brandTagline')} · v{version}</small></span>
-      </div>
-
-      {props.onShowLibrary && (
-        <button type="button" className="btn btn-sm top-bar-home" onClick={props.onShowLibrary} aria-label={t('shell.home')} title={t('shell.home')}>
-          <HomeIcon aria-hidden="true" /><span>{t('shell.library')}</span>
-        </button>
-      )}
-      {props.hasDocument && <ProjectTitle />}
+      </button>
       <div className="top-bar-drag" data-tauri-drag-region />
 
       <button type="button" className="top-bar-search" onClick={props.onOpenPalette} title={t('shell.search')} aria-keyshortcuts="Control+K"
