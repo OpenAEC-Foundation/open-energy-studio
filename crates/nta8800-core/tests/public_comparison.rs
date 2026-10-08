@@ -457,7 +457,10 @@ fn case_g_under_nta_8800_2024() {
     let need = performance["hotWater"]["annualNetNeedKwh"]
         .as_f64()
         .unwrap();
-    assert!((need - 856.0 * (1.28 + 0.01 * 369.10)).abs() < 0.5, "{need}");
+    assert!(
+        (need - 856.0 * (1.28 + 0.01 * 369.10)).abs() < 0.5,
+        "{need}"
+    );
     let output = performance["hotWater"]["annualGeneratorOutputKwh"]
         .as_f64()
         .unwrap();
