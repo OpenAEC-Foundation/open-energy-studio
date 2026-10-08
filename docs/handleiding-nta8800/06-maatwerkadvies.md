@@ -84,7 +84,7 @@ Sjabloonmaatregelen gebruiken id's en hebben daar geen last van.
 
 ## Adviesrapport
 
-Kies in het paneel **Adviesrapport (HTML)**. Het rapport is in het Nederlands, met:
+Kies op de stap **Maatwerkadvies** de knop **Adviesrapport (HTML)**. Het rapport is in het Nederlands, met:
 - categorieën;
 - bedragen gegroepeerd per duizendtal;
 - de reden bij een ongeldige variant;

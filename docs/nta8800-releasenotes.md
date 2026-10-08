@@ -2,6 +2,16 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 8 oktober 2026 — werkstroom van begin tot eind getest; uitgave en bewijs in de interface
+
+Geen wijziging van uitkomsten of statussen. Wel in de interface:
+- De keuzelijst *Uitgave NTA 8800* toont bij een project zonder uitgave de aangewezen uitgave (2025+C1), waarin de kern dan ook rekent, in plaats van "—". De lege keuze is vervallen.
+- Een uitkomst in een oudere uitgave (`calculated_legacy_edition`) toont op de stap Project nu een eigen statustekst (voorheen de ruwe sleutel), en het dashboard van Resultaten meldt "Oudere uitgave — niet voor registratie".
+- Het veld *massa per m² gebruiksoppervlakte* (alleen 2022 en 2020+A1) bleef onder een latere uitgave zichtbaar; het volgt nu de regel van de andere 2022-velden, met een melding en **Verwijderen**.
+- Een bewijsstuk toevoegen of koppelen in *Bron & bewijs* vervangt de tekst van het bronveld niet meer: `evidence:<id>` komt achter de bestaande omschrijving.
+- Een element selecteren opent in het contextpaneel het tabblad *Eigenschappen*, ook als *Voorbeeld* openstond.
+- Nieuwe test `src/__tests__/workflow-e2e.test.tsx` loopt de werkstroom door in de volledige app, met antwoorden die de echte kern op dezelfde verzoeken gaf. De handleiding is bijgewerkt en heeft een hoofdstuk *Normversies*.
+
 ## 8 oktober 2026 — kelder met diepte per wanddeel rekent weer; dekking van alle opties
 
 - Een verwarmde kelder met de diepte per wanddeel (`groundFloors[].heatedBasement.wallDepths`, 8.42/D.12) zonder `depthM` gaf status `invalid` met `non_finite_result`. De lege `depthM` kwam als NaN in de afgeleide invoer. Hij blijft nu weg, net als de lege `reductionFactor` van 7 oktober.

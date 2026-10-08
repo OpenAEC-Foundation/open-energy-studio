@@ -34,3 +34,12 @@ De handleiding citeert geen tekst uit NTA 8800, ISSO-publicaties of BRL-document
 - Het programma is **niet geattesteerd** volgens BRL 9501. Uitkomsten hebben de status `calculated_unverified` (of `calculated_legacy_edition` in een oudere uitgave) en zijn geen geregistreerd energielabel.
 - Een energielabel ontstaat pas na registratie door een gecertificeerd adviseur (BRL 9500), met een geattesteerd rekenprogramma.
 - De voorbeeldprojecten in `training-data/` zijn fictief.
+
+## Nog te doen: schermafdrukken
+
+Alle afbeeldingen waar de hoofdstukken naar verwijzen staan in `img/`. Ze zijn gemaakt vóór 8 oktober 2026. Voor deze onderdelen is nog geen schermafdruk:
+- de keuzelijst *Uitgave NTA 8800* en de melding "Oudere uitgave — niet voor registratie" onder Resultaten ([hoofdstuk 10](10-normversies.md));
+- *Gebouw › Schil & ramen* met de tabel *Belemmering per raam*;
+- *Installaties › Koeling* met het formulier van bijlage AA;
+- de basisopname met de voortgangslijst en *Overnemen in projectmodel*;
+- het blok *Bron & bewijs* in het contextpaneel.
