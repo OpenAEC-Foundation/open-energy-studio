@@ -21,6 +21,15 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 - **Referentiesuite:** de band van BENG 2 bij geval H is weer ±0,05, zoals in `public_comparison.rs` (de relatieve band verbreedde hem tot ±0,08). De kop noemt A–H.
 - **Bijlage V in 2020+A1 gecontroleerd:** tabel V.1 en V.3 hebben dezelfde getallen als in de latere uitgaven (2020+A1 p. 1069, 1072); de toegestane c_source 1,00 / 1,02 / 1,04 geldt dus in elke uitgave.
 
+### 9 oktober 2026 — bronfactor gaswarmtepomp, ontwerpafgiftetemperatuur ketel en negatieve projectgegevens
+
+Invoer die eerder rekende, wordt nu geweigerd. Geldige projecten rekenen als voorheen.
+
+- **Bronfactor van de gaswarmtepomp.** De losse diagnose van de gaswarmtepomp (tabellen 9.27/9.29) nam elke positieve c_source aan, bijvoorbeeld 1,1. Bijlage V, tabel V.1 (2025+C1 p. 1114) geeft alleen 1,00, 1,02 en 1,04, en de elektrische warmtepomp volgde dat al. Een andere waarde geeft nu `source_correction_invalid`; het formulier weigert haar ook.
+- **Gemiddelde ontwerpafgiftetemperatuur van de ketel.** Toegestaan was −30 tot 120 °C. Tabel 9.26 noot a (2025+C1 p. 329) definieert θem;avg als het gemiddelde van de ontwerpaanvoer- en retourtemperatuur van het verwarmingswater (voorbeelden 45/38 tot 90/70). Nu geldt 20 °C < θem;avg ≤ 100 °C: daaronder verwarmt het water niet boven de binnentemperatuur, daarboven kookt het. Een waarde daarbuiten geeft `average_emission_temperature_invalid`.
+- **Negatieve projectgegevens.** Een projectbestand met een negatieve of niet-eindige vloeroppervlakte, inhoud of hoogte van een zone, R_c of U van een constructie, of COP of dekkingsgraad (boven 1) van een verwarmingssysteem wordt bij het openen geweigerd. De NTA-berekening leest deze getallen niet, maar de editor, de vereenvoudigde berekening en de export wel. Het zone-, constructie- en verwarmingsvenster negeren een getypt minteken.
+- **Numerieke fuzz.** Bereikt nu ook de gedeclareerde f_ctrl en een gedeclareerde F_c per raam; de test faalt als hij die posities niet meer raakt.
+
 ### 9 oktober 2026 — gedeclareerde f_ctrl en zonwering per raam
 
 Twee nieuwe invoerroutes. Projecten zonder deze invoer rekenen precies als voorheen.
