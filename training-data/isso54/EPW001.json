@@ -242,10 +242,11 @@
         }
       },
       "valvesInsulated": true,
+      "unheatedPipeLengthM": 0.0,
       "pump": {
         "method": "included_in_generator_auxiliary"
       },
-      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6: tweepijps 45/40, waterzijdig ingeregeld, beugels en kleppen geisoleerd, geen aanvullende pomp, geen warmtemeter; leidingen geisoleerd (EP-W202 referentie, p. 24), bouwjaar 2021"
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6: tweepijps 45/40, waterzijdig ingeregeld, beugels en kleppen geisoleerd, geen aanvullende pomp, geen warmtemeter; leidingen geisoleerd (EP-W202 referentie, p. 24), bouwjaar 2021; geen leidingen in onverwarmde ruimten (L_si;j = 0, anders 15 % volgens 9.36)"
     },
     "generator": {
       "kind": "gas_boiler",

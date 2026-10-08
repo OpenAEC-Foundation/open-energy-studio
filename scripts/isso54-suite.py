@@ -1351,6 +1351,91 @@ UTILITY_CASES += [
 ]
 
 
+# --- EP-W201b-d: radiators and convectors (p. 23; 2022 table 9.3, p. 273) ---
+# The over-temperature row follows the mean water temperature minus 20 °C:
+# 55/47 is 31 K (row 30 K), 90/70 60 K, 50/42 26 K (row 30 K). Booster fans:
+# table 9.11 gives 10 W per fan convector; the 40 W of the test needs the
+# NEN-EN 16430 route, which NTA 8800:2022 does not have (switch point 56).
+def radiators(test_id, system, over_temperature, position, room_automation, certified=False, fans=None, why=""):
+    body = {
+        "system": system,
+        "balancing": "none_or_unknown",
+        "control": "individual_room_thermostats",
+        "sourceReference": why,
+        "edition2023": {
+            "kind": {"type": "radiators", "control": "room", "overTemperature": over_temperature, "position": position},
+            "certifiedControl": certified,
+            "roomAutomation": room_automation,
+            "pipeSystem": "two_pipe",
+            "balancing": "none_or_unknown",
+        },
+    }
+    if fans is not None:
+        body["fans"] = {"kind": "fan_convector", "count": fans, "sourceReference": f"ISSO 54 v2.0 {test_id}: {fans} ventilatoren (40 W in de test; tabel 9.11 forfaitair)"}
+    return setp(f"{NTA}/emission", body)
+
+
+def boiler_temperature(supply, ret):
+    return [
+        setp(f"{BOILER}/averageDesignEmissionTemperatureC", (supply + ret) / 2),
+        setp(f"{BOILER}/temperatureAndCircuitReference", f"ontwerp {supply}/{ret} volgens de deeltest"),
+    ]
+
+
+CASES += [
+    (
+        "EPW201b",
+        23,
+        [
+            radiators("EP-W201b", "radiators_or_convectors", "two_pipe30_k", "outer_wall", "network_with_override_and_adaptive", why="ISSO 54 v2.0 EP-W201b p. 23: radiatoren tegen buitenwand, 55/47, netwerk met handmatig overrulen en adaptief, geen waterzijdige inregeling"),
+            temperature_class("55_47"),
+        ]
+        + boiler_temperature(55, 47),
+    ),
+    (
+        "EPW201c",
+        23,
+        [
+            radiators("EP-W201c", "fan_assisted_radiators_or_convectors", "fan_assisted", "unknown", "individual_per_room", fans=6, why="ISSO 54 v2.0 EP-W201c p. 23: convectoren met boosterventilatoren, 90/70, individueel per ruimte, geen waterzijdige inregeling"),
+            temperature_class("90_70"),
+        ]
+        + boiler_temperature(90, 70),
+    ),
+    (
+        "EPW201d",
+        23,
+        [
+            radiators("EP-W201d", "fan_assisted_radiators_or_convectors", "fan_assisted", "unknown", "individual_per_room", certified=True, fans=6, why="ISSO 54 v2.0 EP-W201d p. 23: convectoren met boosterventilatoren, 50/42, individueel per ruimte, regeling volgens NEN-EN 215 en NEN-EN 15500, geen waterzijdige inregeling"),
+            temperature_class("50_42"),
+        ]
+        + boiler_temperature(50, 42),
+    ),
+    # EP-W202a-d: heating distribution (p. 24; 9.36, table 9.16).
+    ("EPW202a", 24, [remove(f"{NTA}/distributionSystem/unheatedPipeLengthM")]),
+    ("EPW202b", 24, [setp(f"{NTA}/distributionSystem/unheatedPipeLengthM", 20.0), setp(f"{NTA}/distributionSystem/valvesInsulated", False)]),
+    (
+        "EPW202c",
+        24,
+        [
+            remove(f"{NTA}/distributionSystem/unheatedPipeLengthM"),
+            setp(f"{NTA}/distributionSystem/pipeTransmittance/insulation", {"state": "uninsulated"}),
+            setp(f"{NTA}/distributionSystem/valvesInsulated", False),
+        ],
+    ),
+    (
+        "EPW202d",
+        24,
+        [
+            remove(f"{NTA}/distributionSystem/unheatedPipeLengthM"),
+            setp(
+                f"{NTA}/distributionSystem/pump",
+                {"method": "calculated", "heatMeterPresent": False, "electricPowerKw": 0.05, "energyEfficiencyIndex": 0.3, "sourceReference": "ISSO 54 v2.0 EP-W202d p. 24: aanvullende distributiepomp 50 W, EEI 0,3"},
+            ),
+        ],
+    ),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
