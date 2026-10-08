@@ -384,8 +384,7 @@
         }
       ],
       "pointThermalBridges": [],
-      "pointBridgeInventoryComplete": true,
-      "airTightness": {}
+      "pointBridgeInventoryComplete": true
     }
   ],
   "heatingSystems": [],
