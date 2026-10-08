@@ -464,3 +464,41 @@ fn case_g_under_nta_8800_2024() {
     assert!((output - 7317.0).abs() < 1.0, "{output}");
     assert!((used_kwh(&performance, "hotWater") - 5545.0).abs() < 1.0);
 }
+
+/// Case H, the first utility case: a building with an office, an assembly
+/// and a healthcare function and a gym (sport), 743,80 m² in two zones,
+/// calculated on 29-05-2024 with Uniec 3.2.9.2 (NTA 8800:2023 period);
+/// published 29,08 / 80,01 / 30,5 against limits 44,94 / 86,22 / 30,4.
+/// The common space of 49,20 m² serves all four functions and is shared over
+/// them pro rata; with that the kernel's Bbl limits equal the report's.
+/// Lighting (34 294 kWh, forfait power, manual on/off), hot water (7 961 kWh,
+/// table 13.1 per function, COP 1,40, f_sto;dis;ls 4), PV (9 652 kWh) and the
+/// heat-pump COP (3,05, table 9.29 outdoor air at 45 °C) agree. BENG 2
+/// (Δ kWh · 1,45 / A_g): heating −393 (−0,77) with a 9 % lower heat, its
+/// auxiliary energy −25 (−0,05), cooling +630 (+1,23; the literal 10.15
+/// emission loss), the 10.87 cooling control energy +88 (+0,17) and the
+/// forfait fans +15 (+0,03). BENG 1 is 6,2 % lower; the floor perimeters are
+/// not printed and are taken as the lengths of the foundation junctions.
+#[test]
+fn case_h_utility_under_nta_8800_2023() {
+    let value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-h.json"
+    ))
+    .unwrap();
+    assert_eq!(value["ntaCalculation"]["normVersion"], "2023");
+    let (performance, indicators) = run_edition(&value, "2023");
+    assert_indicators("H 2023", indicators, [27.29, 80.63, 29.7]);
+    let limits = &performance["bblCheck"]["limits"];
+    let limit = |key: &str| limits[key].as_f64().unwrap();
+    assert!((limit("energyNeedMaxKwhPerM2") - 44.94).abs() < 0.005);
+    assert!((limit("primaryFossilMaxKwhPerM2") - 86.22).abs() < 0.005);
+    assert!((limit("renewableShareMinPercent") - 30.4).abs() < 0.005);
+    assert!((used_kwh(&performance, "lighting") - 34294.0).abs() < 1.0);
+    assert!((used_kwh(&performance, "hotWater") - 7961.0).abs() < 1.0);
+    let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
+    assert!((pv - 9652.0).abs() < 1.0, "{pv}");
+    assert_eq!(
+        performance["spaceHeating"]["generationEfficiency"].as_f64(),
+        Some(3.05)
+    );
+}
