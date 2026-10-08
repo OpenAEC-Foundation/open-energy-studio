@@ -7,6 +7,7 @@ import {
 } from '../../scripts/nta-manual.mjs';
 import { kernelVersion } from '../../scripts/nta-kernel-version.mjs';
 import { readIdentity, renderLeveringsdocument } from '../../scripts/nta-leveringsdocument.mjs';
+import { safeHref } from '../../scripts/nta-manual-markdown.mjs';
 
 const root = join(__dirname, '../..');
 
@@ -46,6 +47,29 @@ describe('manual Markdown parser (BRL 9501 §4.4)', () => {
     expect(html).toContain('&lt;script&gt;');
     expect(html).not.toMatch(/href="javascript/);
     expect(html).not.toMatch(/src="javascript/);
+  });
+
+  // Review 9 October 2026: browsers strip tabs, newlines and other control
+  // characters from a URL, so these are still script links.
+  it.each([
+    'java\tscript:alert(1)',
+    'java\nscript:alert(1)',
+    '\u0001javascript:alert(1)',
+    'javascript\u0000:alert(1)',
+    ' JavaScript:alert(1)',
+    'vbscript:x',
+    'data:text/html,x',
+    'jav ascript:alert(1)',
+  ])('safeHref refuses a scheme hidden by control characters or spaces: %j', (href) => {
+    expect(safeHref(href)).toBeNull();
+  });
+
+  it('safeHref keeps http(s), mailto, in-page and relative links', () => {
+    expect(safeHref('https://wetten.overheid.nl/x')).toBe('https://wetten.overheid.nl/x');
+    expect(safeHref('mailto:info@example.org')).toBe('mailto:info@example.org');
+    expect(safeHref('#stap-2')).toBe('#stap-2');
+    expect(safeHref('07-herlabelen.md#a')).toBe('07-herlabelen.md#a');
+    expect(safeHref('img/a.png')).toBe('img/a.png');
   });
 });
 

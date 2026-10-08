@@ -218,11 +218,19 @@ export function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (ch) => ESCAPES[ch]);
 }
 
-/** Only http(s), mailto, in-page and relative links; anything else is dropped. */
+/**
+ * Only http(s), mailto, in-page and relative links; anything else is dropped.
+ * Browsers remove tabs, newlines and other control characters from a URL, so
+ * `java\tscript:` is still a script link: a link with a control character
+ * is refused, and the scheme is tested with whitespace removed.
+ */
 export function safeHref(href) {
-  const value = href.trim();
-  if (/^(https?:|mailto:)/i.test(value)) return value;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return null;
+  const value = String(href).trim();
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(value)) return null;
+  const probe = value.replace(/\s+/g, '');
+  if (/^(https?:|mailto:)/i.test(probe)) return value;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(probe)) return null;
   return value;
 }
 

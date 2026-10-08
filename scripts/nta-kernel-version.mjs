@@ -7,6 +7,9 @@
 //   node scripts/nta-kernel-version.mjs release <yyyy-mm-dd>
 //       Moves the unreleased entries under a new version section for the
 //       current KERNEL_VERSION (used by scripts/release-nta.sh).
+//   node scripts/nta-kernel-version.mjs check-released <old-notes>
+//       Fails when a version section of the previous release (its notes as
+//       given) was changed; used by scripts/release-nta.sh against the tag.
 //   node scripts/nta-kernel-version.mjs version
 //       Prints KERNEL_VERSION.
 //
@@ -14,8 +17,12 @@
 // - a released version is `## Rekenkern X.Y.Z — <datum>` followed by the line
 //   `<!-- kernel-version: X.Y.Z -->`; versions descend through the file;
 // - every dated entry (`## ` or `### <d> <maand> <jjjj> — titel`) above the
-//   first version section is unreleased;
-// - an entry changes results unless its title says "geen rekenwijziging".
+//   first version section is unreleased. Above that section every heading is
+//   either structural ("Onuitgebracht", "Afspraken voor dit bestand"), an
+//   entry in exactly that form, or a subheading of an entry; anything else
+//   (other dash, capital month, abbreviated or ISO date, #### entry) is an
+//   error, so a malformed entry cannot slip past the check;
+// - an entry changes results unless its title ends in "(geen rekenwijziging)".
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +31,17 @@ const MONTHS = 'januari|februari|maart|april|mei|juni|juli|augustus|september|ok
 const DATED = new RegExp(`^(#{2,3}) (\\d{1,2} (?:${MONTHS}) \\d{4}) — (.+)$`);
 const SECTION = /^## Rekenkern (\d+\.\d+\.\d+) — (.+)$/;
 const MARKER = /^<!-- kernel-version: (\d+\.\d+\.\d+) -->$/;
-const NO_RESULT_CHANGE = /geen rekenwijziging/i;
+const NO_RESULT_CHANGE = / \(geen rekenwijziging\)$/;
+const MENTIONS_NO_RESULT_CHANGE = /geen\s+rekenwijziging/i;
+const HEADING = /^(#{1,6})\s+(.*?)\s*$/;
+const STRUCTURAL = new Set(['Onuitgebracht', 'Afspraken voor dit bestand']);
+// A heading that reads like a date: a day and a word and a year, or an ISO date.
+const DATE_LIKE = /^(\d{1,2}\s+\S+\.?\s+\d{4}|\d{4}-\d{2}-\d{2})\b/;
+
+/** Normalises line endings, so CRLF files parse like LF files. */
+export function normaliseNewlines(text) {
+  return text.replace(/\r\n?/g, '\n');
+}
 
 export function parseVersion(text) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(text);
@@ -40,10 +57,15 @@ export function compareVersions(a, b) {
 
 /** Splits the release notes into unreleased entries and version sections. */
 export function parseReleaseNotes(text) {
-  const lines = text.split('\n');
+  const lines = normaliseNewlines(text).split('\n');
   const sections = [];
   const unreleased = [];
   const problems = [];
+  // Above the first version section: the level of the current entry (its
+  // subheadings are deeper), or of a structural section that allows free
+  // subheadings ("Afspraken"), or null.
+  let entryLevel = null;
+  let freeLevel = null;
   for (let i = 0; i < lines.length; i += 1) {
     const section = SECTION.exec(lines[i]);
     if (section) {
@@ -59,15 +81,50 @@ export function parseReleaseNotes(text) {
     if (MARKER.test(lines[i]) && !SECTION.test(lines[i - 1] ?? '')) {
       problems.push(`Regel ${i + 1}: een versiemarkering zonder versiekop.`);
     }
-    const dated = DATED.exec(lines[i]);
-    if (dated && sections.length === 0) {
-      unreleased.push({
-        line: i + 1,
-        date: dated[2],
-        title: dated[3],
-        changesResults: !NO_RESULT_CHANGE.test(dated[3]),
-      });
+    if (sections.length > 0) continue;
+    const heading = HEADING.exec(lines[i]);
+    if (!heading) continue;
+    const level = heading[1].length;
+    const title = heading[2];
+    if (level === 1) {
+      entryLevel = null;
+      freeLevel = null;
+      continue;
     }
+    if (freeLevel !== null && level > freeLevel) continue;
+    freeLevel = null;
+    if (level === 2 && STRUCTURAL.has(title)) {
+      entryLevel = null;
+      if (title !== 'Onuitgebracht') freeLevel = level;
+      continue;
+    }
+    const dated = DATED.exec(lines[i]);
+    if (entryLevel !== null && level > entryLevel && !dated) {
+      if (DATE_LIKE.test(title)) {
+        problems.push(
+          `Regel ${i + 1}: "${lines[i]}" lijkt een item met een datum, maar staat als subkop onder een item. ` +
+            'Een item is `### <d> <maand> <jjjj> — <titel>` direct onder "Onuitgebracht".',
+        );
+      }
+      continue;
+    }
+    if (!dated) {
+      problems.push(
+        `Regel ${i + 1}: "${lines[i]}" is geen geldige itemkop boven de eerste versiesectie. ` +
+          'Verwacht `### <d> <maand> <jjjj> — <titel>` (dag, maand voluit in kleine letters, jaar, em-streep —).',
+      );
+      entryLevel = null;
+      continue;
+    }
+    entryLevel = dated[1].length;
+    const changesResults = !NO_RESULT_CHANGE.test(dated[3]);
+    if (changesResults && MENTIONS_NO_RESULT_CHANGE.test(dated[3])) {
+      problems.push(
+        `Regel ${i + 1}: "${dated[3]}" noemt "geen rekenwijziging" niet als het exacte slot "(geen rekenwijziging)"; ` +
+          'het item telt daarom als uitkomstwijziging. Zet het slot letterlijk aan het eind van de titel.',
+      );
+    }
+    unreleased.push({ line: i + 1, date: dated[2], title: dated[3], changesResults });
   }
   for (let i = 1; i < sections.length; i += 1) {
     if (compareVersions(sections[i - 1].version, sections[i].version) <= 0) {
@@ -126,6 +183,7 @@ export function checkReleaseNotes(text, kernelVersion) {
 export function releaseNotes(text, kernelVersion, date) {
   const errors = checkReleaseNotes(text, kernelVersion);
   if (errors.length > 0) throw new Error(errors.join('\n'));
+  text = normaliseNewlines(text);
   const { sections, unreleased } = parseReleaseNotes(text);
   if (compareVersions(kernelVersion, sections[0].version) <= 0) {
     throw new Error(`KERNEL_VERSION ${kernelVersion} is al uitgebracht; verhoog de versie eerst.`);
@@ -141,6 +199,36 @@ export function releaseNotes(text, kernelVersion, date) {
   });
   const header = [`## Rekenkern ${kernelVersion} — ${date}`, `<!-- kernel-version: ${kernelVersion} -->`, ''];
   return [...lines.slice(0, first), ...header, ...moved, ...lines.slice(end)].join('\n');
+}
+
+/**
+ * Released sections are history: a release only adds a section on top. Given
+ * the notes of the previous release (its tag), everything from that release's
+ * first version section to the end must be unchanged in the current notes.
+ * Returns the violations (empty when untouched).
+ */
+export function checkReleasedSections(previousText, currentText) {
+  const previous = normaliseNewlines(previousText).split('\n');
+  const current = normaliseNewlines(currentText).split('\n');
+  const start = previous.findIndex((line) => SECTION.test(line));
+  if (start < 0) return [];
+  const anchor = current.indexOf(previous[start]);
+  if (anchor < 0) {
+    return [`De versiesectie "${previous[start]}" van de vorige vrijgave ontbreekt in de releasenotes.`];
+  }
+  const before = previous.slice(start);
+  const after = current.slice(anchor);
+  const length = Math.max(before.length, after.length);
+  for (let i = 0; i < length; i += 1) {
+    if (before[i] !== after[i]) {
+      return [
+        `Een uitgebrachte versiesectie is gewijzigd (regel ${anchor + i + 1}): ` +
+          `"${(after[i] ?? '').slice(0, 80)}" was "${(before[i] ?? '').slice(0, 80)}". ` +
+          'Nieuwe items horen onder "Onuitgebracht".',
+      ];
+    }
+  }
+  return [];
 }
 
 export function kernelVersion(root) {
@@ -179,12 +267,25 @@ function main(argv) {
     console.log(`KERNEL_VERSION ${version} past bij de releasenotes (${unreleased.length} onuitgebrachte items).`);
     return 0;
   }
+  if (command === 'check-released') {
+    if (!argument) {
+      console.error('Gebruik: nta-kernel-version.mjs check-released <releasenotes van de vorige vrijgave>');
+      return 2;
+    }
+    const errors = checkReleasedSections(readFileSync(argument, 'utf8'), text);
+    if (errors.length > 0) {
+      for (const error of errors) console.error(`- ${error}`);
+      return 1;
+    }
+    console.log('Uitgebrachte versiesecties ongewijzigd.');
+    return 0;
+  }
   if (command === 'release') {
     writeFileSync(notesPath, releaseNotes(text, version, dutchDate(argument ?? '')));
     console.log(`Releasenotes: onuitgebrachte items onder Rekenkern ${version}.`);
     return 0;
   }
-  console.error('Gebruik: nta-kernel-version.mjs check | release <jjjj-mm-dd> | version');
+  console.error('Gebruik: nta-kernel-version.mjs check | check-released <bestand> | release <jjjj-mm-dd> | version');
   return 2;
 }
 

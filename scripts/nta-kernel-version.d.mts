@@ -21,3 +21,5 @@ export function checkReleaseNotes(text: string, kernelVersion: string): string[]
 export function releaseNotes(text: string, kernelVersion: string, date: string): string;
 export function kernelVersion(root: string): string;
 export function dutchDate(isoDate: string): string;
+export function normaliseNewlines(text: string): string;
+export function checkReleasedSections(previousText: string, currentText: string): string[];
