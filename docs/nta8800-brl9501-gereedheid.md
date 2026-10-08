@@ -97,7 +97,7 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 - De testgeometrie van EPW001 staat als historische invoerregressie in `training-data/edr-2022-epw001-*.json`, zonder verwachte uitkomsten.
 
 **Wat al kan, als voorbereiding en niet als bewijs.**
-- **Openbare rapporten A–F** (Uniec, uitgaven 2020+A1 tot 2024), in `training-data/nta8800-public-comparison-{a..f}.json` en `crates/nta8800-core/tests/public_comparison.rs`. Na verklaring per post resten vooral twee oorzaken: de lezing van 10.15 en 10.87 bij koeling, en aannames waar een uitdraai gegevens mist. Twee voorbeelden:
+- **Openbare rapporten A–H** (Uniec, uitgaven 2020+A1 tot 2024; H is het eerste utiliteitsgebouw, G het eerste geval in de editie 2024), in `training-data/nta8800-public-comparison-{a..h}.json` en `crates/nta8800-core/tests/public_comparison.rs`. Na verklaring per post resten vooral twee oorzaken: de lezing van 10.15 en 10.87 bij koeling, en aannames waar een uitdraai gegevens mist. Twee voorbeelden:
   - D (2020+A1): 86,35 / 39,07 / 83,6 tegen 86,72 / 39,19 / 83,5;
   - F (2020+A1): 74,06 / 3,79 / 96,3 tegen 74,69 / 2,59 / 97,5.
   

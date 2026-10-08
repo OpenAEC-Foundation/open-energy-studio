@@ -62,7 +62,7 @@ De gate `scripts/verify-nta.sh` loopt bij elke wijziging. Er wordt alleen vastge
 - de unittests van de kern, met paginaverwijzingen naar de norm;
 - de differentiële tests tussen de normversies;
 - de **optiedekkingstest** (`crates/nta8800-core/tests/option_coverage.rs`). Die leidt elke invoeroptie af uit de invoertypen zelf en rekent haar door in alle vijf normversies. Elke run moet rekenen of weigeren met een benoemde code met tekst, zonder paniek en zonder niet-eindige getallen.
-- de **openbare gevallen** A–F (`tests/public_comparison.rs`), nagerekend in hun eigen normversie;
+- de **openbare gevallen** A–H, waarvan H een utiliteitsgebouw (`tests/public_comparison.rs`), nagerekend in hun eigen normversie;
 - de robuustheidstests;
 - de service- en API-tests;
 - de tests van de desktop-opdrachten;

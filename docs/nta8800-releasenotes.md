@@ -13,6 +13,13 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — openbare gevallen G (NTA 8800:2024) en H (eerste utiliteitsgebouw) (geen rekenwijziging)
+
+- **G**, vrijstaande woning met verwarmde kelder, Uniec 3.3.5.0 (29-04-2025), het eerste geval in de editie 2024: kern 65,67 / 30,89 / 71,8 tegen 64,52 / 29,44 / 70,6. Tapwater (5 545 kWh), PV, ventilatoren en de COP zijn gelijk. Het verschil zit in de product-f_ctrl 0,51 uit een BCRG-verklaring (de kern rekent tabel 11.5, 0,59) en in de letterlijke 10.15 bij koeling.
+- **H**, utiliteitsgebouw met kantoor, bijeenkomst, zorg en sportschool, 743,80 m² in twee zones, Uniec 3.2.9.2 (29-05-2024, editie 2023): kern 27,29 / 80,63 / 29,7 tegen 29,08 / 80,01 / 30,5. Verlichting, tapwater, PV, de COP en de Bbl-grenswaarden van het gemengde gebouw (44,94 / 86,22 / 30,4) zijn gelijk.
+- Beide staan in `tests/public_comparison.rs` en in de referentiesuite `openbare-gevallen.json`. Zie [de vergelijking](nta8800-vergelijking-openbare-rapporten.md#g-in-2024-en-h-het-eerste-utiliteitsgebouw-in-2023-9-oktober-2026).
+- Bevinding zonder codewijziging: de kern kent geen gedeclareerde f_ctrl (gelijkwaardigheidsverklaring) en geen zonwering op één raam.
+
 ### 9 oktober 2026 — procedures voor het kwaliteitssysteem (geen rekenwijziging)
 
 - **Nieuwe map `docs/kwaliteit/`** met concepten die de attesthouder alleen nog hoeft in te vullen en vast te stellen (BRL 9501 hoofdstuk 5 en 6, taken C2, C3, C4 en C6):
