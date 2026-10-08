@@ -241,8 +241,11 @@ CASES = [
         23,
         [
             setp(f"{NTA}/emission/system", "other_or_unknown"),
+            # Only the emitter, the NEN-EN 215 declaration and the missing
+            # hydronic balancing change; room control stays as in EP-W001.
             emission2023(
                 {"type": "surface", "control": "room", "system": "wall", "insulation": "minimal_insulation"},
+                room_automation="individual_per_room",
                 certified=True,
             ),
         ],
@@ -266,6 +269,538 @@ CASES = [
             setp(f"{BOILER}/location", "outside_thermal_boundary"),
             setp(f"{BOILER}/averageDesignEmissionTemperatureC", 70.0),
             setp(f"{NTA}/distributionSystem/designTemperatureClass", "80_60"),
+        ],
+    ),
+]
+
+
+# --- EP-W003a/c: window U from 8.15 and 8.22/8.23 (p. 7) ---
+# The project takes the window U as a value; it is computed here with the
+# kernel's window_u formulas and rounded per 8.2.2.1 (one decimal above 1,0).
+# EP-W003a: 8.15 simplified, max(0,7.2,0+0,3.3,4; 0,8.2,0+0,2.3,4) + 2,5.0,11
+#   = 2,695 -> 2,7.
+# EP-W003c: U_W+shut = 1/(1/1,8 + 0,2) = 1,324 (8.23); effective
+#   0,5.1,8 + 0,5.1,324 = 1,562 -> 1,6 (8.22, f_shut;with 0,5). Only the extra
+#   resistance is varied; the roller shutter is not entered as sun shading.
+CASES += [
+    ("EPW003a", 7, windows("uValue", 2.7)),
+    ("EPW003c", 7, windows("uValue", 1.6)),
+]
+
+
+# --- EP-W015a/b: vertical pipes through the thermal envelope (p. 18; 7.3.3) ---
+# EP-W015a: no penetrations, no pipe. EP-W015b: one insulated pipe running
+# through both storeys (table 7.1 footnote a).
+CASES += [
+    ("EPW015a", 18, [setp(f"{NTA}/verticalPipes", [])]),
+    (
+        "EPW015b",
+        18,
+        [setp(f"{NTA}/verticalPipes", [{"id": "leiding-1", "storeys": 2, "insulated": True, "sourceReference": "ISSO 54 v2.0 EP-W015b p. 18: 1 geisoleerde verticale leiding per bouwlaag"}])],
+    ),
+]
+
+
+# --- EP-W016: a door in the north facade, 2 m2 incl. frame (p. 18) ---
+# A door is a window element of the north facade (gross 43,2 m2, net 41,2).
+# Opaque: U 3,4 (8.20), g 0. With glass (U_gl 2,8, g_gl 0,7): U area-weighted
+# over glass and opaque door, no edge psi given; the frame fraction is
+# project-wide (0,25), so the glass share enters as an equivalent g:
+# g_gl . share / (1 - 0,25).
+def door(u_value, g_value):
+    return setp(
+        "/zones/0/surfaces/3/windows",
+        [
+            {
+                "id": "deur-noord",
+                "name": "Deur noord",
+                "area": 2.0,
+                "uValue": u_value,
+                "gValue": g_value,
+                "orientation": "N",
+                "surfaceId": "gevel-noord",
+            }
+        ],
+    )
+
+
+CASES += [
+    ("EPW016a", 18, [door(3.4, 0.0)]),
+    ("EPW016b", 18, [door(3.1, round(0.7 * 0.5 / 0.75, 4))]),
+    ("EPW016c", 18, [door(2.9, round(0.7 * 0.8 / 0.75, 4))]),
+]
+
+
+# --- EP-W012: movable shading with the building turned (p. 15) ---
+# Table 7.5/7.6 devices, operated from inside: manual residential control.
+def residential_screen(device):
+    return setp(
+        f"{NTA}/windowSolar/movableShading",
+        {"device": device, "control": "manual_residential", "sourceReference": "zonwering volgens de deeltest, van binnenuit bediend"},
+    )
+
+
+CASES += [
+    ("EPW012a", 15, [residential_screen({"kind": "external_screen", "colour": "dark"})]),
+    ("EPW012b", 15, rotate("SW") + [residential_screen({"kind": "external_venetian_blind", "colour": "white"})]),
+    ("EPW012c", 15, rotate("W") + [residential_screen({"kind": "external_screen", "colour": "other"})]),
+    ("EPW012d", 15, rotate("SE") + [residential_screen({"kind": "internal_metallised_fabric"})]),
+    ("EPW012e", 15, rotate("E") + [residential_screen({"kind": "drop_arm_awning"})]),
+    ("EPW012f", 15, [residential_screen({"kind": "folding_arm_awning"})]),
+]
+
+
+# --- EP-W4xx: hot water (p. 33-40) ---
+HW = f"{NTA}/hotWater"
+
+
+def draw_off(kitchen, diameter, bathroom):
+    return setp(
+        f"{HW}/emission",
+        {
+            "method": "residential",
+            "served": "kitchen_and_bathroom",
+            "kitchenLengthM": kitchen,
+            "kitchenPipeDiameter": diameter,
+            "bathroomLengthM": bathroom,
+            "sourceReference": "uittapleidingen volgens de deeltest",
+        },
+    )
+
+
+def showers(units, connection):
+    return setp(
+        f"{HW}/showerHeatRecovery",
+        {"showers": units, "connection": connection, "sourceReference": "douche-WTW volgens de deeltest"},
+    )
+
+
+def vessel(volume, loss, factor, heated, vessel_id="vat-1", **extra):
+    body = {
+        "id": vessel_id,
+        "volumeL": volume,
+        "loss": loss,
+        "connectionFactor": factor,
+        "inHeatedZone": heated,
+        "sourceReference": "voorraadvat volgens de deeltest",
+    }
+    body.update(extra)
+    return body
+
+
+def hw_generator(body):
+    return setp(f"{HW}/generator", body)
+
+
+def indirect_hr107(inside, also_heating=True):
+    return hw_generator(
+        {"kind": "indirect_boiler", "boiler": "hr107", "oil": False, "insideBoundary": inside, "alsoSpaceHeating": also_heating}
+    )
+
+
+MINIMAL = {"method": "minimal"}
+FULL = {"method": "full"}
+
+
+def LABEL(label):
+    return {"method": "label", "label": label}
+
+
+def MEASURED(w_per_k):
+    return {"method": "measured", "transmissionWPerK": w_per_k}
+
+
+def storage(volume, loss, backup=None):
+    body = {"totalVolumeL": volume, "loss": loss}
+    if backup is not None:
+        body["backupVolumeL"] = backup
+    return body
+
+
+def solar(area, collector, orientation, tilt, obstruction, vessel_body, solar_type="preheater", use="water_heating", pvt=None):
+    heater = {
+        "id": "zonneboiler-1",
+        "solarUse": use,
+        "method": {
+            "method": "calculated",
+            "solarType": solar_type,
+            "collectors": {
+                "moduleAreaM2": area,
+                "moduleCount": 1,
+                "orientation": orientation,
+                "tiltDeg": tilt,
+                "obstruction": obstruction,
+                "efficiency": {"method": "forfait", "collector": collector},
+                "loopPipes": {"method": "forfait"},
+            },
+            "storage": vessel_body,
+        },
+        "sourceReference": "zonneboiler volgens de deeltest, collector- en vatgegevens forfaitair waar niet gegeven",
+    }
+    if pvt is not None:
+        heater["pvt"] = pvt
+    return setp(f"{HW}/solar", [heater])
+
+
+def pv(system_id, kpk, area, azimuth, tilt, mounting, obstruction=MINIMAL, **extra):
+    body = {
+        "id": system_id,
+        "peakPower": {"method": "declared_specific", "peakPowerWPerM2": kpk, "panelAreaM2": area},
+        "azimuthDeg": azimuth,
+        "tiltDeg": tilt,
+        "mounting": mounting,
+        "obstruction": obstruction,
+        "sourceReference": "PV-systeem volgens de deeltest",
+    }
+    body.update(extra)
+    return body
+
+
+CASES += [
+    # EP-W401a/b: draw-off lengths and kitchen pipe diameter (p. 33; table 13.2).
+    ("EPW401a", 33, [draw_off(7.0, "up_to_10_mm", 3.0)]),
+    ("EPW401b", 33, [draw_off(3.0, "up_to_8_mm", 1.0)]),
+    # EP-W403a-d: shower heat recovery (p. 34-35; table 13.8, 13.5.3).
+    ("EPW403a", 34, [showers([{"unit": "vertical"}], "mixer_and_heater")]),
+    ("EPW403b", 34, [showers([{"unit": "horizontal"}], "heater_only")]),
+    (
+        "EPW403c",
+        34,
+        [
+            showers(
+                [{"unit": "declared", "efficiency": 0.45, "sourceReference": "ISSO 54 v2.0 EP-W403c p. 34: rendement 45 % (verklaring aanwezig)"}],
+                "mixer_only",
+            )
+        ],
+    ),
+    ("EPW403d", 35, [showers([{"unit": "horizontal"}, {"unit": "vertical"}], "mixer_only")]),
+    # EP-W404a-d: storage vessels (p. 35; 13.6, f_sto;dis;ls 2022 p. 549-550).
+    (
+        "EPW404a",
+        35,
+        [setp(f"{HW}/storage", [vessel(100.0, {"method": "label", "label": "a_plus"}, 2, True)]), indirect_hr107(True)],
+    ),
+    (
+        "EPW404b",
+        35,
+        [
+            setp(
+                f"{HW}/storage",
+                [
+                    vessel(200.0, {"method": "label", "label": "f"}, 5, False, "vat-1"),
+                    vessel(200.0, {"method": "label", "label": "f"}, 5, False, "vat-2"),
+                ],
+            ),
+            indirect_hr107(False),
+            setp(f"{BOILER}/location", "outside_thermal_boundary"),
+        ],
+    ),
+    (
+        "EPW404c",
+        35,
+        [
+            setp(
+                f"{HW}/storage",
+                [
+                    vessel(
+                        100.0,
+                        {"method": "measured_standby", "standbyKwhPerDay": 2.0, "referenceStorageC": 60.0, "referenceAmbientC": 20.0},
+                        1,
+                        True,
+                    )
+                ],
+            ),
+            setp(f"{HW}/boilingWaterTap", True),
+            hw_generator({"kind": "electric_boiler"}),
+        ],
+    ),
+    (
+        "EPW404d",
+        35,
+        [
+            setp(
+                f"{HW}/storage",
+                [vessel(150.0, {"method": "label", "label": "c"}, 2, True, electricBoilerInsulatedPipe=True)],
+            ),
+            hw_generator({"kind": "electric_boiler"}),
+        ],
+    ),
+    # EP-W406: hot-water generators (p. 37-40; tables 13.25-13.28).
+    ("EPW406a", 37, [hw_generator({"kind": "gas_appliance", "appliance": "combi_gaskeur", "measuredClass": "class3"})]),
+    (
+        "EPW406b",
+        37,
+        [
+            setp(f"{HW}/storage", [vessel(80.0, {"method": "label", "label": "c"}, 2, True, electricBoilerInsulatedPipe=True)]),
+            hw_generator({"kind": "electric_boiler"}),
+        ],
+    ),
+    ("EPW406c", 37, [hw_generator({"kind": "electric_instantaneous"})]),
+    (
+        "EPW406g",
+        37,
+        [hw_generator({"kind": "gas_storage_heater", "volumeL": 100.0, "before1985": False, "inHeatedZone": True})],
+    ),
+    # EP-W405a-f: solar water heaters, method 2 with table 13.14 forfaits
+    # (p. 35-36; 13.7.2.2). The given area is taken as the reference area.
+    ("EPW405a", 35, [solar(5.0, "glazed", "south", 45.0, MINIMAL, storage(100.0, LABEL("a")))]),
+    ("EPW405b", 35, [solar(3.0, "unglazed_or_unknown", "west", 30.0, MINIMAL, storage(200.0, LABEL("c")))]),
+    ("EPW405c", 36, [solar(3.0, "evacuated_tube", "south_east", 60.0, FULL, storage(150.0, MEASURED(0.5)))]),
+    (
+        "EPW405d",
+        36,
+        [
+            solar(5.0, "glazed", "south", 30.0, FULL, storage(150.0, MEASURED(0.5), backup=150.0), solar_type="integrated_backup"),
+            indirect_hr107(True, also_heating=False),
+        ],
+    ),
+    (
+        "EPW405e",
+        36,
+        [
+            solar(5.0, "glazed", "south", 30.0, MINIMAL, storage(220.0, LABEL("b"), backup=100.0), solar_type="integrated_backup"),
+            indirect_hr107(True),
+        ],
+    ),
+    ("EPW405f", 36, [solar(5.0, "glazed", "south", 30.0, MINIMAL, storage(220.0, LABEL("b")), use="combi")]),
+    (
+        "EPW406q",
+        39,
+        [
+            hw_generator(
+                {
+                    "kind": "gas_appliance",
+                    "appliance": "combi_gaskeur_hr_cw",
+                    "measuredClass": "class4",
+                    "declared": {"value": 0.725, "sourceReference": "ISSO 54 v2.0 EP-W406q p. 39: kwaliteitsverklaring, gemeten tappatroon CW4, rendement 72,5 %"},
+                }
+            )
+        ],
+    ),
+]
+
+
+# --- EP-W203/W204: heating generators (p. 25-27) ---
+GEN = f"{NTA}/generator"
+GROUND_SOURCES = {"ground", "groundwater_below15_c"}
+# Table 9.28 evidence: ISSO 54 states only "voldoet aan tabel 9.28"; the test
+# points are set just above the table 9.28 minimums (fictitious values).
+HIGH_POINTS = {
+    "ground": [("b0_w45", 3.05), ("b0_w35", 3.55)],
+    "groundwater_below15_c": [("w10_w45", 3.8), ("w10_w35", 4.45)],
+    "outdoor_air": [("a7_wet6_w45", 2.8), ("a7_wet6_w35", 2.9), ("a_minus7_wet_minus8_w45", 1.95)],
+}
+
+
+def heat_pump(test_id, source, supply, high=False, declaration=None, sink="hydronic"):
+    forfait = {
+        "generatorId": "wp",
+        "classificationSourceReference": f"ISSO 54 v2.0 {test_id}: elektrische warmtepomp, bron {source}",
+        "scope": "residential_at_most25_kw",
+        "source": source,
+        "sink": sink,
+        "designSupplyTemperatureC": supply if sink == "hydronic" else None,
+    }
+    if source in GROUND_SOURCES:
+        forfait["sourceCorrectionFactor"] = 1.0
+        forfait["sourceCorrectionReference"] = "geen regeneratie genoemd in de deeltest"
+    if high:
+        forfait["rowVariant"] = "table_9_28_high_efficiency"
+        forfait["highEfficiencyEvidence"] = {
+            "productReference": f"ISSO 54 v2.0 {test_id}: COP voldoet aan tabel 9.28",
+            "testReportReference": "fictief: de deeltest geeft geen meetwaarden, hier net boven de minima van tabel 9.28",
+            "testStandardEdition": "NEN-EN 14511-2:2007",
+            "points": [{"condition": c, "measuredCop": v} for c, v in HIGH_POINTS[source]],
+        }
+    if declaration is not None:
+        forfait["qualityDeclaration"] = declaration
+    return setp(
+        GEN,
+        {
+            "kind": "heat_pump_forfait",
+            "forfait": forfait,
+            "sourceSystem": "individual",
+            "sourceSystemReference": f"ISSO 54 v2.0 {test_id}: individuele warmtepomp",
+        },
+    )
+
+
+def temperature_class(value):
+    return setp(f"{NTA}/distributionSystem/designTemperatureClass", value)
+
+
+def biomass(test_id, appliance, location, compliant, automatic=False, power=None):
+    body = {
+        "kind": "biomass",
+        "appliance": appliance,
+        "location": location,
+        "annexRCompliantAtMost500Kw": compliant,
+        "annexRReference": f"ISSO 54 v2.0 {test_id}: biomassa {'voldoet' if compliant else 'voldoet niet'} aan bijlage R",
+        "equipmentReference": f"ISSO 54 v2.0 {test_id}",
+        "automaticFuelFeed": automatic,
+    }
+    if power is not None:
+        body["auxiliary"] = {"electricallyConnectedDevices": 1, "nominalPowerKw": power, "sourceReference": f"ISSO 54 v2.0 {test_id}: vermogen {power} kW, aangesloten op het net"}
+    else:
+        body["auxiliary"] = {"electricallyConnectedDevices": 0, "sourceReference": f"ISSO 54 v2.0 {test_id}: geen aansluiting op het elektriciteitsnet"}
+    if appliance != "central_boiler":
+        # §9.6.5: the stove is the only heating in the rooms it serves (the
+        # deeltest replaces the boiler by the stove).
+        body["soleHeatingInServedRooms"] = True
+    return setp(GEN, body)
+
+
+def renewable(test_id, below_20, exhaust=False):
+    """Annex P evidence for the renewable share of a heat pump."""
+    return setp(
+        f"{NTA}/heatPumpRenewable",
+        {"sourceBelow20C": below_20, "exhaustAirSource": exhaust, "sourceReference": f"ISSO 54 v2.0 {test_id}: bron volgens de deeltest"},
+    )
+
+
+# Generators outside 9.85 (biomass, external heat) have a pump of their own
+# (9.41-9.51, power and EEI unknown: forfait).
+CALCULATED_PUMP = setp(
+    f"{NTA}/distributionSystem/pump",
+    {"method": "calculated", "heatMeterPresent": False, "sourceReference": "distributiepomp, vermogen en EEI onbekend"},
+)
+# Local stoves without a water-borne system: emission as local heater
+# (table 9.2 "overige"), no distribution.
+LOCAL = [
+    setp(
+        f"{NTA}/emission",
+        {"system": "local_heater", "balancing": "not_applicable", "control": "individual_room_thermostats", "sourceReference": "lokale toestellen, regeling individueel per ruimte"},
+    ),
+    remove(f"{NTA}/distributionSystem"),
+    setp(
+        f"{NTA}/distribution",
+        {"method": "declared", "monthlyLossKwh": [0.0] * 12, "sourceReference": "geen watergedragen distributiesysteem (lokale toestellen): geen distributieverlies"},
+    ),
+]
+
+
+CASES += [
+    (
+        "EPW203a",
+        25,
+        [
+            setp(
+                GEN,
+                {
+                    "kind": "forfait_heater",
+                    "heaterKind": "local_with_flue",
+                    "fuel": "natural_gas",
+                    "equipmentReference": "ISSO 54 v2.0 EP-W203a p. 25: lokale gasverwarming met afvoer, zonder elektriciteitsaansluiting",
+                    "auxiliary": {"electricallyConnectedDevices": 0, "sourceReference": "ISSO 54 v2.0 EP-W203a: zonder elektriciteitsaansluiting"},
+                },
+            )
+        ]
+        + LOCAL,
+    ),
+    ("EPW203d", 25, [heat_pump("EP-W203d", "ground", 35.0), temperature_class("35_30"), renewable("EP-W203d", True)]),
+    ("EPW203e", 25, [heat_pump("EP-W203e", "groundwater_below15_c", 45.0, high=True), temperature_class("45_40"), renewable("EP-W203e", True)]),
+    ("EPW203f", 25, [heat_pump("EP-W203f", "outdoor_air", 55.0, high=True), temperature_class("55_47"), renewable("EP-W203f", True)]),
+    ("EPW203h", 26, [heat_pump("EP-W203h", "ground", 50.0, high=True), temperature_class("50_42"), renewable("EP-W203h", True)]),
+    (
+        "EPW203i",
+        26,
+        [
+            heat_pump(
+                "EP-W203i",
+                "outdoor_air",
+                50.0,
+                declaration={"declarationReference": "ISSO 54 v2.0 EP-W203i p. 26: kwaliteitsverklaring", "generationEfficiency": 3.8, "auxiliaryKwhPerYear": 100.0},
+            ),
+            temperature_class("50_42"),
+            renewable("EP-W203i", True),
+        ],
+    ),
+    (
+        "EPW203p",
+        27,
+        [heat_pump("EP-W203p", "exhaust_air", 55.0), temperature_class("55_47"), renewable("EP-W203p", True, exhaust=True), unit("c1", "luka_a_b_c"), NO_PASSIVE],
+    ),
+    (
+        "EPW204a",
+        27,
+        [
+            setp(
+                GEN,
+                {
+                    "kind": "external_heat",
+                    "supplierReference": "ISSO 54 v2.0 EP-W204a p. 27: warmtelevering door derden",
+                    "qualityDeclarationPresent": False,
+                    "auxiliary": {"electricallyConnectedDevices": 1, "sourceReference": "ISSO 54 v2.0 EP-W204a: afleverset met hoofddistributiepomp"},
+                },
+            ),
+            CALCULATED_PUMP,
+        ],
+    ),
+    ("EPW204c", 27, [biomass("EP-W204c", "freestanding_wood_stove", "inside_thermal_boundary", True)] + LOCAL),
+    # EP-W204d (pellet stove not meeting annex R): table 9.30 (2022 p. 337)
+    # only covers appliances meeting annex R, so the forfait route has no
+    # efficiency and the kernel refuses (biomass_class_unsupported). Not encoded.
+    ("EPW204e", 28, [biomass("EP-W204e", "central_boiler", "outside_thermal_boundary", True, automatic=True, power=5.0), CALCULATED_PUMP]),
+]
+
+
+# --- EP-W501: PV panels (p. 42-43; 16.4a, tables 16.1/16.2, 17.15) ---
+CASES += [
+    ("EPW501a", 42, [setp(f"{NTA}/pvSystems", [pv("pv-1", 165.0, 16.0, 180.0, 30.0, "moderately_ventilated")])]),
+    (
+        "EPW501b",
+        42,
+        [
+            setp(
+                f"{NTA}/pvSystems",
+                [
+                    pv("pv-1", 170.0, 16.0, 225.0, 45.0, "not_ventilated"),
+                    pv("pv-2", 140.0, 3.2, 135.0, 30.0, "strongly_ventilated", FULL),
+                ],
+            )
+        ],
+    ),
+    (
+        "EPW501c",
+        42,
+        [
+            setp(
+                f"{NTA}/pvSystems",
+                [
+                    {
+                        "id": "pv-1",
+                        "peakPower": {"method": "table16_1", "moduleType": "multicrystalline_before2001", "panelAreaM2": 6.4},
+                        "azimuthDeg": 90.0,
+                        "tiltDeg": 15.0,
+                        "mounting": "moderately_ventilated",
+                        "obstruction": MINIMAL,
+                        "sourceReference": "ISSO 54 v2.0 EP-W501c p. 42: multikristallijn, geplaatst in 2000 (tabel 16.1)",
+                    }
+                ],
+            )
+        ],
+    ),
+    # EP-W501d: 10 m2 PVT covered with single glass on a solar preheater
+    # (p. 42-43; table 16.4 and 13.16).
+    (
+        "EPW501d",
+        42,
+        [
+            setp(
+                f"{NTA}/pvSystems",
+                [
+                    pv(
+                        "pvt-1",
+                        150.0,
+                        10.0,
+                        270.0,
+                        60.0,
+                        "not_ventilated",
+                        pvt={"kind": "glazed", "collectorAreaM2": 10.0, "storageVolumeL": 100.0},
+                    )
+                ],
+            ),
+            solar(10.0, "glazed", "west", 60.0, MINIMAL, storage(100.0, LABEL("a")), pvt="single_glazed"),
         ],
     ),
 ]
@@ -310,6 +845,42 @@ def screen(device, control):
     )
 
 
+LZ = f"{NTA}/lighting/0/lightingZones/0"
+
+
+def lamps(watts, technology):
+    return setp(
+        f"{LZ}/power",
+        {
+            "method": "installed",
+            "luminaires": [{"count": 1, "power": {"method": "lamps", "lampPowerW": watts, "lampCount": 1, "technology": technology}}],
+            "sourceReference": f"lampvermogen {watts} W volgens de deeltest, als een groep",
+        },
+    )
+
+
+def switch(control, central=False):
+    return setp(f"{LZ}/occupancy", {"control": control, "centralOnControl": central, "largeOfficeGroup": False})
+
+
+PARASITIC_601A = setp(
+    f"{LZ}/parasitic",
+    {"method": "installed", "emergencyChargingW": 10.0, "controlStandbyW": 20.0, "sourceReference": "ISSO 54 v2.0 EP-U601a p. 50: noodverlichting 10 W, besturing 20 W"},
+)
+U601A = [lamps(768.0, "led"), setp(f"{LZ}/constantIlluminance", "led_l80"), PARASITIC_601A]
+
+
+def utility_heat_pump(test_id, source, supply, page):
+    """EP-U303: a utility heat pump, table 9.29 (scope utility)."""
+    step = heat_pump(test_id, source, supply)
+    forfait = step["value"]["forfait"]
+    forfait["scope"] = "utility_collective_or_over25_kw"
+    # c_source (annex V) is footnote a of table 9.27, dwellings only.
+    forfait.pop("sourceCorrectionFactor", None)
+    forfait.pop("sourceCorrectionReference", None)
+    return step
+
+
 UTILITY_CASES = [
     ("EPU001", 44, []),
     *[(f"EPU002{letter}", 44, function(letter)) for letter in "abcdefghi"],
@@ -342,6 +913,29 @@ UTILITY_CASES = [
         rotate("W") + [screen({"kind": "external_screen", "colour": "white"}, "manual_utility_without_glare_protection")],
     ),
     ("EPU102c", 45, rotate("E") + [screen({"kind": "drop_arm_awning"}, "automatic")]),
+    # EP-U303a-e: utility heat pumps (p. 47; table 9.29).
+    ("EPU303a", 47, [utility_heat_pump("EP-U303a", "ground", 30.0, 47), temperature_class("30_27"), renewable("EP-U303a", True)]),
+    ("EPU303b", 47, [utility_heat_pump("EP-U303b", "outdoor_air", 35.0, 47), temperature_class("35_30"), renewable("EP-U303b", True)]),
+    (
+        "EPU303c",
+        47,
+        [utility_heat_pump("EP-U303c", "exhaust_air", 40.0, 47), temperature_class("40_35"), renewable("EP-U303c", True, exhaust=True), unit("c1", "luka_a_b_c"), NO_PASSIVE],
+    ),
+    ("EPU303d", 47, [utility_heat_pump("EP-U303d", "groundwater_below15_c", 50.0, 47), temperature_class("50_42"), renewable("EP-U303d", True)]),
+    ("EPU303e", 47, [utility_heat_pump("EP-U303e", "surface_water", 55.0, 47), temperature_class("55_47"), renewable("EP-U303e", True)]),
+    # EP-U601a-c: lighting power (p. 50; 14.8/14.9, table 14.2, NTA 8800:2022
+    # table 14.4 constant-illuminance compensation).
+    ("EPU601a", 50, U601A),
+    ("EPU601b", 50, [lamps(960.0, "unknown_or_other")]),
+    ("EPU601c", 50, [lamps(1344.0, "fluorescent_t5"), setp(f"{LZ}/constantIlluminance", "linear_fluorescent")]),
+    # EP-U602a-f/i: lighting control (p. 50-51; table 14.5).
+    ("EPU602a", 50, [switch("manual_or_unknown", central=True)]),
+    ("EPU602b", 50, [switch("manual_or_unknown")]),
+    ("EPU602c", 50, [switch("manual_with_sweep")]),
+    ("EPU602d", 50, function("d") + [switch("auto_on_dimmed")]),
+    ("EPU602e", 50, [switch("manual_on_dimmed")]),
+    ("EPU602f", 50, [switch("manual_on_auto_off")]),
+    ("EPU602i", 51, U601A + [setp(f"{LZ}/extractedLuminaires", True)]),
 ]
 
 

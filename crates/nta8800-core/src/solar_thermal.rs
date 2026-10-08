@@ -332,6 +332,12 @@ pub enum SolarMethod {
 }
 
 impl SolarMethod {
+    pub fn solar_type(&self) -> SolarType {
+        match self {
+            Self::Calculated { solar_type, .. } | Self::Tested { solar_type, .. } => *solar_type,
+        }
+    }
+
     pub fn total_volume_l(&self) -> f64 {
         match self {
             Self::Calculated { storage, .. } => storage.total_volume_l,
@@ -559,7 +565,10 @@ pub fn validate_solar(heater: &SolarWaterHeater, path: &str) -> Vec<SolarIssue> 
                         "method.storage.backupVolumeL",
                     );
                 }
-                if !backup.is_finite() || backup < 0.0 || backup >= storage.total_volume_l {
+                // 13.80 (2025+C1 p. 581, 2022 p. 562): the forfait itself
+                // gives V_sto;bu = V_sto below 80 l, so the backup part may
+                // fill the whole vessel; only more than the vessel is invalid.
+                if !backup.is_finite() || backup < 0.0 || backup > storage.total_volume_l {
                     push(
                         "hot_water_storage_volume_invalid",
                         "method.storage.backupVolumeL",
@@ -1004,6 +1013,40 @@ mod tests {
         assert_eq!(SolarStorage::forfait_backup_volume_l(150.0), 80.0);
         assert_eq!(SolarStorage::forfait_backup_volume_l(250.0), 100.0);
         assert_eq!(SolarStorage::forfait_backup_volume_l(400.0), 120.0);
+    }
+
+    /// 13.80 (2025+C1 p. 581): the forfait gives V_sto;bu = V_sto below
+    /// 80 l, so a declared backup part filling the whole vessel is valid;
+    /// a backup part larger than the vessel is not.
+    #[test]
+    fn backup_volume_may_fill_the_whole_vessel() {
+        let heater = |backup: f64| SolarWaterHeater {
+            id: "zb".into(),
+            solar_use: SolarUse::WaterHeating,
+            count: 1,
+            method: SolarMethod::Calculated {
+                solar_type: SolarType::IntegratedBackup,
+                collectors: field(),
+                storage: SolarStorage {
+                    total_volume_l: 150.0,
+                    backup_volume_l: Some(backup),
+                    loss: StorageLoss::Measured {
+                        transmission_w_per_k: 0.5,
+                    },
+                    backup_loss_in_generator_efficiency: false,
+                },
+            },
+            pvt: None,
+            source_reference: "ISSO 54 v2.0 EP-W405d".into(),
+        };
+        let codes = |backup| -> Vec<&str> {
+            validate_solar(&heater(backup), "solar[0]")
+                .iter()
+                .map(|issue| issue.code)
+                .collect()
+        };
+        assert!(!codes(150.0).contains(&"hot_water_storage_volume_invalid"));
+        assert!(codes(150.1).contains(&"hot_water_storage_volume_invalid"));
     }
 
     #[test]
