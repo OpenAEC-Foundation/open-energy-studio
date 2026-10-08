@@ -90,6 +90,8 @@ interface FileCommands {
   onNewProject: () => void;
   /** A new project of a kind: existing dwelling or utility building (basisopname), or new build. */
   onNewProjectOf: (kind: NewProjectKind) => void;
+  /** Shows the project library while documents stay open. */
+  onShowLibrary: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
   onSaveAsProject: () => void;
@@ -417,6 +419,10 @@ function EmptyStatusBar() {
 function AppContent() {
   const { docState, docDispatch } = useDocumentManager();
   const hasActiveDoc = useHasActiveDocument();
+  // The project library over the open documents (feedback 8 Oct 2026: "hoe moet ik de bibliotheek vinden").
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const activeDocumentId = docState.activeDocumentId;
+  useEffect(() => { setLibraryOpen(false); }, [activeDocumentId]);
   const { t } = useI18n();
   const toast = useToast();
   const confirmChoice = useConfirm();
@@ -794,6 +800,7 @@ function AppContent() {
   const files = useMemo<FileCommands>(() => ({
     onNewProject: handleNewProject,
     onNewProjectOf: handleNewProjectOf,
+    onShowLibrary: () => setLibraryOpen(true),
     onOpenProject: handleOpenProject,
     onSaveProject: handleSaveProject,
     onSaveAsProject: handleSaveAsProject,
@@ -840,11 +847,11 @@ function AppContent() {
     <div className={hasActiveDoc ? 'app-shell' : 'app-shell app-shell--empty'}>
       <a className="skip-link" href="#main-content"
         onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('nav.skip')}</a>
-      {hasActiveDoc ? (
+      {hasActiveDoc && !libraryOpen ? (
         <ActiveDocumentContent files={files} paletteOpen={paletteOpen} setPaletteOpen={setPaletteOpen} onReport={setActiveReport} />
       ) : (
         <>
-          <TopBar {...welcomeTopBar} />
+          <TopBar {...welcomeTopBar} hasDocument={hasActiveDoc} />
           <main id="main-content" className="shell-main" tabIndex={-1}>
             <WelcomeScreen
               onNewProject={handleNewProjectOf}
@@ -855,6 +862,7 @@ function AppContent() {
               recent={recentProjects}
               onOpenRecent={handleOpenRecent}
               onForgetRecent={(path) => setRecentProjects(forgetRecentProject(path))}
+              onBack={hasActiveDoc ? () => setLibraryOpen(false) : undefined}
               onOpenEntry={openLibraryEntry}
               onDuplicateEntry={duplicateLibraryEntry}
               onDeleteEntry={deleteLibraryEntry}

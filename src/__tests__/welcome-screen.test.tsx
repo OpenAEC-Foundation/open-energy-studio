@@ -84,6 +84,14 @@ describe('WelcomeScreen', () => {
     expect(onForgetRecent).toHaveBeenCalledWith('/home/a/Kantoor.oes.json');
   });
 
+  it('offers a way back to the open project when shown over documents', async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    renderWithProviders(<WelcomeScreen {...noop()} onBack={onBack} />);
+    await user.click(screen.getByRole('button', { name: /Back to the project/ }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
   it('says how to start when the library is empty', () => {
     renderWithProviders(<WelcomeScreen {...noop()} />);
     expect(screen.getByText(/No projects yet\. Start with "New project"/)).toBeInTheDocument();

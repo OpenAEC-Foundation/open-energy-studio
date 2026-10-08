@@ -33,6 +33,8 @@ export interface TopBarProps {
   onNewProject: () => void;
   /** The "+" menu offers the four project kinds of the welcome screen. */
   onNewProjectOf?: (kind: NewProjectKind) => void;
+  /** Shows the project library while documents stay open. */
+  onShowLibrary?: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
   onSaveAsProject: () => void;
@@ -140,10 +142,13 @@ export function TopBar(props: TopBarProps) {
 
       {props.hasDocument && (
         <DocumentTabs onCloseTab={props.onCloseTab} onNewProject={props.onNewProject} onNewProjectOf={props.onNewProjectOf}
-          onOpenProject={props.onOpenProject} />
+          onOpenProject={props.onOpenProject} onShowLibrary={props.onShowLibrary} />
       )}
       <div className="top-bar-drag" data-tauri-drag-region />
 
+      {props.hasDocument && props.onShowLibrary && (
+        <button type="button" className="btn btn-sm top-bar-library" onClick={props.onShowLibrary}>{t('shell.library')}</button>
+      )}
       <button type="button" className="top-bar-search" onClick={props.onOpenPalette} title={t('shell.search')} aria-keyshortcuts="Control+K"
         aria-haspopup="dialog">
         <Search aria-hidden="true" /><span>{t('shell.search')}</span><Kbd>Ctrl K</Kbd>

@@ -38,6 +38,8 @@ interface WelcomeScreenProps {
   onDeleteEntry?: (id: string) => void;
   onMoveEntry?: (id: string, folder: string | null) => void;
   onArchiveEntry?: (id: string, archived: boolean) => void;
+  /** Shown over open documents: a way back to the active project. */
+  onBack?: () => void;
 }
 
 const ALL = '__all__';
@@ -86,7 +88,7 @@ function Menu({ label, items }: { label: ReactNode; items: Array<{ key: string; 
 
 export function WelcomeScreen({
   onNewProject, onOpenProject, onOpenExample, onImportUNIEC3, onImportVABI, recent = [], onOpenRecent, onForgetRecent,
-  onOpenEntry, onDuplicateEntry, onDeleteEntry, onMoveEntry, onArchiveEntry,
+  onOpenEntry, onDuplicateEntry, onDeleteEntry, onMoveEntry, onArchiveEntry, onBack,
 }: WelcomeScreenProps) {
   const { t, locale } = useI18n();
   const entries = useLibrary();
@@ -188,6 +190,7 @@ export function WelcomeScreen({
 
           <section className="library-main" aria-label={t('library.title')}>
             <div className="library-toolbar">
+              {onBack && <button type="button" className="btn btn-sm" onClick={onBack}>← {t('shell.libraryBack')}</button>}
               <label className="library-search"><Search aria-hidden="true" />
                 <input type="search" value={query} placeholder={t('library.search')} aria-label={t('library.search')} onChange={(event) => setQuery(event.target.value)} />
               </label>

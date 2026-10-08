@@ -18,6 +18,8 @@ interface DocumentTabsProps {
   onNewProject: () => void;
   /** With this, "+" offers the project kinds (existing dwelling first) instead of one "New". */
   onNewProjectOf?: (kind: NewProjectKind) => void;
+  /** Shows the project library while documents stay open. */
+  onShowLibrary?: () => void;
   onOpenProject: () => void;
 }
 
@@ -28,7 +30,7 @@ const NEW_KINDS: Array<{ kind: NewProjectKind; labelKey: string }> = [
   { kind: 'utility', labelKey: 'welcome.newUtility' },
 ];
 
-export function DocumentTabs({ onCloseTab, onNewProject, onNewProjectOf, onOpenProject }: DocumentTabsProps) {
+export function DocumentTabs({ onCloseTab, onNewProject, onNewProjectOf, onOpenProject, onShowLibrary }: DocumentTabsProps) {
   const { t } = useI18n();
   const { docState, docDispatch } = useDocumentManager();
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -123,6 +125,12 @@ export function DocumentTabs({ onCloseTab, onNewProject, onNewProjectOf, onOpenP
           className="document-tab-menu"
           style={{ left: menuPos.x, top: menuPos.y }}
         >
+          {onShowLibrary && <button type="button" className="document-tab-menu-item" onClick={() => { setMenuPos(null); onShowLibrary(); }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+            </svg>
+            {t('shell.library')}
+          </button>}
           {onNewProjectOf && NEW_KINDS.map((item) => (
             <button key={item.kind} type="button" className="document-tab-menu-item"
               onClick={() => { setMenuPos(null); onNewProjectOf(item.kind); }}>
