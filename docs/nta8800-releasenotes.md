@@ -13,6 +13,14 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — ISSO 54: 115 deeltesten gecodeerd; zonneboiler met geïntegreerde naverwarming
+
+- **Zonneboiler met geïntegreerde naverwarming.** Een indirect gestookt vat (ketel of warmtepomp) die het back-updeel van een zonneboilervat verwarmt, vroeg een eigen voorraadvat (`hot_water_storage_required`). §13.6.2 (2025+C1 p. 566, 2022 p. 547) zegt dat het verlies van het vat en het naverwarmerdeel bij een zonne-energiesysteem volgens 13.7 gaat. Bij een zonneboiler met `integrated_backup` voor tapwater is een apart vat nu niet meer vereist. Bij een voorverwarmer blijft het vat van de ketel nodig.
+- **Back-updeel gelijk aan het hele vat.** Een opgegeven `backupVolumeL` gelijk aan `totalVolumeL` werd geweigerd (`hot_water_storage_volume_invalid`). De forfaitaire waarde van 13.80 (2025+C1 p. 581) geeft onder 80 l zelf V_sto;bu = V_sto, dus dat is geldig. Alleen meer dan het vat wordt nog geweigerd.
+- **ISSO 54 versie 2.0.** 63 deeltesten erbij, nu 115 van de 266 (86 woning, 29 utiliteit): EP-W003a/c, W012, W015, W016, W203a/d–f/h/i/p, W204a/c/e, W401, W403–W405, W406a/b/c/g/q, W501, EP-U303a–e, U601 en U602a–f/i. Alle rekenen in de gate, zonder verwachting.
+  - EP-W201e verandert alleen de afgifte, de NEN-EN 215-verklaring en de inregeling; de regeling per ruimte blijft die van EP-W001.
+  - Niet te coderen: EP-W204d (tabel 9.30 heeft geen rendement voor biomassa die niet aan bijlage R voldoet) en EP-U602g/h (opgegeven daglichtfactoren zonder geometrie). Zie [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md).
+
 ### 9 oktober 2026 — voorbereiding op de testset ISSO 54 (geen rekenwijziging)
 
 - **Gevallen zonder verwachting in het referentieharnas.** Een referentiegeval mag nu `pending` geven in plaats van `expected`: de reden en de metrieken die het vastlegt, met de band die straks geldt. Zo'n geval wordt doorgerekend en krijgt status `pending_expectation`, zonder oordeel. Het laat de gate slagen, maar een geval dat niet rekent, laat hem falen. Het rapport toont "geen verwachting" en het aantal van zulke gevallen (`pendingExpectationCases`). `pending` naast verwachte waarden of een labelklasse wordt geweigerd (`pending_with_expected_values`); verder zijn er de codes `pending_reason_required` en `pending_metrics_required`. Bestaande gevallen en uitkomsten veranderen niet.
