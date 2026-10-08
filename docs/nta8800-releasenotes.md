@@ -13,6 +13,15 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — routes uit ISSO 54: glas per raam, opgegeven hulpenergie- en WKK-waarden, ψ uit de leidinggegevens
+
+Het coderen van de ISSO 54-deeltesten liet vier invoerroutes zien die de rekenkern kende maar de projectinvoer niet doorgaf, of die ontbraken. Ze gelden in alle uitgaven. Projecten zonder deze invoer rekenen gelijk.
+
+- **Glas per raam** (`ntaCalculation.windowGlazings`, 7.6.6.1.2/7.6.6.1.3, 2025+C1 p. 189–193). Per raam een glastype van tabel 7.4, vaste lamellen (7.41a/7.41b) of verstrooiende beglazing of vaste zonwering met de ISO 15099-waarden van 7.41. Een raam dat niet in de lijst staat, rekent met zijn eigen g-waarde. Nieuwe meldcodes: `window_glazing_duplicate`, `window_glazing_without_window`, `window_glazing_not_outdoor`, `window_glazing_reference_required`. Fouten in de glaswaarden komen als invoergat bij het eigen item. Formulier: Gebouw › Schil › "Glas per raam". ISSO 54 EP-W011a.
+- **Hulpenergie van de ketel uit een kwaliteitsverklaring** (`generator.declaredAuxiliaryConstants`, §9.1 p. 285 met 9.85 p. 359–360). A, B, C en B_nom vervangen de forfaitaire constanten. A en C worden naar beneden afgerond op één decimaal en B op drie, zoals de forfaitaire waarden. Niet samen met de metingen van bijlage O (`boiler_auxiliary_declared_and_measured`); ongeldige waarden geven `auxiliary_constant_invalid`. ISSO 54 EP-W203j.
+- **WKK-omzettingsgetallen uit een kwaliteitsverklaring** (`generator.declaredEfficiencies`, §9.1 met methode 2, 9.65 en tabel 9.31, p. 342–343). ε_chp;th en ε_chp;el vervangen de tabelregel, naar beneden afgerond op twee decimalen; ze moeten groter dan 0 zijn en samen ten hoogste 1 (`chp_declared_efficiency_invalid`). Bij methode 1 weigert de kern ze (`chp_declared_efficiency_method1`). ISSO 54 EP-W204h.
+- **ψ uit de leidinggegevens voor koeling en tapwater.** Verwarming kende 9.33–9.35 al (`pipeTransmittance`). Nu ook koeling met 10.24–10.26 (p. 384–385, `pipe` `{kind: "calculated", geometry}`) en de tapwatercirculatie met 13.27–13.29 (p. 551, `circulation.calculatedPsi`), onder meer voor leidingen in de constructie. Nieuwe meldcodes: `cooling_pipe_geometry_invalid`, `hot_water_pipe_geometry_invalid`, `hot_water_psi_declared_and_calculated`. ISSO 54 EP-W202e, EP-W302e, EP-W402f.
+
 ### 9 oktober 2026 — ISSO 54: 199 deeltesten gecodeerd (geen rekenwijziging)
 
 - **84 deeltesten erbij,** nu 199 van de 266 (149 woning, 50 utiliteit). Alle rekenen in de gate, zonder verwachting.

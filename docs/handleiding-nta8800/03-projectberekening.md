@@ -57,21 +57,22 @@ Het formulier vraagt alleen wat het projectmodel nog niet heeft. De secties staa
 | Ramen (zonwinst) | kozijnfractie, belemmering, beweegbare zonwering (F_c, bediening) | §7.6, §17.3, 7.42/7.43 |
 | Belemmering per raam (Gebouw › Schil & ramen) | per buitenraam "Zoals project" of een eigen situatie a–g of opgegeven factoren, met bron; een raam dat niet meer in het project staat, wordt gemeld met **Verwijderen** | 7.13, §17.3.2 |
 | Zonwering per raam (Gebouw › Schil & ramen) | per buitenraam "Zoals project", "Geen" of een eigen beweegbare zonwering: de bediening (tabel 7.7–7.9), het type uit tabel 7.5/7.6 of een eigen F_c, en de bron; bijvoorbeeld screens op alleen het dakraam | 7.42, 7.43 |
+| Glas per raam (Gebouw › Schil & ramen) | per buitenraam "zoals project" (de g-waarde van het raam), een glastype van tabel 7.4 en/of vaste lamellen (7.41a), of verstrooiende beglazing of vaste zonwering met g_gl,alt en g_gl,dif volgens ISO 15099 (7.41), met bron | 7.6.6.1.2, 7.6.6.1.3, 7.41 |
 | Dynamische ramen (bijlage A) | per buitenraam methode A (toestanden met gewichten) of B, correctie stap 2 | bijlage A (p. 766–771) |
 | Aangrenzende onverwarmde serres (7.30b) | serre en de vlakken ervan | 7.30b |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
 | Vloeren op grond (§8.3) | blootgestelde omtrek, R_si + R_c, vloerrand (ψ of forfait), kruipruimte of onverwarmde kelder, verwarmde kelder, randisolatie; onder 2022 en 2020+A1 bij een kruipruimte of kelder ook de wandhoogte h boven maaiveld (8.47) | §8.3, bijlage D |
 | Verticale leidingen (7.3.3) | "geen", een lijst, of onbekend (geeft een gat) | §7.3.3 |
 | Ventilatie | hoofdstuk 11 (systeem, WTW, kanalen, LBK, infiltratie, regelingen, passieve koeling), of "H_ve zelf opgeven". Bij het systeem kan een **gedeclareerde f_ctrl** uit een kwaliteitsverklaring of BCRG-gelijkwaardigheidsverklaring worden opgegeven, met de verklaring als bron; die vervangt de waarde van tabel 11.5 (niet bij het decentrale deel van E.1) | hoofdstuk 11, tabel 11.5 |
-| Afgifte en distributie (§9.3/9.4) | afgiftesysteem, inregeling, regeling, ventilatoren in de afgifte, distributie berekend of forfaitair, luchtverwarmers | §9.3, §9.4, 9.21/9.22, 9.26–9.51 |
-| Opwekker | zie hieronder | §9.6 |
+| Afgifte en distributie (§9.3/9.4) | afgiftesysteem, inregeling, regeling, ventilatoren in de afgifte, distributie berekend of forfaitair, luchtverwarmers. ψ van de leidingen kan uit de leidinggegevens worden berekend, ook voor leidingen in de constructie (9.34) | §9.3, §9.4, 9.21/9.22, 9.26–9.51 |
+| Opwekker | zie hieronder. Bij een gasketel kan de hulpenergie uit een kwaliteitsverklaring komen (A, B, C en B_nom van 9.85; A en C worden naar beneden afgerond op één decimaal, B op drie). Bij een WKK met methode 2 kunnen ε_chp;th en ε_chp;el uit een kwaliteitsverklaring de waarden van tabel 9.31 vervangen | §9.6 |
 | BCRG-verklaringstabel | losse controle van een BCRG-tabel; telt niet mee in de projectberekening | — |
 | Extra verwarmingssystemen (§9.2) | bij meerdere zones: systemen per zone | §9.2 |
-| Warm tapwater (§13) | functie en oppervlakte of aantal woningen, tappunten, leidingen, circulatie, voorraadvaten, toestel; onder 2022 en 2020+A1 ook "elektrische boiler met geïsoleerde leidingen" (f_sto;dis;ls) | hoofdstuk 13 |
+| Warm tapwater (§13) | functie en oppervlakte of aantal woningen, tappunten, leidingen, circulatie, voorraadvaten, toestel; onder 2022 en 2020+A1 ook "elektrische boiler met geïsoleerde leidingen" (f_sto;dis;ls). Bij een circulatieleiding kan ψ uit de leidinggegevens worden berekend (13.27–13.29), bijvoorbeeld voor een leiding in de constructie | hoofdstuk 13 |
 | Extra tapwatersystemen (§13.2.4) | meerdere systemen per gebouw | §13.2.4 |
 | Zonneboilers (§13.7) | berekend of getest systeem, PVT | §13.7 |
 | Zonneverwarming zonder tapwatersysteem | zonnecombi voor ruimteverwarming | §13.7 |
-| Koeling (§10.5) | opwekker (methode 1, 2 of 3), afgifte, distributie; bij meerdere zones meerdere koelsystemen | hoofdstuk 10 |
+| Koeling (§10.5) | opwekker (methode 1, 2 of 3), afgifte, distributie; bij meerdere zones meerdere koelsystemen. Bij water als koudedrager kan ψ van de leidingen uit de leidinggegevens worden berekend (10.24–10.26) | hoofdstuk 10 |
 | Bevochtiging (hoofdstuk 12) | per zone verneveling of stoom, eventueel bediend oppervlak | hoofdstuk 12 |
 | Verlichting (hoofdstuk 14), alleen utiliteit | per verlichtingszone vermogen (forfait of armaturen), schakeling, daglicht, parasitair vermogen; onder 2022 en 2020+A1 ook constante-lichtregeling (tabel 14.4) | hoofdstuk 14 |
 | PV (§16) | piekvermogen, belemmering per systeem | hoofdstuk 16, §17.3 |
