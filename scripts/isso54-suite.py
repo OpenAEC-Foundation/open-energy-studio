@@ -1900,6 +1900,41 @@ CASES += [
 ]
 
 
+# --- EP-W010: an obstruction on the plot parallel to the facade (p. 13-14) ---
+# Figure 6: windows 3,0 x 2,0 m with the sill at 0,5 m, storey height 2,7 m,
+# so the window centres are at 1,5 m and 4,2 m. h_b;perp of 17.3.2b (2022
+# p. 671): (h - centre) / x; an obstruction below the centre is no
+# obstruction (minimal, 17.3.2a). raam-zuid-1/2 are taken as the ground-floor
+# windows, raam-zuid-3/4 as the upper floor.
+WINDOW_CENTRES = {"raam-zuid-1": 1.5, "raam-zuid-2": 1.5, "raam-zuid-3": 4.2, "raam-zuid-4": 4.2}
+
+
+def plot_obstruction(test_id, distance, height):
+    entries = []
+    for window_id, centre in WINDOW_CENTRES.items():
+        relative = (height - centre) / distance
+        obstruction = {"method": "parallel_obstruction", "relativeHeight": round(relative, 4)} if relative > 0 else {"method": "minimal"}
+        entries.append(
+            {
+                "windowId": window_id,
+                "obstruction": obstruction,
+                "sourceReference": f"ISSO 54 v2.0 {test_id} p. 13: x {distance} m, h {height} m, raammidden {centre} m: h_b = {round(relative, 4)}",
+            }
+        )
+    return setp(f"{NTA}/windowObstructions", entries)
+
+
+CASES += [
+    ("EPW010a", 13, [plot_obstruction("EP-W010a", 0.6, 2.7)]),
+    ("EPW010b", 13, [plot_obstruction("EP-W010b", 0.6, 5.4)]),
+    ("EPW010c", 13, [plot_obstruction("EP-W010c", 1.2, 2.7)]),
+    ("EPW010d", 13, [plot_obstruction("EP-W010d", 1.2, 5.4)]),
+    # EP-W010e: full obstruction for all windows (17.3.2e); the cooling
+    # conditions of table 17.14 are not stated, so table 17.5 applies.
+    ("EPW010e", 13, [setp(f"{NTA}/windowSolar/obstruction", {"method": "full"})]),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS

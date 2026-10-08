@@ -10938,6 +10938,376 @@
       }
     },
     {
+      "caseId": "isso54-v2-EPW010a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/windowObstructions",
+          "value": [
+            {
+              "windowId": "raam-zuid-1",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 2.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010a p. 13: x 0.6 m, h 2.7 m, raammidden 1.5 m: h_b = 2.0"
+            },
+            {
+              "windowId": "raam-zuid-2",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 2.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010a p. 13: x 0.6 m, h 2.7 m, raammidden 1.5 m: h_b = 2.0"
+            },
+            {
+              "windowId": "raam-zuid-3",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010a p. 13: x 0.6 m, h 2.7 m, raammidden 4.2 m: h_b = -2.5"
+            },
+            {
+              "windowId": "raam-zuid-4",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010a p. 13: x 0.6 m, h 2.7 m, raammidden 4.2 m: h_b = -2.5"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-010a, p. 13",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW010b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/windowObstructions",
+          "value": [
+            {
+              "windowId": "raam-zuid-1",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 6.5
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010b p. 13: x 0.6 m, h 5.4 m, raammidden 1.5 m: h_b = 6.5"
+            },
+            {
+              "windowId": "raam-zuid-2",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 6.5
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010b p. 13: x 0.6 m, h 5.4 m, raammidden 1.5 m: h_b = 6.5"
+            },
+            {
+              "windowId": "raam-zuid-3",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 2.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010b p. 13: x 0.6 m, h 5.4 m, raammidden 4.2 m: h_b = 2.0"
+            },
+            {
+              "windowId": "raam-zuid-4",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 2.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010b p. 13: x 0.6 m, h 5.4 m, raammidden 4.2 m: h_b = 2.0"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-010b, p. 13",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW010c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/windowObstructions",
+          "value": [
+            {
+              "windowId": "raam-zuid-1",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 1.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010c p. 13: x 1.2 m, h 2.7 m, raammidden 1.5 m: h_b = 1.0"
+            },
+            {
+              "windowId": "raam-zuid-2",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 1.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010c p. 13: x 1.2 m, h 2.7 m, raammidden 1.5 m: h_b = 1.0"
+            },
+            {
+              "windowId": "raam-zuid-3",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010c p. 13: x 1.2 m, h 2.7 m, raammidden 4.2 m: h_b = -1.25"
+            },
+            {
+              "windowId": "raam-zuid-4",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010c p. 13: x 1.2 m, h 2.7 m, raammidden 4.2 m: h_b = -1.25"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-010c, p. 13",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW010d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/windowObstructions",
+          "value": [
+            {
+              "windowId": "raam-zuid-1",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 3.25
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010d p. 13: x 1.2 m, h 5.4 m, raammidden 1.5 m: h_b = 3.25"
+            },
+            {
+              "windowId": "raam-zuid-2",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 3.25
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010d p. 13: x 1.2 m, h 5.4 m, raammidden 1.5 m: h_b = 3.25"
+            },
+            {
+              "windowId": "raam-zuid-3",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 1.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010d p. 13: x 1.2 m, h 5.4 m, raammidden 4.2 m: h_b = 1.0"
+            },
+            {
+              "windowId": "raam-zuid-4",
+              "obstruction": {
+                "method": "parallel_obstruction",
+                "relativeHeight": 1.0
+              },
+              "sourceReference": "ISSO 54 v2.0 EP-W010d p. 13: x 1.2 m, h 5.4 m, raammidden 4.2 m: h_b = 1.0"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-010d, p. 13",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW010e",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/windowSolar/obstruction",
+          "value": {
+            "method": "full"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-010e, p. 13",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
       "caseId": "isso54-v2-EPU001",
       "normVersion": "2022",
       "projectFile": "../isso54/EPU001.json",
