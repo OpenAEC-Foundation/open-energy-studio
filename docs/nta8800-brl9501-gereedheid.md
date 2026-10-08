@@ -48,7 +48,7 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 | §4.3.1, p. 8 | De berekening en de uitkomst worden geleverd in de vastgelegde XML-standaard voor upload naar de RVO-database. | extern | Er is een `ep-online-gegevensoverzicht.json` volgens het openbare *export*schema. Dat is uitdrukkelijk geen registratiebestand ([attestdossier](nta8800-attestdossier.md), [bronnenregister](nta8800-bronnenregister.md)). | Het XSD voor aanlevering of registratie, op te vragen bij RVO, en daarna de adapter. |
 | §4.3.1, p. 8 | Voldoen aan de eisen van RVO voor inloggen met eHerkenning. | extern | – | De eisen van RVO, en eHerkenning voor de attesthouder. |
 | §4.3.1 opm., p. 8 | Bij invoer voor registratie wordt vermeld of, en met welk hulpmiddel, de adviseur gegevens heeft ingelezen. Automatisch inlezen mag niet. | voldaan | `src/core/io/importLog.ts`: elke UNIEC3- of VABI-import schrijft een regel. De registratiecontrole geeft `dataImport`, en het rapport toont dat. Een import start altijd de adviseur zelf. | – |
-| §4.4, p. 8 | De attesthouder geeft de licentiehouders schriftelijk een handleiding. Zonder licenties hoeft dat niet, maar een beknopte beschrijving voor de instelling wordt aangeraden. | deels | De [handleiding](handleiding-nta8800/index.md) staat als Markdown in de repo. | De handleiding wordt nog niet met een release meegeleverd, als PDF of in de app (taak B7). |
+| §4.4, p. 8 | De attesthouder geeft de licentiehouders schriftelijk een handleiding. Zonder licenties hoeft dat niet, maar een beknopte beschrijving voor de instelling wordt aangeraden. | voldaan | De [handleiding](handleiding-nta8800/index.md) zit in het programma (Gereedschap › Handleiding, ook via Instellingen › Over en een knop *Handleiding* op elke werkstap) en gaat bij elke vrijgave als één HTML-bestand mee, met SHA-256 in het leveringsdocument en `SHA256SUMS` (taak B7). De stempel in `index.md` noemt de rekenkernversie; de gate controleert die tegen `KERNEL_VERSION`. | Een PDF komt alleen mee als op de buildmachine chromium of wkhtmltopdf staat; anders alleen HTML. |
 
 ### Eisen aan de attesthouder (hoofdstuk 5)
 
@@ -138,7 +138,7 @@ Afgerond op 8 oktober 2026: B1–B5 (gebouwd, zie de rijen) en B6, B8 en B9 (✔
 |---|---|---|
 | **B1** | §3.0, §6.2, §6.3, §7.2 | Een testsetrunner die alle referentiecases in een map draait, met `audit_reference_case` per case. Hij schrijft een rapport (Markdown en JSON) met de commit, `KERNEL_VERSION`, `TARGET_NORM_VERSION`, het oordeel per deeltest en de SHA-256 van invoer en uitvoer. De gate roept hem aan, zodat de openbare gevallen en later ISSO 54 elke run meelopen. **Gebouwd (8 oktober 2026):** `reference_gate --suite … --report-dir …` met `reference-report.json` en `.md`; suites voor de openbare gevallen A–F en de RVO-voorbeeldwoningen; draait in elke gate. |
 | **B2** | §4.2 | Bandbreedtes in het referentiemanifest: naast `absoluteTolerance` ook `relativeTolerance` (bijvoorbeeld 1 %), en per metriek de regel "absoluut of relatief, welke het ruimst is". ISSO 54 versie 2.0 werkt met een percentage per deeltest. |
-| **B7** | §4.4 | De handleiding bij elke release meeleveren, als PDF of in de app, met dezelfde versie als het programma. |
+| **B7** ✔ | §4.4 | De handleiding bij elke release meeleveren, als PDF of in de app, met dezelfde versie als het programma. **Gebouwd (9 oktober 2026):** in de app via `src/core/manual/` en `ManualView`; bij de vrijgave `scripts/nta-manual.mjs html`; gatecontrole `scripts/nta-manual.mjs check`. |
 | **B8** ✔ | §8.4 | Het NL-EPBD-merk en het attestnummer tonen in de app en op het rapport, zodra `SOFTWARE_ATTEST_NUMBER` gevuld is. |
 | **B9** ✔ | Omgevingsregeling art. 5.13a | Invoervelden voor de verklaringen van de adviseur bij labelelementen k en l. |
 
@@ -185,10 +185,10 @@ Telling over de eisentabel in §1 (34 rijen). Een rij met twee statussen telt bi
 
 | Status | Aantal |
 |---|---|
-| voldaan | 5 |
-| deels | 13 |
+| voldaan | 6 |
+| deels | 12 |
 | open | 8 |
 | extern | 7 |
 | n.v.t. | 1 |
 
-Bijgewerkt na taken B1–B5 en B6, B8, B9 (8 oktober 2026): §3.0, §4.3 en §6.2 (logboek) gingen naar voldaan, §6.1 en §8.4 van open naar deels.
+Bijgewerkt na taken B1–B5 en B6, B8, B9 (8 oktober 2026): §3.0, §4.3 en §6.2 (logboek) gingen naar voldaan, §6.1 en §8.4 van open naar deels. Na taak B7 (9 oktober 2026) ging §4.4 van deels naar voldaan.

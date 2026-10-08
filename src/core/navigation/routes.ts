@@ -35,6 +35,8 @@ export interface Route {
   sub?: string;
   /** Kernel or project path of the field to focus after navigating ("Ga naar"). */
   focusPath?: string;
+  /** Gereedschap › Handleiding: the chapter, optionally with "#anchor" ("03-projectberekening#koelvermogen…"). */
+  chapter?: string;
 }
 
 export const WORKFLOW_STEPS: StepDefinition[] = [
@@ -119,8 +121,12 @@ export const TOOL_STEP: StepDefinition = {
     { id: 'uvalue', labelKey: 'ribbon.uvalueCalc' },
     { id: 'thermal-bridge', labelKey: 'ribbon.thermalBridgeCalc' },
     { id: 'heat-pump-sizing', labelKey: 'ribbon.heatPumpSizing' },
+    { id: 'manual', labelKey: 'manual.title' },
   ],
 };
+
+/** Tool pages that are not calculators (the tools menu lists them under Help). */
+export const HELP_TOOL_SUBS = new Set(['manual']);
 
 export const STEP_GROUPS: Array<{ id: StepGroup; labelKey: string }> = [
   { id: 'input', labelKey: 'nav.group.input' },
@@ -148,7 +154,10 @@ export function defaultSub(step: StepId): string | undefined {
 export function normalizeRoute(route: Route): Route {
   const definition = stepDefinition(route.step);
   const sub = route.sub && definition.subs.some((candidate) => candidate.id === route.sub) ? route.sub : defaultSub(route.step);
-  return { step: definition.id, ...(sub ? { sub } : {}), ...(route.focusPath ? { focusPath: route.focusPath } : {}) };
+  return {
+    step: definition.id, ...(sub ? { sub } : {}), ...(route.focusPath ? { focusPath: route.focusPath } : {}),
+    ...(route.chapter && definition.id === 'tool' && sub === 'manual' ? { chapter: route.chapter } : {}),
+  };
 }
 
 /** Old view modes (ribbon era) as routes; `SET_VIEW_MODE` is an alias of navigating there. */
