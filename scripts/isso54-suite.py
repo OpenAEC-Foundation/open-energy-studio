@@ -271,6 +271,317 @@ CASES = [
 ]
 
 
+# --- EP-W012: movable shading with the building turned (p. 15) ---
+# Table 7.5/7.6 devices, operated from inside: manual residential control.
+def residential_screen(device):
+    return setp(
+        f"{NTA}/windowSolar/movableShading",
+        {"device": device, "control": "manual_residential", "sourceReference": "zonwering volgens de deeltest, van binnenuit bediend"},
+    )
+
+
+CASES += [
+    ("EPW012a", 15, [residential_screen({"kind": "external_screen", "colour": "dark"})]),
+    ("EPW012b", 15, rotate("SW") + [residential_screen({"kind": "external_venetian_blind", "colour": "white"})]),
+    ("EPW012c", 15, rotate("W") + [residential_screen({"kind": "external_screen", "colour": "other"})]),
+    ("EPW012d", 15, rotate("SE") + [residential_screen({"kind": "internal_metallised_fabric"})]),
+    ("EPW012e", 15, rotate("E") + [residential_screen({"kind": "drop_arm_awning"})]),
+    ("EPW012f", 15, [residential_screen({"kind": "folding_arm_awning"})]),
+]
+
+
+# --- EP-W4xx: hot water (p. 33-40) ---
+HW = f"{NTA}/hotWater"
+
+
+def draw_off(kitchen, diameter, bathroom):
+    return setp(
+        f"{HW}/emission",
+        {
+            "method": "residential",
+            "served": "kitchen_and_bathroom",
+            "kitchenLengthM": kitchen,
+            "kitchenPipeDiameter": diameter,
+            "bathroomLengthM": bathroom,
+            "sourceReference": "uittapleidingen volgens de deeltest",
+        },
+    )
+
+
+def showers(units, connection):
+    return setp(
+        f"{HW}/showerHeatRecovery",
+        {"showers": units, "connection": connection, "sourceReference": "douche-WTW volgens de deeltest"},
+    )
+
+
+def vessel(volume, loss, factor, heated, vessel_id="vat-1", **extra):
+    body = {
+        "id": vessel_id,
+        "volumeL": volume,
+        "loss": loss,
+        "connectionFactor": factor,
+        "inHeatedZone": heated,
+        "sourceReference": "voorraadvat volgens de deeltest",
+    }
+    body.update(extra)
+    return body
+
+
+def hw_generator(body):
+    return setp(f"{HW}/generator", body)
+
+
+def indirect_hr107(inside, also_heating=True):
+    return hw_generator(
+        {"kind": "indirect_boiler", "boiler": "hr107", "oil": False, "insideBoundary": inside, "alsoSpaceHeating": also_heating}
+    )
+
+
+MINIMAL = {"method": "minimal"}
+FULL = {"method": "full"}
+
+
+def LABEL(label):
+    return {"method": "label", "label": label}
+
+
+def MEASURED(w_per_k):
+    return {"method": "measured", "transmissionWPerK": w_per_k}
+
+
+def storage(volume, loss, backup=None):
+    body = {"totalVolumeL": volume, "loss": loss}
+    if backup is not None:
+        body["backupVolumeL"] = backup
+    return body
+
+
+def solar(area, collector, orientation, tilt, obstruction, vessel_body, solar_type="preheater", use="water_heating", pvt=None):
+    heater = {
+        "id": "zonneboiler-1",
+        "solarUse": use,
+        "method": {
+            "method": "calculated",
+            "solarType": solar_type,
+            "collectors": {
+                "moduleAreaM2": area,
+                "moduleCount": 1,
+                "orientation": orientation,
+                "tiltDeg": tilt,
+                "obstruction": obstruction,
+                "efficiency": {"method": "forfait", "collector": collector},
+                "loopPipes": {"method": "forfait"},
+            },
+            "storage": vessel_body,
+        },
+        "sourceReference": "zonneboiler volgens de deeltest, collector- en vatgegevens forfaitair waar niet gegeven",
+    }
+    if pvt is not None:
+        heater["pvt"] = pvt
+    return setp(f"{HW}/solar", [heater])
+
+
+def pv(system_id, kpk, area, azimuth, tilt, mounting, obstruction=MINIMAL, **extra):
+    body = {
+        "id": system_id,
+        "peakPower": {"method": "declared_specific", "peakPowerWPerM2": kpk, "panelAreaM2": area},
+        "azimuthDeg": azimuth,
+        "tiltDeg": tilt,
+        "mounting": mounting,
+        "obstruction": obstruction,
+        "sourceReference": "PV-systeem volgens de deeltest",
+    }
+    body.update(extra)
+    return body
+
+
+CASES += [
+    # EP-W401a/b: draw-off lengths and kitchen pipe diameter (p. 33; table 13.2).
+    ("EPW401a", 33, [draw_off(7.0, "up_to_10_mm", 3.0)]),
+    ("EPW401b", 33, [draw_off(3.0, "up_to_8_mm", 1.0)]),
+    # EP-W403a-d: shower heat recovery (p. 34-35; table 13.8, 13.5.3).
+    ("EPW403a", 34, [showers([{"unit": "vertical"}], "mixer_and_heater")]),
+    ("EPW403b", 34, [showers([{"unit": "horizontal"}], "heater_only")]),
+    (
+        "EPW403c",
+        34,
+        [
+            showers(
+                [{"unit": "declared", "efficiency": 0.45, "sourceReference": "ISSO 54 v2.0 EP-W403c p. 34: rendement 45 % (verklaring aanwezig)"}],
+                "mixer_only",
+            )
+        ],
+    ),
+    ("EPW403d", 35, [showers([{"unit": "horizontal"}, {"unit": "vertical"}], "mixer_only")]),
+    # EP-W404a-d: storage vessels (p. 35; 13.6, f_sto;dis;ls 2022 p. 549-550).
+    (
+        "EPW404a",
+        35,
+        [setp(f"{HW}/storage", [vessel(100.0, {"method": "label", "label": "a_plus"}, 2, True)]), indirect_hr107(True)],
+    ),
+    (
+        "EPW404b",
+        35,
+        [
+            setp(
+                f"{HW}/storage",
+                [
+                    vessel(200.0, {"method": "label", "label": "f"}, 5, False, "vat-1"),
+                    vessel(200.0, {"method": "label", "label": "f"}, 5, False, "vat-2"),
+                ],
+            ),
+            indirect_hr107(False),
+            setp(f"{BOILER}/location", "outside_thermal_boundary"),
+        ],
+    ),
+    (
+        "EPW404c",
+        35,
+        [
+            setp(
+                f"{HW}/storage",
+                [
+                    vessel(
+                        100.0,
+                        {"method": "measured_standby", "standbyKwhPerDay": 2.0, "referenceStorageC": 60.0, "referenceAmbientC": 20.0},
+                        1,
+                        True,
+                    )
+                ],
+            ),
+            setp(f"{HW}/boilingWaterTap", True),
+            hw_generator({"kind": "electric_boiler"}),
+        ],
+    ),
+    (
+        "EPW404d",
+        35,
+        [
+            setp(
+                f"{HW}/storage",
+                [vessel(150.0, {"method": "label", "label": "c"}, 2, True, electricBoilerInsulatedPipe=True)],
+            ),
+            hw_generator({"kind": "electric_boiler"}),
+        ],
+    ),
+    # EP-W406: hot-water generators (p. 37-40; tables 13.25-13.28).
+    ("EPW406a", 37, [hw_generator({"kind": "gas_appliance", "appliance": "combi_gaskeur", "measuredClass": "class3"})]),
+    (
+        "EPW406b",
+        37,
+        [
+            setp(f"{HW}/storage", [vessel(80.0, {"method": "label", "label": "c"}, 2, True, electricBoilerInsulatedPipe=True)]),
+            hw_generator({"kind": "electric_boiler"}),
+        ],
+    ),
+    ("EPW406c", 37, [hw_generator({"kind": "electric_instantaneous"})]),
+    (
+        "EPW406g",
+        37,
+        [hw_generator({"kind": "gas_storage_heater", "volumeL": 100.0, "before1985": False, "inHeatedZone": True})],
+    ),
+    # EP-W405a-f: solar water heaters, method 2 with table 13.14 forfaits
+    # (p. 35-36; 13.7.2.2). The given area is taken as the reference area.
+    ("EPW405a", 35, [solar(5.0, "glazed", "south", 45.0, MINIMAL, storage(100.0, LABEL("a")))]),
+    ("EPW405b", 35, [solar(3.0, "unglazed_or_unknown", "west", 30.0, MINIMAL, storage(200.0, LABEL("c")))]),
+    ("EPW405c", 36, [solar(3.0, "evacuated_tube", "south_east", 60.0, FULL, storage(150.0, MEASURED(0.5)))]),
+    (
+        "EPW405d",
+        36,
+        [
+            solar(5.0, "glazed", "south", 30.0, FULL, storage(150.0, MEASURED(0.5), backup=150.0), solar_type="integrated_backup"),
+            indirect_hr107(True, also_heating=False),
+        ],
+    ),
+    (
+        "EPW405e",
+        36,
+        [
+            solar(5.0, "glazed", "south", 30.0, MINIMAL, storage(220.0, LABEL("b"), backup=100.0), solar_type="integrated_backup"),
+            indirect_hr107(True),
+        ],
+    ),
+    ("EPW405f", 36, [solar(5.0, "glazed", "south", 30.0, MINIMAL, storage(220.0, LABEL("b")), use="combi")]),
+    (
+        "EPW406q",
+        39,
+        [
+            hw_generator(
+                {
+                    "kind": "gas_appliance",
+                    "appliance": "combi_gaskeur_hr_cw",
+                    "measuredClass": "class4",
+                    "declared": {"value": 0.725, "sourceReference": "ISSO 54 v2.0 EP-W406q p. 39: kwaliteitsverklaring, gemeten tappatroon CW4, rendement 72,5 %"},
+                }
+            )
+        ],
+    ),
+]
+
+
+# --- EP-W501: PV panels (p. 42-43; 16.4a, tables 16.1/16.2, 17.15) ---
+CASES += [
+    ("EPW501a", 42, [setp(f"{NTA}/pvSystems", [pv("pv-1", 165.0, 16.0, 180.0, 30.0, "moderately_ventilated")])]),
+    (
+        "EPW501b",
+        42,
+        [
+            setp(
+                f"{NTA}/pvSystems",
+                [
+                    pv("pv-1", 170.0, 16.0, 225.0, 45.0, "not_ventilated"),
+                    pv("pv-2", 140.0, 3.2, 135.0, 30.0, "strongly_ventilated", FULL),
+                ],
+            )
+        ],
+    ),
+    (
+        "EPW501c",
+        42,
+        [
+            setp(
+                f"{NTA}/pvSystems",
+                [
+                    {
+                        "id": "pv-1",
+                        "peakPower": {"method": "table16_1", "moduleType": "multicrystalline_before2001", "panelAreaM2": 6.4},
+                        "azimuthDeg": 90.0,
+                        "tiltDeg": 15.0,
+                        "mounting": "moderately_ventilated",
+                        "obstruction": MINIMAL,
+                        "sourceReference": "ISSO 54 v2.0 EP-W501c p. 42: multikristallijn, geplaatst in 2000 (tabel 16.1)",
+                    }
+                ],
+            )
+        ],
+    ),
+    # EP-W501d: 10 m2 PVT covered with single glass on a solar preheater
+    # (p. 42-43; table 16.4 and 13.16).
+    (
+        "EPW501d",
+        42,
+        [
+            setp(
+                f"{NTA}/pvSystems",
+                [
+                    pv(
+                        "pvt-1",
+                        150.0,
+                        10.0,
+                        270.0,
+                        60.0,
+                        "not_ventilated",
+                        pvt={"kind": "glazed", "collectorAreaM2": 10.0, "storageVolumeL": 100.0},
+                    )
+                ],
+            ),
+            solar(10.0, "glazed", "west", 60.0, MINIMAL, storage(100.0, LABEL("a")), pvt="single_glazed"),
+        ],
+    ),
+]
+
+
 # --- EP-U: the EP-U001 office (p. 44) ---
 # One use function in four enums: demand (table 7.13), ventilation (table
 # 11.8), label/hot water/lighting (tables 13.1, 14.x) and Bbl.

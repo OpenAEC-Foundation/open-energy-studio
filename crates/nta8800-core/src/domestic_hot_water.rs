@@ -2199,14 +2199,23 @@ pub fn validate_hot_water(
                 .map(|unit| &unit.generator),
         )
         .collect();
-    let needs_storage = generators.iter().any(|generator| {
-        matches!(
-            generator,
-            HotWaterGenerator::ElectricBoiler
-                | HotWaterGenerator::IndirectBoiler { .. }
-                | HotWaterGenerator::IndirectHeatPump { .. }
-        )
+    // §13.6.2 (2025+C1 p. 566, 2022 p. 547): for a solar system the loss of
+    // the vessel and of its backup part follows 13.7 (13.95/13.113), so a
+    // boiler that heats the backup part of an integrated-backup solar vessel
+    // needs no separate vessel of its own.
+    let solar_vessel_with_backup = system.solar.iter().any(|heater| {
+        heater.solar_use != crate::solar_thermal::SolarUse::SpaceHeating
+            && heater.method.solar_type() == crate::solar_thermal::SolarType::IntegratedBackup
     });
+    let needs_storage = !solar_vessel_with_backup
+        && generators.iter().any(|generator| {
+            matches!(
+                generator,
+                HotWaterGenerator::ElectricBoiler
+                    | HotWaterGenerator::IndirectBoiler { .. }
+                    | HotWaterGenerator::IndirectHeatPump { .. }
+            )
+        });
     // Note 1 of §13.6.2: a vessel outside the 24-hour test of a
     // 13.8.4.2/13.8.4.3 appliance is calculated like any other.
     let tested = generators.iter().any(|generator| {
@@ -5809,6 +5818,69 @@ mod tests {
         let expected =
             jan.generator_output_kwh / jan.generation_efficiency - jan.generator_output_kwh;
         assert!((jan.recoverable_loss_kwh - expected).abs() < 1e-9);
+    }
+
+    /// §13.6.2 (2025+C1 p. 566): for a solar system the vessel and its
+    /// backup part are calculated in 13.7, so a boiler heating the backup
+    /// part of an integrated-backup solar vessel needs no vessel of its own
+    /// (ISSO 54 v2.0 EP-W405d/e). A solar preheater does not lift the
+    /// requirement: the boiler's own vessel stays.
+    #[test]
+    fn integrated_backup_solar_vessel_replaces_the_boiler_vessel() {
+        use crate::solar_thermal::{
+            CollectorEfficiency, CollectorField, CollectorType, LoopPipes, SolarMethod,
+            SolarStorage, SolarType, SolarUse, SolarWaterHeater,
+        };
+        let solar = |solar_type| SolarWaterHeater {
+            id: "zb".into(),
+            solar_use: SolarUse::WaterHeating,
+            count: 1,
+            method: SolarMethod::Calculated {
+                solar_type,
+                collectors: CollectorField {
+                    module_area_m2: 5.0,
+                    module_count: 1,
+                    orientation: crate::climate::Orientation::South,
+                    tilt_deg: 30.0,
+                    obstruction: crate::solar_shading::CollectorObstruction::Minimal,
+                    efficiency: CollectorEfficiency::Forfait {
+                        collector: CollectorType::Glazed,
+                    },
+                    heat_exchanger_w_per_k: None,
+                    loop_pipes: LoopPipes::Forfait,
+                    pump_power_w: None,
+                },
+                storage: SolarStorage {
+                    total_volume_l: 220.0,
+                    backup_volume_l: Some(100.0),
+                    loss: StorageLoss::Label {
+                        label: StorageLabel::B,
+                    },
+                    backup_loss_in_generator_efficiency: false,
+                },
+            },
+            pvt: None,
+            source_reference: "ISSO 54 v2.0 EP-W405e".into(),
+        };
+        let mut input = system(HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: None,
+            pilot_flame: false,
+        });
+        let codes = |input: &HotWaterSystem| -> Vec<&str> {
+            validate_hot_water(input, context(), "dhw")
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        assert!(codes(&input).contains(&"hot_water_storage_required"));
+        input.solar = vec![solar(SolarType::IntegratedBackup)];
+        assert!(!codes(&input).contains(&"hot_water_storage_required"));
+        input.solar = vec![solar(SolarType::Preheater)];
+        assert!(codes(&input).contains(&"hot_water_storage_required"));
     }
 
     #[test]
