@@ -26,6 +26,9 @@ if (!import.meta.env.DEV) {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
+// The app started: index.html's stale-asset reload is not needed (and its flag can go).
+(window as unknown as { __oesStarted?: boolean }).__oesStarted = true;
+try { sessionStorage.removeItem('oes.reloadedForStaleAssets'); } catch { /* storage unavailable */ }
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
