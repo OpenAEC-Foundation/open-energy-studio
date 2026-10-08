@@ -485,23 +485,37 @@ pub(crate) fn validate_item_ids<'a>(
 /// hot-water generators and further hot-water systems.
 fn validate_residential_item_ids(survey: &ResidentialSurvey, recorder: &mut Recorder) {
     validate_item_ids(
-        survey.heating.additional_generators.iter().map(|item| item.id.as_deref()),
+        survey
+            .heating
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
         "heating.additionalGenerators",
         recorder,
     );
     validate_item_ids(
-        survey.hot_water.additional_generators.iter().map(|item| item.id.as_deref()),
+        survey
+            .hot_water
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
         "hotWater.additionalGenerators",
         recorder,
     );
     validate_item_ids(
-        survey.additional_hot_water_systems.iter().map(|item| item.id.as_deref()),
+        survey
+            .additional_hot_water_systems
+            .iter()
+            .map(|item| item.id.as_deref()),
         "additionalHotWaterSystems",
         recorder,
     );
     for (index, system) in survey.additional_hot_water_systems.iter().enumerate() {
         validate_item_ids(
-            system.additional_generators.iter().map(|item| item.id.as_deref()),
+            system
+                .additional_generators
+                .iter()
+                .map(|item| item.id.as_deref()),
             &format!("additionalHotWaterSystems[{index}].additionalGenerators"),
             recorder,
         );
@@ -1431,12 +1445,18 @@ mod tests {
         assert_eq!(json["heating"]["additionalGenerators"][0]["id"], "wp-1");
         survey.heating.additional_generators = vec![extra(Some("wp-1")), extra(Some("wp-1"))];
         let repeated = assess_residential_survey(&survey);
-        assert!(repeated.issues.iter().any(|item| item.code == "survey_item_id_duplicate"
-            && item.path == "heating.additionalGenerators[1].id"));
+        assert!(repeated
+            .issues
+            .iter()
+            .any(|item| item.code == "survey_item_id_duplicate"
+                && item.path == "heating.additionalGenerators[1].id"));
         survey.heating.additional_generators = vec![extra(Some(" "))];
         let blank = assess_residential_survey(&survey);
-        assert!(blank.issues.iter().any(|item| item.code == "survey_item_id_blank"
-            && item.path == "heating.additionalGenerators[0].id"));
+        assert!(blank
+            .issues
+            .iter()
+            .any(|item| item.code == "survey_item_id_blank"
+                && item.path == "heating.additionalGenerators[0].id"));
     }
 
     #[test]

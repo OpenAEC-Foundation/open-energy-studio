@@ -3392,23 +3392,37 @@ fn lighting_value(
 fn validate(survey: &UtilitySurvey, recorder: &mut Recorder) {
     // Ids of the lists without a natural key (evidence and photo links).
     super::validate_item_ids(
-        survey.heating.additional_generators.iter().map(|item| item.id.as_deref()),
+        survey
+            .heating
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
         "heating.additionalGenerators",
         recorder,
     );
     super::validate_item_ids(
-        survey.hot_water.additional_generators.iter().map(|item| item.id.as_deref()),
+        survey
+            .hot_water
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
         "hotWater.additionalGenerators",
         recorder,
     );
     super::validate_item_ids(
-        survey.additional_hot_water_systems.iter().map(|item| item.id.as_deref()),
+        survey
+            .additional_hot_water_systems
+            .iter()
+            .map(|item| item.id.as_deref()),
         "additionalHotWaterSystems",
         recorder,
     );
     for (index, system) in survey.additional_hot_water_systems.iter().enumerate() {
         super::validate_item_ids(
-            system.additional_generators.iter().map(|item| item.id.as_deref()),
+            system
+                .additional_generators
+                .iter()
+                .map(|item| item.id.as_deref()),
             &format!("additionalHotWaterSystems[{index}].additionalGenerators"),
             recorder,
         );

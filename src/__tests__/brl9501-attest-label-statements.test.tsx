@@ -75,7 +75,7 @@ describe('label elements k and l (Omgevingsregeling art. 5.13a lid 1)', () => {
 
   it('prefers the kernel label elements k and l and shows them once', () => {
     const { project, assessment } = load();
-    const elements = assessment.labelData!.indicators!.elements;
+    const elements = assessment.labelData!.indicators!.elements!;
     const kernel: ProjectPerformanceAssessment = {
       ...assessment,
       labelData: {

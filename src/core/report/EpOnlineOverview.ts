@@ -218,9 +218,9 @@ export function buildEpOnlineOverview(
     labelStatements: {
       note: LABEL_STATEMENTS_NOTE,
       // The kernel's label elements k and l first; the registration when there is no label data.
-      k_reageertOpExterneSignalen: indicators?.elements.respondsToExternalSignals
+      k_reageertOpExterneSignalen: indicators?.elements?.respondsToExternalSignals
         ?? registration.labelStatements?.respondsToExternalSignals ?? null,
-      l_afgiftesysteemLageTemperatuur: indicators?.elements.lowTemperatureHeating
+      l_afgiftesysteemLageTemperatuur: indicators?.elements?.lowTemperatureHeating
         ?? registration.labelStatements?.lowTemperatureHeating ?? null,
     },
   };
