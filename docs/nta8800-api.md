@@ -28,7 +28,7 @@ cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
 
 Een vlag wint van de omgevingsvariabele. Op een niet-loopback-adres meldt de server een waarschuwing: de API heeft geen authenticatie en is bedoeld voor lokaal gebruik. SIGINT en SIGTERM stoppen netjes: de server neemt geen nieuwe verbindingen meer aan en laat lopende verzoeken afmaken.
 
-Het geheugen van een berekening groeit ongeveer evenredig met het aantal rekenzones (circa 0,7 MB per zone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#grenzen-en-prestaties)). `--max-calculations` begrenst daarmee het geheugen van de service. Na de tijdslimiet krijgt de client 503; een berekening die al loopt, maakt de service op de achtergrond af en houdt zolang haar rekenplaats bezet.
+Het geheugen van een berekening groeit ongeveer evenredig met het aantal rekenzones (circa 0,7 MB per zone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties)). `--max-calculations` begrenst daarmee het geheugen van de service. Na de tijdslimiet krijgt de client 503; een berekening die al loopt, maakt de service op de achtergrond af en houdt zolang haar rekenplaats bezet.
 
 De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desktop-app roept de kern rechtstreeks aan en gebruikt de API niet.
 
