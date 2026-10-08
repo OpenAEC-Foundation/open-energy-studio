@@ -1045,6 +1045,58 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    fn pending_suite_case(case_id: &str, patch: Value) -> Value {
+        json!({
+            "caseId":case_id, "normVersion":"2025+C1", "projectFile":"project.json",
+            "projectPatch": patch,
+            "source":{"publisher":"synthetic", "documentId":"internal-3", "edition":"test",
+                "usePermission":"internal", "independentReviewer":"none"},
+            "pending":{"reason":"results document not in hand",
+                "metrics":[{"path":"beng2", "unit":"kWh/m2.year",
+                    "normReference":"internal test", "relativeTolerance":0.01}]}
+        })
+    }
+
+    #[test]
+    fn pending_cases_record_without_a_verdict_but_must_calculate() {
+        let dir = suite_dir();
+        let suite = dir.join("suite.json");
+        fs::write(
+            &suite,
+            json!({"suiteId":"pending", "description":"test suite",
+                "cases":[pending_suite_case("pending-case", json!([]))]})
+            .to_string(),
+        )
+        .unwrap();
+        let report = run_with(&[], std::slice::from_ref(&suite), None);
+        assert!(report.numeric_comparison_passed, "{:?}", report.errors.len());
+        assert_eq!(report.pending_expectation_cases, 1);
+        let comparison = &report.cases[0].comparison;
+        assert_eq!(comparison.status, "pending_expectation");
+        assert!(comparison.metrics.is_empty());
+        assert_eq!(comparison.recorded[0].path, "beng2");
+        assert!(!report.reference_verified);
+        let text = markdown(&report);
+        assert!(text.contains("| pending-case | NTA 8800:2025+C1:2026 | geen verwachting | `beng2` | – |"));
+        assert!(text.contains("| Zonder verwachting | 1 gevallen"));
+
+        // A pending case whose project no longer calculates fails the run.
+        let broken = json!([{"op":"set", "pointer":"/ntaCalculation", "value":{}}]);
+        fs::write(
+            &suite,
+            json!({"suiteId":"pending", "description":"test suite",
+                "cases":[pending_suite_case("pending-case", json!([])),
+                    pending_suite_case("broken-case", broken)]})
+            .to_string(),
+        )
+        .unwrap();
+        let failed = run_with(&[], std::slice::from_ref(&suite), None);
+        assert!(!failed.numeric_comparison_passed);
+        assert_eq!(failed.pending_expectation_cases, 1);
+        assert_ne!(failed.cases[1].comparison.status, "pending_expectation");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn committed_suites_pass() {
         let root =
@@ -1052,18 +1104,35 @@ mod tests {
         let suites = [
             root.join("openbare-gevallen.json"),
             root.join("rvo-voorbeeldwoningen.json"),
+            root.join("isso54-v2.json"),
         ];
         let report = run_with(&[], &suites, None);
         let failing: Vec<_> = report
             .cases
             .iter()
-            .filter(|case| case.comparison.status != "compared_pass")
-            .map(|case| &case.comparison.case_id)
+            .filter(|case| !comparison_status_acceptable(case.comparison.status))
+            .map(|case| (&case.comparison.case_id, &case.comparison.issues))
             .collect();
         assert!(report.errors.is_empty(), "{}", report.errors[0].error);
         assert!(failing.is_empty(), "{failing:?}");
         assert!(report.numeric_comparison_passed);
-        assert_eq!(report.cases.len(), 23);
+        assert_eq!(report.cases.len(), 75);
+        // The public cases and RVO compare; every ISSO 54 deeltest is
+        // pending (its results document is not in hand) and calculates.
+        for case in &report.cases {
+            let isso = case.suite.as_deref() == Some("isso54-v2");
+            let expected = if isso {
+                "pending_expectation"
+            } else {
+                "compared_pass"
+            };
+            assert_eq!(
+                case.comparison.status, expected,
+                "{}",
+                case.comparison.case_id
+            );
+        }
+        assert_eq!(report.pending_expectation_cases, 52);
         // Every edition the kernel calculates in is exercised.
         for edition in [
             "NTA 8800:2025+C1:2026",

@@ -1310,11 +1310,11 @@ mod tests {
             reason: "results document of the test set not in hand".into(),
             metrics: vec![
                 PendingMetric {
-                    path: "beng1".into(),
-                    unit: "kWh/m2.year".into(),
-                    norm_reference: "BENG 1 (5.3)".into(),
-                    absolute_tolerance: 0.0,
-                    relative_tolerance: Some(0.01),
+                    path: "heatingMonth/1/heatingNeedKwh".into(),
+                    unit: "kWh".into(),
+                    norm_reference: "heating need, January (7.2)".into(),
+                    absolute_tolerance: 0.5,
+                    relative_tolerance: None,
                 },
                 PendingMetric {
                     path: "beng2".into(),
@@ -1330,11 +1330,11 @@ mod tests {
 
     #[test]
     fn pending_case_records_without_a_verdict_and_must_calculate() {
-        let project: Value = serde_json::from_str(include_str!(
+        let calculating: Value = serde_json::from_str(include_str!(
             "../../../training-data/nta8800-project-performance-synthetic.json"
         ))
         .unwrap();
-        let case = pending_case(project);
+        let case = pending_case(calculating);
         let audit = audit_reference_case(case.clone());
         assert!(audit.manifest_complete, "{:?}", audit.issues);
         let recorded = compare_reference_case(case.clone());
@@ -1380,7 +1380,7 @@ mod tests {
         let mut blank = pending_case(project());
         let pending = blank.pending.as_mut().unwrap();
         pending.reason = " ".into();
-        pending.metrics[1].path = "beng1".into();
+        pending.metrics[1].path = pending.metrics[0].path.clone();
         pending.metrics[0].relative_tolerance = Some(1.5);
         let found = codes(blank);
         for code in [
