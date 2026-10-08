@@ -31,6 +31,8 @@ RESIDENTIAL_METRICS = [
     ("tojuliMax", "K", "TOjuli;max (5.7)"),
 ]
 
+UTILITY_METRICS = RESIDENTIAL_METRICS[:3]
+
 SURFACE = {"dak": 0, "vloer": 1, "zuid": 2, "noord": 3, "oost": 4, "west": 5}
 NTA = "/ntaCalculation"
 VENT = f"{NTA}/ventilation"
@@ -269,11 +271,87 @@ CASES = [
 ]
 
 
+# --- EP-U: the EP-U001 office (p. 44) ---
+# One use function in four enums: demand (table 7.13), ventilation (table
+# 11.8), label/hot water/lighting (tables 13.1, 14.x) and Bbl.
+FUNCTIONS = {
+    "a": ("assembly_child_care", "assembly_child_care", "assembly_with_day_care", "assembly_child_care"),
+    "b": ("other_assembly", "other_assembly", "assembly_without_day_care", "other_assembly"),
+    "c": ("cell", "cell", "cell", "cell"),
+    "d": ("healthcare_with_beds", "healthcare_bed_area", "healthcare_with_beds", "healthcare_with_beds"),
+    "e": ("other_healthcare", "other_healthcare", "healthcare_without_beds", "other_healthcare"),
+    "f": ("lodging", "lodging_building", "lodging", "lodging_in_lodging_building"),
+    "g": ("education", "education", "education", "education"),
+    "h": ("sport", "sport", "sport", "sport"),
+    "i": ("retail", "retail", "retail", "retail"),
+}
+# Table 7.13: heating setpoint per function; cooling is 24 for all.
+HEATING_SETPOINT = {"healthcare_with_beds": 22.0, "sport": 16.0}
+
+
+def function(letter):
+    usage, ventilation, label, bbl = FUNCTIONS[letter]
+    heating = HEATING_SETPOINT.get(usage, 21.0)
+    return [
+        setp(f"{NTA}/usageFunction", usage),
+        setp(f"{NTA}/bblFunction", bbl),
+        setp(f"{NTA}/setpoints/heatingC", heating),
+        setp(f"{VENT}/heatingSetpointC", heating),
+        setp(f"{VENT}/functions", [{"function": ventilation, "areaM2": 96.0}]),
+        setp(f"{NTA}/hotWater/need/areas", [{"function": label, "areaM2": 96.0}]),
+        setp(f"{NTA}/lighting/0/functions", [{"function": label, "areaM2": 96.0}]),
+    ]
+
+
+def screen(device, control):
+    return setp(
+        f"{NTA}/windowSolar/movableShading",
+        {"device": device, "control": control, "sourceReference": "zonwering volgens de deeltest, van binnenuit bediend"},
+    )
+
+
+UTILITY_CASES = [
+    ("EPU001", 44, []),
+    *[(f"EPU002{letter}", 44, function(letter)) for letter in "abcdefghi"],
+    # EP-U002j: 30 % office, 70 % other assembly in one zone (p. 45).
+    (
+        "EPU002j",
+        45,
+        [
+            setp(f"{NTA}/usageFunction", "other_assembly"),
+            setp(f"{NTA}/bblFunction", "other_assembly"),
+            setp(
+                f"{VENT}/functions",
+                [{"function": "office", "areaM2": 28.8}, {"function": "other_assembly", "areaM2": 67.2}],
+            ),
+            setp(
+                f"{NTA}/hotWater/need/areas",
+                [{"function": "office", "areaM2": 28.8}, {"function": "assembly_without_day_care", "areaM2": 67.2}],
+            ),
+            setp(
+                f"{NTA}/lighting/0/functions",
+                [{"function": "office", "areaM2": 28.8}, {"function": "assembly_without_day_care", "areaM2": 67.2}],
+            ),
+        ],
+    ),
+    # EP-U102a-c: movable shading, operated from inside (p. 45; tables 7.5/7.6).
+    ("EPU102a", 45, [screen({"kind": "external_screen", "colour": "dark"}, "manual_utility_with_glare_protection")]),
+    (
+        "EPU102b",
+        45,
+        rotate("W") + [screen({"kind": "external_screen", "colour": "white"}, "manual_utility_without_glare_protection")],
+    ),
+    ("EPU102c", 45, rotate("E") + [screen({"kind": "drop_arm_awning"}, "automatic")]),
+]
+
+
 def case(test_id, page, patch):
+    utility = test_id.startswith("EPU")
+    metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
     return {
         "caseId": f"isso54-v2-{test_id}",
         "normVersion": "2022",
-        "projectFile": "../isso54/EPW001.json",
+        "projectFile": "../isso54/EPU001.json" if utility else "../isso54/EPW001.json",
         "projectPatch": patch,
         "source": {
             "publisher": "ISSO / InstallQ (CCvD)",
@@ -291,7 +369,7 @@ def case(test_id, page, patch):
                     "normReference": f"{reference}; band: {BAND}",
                     "relativeTolerance": 0.01,
                 }
-                for path, unit_, reference in RESIDENTIAL_METRICS
+                for path, unit_, reference in metrics
             ],
         },
     }
@@ -305,8 +383,8 @@ suite = {
         "rekenen; de indicatoren worden vastgelegd zonder oordeel. Niet gecodeerde deeltesten en hun "
         "ontbrekende route: docs/nta8800-isso54-voorbereiding.md."
     ),
-    "cases": [case(*item) for item in CASES],
+    "cases": [case(*item) for item in CASES + UTILITY_CASES],
 }
 
 OUT.write_text(json.dumps(suite, ensure_ascii=False, indent=2) + "\n")
-print(f"{OUT.relative_to(ROOT)}: {len(CASES)} cases")
+print(f"{OUT.relative_to(ROOT)}: {len(CASES) + len(UTILITY_CASES)} cases")
