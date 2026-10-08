@@ -371,7 +371,10 @@ fn iso6946_d2_resistance(thickness_m: f64, heat_flow: HeatFlow, emissivity_2: f6
 /// to 2 decimals like the table values (table 8 of NEN-EN-ISO 6946:2017 is
 /// built on the same D.2 method).
 pub fn thin_cavity_resistance(thickness_mm: f64, heat_flow: HeatFlow) -> f64 {
-    round_half_up(iso6946_d2_resistance(thickness_mm / 1000.0, heat_flow, 0.9), 2)
+    round_half_up(
+        iso6946_d2_resistance(thickness_mm / 1000.0, heat_flow, 0.9),
+        2,
+    )
 }
 
 /// Exterior surface resistance at a strongly ventilated cavity (C.3.3,

@@ -1303,7 +1303,11 @@ fn numeric_route_jobs(fixtures: &[Fixture]) -> Vec<Job> {
         ("unventilated", json!({ "kind": "unventilated" }), false),
         ("strongly ventilated", json!({ "kind": "strongly" }), false),
         ("weakly ventilated", json!({ "kind": "weakly" }), false),
-        ("unventilated, reflective", json!({ "kind": "unventilated" }), true),
+        (
+            "unventilated, reflective",
+            json!({ "kind": "unventilated" }),
+            true,
+        ),
     ]
     .into_iter()
     .map(|(label, ventilation, reflective)| Job {
