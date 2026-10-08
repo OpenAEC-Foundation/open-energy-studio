@@ -78,6 +78,7 @@ Daarnaast zijn er:
 
 - **Versienummers.** Het programma heeft een programmaversie en een rekenkernversie, beide volgens `MAJOR.MINOR.PATCH`. Hoe ze verhogen, hoe versies uitwisselbaar blijven en hoe oude versies bewaard worden, staat in [versiebeheer](nta8800-versiebeheer.md) (§4.3, p. 7; §5.2–5.3, p. 9).
 - **Releasenotes.** Elke wijziging die een uitkomst of status verandert, staat in de [releasenotes](nta8800-releasenotes.md).
+- **Kwaliteitssysteem.** Het [kwaliteitshandboek](kwaliteit/kwaliteitshandboek.md) bundelt de procedures voor hoofdstuk 5 en 6 van de BRL (p. 9–10): [melden van wijzigingen](kwaliteit/meldprocedure-wijzigingen.md), [klachten](kwaliteit/klachtenprocedure.md), het [register van licentiehouders](kwaliteit/register-licentiehouders.md) en het [archiefbeleid](kwaliteit/archiefbeleid.md). Het zijn concepten tot de attesthouder ze vaststelt.
 - **Attestnummer.** Het programma leest zijn BRL 9501-attestnummer uit één accessor (`src/core/nta/Attest.ts`). Zolang dat leeg is:
   - toont de app geen NL-EPBD-merk;
   - meldt het rapport "niet geattesteerd";
