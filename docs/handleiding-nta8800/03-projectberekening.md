@@ -56,12 +56,13 @@ Het formulier vraagt alleen wat het projectmodel nog niet heeft. De secties staa
 | Interne warmtewinst | aantal woningen; bij utiliteit de tabelmethode of een opgegeven W/m² | 7.21–7.29, tabellen 7.2/7.3 |
 | Ramen (zonwinst) | kozijnfractie, belemmering, beweegbare zonwering (F_c, bediening) | §7.6, §17.3, 7.42/7.43 |
 | Belemmering per raam (Gebouw › Schil & ramen) | per buitenraam "Zoals project" of een eigen situatie a–g of opgegeven factoren, met bron; een raam dat niet meer in het project staat, wordt gemeld met **Verwijderen** | 7.13, §17.3.2 |
+| Zonwering per raam (Gebouw › Schil & ramen) | per buitenraam "Zoals project", "Geen" of een eigen beweegbare zonwering: de bediening (tabel 7.7–7.9), het type uit tabel 7.5/7.6 of een eigen F_c, en de bron; bijvoorbeeld screens op alleen het dakraam | 7.42, 7.43 |
 | Dynamische ramen (bijlage A) | per buitenraam methode A (toestanden met gewichten) of B, correctie stap 2 | bijlage A (p. 766–771) |
 | Aangrenzende onverwarmde serres (7.30b) | serre en de vlakken ervan | 7.30b |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
 | Vloeren op grond (§8.3) | blootgestelde omtrek, R_si + R_c, vloerrand (ψ of forfait), kruipruimte of onverwarmde kelder, verwarmde kelder, randisolatie; onder 2022 en 2020+A1 bij een kruipruimte of kelder ook de wandhoogte h boven maaiveld (8.47) | §8.3, bijlage D |
 | Verticale leidingen (7.3.3) | "geen", een lijst, of onbekend (geeft een gat) | §7.3.3 |
-| Ventilatie | hoofdstuk 11 (systeem, WTW, kanalen, LBK, infiltratie, regelingen, passieve koeling), of "H_ve zelf opgeven" | hoofdstuk 11 |
+| Ventilatie | hoofdstuk 11 (systeem, WTW, kanalen, LBK, infiltratie, regelingen, passieve koeling), of "H_ve zelf opgeven". Bij het systeem kan een **gedeclareerde f_ctrl** uit een kwaliteitsverklaring of BCRG-gelijkwaardigheidsverklaring worden opgegeven, met de verklaring als bron; die vervangt de waarde van tabel 11.5 (niet bij het decentrale deel van E.1) | hoofdstuk 11, tabel 11.5 |
 | Afgifte en distributie (§9.3/9.4) | afgiftesysteem, inregeling, regeling, ventilatoren in de afgifte, distributie berekend of forfaitair, luchtverwarmers | §9.3, §9.4, 9.21/9.22, 9.26–9.51 |
 | Opwekker | zie hieronder | §9.6 |
 | BCRG-verklaringstabel | losse controle van een BCRG-tabel; telt niet mee in de projectberekening | — |
