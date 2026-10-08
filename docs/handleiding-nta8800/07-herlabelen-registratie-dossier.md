@@ -2,7 +2,7 @@
 
 ## Registratiegegevens
 
-De registratiegegevens staan in **Projectgegevens** → *Registratie (BRL 9500)*. Ze worden bewaard in het projectblok `registration`. Alle velden zijn optioneel: de kern meldt wat nog ontbreekt. Het gaat om:
+De registratiegegevens staan in werkstap 10 **Registratie**, in het formulier onder de gereedheid en het rekenprogramma. (Tot het UI-herontwerp stonden ze in *Projectgegevens*; dat venster verwijst nu naar de stap Registratie.) Ze worden bewaard in het projectblok `registration`. Alle velden zijn optioneel: de kern meldt wat nog ontbreekt. Het gaat om:
 - **Gebouw:**
   - doel (toets Bbl, oplevering, bestaande bouw);
   - opnametype en representativiteit;
@@ -32,15 +32,15 @@ Bij opslaan schrijft de app ook de identiteit van het rekenprogramma: naam, vers
 
 ## Bewijsregister
 
-**Projectgegevens** → *Bewijsregister (BRL 9500 bijlage 3)*. Leg per bestand vast:
+Het bewijsregister staat in werkstap 10 **Registratie**, onder het registratieformulier. *Rapport & dossier › Checklist BRL 9500* toont het register ook, met **Bewerken in Registratie**. Leg per bestand vast:
 - soort, bestandsnaam en SHA-256;
 - datum, optioneel GPS;
 - aanleverende partij en controlerende adviseur;
 - de JSON-paden die het bestand onderbouwt.
 
 Verwijs vanuit een bronveld naar een bewijsstuk met `evidence:<id>`. Dat hoeft niet met de hand:
-- **Bron & bewijs** onder elke invoersectie heeft per bronveld een keuzelijst met de bewijsstukken. Kiezen vult het bronveld met de verwijzing. Met **Bestand toevoegen** zet je een nieuw bestand in het register en koppel je het direct.
-- In de **inspector** heeft een geselecteerd gebouwelement (zone, vlak, raam, koudebrug) een blok **Bron & bewijs**. Daar koppel je een tekening, foto of verklaring aan dat element (`linkedPaths`, bijvoorbeeld `/zones/@woonzone/surfaces/@gevel-noord`: zone en vlak op hun id). De koppeling blijft bij het element als je andere elementen verwijdert of verschuift. Een project uit een eerdere versie met koppelingen op positie (`/zones/0/surfaces/2`) krijgt bij het openen koppelingen op id.
+- **Bron & bewijs** onder elke invoersectie heeft per bronveld een keuzelijst met de bewijsstukken. Kiezen zet de verwijzing in het bronveld: achter de tekst die er al stond (`tekening A-101; evidence:ev-2`), of als enige inhoud van een leeg bronveld. Met **Bestand toevoegen** zet je een nieuw bestand in het register en koppel je het direct op dezelfde manier.
+- In het **contextpaneel** (tabblad *Eigenschappen*, dat opent zodra je een element selecteert) heeft een geselecteerd gebouwelement (zone, vlak, raam, koudebrug) een blok **Bron & bewijs**. Daar koppel je een tekening, foto of verklaring aan dat element (`linkedPaths`, bijvoorbeeld `/zones/@woonzone/surfaces/@gevel-noord`: zone en vlak op hun id). De koppeling blijft bij het element als je andere elementen verwijdert of verschuift. Een project uit een eerdere versie met koppelingen op positie (`/zones/0/surfaces/2`) krijgt bij het openen koppelingen op id.
 - In de **basisopname** heeft elk onderdeel een blok **Foto's** (zie [hoofdstuk 2](02-basisopname.md)).
 
 De **Checklist BRL 9500** toont per bewijsstuk de kolom **Onderbouwt**: de gekoppelde invoer, met een knop naar de stap waar die invoer staat. Een bewijsstuk zonder koppeling krijgt "niet gekoppeld". Wijst een bronveld naar een bewijsstuk dat niet meer in het register staat, dan meldt de pagina dat. Hetzelfde geldt voor een koppeling naar een element of opname-onderdeel dat niet meer in het project staat; die koppeling krijgt "niet meer in het project".
@@ -101,7 +101,7 @@ De indeling volgt W bijlage 6a/6b (p. 67–68) en U bijlage 6a/6b (p. 58–60):
 
 ## Projectdossier
 
-Kies **Rapport** → **Projectdossier exporteren (ZIP)**. De ZIP bevat:
+Kies in *Rapport & dossier › Checklist BRL 9500* of *› Exports* **Projectdossier exporteren (ZIP)**. In de desktopapp kies je de plek in een opslagvenster; de browser downloadt het bestand. De ZIP bevat:
 
 | Bestand | Inhoud |
 |---|---|

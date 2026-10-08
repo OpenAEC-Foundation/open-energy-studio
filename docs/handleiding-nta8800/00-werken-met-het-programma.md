@@ -4,7 +4,7 @@ Dit hoofdstuk beschrijft de schermindeling en de navigatie van Open Energy Studi
 
 ## Welkomstscherm
 
-Zonder open project toont het programma het welkomstscherm.
+Bij het starten opent het programma het demoproject *2467 Goejanverwelledijk 85 Gouda* (fictief). Sluit je alle projecttabbladen, dan toont het programma het welkomstscherm.
 
 ![Welkomstscherm met recente projecten](img/welkom.png)
 
@@ -29,7 +29,7 @@ Het venster heeft vijf delen:
    Elke stap toont zijn status: gereed (vinkje), het aantal fouten of waarschuwingen, of nog niet begonnen. Onder de actieve stap staan de subpagina's. Met Alt+↑ en Alt+↓ ga je naar de vorige of volgende stap.
 3. **Werkgebied** in het midden: de pagina van de gekozen stap, met bovenaan het pad (bijv. *Invoer › Installaties › Verwarming*), de titel, de subtabbladen en de knoppen van die pagina.
 4. **Contextpaneel** rechts, met drie tabbladen:
-   - *Eigenschappen*: de gegevens van het geselecteerde element (zone, constructie, vlak, raam, systeem). Je kunt ze hier direct wijzigen;
+   - *Eigenschappen*: de gegevens van het geselecteerde element (zone, constructie, vlak, raam, systeem). Je kunt ze hier direct wijzigen. Selecteer je een element, dan opent dit tabblad, ook als *Voorbeeld* open stond. Bij een vlak, raam, koudebrug of zone staat hier ook het blok **Bron & bewijs** met de bestanden die bij dat element horen;
    - *Voorbeeld*: label, BENG 1–3, TO<sub>juli</sub>, maandbehoefte en kerngetallen van de laatste doorrekening;
    - *Controle*: de open punten van de rekenkern voor deze stap, elk met **Ga naar**.
 5. **Statusbalk** onderaan: de status van de rekenkern (actueel, verouderd, bezig), kern- en normversie, BENG 1–3, TO<sub>juli</sub> en het label. Klik op een waarde om Resultaten te openen.
@@ -65,9 +65,10 @@ De invoer van het NTA 8800-formulier staat verdeeld over de stappen waar hij inh
 
 - **Basis / Alle velden.** Rechtsboven kies je of alleen de gangbare velden zichtbaar zijn of alle velden. In de stand Basis staan de overige velden onder **Geavanceerd**; dat blok staat open zodra een van die velden is ingevuld, een melding heeft of het doel is van Ga naar. De keuze wordt onthouden.
 - **Verwarming** is opgedeeld in Opwekking, Distributie, Afgifte, Regeling & BCRG, Hulpenergie en Zonneverwarming. Het overzicht van Installaties toont deze keten per verwarmingssysteem. Een groene stip betekent dat dat deel is ingevuld; klik op een deel om het te openen.
-- **Eén concept.** Wijzigingen in de NTA-invoer gaan eerst in een concept dat over alle stappen heen blijft bestaan. De **toepasbalk** onderaan toont hoeveel wijzigingen nog niet zijn toegepast, met **Ongedaan maken**, **Toepassen** en **Toepassen en verder**. Pas na Toepassen rekent de kern met de nieuwe invoer.
+- **Eén concept.** Wijzigingen in de NTA-invoer gaan eerst in een concept dat over alle stappen heen blijft bestaan. De **toepasbalk** onderaan toont hoeveel wijzigingen nog niet zijn toegepast, met **Ongedaan maken**, **Vorige stap**, **Toepassen** en **Toepassen en verder**. Pas na Toepassen rekent de kern met de nieuwe invoer.
+- **Project zonder NTA-invoer.** Een nieuw project heeft nog geen NTA-invoer. Op de stap Project staat dan "Dit project heeft nog geen NTA-invoer" met de knop **NTA-invoer starten**; die maakt een concept in de uitgave die onder *Instellingen › Berekening* is gekozen (standaard NTA 8800:2025+C1:2026).
 - **Sluiten met een open concept.** Sluit je een projecttabblad terwijl het concept niet-toegepaste wijzigingen heeft, dan vraagt het programma eerst of je wilt sluiten zonder toe te passen. Daarna volgt, zoals altijd, de vraag om niet-opgeslagen wijzigingen op te slaan.
-- **Bron & bewijs** onder een sectie toont de bronvelden en het bewijs bij die sectie. Per bronveld kies je een bewijsstuk uit het register of voeg je een bestand toe; het bronveld krijgt dan `evidence:<id>` (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)).
+- **Bron & bewijs** onder een sectie toont de bronvelden en het bewijs bij die sectie. Per bronveld kies je een bewijsstuk uit het register of voeg je een bestand toe. Het bronveld krijgt dan `evidence:<id>` achter de tekst die er al stond, bijvoorbeeld `tekening A-101; evidence:ev-2`; een leeg bronveld krijgt alleen `evidence:<id>` (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)).
 
 ## Controle en Ga naar
 
@@ -79,7 +80,7 @@ Dezelfde meldingen voor de huidige stap staan in het contextpaneel onder *Contro
 
 ## Uitgave van NTA 8800
 
-Op de stap **Project** kies je de uitgave van NTA 8800 waarmee het project rekent. Standaard is dat NTA 8800:2025+C1:2026. Een oudere uitgave is alleen bedoeld voor vergelijking: de statusbalk en het rapport melden dan "Oudere uitgave — niet voor registratie". Onder *Instellingen › Berekening* kies je de uitgave voor nieuwe berekeningen; bestaande projecten houden hun uitgave. Zie [hoofdstuk 8](08-versies-en-verwijzingen.md).
+Op de stap **Project** kies je de uitgave van NTA 8800 waarmee het project rekent: NTA 8800:2025+C1:2026 (de aangewezen uitgave en de standaard), 2024, 2023, 2022 of 2020+A1. Een project zonder gekozen uitgave rekent in de aangewezen uitgave; de keuzelijst toont die dan ook. Een oudere uitgave is alleen bedoeld voor vergelijking: het formulier, de projectstatus, Resultaten, de statusbalk en het rapport melden dan "Oudere uitgave — niet voor registratie". Onder *Instellingen › Berekening* kies je de uitgave voor nieuwe berekeningen; bestaande projecten houden hun uitgave. Zie [Normversies](10-normversies.md) en [hoofdstuk 8](08-versies-en-verwijzingen.md).
 
 ## Resultaten
 

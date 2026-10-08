@@ -1,10 +1,12 @@
 # 2. Basisopname
 
-De basisopname staat in het paneel **Basisopname**, onder Project. Er zijn twee soorten:
+De basisopname is werkstap 6 **Basisopname** (groep *Bestaande bouw*). Er zijn twee soorten:
 - **Woning-opname starten:** voor bestaande woningen, volgens ISSO 82.1, 7e druk met erratum van 6 januari 2026.
 - **Utiliteit-opname starten:** voor bestaande utiliteitsgebouwen, volgens ISSO 75.1, 7e druk.
 
-De opname wordt bij het project bewaard (blok `basisopname`). De kern zet de opname om in NTA 8800-invoer en rekent die door met **Opname doorrekenen**. Het resultaat staat los van de projectberekening: het paneel toont het als een aparte, op de opname gebaseerde uitkomst.
+Na het starten loop je de opname door met de voortgangslijst links: Algemeen, (alleen utiliteit) Rekenzones, Thermische schil, Verwarming, Warm tapwater, Ventilatie, Koeling, Zonnestroom (PV) en **Uitkomst & forfaitair**. **Vorige** en **Volgende** gaan een onderdeel terug of verder. **Opname verwijderen** haalt de opname uit het project.
+
+De opname wordt bij het project bewaard (blok `basisopname`). De kern zet de opname om in NTA 8800-invoer en rekent die door met **Opname doorrekenen**, in de uitgave van NTA 8800 die het project gebruikt (zie [hoofdstuk 8](08-versies-en-verwijzingen.md)). Na het doorrekenen toont de voortgangslijst per onderdeel het aantal fouten. De uitkomst zelf (status, uitgave, label en BENG 1–3, de toegepaste standaardwaarden en de meldingen) staat onder **Uitkomst & forfaitair**. Die uitkomst staat los van de projectberekening: het is een aparte, op de opname gebaseerde uitkomst.
 
 **Volgorde van bronnen.** Volgens het wijzigingsdocument v1.1 (p. 6) zitten de wijzigingen daarvan in de 7e druk. Waar de bronnen verschillen, geldt daarom de 7e druk met het erratum. De keuzes per tabel staan in [`docs/nta8800-basisopname.md`](../nta8800-basisopname.md).
 
@@ -22,7 +24,7 @@ De opname heeft deze onderdelen:
 | Ruimtekoeling | opwekker en afgifte | hoofdstuk 10 |
 | Zonnestroom (PV) | panelen, oriëntatie, helling | ISSO-hoofdstuk over zonne-energie; NTA hoofdstuk 16 |
 
-**Standaardwaarden.** Een vraag zonder antwoord krijgt de standaardwaarde uit de ISSO-tabel. Elke toegepaste standaardwaarde verschijnt in de lijst "Toegepaste standaardwaarden". Leg per regel de reden vast in het veld **Reden**. Het projectdossier toetst die redenen; zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md).
+**Standaardwaarden.** Een vraag zonder antwoord krijgt de standaardwaarde uit de ISSO-tabel. Elke toegepaste standaardwaarde verschijnt onder Uitkomst & forfaitair in de lijst "Toegepaste standaardwaarden". Leg per regel de reden vast in het veld **Reden inklappen**. Het projectdossier toetst die redenen; zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md).
 
 **Meldingen die vaak voorkomen**
 - **Warmtepomp boven 70 °C** (`heat_pump_above_70_requires_declaration`, erratum §4): geef een gecontroleerde verklaring op.
@@ -89,7 +91,7 @@ Een koppeling verwijst naar het id van het onderdeel, zoals de id van een vlak, 
 
 ## Overnemen in projectmodel
 
-Na **Opname doorrekenen** staat in het resultaat de knop **Overnemen in projectmodel**. Die zet de NTA-invoer die de kern uit de opname afleidde in het concept van de NTA-invoer. Eerst toont een venster per invoer de huidige waarde en de waarde uit de opname.
+Na **Opname doorrekenen** staat onder Uitkomst & forfaitair de knop **Overnemen in projectmodel**. Hij werkt alleen bij een berekende opname met afgeleide NTA-invoer; anders vraagt de knop eerst de opname door te rekenen. Die zet de NTA-invoer die de kern uit de opname afleidde in het concept van de NTA-invoer. Eerst toont een venster per invoer de huidige waarde en de waarde uit de opname.
 
 | Overgenomen | Niet overgenomen |
 |---|---|

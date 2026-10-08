@@ -8,7 +8,7 @@ Deze handleiding beschrijft het NTA 8800-deel van Open Energy Studio:
 - herlabelen;
 - het projectdossier.
 
-Ze is geschreven als programmadocumentatie voor een softwareattest (BRL 9501). Ze volgt de code van de branch `nta8800-kernel` per 5 oktober 2026, na het UI-herontwerp (werkstappen in plaats van het lint).
+Ze is geschreven als programmadocumentatie voor een softwareattest (BRL 9501). Ze volgt de code van de branch `nta8800-kernel` per 8 oktober 2026, na het UI-herontwerp (werkstappen in plaats van het lint) en met de oudere uitgaven van NTA 8800 in de kern.
 
 De handleiding citeert geen tekst uit NTA 8800, ISSO-publicaties of BRL-documenten. Verwijzingen noemen alleen paragraaf-, formule-, tabel- en paginanummers. Houd de bronnen zelf bij de hand.
 
@@ -27,9 +27,10 @@ De handleiding citeert geen tekst uit NTA 8800, ISSO-publicaties of BRL-document
    - de registratiegegevens en de dossierexport.
 8. [Versies en verwijzingen](08-versies-en-verwijzingen.md): kernversie, invoervingerafdruk, het bewaren van oudere builds en de overige documentatie.
 9. [Bestanden en uitwisseling](09-bestanden-en-uitwisseling.md): opslaan en openen van `.oes.json`, de voorbeeldprojecten, UNIEC3-export en -import en de exports onder Rapport & dossier › Exports.
+10. [Normversies](10-normversies.md): rekenen in NTA 8800:2025+C1, 2024, 2023, 2022 of 2020+A1, invoer per uitgave en waarom een oudere uitgave niet registreerbaar is.
 
 ## Belangrijk vooraf
 
-- Het programma is **niet geattesteerd** volgens BRL 9501. Uitkomsten hebben de status `calculated_unverified` en zijn geen geregistreerd energielabel.
+- Het programma is **niet geattesteerd** volgens BRL 9501. Uitkomsten hebben de status `calculated_unverified` (of `calculated_legacy_edition` in een oudere uitgave) en zijn geen geregistreerd energielabel.
 - Een energielabel ontstaat pas na registratie door een gecertificeerd adviseur (BRL 9500), met een geattesteerd rekenprogramma.
 - De voorbeeldprojecten in `training-data/` zijn fictief.
