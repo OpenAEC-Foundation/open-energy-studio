@@ -2685,6 +2685,52 @@ CASES += [
     ),
 ]
 
+
+# --- EP-W406i/k: a booster heat pump on a collective heating system ---
+# The apartment variant (top-floor corner, 4 dwellings, 10,8 m) heated by a
+# collective HR107 of 100 kW outside the envelope, 45/40, pipes through
+# unheated spaces of unknown length, insulated, valves insulated, no heat
+# meters, pump power and EEI unknown (p. 37-38). Hot water: a booster heat
+# pump with no test data, so the forfait of 13.162/13.163 (2022 p. 607-609)
+# on the 45 degrees C supply of that heating system (held at the 44 degrees C
+# value); its heat loads the space-heating chain (9.4).
+W406I = APARTMENT + [
+    setp(f"{BOILER}/role", "collective"),
+    setp(f"{BOILER}/location", "outside_thermal_boundary"),
+    setp(f"{GEN}/auxiliary", {"electricallyConnectedDevices": 1, "nominalPowerKw": 100.0, "sourceReference": "ISSO 54 v2.0 EP-W406i p. 37: collectieve HR107, 100 kW"}),
+    setp(f"{NTA}/collectiveConnection", {"connectedUsableAreaM2": BUILDING_AREA, "sourceReference": "ISSO 54 v2.0 EP-W406i p. 37: 4 woningen van 96 m2"}),
+    setp(f"{NTA}/distributionSystem/installation", "collective"),
+    setp(f"{NTA}/distributionSystem/connectedStoreys", 4),
+    remove(f"{NTA}/distributionSystem/unheatedPipeLengthM"),
+    COLLECTIVE_PUMP,
+    hw_generator(
+        {
+            "kind": "booster_heat_pump_forfait",
+            "designSupplyTemperatureC": 45.0,
+            "heatSource": {"kind": "heating_system"},
+            "sourceReference": "ISSO 54 v2.0 EP-W406i p. 38: boosterwarmtepomp zonder meetgegevens op de collectieve HR107, ontwerpaanvoer 45 C (13.162/13.163)",
+        }
+    ),
+]
+
+CASES += [
+    ("EPW406i", 37, W406I),
+    # EP-W406k: as EP-W406i with an individual compression chiller, floor
+    # cooling, control in the main room (table 10.4 central with room
+    # control), design 12/16 (17/21 for floor cooling only, table 10.8 note
+    # 2), insulated pipes, none outside the cooled zone, fittings insulated,
+    # a pump of unknown power (p. 38). The A/B/C/B_nom of the test are the
+    # 9.85 constants of an individual appliance; the collective HR107 takes
+    # 9.91, so they are not entered.
+    (
+        "EPW406k",
+        38,
+        W406I
+        + W301A
+        + [cooling_emission("floor_cooling", control="central_with_room_control", why="ISSO 54 v2.0 EP-W406k p. 38: vloerkoeling, regeling in het hoofdvertrek")],
+    ),
+]
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
