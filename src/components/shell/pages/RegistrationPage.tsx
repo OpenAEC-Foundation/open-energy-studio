@@ -16,6 +16,8 @@ import type { ShellActions } from '../ShellActions';
 import './delivery.css';
 import { routeLabel } from '../PageHeader';
 import { RegistrationForm } from './RegistrationForm';
+import { isSurveyProject } from '../../../core/nta/stepStatus';
+import { SurveyRegistration } from '../../SurveyWizard/SurveyRegistration';
 
 /** Every reason the registration is not ready (dossier and/or attest), as i18n keys. */
 export function readinessReasons(assessment: RegistrationAssessment | null | undefined): string[] {
@@ -29,6 +31,8 @@ export function readinessReasons(assessment: RegistrationAssessment | null | und
 export function RegistrationPage({ project, actions }: { project: IProject; actions: Pick<ShellActions, 'navigate' | 'openDialog'> }) {
   const { t } = useI18n();
   const registration = useKernel()?.settled?.registration ?? null;
+  // A basisopname project: checklist and only the fields the survey did not ask.
+  if (isSurveyProject(project)) return <SurveyRegistration actions={actions} />;
   const yesNo = (value: boolean | null | undefined) => (value == null ? '—'
     : <Pill tone={value ? 'ok' : 'warn'}>{t(value ? 'registration.page.yes' : 'registration.page.no')}</Pill>);
   const data = project.registration;

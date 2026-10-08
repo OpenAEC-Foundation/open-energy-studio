@@ -83,7 +83,13 @@ function AddressFields({ t }: { t: T }) {
   const { state, dispatch } = useEnergy();
   const project = state.project;
   const registration = (project.registration ?? {}) as NonNullable<typeof project.registration>;
+  const stored = project.basisopname as (Stored & { surveyDate?: string }) | undefined;
   const set = (payload: Record<string, unknown>) => dispatch({ type: 'UPDATE_PROJECT_INFO', payload });
+  // The registering adviser taken over from the surveying one follows its changes (Registratie).
+  const setAdvisor = (surveyingAdvisor: { name: string; competenceNumber: string }) => {
+    const follows = JSON.stringify(registration.registeringAdvisor) === JSON.stringify(registration.surveyingAdvisor);
+    set({ registration: { ...registration, surveyingAdvisor, ...(follows ? { registeringAdvisor: { ...surveyingAdvisor } } : {}) } });
+  };
   const text = (label: string, value: string | undefined, onChange: (value: string) => void, wide = false) =>
     <label className={wide ? 'survey-address-wide' : undefined}>{label}
       <input type="text" value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
@@ -96,11 +102,15 @@ function AddressFields({ t }: { t: T }) {
     {text(t('survey.address.city'), project.city, (city) => set({ city }))}
     <p className="nta-form-subhead">{t('survey.address.adviser')}</p>
     {text(t('survey.address.adviserName'), registration.surveyingAdvisor?.name,
-      (name) => set({ registration: { ...registration, surveyingAdvisor: { name, competenceNumber: registration.surveyingAdvisor?.competenceNumber ?? '' } } }))}
+      (name) => setAdvisor({ name, competenceNumber: registration.surveyingAdvisor?.competenceNumber ?? '' }))}
     {text(t('survey.address.adviserNumber'), registration.surveyingAdvisor?.competenceNumber,
-      (competenceNumber) => set({ registration: { ...registration, surveyingAdvisor: { name: registration.surveyingAdvisor?.name ?? '', competenceNumber } } }))}
+      (competenceNumber) => setAdvisor({ name: registration.surveyingAdvisor?.name ?? '', competenceNumber }))}
     {text(t('survey.address.certificate'), registration.certificateNumber,
       (certificateNumber) => set({ registration: { ...registration, certificateNumber: certificateNumber || undefined } }))}
+    {stored && <label>{t('survey.surveyDate')}
+      <input type="date" value={stored.surveyDate ?? ''}
+        onChange={(event) => dispatch({ type: 'SET_BASISOPNAME', payload: { ...stored, surveyDate: event.target.value || undefined } })} />
+    </label>}
   </div></div>;
 }
 
