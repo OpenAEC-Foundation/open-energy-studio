@@ -317,3 +317,14 @@
 .survey-relabel-label { font-family: var(--font-display, inherit); font-size: 28px; font-weight: 700; }
 .survey-relabel-check li { padding: 5px 0; }
 .survey-relabel .survey-aside .btn { margin-top: 8px; }
+
+/* Woningpas in the maatwerkadvies of a survey project (feedback 8 Oct 2026). */
+.mwa-passport-enable { margin-bottom: 12px; font-weight: 600; }
+.mwa-passport-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.mwa-passport-step { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.mwa-passport-step select { height: 36px; }
+.mwa-passport-result { display: flex; align-items: center; gap: 10px; margin: 0; font-size: var(--fs-sm); }
+.mwa-req { width: 18px; text-align: center; font-weight: 700; }
+.mwa-req--done { color: var(--ok-text); }
+.mwa-req--open { color: var(--error-text); }
+.mwa-req--waiting { color: var(--warn-text); }

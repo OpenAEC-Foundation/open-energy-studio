@@ -173,6 +173,14 @@ export async function assessSurveyMaatwerkadvies(stored: StoredSurvey, definitio
       ? { advisedPackageId: definition.advisedPackageId } : {}),
     ...(definition.adviceMotivation ? { adviceMotivation: definition.adviceMotivation } : {}),
     ...(definition.notes ? { notes: definition.notes } : {}),
+    // ISSO 82.2 §1.10/§4.4: three stacked packages; measure lists hold known measures only.
+    ...(definition.renovationPassport ? { renovationPassport: {
+      ...definition.renovationPassport,
+      ...(definition.renovationPassport.overheatingMeasureIds
+        ? { overheatingMeasureIds: definition.renovationPassport.overheatingMeasureIds.filter((id) => known.has(id)) } : {}),
+      ...(definition.renovationPassport.coolingMeasureIds
+        ? { coolingMeasureIds: definition.renovationPassport.coolingMeasureIds.filter((id) => known.has(id)) } : {}),
+    } } : {}),
   };
   const assessment = await assessMaatwerkadviesInputWithRust(input);
   return { assessment, patches };

@@ -25,8 +25,8 @@ import { KernelCode } from '../KernelCode/KernelCode';
 
 type T = (key: string, options?: Record<string, unknown>) => string;
 type Json = Record<string, unknown>;
-type MwaStep = 'measures' | 'packages' | 'use' | 'advice';
-const STEPS: MwaStep[] = ['measures', 'packages', 'use', 'advice'];
+type MwaStep = 'measures' | 'packages' | 'passport' | 'use' | 'advice';
+const STEPS: MwaStep[] = ['measures', 'packages', 'passport', 'use', 'advice'];
 
 const ICONS: Record<SurveyMeasureKind, React.ReactNode> = {
   roof: <Home />, facade: <LayoutGrid />, floor: <Layers />, windows: <PanelTop />, heating: <Flame />,
@@ -85,7 +85,7 @@ export function SurveyMwa({ route, navigate }: { route: Route; navigate: (route:
   const project = state.project;
   const stored = project.basisopname as StoredSurvey | undefined;
   const definition = project.maatwerkadvies ?? emptyDefinition();
-  const step: MwaStep = STEPS.includes(route.sub as MwaStep) ? route.sub as MwaStep : route.sub === 'passport' ? 'advice' : 'measures';
+  const step: MwaStep = STEPS.includes(route.sub as MwaStep) ? route.sub as MwaStep : 'measures';
   const save = (next: NtaMaatwerkadvies) => dispatch({ type: 'SET_MAATWERKADVIES', payload: next });
   const [run, setRun] = useState<SurveyMwaRun | null>(null);
   const [busy, setBusy] = useState(false);
@@ -146,6 +146,7 @@ export function SurveyMwa({ route, navigate }: { route: Route; navigate: (route:
       {step === 'measures' && <Measures definition={definition} survey={survey} save={save} resultOf={(id) => resultOf(id, 'measure')}
         current={assessment?.current ?? null} t={t} locale={locale} />}
       {step === 'packages' && <Packages definition={definition} save={save} run={run} resultOf={(id) => resultOf(id, 'package')} t={t} locale={locale} />}
+      {step === 'passport' && <Passport definition={definition} save={save} assessment={assessment} residential={stored.kind === 'residential'} t={t} locale={locale} />}
       {step === 'use' && <Use definition={definition} save={save} assessment={assessment} t={t} locale={locale} />}
       {step === 'advice' && <Advice definition={definition} save={save} assessment={assessment} t={t} locale={locale}
         onPdf={() => assessment && htmlToPdf(generateMaatwerkadviesReportHTML(project, definition, assessment), 'BRL 9500-MWA · ISSO 82.2')
@@ -169,6 +170,15 @@ export function SurveyMwa({ route, navigate }: { route: Route; navigate: (route:
           <span>{pack.name} · {formatNumber(pack.label.primaryFossilIndicatorKwhPerM2, locale, 1)}</span></div>)}
         <p className="survey-muted">{t('mwaSurvey.ep2Note')}</p>
       </div>
+      {definition.renovationPassport && <div className="survey-card">
+        <span className="survey-overline">{t('mwaSurvey.passport.registration')}</span>
+        <p className="survey-final-facts">{t(assessment?.registrationType === 'maatwerkadvies_met_renovatiepaspoort'
+          ? 'mwaSurvey.passport.withPassport' : 'mwaSurvey.passport.withoutPassport')}</p>
+        {(() => {
+          const open = (assessment?.renovationPassport?.requirements ?? []).filter((requirement) => requirement.met !== true).length;
+          return open > 0 && <p className="survey-muted">{t('mwaSurvey.passport.open', { count: open })}</p>;
+        })()}
+      </div>}
       <div className="survey-card">
         <span className="survey-overline">{t('survey.open.title')}</span>
         <ul className="mwa-todo">
@@ -324,6 +334,92 @@ function Packages({ definition, save, run, resultOf, t, locale }: {
     })}
     <div><button type="button" className="btn" onClick={add}>+ {t('mwaSurvey.addPackage')}</button></div>
     <p className="survey-muted">{t('mwaSurvey.packagesNote')}</p>
+  </>;
+}
+
+const PASSPORT_STEPS = ['demandPackageId', 'systemsPackageId', 'productionPackageId'] as const;
+
+/** Renovation passport (woningpas, ISSO 82.2 §1.10/§4.4): three stacked packages and the BRL 9500-MWA §3.2 requirements. */
+function Passport({ definition, save, assessment, residential, t, locale }: {
+  definition: NtaMaatwerkadvies; save: (next: NtaMaatwerkadvies) => void; assessment: MaatwerkadviesAssessment | null;
+  residential: boolean; t: T; locale: string;
+}) {
+  const passport = definition.renovationPassport;
+  const result = assessment?.renovationPassport ?? null;
+  const set = (patch: Partial<NonNullable<NtaMaatwerkadvies['renovationPassport']>>) =>
+    passport && save({ ...definition, renovationPassport: { ...passport, ...patch } });
+  const ids = (key: 'overheatingMeasureIds' | 'coolingMeasureIds') => passport?.[key] ?? [];
+  const toggle = (key: 'overheatingMeasureIds' | 'coolingMeasureIds', id: string, on: boolean) =>
+    set({ [key]: on ? [...ids(key), id] : ids(key).filter((item) => item !== id) });
+  const check = (key: 'insulationStandardMet' | 'prewarStandard' | 'storageConsidered' | 'lowTemperatureReady', label: string) =>
+    <label className="mwa-check"><input type="checkbox" checked={passport?.[key] ?? false}
+      onChange={(event) => set({ [key]: event.target.checked })} />{label}</label>;
+  const text = (key: 'prewarMotivation' | 'gasFreeNotRealisticMotivation' | 'facadeInsulationImpossibleMotivation', label: string) =>
+    <label className="survey-address-wide">{label}<input type="text" value={passport?.[key] ?? ''}
+      onChange={(event) => set({ [key]: event.target.value || undefined })} /></label>;
+  return <>
+    <label className="mwa-check mwa-passport-enable"><input type="checkbox" checked={passport != null} onChange={(event) => save({
+      ...definition,
+      renovationPassport: event.target.checked ? {
+        demandPackageId: definition.packages[0]?.id ?? '', systemsPackageId: definition.packages[1]?.id ?? '',
+        productionPackageId: definition.packages[2]?.id ?? '',
+      } : undefined,
+    })} />{t('mwaSurvey.passport.enable')}</label>
+    {passport && <>
+      {definition.packages.length < 3 && <p className="survey-issues-note">{t('mwaSurvey.passport.needPackages')}</p>}
+      <div className="mwa-passport-steps">
+        {PASSPORT_STEPS.map((key, at) => {
+          const variant = result?.steps[at] ?? null;
+          return <section key={key} className="survey-card mwa-passport-step" aria-label={t(`mwaSurvey.passport.step${at + 1}`)}>
+            <span className="survey-overline">{at + 1} · {t(`mwaSurvey.passport.step${at + 1}`)}</span>
+            <select aria-label={t(`mwa.passport.${key}`)} value={passport[key]} onChange={(event) => set({ [key]: event.target.value })}>
+              <option value="">—</option>
+              {definition.packages.map((pack) => <option key={pack.id} value={pack.id}>{pack.name}</option>)}
+            </select>
+            {variant && <p className="mwa-passport-result"><Label value={variant.label.labelClass} />
+              <span>EP2 {formatNumber(variant.label.primaryFossilIndicatorKwhPerM2, locale, 1)}</span></p>}
+          </section>;
+        })}
+      </div>
+      <p className="survey-muted">{t('mwaSurvey.passport.stacked')}</p>
+
+      <section className="survey-card">
+        <span className="survey-overline">{t(residential ? 'mwa.passport.schemeW' : 'mwa.passport.schemeU')}</span>
+        {!result && <p className="survey-muted">{t('survey.result.busy')}</p>}
+        <ul className="survey-reg-list">{(result?.requirements ?? []).map((requirement) => {
+          const state = requirement.met === true ? 'done' : requirement.met === false ? 'open' : 'waiting';
+          return <li key={requirement.code} data-state={state}>
+            <span className={`mwa-req mwa-req--${state}`} aria-hidden="true">{state === 'done' ? '✓' : state === 'open' ? '✗' : '?'}</span>
+            <span className="survey-reg-text">{t(`mwa.passport.req.${requirement.code}`)}{requirement.detail && <small>{requirement.detail}</small>}</span>
+            <span className="sr-only">{t(`surveyReg.state.${state}`)}</span>
+          </li>;
+        })}</ul>
+      </section>
+
+      <section className="survey-card">
+        <span className="survey-overline">{t('mwaSurvey.passport.statements')}</span>
+        <div className="nta-form"><div className="nta-form-grid">
+          {residential ? <>
+            {check('insulationStandardMet', t('mwa.passport.insulationStandard'))}
+            {check('prewarStandard', t('mwa.passport.prewar'))}
+            {passport.prewarStandard && text('prewarMotivation', t('mwa.passport.prewarMotivation'))}
+            {text('gasFreeNotRealisticMotivation', t('mwa.passport.gasFreeNotRealistic'))}
+            {check('storageConsidered', t('mwa.passport.storage'))}
+          </> : <>
+            {check('lowTemperatureReady', t('mwa.passport.lowTemperatureReady'))}
+            {text('facadeInsulationImpossibleMotivation', t('mwa.passport.facadeImpossible'))}
+          </>}
+        </div></div>
+        {definition.measures.length > 0 && <>
+          <p className="nta-form-subhead">{t(residential ? 'mwa.passport.overheating' : 'mwa.passport.cooling')}</p>
+          <div className="mwa-checks">{definition.measures.map((measure) => {
+            const key = residential ? 'overheatingMeasureIds' : 'coolingMeasureIds';
+            return <label key={measure.id} className="mwa-check"><input type="checkbox" checked={ids(key).includes(measure.id)}
+              onChange={(event) => toggle(key, measure.id, event.target.checked)} />{measure.name}</label>;
+          })}</div>
+        </>}
+      </section>
+    </>}
   </>;
 }
 
