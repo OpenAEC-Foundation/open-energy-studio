@@ -141,9 +141,18 @@ pub fn assess_gas_heat_pump_forfait_draft(
             GasPumpSource::Ground | GasPumpSource::GroundwaterAquifer
         );
     if correction_required {
+        // Bijlage V (table V.1, 2025+C1 p. 1114): c_source is 1,00, 1,02 or
+        // 1,04, as on the electric heat-pump routes.
         match input.source_correction_factor {
-            Some(factor) if factor.is_finite() && factor > 0.0 => {}
-            _ => add("source_correction_required", "sourceCorrectionFactor"),
+            None => add("source_correction_required", "sourceCorrectionFactor"),
+            Some(factor)
+                if ![1.00, 1.02, 1.04]
+                    .iter()
+                    .any(|allowed| (factor - allowed).abs() < 1e-9) =>
+            {
+                add("source_correction_invalid", "sourceCorrectionFactor")
+            }
+            Some(_) => {}
         }
         if input
             .source_correction_reference
@@ -366,12 +375,22 @@ mod tests {
         assert_eq!(ground.forfait_cop, Some(1.3));
         assert_eq!(ground.corrected_cop, Some(1.3));
         input.source = GasPumpSource::Ground;
-        input.source_correction_factor = Some(1.1);
+        input.source_correction_factor = Some(1.04);
         input.source_correction_reference = Some("appendix V evidence".into());
         input.design_supply_temperature_c = 35.0;
         let corrected = assess_gas_heat_pump_forfait_draft(&input);
         assert_eq!(corrected.forfait_cop, Some(1.3));
-        assert_eq!(corrected.corrected_cop, Some(1.3 * 1.1));
+        assert_eq!(corrected.corrected_cop, Some(1.3 * 1.04));
+        // Annex V table V.1 (2025+C1 p. 1114) has only 1,00, 1,02 and 1,04.
+        for factor in [1.1, 0.5, 1.03, f64::INFINITY] {
+            input.source_correction_factor = Some(factor);
+            let refused = assess_gas_heat_pump_forfait_draft(&input);
+            assert!(refused.forfait_cop.is_none(), "{factor}");
+            assert!(refused
+                .issues
+                .iter()
+                .any(|item| item.code == "source_correction_invalid"));
+        }
         input.source_correction_factor = None;
         assert!(assess_gas_heat_pump_forfait_draft(&input)
             .forfait_cop

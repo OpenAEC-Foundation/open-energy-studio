@@ -1720,7 +1720,7 @@ mod tests {
             "externalHeatSupply":false, "thermalCapacityKw":25.0, "capacityReference":"plate",
             "source":"ground", "sourceReference":"ground loop plan",
             "designSupplyTemperatureC":35.0, "designSupplyReference":"heating design",
-            "sourceCorrectionFactor":1.1, "sourceCorrectionReference":"appendix V calculation"
+            "sourceCorrectionFactor":1.04, "sourceCorrectionReference":"appendix V calculation"
         });
         let endpoint = "/v1/nta8800/heat-pumps/gas-forfait-cop-draft/diagnose";
         let request = |input: &Value| {
@@ -1736,7 +1736,7 @@ mod tests {
                 .unwrap();
         assert_eq!(value["table"], "9.27");
         assert_eq!(value["forfaitCop"], 1.3);
-        assert!((value["correctedCop"].as_f64().unwrap() - 1.43).abs() < 1e-12);
+        assert!((value["correctedCop"].as_f64().unwrap() - 1.352).abs() < 1e-12);
         assert_eq!(value["gasInputEnergyAvailable"], false);
         input["sourceCorrectionReference"] = Value::Null;
         let response = app().oneshot(request(&input)).await.unwrap();

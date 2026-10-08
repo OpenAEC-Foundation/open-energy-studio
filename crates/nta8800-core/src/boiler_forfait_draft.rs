@@ -183,8 +183,14 @@ pub fn assess_boiler_forfait_draft(
     if input.kind == BoilerKind::Unknown && input.role != BoilerRole::Collective {
         issues.push(issue("unknown_boiler_collective_only", "kind"));
     }
+    // θem;avg is the mean of the design supply and return temperature of the
+    // heating water (table 9.26, note a, 2025+C1 p. 329; examples 45/38 to
+    // 90/70). A heating circuit below the room setpoint of 20 °C heats
+    // nothing, and a water circuit stays below boiling, so only
+    // 20 °C < θem;avg ≤ 100 °C is a design temperature.
     if !input.average_design_emission_temperature_c.is_finite()
-        || !(-30.0..=120.0).contains(&input.average_design_emission_temperature_c)
+        || input.average_design_emission_temperature_c <= 20.0
+        || input.average_design_emission_temperature_c > 100.0
     {
         issues.push(issue(
             "average_emission_temperature_invalid",
@@ -492,6 +498,28 @@ mod tests {
             assess_boiler_forfait_draft(&unknown).generation_efficiency,
             Some(0.70)
         );
+    }
+
+    #[test]
+    fn emission_temperature_is_a_heating_design_temperature() {
+        // Table 9.26 note a (2025+C1 p. 329): the mean of the design supply
+        // and return temperature, so above the 20 °C setpoint and below
+        // boiling.
+        let mut input = sample();
+        for valid in [20.5, 42.5, 50.0, 80.0, 100.0] {
+            input.average_design_emission_temperature_c = valid;
+            assert_eq!(assess_boiler_forfait_draft(&input).status, "diagnostic_valid", "{valid}");
+        }
+        for invalid in [-30.0, -1.0, 0.0, 20.0, 100.5, 120.0, f64::NAN] {
+            input.average_design_emission_temperature_c = invalid;
+            assert!(
+                assess_boiler_forfait_draft(&input)
+                    .issues
+                    .iter()
+                    .any(|item| item.code == "average_emission_temperature_invalid"),
+                "{invalid}"
+            );
+        }
     }
 
     #[test]

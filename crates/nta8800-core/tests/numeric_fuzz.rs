@@ -59,7 +59,23 @@ fn fixtures() -> Vec<(&'static str, Value)> {
     ]
     .into_iter()
     .map(|(name, json)| (name, serde_json::from_str(json).unwrap()))
+    .chain(std::iter::once(declared_window_shading()))
     .collect()
+}
+
+/// Case G with its roof-window screen given as a declared `F_c` instead of
+/// the table 7.5 device, so the numeric leaf of a per-window shading
+/// (`windowShadings[].movableShading.reductionFactor`, 7.43) is fuzzed too.
+fn declared_window_shading() -> (&'static str, Value) {
+    let mut value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-g.json"
+    ))
+    .unwrap();
+    let shading = &mut value["ntaCalculation"]["windowShadings"][0]["movableShading"];
+    let object = shading.as_object_mut().expect("case G has a window shading");
+    object.remove("device");
+    object.insert("reductionFactor".into(), Value::from(0.25));
+    ("public-comparison-g (declared F_c per window)", value)
 }
 
 /// A numeric leaf: its pointer, its value and whether it is an integer.
@@ -127,7 +143,15 @@ fn adversarial(leaf: &Leaf) -> Vec<(String, Value)> {
         .next()
         .unwrap_or("")
         .to_ascii_lowercase();
-    let edges: &[f64] = if member.ends_with("year") && !member.ends_with("peryear") {
+    let declared_control_factor = leaf
+        .pointer
+        .to_ascii_lowercase()
+        .contains("/declaredcontrolfactor/");
+    let edges: &[f64] = if declared_control_factor {
+        // f_ctrl from a declaration: 0 < f_ctrl ≤ 2 (table 11.5 values lie
+        // in that range; the kernel's bound).
+        &[2.0, 2.0 + 1e-9, 1e-9, -1e-9]
+    } else if member.ends_with("year") && !member.ends_with("peryear") {
         &[1899.0, 1900.0, 2100.0, 2101.0]
     } else if member.contains("fraction")
         || member.contains("factor")
@@ -532,6 +556,15 @@ fn every_number_at_its_edges_calculates_plausibly_or_refuses_with_a_routed_gap()
     );
     // Coverage may grow but not silently shrink.
     assert!(positions >= 110, "{positions}");
+    for required in [
+        "/ntaCalculation/ventilation/system/unit/declaredControlFactor/value",
+        "/ntaCalculation/windowShadings/*/movableShading/reductionFactor",
+    ] {
+        assert!(
+            occurrences.contains_key(required),
+            "the fuzz no longer reaches {required}"
+        );
+    }
     assert!(leaf_count >= 1700, "{leaf_count}");
     assert!(monotone_jobs >= 20, "{monotone_jobs}");
 }
