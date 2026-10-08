@@ -1436,6 +1436,141 @@ CASES += [
 ]
 
 
+# --- EP-W101c/r/s/w, EP-W102, EP-W103: further ventilation (p. 19-22) ---
+D4_RECOVERY = {"kind": "insulated"}
+
+
+def declared_recovery(value, standard, why):
+    return {"method": "declared", "value": value, "standard": standard, "sourceReference": why}
+
+
+# EP-W103a/b: four windows of the south facade, 2,5 m2 net each (8,33 m2 x
+# 0,30 mesh), opening angle 90 degrees, centres 1,2 m and 3,9 m above ground,
+# opening height 2 m (p. 22; 11.2.3.3, 11.71b).
+def summer_night(operation, why):
+    openings = [
+        {
+            "id": f"raam-{k + 1}",
+            "area": {"method": "opening_angle", "maxNetAreaM2": 2.5, "maxAngleDeg": 90.0},
+            "centreHeightM": 1.2 if k < 2 else 3.9,
+            "openingHeightM": 2.0,
+            "azimuthDeg": 180.0,
+            "tiltDeg": 90.0,
+        }
+        for k in range(4)
+    ]
+    return setp(f"{VENT}/ventilativeCooling", {"openings": openings, "operation": operation, "conditionsEvidence": why})
+
+
+CASES += [
+    # EP-W101c: B1, Luka A, construction year 1985 acting on infiltration, the
+    # fans and the insulation period of the heating pipes (not the boiler),
+    # AC fans (p. 19).
+    (
+        "EPW101c",
+        19,
+        [
+            unit("b1", "luka_a_b_c"),
+            NO_PASSIVE,
+            setp(f"{NTA}/constructionYear", 1985),
+            setp(f"{VENT}/constructionYear", 1985),
+            setp(f"{VENT}/fans", {"method": "forfait", "current": "ac", "manufactureYear": 1985}),
+            setp(f"{NTA}/distributionSystem/pipeTransmittance/insulation", {"state": "insulated", "period": "from1980_to1995"}),
+        ],
+    ),
+    # EP-W101r: D4a, declared 85 % with dissipation included (NEN-EN 13141-7),
+    # insulated duct 1 m, central, bypass 70 % (p. 21).
+    (
+        "EPW101r",
+        21,
+        [
+            unit(
+                "d4a",
+                "luka_a_b_c",
+                recovery(
+                    declared_recovery(0.85, "en13141_7", "ISSO 54 v2.0 EP-W101r p. 21: WTW-verklaring 85 %, dissipatie verdisconteerd"),
+                    {"kind": "partial", "fraction": 0.7},
+                    length=1.0,
+                ),
+            )
+        ],
+    ),
+    # EP-W101s: D4b, declared 85 % per NEN-EN 13142 without dissipation,
+    # uninsulated duct 1 m, central, bypass 100 % (p. 21).
+    (
+        "EPW101s",
+        21,
+        [
+            unit(
+                "d4b",
+                "luka_a_b_c",
+                recovery(
+                    declared_recovery(0.85, "en13142", "ISSO 54 v2.0 EP-W101s p. 21: WTW-verklaring 85 % volgens EN 13142, dissipatie niet verdisconteerd"),
+                    {"kind": "full"},
+                    length=1.0,
+                    insulation={"kind": "uninsulated"},
+                ),
+            )
+        ],
+    ),
+    # EP-W101w: E1, decentral D5b on 40 m2 and C1 on 30 m2 of residence area
+    # (p. 21; 11.29-11.45).
+    (
+        "EPW101w",
+        21,
+        [
+            setp(
+                f"{VENT}/system",
+                {
+                    "kind": "combined",
+                    "decentralAreaM2": 40.0,
+                    "totalResidenceAreaM2": 70.0,
+                    "decentral": {
+                        "variant": "d5b",
+                        "ducts": "luka_a_b_c",
+                        "equipmentReference": "ISSO 54 v2.0 EP-W101w p. 21: decentrale WTW (D5b)",
+                        "heatRecovery": recovery(TABLE_PLASTIC, {"kind": "none"}, layout="decentral", length=1.0),
+                    },
+                    "other": {"variant": "c1", "ducts": "luka_a_b_c", "equipmentReference": "ISSO 54 v2.0 EP-W101w p. 21: mechanische afvoer (C1)"},
+                },
+            ),
+            NO_PASSIVE,
+        ],
+    ),
+    # EP-W102a/b: C1 with preheating of the natural supply (p. 21-22; 11.123,
+    # 11.124).
+    (
+        "EPW102a",
+        21,
+        [
+            unit("c1", "luka_a_b_c"),
+            NO_PASSIVE,
+            setp(f"{VENT}/grillePreheating", {"control": {"method": "fallback"}, "sourceReference": "ISSO 54 v2.0 EP-W102a p. 21: voorverwarming natuurlijke toevoer, geen nadere gegevens"}),
+        ],
+    ),
+    (
+        "EPW102b",
+        22,
+        [
+            unit("c1", "luka_a_b_c"),
+            NO_PASSIVE,
+            installed(60.0, "ISSO 54 v2.0 EP-W102b p. 22: q_v;inst 60 dm3/s"),
+            setp(f"{VENT}/installedCapacity/naturalSupplyDm3PerS", 60.0),
+            setp(
+                f"{VENT}/grillePreheating",
+                {
+                    "control": {"method": "specified", "maxPowerWPerDm3PerS": 10.0, "maxTemperatureRiseK": 5.0, "switchOnBelowC": 18.0, "maxSupplyTemperatureC": 15.0},
+                    "preheatedDesignFlowM3PerH": 108.0,
+                    "sourceReference": "ISSO 54 v2.0 EP-W102b p. 22: 50 % voorverwarmd (30 dm3/s), sprong 5 K, 10 W/(dm3/s), aan onder 18 C, inblaas max 15 C",
+                },
+            ),
+        ],
+    ),
+    ("EPW103a", 22, [summer_night("manual", "ISSO 54 v2.0 EP-W103a p. 22: zomernachtventilatie, enkelzijdig, handbediend; voorwaarden 11.2.3.3 als vervuld aangenomen")]),
+    ("EPW103b", 22, [summer_night("automatic", "ISSO 54 v2.0 EP-W103b p. 22: automatische bediening zonder temperatuurmeting; voorwaarden 11.2.3.3 als vervuld aangenomen")]),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
