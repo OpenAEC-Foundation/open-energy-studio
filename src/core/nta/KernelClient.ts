@@ -4319,6 +4319,16 @@ export interface NtaCalculationInput {
   windowObstructions?: Array<{ windowId: string; obstruction: NtaObstruction; sourceReference: string }>;
   /** Movable shading per project window (absent: none on that window); others keep `windowSolar.movableShading`. */
   windowShadings?: Array<{ windowId: string; movableShading?: NtaMovableShading | null; sourceReference: string }>;
+  /** Glazing details per project window (table 7.4 type, fixed louvres 7.41a/b, diffusing 7.41); others use their gValue. */
+  windowGlazings?: Array<{
+    windowId: string;
+    glazing: {
+      glazingType?: string;
+      fixedLouvres?: { kind: string; control?: string };
+      diffusing?: { gAltitude45: number; gDiffuse: number; sourceReference: string };
+    };
+    sourceReference: string;
+  }>;
   groundFloors: Array<{
     surfaceId: string;
     exposedPerimeterM: number;
