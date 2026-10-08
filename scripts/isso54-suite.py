@@ -788,6 +788,42 @@ def screen(device, control):
     )
 
 
+LZ = f"{NTA}/lighting/0/lightingZones/0"
+
+
+def lamps(watts, technology):
+    return setp(
+        f"{LZ}/power",
+        {
+            "method": "installed",
+            "luminaires": [{"count": 1, "power": {"method": "lamps", "lampPowerW": watts, "lampCount": 1, "technology": technology}}],
+            "sourceReference": f"lampvermogen {watts} W volgens de deeltest, als een groep",
+        },
+    )
+
+
+def switch(control, central=False):
+    return setp(f"{LZ}/occupancy", {"control": control, "centralOnControl": central, "largeOfficeGroup": False})
+
+
+PARASITIC_601A = setp(
+    f"{LZ}/parasitic",
+    {"method": "installed", "emergencyChargingW": 10.0, "controlStandbyW": 20.0, "sourceReference": "ISSO 54 v2.0 EP-U601a p. 50: noodverlichting 10 W, besturing 20 W"},
+)
+U601A = [lamps(768.0, "led"), setp(f"{LZ}/constantIlluminance", "led_l80"), PARASITIC_601A]
+
+
+def utility_heat_pump(test_id, source, supply, page):
+    """EP-U303: a utility heat pump, table 9.29 (scope utility)."""
+    step = heat_pump(test_id, source, supply)
+    forfait = step["value"]["forfait"]
+    forfait["scope"] = "utility_collective_or_over25_kw"
+    # c_source (annex V) is footnote a of table 9.27, dwellings only.
+    forfait.pop("sourceCorrectionFactor", None)
+    forfait.pop("sourceCorrectionReference", None)
+    return step
+
+
 UTILITY_CASES = [
     ("EPU001", 44, []),
     *[(f"EPU002{letter}", 44, function(letter)) for letter in "abcdefghi"],
@@ -820,6 +856,29 @@ UTILITY_CASES = [
         rotate("W") + [screen({"kind": "external_screen", "colour": "white"}, "manual_utility_without_glare_protection")],
     ),
     ("EPU102c", 45, rotate("E") + [screen({"kind": "drop_arm_awning"}, "automatic")]),
+    # EP-U303a-e: utility heat pumps (p. 47; table 9.29).
+    ("EPU303a", 47, [utility_heat_pump("EP-U303a", "ground", 30.0, 47), temperature_class("30_27"), renewable("EP-U303a", True)]),
+    ("EPU303b", 47, [utility_heat_pump("EP-U303b", "outdoor_air", 35.0, 47), temperature_class("35_30"), renewable("EP-U303b", True)]),
+    (
+        "EPU303c",
+        47,
+        [utility_heat_pump("EP-U303c", "exhaust_air", 40.0, 47), temperature_class("40_35"), renewable("EP-U303c", True, exhaust=True), unit("c1", "luka_a_b_c"), NO_PASSIVE],
+    ),
+    ("EPU303d", 47, [utility_heat_pump("EP-U303d", "groundwater_below15_c", 50.0, 47), temperature_class("50_42"), renewable("EP-U303d", True)]),
+    ("EPU303e", 47, [utility_heat_pump("EP-U303e", "surface_water", 55.0, 47), temperature_class("55_47"), renewable("EP-U303e", True)]),
+    # EP-U601a-c: lighting power (p. 50; 14.8/14.9, table 14.2, NTA 8800:2022
+    # table 14.4 constant-illuminance compensation).
+    ("EPU601a", 50, U601A),
+    ("EPU601b", 50, [lamps(960.0, "unknown_or_other")]),
+    ("EPU601c", 50, [lamps(1344.0, "fluorescent_t5"), setp(f"{LZ}/constantIlluminance", "linear_fluorescent")]),
+    # EP-U602a-f/i: lighting control (p. 50-51; table 14.5).
+    ("EPU602a", 50, [switch("manual_or_unknown", central=True)]),
+    ("EPU602b", 50, [switch("manual_or_unknown")]),
+    ("EPU602c", 50, [switch("manual_with_sweep")]),
+    ("EPU602d", 50, function("d") + [switch("auto_on_dimmed")]),
+    ("EPU602e", 50, [switch("manual_on_dimmed")]),
+    ("EPU602f", 50, [switch("manual_on_auto_off")]),
+    ("EPU602i", 51, U601A + [setp(f"{LZ}/extractedLuminaires", True)]),
 ]
 
 
