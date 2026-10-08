@@ -875,7 +875,10 @@ fn is_nan(value: &f64) -> bool {
 pub fn validate_movable_shading(shading: &MovableShading) -> Vec<(&'static str, &'static str)> {
     let mut issues = Vec::new();
     if shading.device.is_some() && shading.reduction_factor.is_finite() {
-        issues.push(("window_shading_factor_declared_and_table", ".reductionFactor"));
+        issues.push((
+            "window_shading_factor_declared_and_table",
+            ".reductionFactor",
+        ));
     }
     if shading.device.is_none() && !(0.0..=1.0).contains(&shading.reduction_factor) {
         issues.push(("window_shading_factor_invalid", ".reductionFactor"));

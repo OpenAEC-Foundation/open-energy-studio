@@ -1689,7 +1689,10 @@ fn validate_unit(
             && declared.value > 0.0
             && declared.value <= MAX_DECLARED_CONTROL_FACTOR)
         {
-            issues.push(issue("declared_control_factor_invalid", format!("{dpath}.value")));
+            issues.push(issue(
+                "declared_control_factor_invalid",
+                format!("{dpath}.value"),
+            ));
         }
         if declared.declaration_reference.trim().is_empty() {
             issues.push(issue(
@@ -4029,7 +4032,9 @@ mod tests {
         // serialised.
         let plain = dwelling(SystemVariant::C4c);
         let json = serde_json::to_value(&plain).unwrap();
-        assert!(json["system"]["unit"].get("declaredControlFactor").is_none());
+        assert!(json["system"]["unit"]
+            .get("declaredControlFactor")
+            .is_none());
     }
 
     #[test]
