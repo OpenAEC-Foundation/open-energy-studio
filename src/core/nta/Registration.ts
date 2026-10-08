@@ -1,16 +1,22 @@
 import { version } from '../../../package.json';
+import attest from './attest.json';
 import type { NtaRegistration, NtaSoftwareIdentity } from './KernelClient';
 import { sha256Hex } from './Evidence';
 
-/** Name of this program in the registration (Omgevingsregeling art. 5.14 lid 1 onder b. */
-export const SOFTWARE_NAME = 'Open Energy Studio';
+/**
+ * Name of this program in the registration (Omgevingsregeling art. 5.14 lid 1
+ * onder b). It, the attest number and the identification code come from
+ * `attest.json`, which the leveringsdocument of a release reads too
+ * (scripts/nta-leveringsdocument.mjs, BRL 9501 §6.1).
+ */
+export const SOFTWARE_NAME: string = attest.softwareName;
 
 /**
  * BRL 9501 attest number of this program. Empty until the program is
  * attested; the kernel then reports `softwareAttested: false`, apart from
  * the dossier issues.
  */
-export const SOFTWARE_ATTEST_NUMBER = '';
+export const SOFTWARE_ATTEST_NUMBER: string = attest.attestNumber;
 
 /**
  * The program that makes the calculation, stored with the registration block.
