@@ -2372,7 +2372,10 @@ fn ventilation_value(
     // An entered unit year outside the range of tables 11.20/11.23 is refused
     // here, at the survey field, instead of deep in the derived input.
     if !crate::ventilation::manufacture_year_valid(vent.unit_manufacture_year) {
-        recorder.issue("manufacture_year_invalid", "ventilation.unitManufactureYear");
+        recorder.issue(
+            "manufacture_year_invalid",
+            "ventilation.unitManufactureYear",
+        );
     }
     let mut recovery = None;
     if vent.principle == VentilationPrinciple::Balanced || combined.is_some() {
@@ -6503,9 +6506,11 @@ mod tests {
         survey.ventilation.unit_manufacture_year = Some(1850);
         let mut recorder = Recorder::default();
         let _ = derive_utility_input(&survey, &mut recorder);
-        assert!(recorder.issues.iter().any(|issue| issue.code
-            == "manufacture_year_invalid"
-            && issue.path == "ventilation.unitManufactureYear"));
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|issue| issue.code == "manufacture_year_invalid"
+                && issue.path == "ventilation.unitManufactureYear"));
     }
 
     #[test]
