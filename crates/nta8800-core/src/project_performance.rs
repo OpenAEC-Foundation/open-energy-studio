@@ -1442,6 +1442,171 @@ fn tojuli_evidence_gaps(tojuli: &[crate::tojuli::TojuliAssessment]) -> Vec<Input
     gaps
 }
 
+/// A refusal of the building calculation (a route the edition lacks, a
+/// combination the chapters refuse) names its cause in `performance.issues`
+/// with a path in the derived input. Each such issue becomes a project gap
+/// at the project input that feeds it, so the refusal is actionable; the
+/// derived path stays in `detail`.
+fn building_issue_gaps(
+    issues: &[crate::building_performance::PerformanceIssue],
+    derived: &BuildingPerformanceInput,
+    project_value: &Value,
+    existing: &[InputGap],
+) -> Vec<InputGap> {
+    let mut gaps: Vec<InputGap> = Vec::new();
+    for issue in issues {
+        let path = project_path_for_derived(&issue.path, derived, project_value);
+        let known = existing
+            .iter()
+            .chain(gaps.iter())
+            .any(|gap| gap.code == issue.code && gap.path == path);
+        if !known {
+            gaps.push(InputGap {
+                detail: Some(format!("derivedInput.{}", issue.path)),
+                ..gap(issue.code, path)
+            });
+        }
+    }
+    gaps
+}
+
+/// Splits `a.b[2].c` into its first member, the index directly after it and
+/// the rest (`.c`, with its leading separator).
+fn split_member(path: &str) -> (&str, Option<usize>, &str) {
+    let end = path.find(['.', '[']).unwrap_or(path.len());
+    let (member, rest) = path.split_at(end);
+    if let Some(after) = rest.strip_prefix('[') {
+        if let Some(close) = after.find(']') {
+            if let Ok(index) = after[..close].parse() {
+                return (member, Some(index), &after[close + 1..]);
+            }
+        }
+    }
+    (member, None, rest)
+}
+
+/// The project input path behind a path in the derived building input.
+/// Members the derived input shares with `ntaCalculation` keep their path;
+/// the space-heating chain is taken apart into the NTA blocks and zones it
+/// was built from. Anything else lands on the NTA input as a whole.
+fn project_path_for_derived(
+    path: &str,
+    derived: &BuildingPerformanceInput,
+    project_value: &Value,
+) -> String {
+    let nta = project_value.get("ntaCalculation");
+    let has_member = |member: &str| nta.and_then(|nta| nta.get(member)).is_some();
+    let (member, index, rest) = split_member(path);
+    match member {
+        "spaceHeating" => chain_path(
+            rest.strip_prefix('.').unwrap_or(rest),
+            &derived.space_heating,
+            None,
+            project_value,
+        ),
+        "additionalHeatingSystems" => {
+            let system = index.and_then(|index| derived.additional_heating_systems.get(index));
+            let base = match index {
+                Some(index) => format!("ntaCalculation.additionalHeatingSystems[{index}]"),
+                None => "ntaCalculation.additionalHeatingSystems".to_string(),
+            };
+            match system {
+                Some(system) => chain_path(
+                    rest.strip_prefix('.').unwrap_or(rest),
+                    system,
+                    Some(&base),
+                    project_value,
+                ),
+                None => base,
+            }
+        }
+        // Built from the zones (6.6, the usable area and loss area).
+        "totalUsableFloorAreaM2" | "lossAreaM2" => "zones".to_string(),
+        member if has_member(member) => format!("ntaCalculation.{path}"),
+        _ => "ntaCalculation".to_string(),
+    }
+}
+
+/// Path inside one space-heating chain (`spaceHeating` or an entry of
+/// `additionalHeatingSystems`, whose own blocks sit under `system`).
+fn chain_path(
+    path: &str,
+    chain: &crate::space_heating_chain::SpaceHeatingChainInput,
+    system: Option<&str>,
+    project_value: &Value,
+) -> String {
+    let (member, index, rest) = split_member(path);
+    let own = |block: &str| match system {
+        Some(system) => format!("{system}.{block}{rest}"),
+        None => format!("ntaCalculation.{block}{rest}"),
+    };
+    match member {
+        "generator" | "distributionSystem" | "humidifiers" => own(member),
+        "collectiveConnection" | "identicalSystems" => format!("ntaCalculation.{member}{rest}"),
+        "demand" | "emission" | "distribution" => {
+            zone_path(member, rest, &chain.demand.zone_id, project_value)
+        }
+        "additionalZones" => match index.and_then(|index| chain.additional_zones.get(index)) {
+            Some(zone) => {
+                let (part, _, rest) = split_member(rest.strip_prefix('.').unwrap_or(rest));
+                zone_path(part, rest, &zone.demand.zone_id, project_value)
+            }
+            None => "zones".to_string(),
+        },
+        _ => system
+            .map(str::to_string)
+            .unwrap_or_else(|| "ntaCalculation".to_string()),
+    }
+}
+
+/// Path of a zone part of the chain (`demand`, `emission`, `distribution`)
+/// in the zone with `zone_id`.
+fn zone_path(part: &str, rest: &str, zone_id: &str, project_value: &Value) -> String {
+    let index_of = |list: &str| {
+        project_value
+            .pointer(list)
+            .and_then(Value::as_array)
+            .and_then(|items| {
+                items.iter().position(|item| {
+                    item.get("zoneId")
+                        .or_else(|| item.get("id"))
+                        .and_then(Value::as_str)
+                        == Some(zone_id)
+                })
+            })
+    };
+    let zone = index_of("/zones")
+        .map(|index| format!("zones[{index}]"))
+        .unwrap_or_else(|| "zones".to_string());
+    match part {
+        "emission" | "distribution" => format!("ntaCalculation.{part}{rest}"),
+        "demand" => {
+            let (field, _, tail) = split_member(rest.strip_prefix('.').unwrap_or(rest));
+            match field {
+                // Per-zone NTA data where the project has it, else the block.
+                "ventilation" | "ventilationFlows" | "verticalPipes" => {
+                    match index_of("/ntaCalculation/zoneData") {
+                        Some(index) => format!("ntaCalculation.zoneData[{index}].{field}{tail}"),
+                        None => format!("ntaCalculation.{field}{tail}"),
+                    }
+                }
+                "internalGains" | "thermalMass" | "setpoints" | "dwellingType" => {
+                    format!("ntaCalculation.{field}{tail}")
+                }
+                // The window list of the demand is built from all outdoor
+                // windows; their solar data sit in one block.
+                "windows" => "ntaCalculation.windowSolar".to_string(),
+                "transmission" => match tail.strip_prefix(".groundFloors") {
+                    Some(floor) => format!("ntaCalculation.groundFloors{floor}"),
+                    None => format!("{zone}.surfaces"),
+                },
+                _ => zone,
+            }
+        }
+        _ => zone,
+    }
+}
+
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
     // The whole project route (derived constructions, materials, annexes)
     // runs in the chosen edition, not only the building calculation.
@@ -1473,6 +1638,12 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
     let performance = derived.as_ref().map(assess_building_performance);
     if let Some(result) = &performance {
         gaps.extend(tojuli_evidence_gaps(&result.tojuli));
+    }
+    if let (Some(input), Some(result)) = (&derived, &performance) {
+        if !result.status.starts_with("calculated") {
+            let found = building_issue_gaps(&result.issues, input, project_value, &gaps);
+            gaps.extend(found);
+        }
     }
     let version = project_norm_version(project_value);
     let status = match (&derived, &performance) {
@@ -5666,5 +5837,119 @@ mod blank_fuzz {
             0x2545_F491_4F6C_DD1D,
             300,
         );
+    }
+}
+
+#[cfg(test)]
+mod refusal_gaps {
+    use super::*;
+
+    fn office() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap()
+    }
+
+    fn office_in(edition: &str) -> ProjectPerformanceAssessment {
+        let mut office = office();
+        office["ntaCalculation"]["normVersion"] = Value::from(edition);
+        assess_project_performance(&office)
+    }
+
+    /// A route the edition lacks refuses the building calculation; the
+    /// project names it as a gap at the project input, not only in
+    /// `performance.issues`.
+    #[test]
+    fn refused_routes_are_project_gaps() {
+        let result = office_in("2020+A1");
+        assert_eq!(result.status, "invalid");
+        let found: Vec<(&str, &str, Option<&str>)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str(), gap.detail.as_deref()))
+            .collect();
+        for expected in [
+            (
+                "route_not_in_edition",
+                "ntaCalculation.lighting[0].lightingZones[0].power.ledFrom2017",
+            ),
+            (
+                "route_not_in_edition",
+                "ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW",
+            ),
+            (
+                "lighting_gain_requires_chapter_14",
+                "ntaCalculation.internalGains.lighting",
+            ),
+        ] {
+            assert!(
+                found
+                    .iter()
+                    .any(|(code, path, _)| (*code, *path) == expected),
+                "{expected:?} in {found:?}"
+            );
+        }
+        // The derived path stays in the detail.
+        assert!(found.iter().any(|(_, _, detail)| *detail
+            == Some("derivedInput.spaceHeating.demand.internalGains.lighting")));
+        // A calculated result gets no gaps from the building issues.
+        assert!(office_in("2025+C1").status.starts_with("calculated"));
+    }
+
+    #[test]
+    fn derived_paths_map_to_their_project_input() {
+        let project = office();
+        let mut gaps = Vec::new();
+        let derived = derive_input(&project, &mut gaps).unwrap();
+        let zone = &derived.space_heating.demand.zone_id;
+        let zone_index = project["zones"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|item| item["id"].as_str() == Some(zone))
+            .unwrap();
+        for (path, expected) in [
+            (
+                "spaceHeating.generator.boiler.x",
+                "ntaCalculation.generator.boiler.x".to_string(),
+            ),
+            (
+                "spaceHeating.emission.fans",
+                "ntaCalculation.emission.fans".to_string(),
+            ),
+            (
+                "spaceHeating.distributionSystem.pump",
+                "ntaCalculation.distributionSystem.pump".to_string(),
+            ),
+            (
+                "spaceHeating.demand.thermalMass",
+                "ntaCalculation.thermalMass".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.groundFloors[0].heatedBasement",
+                "ntaCalculation.groundFloors[0].heatedBasement".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.elements[3]",
+                format!("zones[{zone_index}].surfaces"),
+            ),
+            (
+                "spaceHeating.demand.windows[1].gValue",
+                "ntaCalculation.windowSolar".to_string(),
+            ),
+            (
+                "hotWater.generator",
+                "ntaCalculation.hotWater.generator".to_string(),
+            ),
+            ("totalUsableFloorAreaM2", "zones".to_string()),
+            ("notAProjectMember", "ntaCalculation".to_string()),
+        ] {
+            assert_eq!(
+                project_path_for_derived(path, &derived, &project),
+                expected,
+                "{path}"
+            );
+        }
     }
 }

@@ -814,7 +814,84 @@ fn run(route: Route, input: &Value) -> Result<(bool, BTreeSet<String>), String> 
     if !calculated && found.is_empty() {
         return Err(format!("status {status} without any code"));
     }
+    if route == Route::Project && !calculated {
+        let gaps = value["gaps"].as_array().cloned().unwrap_or_default();
+        if gaps.is_empty() {
+            return Err(format!("status {status} without any project gap"));
+        }
+        let routes = gap_routes();
+        for gap in &gaps {
+            let path = gap["path"].as_str().unwrap_or("");
+            if !routes.routes(path) {
+                return Err(format!(
+                    "gap {} at {path} has no route in gapRoutes.ts",
+                    gap["code"]
+                ));
+            }
+        }
+    }
     Ok((calculated, found))
+}
+
+/// The prefixes of `src/core/nta/gapRoutes.ts`: the first member of every
+/// `GAP_ROUTES` prefix and every member of `NTA_INPUT_ROUTES` (below
+/// `ntaCalculation`). A gap path routes when its first member is one of the
+/// former, or when it sits in the NTA input and its member is one of the
+/// latter; the UI then opens the step page with that section.
+struct GapRoutes {
+    project: HashSet<String>,
+    nta: HashSet<String>,
+}
+
+impl GapRoutes {
+    fn routes(&self, path: &str) -> bool {
+        let first =
+            |path: &str| -> String { path.split(['.', '[']).next().unwrap_or("").to_string() };
+        match path.strip_prefix("ntaCalculation") {
+            Some("") => true,
+            Some(rest) if rest.starts_with('.') => self.nta.contains(&first(&rest[1..])),
+            _ => self.project.contains(&first(path)),
+        }
+    }
+}
+
+fn gap_routes() -> &'static GapRoutes {
+    static ROUTES: std::sync::OnceLock<GapRoutes> = std::sync::OnceLock::new();
+    ROUTES.get_or_init(|| {
+        let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/core/nta/gapRoutes.ts");
+        let text = std::fs::read_to_string(file).unwrap();
+        let mut project = HashSet::new();
+        let mut nta = HashSet::new();
+        let mut in_nta = false;
+        for line in text.lines() {
+            let line = line.trim();
+            if line.starts_with("export const NTA_INPUT_ROUTES") {
+                in_nta = true;
+                continue;
+            }
+            if in_nta {
+                if line.starts_with("};") {
+                    in_nta = false;
+                    continue;
+                }
+                let key = line
+                    .split(':')
+                    .next()
+                    .unwrap_or("")
+                    .trim_matches(|c: char| c == '\'' || c.is_whitespace());
+                let member = key.split(['.', '[']).next().unwrap_or("");
+                if !member.is_empty() {
+                    nta.insert(member.to_string());
+                }
+            } else if let Some(rest) = line.split("prefix: '").nth(1) {
+                let prefix = rest.split('\'').next().unwrap_or("");
+                let member = prefix.split(['.', '[']).next().unwrap_or("");
+                project.insert(member.to_string());
+            }
+        }
+        assert!(nta.contains("generator") && project.contains("zones"));
+        GapRoutes { project, nta }
+    })
 }
 
 /// The label keys of `src/i18n`, Dutch and English apart: `nl.ts` and

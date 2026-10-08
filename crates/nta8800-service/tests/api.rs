@@ -399,6 +399,28 @@ async fn cors_is_off_by_default_and_configurable() {
     assert!(headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
 }
 
+/// A route the edition lacks is refused with 422 and a project gap at the
+/// project input (the example office has LED lighting from 2017 and PV per
+/// panel, neither of which NTA 8800:2020+A1 has).
+#[tokio::test]
+async fn refused_route_is_a_project_gap() {
+    let mut office = without_nulls(fixture("nta8800-example-office.json"));
+    office["ntaCalculation"]["normVersion"] = json!("2020+A1");
+    let (status, body) = post(
+        "/v1/nta8800/project/performance",
+        json!({ "project": office }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    let gaps = body["gaps"].as_array().unwrap();
+    assert!(
+        gaps.iter().any(|gap| gap["code"] == "route_not_in_edition"
+            && gap["path"] == "ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW"
+            && gap["detail"] == "derivedInput.pvSystems[0].peakPower.panelPeakPowerW"),
+        "{body}"
+    );
+}
+
 /// The option sweep of the kernel (crates/nta8800-core/tests/option_coverage.rs)
 /// through the HTTP layer, for a few options of each outcome and every
 /// edition: a calculated input answers 200 with a calculated status, a refused
@@ -450,11 +472,11 @@ async fn option_sweep_keeps_the_http_error_model() {
                     "{context}"
                 ),
                 StatusCode::UNPROCESSABLE_ENTITY => {
-                    // The refusal names its cause in the project gaps or, for
-                    // a route of the building calculation, in its issues.
-                    let codes: Vec<&Value> = ["/gaps", "/performance/issues"]
-                        .iter()
-                        .filter_map(|pointer| body.pointer(pointer).and_then(Value::as_array))
+                    // The refusal names its cause in the project gaps, also
+                    // for a route the building calculation refuses.
+                    let codes: Vec<&Value> = body["gaps"]
+                        .as_array()
+                        .into_iter()
                         .flatten()
                         .map(|entry| &entry["code"])
                         .collect();

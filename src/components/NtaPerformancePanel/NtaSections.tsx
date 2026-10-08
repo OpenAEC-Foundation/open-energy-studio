@@ -291,6 +291,8 @@ function GeneralSection(props: NtaSectionProps) {
     {read(draft, ['usageFunction']) === 'residential' && <SelectField {...f} path={['dwellingType']}
       label={t('nta.form.dwellingType')} options={[
         ['apartment_building', t('nta.form.dwellingType.apartment')], ['other', t('nta.form.dwellingType.other')]]} />}
+    <SelectField {...f} path={['labelFunction']} label={t('nta.form.labelFunction')}
+      options={LABEL_FUNCTIONS.map((key) => [key, t(`nta.form.labelFn.${key}`)])} />
     <SelectField {...f} path={['bblFunction']} label={t('nta.form.bblFunction')} options={[
       ['other_residential', t('nta.form.bbl.other_residential')], ['residential_building', t('nta.form.bbl.residential_building')],
       ['office', t('nta.form.bbl.office')], ['education', t('nta.form.bbl.education')], ['retail', t('nta.form.bbl.retail')],
@@ -734,7 +736,7 @@ const listed = (key: string) => (_: IProject, draft: Draft) => ((read(draft, [ke
 /** All sections, in the order of the full form. */
 export const NTA_SECTIONS: NtaSectionDef[] = [
   { id: 'general', step: 'project', titleKey: 'nta.form.general', Component: GeneralSection,
-    paths: ['normVersion', 'calculationScope', 'areaSourceReference', 'usageFunction', 'dwellingType', 'bblFunction',
+    paths: ['normVersion', 'calculationScope', 'areaSourceReference', 'usageFunction', 'dwellingType', 'labelFunction', 'bblFunction',
       'zebHeatDeliveryTemperature', 'permitApplicationAfter20260529', 'constructionYear', 'fossilAppliancesOutsideCalculation'] },
   { id: 'activeCooling', step: 'installations', sub: 'cooling', titleKey: 'ntaStep.section.activeCooling', Component: ActiveCoolingSection,
     paths: ['activeCooling'] },
