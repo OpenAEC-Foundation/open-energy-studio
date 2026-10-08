@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback, ReactNode } from 'react';
 import { normalizeProject } from '../core/energy/normalizeProject';
 import type { NormVersion } from '../core/nta/KernelClient';
 import {
@@ -1061,7 +1061,20 @@ function ActiveDocumentBridge({ children }: { children: ReactNode }) {
 // Autosave: the open documents survive a reload or a crash of the tab
 // ============================================================
 
-const AUTOSAVE_KEY = 'oes.autosave.v1';
+/*
+ * Every document has its own key (feedback 8 Oct 2026: work was lost), so
+ *  - two tabs of the app no longer overwrite each other's documents: a tab
+ *    writes only the documents it has open and removes only those it closes;
+ *  - a document that cannot be restored is skipped, never wiped: its key
+ *    stays until the user closes it in a tab that holds it.
+ * The index lists the ids of all saved documents, whatever tab saved them.
+ */
+const AUTOSAVE_PREFIX = 'oes.autosave.v2.doc.';
+const AUTOSAVE_INDEX = 'oes.autosave.v2.index';
+const AUTOSAVE_ACTIVE = 'oes.autosave.v2.active';
+/** The single-key autosave of before; moved into the per-document keys once, then kept as a backup. */
+const AUTOSAVE_V1 = 'oes.autosave.v1';
+const AUTOSAVE_V1_BACKUP = 'oes.autosave.v1.backup';
 
 interface AutosavedDocument {
   id: string;
@@ -1078,37 +1091,106 @@ function storage(): Storage | null {
   try { return window.localStorage; } catch { return null; }
 }
 
-/** The documents of the last session, or the default document when there is none or it cannot be read. */
-export function restoreDocuments(): DocumentManagerState {
-  if (!autosaveEnabled()) return initialDocManagerState;
+type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+const readJson = <T,>(store: Store, key: string): T | null => {
   try {
-    const raw = storage()?.getItem(AUTOSAVE_KEY);
-    if (!raw) return initialDocManagerState;
-    const saved = JSON.parse(raw) as { documents: AutosavedDocument[]; activeDocumentId: string | null };
-    const documents: DocumentEntry[] = saved.documents.map((doc) => {
+    const raw = store.getItem(key);
+    return raw ? JSON.parse(raw) as T : null;
+  } catch {
+    return null;
+  }
+};
+const writeJson = (store: Store, key: string, value: unknown) => {
+  try { store.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ }
+};
+const savedIds = (store: Store): string[] => {
+  const ids = readJson<unknown>(store, AUTOSAVE_INDEX);
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+};
+
+/** Moves the documents of the single-key autosave into their own keys (never over a newer one). */
+function migrateV1(store: Store) {
+  const v1 = readJson<{ documents?: AutosavedDocument[] }>(store, AUTOSAVE_V1);
+  if (!v1) return;
+  const ids = savedIds(store);
+  for (const doc of v1.documents ?? []) {
+    if (!doc?.id || ids.includes(doc.id)) continue;
+    writeJson(store, AUTOSAVE_PREFIX + doc.id, doc);
+    ids.push(doc.id);
+  }
+  writeJson(store, AUTOSAVE_INDEX, ids);
+  try {
+    store.setItem(AUTOSAVE_V1_BACKUP, store.getItem(AUTOSAVE_V1) ?? '');
+    store.removeItem(AUTOSAVE_V1);
+  } catch { /* keep v1 as it is */ }
+}
+
+/** The saved documents that can be restored; one that cannot is skipped and its key left alone. */
+export function restoreFrom(store: Store): DocumentManagerState {
+  migrateV1(store);
+  const documents: DocumentEntry[] = [];
+  for (const id of savedIds(store)) {
+    const doc = readJson<AutosavedDocument>(store, AUTOSAVE_PREFIX + id);
+    if (!doc) continue;
+    try {
       const project = normalizeProject(doc.project);
       const state = createDocumentState(project);
       const route = normalizeRoute(doc.route ?? state.route);
-      return { id: doc.id, filePath: doc.filePath, state: { ...state, route, viewMode: viewModeForRoute(route), isDirty: Boolean(doc.isDirty) } };
-    });
-    const active = documents.some((doc) => doc.id === saved.activeDocumentId) ? saved.activeDocumentId : documents[0]?.id ?? null;
-    return { documents, activeDocumentId: active };
-  } catch {
-    return initialDocManagerState;
+      documents.push({ id: doc.id, filePath: doc.filePath, state: { ...state, route, viewMode: viewModeForRoute(route), isDirty: Boolean(doc.isDirty) } });
+    } catch {
+      // Not readable by this version: kept in storage, not opened.
+    }
   }
+  if (documents.length === 0) return initialDocManagerState;
+  const active = readJson<string>(store, AUTOSAVE_ACTIVE);
+  return { documents, activeDocumentId: documents.some((doc) => doc.id === active) ? active : documents[0].id };
+}
+
+/**
+ * Saves the documents this tab holds that changed since `previous`, and
+ * removes the ones this tab closed. Documents of other tabs stay.
+ */
+export function saveTo(store: Store, state: DocumentManagerState, previous: Map<string, DocumentEntry>): Map<string, DocumentEntry> {
+  const ids = new Set(savedIds(store));
+  const now = new Map(state.documents.map((doc) => [doc.id, doc]));
+  for (const doc of state.documents) {
+    const before = previous.get(doc.id);
+    if (before && before.state.project === doc.state.project && before.state.route === doc.state.route
+      && before.state.isDirty === doc.state.isDirty && before.filePath === doc.filePath) continue;
+    const saved: AutosavedDocument = {
+      id: doc.id, filePath: doc.filePath, project: doc.state.project, route: doc.state.route, isDirty: doc.state.isDirty,
+    };
+    writeJson(store, AUTOSAVE_PREFIX + doc.id, saved);
+    ids.add(doc.id);
+  }
+  for (const id of previous.keys()) {
+    if (now.has(id)) continue;
+    try { store.removeItem(AUTOSAVE_PREFIX + id); } catch { /* ignore */ }
+    ids.delete(id);
+  }
+  writeJson(store, AUTOSAVE_INDEX, [...ids]);
+  if (state.activeDocumentId) writeJson(store, AUTOSAVE_ACTIVE, state.activeDocumentId);
+  return now;
+}
+
+/** The documents of the last session, or the default document when there is none or none can be read. */
+export function restoreDocuments(): DocumentManagerState {
+  if (!autosaveEnabled()) return initialDocManagerState;
+  const store = storage();
+  return store ? restoreFrom(store) : initialDocManagerState;
 }
 
 function useAutosave(docState: DocumentManagerState) {
+  // What this tab last saved: the restored documents count as saved, so a
+  // document this tab never changes is not written over a newer copy of another tab.
+  const saved = useRef<Map<string, DocumentEntry> | null>(null);
+  if (saved.current === null) saved.current = new Map(docState.documents.map((doc) => [doc.id, doc]));
   useEffect(() => {
     if (!autosaveEnabled()) return undefined;
     const timer = window.setTimeout(() => {
-      const payload = {
-        activeDocumentId: docState.activeDocumentId,
-        documents: docState.documents.map((doc): AutosavedDocument => ({
-          id: doc.id, filePath: doc.filePath, project: doc.state.project, route: doc.state.route, isDirty: doc.state.isDirty,
-        })),
-      };
-      try { storage()?.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* storage full or blocked */ }
+      const store = storage();
+      if (store && saved.current) saved.current = saveTo(store, docState, saved.current);
     }, 500);
     return () => window.clearTimeout(timer);
   }, [docState]);
