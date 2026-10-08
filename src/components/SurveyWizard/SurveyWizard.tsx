@@ -82,7 +82,7 @@ function ChoiceCards({ options, selected, onPick, label }: {
 function AddressFields({ t }: { t: T }) {
   const { state, dispatch } = useEnergy();
   const project = state.project;
-  const registration = project.registration ?? {};
+  const registration = (project.registration ?? {}) as NonNullable<typeof project.registration>;
   const set = (payload: Record<string, unknown>) => dispatch({ type: 'UPDATE_PROJECT_INFO', payload });
   const text = (label: string, value: string | undefined, onChange: (value: string) => void, wide = false) =>
     <label className={wide ? 'survey-address-wide' : undefined}>{label}
@@ -94,6 +94,13 @@ function AddressFields({ t }: { t: T }) {
     {text(t('survey.address.postcode'), (registration as { postcode?: string }).postcode,
       (postcode) => set({ registration: { ...registration, postcode: postcode || undefined } }))}
     {text(t('survey.address.city'), project.city, (city) => set({ city }))}
+    <p className="nta-form-subhead">{t('survey.address.adviser')}</p>
+    {text(t('survey.address.adviserName'), registration.surveyingAdvisor?.name,
+      (name) => set({ registration: { ...registration, surveyingAdvisor: { name, competenceNumber: registration.surveyingAdvisor?.competenceNumber ?? '' } } }))}
+    {text(t('survey.address.adviserNumber'), registration.surveyingAdvisor?.competenceNumber,
+      (competenceNumber) => set({ registration: { ...registration, surveyingAdvisor: { name: registration.surveyingAdvisor?.name ?? '', competenceNumber } } }))}
+    {text(t('survey.address.certificate'), registration.certificateNumber,
+      (certificateNumber) => set({ registration: { ...registration, certificateNumber: certificateNumber || undefined } }))}
   </div></div>;
 }
 
@@ -358,22 +365,29 @@ export function defaultStep(item: { path: string; rule: string }, stored: Stored
 }
 
 /** The defaults of one step, identical values on several surfaces taken together ("Gevel 1–7"). */
-export function StepDefaults({ items, draft, t, locale, plain = false }: {
+/** Common reasons for falling back on a default (BRL 9500-W §4.2.2), offered as suggestions. */
+const REASON_KEYS = ['notVisible', 'noDocuments', 'destructive', 'clientUnknown'];
+
+export function StepDefaults({ items, draft, t, locale, plain = false, onReason }: {
   items: OpnameAssessment['appliedDefaults']; draft: Draft; t: T; locale: string;
   /** The list without the fold (report). */
   plain?: boolean;
+  /** Sets the reason for the defaults at these paths; without it the reasons are only shown. */
+  onReason?: (paths: string[], reason: string) => void;
 }) {
+  const reasons = (read(draft, ['inklapRedenen']) as Record<string, string> | undefined) ?? {};
   const names = surfaceNames(draft, t);
   const surfaces = (read(draft, ['envelope', 'surfaces']) as Array<Record<string, unknown>> | undefined) ?? [];
-  const groups: Array<{ subjects: string[]; value: string; rule: string }> = [];
+  const groups: Array<{ subjects: string[]; value: string; rule: string; paths: string[]; reason: string }> = [];
   for (const item of items) {
     const surface = /^envelope\.surfaces\[(\d+)\]/.exec(item.path);
     const subject = surface ? names.get(String(surfaces[Number(surface[1])]?.id ?? '')) ?? null : null;
     const label = t(`survey.rule.${item.rule}`);
     const fallback = label !== `survey.rule.${item.rule}` ? label : defaultPathLabel(t, item.path);
     const group = groups.find((candidate) => candidate.value === item.value && candidate.rule === item.rule);
-    if (group && subject) group.subjects.push(subject);
-    else groups.push({ subjects: [subject ?? fallback], value: item.value, rule: item.rule });
+    const reason = item.inklapReden ?? reasons[item.path] ?? reasons[item.rule] ?? '';
+    if (group && subject) { group.subjects.push(subject); group.paths.push(item.path); }
+    else groups.push({ subjects: [subject ?? fallback], value: item.value, rule: item.rule, paths: [item.path], reason });
   }
   if (items.length === 0) return <p className="survey-defaults-none">✓ {t('survey.check.noDefaults')}</p>;
   const subjectText = (subjects: string[]) => {
@@ -382,10 +396,18 @@ export function StepDefaults({ items, draft, t, locale, plain = false }: {
     const sameKind = subjects.every((subject) => subject.startsWith(`${word} `));
     return sameKind ? `${word} ${subjects[0].slice(word.length + 1)}–${subjects[subjects.length - 1].slice(word.length + 1)}` : subjects.join(', ');
   };
-  const rows = groups.map((group, index) => <li key={index}>{subjectText(group.subjects)}: {defaultValueLabel(t, group.value, locale)}</li>);
+  const rows = groups.map((group, index) => <li key={index}>{subjectText(group.subjects)}: {defaultValueLabel(t, group.value, locale)}
+    {plain && <span className="survey-report-reason"> — {group.reason || t('survey.reason.missing')}</span>}
+    {!plain && onReason && <input className="survey-reason" type="text" list="survey-reasons" defaultValue={group.reason}
+      aria-label={t('survey.reason.label', { subject: subjectText(group.subjects) })} placeholder={t('survey.reason.placeholder')}
+      onBlur={(event) => { if (event.target.value !== group.reason) onReason(group.paths, event.target.value.trim()); }} />}
+  </li>);
+  const missing = groups.filter((group) => !group.reason).length;
   if (plain) return <ul className="survey-report-defaults">{rows}</ul>;
   return <details className="survey-step-defaults">
-    <summary>{t(items.length === 1 ? 'survey.check.oneDefault' : 'survey.check.stepDefaults', { count: items.length })}</summary>
+    <summary>{t(items.length === 1 ? 'survey.check.oneDefault' : 'survey.check.stepDefaults', { count: items.length })}
+      {onReason && missing > 0 && <span className="survey-reason-open"> · {t('survey.reason.open', { count: missing })}</span>}</summary>
+    <datalist id="survey-reasons">{REASON_KEYS.map((key) => <option key={key} value={t(`survey.reason.${key}`)} />)}</datalist>
     <ul>{rows}</ul>
   </details>;
 }
@@ -418,9 +440,10 @@ export function projectAddress(project: { address?: string; city?: string; regis
   return text || null;
 }
 
-function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
+function CheckPage({ stored, steps, result, onEdit, onGoToPath, onReason, t, locale }: {
   stored: Stored; steps: SurveyFlowStep[]; result: OpnameAssessment | null;
-  onEdit: (step: SurveyStepId) => void; onGoToPath: (path: string) => void; t: T; locale: string;
+  onEdit: (step: SurveyStepId) => void; onGoToPath: (path: string) => void;
+  onReason: (paths: string[], reason: string) => void; t: T; locale: string;
 }) {
   const draft = stored.survey as Draft;
   const address = projectAddress(useEnergy().state.project) ?? undefined;
@@ -450,7 +473,8 @@ function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
             <button type="button" className="btn btn-sm" onClick={() => onEdit(step.id)}>{t('survey.check.edit')}</button>
           </div>
           <ul>{stepFacts(step.id, draft, t, locale, address).map((fact, index) => <li key={index}>{fact}</li>)}</ul>
-          {result && <StepDefaults items={result.appliedDefaults.filter((item) => defaultStep(item, stored) === step.id)} draft={draft} t={t} locale={locale} />}
+          {result && <StepDefaults items={result.appliedDefaults.filter((item) => defaultStep(item, stored) === step.id)} draft={draft} t={t} locale={locale}
+            onReason={onReason} />}
           {state === 'skipped' && <p className="survey-skipped-note">{t('survey.check.skipped')}</p>}
           {issues > 0 && <p className="survey-issues-note">{t('survey.result.issues', { count: issues })}</p>}
         </section>;
@@ -601,7 +625,12 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
       {step.special === 'check' && <>
         <h1>{t('survey.check.title')}</h1>
         <p className="survey-lead">{t('survey.check.lead')}</p>
-        <CheckPage stored={stored} steps={steps} result={result} onEdit={goToStep} onGoToPath={goToPath} t={t} locale={locale} />
+        <CheckPage stored={stored} steps={steps} result={result} onEdit={goToStep} onGoToPath={goToPath} t={t} locale={locale}
+          onReason={(paths, reason) => {
+            const map = { ...((draft.inklapRedenen as Record<string, string> | undefined) ?? {}) };
+            for (const path of paths) { if (reason) map[path] = reason; else delete map[path]; }
+            change(['inklapRedenen'], map);
+          }} />
       </>}
 
       {step.special === 'label' && <>

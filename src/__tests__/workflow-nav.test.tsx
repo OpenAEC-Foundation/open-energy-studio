@@ -220,7 +220,7 @@ describe('Step pages keep the ribbon actions', () => {
     expect(within(subtabs).getAllByRole('button').map((tab) => tab.textContent))
       .toEqual(['Calculation report', 'Input dossier', 'BRL 9500 checklist', 'Exports']);
     const head = document.querySelector('.page-actions') as HTMLElement;
-    await user.click(within(head).getByRole('button', { name: 'Export Report' }));
+    await user.click(within(head).getByRole('button', { name: 'Download report (pdf)' }));
     expect(actions.exportReport).toHaveBeenCalledOnce();
     await user.click(within(head).getByRole('button', { name: 'Print' }));
     expect(actions.printReport).toHaveBeenCalledOnce();

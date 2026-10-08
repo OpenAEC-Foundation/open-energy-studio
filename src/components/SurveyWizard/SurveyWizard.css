@@ -235,3 +235,12 @@
   .survey-report-doc { position: absolute; left: 0; top: 0; width: 100%; border-radius: 0; padding: 0; }
   html, body, .app-shell { overflow: visible !important; height: auto !important; }
 }
+
+.survey-step-defaults li { margin-bottom: 6px; }
+.survey-reason { display: block; width: 100%; box-sizing: border-box; margin-top: 3px; height: 30px; padding: 0 8px; font: inherit; font-size: var(--fs-sm);
+  color: var(--fg-1); background: var(--surface-sunken); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.survey-reason::placeholder { color: #FCA5A5; }
+.survey-reason-open { color: #FCA5A5; }
+.survey-report-reason { color: #5b6570; font-style: italic; }
+.survey-report-table--evidence td, .survey-report-table--evidence th { text-align: left; }
+.survey-report-code { font-family: var(--font-mono); font-size: 11px; }

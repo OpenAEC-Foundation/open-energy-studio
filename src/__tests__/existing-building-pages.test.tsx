@@ -147,7 +147,7 @@ describe('maatwerkadvies tabs (F8)', () => {
     await user.click(screen.getByRole('button', { name: 'to advice' }));
     const inspector = screen.getByRole('region', { name: 'Chosen package Schil + WP' });
     expect(within(inspector).getByLabelText('Label from E to A')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Advice report (HTML)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Advice report (pdf)' })).toBeInTheDocument();
   }, 60000);
 });
 

@@ -5,7 +5,7 @@
  * the report itself; the input file, the BRL 9500 checklist and the exports
  * stay available in a fold.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FileDown, Printer } from 'lucide-react';
 import './SurveyWizard.css';
 import { useI18n } from '../../i18n/i18n';
@@ -19,6 +19,20 @@ import { labelColor } from '../shell/pages/results/resultsData';
 import { DossierPage, ExportsPage, InputDossierPage } from '../shell/pages/DeliveryPages';
 import type { ShellActions } from '../shell/ShellActions';
 import { defaultStep, projectAddress, stepFacts, StepDefaults } from './SurveyWizard';
+import { questionForPath } from '../../core/survey/surveyFlow';
+import { useKernel } from '../../context/KernelProvider';
+import { elementToPdf, fileNamePart, savePdf } from '../../core/report/pdf';
+import { version } from '../../../package.json';
+
+/** SHA-256 of a text, hex; null without WebCrypto. */
+async function sha256(text: string): Promise<string | null> {
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;
+  }
+}
 
 type Level = 'summary' | 'standard' | 'detailed';
 const LEVEL_KEY = 'oes.surveyReport.level';
@@ -43,6 +57,16 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
   const assessment = useSurveyAssessment();
   const [level, setLevel] = useState<Level>(storedLevel);
   const surveyJson = stored ? JSON.stringify(stored.survey) : null;
+  const kernel = useKernel();
+  const docRef = useRef<HTMLElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    if (surveyJson) void sha256(surveyJson).then((hash) => { if (live) setFingerprint(hash); });
+    return () => { live = false; };
+  }, [surveyJson]);
 
   // The report needs the survey outcome, also when the survey pages were not opened in this session.
   useEffect(() => {
@@ -69,6 +93,16 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
   const used = (month: number, service: string) => months.filter((row) => row.month === month && row.service === service)
     .reduce((sum, row) => sum + row.usedKwh, 0);
   const year = typeof draft.constructionYear === 'number' ? String(draft.constructionYear) : '—';
+  const registration = project.registration;
+  const evidence = registration?.evidence ?? [];
+  // Evidence linked to the survey (JSON pointer /basisopname/survey/...) names its step.
+  const evidencePart = (paths: string[] | undefined) => {
+    const pointer = paths?.find((path) => path.startsWith('/basisopname/survey/'));
+    if (!pointer) return '—';
+    const surveyPath = pointer.slice('/basisopname/survey/'.length).split('/')
+      .map((part, index) => (/^\d+$/.test(part) ? `[${part}]` : `${index ? '.' : ''}${part}`)).join('');
+    return t(`survey.step.${questionForPath(surveyPath, stored).step}`);
+  };
 
   return <div className="survey-report">
     <div className="survey-report-head">
@@ -78,11 +112,20 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
       </div>
       <div className="survey-report-buttons">
         <button type="button" className="btn" onClick={() => window.print()}><Printer aria-hidden="true" /> {t('survey.report.print')}</button>
-        <button type="button" className="btn btn-primary" onClick={() => window.print()} title={t('survey.report.pdfHint')}>
-          <FileDown aria-hidden="true" /> {t('survey.report.pdf')}</button>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => {
+          if (!docRef.current) return;
+          setBusy(true);
+          setError(null);
+          elementToPdf(docRef.current)
+            .then((blob) => savePdf(`Opname-${fileNamePart(project.name || (typeof stored.survey.id === 'string' ? stored.survey.id : undefined))}.pdf`, blob))
+            .catch((failure: unknown) => setError(failure instanceof Error ? failure.message : String(failure)))
+            .finally(() => setBusy(false));
+        }}>
+          <FileDown aria-hidden="true" /> {busy ? t('survey.report.pdfBusy') : t('survey.report.pdf')}</button>
       </div>
     </div>
 
+    {error && <p className="survey-issues-note" role="alert">{error}</p>}
     <div className="survey-report-levels" role="radiogroup" aria-label={t('survey.report.level')}>
       {LEVELS.map((item) => <button key={item} type="button" role="radio" aria-checked={level === item}
         className="survey-choice survey-report-level" onClick={() => choose(item)}>
@@ -98,7 +141,7 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
       <ExportsPage actions={actions} />
     </details>
 
-    <article className="survey-report-doc" aria-label={t('survey.report.preview')}>
+    <article className="survey-report-doc" aria-label={t('survey.report.preview')} ref={docRef}>
       <header>
         <h2>{t(stored.kind === 'residential' ? 'survey.report.docTitle' : 'survey.report.docTitleUtility')}</h2>
         <p className="survey-report-sub">{t('survey.report.method', { method: stored.kind === 'residential' ? 'ISSO 82.1' : 'ISSO 75.1' })} · NTA 8800:2025+C1:2026</p>
@@ -108,6 +151,9 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
         <dt>{t('survey.report.address')}</dt><dd>{address ?? '—'}</dd>
         <dt>{t('survey.report.building')}</dt><dd>{[stepFacts('woning', draft, t, locale)[0], t('survey.fact.year', { year })].filter(Boolean).join(', ')}</dd>
         <dt>{t('survey.surveyDate')}</dt><dd>{stored.surveyDate ? new Date(stored.surveyDate).toLocaleDateString(locale) : '—'}</dd>
+        <dt>{t('survey.report.adviser')}</dt><dd>{[registration?.surveyingAdvisor?.name, registration?.surveyingAdvisor?.competenceNumber]
+          .filter((part) => part && part.trim()).join(', ') || '—'}</dd>
+        <dt>{t('survey.report.certificate')}</dt><dd>{registration?.certificateNumber || '—'}</dd>
         <dt>{t('survey.report.status')}</dt><dd>{t('survey.report.statusIndicative')}</dd>
       </dl>
       <section className="survey-report-result">
@@ -153,10 +199,34 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
       </section>}
 
       <section className="survey-report-section">
+        <h3>{t('survey.report.evidence')}</h3>
+        {evidence.length === 0 ? <p className="survey-muted">{t('survey.report.evidenceNone')}</p>
+          : <table className="survey-report-table survey-report-table--evidence">
+            <thead><tr><th>{t('survey.report.evidenceFile')}</th><th>{t('survey.report.evidenceKind')}</th>
+              <th>{t('survey.report.evidencePart')}</th><th>{t('survey.report.evidenceDate')}</th><th>SHA-256</th></tr></thead>
+            <tbody>{evidence.map((item) => <tr key={item.id}>
+              <td>{item.fileName}{item.description ? ` — ${item.description}` : ''}</td>
+              <td>{t(`evidence.kind.${item.kind}`)}</td>
+              <td>{evidencePart(item.linkedPaths)}</td>
+              <td>{item.date ?? '—'}</td>
+              <td className="survey-report-code">{item.sha256.slice(0, 12)}…</td>
+            </tr>)}</tbody>
+          </table>}
+      </section>
+
+      <section className="survey-report-section">
         <h3>{t('survey.report.accountability')}</h3>
         <p>{t('survey.report.accountabilityText', { count: result?.appliedDefaults.length ?? 0 })}</p>
         {typeof draft.sourceReference === 'string' && draft.sourceReference.trim() &&
           <p>{t('survey.final.source', { source: draft.sourceReference })}</p>}
+      </section>
+
+      <section className="survey-report-section">
+        <h3>{t('survey.report.software')}</h3>
+        <p>{t('survey.report.softwareText', {
+          version, kernel: kernel?.settled?.kernelVersion ?? '—', norm: kernel?.settled?.targetNormVersion ?? 'NTA 8800:2025+C1:2026',
+        })}</p>
+        {fingerprint && <p className="survey-report-code">{t('survey.report.fingerprint', { hash: fingerprint })}</p>}
       </section>
     </article>
   </div>;

@@ -4,6 +4,14 @@ import { createDefaultProject } from '../context/EnergyContext';
 import { ReportView } from '../components/ReportView/ReportView';
 import { generateNtaInputDossierHTML } from '../core/report/NtaInputDossier';
 import { renderWithProviders, userEvent } from './test-utils';
+import { savePdf } from '../core/report/pdf';
+
+// The downloads are pdfs; jsdom cannot lay out a page, so the pdf step is replaced.
+vi.mock('../core/report/pdf', () => ({
+  htmlToPdf: vi.fn(async (html: string) => new Blob([html], { type: 'application/pdf' })),
+  savePdf: vi.fn(async () => undefined),
+  fileNamePart: (name: string | undefined) => (name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-'),
+}));
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -125,15 +133,10 @@ describe('NTA input and evidence dossier', () => {
 
   it('offers the input dossier from the report view before a calculation exists', async () => {
     const user = userEvent.setup();
-    const createObjectURL = vi.fn(() => 'blob:oes-dossier');
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     renderWithProviders(<ReportView />);
-    await user.click(screen.getByRole('button', { name: 'Export NTA input dossier' }));
-    expect(createObjectURL).toHaveBeenCalledOnce();
-    expect(click).toHaveBeenCalledOnce();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:oes-dossier');
+    await user.click(screen.getByRole('button', { name: 'Download NTA input dossier (pdf)' }));
+    await vi.waitFor(() => expect(savePdf).toHaveBeenCalledOnce());
+    expect(vi.mocked(savePdf).mock.calls[0][0]).toMatch(/^NTA8800-Invoer-.*\.pdf$/);
     expect(screen.queryByText('BENG 1')).not.toBeInTheDocument();
   });
   it('lists every NTA input source and flags missing ones', () => {
