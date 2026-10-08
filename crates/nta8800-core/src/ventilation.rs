@@ -498,6 +498,33 @@ pub struct SystemUnit {
     #[serde(default)]
     pub air_handling_unit: Option<AirHandlingUnit>,
     pub equipment_reference: String,
+    /// f_ctrl from a kwaliteitsverklaring (gelijkwaardigheidsverklaring) of
+    /// the applied system, replacing the table 11.5 value (forfaitaire
+    /// waarde, 2025+C1 p. 7; table 11.5 p. 460). It enters 11.48/11.49 as
+    /// f_ctrl;tabel 11.5, and in E.1 (11.51/11.52) as f_ctrl;overig.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_control_factor: Option<DeclaredControlFactor>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeclaredControlFactor {
+    pub value: f64,
+    /// The kwaliteitsverklaring (e.g. BCRG) that gives the value.
+    pub declaration_reference: String,
+}
+
+/// Highest declared f_ctrl the kernel accepts; table 11.5 runs up to 1,32.
+pub const MAX_DECLARED_CONTROL_FACTOR: f64 = 2.0;
+
+impl SystemUnit {
+    /// f_ctrl;tabel 11.5 of the unit: the declared value, else table 11.5.
+    fn control_factor_value(&self, category: Category) -> Option<f64> {
+        match &self.declared_control_factor {
+            Some(declared) => Some(declared.value),
+            None => self.variant.control_factor(category),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1656,6 +1683,25 @@ fn validate_unit(
             format!("{path}.variant"),
         ));
     }
+    if let Some(declared) = &unit.declared_control_factor {
+        let dpath = format!("{path}.declaredControlFactor");
+        if !(declared.value.is_finite()
+            && declared.value > 0.0
+            && declared.value <= MAX_DECLARED_CONTROL_FACTOR)
+        {
+            issues.push(issue("declared_control_factor_invalid", format!("{dpath}.value")));
+        }
+        if declared.declaration_reference.trim().is_empty() {
+            issues.push(issue(
+                "source_reference_required",
+                format!("{dpath}.declarationReference"),
+            ));
+        }
+        // E.1 fixes f_ctrl of the decentral D.5b part (11.51/11.52).
+        if path.ends_with(".decentral") {
+            issues.push(issue("declared_control_factor_not_applicable", dpath));
+        }
+    }
     let op = unit.variant.op();
     if let Some(recovery) = &unit.heat_recovery {
         let rpath = format!("{path}.heatRecovery");
@@ -2097,7 +2143,7 @@ fn parts(system: &VentilationSystem) -> Vec<Part<'_>> {
 fn control_factor_table(input: &VentilationInput) -> f64 {
     match &input.system {
         VentilationSystem::Single { unit } => {
-            unit.variant.control_factor(input.category).unwrap_or(1.0)
+            unit.control_factor_value(input.category).unwrap_or(1.0)
         }
         VentilationSystem::Combined {
             decentral_area_m2,
@@ -2109,7 +2155,7 @@ fn control_factor_table(input: &VentilationInput) -> f64 {
                 Category::Residential => 0.52,
                 Category::Utility => 0.67,
             };
-            let other_factor = other.variant.control_factor(input.category).unwrap_or(1.0);
+            let other_factor = other.control_factor_value(input.category).unwrap_or(1.0);
             (decentral_area_m2 * hru + (total_residence_area_m2 - decentral_area_m2) * other_factor)
                 / total_residence_area_m2
         }
@@ -3318,6 +3364,7 @@ pub fn c1_variant(input: &VentilationInput) -> VentilationInput {
             ducts: DuctAirtightness::LukaABC,
             air_handling_unit: None,
             equipment_reference: "NTA 8800 §5.4.3 fixed C1 system".into(),
+            declared_control_factor: None,
         },
     };
     fixed.maximum_capacity_for_cooling = None;
@@ -3431,6 +3478,7 @@ mod tests {
             },
             air_handling_unit: None,
             equipment_reference: "design".into(),
+            declared_control_factor: None,
         }
     }
 
@@ -3955,6 +4003,65 @@ mod tests {
         let mut broken = dwelling(SystemVariant::C1);
         broken.usable_floor_area_m2 = 0.0;
         assert_eq!(assess_ventilation(&broken).status, "invalid");
+    }
+
+    #[test]
+    fn declared_control_factor_replaces_table_11_5() {
+        // Table 11.5 (2025+C1 p. 460): C.4c f_ctrl 0,59 for heating. A
+        // kwaliteitsverklaring may replace this forfaitaire waarde (p. 7);
+        // the declared value enters 11.48/11.49 as f_ctrl;tabel 11.5.
+        let table = calculate_ventilation(&dwelling(SystemVariant::C4c)).unwrap();
+        let mut declared = dwelling(SystemVariant::C4c);
+        if let VentilationSystem::Single { unit } = &mut declared.system {
+            unit.declared_control_factor = Some(DeclaredControlFactor {
+                value: 0.51,
+                declaration_reference: "BCRG gelijkwaardigheidsverklaring".into(),
+            });
+        }
+        assert!(validate_ventilation(&declared).is_empty());
+        let result = calculate_ventilation(&declared).unwrap();
+        close(
+            result.months[0].heating.required_outdoor_air_m3_per_h,
+            table.months[0].heating.required_outdoor_air_m3_per_h * 0.51 / 0.59,
+            1e-9,
+        );
+        // Without a declaration nothing changes, and the field is not
+        // serialised.
+        let plain = dwelling(SystemVariant::C4c);
+        let json = serde_json::to_value(&plain).unwrap();
+        assert!(json["system"]["unit"].get("declaredControlFactor").is_none());
+    }
+
+    #[test]
+    fn declared_control_factor_is_validated() {
+        let mut input = dwelling(SystemVariant::C4c);
+        if let VentilationSystem::Single { unit } = &mut input.system {
+            unit.declared_control_factor = Some(DeclaredControlFactor {
+                value: f64::NAN,
+                declaration_reference: " ".into(),
+            });
+        }
+        let issues = validate_ventilation(&input);
+        let found: Vec<_> = issues.iter().map(|i| (i.code, i.path.as_str())).collect();
+        assert!(found.contains(&(
+            "declared_control_factor_invalid",
+            "system.unit.declaredControlFactor.value"
+        )));
+        assert!(found.contains(&(
+            "source_reference_required",
+            "system.unit.declaredControlFactor.declarationReference"
+        )));
+        for value in [0.0, -0.1, 2.5] {
+            if let VentilationSystem::Single { unit } = &mut input.system {
+                unit.declared_control_factor = Some(DeclaredControlFactor {
+                    value,
+                    declaration_reference: "verklaring".into(),
+                });
+            }
+            assert!(validate_ventilation(&input)
+                .iter()
+                .any(|i| i.code == "declared_control_factor_invalid"));
+        }
     }
 
     #[test]
