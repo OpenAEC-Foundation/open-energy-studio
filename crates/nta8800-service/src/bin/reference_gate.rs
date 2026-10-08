@@ -6,6 +6,12 @@
 //! run is also written as `reference-report.json` and `reference-report.md`,
 //! with the commit, `KERNEL_VERSION`, the edition per case and the SHA-256 of
 //! every input and output: the test record of BRL 9501 §6.2–6.3.
+//!
+//! Exit codes: `0` at least one case was compared and nothing failed; `1` a
+//! case failed, could not be read or the coverage plan was not met; `2` a
+//! usage or report-writing error; `3` nothing failed but no case was
+//! compared (every case is `pending_expectation`), so the run proves
+//! nothing about the results.
 
 use nta8800_core::reference::{
     compare_reference_case, comparison_status_acceptable, ReferenceCase, ReferenceComparison,
@@ -220,7 +226,13 @@ struct GateReport {
     commit: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suites: Vec<SuiteRecord>,
+    /// True only when at least one case was compared and nothing failed.
     numeric_comparison_passed: bool,
+    /// `passed`, `failed`, or `no_comparison` when nothing failed but no case
+    /// was compared against expected values.
+    comparison_verdict: &'static str,
+    /// Cases compared against expected values (passed or not).
+    compared_cases: usize,
     /// Cases calculated without expected values (`pending_expectation`):
     /// they pass the run but prove nothing about the result.
     pending_expectation_cases: usize,
@@ -394,6 +406,8 @@ fn push_case(
     report.numeric_comparison_passed &= comparison_status_acceptable(comparison.status);
     if comparison.status == "pending_expectation" {
         report.pending_expectation_cases += 1;
+    } else {
+        report.compared_cases += 1;
     }
     let output_sha256 =
         sha256(&serde_json::to_vec(&comparison).expect("reference comparison serializes"));
@@ -417,6 +431,8 @@ fn run_with(paths: &[PathBuf], suites: &[PathBuf], plan_path: Option<&Path>) -> 
         commit: None,
         suites: Vec::new(),
         numeric_comparison_passed: !paths.is_empty() || !suites.is_empty(),
+        comparison_verdict: "failed",
+        compared_cases: 0,
         pending_expectation_cases: 0,
         planned_coverage_passed: None,
         coverage_plan_fingerprint: None,
@@ -527,6 +543,16 @@ fn run_with(paths: &[PathBuf], suites: &[PathBuf], plan_path: Option<&Path>) -> 
             }
         });
     }
+    // Nothing failed is not the same as something compared: a run of only
+    // pending cases has no verdict on the results.
+    report.comparison_verdict = if !report.numeric_comparison_passed {
+        "failed"
+    } else if report.compared_cases == 0 {
+        report.numeric_comparison_passed = false;
+        "no_comparison"
+    } else {
+        "passed"
+    };
     report
 }
 
@@ -560,10 +586,14 @@ fn markdown(report: &GateReport) -> String {
         "| Normversie van de kern | {} |\n",
         report.target_norm_version
     ));
+    let comparison = match report.comparison_verdict {
+        "passed" => "geslaagd",
+        "no_comparison" => "geen vergelijking",
+        _ => "niet geslaagd",
+    };
     out.push_str(&format!(
-        "| Vergelijking | {} ({} gevallen) |\n",
-        verdict(report.numeric_comparison_passed),
-        report.cases.len()
+        "| Vergelijking | {comparison} ({} vergeleken, {} zonder verwachting) |\n",
+        report.compared_cases, report.pending_expectation_cases
     ));
     if report.pending_expectation_cases > 0 {
         out.push_str(&format!(
@@ -729,6 +759,11 @@ fn main() -> ExitCode {
     }
     if success {
         ExitCode::SUCCESS
+    } else if report.comparison_verdict == "no_comparison"
+        && report.planned_coverage_passed.unwrap_or(true)
+    {
+        eprintln!("No case was compared against expected values; the run proves nothing");
+        ExitCode::from(3)
     } else {
         ExitCode::from(1)
     }
@@ -1069,11 +1104,11 @@ mod tests {
         )
         .unwrap();
         let report = run_with(&[], std::slice::from_ref(&suite), None);
-        assert!(
-            report.numeric_comparison_passed,
-            "{:?}",
-            report.errors.len()
-        );
+        // Nothing failed, but nothing was compared either: no pass.
+        assert!(report.errors.is_empty(), "{:?}", report.errors.len());
+        assert!(!report.numeric_comparison_passed);
+        assert_eq!(report.comparison_verdict, "no_comparison");
+        assert_eq!(report.compared_cases, 0);
         assert_eq!(report.pending_expectation_cases, 1);
         let comparison = &report.cases[0].comparison;
         assert_eq!(comparison.status, "pending_expectation");
@@ -1084,6 +1119,21 @@ mod tests {
         assert!(text
             .contains("| pending-case | NTA 8800:2025+C1:2026 | geen verwachting | `beng2` | – |"));
         assert!(text.contains("| Zonder verwachting | 1 gevallen"));
+        assert!(text.contains(
+            "| Vergelijking | geen vergelijking (0 vergeleken, 1 zonder verwachting) |"
+        ));
+
+        // With one compared case next to it, the run has a verdict again.
+        let mixed = run_with(
+            &[temporary_case_file(&case(8.17))],
+            std::slice::from_ref(&suite),
+            None,
+        );
+        assert_eq!(mixed.comparison_verdict, "passed", "{}", mixed.errors.len());
+        assert!(mixed.numeric_comparison_passed);
+        assert_eq!((mixed.compared_cases, mixed.pending_expectation_cases), (1, 1));
+        assert!(markdown(&mixed)
+            .contains("| Vergelijking | geslaagd (1 vergeleken, 1 zonder verwachting) |"));
 
         // A pending case whose project no longer calculates fails the run.
         let broken = json!([{"op":"set", "pointer":"/ntaCalculation", "value":{}}]);
@@ -1097,6 +1147,7 @@ mod tests {
         .unwrap();
         let failed = run_with(&[], std::slice::from_ref(&suite), None);
         assert!(!failed.numeric_comparison_passed);
+        assert_eq!(failed.comparison_verdict, "failed");
         assert_eq!(failed.pending_expectation_cases, 1);
         assert_ne!(failed.cases[1].comparison.status, "pending_expectation");
         fs::remove_dir_all(dir).unwrap();
@@ -1121,6 +1172,8 @@ mod tests {
         assert!(report.errors.is_empty(), "{}", report.errors[0].error);
         assert!(failing.is_empty(), "{failing:?}");
         assert!(report.numeric_comparison_passed);
+        assert_eq!(report.comparison_verdict, "passed");
+        assert_eq!(report.compared_cases, 23);
         assert_eq!(report.cases.len(), 75);
         // The public cases and RVO compare; every ISSO 54 deeltest is
         // pending (its results document is not in hand) and calculates.
