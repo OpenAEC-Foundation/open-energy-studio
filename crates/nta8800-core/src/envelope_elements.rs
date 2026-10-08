@@ -544,6 +544,36 @@ pub const INTERPRETATIONS: &[&str] = &[
 mod tests {
     use super::*;
 
+    /// Footnotes c and e of tables C.3/C.4 (2025+C1 p. 782 and 784): the
+    /// fixture's weakly ventilated 40 mm cavity made 10 mm. Unventilated it
+    /// calculates by D.2 of NEN-EN-ISO 6946 (R 0,15 instead of the table's
+    /// 0,18, so a higher U); weakly ventilated it is refused.
+    #[test]
+    fn thin_cavity_in_a_construction() {
+        let base: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-constructions-synthetic.json"
+        ))
+        .unwrap();
+        let layer = "/elements/0/element/construction/build/layers/2";
+        let with = |thickness: f64, ventilation: &str| {
+            let mut value = base.clone();
+            *value.pointer_mut(&format!("{layer}/thicknessMm")).unwrap() = thickness.into();
+            *value.pointer_mut(&format!("{layer}/ventilation")).unwrap() =
+                serde_json::json!({ "kind": ventilation });
+            assess_envelope(&serde_json::from_value(value).unwrap())
+        };
+        let thick = with(40.0, "unventilated");
+        let thin = with(10.0, "unventilated");
+        assert_eq!(thin.status, "calculated_unverified", "{:?}", thin.issues);
+        assert!(thin.elements[0].u_value >= thick.elements[0].u_value);
+        let weak = with(10.0, "weakly");
+        assert_eq!(weak.status, "invalid");
+        assert!(weak
+            .issues
+            .iter()
+            .any(|i| i.code == "air_cavity_below_20_mm_unsupported"));
+    }
+
     #[test]
     fn fixture_assesses_all_element_kinds() {
         let input: EnvelopeInput = serde_json::from_str(include_str!(

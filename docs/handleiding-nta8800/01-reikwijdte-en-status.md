@@ -39,7 +39,7 @@ Daarnaast bevat het programma:
 
 **Afhankelijk van externe gegevens die niet beschikbaar zijn**
 - Uurwaarden van het klimaat voor §17.3.8. Belemmeringsfactoren worden daarom als opgegeven waarden aanvaard.
-- NEN-EN-ISO 6946 tabel 8, voor luchtspouwen dunner dan 20 mm. Geef zo'n laag op als R-waarde.
+- Luchtspouwen dunner dan 20 mm die zwak geventileerd zijn of een werkzame reflecterende laag hebben. Geef zo'n laag op als R-waarde met bron. Een niet-geventileerde dunne spouw zonder reflecterende laag rekent het programma zelf (bijlage D.2 van NEN-EN-ISO 6946, zie de [constructies](../nta8800-constructies.md)).
 - De kostenmodelbeschrijving van ISSO (rapport 110293) en een locatieklimaat voor het maatwerkadvies.
 - Het uitwisselformaat (XSD) van EP-Online voor registratie. Het programma registreert niet zelf.
 - Officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026, de testset waar BRL 9501 naar verwijst, met hun verwachte uitkomsten.

@@ -26,8 +26,7 @@
 **Openstaand, externe gegevens of besluiten.**
 - officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026 met hun verwachte uitkomsten (BRL 9501 van 29-05-2026, §4.2 en §11). Openbaar is alleen versie 2.0 van 2022, voor NTA 8800:2022, zonder de uitkomsten;
 - het EP-Online-uitwisselschema voor **aanlevering/registratie** (XSD); de openbare RVO-XSD voor het opvragen van het totaalbestand is een ander contract, zie het [bronnenregister](nta8800-bronnenregister.md);
-- het uurklimaat van 17.3.8;
-- ISO 6946 tabel 8 (spouwen kleiner dan 20 mm);
+- het uurklimaat van 17.3.8 (uurwaarden van NEN 5060:2018+A1:2021);
 - het attestnummer.
 
 **Interne controle op `aace329` (4 oktober).** De volledige Rust-kern (751 tests), HTTP/MCP-service (53 tests), frontend (385 tests in 61 bestanden) en TypeScript-/Vite-build zijn geslaagd. Daarna is een extra regressietest toegevoegd voor de onderwijsgrens van Bbl-tabel 4.148A; deze gerichte test en `cargo fmt --check` slaagden. Deze controles leveren geen externe normtoets of attest op.
@@ -187,8 +186,8 @@ Na audit 2 zijn de echte gaten gedicht. De kern dekt nu:
   - woningen: aangrenzende onverwarmde serre (AOS), daklichten, woonboot en caravan.
 
 Wat buiten bereik blijft:
-- 17.3.8: daarvoor zijn uurdata volgens NEN 5060 nodig. De kern accepteert opgegeven factoren.
-- Spouwen dunner dan 20 mm: de waarden staan in NEN-EN-ISO 6946 tabel 8, die niet beschikbaar is. Zo'n spouw kan als opgegeven R-laag worden ingevoerd.
+- 17.3.8: daarvoor zijn de uurwaarden van NEN 5060:2018+A1:2021 nodig: per uur de zonnestand, de totale zonnestraling op het vlak en het deel dat uit de richting van de zon komt (direct plus circumsolair) (2025+C1 p. 764–765). Die norm is niet beschikbaar. De kern accepteert opgegeven factoren met bron.
+- Spouwen dunner dan 20 mm (9 oktober 2026): niet-geventileerd zonder werkzame reflecterende laag rekent de kern met bijlage D.2 van NEN-EN-ISO 6946:2017 en de parameters van voetnoot e van tabel C.3/C.4 (p. 782 en 784). Dezelfde methode reproduceert alle waarden van tabel C.3 en C.4. Zwak geventileerd of met reflecterende laag blijft `air_cavity_below_20_mm_unsupported`; zo'n spouw wordt als opgegeven R-laag ingevoerd.
 - Bijlage J: dit is een productbepaling.
 - Bijlage K: dit zijn meetregels; de oppervlakken zijn invoer.
 

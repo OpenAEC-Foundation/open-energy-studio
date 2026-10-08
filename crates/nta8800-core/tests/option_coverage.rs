@@ -26,8 +26,9 @@
 //! The runs are spread over threads; the edition is thread-local.
 
 use nta8800_core::building_performance::{assess_building_performance, BuildingPerformanceInput};
+use nta8800_core::envelope_elements::{assess_envelope, EnvelopeInput};
 use nta8800_core::finite::first_non_finite;
-use nta8800_core::norm_versions::NormVersion;
+use nta8800_core::norm_versions::{with_version, NormVersion};
 use nta8800_core::opname::utility::{assess_utility_survey, UtilitySurvey};
 use nta8800_core::opname::{assess_residential_survey, ResidentialSurvey};
 use nta8800_core::project_performance::{assess_project_performance, NtaCalculationInput};
@@ -48,6 +49,9 @@ enum Route {
     Building,
     Residential,
     Utility,
+    /// Layered constructions and envelope elements (chapter 8, bijlage C);
+    /// the input carries no edition, so it runs under `with_version`.
+    Envelope,
 }
 
 struct Fixture {
@@ -68,7 +72,7 @@ macro_rules! fixture {
 
 /// The fixtures a user's input can look like, per route.
 fn fixtures() -> Vec<Fixture> {
-    let sources: [(&str, Route, &str); 25] = [
+    let sources: [(&str, Route, &str); 26] = [
         fixture!("example-office", Route::Project),
         fixture!("example-terraced-dwelling", Route::Project),
         fixture!("project-performance-synthetic", Route::Project),
@@ -121,6 +125,7 @@ fn fixtures() -> Vec<Fixture> {
         fixture!("opname-utility-1970-retail", Route::Utility),
         fixture!("opname-utility-1985-office", Route::Utility),
         fixture!("opname-utility-2005-school", Route::Utility),
+        fixture!("constructions-synthetic", Route::Envelope),
     ];
     sources
         .into_iter()
@@ -224,6 +229,7 @@ fn shape_error(route: Route, value: &Value) -> Option<ShapeError> {
         Route::Building => shape::<BuildingPerformanceInput>(value, ""),
         Route::Residential => shape::<ResidentialSurvey>(value, ""),
         Route::Utility => shape::<UtilitySurvey>(value, ""),
+        Route::Envelope => shape::<EnvelopeInput>(value, ""),
     }
 }
 
@@ -763,7 +769,11 @@ fn checked<T: serde::Serialize>(result: &T) -> Result<Value, String> {
 }
 
 /// Runs one input and checks it: `Ok(calculated, codes)` or the broken rule.
-fn run(route: Route, input: &Value) -> Result<(bool, BTreeSet<String>), String> {
+fn run(
+    route: Route,
+    version: NormVersion,
+    input: &Value,
+) -> Result<(bool, BTreeSet<String>), String> {
     let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<(Value, String), String> {
         let shape = |error: serde_json::Error| format!("shape: {error}");
         match route {
@@ -786,6 +796,11 @@ fn run(route: Route, input: &Value) -> Result<(bool, BTreeSet<String>), String> 
             Route::Utility => {
                 let survey: UtilitySurvey = serde_json::from_value(input.clone()).map_err(shape)?;
                 let result = assess_utility_survey(&survey);
+                Ok((checked(&result)?, result.status.to_string()))
+            }
+            Route::Envelope => {
+                let parsed: EnvelopeInput = serde_json::from_value(input.clone()).map_err(shape)?;
+                let result = with_version(version, || assess_envelope(&parsed));
                 Ok((checked(&result)?, result.status.to_string()))
             }
         }
@@ -1002,8 +1017,10 @@ fn run_jobs(fixtures: &[Fixture], jobs: &[Job]) -> Tally {
                     let pointer = edition_pointer(fixture.route);
                     let parent = pointer.rsplit_once('/').unwrap().0;
                     // Without its block (`ntaCalculation` left out) the input
-                    // has no edition to set.
-                    if parent.is_empty() || edition.pointer(parent).is_some() {
+                    // has no edition to set; the envelope input has none.
+                    if fixture.route != Route::Envelope
+                        && (parent.is_empty() || edition.pointer(parent).is_some())
+                    {
                         set_pointer(
                             &mut edition,
                             pointer,
@@ -1011,7 +1028,7 @@ fn run_jobs(fixtures: &[Fixture], jobs: &[Job]) -> Tally {
                         );
                     }
                     local.runs += 1;
-                    match run(fixture.route, &edition) {
+                    match run(fixture.route, version, &edition) {
                         Ok((calculated, codes)) => {
                             local.calculated += usize::from(calculated);
                             local.codes.extend(codes);
@@ -1211,6 +1228,7 @@ fn every_option_in_every_edition_calculates_or_refuses_with_a_labelled_code() {
             });
         }
     }
+    jobs.extend(numeric_route_jobs(&fixtures));
     let tally = run_jobs(&fixtures, &jobs);
     let (nl, en) = label_keys();
     let unlabelled: Vec<&String> = tally
@@ -1265,8 +1283,47 @@ fn every_option_in_every_edition_calculates_or_refuses_with_a_labelled_code() {
     assert!(omitted >= MIN_OMITTED, "{omitted}");
 }
 
+/// Routes behind a numeric threshold instead of a variant or a field, which
+/// the discovery above cannot see: each is one edit of a fixture.
+fn numeric_route_jobs(fixtures: &[Fixture]) -> Vec<Job> {
+    let envelope = fixtures
+        .iter()
+        .position(|f| f.route == Route::Envelope)
+        .expect("envelope fixture");
+    let cavity = "/elements/0/element/construction/build/layers/2";
+    assert_eq!(
+        fixtures[envelope].value.pointer(&format!("{cavity}/kind")),
+        Some(&json!("air_cavity")),
+        "the thin-cavity jobs edit this layer"
+    );
+    // Footnotes c and e of tables C.3/C.4: an unventilated layer below
+    // 20 mm calculates by D.2 of NEN-EN-ISO 6946; weak ventilation and an
+    // effective reflective layer below 20 mm are refused with a code.
+    [
+        ("unventilated", json!({ "kind": "unventilated" }), false),
+        ("strongly ventilated", json!({ "kind": "strongly" }), false),
+        ("weakly ventilated", json!({ "kind": "weakly" }), false),
+        ("unventilated, reflective", json!({ "kind": "unventilated" }), true),
+    ]
+    .into_iter()
+    .map(|(label, ventilation, reflective)| Job {
+        label: format!("constructions-synthetic air cavity of 10 mm, {label}"),
+        fixture: envelope,
+        edits: vec![
+            (format!("{cavity}/thicknessMm"), Some(json!(10))),
+            (format!("{cavity}/ventilation"), Some(ventilation)),
+            (
+                format!("{cavity}/reflectiveSurface"),
+                Some(json!(reflective)),
+            ),
+        ],
+    })
+    .collect()
+}
+
 /// Floors of the reached options and left-out members, just under the
-/// counts of 2026-10-08 (1203 variants, 1130 fields, 299 members).
-const MIN_VARIANTS: usize = 1190;
-const MIN_FIELDS: usize = 1110;
-const MIN_OMITTED: usize = 290;
+/// counts of 2026-10-09 with the envelope route (1508 variants, 1233
+/// fields, 313 members).
+const MIN_VARIANTS: usize = 1490;
+const MIN_FIELDS: usize = 1210;
+const MIN_OMITTED: usize = 300;
