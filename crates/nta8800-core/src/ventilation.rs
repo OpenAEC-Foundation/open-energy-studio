@@ -1679,13 +1679,21 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
     issues
 }
 
+/// Earliest manufacture year of a fan or heat-recovery unit. Every year up to
+/// it falls in the oldest row of table 11.20 ("onbekend of J < 2005",
+/// 2025+C1 p. 516) and table 11.23 ("j ≤ 1980 of onbekend", p. 519), so a
+/// survey that substitutes an older construction year may clamp to it
+/// without changing the result.
+pub const EARLIEST_MANUFACTURE_YEAR: i32 = 1900;
+
 /// A manufacture year picks a row of tables 11.20 (motor efficiency), 11.23
 /// (forfait fan power) and the heat-recovery rule of 11.2.6; a year outside
-/// 1900 to `LATEST_PLAUSIBLE_YEAR` is no real appliance and would silently
-/// take the oldest or newest row. Absent means unknown.
-fn manufacture_year_valid(year: Option<i32>) -> bool {
+/// `EARLIEST_MANUFACTURE_YEAR` to `LATEST_PLAUSIBLE_YEAR` is no real
+/// appliance and would silently take the oldest or newest row. Absent means
+/// unknown.
+pub fn manufacture_year_valid(year: Option<i32>) -> bool {
     year.map_or(true, |year| {
-        (1900..=i32::from(crate::LATEST_PLAUSIBLE_YEAR)).contains(&year)
+        (EARLIEST_MANUFACTURE_YEAR..=i32::from(crate::LATEST_PLAUSIBLE_YEAR)).contains(&year)
     })
 }
 
