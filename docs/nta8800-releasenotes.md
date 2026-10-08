@@ -13,6 +13,16 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — procedures voor het kwaliteitssysteem (geen rekenwijziging)
+
+- **Nieuwe map `docs/kwaliteit/`** met concepten die de attesthouder alleen nog hoeft in te vullen en vast te stellen (BRL 9501 hoofdstuk 5 en 6, taken C2, C3, C4 en C6):
+  - [kwaliteitshandboek](kwaliteit/kwaliteitshandboek.md): rollen, overzicht van alle procedures met hun bewijs, jaarlijkse review;
+  - [meldprocedure wijzigingen](kwaliteit/meldprocedure-wijzigingen.md) (§5.2, §6.4): wanneer en hoe instelling en licentiehouders bericht krijgen, gekoppeld aan "Onuitgebracht" en `KERNEL_VERSION`, met sjabloon en meldregister;
+  - [klachtenprocedure](kwaliteit/klachtenprocedure.md) (§6.5): verloop met termijnen, oorzaakanalyse (rekenfout, interpretatie, interface, gebruiker) en een registersjabloon;
+  - [register van licentiehouders](kwaliteit/register-licentiehouders.md) (§6.2.1): velden en CSV-sjablonen, gekoppeld aan `SHA256SUMS` per vrijgave;
+  - [archiefbeleid](kwaliteit/archiefbeleid.md) (§5.3, §6.2–6.3): bewaartermijnen, twee kopieën, integriteitscontrole en het terughalen van een oude versie.
+- De [gereedheidsanalyse](nta8800-brl9501-gereedheid.md) telt nu 6 voldaan, 14 deels, 6 open, 7 extern en 1 n.v.t.
+
 ### 9 oktober 2026 — handleiding in de app en bij elke vrijgave (geen rekenwijziging)
 
 - **Handleiding in de app** (BRL 9501 §4.4, taak B7). *Gereedschap › Handleiding* toont de gebruikershandleiding uit `docs/handleiding-nta8800/`. De hoofdstukken en afbeeldingen zitten in de build, dus de desktop-app toont ze ook offline. Links tussen hoofdstukken blijven in de viewer; verwijzingen naar andere documenten tonen hun pad. Naast de inhoud staan de programmaversie, de rekenkernversie waarvoor de handleiding is nagelopen en de rekenkern van deze installatie; verschillen die, dan meldt de viewer dat.

@@ -55,9 +55,9 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 | Eis (BRL 9501) | Inhoud in eigen woorden | Status | Bewijs in de repo | Wat ontbreekt |
 |---|---|---|---|---|
 | §5.1, p. 9 | De attesthouder staat in het handelsregister van een EU-lidstaat, met een uittreksel van maximaal een jaar oud. | open | – | Vaststellen welke rechtspersoon attesthouder wordt, en een uittreksel opvragen. |
-| §5.2, p. 9 | Wijzigingen die het resultaat kunnen beïnvloeden worden direct schriftelijk gemeld aan de instelling en de licentiehouders. | deels | De [releasenotes](nta8800-releasenotes.md) leggen elke uitkomstwijziging vast, gegroepeerd per rekenkernversie (taak B3). | Een meldprocedure naar de instelling en de licentiehouders (organisatorisch). |
+| §5.2, p. 9 | Wijzigingen die het resultaat kunnen beïnvloeden worden direct schriftelijk gemeld aan de instelling en de licentiehouders. | deels | De [releasenotes](nta8800-releasenotes.md) leggen elke uitkomstwijziging vast, gegroepeerd per rekenkernversie (taak B3). [Meldprocedure wijzigingen](kwaliteit/meldprocedure-wijzigingen.md) met triggers, sjabloon en meldregister. | Procedure klaar, vaststelling door de organisatie: namen invullen en vaststellen in het [kwaliteitshandboek](kwaliteit/kwaliteitshandboek.md). |
 | §5.2, p. 9 | Het rekenkerndeel van het versienummer wordt bij RVO geregistreerd. | open | `KERNEL_VERSION` en `TARGET_NORM_VERSION` bestaan ([versiebeheer](nta8800-versiebeheer.md)). | De registratie bij RVO, na de eerste echte release van de kern. |
-| §5.3, p. 9 | Na een normwijziging blijft de oude versie minstens 3 jaar bruikbaar: het oude programma zelf, een versie om mee te rekenen, of de attesthouder rekent op verzoek. | deels | De broncode van elke versie staat in git. De kern rekent bovendien oudere uitgaven (2024, 2023, 2022, 2020+A1) als `calculated_legacy_edition` ([normversies](nta8800-normversies.md)). | `scripts/release-nta.sh` maakt per vrijgave een git-tag en een archief met het installatiepakket en SHA-256 (taak B4). Nog vast te leggen: waar de archieven minstens 3 jaar worden bewaard (organisatorisch). Let op: de uitgavenprofielen in de huidige kern zijn niet hetzelfde als de geattesteerde oude kern, en vervangen die dus niet. |
+| §5.3, p. 9 | Na een normwijziging blijft de oude versie minstens 3 jaar bruikbaar: het oude programma zelf, een versie om mee te rekenen, of de attesthouder rekent op verzoek. | deels | De broncode van elke versie staat in git. De kern rekent bovendien oudere uitgaven (2024, 2023, 2022, 2020+A1) als `calculated_legacy_edition` ([normversies](nta8800-normversies.md)). [Archiefbeleid](kwaliteit/archiefbeleid.md): termijnen, twee kopieën, `sha256sum -c` en het terughalen van een oude versie uit tag of archief. | Procedure klaar, vaststelling door de organisatie: archieflocaties kiezen. Let op: de uitgavenprofielen in de huidige kern zijn niet hetzelfde als de geattesteerde oude kern, en vervangen die dus niet. |
 | §5.3 opm. 2, p. 9 | Zowel de invoer als de uitkomst van de berekening gaat naar EP-Online. | extern | Het projectdossier bevat beide. | Het registratieformaat (zie §4.3.1). |
 | §5.4, p. 9 | Elk jaar registreert minstens één certificaathouder een berekening volgens BRL 9500-W en een volgens 9500-U. | open | – | Kan pas na het attest en de EP-Online-koppeling. Daarvoor zijn afspraken met een certificaathouder nodig. |
 | §5.5, p. 9 | De attesthouder neemt deel aan TC 9501 van InstallQ. | open | – | Aanmelden bij InstallQ. |
@@ -69,10 +69,10 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 | §6.1, p. 10 | Het programma wordt geleverd met een leveringsdocument dat het versienummer uit het attest draagt. | deels | `scripts/release-nta.sh` vult bij elke vrijgave het sjabloon `docs/templates/nta8800-leveringsdocument.md` uit `src/core/nta/attest.json`, de versienummers en de SHA-256 van de pakketten (taak B5). | Het attestnummer en de identificatiecode in `attest.json`, na het attest. |
 | §6.2, p. 10 | Er is een logboek van elke wijziging in de software zoals de licentiehouder die gebruikt. | voldaan | De git-geschiedenis, de [releasenotes](nta8800-releasenotes.md) per rekenkernversie (taak B3) en per vrijgave een git-tag met archief (taak B4). | – |
 | §6.2, p. 10 | De testresultaten worden bij elke wijziging van de berekeningsmethode of de gebruikersinterface bewaard. | deels | De gate `scripts/verify-nta.sh` draait de kern-, service-, Tauri- en frontendtests, de optiedekking, de openbare gevallen, de MSRV-controle en de build. Voor een aantal commits staat het resultaat vast in `docs/nta8800-build-verificatie-*.md`. De gate schrijft het rapport van de referentiesuites met commit, `KERNEL_VERSION` en SHA-256 per invoer en uitvoer; `scripts/release-nta.sh` bewaart het gatelog en dat rapport per vrijgave (taken B1 en B4). | De ISSO 54-tests ontbreken in de gate. |
-| §6.2.1, p. 10 | Er is een register van licentiehouders. | open | – | Een register opzetten, buiten de software. |
-| §6.3, p. 10 | Na elke release toont de attesthouder aan dat hoofdstuk 4 nog voldaan is, en bewaart hij dat onderzoek. | deels | Dezelfde gate als hierboven. | De ISSO 54-run per release. Zonder de testset is §4.2 niet aan te tonen. |
-| §6.4, p. 10 | Na elke wijziging van de berekeningsmethode of de gebruikersinterface volgt een releasenote, die naar de instelling en de licentiehouders gaat. | deels | [Releasenotes](nta8800-releasenotes.md). | Een releasenote per release-versie, ook voor wijzigingen die alleen de gebruikersinterface raken. De releasenotes moeten ook naar de instelling en de licentiehouders worden verspreid. |
-| §6.5, p. 10 | Er is een gedocumenteerde klachtenprocedure: afhandeling, verantwoordelijken, registratie (datum, aard, oplossing, oorzaak), terugkoppeling aan de klager en intern, en archivering. | open | Alleen genoemd in het [totaalplan](nta8800-totaalplan.md), stap 7. | Een procedure en een klachtenregister (taak C3). |
+| §6.2.1, p. 10 | Er is een register van licentiehouders. | deels | [Register van licentiehouders](kwaliteit/register-licentiehouders.md) met velden, CSV-sjablonen en de koppeling aan `SHA256SUMS` per vrijgave. | Procedure klaar, vaststelling door de organisatie; het register zelf staat buiten de software. |
+| §6.3, p. 10 | Na elke release toont de attesthouder aan dat hoofdstuk 4 nog voldaan is, en bewaart hij dat onderzoek. | deels | Dezelfde gate als hierboven. [Archiefbeleid](kwaliteit/archiefbeleid.md) bewaart gatelog en referentierapport per vrijgave. | De ISSO 54-run per release. Zonder de testset is §4.2 niet aan te tonen. |
+| §6.4, p. 10 | Na elke wijziging van de berekeningsmethode of de gebruikersinterface volgt een releasenote, die naar de instelling en de licentiehouders gaat. | deels | [Releasenotes](nta8800-releasenotes.md). [Meldprocedure wijzigingen](kwaliteit/meldprocedure-wijzigingen.md) regelt de verspreiding naar instelling en licentiehouders, ook bij wijzigingen die alleen de interface raken. | Procedure klaar, vaststelling door de organisatie. |
+| §6.5, p. 10 | Er is een gedocumenteerde klachtenprocedure: afhandeling, verantwoordelijken, registratie (datum, aard, oplossing, oorzaak), terugkoppeling aan de klager en intern, en archivering. | deels | Alleen genoemd in het [totaalplan](nta8800-totaalplan.md), stap 7. [Klachtenprocedure](kwaliteit/klachtenprocedure.md) met rollen, termijnen, oorzaakanalyse, registersjabloon en archivering. | Procedure klaar, vaststelling door de organisatie (taak C3). |
 
 ### Attest en attestmerk (hoofdstukken 7–9)
 
@@ -155,16 +155,16 @@ Afgerond op 8 oktober 2026: B1–B5 (gebouwd, zie de rijen) en B6, B8 en B9 (✔
 
 ### (c) Organisatorisch
 
-| Punt | Eis |
-|---|---|
-| **C1** De rechtspersoon van de attesthouder vaststellen, met een KvK-uittreksel van hooguit een jaar oud | §5.1, §8.1 |
-| **C2** Een kwaliteitshandboek met wijzigings- en releaseprocedure, meldprocedure richting instelling en licentiehouders, en een interne reviewer | §5.2, §6.2–6.4 |
-| **C3** Een klachtenprocedure en een klachtenregister | §6.5 |
-| **C4** Een register van licentiehouders | §6.2.1 |
-| **C5** De rekenkernversie registreren bij RVO | §5.2 |
-| **C6** Bewaartermijnen vastleggen: 3 jaar na een normwijziging, 24 maanden voor herlabelen | §5.3; BRL 9500 §4.2.4 |
-| **C7** Deelnemen aan TC 9501 | §5.5 |
-| **C8** Afspraken met minstens één certificaathouder over een jaarlijkse W- en U-registratie | §5.4 |
+| Punt | Eis | Status (9 oktober 2026) |
+|---|---|---|
+| **C1** De rechtspersoon van de attesthouder vaststellen, met een KvK-uittreksel van hooguit een jaar oud | §5.1, §8.1 | open |
+| **C2** Een kwaliteitshandboek met wijzigings- en releaseprocedure, meldprocedure richting instelling en licentiehouders, en een interne reviewer | §5.2, §6.2–6.4 | concept klaar: [kwaliteitshandboek](kwaliteit/kwaliteitshandboek.md), [meldprocedure](kwaliteit/meldprocedure-wijzigingen.md); procedure klaar, vaststelling door de organisatie |
+| **C3** Een klachtenprocedure en een klachtenregister | §6.5 | concept klaar: [klachtenprocedure](kwaliteit/klachtenprocedure.md); procedure klaar, vaststelling door de organisatie |
+| **C4** Een register van licentiehouders | §6.2.1 | concept klaar: [register](kwaliteit/register-licentiehouders.md); procedure klaar, vaststelling door de organisatie |
+| **C5** De rekenkernversie registreren bij RVO | §5.2 | open (na de eerste vrijgave met attest) |
+| **C6** Bewaartermijnen vastleggen: 3 jaar na een normwijziging, 24 maanden voor herlabelen | §5.3; BRL 9500 §4.2.4 | concept klaar: [archiefbeleid](kwaliteit/archiefbeleid.md); procedure klaar, vaststelling door de organisatie |
+| **C7** Deelnemen aan TC 9501 | §5.5 | open |
+| **C8** Afspraken met minstens één certificaathouder over een jaarlijkse W- en U-registratie | §5.4 | open |
 
 ### De tien belangrijkste blokkades, op volgorde
 
@@ -174,9 +174,9 @@ Afgerond op 8 oktober 2026: B1–B5 (gebouwd, zie de rijen) en B6, B8 en B9 (✔
 4. ~~**B1 + B2:** een testsetrunner met relatieve bandbreedtes~~ (gebouwd 8 oktober 2026).
 5. ~~**B3:** de discipline voor de rekenkernversie, met releasenotes per versie~~ (gebouwd 8 oktober 2026).
 6. **E4:** een attesteringsinstelling en de overeenkomst (extern).
-7. **C2:** het kwaliteitshandboek met de wijzigings-, release- en meldprocedures (organisatorisch).
+7. **C2:** het kwaliteitshandboek met de wijzigings-, release- en meldprocedures (organisatorisch; concept klaar 9 oktober 2026, vaststelling door de organisatie).
 8. ~~**B4 + B5:** een releasearchief en het leveringsdocument~~ (gebouwd 8 oktober 2026; de bewaarplaats van de archieven is organisatorisch).
-9. **C1 + C3 + C4:** KvK, klachtenprocedure, register van licentiehouders (organisatorisch).
+9. **C1 + C3 + C4:** KvK, klachtenprocedure, register van licentiehouders (organisatorisch; C3 en C4 als concept klaar 9 oktober 2026).
 10. **E5:** het uurklimaat 17.3.8 en ISO 6946 tabel 8 (extern).
 
 ## Telling
@@ -186,9 +186,9 @@ Telling over de eisentabel in §1 (34 rijen). Een rij met twee statussen telt bi
 | Status | Aantal |
 |---|---|
 | voldaan | 6 |
-| deels | 12 |
-| open | 8 |
+| deels | 14 |
+| open | 6 |
 | extern | 7 |
 | n.v.t. | 1 |
 
-Bijgewerkt na taken B1–B5 en B6, B8, B9 (8 oktober 2026): §3.0, §4.3 en §6.2 (logboek) gingen naar voldaan, §6.1 en §8.4 van open naar deels. Na taak B7 (9 oktober 2026) ging §4.4 van deels naar voldaan.
+Bijgewerkt na taken B1–B5 en B6, B8, B9 (8 oktober 2026): §3.0, §4.3 en §6.2 (logboek) gingen naar voldaan, §6.1 en §8.4 van open naar deels. Na taak B7 (9 oktober 2026) ging §4.4 van deels naar voldaan. Met de procedures in [kwaliteit/](kwaliteit/kwaliteitshandboek.md) (9 oktober 2026) gingen §6.2.1 en §6.5 van open naar deels; ze worden voldaan zodra de organisatie ze vaststelt.
