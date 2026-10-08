@@ -73,6 +73,33 @@ describe('label elements k and l (Omgevingsregeling art. 5.13a lid 1)', () => {
     expect(unanswered.labelStatements).toMatchObject({ k_reageertOpExterneSignalen: null, l_afgiftesysteemLageTemperatuur: null });
   });
 
+  it('prefers the kernel label elements k and l and shows them once', () => {
+    const { project, assessment } = load();
+    const elements = assessment.labelData!.indicators!.elements;
+    const kernel: ProjectPerformanceAssessment = {
+      ...assessment,
+      labelData: {
+        ...assessment.labelData!,
+        indicators: {
+          ...assessment.labelData!.indicators!,
+          elements: { ...elements, respondsToExternalSignals: true, lowTemperatureHeating: false },
+        },
+      },
+    };
+    // The registration says the opposite: the kernel's elements win.
+    const withStatements: IProject = {
+      ...project,
+      registration: { ...project.registration, labelStatements: { respondsToExternalSignals: false, lowTemperatureHeating: true } },
+    };
+    const html = generateEnergyPerformanceReportHTML(withStatements, kernel, { level: 'summary', generatedAt: at });
+    expect(html).toContain('k. Reageert op externe signalen (verklaring adviseur)</th><td colspan="2">ja');
+    expect(html).toContain('l. Afgiftesysteem ontworpen voor lage temperatuur (verklaring adviseur)</th><td colspan="2">nee');
+    expect(html.match(/k\. Reageert op externe signalen/g)).toHaveLength(1);
+    expect(html).not.toContain('respondsToExternalSignals');
+    expect(buildEpOnlineOverview(withStatements, kernel).labelStatements)
+      .toMatchObject({ k_reageertOpExterneSignalen: true, l_afgiftesysteemLageTemperatuur: false });
+  });
+
   function Harness() {
     const { state } = useEnergy();
     return <>

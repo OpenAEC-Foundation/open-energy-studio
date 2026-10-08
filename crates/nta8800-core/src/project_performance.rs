@@ -1669,6 +1669,13 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
             indicators.elements.wlc_gwp_kg_co2_eq_per_m2 = project_value
                 .pointer("/registration/wlcGwp/valueKgCo2EqPerM2Year")
                 .and_then(Value::as_f64);
+            // Onder k en l: the adviser's statements from the registration.
+            indicators.elements.responds_to_external_signals = project_value
+                .pointer("/registration/labelStatements/respondsToExternalSignals")
+                .and_then(Value::as_bool);
+            indicators.elements.low_temperature_heating = project_value
+                .pointer("/registration/labelStatements/lowTemperatureHeating")
+                .and_then(Value::as_bool);
         }
         data
     });
@@ -4266,6 +4273,46 @@ mod tests {
         assert!(elements.renewable_production_kwh.unwrap() > 0.0);
         assert!(elements.main_renewable_source.is_some());
         assert_eq!(elements.responds_to_external_signals, None);
+        assert_eq!(elements.low_temperature_heating, None);
+    }
+
+    /// Art. 5.13a lid 1 onder k en l: the adviser's statements in the
+    /// registration reach the label elements; an unanswered one stays `None`.
+    #[test]
+    fn label_elements_k_and_l_come_from_the_registration() {
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        value["registration"] = serde_json::json!({
+            "labelStatements": {
+                "respondsToExternalSignals": false,
+                "lowTemperatureHeating": true
+            }
+        });
+        let result = assess_project_performance(&value);
+        let elements = &result
+            .label_data
+            .as_ref()
+            .unwrap()
+            .indicators
+            .as_ref()
+            .unwrap()
+            .elements;
+        assert_eq!(elements.responds_to_external_signals, Some(false));
+        assert_eq!(elements.low_temperature_heating, Some(true));
+        value["registration"]["labelStatements"] =
+            serde_json::json!({ "respondsToExternalSignals": true });
+        let result = assess_project_performance(&value);
+        let elements = &result
+            .label_data
+            .as_ref()
+            .unwrap()
+            .indicators
+            .as_ref()
+            .unwrap()
+            .elements;
+        assert_eq!(elements.responds_to_external_signals, Some(true));
         assert_eq!(elements.low_temperature_heating, None);
     }
 

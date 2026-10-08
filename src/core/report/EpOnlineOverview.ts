@@ -217,8 +217,11 @@ export function buildEpOnlineOverview(
     missingRequired: EP_ONLINE_REQUIRED.filter((field) => !(field in ordered)),
     labelStatements: {
       note: LABEL_STATEMENTS_NOTE,
-      k_reageertOpExterneSignalen: registration.labelStatements?.respondsToExternalSignals ?? null,
-      l_afgiftesysteemLageTemperatuur: registration.labelStatements?.lowTemperatureHeating ?? null,
+      // The kernel's label elements k and l first; the registration when there is no label data.
+      k_reageertOpExterneSignalen: indicators?.elements.respondsToExternalSignals
+        ?? registration.labelStatements?.respondsToExternalSignals ?? null,
+      l_afgiftesysteemLageTemperatuur: indicators?.elements.lowTemperatureHeating
+        ?? registration.labelStatements?.lowTemperatureHeating ?? null,
     },
   };
 }
