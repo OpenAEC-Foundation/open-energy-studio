@@ -1176,7 +1176,7 @@ mod tests {
         assert!(report.numeric_comparison_passed);
         assert_eq!(report.comparison_verdict, "passed");
         assert_eq!(report.compared_cases, 23);
-        assert_eq!(report.cases.len(), 138);
+        assert_eq!(report.cases.len(), 222);
         // The public cases and RVO compare; every ISSO 54 deeltest is
         // pending (its results document is not in hand) and calculates.
         for case in &report.cases {
@@ -1192,7 +1192,7 @@ mod tests {
                 case.comparison.case_id
             );
         }
-        assert_eq!(report.pending_expectation_cases, 115);
+        assert_eq!(report.pending_expectation_cases, 199);
         // Every edition the kernel calculates in is exercised.
         for edition in [
             "NTA 8800:2025+C1:2026",
