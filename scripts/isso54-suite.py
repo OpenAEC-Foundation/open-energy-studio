@@ -1935,6 +1935,100 @@ CASES += [
 ]
 
 
+# --- EP-U303f/g: gas-engine heat pump and CHP for the office (p. 47) ---
+UTILITY_CASES += [
+    (
+        "EPU303f",
+        47,
+        [
+            setp(
+                GEN,
+                {
+                    "kind": "gas_heat_pump",
+                    "table": "utility_collective_or_above25_kw",
+                    "source": "surface_water",
+                    "designSupplyTemperatureC": 35.0,
+                    "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": 50.0, "sourceReference": "ISSO 54 v2.0 EP-U303f p. 47: nominaal thermisch vermogen 50 kW"},
+                    "equipmentReference": "ISSO 54 v2.0 EP-U303f p. 47: gasmotorwarmtepomp op oppervlaktewater (tabel 9.29)",
+                },
+            ),
+            temperature_class("35_30"),
+            renewable("EP-U303f", True),
+            CALCULATED_PUMP,
+        ],
+    ),
+    # EP-U303g: CHP of 20-200 kW electric (table 9.31 row, 100 kW taken), built
+    # after 2006, 50 kW thermal, 45/40 (low temperature) (p. 47).
+    (
+        "EPU303g",
+        47,
+        [
+            setp(
+                GEN,
+                {
+                    "kind": "chp",
+                    "chp": {"powerKw": 100.0, "builtAfter2006": True, "lowTemperature": True},
+                    "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": 50.0, "sourceReference": "ISSO 54 v2.0 EP-U303g p. 47: nominaal thermisch vermogen 50 kW"},
+                    "equipmentReference": "ISSO 54 v2.0 EP-U303g p. 47: WKK 20-200 kW elektrisch (tabel 9.31; 100 kW als klassewaarde), na 2006, 45/40",
+                },
+            ),
+            temperature_class("45_40"),
+            CALCULATED_PUMP,
+        ],
+    ),
+]
+
+
+# --- EP-W205a/c: collective installations of several boilers (p. 28-29) ---
+# Existing building, calculated per apartment (the apartment variant). The
+# HR107 is taken as the preferred generator (9.6.1, table 9.1), the VR boilers
+# after it; the forfait auxiliary energy is 9.91 per boiler.
+def collective_boiler(gen_id, kind, temperature, pilot, why):
+    return {
+        "kind": "gas_boiler",
+        "boiler": {
+            "generatorId": gen_id,
+            "role": "collective",
+            "location": "outside_thermal_boundary",
+            "kind": kind,
+            "fuel": "natural_gas",
+            "averageDesignEmissionTemperatureC": temperature,
+            "emissionCircuit": "direct",
+            "equipmentReference": why,
+            "locationReference": "buiten de thermische schil",
+            "temperatureAndCircuitReference": f"gemiddelde ontwerptemperatuur {temperature} C",
+            "pilotFlamePresent": pilot,
+            "installationYear": 2021,
+            "installationYearReference": "ISSO 54 v2.0: installatiejaar als EP-W001",
+        },
+        "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": 10.0, "sourceReference": f"{why}, 10 kW"},
+    }
+
+
+def boiler_set(test_id, boilers, temperature, dwellings, cls):
+    return APARTMENT + [
+        setp(
+            GEN,
+            {
+                "kind": "multiple",
+                "generators": [{"preference": k + 1, "nominalPowerKw": 10.0, "generator": collective_boiler(f"ketel-{k + 1}", kind, temperature, pilot, f"ISSO 54 v2.0 {test_id}: {kind}")} for k, (kind, pilot) in enumerate(boilers)],
+                "sourceReference": f"ISSO 54 v2.0 {test_id}: collectieve installatie, HR107 voorkeur",
+            },
+        ),
+        temperature_class(cls),
+        setp(f"{NTA}/collectiveConnection", {"connectedUsableAreaM2": 96.0 * dwellings, "sourceReference": f"ISSO 54 v2.0 {test_id}: {dwellings} woningen van 96 m2"}),
+        setp(f"{NTA}/distributionSystem/installation", "collective"),
+        setp(f"{NTA}/distributionSystem/connectedStoreys", 4),
+        COLLECTIVE_PUMP,
+    ]
+
+
+CASES += [
+    ("EPW205a", 28, boiler_set("EP-W205a", [("hr107", False), ("vr", False)], 70.0, 4, "80_60")),
+    ("EPW205c", 29, boiler_set("EP-W205c", [("hr107", False), ("vr", True), ("vr", True)], 46.0, 10, "50_42")),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
