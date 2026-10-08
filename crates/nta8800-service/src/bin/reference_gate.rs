@@ -7,7 +7,9 @@
 //! with the commit, `KERNEL_VERSION`, the edition per case and the SHA-256 of
 //! every input and output: the test record of BRL 9501 §6.2–6.3.
 
-use nta8800_core::reference::{compare_reference_case, ReferenceCase, ReferenceComparison};
+use nta8800_core::reference::{
+    compare_reference_case, comparison_status_acceptable, ReferenceCase, ReferenceComparison,
+};
 use nta8800_core::{KERNEL_VERSION, TARGET_NORM_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -219,6 +221,9 @@ struct GateReport {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suites: Vec<SuiteRecord>,
     numeric_comparison_passed: bool,
+    /// Cases calculated without expected values (`pending_expectation`):
+    /// they pass the run but prove nothing about the result.
+    pending_expectation_cases: usize,
     /// None means that no independently agreed coverage plan was supplied.
     planned_coverage_passed: Option<bool>,
     /// SHA-256 of the exact plan bytes, for release-level traceability only.
@@ -386,7 +391,10 @@ fn push_case(
     let input_sha256 =
         sha256(&serde_json::to_vec(&resolved.case).expect("reference case serializes"));
     let comparison = compare_reference_case(resolved.case);
-    report.numeric_comparison_passed &= comparison.status == "compared_pass";
+    report.numeric_comparison_passed &= comparison_status_acceptable(comparison.status);
+    if comparison.status == "pending_expectation" {
+        report.pending_expectation_cases += 1;
+    }
     let output_sha256 =
         sha256(&serde_json::to_vec(&comparison).expect("reference comparison serializes"));
     let published = published_comparisons(&comparison, resolved.published);
@@ -409,6 +417,7 @@ fn run_with(paths: &[PathBuf], suites: &[PathBuf], plan_path: Option<&Path>) -> 
         commit: None,
         suites: Vec::new(),
         numeric_comparison_passed: !paths.is_empty() || !suites.is_empty(),
+        pending_expectation_cases: 0,
         planned_coverage_passed: None,
         coverage_plan_fingerprint: None,
         reference_verified: false,
@@ -556,6 +565,12 @@ fn markdown(report: &GateReport) -> String {
         verdict(report.numeric_comparison_passed),
         report.cases.len()
     ));
+    if report.pending_expectation_cases > 0 {
+        out.push_str(&format!(
+            "| Zonder verwachting | {} gevallen (alleen doorgerekend, geen oordeel) |\n",
+            report.pending_expectation_cases
+        ));
+    }
     if let Some(passed) = report.planned_coverage_passed {
         out.push_str(&format!("| Dekkingsplan | {} |\n", verdict(passed)));
     }
@@ -573,7 +588,21 @@ fn markdown(report: &GateReport) -> String {
     out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for case in &report.cases {
         let comparison = &case.comparison;
-        if comparison.metrics.is_empty() {
+        for metric in &comparison.recorded {
+            let band = match metric.relative_tolerance {
+                Some(fraction) => format!("{} %", number(fraction * 100.0)),
+                None => number(metric.absolute_tolerance),
+            };
+            out.push_str(&format!(
+                "| {} | {} | geen verwachting | `{}` | – | {} | – | {} |\n",
+                comparison.case_id,
+                comparison.target_norm_version,
+                metric.path,
+                number(metric.actual),
+                band
+            ));
+        }
+        if comparison.metrics.is_empty() && comparison.recorded.is_empty() {
             out.push_str(&format!(
                 "| {} | {} | {} | – | – | – | – | – |\n",
                 comparison.case_id, comparison.target_norm_version, comparison.status
@@ -1016,6 +1045,63 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    fn pending_suite_case(case_id: &str, patch: Value) -> Value {
+        json!({
+            "caseId":case_id, "normVersion":"2025+C1", "projectFile":"project.json",
+            "projectPatch": patch,
+            "source":{"publisher":"synthetic", "documentId":"internal-3", "edition":"test",
+                "usePermission":"internal", "independentReviewer":"none"},
+            "pending":{"reason":"results document not in hand",
+                "metrics":[{"path":"beng2", "unit":"kWh/m2.year",
+                    "normReference":"internal test", "relativeTolerance":0.01}]}
+        })
+    }
+
+    #[test]
+    fn pending_cases_record_without_a_verdict_but_must_calculate() {
+        let dir = suite_dir();
+        let suite = dir.join("suite.json");
+        fs::write(
+            &suite,
+            json!({"suiteId":"pending", "description":"test suite",
+                "cases":[pending_suite_case("pending-case", json!([]))]})
+            .to_string(),
+        )
+        .unwrap();
+        let report = run_with(&[], std::slice::from_ref(&suite), None);
+        assert!(
+            report.numeric_comparison_passed,
+            "{:?}",
+            report.errors.len()
+        );
+        assert_eq!(report.pending_expectation_cases, 1);
+        let comparison = &report.cases[0].comparison;
+        assert_eq!(comparison.status, "pending_expectation");
+        assert!(comparison.metrics.is_empty());
+        assert_eq!(comparison.recorded[0].path, "beng2");
+        assert!(!report.reference_verified);
+        let text = markdown(&report);
+        assert!(text
+            .contains("| pending-case | NTA 8800:2025+C1:2026 | geen verwachting | `beng2` | – |"));
+        assert!(text.contains("| Zonder verwachting | 1 gevallen"));
+
+        // A pending case whose project no longer calculates fails the run.
+        let broken = json!([{"op":"set", "pointer":"/ntaCalculation", "value":{}}]);
+        fs::write(
+            &suite,
+            json!({"suiteId":"pending", "description":"test suite",
+                "cases":[pending_suite_case("pending-case", json!([])),
+                    pending_suite_case("broken-case", broken)]})
+            .to_string(),
+        )
+        .unwrap();
+        let failed = run_with(&[], std::slice::from_ref(&suite), None);
+        assert!(!failed.numeric_comparison_passed);
+        assert_eq!(failed.pending_expectation_cases, 1);
+        assert_ne!(failed.cases[1].comparison.status, "pending_expectation");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn committed_suites_pass() {
         let root =
@@ -1023,18 +1109,35 @@ mod tests {
         let suites = [
             root.join("openbare-gevallen.json"),
             root.join("rvo-voorbeeldwoningen.json"),
+            root.join("isso54-v2.json"),
         ];
         let report = run_with(&[], &suites, None);
         let failing: Vec<_> = report
             .cases
             .iter()
-            .filter(|case| case.comparison.status != "compared_pass")
-            .map(|case| &case.comparison.case_id)
+            .filter(|case| !comparison_status_acceptable(case.comparison.status))
+            .map(|case| (&case.comparison.case_id, &case.comparison.issues))
             .collect();
         assert!(report.errors.is_empty(), "{}", report.errors[0].error);
         assert!(failing.is_empty(), "{failing:?}");
         assert!(report.numeric_comparison_passed);
-        assert_eq!(report.cases.len(), 23);
+        assert_eq!(report.cases.len(), 75);
+        // The public cases and RVO compare; every ISSO 54 deeltest is
+        // pending (its results document is not in hand) and calculates.
+        for case in &report.cases {
+            let isso = case.suite.as_deref() == Some("isso54-v2");
+            let expected = if isso {
+                "pending_expectation"
+            } else {
+                "compared_pass"
+            };
+            assert_eq!(
+                case.comparison.status, expected,
+                "{}",
+                case.comparison.case_id
+            );
+        }
+        assert_eq!(report.pending_expectation_cases, 52);
         // Every edition the kernel calculates in is exercised.
         for edition in [
             "NTA 8800:2025+C1:2026",

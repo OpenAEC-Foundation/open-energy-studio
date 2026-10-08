@@ -1,0 +1,363 @@
+{
+  "id": "isso54-v2-EPW001",
+  "name": "ISSO 54 v2.0 EP-W001 referentiewoning",
+  "description": "Eigen codering van de invoer van ISSO 54 versie 2.0 (CCvD InstallQ 12-05-2022), referentietest EP-W001, p. 4-6. Rekent in NTA 8800:2022. De verwachte uitkomsten staan in bijlage 2 (apart document) en zijn niet in bezit.",
+  "buildingFunction": "residential",
+  "address": "",
+  "city": "",
+  "zones": [
+    {
+      "id": "epw001-zone",
+      "name": "Rekenzone 1 (2 bouwlagen)",
+      "floorArea": 96.0,
+      "volume": 259.2,
+      "height": 5.4,
+      "surfaces": [
+        {
+          "id": "dak",
+          "name": "Dak (plat)",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 48.0,
+          "orientation": "horizontal",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "bg-vloer",
+          "name": "Begane-grondvloer op grond",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 48.0,
+          "orientation": "horizontal",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "gevel-zuid",
+          "name": "Gevel zuid",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 43.2,
+          "orientation": "S",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "id": "gevel-noord",
+          "name": "Gevel noord",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 43.2,
+          "orientation": "N",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "gevel-oost",
+          "name": "Gevel oost",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 32.4,
+          "orientation": "E",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        },
+        {
+          "id": "gevel-west",
+          "name": "Gevel west",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 32.4,
+          "orientation": "W",
+          "constructionId": "c-rc6",
+          "zoneId": "epw001-zone",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.7
+      }
+    }
+  ],
+  "heatingSystems": [
+    {
+      "id": "hr107",
+      "name": "HR107-combiketel",
+      "type": "hr_combi",
+      "cop": 0.95,
+      "coverageFraction": 1.0
+    }
+  ],
+  "ventilationSystems": [
+    {
+      "id": "d2",
+      "name": "D2 met WTW",
+      "type": "type_d",
+      "heatRecoveryEfficiency": 0.0,
+      "sfp": 0.0
+    }
+  ],
+  "coolingSystems": [],
+  "hotWaterSystems": [
+    {
+      "id": "cw5",
+      "name": "HR107-combi CW5",
+      "type": "hr_combi",
+      "efficiency": 0.0,
+      "hasSolarBoiler": false,
+      "solarBoilerFraction": 0
+    }
+  ],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-rc6",
+      "name": "Dichte constructie Rc 6,0 (tabel 1, p. 5)",
+      "layers": [],
+      "rcValue": 6.0,
+      "uValue": 0.162
+    }
+  ],
+  "ntaCalculation": {
+    "normVersion": "2022",
+    "calculationScope": "residential",
+    "constructionYear": 2021,
+    "areaSourceReference": "ISSO 54 v2.0, EP-W001 p. 5: Ag 96 m2 (2 x 48 m2, binnenmaten NEN 1068)",
+    "usageFunction": "residential",
+    "dwellingType": "other",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "tabel 7.13"
+    },
+    "thermalMass": {
+      "floor": "very_heavy",
+      "wall": "heavy",
+      "ceiling": "open_or_none",
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 5: betonnen wand-vloer skeletbouw / dragend metselwerk met massieve betonnen vloeren, geen of open plafond, D_m 450 kJ/m2K (tabel 7.10)"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "een woning"
+    },
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 5: kozijnfractie 25 %, geen zonwerende coating, geen beweegbare zonwering, geen belemmeringen of overstekken"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "bg-vloer",
+        "exposedPerimeterM": 28.0,
+        "constructionResistanceM2kPerW": 6.17,
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "ISSO 54 v2.0, EP-W001 p. 5: Rc 6,0, perimeter 28 m (NEN 1068), vloer op grond volgens hoofdstuk 8"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "individual_room_thermostats",
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6: vloerverwarming overal, deklaag 1,8 cm, minimale isolatie volgens EN 1264, automatische regeling per ruimte (dtheta_roomaut -0,5 K), tweepijps, ingeregeld per veld met dynamische groepsbalans (drukverschilregeling); NTA 8800:2022 tabellen 9.2 en 9.4 (p. 275)",
+      "edition2023": {
+        "kind": {
+          "type": "surface",
+          "control": "room",
+          "system": "floor_thin_screed",
+          "insulation": "minimal_insulation"
+        },
+        "roomAutomation": "individual_per_room",
+        "pipeSystem": "two_pipe",
+        "balancing": "dynamic_with_load_control"
+      }
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6: alle leidingen in verwarmde ruimten, lengte en Psi forfaitair"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "45_40",
+      "installation": "individual",
+      "usageFunction": "residential",
+      "connectedStoreys": 2,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "insulated",
+          "period": "from1995"
+        }
+      },
+      "valvesInsulated": true,
+      "pump": {
+        "method": "included_in_generator_auxiliary"
+      },
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6: tweepijps 45/40, waterzijdig ingeregeld, beugels en kleppen geisoleerd, geen aanvullende pomp, geen warmtemeter; leidingen geisoleerd (EP-W202 referentie, p. 24), bouwjaar 2021"
+    },
+    "generator": {
+      "kind": "gas_boiler",
+      "boiler": {
+        "generatorId": "hr107",
+        "role": "individual_main",
+        "location": "inside_thermal_boundary",
+        "kind": "hr107",
+        "fuel": "natural_gas",
+        "averageDesignEmissionTemperatureC": 42.5,
+        "emissionCircuit": "direct",
+        "equipmentReference": "ISSO 54 v2.0, EP-W001 p. 6: modulerende HR107-combiketel",
+        "locationReference": "ISSO 54 v2.0, EP-W001 p. 6: binnen de thermische schil",
+        "temperatureAndCircuitReference": "ISSO 54 v2.0, EP-W001 p. 6: aanvoer 45 C, retour 40 C",
+        "pilotFlamePresent": false,
+        "installationYear": 2021,
+        "installationYearReference": "ISSO 54 v2.0, EP-W001 p. 6: installatiejaar 2021"
+      }
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "woning zonder GBS",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential",
+    "verticalPipes": [
+      {
+        "id": "forfaitair",
+        "storeys": 2,
+        "insulated": false,
+        "sourceReference": "ISSO 54 v2.0, EP-W001 p. 5: leidingdoorvoeren forfaitair (7.3.3)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "epw001-zone",
+      "usableFloorAreaM2": 96.0,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 96.0
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 5.4,
+      "constructionYear": 2021,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 20.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d2",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "table",
+              "exchanger": "counter_flow_plastic"
+            },
+            "bypass": {
+              "kind": "full"
+            },
+            "layout": "central",
+            "supplyDuctLengthM": 1.0,
+            "supplyDuctInsulation": {
+              "kind": "insulated"
+            },
+            "equipmentReference": "ISSO 54 v2.0, EP-W001 p. 6: tegenstroomwisselaar kunststof, volledige bypass, toevoerkanaal 1 m geisoleerd"
+          },
+          "ducts": "luka_a_b_c",
+          "equipmentReference": "ISSO 54 v2.0, EP-W001 p. 6: D.2 met WTW, Luka C"
+        }
+      },
+      "maximumCapacityForCooling": "ISSO 54 v2.0, EP-W001 p. 6: maximale benutting van de ventilatiecapaciteit (automatische passieve koeling), bypass volledig",
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "reference",
+        "buildingType": "flat_roof_detached"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2021
+      },
+      "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "een woning"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "kitchen_and_bathroom",
+        "kitchenLengthM": 8.5,
+        "kitchenPipeDiameter": "other",
+        "bathroomLengthM": 5.0,
+        "sourceReference": "ISSO 54 v2.0, EP-W001 p. 6: uittapleiding keuken 8,5 m, douche 5 m, binnendiameter > 10 mm, geen circulatie"
+      },
+      "generator": {
+        "kind": "gas_appliance",
+        "appliance": "combi_gaskeur_hr_cw",
+        "measuredClass": "class4"
+      },
+      "equipmentReference": "ISSO 54 v2.0, EP-W001 p. 6: HR107-combi, tapklasse CW5, Gaskeur HR en CW, geen voorraadvat"
+    }
+  }
+}
