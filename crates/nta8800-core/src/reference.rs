@@ -380,8 +380,7 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     }
     let calculated = match case.input_kind.unwrap_or(ReferenceInputKind::Project) {
         ReferenceInputKind::Project => {
-            let assessment =
-                crate::project_performance::assess_project_performance(&case.project);
+            let assessment = crate::project_performance::assess_project_performance(&case.project);
             result.input_fingerprint = Some(assessment.input_fingerprint);
             // An older edition calculates with the legacy status; the
             // comparison is the same, a registration is never implied.
@@ -1077,8 +1076,8 @@ mod tests {
         assert_eq!(wide.metrics[0].applied_tolerance, 1.0);
         // Without a relative tolerance the manifest and its fingerprint are
         // those of before relative tolerances existed.
-        let plain = serde_json::to_value(comparison_case(json!({}), "beng2", 1.0, "kWh/m2.year"))
-            .unwrap();
+        let plain =
+            serde_json::to_value(comparison_case(json!({}), "beng2", 1.0, "kWh/m2.year")).unwrap();
         assert!(plain["expected"][0].get("relativeTolerance").is_none());
         assert!(plain.get("inputKind").is_none());
     }

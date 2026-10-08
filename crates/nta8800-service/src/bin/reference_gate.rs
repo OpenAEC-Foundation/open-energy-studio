@@ -158,8 +158,8 @@ fn resolve_suite_case(mut raw: Value, suite_dir: &Path) -> Result<ResolvedCase, 
     }
     let bytes = fs::read(suite_dir.join(&project_file))
         .map_err(|error| format!("{project_file}: {error}"))?;
-    let document: Value = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("{project_file}: {error}"))?;
+    let document: Value =
+        serde_json::from_slice(&bytes).map_err(|error| format!("{project_file}: {error}"))?;
     let mut project = document
         .pointer(&pointer)
         .cloned()
@@ -521,6 +521,9 @@ fn run_with(paths: &[PathBuf], suites: &[PathBuf], plan_path: Option<&Path>) -> 
     report
 }
 
+/// Shown when no commit was supplied (a Dutch word, not a kernel code).
+const UNKNOWN_COMMIT: &str = "onbekend";
+
 /// Dutch summary of a run, for the release archive and the attest file.
 fn markdown(report: &GateReport) -> String {
     let number = |value: f64| {
@@ -538,10 +541,16 @@ fn markdown(report: &GateReport) -> String {
     out.push_str("| Gegeven | Waarde |\n| --- | --- |\n");
     out.push_str(&format!(
         "| Commit | {} |\n",
-        report.commit.as_deref().unwrap_or("onbekend")
+        report.commit.as_deref().unwrap_or(UNKNOWN_COMMIT)
     ));
-    out.push_str(&format!("| Rekenkernversie | {} |\n", report.kernel_version));
-    out.push_str(&format!("| Normversie van de kern | {} |\n", report.target_norm_version));
+    out.push_str(&format!(
+        "| Rekenkernversie | {} |\n",
+        report.kernel_version
+    ));
+    out.push_str(&format!(
+        "| Normversie van de kern | {} |\n",
+        report.target_norm_version
+    ));
     out.push_str(&format!(
         "| Vergelijking | {} ({} gevallen) |\n",
         verdict(report.numeric_comparison_passed),
@@ -558,7 +567,9 @@ fn markdown(report: &GateReport) -> String {
         ));
     }
     out.push_str("\n## Per geval\n\n");
-    out.push_str("| Geval | Uitgave | Status | Grootheid | Verwacht | Berekend | Verschil | Band |\n");
+    out.push_str(
+        "| Geval | Uitgave | Status | Grootheid | Verwacht | Berekend | Verschil | Band |\n",
+    );
     out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for case in &report.cases {
         let comparison = &case.comparison;
@@ -590,7 +601,9 @@ fn markdown(report: &GateReport) -> String {
         .collect();
     if !published.is_empty() {
         out.push_str("\n## Gepubliceerde waarden (ter vergelijking, niet beoordeeld)\n\n");
-        out.push_str("| Geval | Grootheid | Gepubliceerd | Berekend | Relatief verschil | Bron |\n");
+        out.push_str(
+            "| Geval | Grootheid | Gepubliceerd | Berekend | Relatief verschil | Bron |\n",
+        );
         out.push_str("| --- | --- | --- | --- | --- | --- |\n");
         for (case, item) in published {
             out.push_str(&format!(
@@ -600,7 +613,10 @@ fn markdown(report: &GateReport) -> String {
                 number(item.published),
                 item.actual.map_or("–".into(), number),
                 item.relative_difference
-                    .map_or("–".into(), |fraction| format!("{} %", number(fraction * 100.0))),
+                    .map_or("–".into(), |fraction| format!(
+                        "{} %",
+                        number(fraction * 100.0)
+                    )),
                 item.source
             ));
         }
@@ -943,12 +959,20 @@ mod tests {
         )
         .unwrap();
         let report = run_with(&[], std::slice::from_ref(&suite), None);
-        assert!(report.numeric_comparison_passed, "{:?}", report.errors.len());
+        assert!(
+            report.numeric_comparison_passed,
+            "{:?}",
+            report.errors.len()
+        );
         let case = &report.cases[0];
         assert_eq!(case.suite.as_deref(), Some("synthetic"));
         assert!(case.input_sha256.starts_with("sha256:"));
         assert!(case.output_sha256.starts_with("sha256:"));
-        assert!(case.project_file_sha256.as_deref().unwrap().starts_with("sha256:"));
+        assert!(case
+            .project_file_sha256
+            .as_deref()
+            .unwrap()
+            .starts_with("sha256:"));
         // 8,17 against 8,2 is within 1 % of 8,2; the band is the relative one.
         assert!((case.comparison.metrics[0].applied_tolerance - 0.082).abs() < 1e-12);
         let published = &case.published[0];
@@ -994,7 +1018,8 @@ mod tests {
 
     #[test]
     fn committed_suites_pass() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../training-data/reference-suites");
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../training-data/reference-suites");
         let suites = [
             root.join("openbare-gevallen.json"),
             root.join("rvo-voorbeeldwoningen.json"),

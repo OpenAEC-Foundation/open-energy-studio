@@ -20,6 +20,19 @@ Nog geen items.
 
 Eerste uitgave onder het afgedwongen versiebeleid. Ze bundelt alle wijzigingen sinds 0.1.0 (30 september 2026), waaronder veel die uitkomsten veranderen: de oudere uitgaven 2024, 2023, 2022 en 2020+A1, de herstelde routes en de controles hieronder. `KERNEL_VERSION` stond in die periode ten onrechte nog op 0.1.0; een project dat met "0.1.0" is gestempeld en na 30 september is berekend, kan met elke stand van deze reeks zijn gemaakt.
 
+### 8 oktober 2026 — versiebeleid, referentiesuites en vrijgave (geen rekenwijziging)
+
+- **Rekenkernversie 0.2.0.** `KERNEL_VERSION` gaat van 0.1.0 naar 0.2.0 (zie de inleiding van deze sectie en [versiebeheer](nta8800-versiebeheer.md)). Een herlabelregistratie met de oorspronkelijke kern 0.1.0 meldt nu `relabel_kernel_version_differs`, zoals het beleid voor een andere kern vraagt.
+- **Releasenotes per versie.** Dit bestand is ingedeeld per rekenkernversie. De gate (`scripts/nta-kernel-version.mjs check`) faalt als een onuitgebracht item uitkomsten verandert zonder MINOR-ophoging.
+- **Referentieharnas.**
+  - Een verwachte waarde mag naast `absoluteTolerance` een `relativeTolerance` hebben; de ruimste band geldt.
+  - Een referentiegeval mag elke uitgave noemen die de kern rekent (label of id), mits de invoer dezelfde uitgave draagt. Eerder weigerde het harnas alles behalve 2025+C1 met `norm_version_mismatch`.
+  - `inputKind: "buildingPerformance"` vergelijkt een gebouwinvoer, met de nieuwe grootheid `chapter5HeatingNeed`.
+  - `reference_gate` leest suites (`--suite`) en schrijft een rapport met commit, `KERNEL_VERSION` en SHA-256 per invoer en uitvoer (`--report-dir`).
+- **Suites in elke gate.** `training-data/reference-suites/` bevat de openbare gevallen A–F in hun eigen uitgave en de zes RVO-voorbeeldwoningen (±6 %-band rond RVO en de eigen regressie). De gedocumenteerde uitkomsten blijven gelijk.
+- **Openbare gevallen A en D.** Het lege object `airTightness: {}` in de zone is weggelaten; de structurele controle weigerde het. Uitkomsten veranderen niet.
+- **Vrijgave.** `scripts/release-nta.sh` maakt een archief met gatelog, referentierapport, pakketten, leveringsdocument, manifest en `SHA256SUMS`, en een lokale tag. Het attestnummer en de identificatiecode staan in `src/core/nta/attest.json`.
+
 ### 8 oktober 2026 — kelder met diepte per wanddeel rekent weer; dekking van alle opties
 
 - Een verwarmde kelder met de diepte per wanddeel (`groundFloors[].heatedBasement.wallDepths`, 8.42/D.12) zonder `depthM` gaf status `invalid` met `non_finite_result`. De lege `depthM` kwam als NaN in de afgeleide invoer. Hij blijft nu weg, net als de lege `reductionFactor` van 7 oktober.
