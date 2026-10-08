@@ -422,19 +422,20 @@ fn shading_device_serialises_without_reduction_factor() {
 
 /// Case G: a detached dwelling with a heated basement, 369,10 m², calculated
 /// on 29-04-2025 with Uniec 3.3.5.0 (NTA 8800:2024); published 64,52 /
-/// 29,44 / 70,6. Fans (300 kWh), PV (4 164 kWh on the meter) and the heating
-/// COP (4,25, table 9.28 ground row at 40 °C) agree. What differs, as BENG 2
-/// (Δ kWh · 1,45 / A_g):
+/// 29,44 / 70,6. Fans (300 kWh), PV (4 164 kWh on the meter), the heating
+/// COP (4,25, table 9.28 ground row at 40 °C) and hot water agree: the
+/// generator heat of both systems is the report's 7 317 kWh and the
+/// electricity its 5 545 kWh, with the net need of 13.15/13.18 (2024
+/// p. 521–522), 856 · (1,28 + 0,01 · 369,10) = 4 255 kWh, and f_sto;dis;ls 2
+/// for both vessels (all connections insulated; an electric boiler without
+/// test data, 2024 p. 552–553). What differs, as BENG 2 (Δ kWh · 1,45 / A_g):
 /// - Heating +381 kWh (+1,50): the report takes the product f_ctrl 0,51 of a
 ///   BCRG declaration for the C.4c unit; the kernel has no declared f_ctrl
 ///   and takes table 11.5 (0,59 for C.4c). With 0,52 (C.4b) the heating
 ///   drops 203 kWh. The rest is the heat need: three windows with "overige
 ///   belemmering" without geometry (§17.3.2g, heating table 17.13) and the
 ///   screens on the roof window, which the kernel cannot give one window.
-/// - Hot water −658 kWh (−2,58): the generator heat of both systems is
-///   13,4 % below the report (6 448 against 7 317 kWh) with the same COP
-///   1,40 and 1,00; the net need is 13.15/13.18 (2024 p. 521–522):
-///   856 · (1,28 + 0,01 · 369,10) = 4 255 kWh. Not reconciled.
+/// - Heating auxiliary +24 kWh (+0,09).
 /// - Cooling −37 kWh (−0,15): the literal 10.15 emission loss (5 886 kWh
 ///   cold against 4 157) and the 10.84 regeneration surcharge (ground not
 ///   shown above 0 °C) nearly cancel.
@@ -446,7 +447,7 @@ fn case_g_under_nta_8800_2024() {
     .unwrap();
     assert_eq!(value["ntaCalculation"]["normVersion"], "2024");
     let (performance, indicators) = run_edition(&value, "2024");
-    assert_indicators("G 2024", indicators, [65.67, 28.30, 73.4]);
+    assert_indicators("G 2024", indicators, [65.67, 30.89, 71.8]);
     assert!((used_kwh(&performance, "ventilation") - 300.4).abs() < 1.0);
     let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
     assert!((pv - 4164.0).abs() < 1.0, "{pv}");
@@ -457,5 +458,9 @@ fn case_g_under_nta_8800_2024() {
         .as_f64()
         .unwrap();
     assert!((need - 856.0 * (1.28 + 0.01 * 369.10)).abs() < 0.5, "{need}");
-    assert!((used_kwh(&performance, "hotWater") - 4886.6).abs() < 1.0);
+    let output = performance["hotWater"]["annualGeneratorOutputKwh"]
+        .as_f64()
+        .unwrap();
+    assert!((output - 7317.0).abs() < 1.0, "{output}");
+    assert!((used_kwh(&performance, "hotWater") - 5545.0).abs() < 1.0);
 }

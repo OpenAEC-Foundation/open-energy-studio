@@ -705,9 +705,9 @@
             "method": "unknown_label",
             "producedFrom2018": true
           },
-          "connectionFactor": 1,
+          "connectionFactor": 2,
           "inHeatedZone": true,
-          "sourceReference": "openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): 300 l, vanaf 2018, label onbekend, alle warme aansluitingen geisoleerd incl. T-stukken en kleppen"
+          "sourceReference": "openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): 300 l, vanaf 2018, label onbekend, alle warme aansluitingen geisoleerd incl. T-stukken en kleppen (f_sto;dis;ls 2, 2024 p. 552-553)"
         }
       ],
       "generator": {
@@ -741,9 +741,9 @@
               "method": "label",
               "label": "a"
             },
-            "connectionFactor": 1,
+            "connectionFactor": 2,
             "inHeatedZone": true,
-            "sourceReference": "openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): kokendwatertoestel 7 l, vanaf 2018, label A"
+            "sourceReference": "openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): kokendwatertoestel 7 l, vanaf 2018, label A; elektrisch zonder meetgegevens: f_sto;dis;ls 2 (2024 p. 553)"
           }
         ],
         "boilingWaterTap": true,
