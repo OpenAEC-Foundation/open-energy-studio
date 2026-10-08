@@ -520,3 +520,49 @@ async fn option_sweep_keeps_the_http_error_model() {
         assert_envelope(&body, "invalid_request_shape");
     }
 }
+
+fn project_request(project: &Value) -> Request<Body> {
+    Request::post("/v1/nta8800/project/performance")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({ "project": project }).to_string()))
+        .unwrap()
+}
+
+/// A calculation that takes longer than the configured timeout is withheld
+/// with 503 `calculation_timeout`, or `server_busy` when the request never
+/// got a slot. With one slot and a normal timeout, simultaneous requests
+/// queue and both calculate.
+#[tokio::test]
+async fn calculation_timeout_and_busy_use_the_error_envelope() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let strict = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        calculation_timeout: std::time::Duration::from_millis(1),
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(strict.clone(), project_request(&project)),
+        send(strict.clone(), project_request(&project)),
+    );
+    for (status, _, body) in [first, second] {
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        let code = body["code"].as_str().unwrap_or_default().to_string();
+        assert!(
+            ["calculation_timeout", "server_busy"].contains(&code.as_str()),
+            "{body}"
+        );
+        assert_envelope(&body, &code);
+    }
+
+    let queued = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(queued.clone(), project_request(&project)),
+        send(queued.clone(), project_request(&project)),
+    );
+    for (status, _, body) in [first, second] {
+        assert_eq!(status, StatusCode::OK, "{}", body["gaps"]);
+    }
+}

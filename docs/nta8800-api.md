@@ -21,10 +21,14 @@ cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
 | `--port POORT` | `OES_API_PORT` | `3007` |
 | `--cors-origin ORIGIN` (herhaalbaar, `*` voor alles) | `OES_API_CORS_ORIGINS` (kommagescheiden) | geen CORS |
 | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` (1–1024) |
+| `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | aantal processorkernen (1–1024): zoveel berekeningen lopen tegelijk, de rest wacht |
+| `--calculation-timeout-s N` | `OES_API_CALCULATION_TIMEOUT_S` | `120` (1–86400): langste wachttijd op een rekenplaats plus de berekening zelf |
 | `--log` / `--no-log` | `OES_API_LOG` (`1`/`0`) | aan: één regel per verzoek op stderr |
 | `--version` | | drukt de versie-informatie af en stopt |
 
 Een vlag wint van de omgevingsvariabele. Op een niet-loopback-adres meldt de server een waarschuwing: de API heeft geen authenticatie en is bedoeld voor lokaal gebruik. SIGINT en SIGTERM stoppen netjes: de server neemt geen nieuwe verbindingen meer aan en laat lopende verzoeken afmaken.
+
+Het geheugen van een berekening groeit ongeveer evenredig met het aantal rekenzones (circa 0,7 MB per zone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#grenzen-en-prestaties)). `--max-calculations` begrenst daarmee het geheugen van de service. Na de tijdslimiet krijgt de client 503; een berekening die al loopt, maakt de service op de achtergrond af en houdt zolang haar rekenplaats bezet.
 
 De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desktop-app roept de kern rechtstreeks aan en gebruikt de API niet.
 
@@ -55,6 +59,7 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
 | 422 | De kern weigert of kan niet afmaken (status `invalid`, `incomplete`, `derived_input_rejected`, `invalid_case`, …) | de **beoordeling zelf**, met `status`, `gaps` en `issues`; bij een diagnose in een editie zonder profiel de foutenvelop `edition_not_implemented` |
 | 500 | Uitkomst achtergehouden (`non_finite_result`) of kernfout (`kernel_panic`) | foutenvelop |
 | 501 | Alleen de verouderde route `/v1/nta8800/calculate` | foutenvelop |
+| 503 | Geen rekenplaats vrij binnen de tijdslimiet (`server_busy`) of de berekening duurde langer dan de tijdslimiet (`calculation_timeout`) | foutenvelop |
 
 De foutenvelop:
 
@@ -68,7 +73,7 @@ De foutenvelop:
 }
 ```
 
-`error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes: `invalid_json`, `invalid_request_shape`, `missing_request_member`, `invalid_project_shape`, `invalid_maatwerkadvies_shape`, `invalid_norm_version` (onbekende editie; `details.supportedNormVersions`), `norm_version_conflict` (de invoer heeft al een andere editie), `norm_version_not_applicable` (geen plek voor de editie, of een referentiegeval buiten 2025+C1), `edition_not_implemented`, `payload_too_large`, `unsupported_media_type`, `not_found`, `method_not_allowed`, `non_finite_result`, `kernel_panic`, `calculation_unavailable`.
+`error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes: `invalid_json`, `invalid_request_shape`, `missing_request_member`, `invalid_project_shape`, `invalid_maatwerkadvies_shape`, `invalid_norm_version` (onbekende editie; `details.supportedNormVersions`), `norm_version_conflict` (de invoer heeft al een andere editie), `norm_version_not_applicable` (geen plek voor de editie, of een referentiegeval buiten 2025+C1), `edition_not_implemented`, `payload_too_large`, `unsupported_media_type`, `not_found`, `method_not_allowed`, `non_finite_result`, `kernel_panic`, `calculation_unavailable`, `server_busy`, `calculation_timeout`.
 
 Een 422 is geen fout van de client of de server, maar een rekenuitkomst: lees `gaps` (ontbrekende invoer met pad) en `issues` (strijdige invoer). De betekenis van elke code staat in de app en in [hoofdstuk 5 van de handleiding](handleiding-nta8800/05-validatie.md).
 
