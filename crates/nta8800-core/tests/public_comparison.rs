@@ -1,4 +1,4 @@
-//! Regression on fictionalised rebuilds of five public BENG reports
+//! Regression on fictionalised rebuilds of public BENG reports
 //! (docs/nta8800-vergelijking-openbare-rapporten.md). The asserted values
 //! are this kernel's own results, recorded on 2026-10-05 after the input
 //! corrections of the line-by-line reconciliation and f_prac 0,95 on declared
@@ -417,5 +417,91 @@ fn shading_device_serialises_without_reduction_factor() {
     assert_eq!(
         serde_json::to_value(&declared).unwrap()["reductionFactor"],
         0.3
+    );
+}
+
+/// Case G: a detached dwelling with a heated basement, 369,10 m², calculated
+/// on 29-04-2025 with Uniec 3.3.5.0 (NTA 8800:2024); published 64,52 /
+/// 29,44 / 70,6. Fans (300 kWh), PV (4 164 kWh on the meter), the heating
+/// COP (4,25, table 9.28 ground row at 40 °C) and hot water agree: the
+/// generator heat of both systems is the report's 7 317 kWh and the
+/// electricity its 5 545 kWh, with the net need of 13.15/13.18 (2024
+/// p. 521–522), 856 · (1,28 + 0,01 · 369,10) = 4 255 kWh, and f_sto;dis;ls 2
+/// for both vessels (all connections insulated; an electric boiler without
+/// test data, 2024 p. 552–553). What differs, as BENG 2 (Δ kWh · 1,45 / A_g):
+/// - Heating +381 kWh (+1,50): the report takes the product f_ctrl 0,51 of a
+///   BCRG declaration for the C.4c unit; the kernel has no declared f_ctrl
+///   and takes table 11.5 (0,59 for C.4c). With 0,52 (C.4b) the heating
+///   drops 203 kWh. The rest is the heat need: three windows with "overige
+///   belemmering" without geometry (§17.3.2g, heating table 17.13) and the
+///   screens on the roof window, which the kernel cannot give one window.
+/// - Heating auxiliary +24 kWh (+0,09).
+/// - Cooling −37 kWh (−0,15): the literal 10.15 emission loss (5 886 kWh
+///   cold against 4 157) and the 10.84 regeneration surcharge (ground not
+///   shown above 0 °C) nearly cancel.
+#[test]
+fn case_g_under_nta_8800_2024() {
+    let value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-g.json"
+    ))
+    .unwrap();
+    assert_eq!(value["ntaCalculation"]["normVersion"], "2024");
+    let (performance, indicators) = run_edition(&value, "2024");
+    assert_indicators("G 2024", indicators, [65.67, 30.89, 71.8]);
+    assert!((used_kwh(&performance, "ventilation") - 300.4).abs() < 1.0);
+    let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
+    assert!((pv - 4164.0).abs() < 1.0, "{pv}");
+    let heating = &performance["spaceHeating"];
+    assert_eq!(heating["generationEfficiency"].as_f64(), Some(4.25));
+    assert!((used_kwh(&performance, "heating") - 4747.2).abs() < 1.0);
+    let need = performance["hotWater"]["annualNetNeedKwh"]
+        .as_f64()
+        .unwrap();
+    assert!(
+        (need - 856.0 * (1.28 + 0.01 * 369.10)).abs() < 0.5,
+        "{need}"
+    );
+    let output = performance["hotWater"]["annualGeneratorOutputKwh"]
+        .as_f64()
+        .unwrap();
+    assert!((output - 7317.0).abs() < 1.0, "{output}");
+    assert!((used_kwh(&performance, "hotWater") - 5545.0).abs() < 1.0);
+}
+
+/// Case H, the first utility case: a building with an office, an assembly
+/// and a healthcare function and a gym (sport), 743,80 m² in two zones,
+/// calculated on 29-05-2024 with Uniec 3.2.9.2 (NTA 8800:2023 period);
+/// published 29,08 / 80,01 / 30,5 against limits 44,94 / 86,22 / 30,4.
+/// The common space of 49,20 m² serves all four functions and is shared over
+/// them pro rata; with that the kernel's Bbl limits equal the report's.
+/// Lighting (34 294 kWh, forfait power, manual on/off), hot water (7 961 kWh,
+/// table 13.1 per function, COP 1,40, f_sto;dis;ls 4), PV (9 652 kWh) and the
+/// heat-pump COP (3,05, table 9.29 outdoor air at 45 °C) agree. BENG 2
+/// (Δ kWh · 1,45 / A_g): heating −393 (−0,77) with a 9 % lower heat, its
+/// auxiliary energy −25 (−0,05), cooling +630 (+1,23; the literal 10.15
+/// emission loss), the 10.87 cooling control energy +88 (+0,17) and the
+/// forfait fans +15 (+0,03). BENG 1 is 6,2 % lower; the floor perimeters are
+/// not printed and are taken as the lengths of the foundation junctions.
+#[test]
+fn case_h_utility_under_nta_8800_2023() {
+    let value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-h.json"
+    ))
+    .unwrap();
+    assert_eq!(value["ntaCalculation"]["normVersion"], "2023");
+    let (performance, indicators) = run_edition(&value, "2023");
+    assert_indicators("H 2023", indicators, [27.29, 80.63, 29.7]);
+    let limits = &performance["bblCheck"]["limits"];
+    let limit = |key: &str| limits[key].as_f64().unwrap();
+    assert!((limit("energyNeedMaxKwhPerM2") - 44.94).abs() < 0.005);
+    assert!((limit("primaryFossilMaxKwhPerM2") - 86.22).abs() < 0.005);
+    assert!((limit("renewableShareMinPercent") - 30.4).abs() < 0.005);
+    assert!((used_kwh(&performance, "lighting") - 34294.0).abs() < 1.0);
+    assert!((used_kwh(&performance, "hotWater") - 7961.0).abs() < 1.0);
+    let pv = performance["pvSystems"][0]["annualKwh"].as_f64().unwrap();
+    assert!((pv - 9652.0).abs() < 1.0, "{pv}");
+    assert_eq!(
+        performance["spaceHeating"]["generationEfficiency"].as_f64(),
+        Some(3.05)
     );
 }
