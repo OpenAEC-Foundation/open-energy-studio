@@ -7177,20 +7177,29 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            (constants.a_kwh, constants.b_kw, constants.c, constants.nominal_load_kw),
+            (
+                constants.a_kwh,
+                constants.b_kw,
+                constants.c,
+                constants.nominal_load_kw
+            ),
             (10.0, 0.12, 0.3, 20.5)
         );
 
         // Invalid values and the combination with annex O measurements.
-        for (field, bad) in [("c", 0.04), ("c", 1.2), ("bKw", -1.0), ("nominalLoadKw", 0.0)] {
+        for (field, bad) in [
+            ("c", 0.04),
+            ("c", 1.2),
+            ("bKw", -1.0),
+            ("nominalLoadKw", 0.0),
+        ] {
             let mut item = json!({
                 "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
                 "declarationReference": "x"
             });
             item[field] = json!(bad);
-            let found =
-                declared_auxiliary_constants(&serde_json::from_value(item).unwrap(), "a")
-                    .unwrap_err();
+            let found = declared_auxiliary_constants(&serde_json::from_value(item).unwrap(), "a")
+                .unwrap_err();
             assert!(
                 found.iter().any(|issue| issue.path == format!("a.{field}")),
                 "{field}: {found:?}"
@@ -7208,8 +7217,11 @@ mod tests {
             .unwrap(),
         );
         let result = assess_space_heating_chain(&input);
-        assert!(result.issues.iter().any(|issue| issue.code == "source_reference_required"
-            && issue.path == "generator.declaredAuxiliaryConstants.declarationReference"));
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.code == "source_reference_required"
+                && issue.path == "generator.declaredAuxiliaryConstants.declarationReference"));
     }
 
     /// §9.1 with method 2 (9.65, table 9.31, 2025+C1 p. 342–343): the
@@ -7274,7 +7286,10 @@ mod tests {
         }));
         let result = assess_space_heating_chain(&input);
         let codes: Vec<&str> = result.issues.iter().map(|issue| issue.code).collect();
-        assert!(codes.contains(&"chp_declared_efficiency_invalid"), "{codes:?}");
+        assert!(
+            codes.contains(&"chp_declared_efficiency_invalid"),
+            "{codes:?}"
+        );
         assert!(codes.contains(&"source_reference_required"), "{codes:?}");
 
         // Without a declaration the table row stays: identical results.

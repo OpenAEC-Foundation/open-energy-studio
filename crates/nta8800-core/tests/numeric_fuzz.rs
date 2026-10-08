@@ -121,7 +121,10 @@ fn isso54_routes() -> Vec<(&'static str, Value)> {
         "kind": "calculated", "geometry": embedded, "sourceReference": "EP-W302e"
     });
     vec![
-        ("example-terraced-dwelling (ISSO 54 glazing, boiler, circulation)", boiler),
+        (
+            "example-terraced-dwelling (ISSO 54 glazing, boiler, circulation)",
+            boiler,
+        ),
         ("example-terraced-dwelling (ISSO 54 declared CHP)", chp),
         ("public-comparison-c (calculated cooling-pipe Ψ)", cooling),
     ]
@@ -154,7 +157,10 @@ fn isso54_route_fixtures_calculate() {
         let mut input = value.clone();
         input["ntaCalculation"]["normVersion"] = Value::from(edition);
         let result = nta8800_core::project_performance::assess_project_performance(&input);
-        (result.status.starts_with("calculated"), format!("{} {:?}", result.status, result.gaps))
+        (
+            result.status.starts_with("calculated"),
+            format!("{} {:?}", result.status, result.gaps),
+        )
     };
     let bases: [Value; 3] = [
         serde_json::from_str(include_str!(

@@ -3047,7 +3047,10 @@ mod tests {
             source_reference: " ".into(),
         });
         let codes: Vec<&str> = issues.iter().map(|issue| issue.code).collect();
-        assert!(codes.contains(&"cooling_pipe_geometry_invalid"), "{codes:?}");
+        assert!(
+            codes.contains(&"cooling_pipe_geometry_invalid"),
+            "{codes:?}"
+        );
         assert!(codes.contains(&"source_reference_required"), "{codes:?}");
     }
 

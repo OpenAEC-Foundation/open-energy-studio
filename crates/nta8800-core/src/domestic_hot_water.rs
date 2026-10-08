@@ -4105,19 +4105,22 @@ pub fn assess_hot_water_with(
             .calculated_psi
             .as_ref()
             .and_then(crate::heating_distribution::PipeGeometry::psi);
-        let psi = circulation.declared_psi_w_per_mk.or(calculated).unwrap_or_else(|| {
-            match circulation.outer_diameter_mm {
-                // NTA 8800:2023 (p. 542) has no table 13.29 nor the 35/80 mm
-                // rule (2024 p. 537–538) but rows "klein"/"overig" for an
-                // unknown diameter; "klein" is read as at most 500 m²
-                // connected (the 2024 utility split), see
-                // docs/nta8800-normversies.md.
-                None if crate::norm_versions::profile().table_13_4_system_rows => {
-                    table_13_4_system_psi(building_area <= 500.0, circulation.insulation)
+        let psi = circulation
+            .declared_psi_w_per_mk
+            .or(calculated)
+            .unwrap_or_else(|| {
+                match circulation.outer_diameter_mm {
+                    // NTA 8800:2023 (p. 542) has no table 13.29 nor the 35/80 mm
+                    // rule (2024 p. 537–538) but rows "klein"/"overig" for an
+                    // unknown diameter; "klein" is read as at most 500 m²
+                    // connected (the 2024 utility split), see
+                    // docs/nta8800-normversies.md.
+                    None if crate::norm_versions::profile().table_13_4_system_rows => {
+                        table_13_4_system_psi(building_area <= 500.0, circulation.insulation)
+                    }
+                    _ => table_13_4_psi(diameter, circulation.insulation),
                 }
-                _ => table_13_4_psi(diameter, circulation.insulation),
-            }
-        });
+            });
         let length = circulation.length_m.unwrap_or(0.3 * reduced + 10.0);
         let unheated = circulation.unheated_length_m.unwrap_or(0.15 * length);
         let heated = length - unheated;
@@ -5329,7 +5332,10 @@ mod tests {
             .iter()
             .map(|issue| issue.code)
             .collect();
-        assert!(codes.contains(&"hot_water_psi_declared_and_calculated"), "{codes:?}");
+        assert!(
+            codes.contains(&"hot_water_psi_declared_and_calculated"),
+            "{codes:?}"
+        );
         let shallow = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
             pipe_outer_diameter_m: 0.02,
             insulated_diameter_m: 0.04,
@@ -5342,7 +5348,10 @@ mod tests {
             .iter()
             .map(|issue| issue.code)
             .collect();
-        assert!(codes.contains(&"hot_water_pipe_geometry_invalid"), "{codes:?}");
+        assert!(
+            codes.contains(&"hot_water_pipe_geometry_invalid"),
+            "{codes:?}"
+        );
     }
 
     #[test]
