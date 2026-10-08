@@ -17,7 +17,7 @@ Een berekening draagt twee versienummers.
 | Deel | Waar vastgelegd | Voorbeeld | Betekenis |
 | --- | --- | --- | --- |
 | Programmaversie | `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` | `0.1.6-alpha` | De versie van de desktop-app en de gebruikersinterface. |
-| Rekenkernversie (`KERNEL_VERSION`) | `crates/nta8800-core/Cargo.toml`, in de kern beschikbaar als `KERNEL_VERSION` | `0.2.0` | De versie van de rekenkern: het deel van het versienummer dat BRL 9501 §5.2 aan de NTA 8800-versie koppelt. |
+| Rekenkernversie (`KERNEL_VERSION`) | `crates/nta8800-core/Cargo.toml`, in de kern beschikbaar als `KERNEL_VERSION` | `0.3.0` (onuitgebracht; laatste uitgave 0.2.0) | De versie van de rekenkern: het deel van het versienummer dat BRL 9501 §5.2 aan de NTA 8800-versie koppelt. |
 | Normversie (`TARGET_NORM_VERSION`) | `crates/nta8800-core/src/lib.rs` | `NTA 8800:2025+C1:2026` | De normtekst waarop de rekenkern is gebaseerd. |
 
 Beide versienummers volgen het schema `MAJOR.MINOR.PATCH`, eventueel met een achtervoegsel voor een voorlopige uitgave (`-alpha`, `-beta`).
