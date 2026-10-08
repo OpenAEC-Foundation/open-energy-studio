@@ -21,6 +21,15 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
   - EP-W201e verandert alleen de afgifte, de NEN-EN 215-verklaring en de inregeling; de regeling per ruimte blijft die van EP-W001.
   - Niet te coderen: EP-W204d (tabel 9.30 heeft geen rendement voor biomassa die niet aan bijlage R voldoet) en EP-U602g/h (opgegeven daglichtfactoren zonder geometrie). Zie [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md).
 
+### 9 oktober 2026 — wachtrij en tijdslimieten van de API, oordeel van de referentierun (geen rekenwijziging)
+
+- **Geen "geslaagd" zonder vergelijking.** Een referentierun waarin elk geval `pending_expectation` is, vergeleek niets maar meldde "geslaagd" en afsluitcode 0. Het rapport heeft nu `comparisonVerdict` (`passed`, `failed`, `no_comparison`) en `comparedCases`; zonder vergeleken geval is `numericComparisonPassed` onwaar, zegt het rapport "geen vergelijking (0 vergeleken, 52 zonder verwachting)" en is de afsluitcode 3. De gate draait alle suites samen en vergelijkt de openbare gevallen en de RVO-woningen, dus die blijft groen.
+- **Een geval zonder verwachting met een niet-eindige waarde** legt die waarde niet meer vast: het krijgt status `calculation_unavailable` met code `metric_not_finite`.
+- **Wachttijd en berekening hebben elk een eigen tijdslimiet.** Eerder deelden ze één limiet: een verzoek dat bijna de hele tijd op een rekenplaats had gewacht, startte toch een berekening die meteen werd afgebroken maar haar plaats bleef bezetten. Nu geeft een wachttijd boven `--queue-timeout-s` (standaard 30 s) 503 `server_busy` zonder berekening, en krijgt de berekening de volle `--calculation-timeout-s`.
+- **Begrensde wachtrij.** `--max-waiting` (standaard twee keer het aantal rekenplaatsen) begrenst de wachtende verzoeken; het verzoek wordt toegelaten of geweigerd voordat de body wordt gelezen, zodat wachtende bodies het geheugen niet onbegrensd vullen.
+- **`Retry-After`** op elke 503 (een kwart van de rekentijdslimiet, 1–60 s), ook in het OpenAPI-document.
+- **Standaardaantal rekenplaatsen** wordt begrensd op 1024, zodat de API op een machine met meer kernen zonder vlag start.
+
 ### 9 oktober 2026 — voorbereiding op de testset ISSO 54 (geen rekenwijziging)
 
 - **Gevallen zonder verwachting in het referentieharnas.** Een referentiegeval mag nu `pending` geven in plaats van `expected`: de reden en de metrieken die het vastlegt, met de band die straks geldt. Zo'n geval wordt doorgerekend en krijgt status `pending_expectation`, zonder oordeel. Het laat de gate slagen, maar een geval dat niet rekent, laat hem falen. Het rapport toont "geen verwachting" en het aantal van zulke gevallen (`pendingExpectationCases`). `pending` naast verwachte waarden of een labelklasse wordt geweigerd (`pending_with_expected_values`); verder zijn er de codes `pending_reason_required` en `pending_metrics_required`. Bestaande gevallen en uitkomsten veranderen niet.

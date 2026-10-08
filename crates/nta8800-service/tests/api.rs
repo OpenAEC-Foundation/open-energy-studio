@@ -544,7 +544,7 @@ async fn calculation_timeout_and_busy_use_the_error_envelope() {
         send(strict.clone(), project_request(&project)),
         send(strict.clone(), project_request(&project)),
     );
-    for (status, _, body) in [first, second] {
+    for (status, headers, body) in [first, second] {
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
         let code = body["code"].as_str().unwrap_or_default().to_string();
         assert!(
@@ -552,6 +552,12 @@ async fn calculation_timeout_and_busy_use_the_error_envelope() {
             "{body}"
         );
         assert_envelope(&body, &code);
+        let retry: u64 = headers[header::RETRY_AFTER]
+            .to_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!((1..=60).contains(&retry), "{retry}");
     }
 
     let queued = app_with(HttpConfig {
@@ -565,4 +571,48 @@ async fn calculation_timeout_and_busy_use_the_error_envelope() {
     for (status, _, body) in [first, second] {
         assert_eq!(status, StatusCode::OK, "{}", body["gaps"]);
     }
+}
+
+/// The queue is bounded before the body is read: with one slot and no
+/// waiting places, a second simultaneous request is refused at once with
+/// `server_busy` and a `Retry-After`, while the first calculates.
+#[tokio::test]
+async fn full_queue_is_refused_before_the_body_is_read() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let no_queue = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        max_waiting_requests: 0,
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(no_queue.clone(), project_request(&project)),
+        send(no_queue.clone(), project_request(&project)),
+    );
+    assert_eq!(first.0, StatusCode::OK, "{}", first.2["gaps"]);
+    assert_eq!(second.0, StatusCode::SERVICE_UNAVAILABLE, "{}", second.2);
+    assert_envelope(&second.2, "server_busy");
+    assert!(second.1.contains_key(header::RETRY_AFTER));
+}
+
+/// The queue wait and the calculation have their own timeouts: a request
+/// that cannot get a slot within the queue timeout is refused with
+/// `server_busy` and starts no calculation; the one that has the slot gets
+/// the full calculation timeout and calculates.
+#[tokio::test]
+async fn queue_timeout_is_separate_from_the_calculation_timeout() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let short_queue = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        max_waiting_requests: 1,
+        queue_timeout: std::time::Duration::from_millis(1),
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(short_queue.clone(), project_request(&project)),
+        send(short_queue.clone(), project_request(&project)),
+    );
+    assert_eq!(first.0, StatusCode::OK, "{}", first.2["gaps"]);
+    assert_eq!(second.0, StatusCode::SERVICE_UNAVAILABLE, "{}", second.2);
+    assert_envelope(&second.2, "server_busy");
+    assert!(second.1.contains_key(header::RETRY_AFTER));
 }

@@ -486,23 +486,15 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     result.calculation_available = true;
     if case.pending.is_some() {
         for (index, metric) in pending_metrics.iter().enumerate() {
-            let Some(actual) = actual_metric(&performance, &metric.path) else {
-                result.status = "calculation_unavailable";
-                result.issues.push(issue(
-                    "metric_calculation_unavailable",
-                    format!("pending.metrics[{index}].path"),
-                    "Requested metric is unavailable for this project",
-                ));
-                result.recorded.clear();
-                return result;
-            };
-            result.recorded.push(RecordedMetric {
-                path: metric.path.clone(),
-                actual,
-                unit: metric.unit.clone(),
-                absolute_tolerance: metric.absolute_tolerance,
-                relative_tolerance: metric.relative_tolerance,
-            });
+            match record_pending_metric(metric, index, actual_metric(&performance, &metric.path)) {
+                Ok(recorded) => result.recorded.push(recorded),
+                Err(failure) => {
+                    result.status = "calculation_unavailable";
+                    result.issues.push(failure);
+                    result.recorded.clear();
+                    return result;
+                }
+            }
         }
         result.status = "pending_expectation";
         return result;
@@ -570,6 +562,37 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
     };
     result.metrics = metrics;
     result
+}
+
+/// One recorded value of a pending case. A missing or non-finite value is a
+/// failed calculation, never a recorded result.
+fn record_pending_metric(
+    metric: &PendingMetric,
+    index: usize,
+    actual: Option<f64>,
+) -> Result<RecordedMetric, ReferenceIssue> {
+    let path = format!("pending.metrics[{index}].path");
+    let Some(actual) = actual else {
+        return Err(issue(
+            "metric_calculation_unavailable",
+            path,
+            "Requested metric is unavailable for this project",
+        ));
+    };
+    if !actual.is_finite() {
+        return Err(issue(
+            "metric_not_finite",
+            path,
+            "Requested metric is not a finite number",
+        ));
+    }
+    Ok(RecordedMetric {
+        path: metric.path.clone(),
+        actual,
+        unit: metric.unit.clone(),
+        absolute_tolerance: metric.absolute_tolerance,
+        relative_tolerance: metric.relative_tolerance,
+    })
 }
 
 fn issue(code: &'static str, path: impl Into<String>, message: &'static str) -> ReferenceIssue {
@@ -1357,6 +1380,22 @@ mod tests {
         assert_eq!(failed.status, "calculation_unavailable");
         assert!(!comparison_status_acceptable(failed.status));
         assert!(failed.recorded.is_empty());
+
+        // A recorded value must be finite; NaN or infinity is a failure.
+        let metric = &case.pending.as_ref().unwrap().metrics[1];
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let refused = record_pending_metric(metric, 1, Some(bad)).unwrap_err();
+            assert_eq!(refused.code, "metric_not_finite");
+            assert_eq!(refused.path, "pending.metrics[1].path");
+        }
+        assert_eq!(
+            record_pending_metric(metric, 1, None).unwrap_err().code,
+            "metric_calculation_unavailable"
+        );
+        assert_eq!(
+            record_pending_metric(metric, 1, Some(31.5)).unwrap().actual,
+            31.5
+        );
 
         // An output path outside the allowlist is refused before calculating.
         let mut unsupported = case.clone();
