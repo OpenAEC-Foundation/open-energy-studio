@@ -21,6 +21,7 @@ import { KernelAuditPanel } from '../KernelAuditPanel/KernelAuditPanel';
 import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel';
 import { ResultsDashboard } from './pages/results/ResultsDashboard';
 import { SurveyWizard } from '../SurveyWizard/SurveyWizard';
+import { SurveyReport } from '../SurveyWizard/SurveyReport';
 import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import { Building3DView, HeatPumpSizingCalculator, LazyPage, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
@@ -213,6 +214,11 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       page = <>{header()}<div className="page-body">{dimmedBanner}<RelabelPanel /></div></>;
       break;
     case 'report':
+      // A basisopname project reports its survey outcome (the new-build calculation is empty there).
+      if (!flow) {
+        page = <div className="page-body"><SurveyReport actions={actions} /></div>;
+        break;
+      }
       page = <>
         {header({
           actions: <>

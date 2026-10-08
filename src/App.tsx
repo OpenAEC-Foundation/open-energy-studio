@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EnergyProvider, useEnergy, useDocumentManager, useHasActiveDocument } from './context/EnergyContext';
+import { isSurveyProject } from './core/nta/stepStatus';
 import { KernelProvider, useKernel } from './context/KernelProvider';
 import { projectCalculated } from './core/nta/KernelClient';
 import { summarizeForPreview } from './core/nta/PreviewSummary';
@@ -281,7 +282,7 @@ function ActiveDocumentShell({ files, paletteOpen, setPaletteOpen }: {
     })
     : []), [paletteOpen, t, project, actions, dispatch]);
 
-  const showInspector = inspectorOpen && route.step !== 'project';
+  const showInspector = inspectorOpen && route.step !== 'project' && !isSurveyProject(project);
   const floorArea = kernel?.settled?.geometry?.usableFloorAreaM2
     ?? (project.zones.length ? project.zones.reduce((sum, zone) => sum + zone.floorArea, 0) : null);
 

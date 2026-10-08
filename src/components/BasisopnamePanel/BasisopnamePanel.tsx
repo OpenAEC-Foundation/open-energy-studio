@@ -745,7 +745,7 @@ interface BasisopnamePanelProps {
 
 /** The panel section that holds a question part; null for parts the question page draws itself. */
 const PART_SECTION: Record<SurveyPart, SurveySection | null> = {
-  dwellingType: null, general: 'general', zones: 'zones', walls: 'envelope', roofFloor: 'envelope',
+  address: null, dwellingType: null, general: 'general', zones: 'zones', walls: 'envelope', roofFloor: 'envelope',
   heatingKind: null, heatingGenerator: 'heating', heatingRest: 'heating',
   hotWaterKind: null, hotWaterGenerator: 'hotWater', hotWaterRest: 'hotWater',
   ventilationPrinciple: null, ventilation: 'ventilation', cooling: 'cooling', pv: 'pv',

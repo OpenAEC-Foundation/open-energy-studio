@@ -8,7 +8,7 @@ import type { StoredSurvey, SurveyKind } from '../nta/SurveyTemplates';
 
 /** Which part of the survey a question shows. */
 export type SurveyPart =
-  | 'dwellingType' | 'general' | 'zones' | 'walls' | 'roofFloor'
+  | 'address' | 'dwellingType' | 'general' | 'zones' | 'walls' | 'roofFloor'
   | 'heatingKind' | 'heatingGenerator' | 'heatingRest'
   | 'hotWaterKind' | 'hotWaterGenerator' | 'hotWaterRest'
   | 'ventilationPrinciple' | 'ventilation' | 'cooling' | 'pv';
@@ -38,8 +38,8 @@ const q = (step: string, id: string, part: SurveyPart): SurveyQuestion => ({
 });
 
 const STEPS: Record<SurveyStepId, SurveyFlowStep> = {
-  woning: { id: 'woning', labelKey: 'survey.step.woning', questions: [q('woning', 'soort', 'dwellingType'), q('woning', 'basis', 'general')] },
-  gebouw: { id: 'gebouw', labelKey: 'survey.step.gebouw', questions: [q('gebouw', 'basis', 'general')] },
+  woning: { id: 'woning', labelKey: 'survey.step.woning', questions: [q('woning', 'adres', 'address'), q('woning', 'soort', 'dwellingType'), q('woning', 'basis', 'general')] },
+  gebouw: { id: 'gebouw', labelKey: 'survey.step.gebouw', questions: [q('gebouw', 'adres', 'address'), q('gebouw', 'basis', 'general')] },
   zones: { id: 'zones', labelKey: 'survey.step.zones', questions: [q('zones', 'zones', 'zones')] },
   gevels: { id: 'gevels', labelKey: 'survey.step.gevels', questions: [q('gevels', 'gevels', 'walls')] },
   'dak-vloer': { id: 'dak-vloer', labelKey: 'survey.step.dak-vloer', questions: [q('dak-vloer', 'dak-vloer', 'roofFloor')] },

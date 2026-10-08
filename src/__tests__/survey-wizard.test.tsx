@@ -112,6 +112,10 @@ describe('survey wizard', () => {
     await user.click(within(nav).getByRole('button', { name: /Basic survey|Basisopname/ }));
     await user.click(screen.getByRole('button', { name: /Existing dwelling/ }));
     expect(snapshot().route).toMatchObject({ step: 'survey', sub: 'woning' });
+    // The first question is the address of the project (ISSO opnameformulier §1).
+    expect(screen.getByRole('heading', { level: 1, name: 'Address and project' })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'Postcode' }), '3013 AL');
+    await user.click(screen.getByRole('button', { name: 'Next question' }));
     expect(screen.getByRole('heading', { level: 1, name: 'What kind of dwelling is it?' })).toBeInTheDocument();
 
     // The navigation now shows the question flow.

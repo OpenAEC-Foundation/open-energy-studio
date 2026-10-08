@@ -78,11 +78,31 @@ function ChoiceCards({ options, selected, onPick, label }: {
 }
 
 /** The fields of one question: choice cards, or the matching part of the survey form. */
+/** The project and address of the survey, as on the ISSO opnameformulier (paragraph 1). */
+function AddressFields({ t }: { t: T }) {
+  const { state, dispatch } = useEnergy();
+  const project = state.project;
+  const registration = project.registration ?? {};
+  const set = (payload: Record<string, unknown>) => dispatch({ type: 'UPDATE_PROJECT_INFO', payload });
+  const text = (label: string, value: string | undefined, onChange: (value: string) => void, wide = false) =>
+    <label className={wide ? 'survey-address-wide' : undefined}>{label}
+      <input type="text" value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
+    </label>;
+  return <div className="nta-form survey-address"><div className="nta-form-grid">
+    {text(t('survey.address.name'), project.name, (name) => set({ name }), true)}
+    {text(t('survey.address.street'), project.address, (address) => set({ address }), true)}
+    {text(t('survey.address.postcode'), (registration as { postcode?: string }).postcode,
+      (postcode) => set({ registration: { ...registration, postcode: postcode || undefined } }))}
+    {text(t('survey.address.city'), project.city, (city) => set({ city }))}
+  </div></div>;
+}
+
 function QuestionBody({ part, stored, draft, change, t }: {
   part: SurveyPart; stored: Stored; draft: Draft; change: (path: Path, value: unknown) => void; t: T;
 }) {
   const field = { draft, onChange: change };
   switch (part) {
+    case 'address': return <AddressFields t={t} />;
     case 'dwellingType': {
       const choice = dwellingChoice(draft);
       const pick = (id: string) => {
@@ -195,7 +215,7 @@ function compass(azimuth: number): string {
 }
 
 /** Short facts of a step for the Controle page: the answers that matter, in a few lines. */
-function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): string[] {
+export function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string, address?: string): string[] {
   const n = (value: unknown, digits = 0) => typeof value === 'number' ? formatNumber(value, locale, digits) : '—';
   const list = (path: Path) => (read(draft, path) as Array<Record<string, unknown>> | undefined) ?? [];
   const surfaces = list(['envelope', 'surfaces']);
@@ -216,6 +236,7 @@ function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): stri
       const pipes = read(draft, ['verticalPipes']);
       const facts = [[choice ? t(`survey.dwelling.${choice}`) : '—', roof ? label(`survey.dwelling.roofTypeKind.${String(roof)}`)?.toLowerCase() : null]
         .filter(Boolean).join(', ')];
+      if (address) facts.unshift(address);
       facts.push(t('survey.fact.basics', { year: typeof year === 'number' ? String(year) : '—', area: n(read(draft, ['usableFloorAreaM2']), 1),
         storeys: n(read(draft, ['storeys'])) }));
       if (floor || wall) facts.push(t('survey.fact.construction', { floor: floor ? short(`survey.construction.floorKind.${String(floor)}`).toLowerCase() : '—',
@@ -331,14 +352,16 @@ function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): stri
 }
 
 /** The step of an applied default: as its path, except the crawl-space rules (floor question). */
-function defaultStep(item: { path: string; rule: string }, stored: Stored): SurveyStepId {
+export function defaultStep(item: { path: string; rule: string }, stored: Stored): SurveyStepId {
   if (item.rule.startsWith('crawlspace')) return 'dak-vloer';
   return questionForPath(item.path, stored).step;
 }
 
 /** The defaults of one step, identical values on several surfaces taken together ("Gevel 1–7"). */
-function StepDefaults({ items, draft, t, locale }: {
+export function StepDefaults({ items, draft, t, locale, plain = false }: {
   items: OpnameAssessment['appliedDefaults']; draft: Draft; t: T; locale: string;
+  /** The list without the fold (report). */
+  plain?: boolean;
 }) {
   const names = surfaceNames(draft, t);
   const surfaces = (read(draft, ['envelope', 'surfaces']) as Array<Record<string, unknown>> | undefined) ?? [];
@@ -359,9 +382,11 @@ function StepDefaults({ items, draft, t, locale }: {
     const sameKind = subjects.every((subject) => subject.startsWith(`${word} `));
     return sameKind ? `${word} ${subjects[0].slice(word.length + 1)}–${subjects[subjects.length - 1].slice(word.length + 1)}` : subjects.join(', ');
   };
+  const rows = groups.map((group, index) => <li key={index}>{subjectText(group.subjects)}: {defaultValueLabel(t, group.value, locale)}</li>);
+  if (plain) return <ul className="survey-report-defaults">{rows}</ul>;
   return <details className="survey-step-defaults">
     <summary>{t(items.length === 1 ? 'survey.check.oneDefault' : 'survey.check.stepDefaults', { count: items.length })}</summary>
-    <ul>{groups.map((group, index) => <li key={index}>{subjectText(group.subjects)}: {defaultValueLabel(t, group.value, locale)}</li>)}</ul>
+    <ul>{rows}</ul>
   </details>;
 }
 
@@ -386,11 +411,19 @@ function ResultCard({ result, busy, error, t, locale, onIssues }: {
 }
 
 /** Everything on one page: the outcome, a card per step, the kernel notices and the defaults. */
+/** "EDR-straat 25, 3013 AL Rotterdam" from the project data; null when empty. */
+export function projectAddress(project: { address?: string; city?: string; registration?: { postcode?: string } }): string | null {
+  const place = [project.registration?.postcode, project.city].filter((part) => part && part.trim()).join(' ');
+  const text = [project.address?.trim(), place].filter(Boolean).join(', ');
+  return text || null;
+}
+
 function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
   stored: Stored; steps: SurveyFlowStep[]; result: OpnameAssessment | null;
   onEdit: (step: SurveyStepId) => void; onGoToPath: (path: string) => void; t: T; locale: string;
 }) {
   const draft = stored.survey as Draft;
+  const address = projectAddress(useEnergy().state.project) ?? undefined;
   const performance = result?.performance;
   const issuesFor = (step: SurveyStepId) => result?.issues.filter((item) => questionForPath(item.path, stored).step === step).length ?? 0;
   return <div className="survey-check">
@@ -416,7 +449,7 @@ function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
             <h2>{t(step.labelKey)}</h2>
             <button type="button" className="btn btn-sm" onClick={() => onEdit(step.id)}>{t('survey.check.edit')}</button>
           </div>
-          <ul>{stepFacts(step.id, draft, t, locale).map((fact, index) => <li key={index}>{fact}</li>)}</ul>
+          <ul>{stepFacts(step.id, draft, t, locale, address).map((fact, index) => <li key={index}>{fact}</li>)}</ul>
           {result && <StepDefaults items={result.appliedDefaults.filter((item) => defaultStep(item, stored) === step.id)} draft={draft} t={t} locale={locale} />}
           {state === 'skipped' && <p className="survey-skipped-note">{t('survey.check.skipped')}</p>}
           {issues > 0 && <p className="survey-issues-note">{t('survey.result.issues', { count: issues })}</p>}
