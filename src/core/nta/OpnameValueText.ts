@@ -105,6 +105,8 @@ export function dutchDecimals(text: string): string {
   const kept: string[] = [];
   const protect = (match: string) => { kept.push(match); return `\u0000${kept.length - 1}\u0000`; };
   const guarded = text
+    // Annex references such as "I.2.1.4" (table I.2.1.4) are numbers, not decimals.
+    .replace(/\b[A-Z](?:\.\d+)+[a-z]?\b/g, protect)
     .replace(/\((?:(?:[5-9]|1\d|[A-Z])\.\d+[a-z]?)(?:\s*[/–-]\s*(?:[5-9]|1\d|[A-Z])\.\d+[a-z]?)*\)/g, protect)
     .replace(/(?:table|tabel|tables|tabellen|formula|formule|formulas|formules|§|NTA|afb\.|figure)\s*\d+(?:\.\d+)+[a-z]?(?:\s*[/–-]\s*\d+(?:\.\d+)+[a-z]?)*/gi, protect);
   return guarded.replace(/(\d)\.(\d)/g, '$1,$2').replace(/\u0000(\d+)\u0000/g, (_, index) => kept[Number(index)]);

@@ -181,3 +181,8 @@
 .survey-issues-link { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; font-size: var(--fs-sm); font-weight: var(--weight-semibold); }
 .survey-issues-link:hover { text-decoration: underline; }
 .survey-issues-link:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+.survey-step-defaults { border-top: 1px solid var(--line-subtle); padding-top: 6px; font-size: var(--fs-sm); }
+.survey-step-defaults summary { cursor: pointer; color: var(--fg-2); }
+.survey-step-defaults[open] summary { color: var(--fg-1); }
+.survey-step-defaults ul { margin: 6px 0 0; padding-left: 18px; color: var(--fg-2); line-height: 1.6; }
+.survey-defaults-none { margin: 0; border-top: 1px solid var(--line-subtle); padding-top: 6px; font-size: var(--fs-sm); color: #6EE7A0; }

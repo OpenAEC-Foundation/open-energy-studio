@@ -165,56 +165,204 @@ function issueSubject(path: string, draft: Draft, t: T): string | null {
   return bare.startsWith('derivedInput') ? null : bare;
 }
 
-/** Short facts of a step for the Controle page. */
+/** Display names of the surfaces: "Gevel 1", "Dak 2", "Vloer 1" (the order within each element). */
+function surfaceNames(draft: Draft, t: T): Map<string, string> {
+  const counts: Record<string, number> = {};
+  const names = new Map<string, string>();
+  for (const surface of (read(draft, ['envelope', 'surfaces']) as Array<Record<string, unknown>> | undefined) ?? []) {
+    const element = String(surface.element ?? 'facade');
+    counts[element] = (counts[element] ?? 0) + 1;
+    names.set(String(surface.id ?? ''), `${t(`survey.element.${element}`)} ${counts[element]}`);
+  }
+  return names;
+}
+
+/** "80 mm" or "100–120 mm" for surfaces with a known thickness; null when none has one. */
+function thicknessRange(items: Array<Record<string, unknown>>, locale: string): string | null {
+  const values = items.map((item) => (item.insulation as { kind?: string; thicknessMm?: number } | undefined))
+    .filter((insulation) => insulation?.kind === 'thickness' && typeof insulation.thicknessMm === 'number')
+    .map((insulation) => insulation!.thicknessMm as number);
+  if (values.length === 0) return null;
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  return low === high ? `${formatNumber(low, locale, 0)} mm` : `${formatNumber(low, locale, 0)}–${formatNumber(high, locale, 0)} mm`;
+}
+
+/** The compass direction of an azimuth (0 = north, clockwise). */
+function compass(azimuth: number): string {
+  const keys = ['north', 'north_east', 'east', 'south_east', 'south', 'south_west', 'west', 'north_west'];
+  return keys[Math.round((((azimuth % 360) + 360) % 360) / 45) % 8];
+}
+
+/** Short facts of a step for the Controle page: the answers that matter, in a few lines. */
 function stepFacts(step: SurveyStepId, draft: Draft, t: T, locale: string): string[] {
   const n = (value: unknown, digits = 0) => typeof value === 'number' ? formatNumber(value, locale, digits) : '—';
-  const surfaces = (read(draft, ['envelope', 'surfaces']) as Array<Record<string, unknown>> | undefined) ?? [];
+  const list = (path: Path) => (read(draft, path) as Array<Record<string, unknown>> | undefined) ?? [];
+  const surfaces = list(['envelope', 'surfaces']);
+  const windows = list(['envelope', 'windows']);
+  const doors = list(['envelope', 'doors']);
+  const rooflights = list(['envelope', 'rooflights']);
   const area = (items: Array<Record<string, unknown>>, key: string) => items.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
+  const elementOf = (surfaceId: unknown) => surfaces.find((surface) => surface.id === surfaceId)?.element;
+  const label = (key: string) => { const text = t(key); return text === key ? null : text; };
+  const short = (key: string) => (label(key) ?? '').split(':')[0];
+  const year = read(draft, ['constructionYear']);
   switch (step) {
     case 'woning': {
       const choice = dwellingChoice(draft);
-      return [choice ? t(`survey.dwelling.${choice}`) : '—',
-        t('survey.fact.year', { year: typeof read(draft, ['constructionYear']) === 'number' ? String(read(draft, ['constructionYear'])) : '—' }),
-        t('survey.fact.area', { area: n(read(draft, ['usableFloorAreaM2']), 1) })];
+      const roof = read(draft, ['dwelling', 'roofType']);
+      const floor = read(draft, ['construction', 'floor']);
+      const wall = read(draft, ['construction', 'wall']);
+      const pipes = read(draft, ['verticalPipes']);
+      const facts = [[choice ? t(`survey.dwelling.${choice}`) : '—', roof ? label(`survey.dwelling.roofTypeKind.${String(roof)}`)?.toLowerCase() : null]
+        .filter(Boolean).join(', ')];
+      facts.push(t('survey.fact.basics', { year: typeof year === 'number' ? String(year) : '—', area: n(read(draft, ['usableFloorAreaM2']), 1),
+        storeys: n(read(draft, ['storeys'])) }));
+      if (floor || wall) facts.push(t('survey.fact.construction', { floor: floor ? short(`survey.construction.floorKind.${String(floor)}`).toLowerCase() : '—',
+        wall: wall ? short(`survey.construction.wallKind.${String(wall)}`).toLowerCase() : '—' }));
+      if (Array.isArray(pipes)) {
+        const insulated = pipes.filter((pipe) => (pipe as { insulated?: boolean }).insulated === true).length;
+        facts.push(pipes.length === 0 ? t('survey.fact.noPipes')
+          : t('survey.fact.pipes', { count: pipes.length, insulated: insulated === pipes.length ? t('survey.fact.insulated') : insulated === 0 ? t('survey.fact.notInsulated') : t('survey.fact.partlyInsulated') }));
+      }
+      return facts;
     }
     case 'gebouw': {
-      const functions = (read(draft, ['functions']) as Array<Record<string, unknown>> | undefined) ?? [];
-      return [t('survey.fact.year', { year: typeof read(draft, ['constructionYear']) === 'number' ? String(read(draft, ['constructionYear'])) : '—' }),
+      const functions = list(['functions']);
+      return [t('survey.fact.year', { year: typeof year === 'number' ? String(year) : '—' }),
         t('survey.fact.functions', { count: functions.length, area: n(area(functions, 'areaM2'), 0) })];
     }
-    case 'zones': return [t('survey.fact.zones', { count: ((read(draft, ['zones']) as unknown[]) ?? []).length })];
+    case 'zones': return [t('survey.fact.zones', { count: list(['zones']).length })];
     case 'gevels': {
       const facades = surfaces.filter((surface) => surface.element === 'facade');
-      const windows = (read(draft, ['envelope', 'windows']) as Array<Record<string, unknown>> | undefined) ?? [];
-      return [t('survey.fact.facades', { count: facades.length, area: n(area(facades, 'grossAreaM2'), 1) }),
-        t('survey.fact.windows', { count: windows.length, area: n(area(windows, 'areaM2'), 1) })];
+      const own = windows.filter((window) => elementOf(window.surfaceId) !== 'roof');
+      const glass = own[0]?.glass;
+      const facts = [[t('survey.fact.facades', { count: facades.length, area: n(area(facades, 'grossAreaM2'), 1) }), thicknessRange(facades, locale)]
+        .filter(Boolean).join(', ')];
+      if (own.length > 0) facts.push([t('survey.fact.windows', { count: own.length, area: n(area(own, 'areaM2'), 1) }),
+        glass && own.every((window) => window.glass === glass) ? label(`opname.window.glassKind.${String(glass)}`) : null].filter(Boolean).join(', '));
+      if (doors.length > 0) facts.push([t('survey.fact.doors', { count: doors.length, area: n(area(doors, 'areaM2'), 2) }),
+        doors.every((door) => door.insulated === true) ? t('survey.fact.insulated') : null].filter(Boolean).join(', '));
+      return facts;
     }
     case 'dak-vloer': {
       const roofs = surfaces.filter((surface) => surface.element === 'roof');
       const floors = surfaces.filter((surface) => surface.element === 'floor');
-      return [t('survey.fact.roofs', { count: roofs.length, area: n(area(roofs, 'grossAreaM2'), 1) }),
-        t('survey.fact.floors', { count: floors.length, area: n(area(floors, 'grossAreaM2'), 1) })];
+      const roofWindows = windows.filter((window) => elementOf(window.surfaceId) === 'roof');
+      const names = surfaceNames(draft, t);
+      const facts = [[t('survey.fact.roofs', { count: roofs.length, area: n(area(roofs, 'grossAreaM2'), 1) }), thicknessRange(roofs, locale)]
+        .filter(Boolean).join(', ')];
+      if (roofWindows.length > 0) facts.push(t('survey.fact.roofWindows', { count: roofWindows.length, area: n(area(roofWindows, 'areaM2'), 2),
+        where: [...new Set(roofWindows.map((window) => names.get(String(window.surfaceId)) ?? ''))].join(', ').toLowerCase() }));
+      if (rooflights.length > 0) facts.push(t('survey.fact.rooflights', { count: rooflights.length, area: n(area(rooflights, 'areaM2'), 2) }));
+      for (const floor of floors) {
+        const boundary = (floor.boundary as { kind?: string } | undefined)?.kind;
+        facts.push([t('survey.fact.floor', { area: n(floor.grossAreaM2, 1), boundary: boundary ? (label(`opname.surface.boundaryKind.${boundary}`) ?? boundary).toLowerCase() : '—' }),
+          thicknessRange([floor], locale)].filter(Boolean).join(', '));
+      }
+      return facts;
     }
     case 'verwarming': {
       const kind = read(draft, ['heating', 'generator', 'kind']);
+      const source = read(draft, ['heating', 'generator', 'source']);
+      const evidence = read(draft, ['heating', 'generator', 'highEfficiencyEvidence']);
       const emitters = read(draft, ['heating', 'emitters']);
-      return [kind ? t(`opname.heating.kind.${String(kind)}`) : '—', emitters ? t(`opname.heating.emitters.${String(emitters)}`) : '—'];
+      const design = read(draft, ['heating', 'designClass']);
+      const distribution = read(draft, ['heating', 'distributionType', 'kind']);
+      const balanced = read(draft, ['heating', 'balanced']);
+      const control = read(draft, ['heating', 'control']);
+      const unheated = read(draft, ['heating', 'unheatedPipes', 'kind']);
+      const facts = [[kind ? t(`opname.heating.kind.${String(kind)}`) : '—',
+        kind === 'heat_pump' && source ? (label(`opname.heating.hpSource.${String(source)}`) ?? String(source)).toLowerCase() : null,
+        evidence ? t('survey.fact.table928') : null].filter(Boolean).join(', ')];
+      if (emitters) facts.push([t(`opname.heating.emitters.${String(emitters)}`), design ? label(`opname.heating.designClassKind.${String(design)}`) : null,
+        distribution ? label(`opname.heating.distributionTypeKind.${String(distribution)}`)?.toLowerCase() : null].filter(Boolean).join(', '));
+      const regime = [balanced === true ? t('survey.fact.balanced') : balanced === false ? t('survey.fact.notBalanced') : null,
+        control && control !== 'unknown' ? label(`survey.heating.controlKind.${String(control)}`)?.toLowerCase() : null].filter(Boolean);
+      if (regime.length > 0) facts.push(regime.join(', '));
+      if (unheated) facts.push(unheated === 'absent' ? t('survey.fact.noUnheatedPipes') : t('survey.fact.unheatedPipes'));
+      return facts;
     }
     case 'warm-water': {
       const kind = read(draft, ['hotWater', 'generator', 'kind']);
-      return [kind ? t(`opname.hotWater.kind.${String(kind)}`) : '—'];
+      const served = read(draft, ['hotWater', 'served']);
+      const kitchen = read(draft, ['hotWater', 'kitchenLengthM']);
+      const bathroom = read(draft, ['hotWater', 'bathroomLengthM']);
+      const showers = read(draft, ['hotWater', 'showers']);
+      const recovery = read(draft, ['hotWater', 'showerHeatRecovery']);
+      const facts = [kind ? t(`opname.hotWater.kind.${String(kind)}`) : '—'];
+      if (served) facts.push([label(`survey.hotWater.servedKind.${String(served)}`),
+        typeof kitchen === 'number' || typeof bathroom === 'number'
+          ? t('survey.fact.pipeLengths', { kitchen: n(kitchen, 1), bathroom: n(bathroom, 1) }) : null].filter(Boolean).join(', '));
+      if (typeof showers === 'number') facts.push([t('survey.fact.showers', { count: showers }),
+        recovery && recovery !== 'none' && recovery !== 'unknown' ? t('survey.fact.dwtw', { kind: (label(`survey.hotWater.showerHeatRecoveryKind.${String(recovery)}`) ?? '').toLowerCase() }) : null]
+        .filter(Boolean).join(' '));
+      return facts;
     }
     case 'ventilatie': {
       const principle = read(draft, ['ventilation', 'principle']);
-      return [principle ? t(`survey.ventilation.principleKind.${String(principle)}`) : '—'];
+      const recovery = read(draft, ['ventilation', 'heatRecovery']);
+      const motor = read(draft, ['ventilation', 'motor']);
+      const unitYear = read(draft, ['ventilation', 'unitManufactureYear']);
+      const ducts = read(draft, ['ventilation', 'ductAirtightness']);
+      const facts = [[principle ? t(`survey.ventilation.principleKind.${String(principle)}`) : '—',
+        principle === 'balanced' ? (recovery ? label(`opname.ventilation.heatRecoveryKind.${String(recovery)}`) : t('survey.fact.noRecovery')) : null]
+        .filter(Boolean).join(', ')];
+      const unit = [motor && motor !== 'unknown' ? label(`survey.ventilation.motorKind.${String(motor)}`) : null,
+        typeof unitYear === 'number' ? t('survey.fact.unitYear', { year: String(unitYear) }) : null].filter(Boolean);
+      if (unit.length > 0) facts.push(unit.join(', '));
+      if (ducts && ducts !== 'unknown') facts.push(t('survey.fact.ducts', { kind: label(`survey.ventilation.ductsKind.${String(ducts)}`) ?? String(ducts) }));
+      return facts;
     }
     case 'koeling': return [read(draft, ['cooling']) != null ? t('survey.fact.cooling') : t('survey.fact.noCooling')];
     case 'zonnepanelen': {
-      const pv = (read(draft, ['pv']) as Array<Record<string, unknown>> | undefined) ?? [];
-      return [pv.length === 0 ? t('survey.fact.noPv') : t('survey.fact.pv', { count: pv.length, area: n(area(pv, 'panelAreaM2'), 1) })];
+      const pv = list(['pv']);
+      if (pv.length === 0) return [t('survey.fact.noPv')];
+      return pv.flatMap((system) => [
+        [t('survey.fact.pvArea', { area: n(system.panelAreaM2, 1) }), label(`opname.pv.module.${String(system.moduleType)}`)?.toLowerCase(),
+          typeof system.installationYear === 'number' ? String(system.installationYear) : null].filter(Boolean).join(', '),
+        [typeof system.azimuthDeg === 'number' ? label(`opname.orientationKind.${compass(system.azimuthDeg)}`) : null,
+          typeof system.tiltDeg === 'number' ? `${n(system.tiltDeg)}°` : null,
+          system.mounting && system.mounting !== 'unknown' ? label(`survey.pv.mountingKind.${String(system.mounting)}`)?.toLowerCase() : null].filter(Boolean).join(', '),
+      ]);
     }
     default: return [];
   }
+}
+
+/** The step of an applied default: as its path, except the crawl-space rules (floor question). */
+function defaultStep(item: { path: string; rule: string }, stored: Stored): SurveyStepId {
+  if (item.rule.startsWith('crawlspace')) return 'dak-vloer';
+  return questionForPath(item.path, stored).step;
+}
+
+/** The defaults of one step, identical values on several surfaces taken together ("Gevel 1–7"). */
+function StepDefaults({ items, draft, t, locale }: {
+  items: OpnameAssessment['appliedDefaults']; draft: Draft; t: T; locale: string;
+}) {
+  const names = surfaceNames(draft, t);
+  const surfaces = (read(draft, ['envelope', 'surfaces']) as Array<Record<string, unknown>> | undefined) ?? [];
+  const groups: Array<{ subjects: string[]; value: string; rule: string }> = [];
+  for (const item of items) {
+    const surface = /^envelope\.surfaces\[(\d+)\]/.exec(item.path);
+    const subject = surface ? names.get(String(surfaces[Number(surface[1])]?.id ?? '')) ?? null : null;
+    const label = t(`survey.rule.${item.rule}`);
+    const fallback = label !== `survey.rule.${item.rule}` ? label : defaultPathLabel(t, item.path);
+    const group = groups.find((candidate) => candidate.value === item.value && candidate.rule === item.rule);
+    if (group && subject) group.subjects.push(subject);
+    else groups.push({ subjects: [subject ?? fallback], value: item.value, rule: item.rule });
+  }
+  if (items.length === 0) return <p className="survey-defaults-none">✓ {t('survey.check.noDefaults')}</p>;
+  const subjectText = (subjects: string[]) => {
+    if (subjects.length < 3) return subjects.join(', ');
+    const [word] = subjects[0].split(' ');
+    const sameKind = subjects.every((subject) => subject.startsWith(`${word} `));
+    return sameKind ? `${word} ${subjects[0].slice(word.length + 1)}–${subjects[subjects.length - 1].slice(word.length + 1)}` : subjects.join(', ');
+  };
+  return <details className="survey-step-defaults">
+    <summary>{t(items.length === 1 ? 'survey.check.oneDefault' : 'survey.check.stepDefaults', { count: items.length })}</summary>
+    <ul>{groups.map((group, index) => <li key={index}>{subjectText(group.subjects)}: {defaultValueLabel(t, group.value, locale)}</li>)}</ul>
+  </details>;
 }
 
 function ResultCard({ result, busy, error, t, locale, onIssues }: {
@@ -269,6 +417,7 @@ function CheckPage({ stored, steps, result, onEdit, onGoToPath, t, locale }: {
             <button type="button" className="btn btn-sm" onClick={() => onEdit(step.id)}>{t('survey.check.edit')}</button>
           </div>
           <ul>{stepFacts(step.id, draft, t, locale).map((fact, index) => <li key={index}>{fact}</li>)}</ul>
+          {result && <StepDefaults items={result.appliedDefaults.filter((item) => defaultStep(item, stored) === step.id)} draft={draft} t={t} locale={locale} />}
           {state === 'skipped' && <p className="survey-skipped-note">{t('survey.check.skipped')}</p>}
           {issues > 0 && <p className="survey-issues-note">{t('survey.result.issues', { count: issues })}</p>}
         </section>;
