@@ -12,6 +12,7 @@ import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS, type NormVersion } fro
 import { readDefaultEdition, writeDefaultEdition } from '../../core/nta/defaultEdition';
 import { softwareIdentity } from '../../core/nta/Registration';
 import { attestMark } from '../../core/nta/Attest';
+import { MANUAL_KERNEL_VERSION } from '../../core/manual/manual-version';
 import { DialogShell } from '../dialogs/DialogShell';
 import { Pill, Select, Switch } from '../ui';
 import './SettingsDialog.css';
@@ -51,6 +52,8 @@ interface SettingsDialogProps {
    * formerly the ribbon Preview toggle); absent without an open document.
    */
   previewSetting?: { enabled: boolean; onChange: (enabled: boolean) => void };
+  /** Opens the user manual (Gereedschap › Handleiding); absent in isolated tests. */
+  onOpenManual?: () => void;
 }
 
 /** Radio group of option rows (theme, language); arrow keys move the choice. */
@@ -89,7 +92,7 @@ function OptionRows<T extends string>({ label, className, rowClassName, options,
   );
 }
 
-export function SettingsDialog({ onClose, previewSetting }: SettingsDialogProps) {
+export function SettingsDialog({ onClose, previewSetting, onOpenManual }: SettingsDialogProps) {
   const { t, locale, setLocale } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const prefix = useId();
@@ -248,8 +251,12 @@ export function SettingsDialog({ onClose, previewSetting }: SettingsDialogProps)
                 <tr><td>{t('registration.page.attestNumber')}</td>
                   <td>{software.attestNumber ?? <Pill tone="unv">{t('status.unattested')}</Pill>}</td></tr>
                 <tr><td>{t('settings.edition.current')}</td><td>{t(`nta.edition.${DEFAULT_NORM_VERSION}`)}</td></tr>
+                <tr><td>{t('manual.manualKernel')}</td><td>{MANUAL_KERNEL_VERSION ?? '–'}</td></tr>
               </tbody>
             </table>
+            {onOpenManual && (
+              <p><button type="button" className="btn" onClick={onOpenManual}>{t('manual.openManual')}</button></p>
+            )}
             {attest.markText && (
               <div className="attest-mark" data-mark="nl-epbd" data-testid="attest-mark">{attest.markText}</div>
             )}

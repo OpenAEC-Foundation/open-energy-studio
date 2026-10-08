@@ -23,7 +23,7 @@ import { ResultsDashboard } from './pages/results/ResultsDashboard';
 import { BasisopnamePanel, type SurveySection } from '../BasisopnamePanel/BasisopnamePanel';
 import { MaatwerkadviesPanel, type MwaTab } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
-import { Building3DView, HeatPumpSizingCalculator, LazyPage, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
+import { Building3DView, HeatPumpSizingCalculator, LazyPage, ManualView, ThermalBridgeCalculator, UValueCalculator } from './lazyPages';
 import { PageHeader, SubTabs, routeLabel } from './PageHeader';
 import { ProjectOverview } from './pages/ProjectOverview';
 import { InstallationAddBar, InstallationsOverview, ServicePage, type ServiceId } from './pages/InstallationsPage';
@@ -204,9 +204,12 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
       break;
     case 'tool':
       page = <>
-        {header({ lead: t('page.tool.lead') })}
+        {header({ lead: t(route.sub === 'manual' ? 'manual.lead' : 'page.tool.lead') })}
         <div className="page-body">
           <LazyPage>
+            {route.sub === 'manual' && (
+              <ManualView chapterRef={route.chapter} onOpen={(chapter) => actions.navigate({ step: 'tool', sub: 'manual', chapter })} />
+            )}
             {route.sub === 'uvalue' && <UValueCalculator />}
             {route.sub === 'thermal-bridge' && <ThermalBridgeCalculator />}
             {route.sub === 'heat-pump-sizing' && <HeatPumpSizingCalculator />}

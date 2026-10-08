@@ -1,0 +1,81 @@
+/* In-app user manual (Gereedschap › Handleiding). */
+.manual-view {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.manual-toc {
+  position: sticky;
+  top: 0;
+  font-size: var(--fs-sm);
+}
+
+.manual-toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.manual-toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.manual-toc-item:hover { background: var(--surface-hover); color: var(--fg-1); }
+.manual-toc-item[aria-current='page'] { background: var(--surface-selected); color: var(--fg-1); font-weight: 600; }
+.manual-toc-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.manual-versions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-subtle);
+  color: var(--fg-3);
+}
+
+.manual-versions dd { margin: 0; font-family: var(--font-mono); color: var(--fg-2); }
+
+.manual-article {
+  max-width: 52rem;
+  line-height: var(--leading-normal);
+  color: var(--fg-1);
+}
+
+.manual-article h2 { font-size: var(--fs-xl); margin: 0 0 var(--space-3); }
+.manual-article h3 { font-size: var(--fs-lg); margin: var(--space-6) 0 var(--space-2); }
+.manual-article h4, .manual-article h5 { font-size: var(--fs-md); margin: var(--space-4) 0 var(--space-2); }
+.manual-article :is(h2, h3, h4, h5):focus { outline: none; }
+.manual-article code { font-family: var(--font-mono); font-size: 0.92em; background: var(--surface-sunken); padding: 0 0.2em; border-radius: var(--radius-xs); }
+.manual-article blockquote { margin: var(--space-3) 0; padding-left: var(--space-3); border-left: 3px solid var(--line-strong); color: var(--fg-2); }
+.manual-article a { color: var(--accent-text); }
+.manual-doc-ref { text-decoration: underline dotted; cursor: help; }
+
+.manual-image {
+  display: block;
+  max-width: 100%;
+  margin: var(--space-3) 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.manual-table-wrap { overflow-x: auto; margin: var(--space-3) 0; }
+.manual-table { border-collapse: collapse; font-size: var(--fs-sm); }
+.manual-table :is(th, td) { border: 1px solid var(--line); padding: var(--space-1) var(--space-2); vertical-align: top; text-align: left; }
+.manual-table th { background: var(--surface-sunken); }
+
+@media (max-width: 720px) {
+  .manual-view { grid-template-columns: 1fr; }
+  .manual-toc { position: static; }
+}

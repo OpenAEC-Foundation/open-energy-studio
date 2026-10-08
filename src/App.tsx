@@ -21,7 +21,7 @@ import { CoolingSystemDialog } from './components/dialogs/CoolingSystemDialog/Co
 import { HotWaterSystemDialog } from './components/dialogs/HotWaterSystemDialog/HotWaterSystemDialog';
 import { SolarPVDialog } from './components/dialogs/SolarPVDialog/SolarPVDialog';
 import { SolarThermalDialog } from './components/dialogs/SolarThermalDialog/SolarThermalDialog';
-import { LazyPage, PrintPreviewDialog } from './components/shell/lazyPages';
+import { LazyPage, ManualView, PrintPreviewDialog } from './components/shell/lazyPages';
 import { FeedbackDialog } from './components/dialogs/FeedbackDialog/FeedbackDialog';
 import { SettingsDialog } from './components/SettingsDialog/SettingsDialog';
 import { TopBar, type TopBarProps } from './components/shell/TopBar';
@@ -47,7 +47,7 @@ import { stepStatuses } from './core/nta/stepStatus';
 import { adjacentStep, routeFromHash, routeToHash, stepDefinition, type Route } from './core/navigation/routes';
 import { selectionForPath } from './core/navigation/projectPaths';
 import { isTauri } from '@tauri-apps/api/core';
-import { ConfirmProvider, ToastProvider, useConfirm, useToast } from './components/ui';
+import { ConfirmProvider, Dialog, ToastProvider, useConfirm, useToast } from './components/ui';
 import { stampProject } from './core/io/KernelStampClient';
 import { forgetRecentProject, readRecentProjects, recordRecentProject } from './core/io/recentProjects';
 import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
@@ -382,6 +382,17 @@ function ActiveDocumentContent({ onReport, ...props }: {
 
 // ── Minimal status bar when no document is open ──
 
+/** The manual without an open document (welcome screen): the same viewer in a dialog. */
+function ManualDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
+  const [chapter, setChapter] = useState<string | undefined>();
+  return (
+    <Dialog title={t('manual.title')} onClose={onClose} width={1100} className="manual-dialog">
+      <LazyPage><ManualView chapterRef={chapter} onOpen={setChapter} /></LazyPage>
+    </Dialog>
+  );
+}
+
 function EmptyStatusBar() {
   const { t } = useI18n();
   return (
@@ -408,6 +419,7 @@ function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
 
   const createEmptyProject = useCallback((buildingFunction: IProject['buildingFunction'] = 'residential'): IProject => {
     untitledCounter.current += 1;
@@ -791,7 +803,17 @@ function AppContent() {
           {paletteOpen && <CommandPalette entries={welcomePalette} onClose={() => setPaletteOpen(false)} />}
         </>
       )}
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} previewSetting={previewSetting} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} previewSetting={previewSetting}
+        onOpenManual={() => {
+          setSettingsOpen(false);
+          // In a document the manual is a page (Gereedschap › Handleiding); on the welcome screen a dialog.
+          if (activeDoc) {
+            docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'NAVIGATE', payload: { step: 'tool', sub: 'manual' } } } });
+          } else {
+            setManualDialogOpen(true);
+          }
+        }} />}
+      {manualDialogOpen && <ManualDialog onClose={() => setManualDialogOpen(false)} />}
       {feedbackOpen && <FeedbackDialog onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
