@@ -49,7 +49,7 @@ describe('NTA sections on the workflow steps', () => {
   it('shows each section on its own step and sub page', async () => {
     renderWithProviders(<Harness initial={{ step: 'project' }} />);
     const page = within(await screen.findByTestId('page'));
-    expect(await page.findByRole('combobox', { name: 'NTA 8800 edition' })).toBeInTheDocument();
+    expect(await page.findByLabelText('NTA 8800 edition')).toBeInTheDocument();
     expect(page.getByLabelText('Calculation scope')).toBeInTheDocument();
     expect(page.queryByLabelText('Heating setpoint °C')).toBeNull();
 
@@ -165,10 +165,10 @@ describe('field input', () => {
     let saved: Record<string, unknown> | null = null;
     renderWithProviders(<NtaCalculationForm project={createDefaultProject()} initial={{ setpoints: { heatingC: 20, coolingC: 24, sourceReference: 'x' } }}
       onSave={(block) => { saved = block; }} onCancel={() => undefined} />);
-    const heating = screen.getByRole('spinbutton', { name: 'Heating setpoint °C' });
+    const heating = screen.getByLabelText('Heating setpoint °C');
     await user.clear(heating);
     await user.type(heating, '20,5');
-    const cooling = screen.getByRole('spinbutton', { name: 'Cooling setpoint °C' });
+    const cooling = screen.getByLabelText('Cooling setpoint °C');
     await user.clear(cooling);
     await user.type(cooling, '24.5');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -197,8 +197,8 @@ describe('2024-only inputs', () => {
     let saved: Record<string, unknown> | null = null;
     renderWithProviders(<NtaCalculationForm project={createDefaultProject()} initial={structuredClone(block2024)}
       onSave={(block) => { saved = block; }} onCancel={() => undefined} />);
-    await user.type(screen.getByRole('spinbutton', { name: 'Effective mass (annex AA, 2024 edition), kg/m²' }), '165');
-    await user.type(screen.getByRole('spinbutton', { name: 'Roof area of room woonkamer (annex AA, 2024 edition), m²' }), '12,5');
+    await user.type(screen.getByLabelText('Effective mass (annex AA, 2024 edition), kg/m²'), '165');
+    await user.type(screen.getByLabelText('Roof area of room woonkamer (annex AA, 2024 edition), m²'), '12,5');
     await user.selectOptions(screen.getByLabelText('Collective source realised from 2013 (2023 or 2024 edition)'), 'true');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const block = saved as unknown as typeof block2024 & {

@@ -68,11 +68,11 @@ describe('survey wizard (F8)', () => {
     await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
     const progress = screen.getByRole('navigation', { name: 'Survey progress' });
     expect(within(progress).getByRole('button', { name: 'General' })).toHaveAttribute('aria-current', 'step');
-    expect(screen.queryByRole('combobox', { name: 'Vertical pipes (§7.2.4)' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Vertical pipes (§7.2.4)')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(within(progress).getByRole('button', { name: 'Calculation zones' })).toHaveAttribute('aria-current', 'step');
-    expect(screen.queryByRole('combobox', { name: 'Vertical pipes (§7.2.4)' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Vertical pipes (§7.2.4)')).not.toBeInTheDocument();
 
     // The outcome card stays beside every section and is marked indicative.
     const card = screen.getByRole('complementary', { name: 'Survey outcome' });
@@ -117,14 +117,14 @@ describe('maatwerkadvies tabs (F8)', () => {
     // Adding a measure opens it in the side sheet.
     await user.click(screen.getByRole('button', { name: 'Add measure' }));
     const sheet = await screen.findByRole('dialog');
-    await user.type(within(sheet).getByRole('textbox', { name: 'Name' }), 'Spouwmuur');
+    await user.type(within(sheet).getByLabelText('Name'), 'Spouwmuur');
     await user.click(within(sheet).getByRole('button', { name: 'Done' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     const card = screen.getByTestId('mwa-card-m1');
     // A fresh insulation template has no value yet: incomplete before the kernel runs.
     expect(within(card).getByText('incomplete')).toBeInTheDocument();
-    await user.selectOptions(within(card).getByRole('combobox', { name: 'Measure type' }), 'manual');
+    await user.selectOptions(within(card).getByLabelText('Measure type'), 'manual');
     expect(JSON.parse(screen.getByTestId('mwa').textContent ?? 'null').measures[0].template).toBeFalsy();
 
     await user.click(screen.getByRole('button', { name: 'Add package' }));
