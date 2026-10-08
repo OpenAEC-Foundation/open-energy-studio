@@ -3177,7 +3177,6 @@ struct Booking {
     combi_heating: Option<[CombiChpHeatingMonth; 12]>,
 }
 
-#[allow(clippy::too_many_arguments)]
 /// The heat source of an annex W or forfait booster heat pump.
 fn booster_heat_source(generator: &HotWaterGenerator) -> Option<&BoosterHeatSource> {
     match generator {
@@ -3204,6 +3203,7 @@ fn booster_months(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn book_generator(
     generator: &HotWaterGenerator,
     system: &HotWaterSystem,
