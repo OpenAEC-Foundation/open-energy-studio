@@ -3,7 +3,32 @@
  * html file). A report page or HTML document is laid out by the browser and
  * drawn into an A4 pdf with jsPDF and html2canvas; text stays text. The Inter
  * font (OFL, public/fonts/pdf) is embedded so ₂, ≤, Δ, ψ and χ render.
+ *
+ * House style of Open Energy Studio on a white page (feedback 8 Oct 2026):
+ * headings in Space Grotesk, text in Inter, a dark band with the amber mark,
+ * amber rules under headings and on table heads.
  */
+
+/** Colours of src/styles/tokens.css. */
+const FORGE_900 = '#2A2A32';
+const FORGE_975 = '#1F1F25';
+const AMBER_500 = '#F59E0B';
+const AMBER_600 = '#D97706';
+const AMBER_700 = '#B45309';
+
+const BRAND_CSS = `
+.pdf-brand { background: #ffffff !important; color: ${FORGE_975} !important; font-family: Inter, sans-serif !important; }
+.pdf-brand h1, .pdf-brand h2, .pdf-brand h3, .pdf-brand h4 { font-family: SpaceGrotesk, Inter, sans-serif !important; color: ${FORGE_900} !important; }
+.pdf-brand h1, .pdf-brand h2 { border-bottom: 3px solid ${AMBER_500} !important; padding-bottom: 4px !important; }
+.pdf-brand h3 { border-bottom: 1px solid ${AMBER_500} !important; }
+.pdf-brand th { background: #FEF3C7 !important; color: ${FORGE_900} !important; border-bottom: 1px solid ${AMBER_600} !important; }
+.pdf-brand a { color: ${AMBER_700} !important; }
+.pdf-brand-band { display: flex; align-items: center; gap: 10px; background: ${FORGE_900}; color: #ffffff; padding: 10px 14px;
+  border-radius: 6px; margin: 0 0 16px; font-family: SpaceGrotesk, Inter, sans-serif; }
+.pdf-brand-band i { display: inline-block; width: 20px; height: 20px; border-radius: 5px; background: ${AMBER_500}; }
+.pdf-brand-band b { font-size: 14px; font-weight: 700; }
+.pdf-brand-band span { margin-left: auto; font-size: 11px; color: #D4D4D8; font-family: Inter, sans-serif; }
+`;
 
 const MARGIN_PT = 36;
 
@@ -23,8 +48,8 @@ async function base64(url: string): Promise<string> {
   return btoa(text);
 }
 
-/** Draws an element (laid out in its own document) into an A4 pdf. */
-export async function elementToPdf(element: HTMLElement): Promise<Blob> {
+/** Draws an element (laid out in its own document) into an A4 pdf in the house style. */
+export async function elementToPdf(element: HTMLElement, band?: string): Promise<Blob> {
   const [{ jsPDF }, html2canvas] = await Promise.all([import('jspdf'), import('html2canvas').then((module) => module.default)]);
   // jsPDF.html looks html2canvas up on the window.
   (window as unknown as { html2canvas: unknown }).html2canvas = html2canvas;
@@ -37,10 +62,30 @@ export async function elementToPdf(element: HTMLElement): Promise<Blob> {
     doc.addFileToVFS('Inter-Bold.ttf', bold);
     doc.addFont('Inter-Bold.ttf', 'Inter', 'bold');
     fontFamily = 'Inter';
+    const [display, displayBold] = await Promise.all([base64(fontUrl('SpaceGrotesk-Medium.ttf')), base64(fontUrl('SpaceGrotesk-Bold.ttf'))]);
+    doc.addFileToVFS('SpaceGrotesk-Medium.ttf', display);
+    doc.addFont('SpaceGrotesk-Medium.ttf', 'SpaceGrotesk', 'normal');
+    doc.addFileToVFS('SpaceGrotesk-Bold.ttf', displayBold);
+    doc.addFont('SpaceGrotesk-Bold.ttf', 'SpaceGrotesk', 'bold');
   } catch { /* the standard font still gives a pdf */ }
   doc.setFont(fontFamily, 'normal');
   const previous = element.style.fontFamily;
   element.style.fontFamily = `${fontFamily}, sans-serif`;
+  const owner = element.ownerDocument;
+  const style = owner.createElement('style');
+  style.textContent = BRAND_CSS;
+  owner.head.appendChild(style);
+  element.classList.add('pdf-brand');
+  let header: HTMLElement | null = null;
+  if (band !== undefined) {
+    header = owner.createElement('div');
+    header.className = 'pdf-brand-band';
+    header.innerHTML = '<i></i><b>Open Energy Studio</b>';
+    const note = owner.createElement('span');
+    note.textContent = band;
+    header.appendChild(note);
+    element.prepend(header);
+  }
   const width = doc.internal.pageSize.getWidth() - 2 * MARGIN_PT;
   const windowWidth = Math.max(element.scrollWidth, 720);
   try {
@@ -60,12 +105,15 @@ export async function elementToPdf(element: HTMLElement): Promise<Blob> {
     });
   } finally {
     element.style.fontFamily = previous;
+    element.classList.remove('pdf-brand');
+    style.remove();
+    header?.remove();
   }
   return doc.output('blob');
 }
 
 /** Lays out a whole HTML document (a report template) in a hidden frame and draws it into a pdf. */
-export async function htmlToPdf(html: string): Promise<Blob> {
+export async function htmlToPdf(html: string, band = ''): Promise<Blob> {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0;visibility:hidden;';
@@ -78,7 +126,7 @@ export async function htmlToPdf(html: string): Promise<Blob> {
     if (!body) throw new Error('report frame without body');
     // Light background and dark text for paper, whatever the report's screen styling.
     body.style.background = '#ffffff';
-    return await elementToPdf(body);
+    return await elementToPdf(body, band);
   } finally {
     frame.remove();
   }

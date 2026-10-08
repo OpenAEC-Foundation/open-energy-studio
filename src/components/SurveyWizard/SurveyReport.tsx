@@ -142,6 +142,8 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
     </details>
 
     <article className="survey-report-doc" aria-label={t('survey.report.preview')} ref={docRef}>
+      <div className="survey-report-band" aria-hidden="true"><i /><b>Open Energy Studio</b>
+        <span>{t('survey.report.statusIndicative')}</span></div>
       <header>
         <h2>{t(stored.kind === 'residential' ? 'survey.report.docTitle' : 'survey.report.docTitleUtility')}</h2>
         <p className="survey-report-sub">{t('survey.report.method', { method: stored.kind === 'residential' ? 'ISSO 82.1' : 'ISSO 75.1' })} · NTA 8800:2025+C1:2026</p>

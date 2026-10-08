@@ -211,8 +211,8 @@
 .survey-report-level[aria-checked='true'] { border: 2px solid var(--amber-600); background: var(--surface-selected); }
 .survey-report-more summary { cursor: pointer; font-weight: var(--weight-semibold); color: var(--amber-500); }
 .survey-report-doc { background: #fff; color: #1d1d1f; border-radius: var(--radius-lg); padding: 28px 32px; font-size: 13px; line-height: 1.55; }
-.survey-report-doc h2 { margin: 0; font-size: 22px; color: #12344d; }
-.survey-report-doc h3 { margin: 18px 0 6px; font-size: 15px; color: #12344d; border-bottom: 1px solid #d8dde3; padding-bottom: 4px; }
+.survey-report-doc h2 { margin: 0; font-family: var(--font-display); font-size: 22px; color: #2A2A32; border-bottom: 3px solid #F59E0B; padding-bottom: 4px; }
+.survey-report-doc h3 { margin: 18px 0 6px; font-family: var(--font-display); font-size: 15px; color: #2A2A32; border-bottom: 1px solid #F59E0B; padding-bottom: 4px; }
 .survey-report-sub { margin: 2px 0 0; color: #5b6570; }
 .survey-report-meta { display: grid; grid-template-columns: 140px 1fr; gap: 3px 14px; margin: 14px 0; }
 .survey-report-meta dt { color: #5b6570; }
@@ -226,6 +226,7 @@
 .survey-report-defaults { margin: 0; padding-left: 18px; color: #3a4148; font-size: 12px; }
 .survey-report-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 .survey-report-table th, .survey-report-table td { border-bottom: 1px solid #e4e7eb; padding: 4px 8px; text-align: right; }
+.survey-report-table th { background: #FEF3C7; color: #2A2A32; border-bottom: 1px solid #D97706; }
 .survey-report-table th:first-child, .survey-report-table td:first-child { text-align: left; }
 .survey-report-doc .survey-muted { color: #5b6570; }
 @media (max-width: 720px) { .survey-report-levels { grid-template-columns: minmax(0, 1fr); } }
@@ -244,3 +245,9 @@
 .survey-report-reason { color: #5b6570; font-style: italic; }
 .survey-report-table--evidence td, .survey-report-table--evidence th { text-align: left; }
 .survey-report-code { font-family: var(--font-mono); font-size: 11px; }
+
+.survey-report-doc { font-family: var(--font-ui); color: #1F1F25; }
+.survey-report-band { display: flex; align-items: center; gap: 10px; background: #2A2A32; color: #fff; padding: 10px 14px; border-radius: 6px; margin: -8px -8px 16px; font-family: var(--font-display); }
+.survey-report-band i { display: inline-block; width: 20px; height: 20px; border-radius: 5px; background: #F59E0B; }
+.survey-report-band b { font-size: 14px; }
+.survey-report-band span { margin-left: auto; font-size: 11px; color: #D4D4D8; font-family: var(--font-ui); }

@@ -19,13 +19,13 @@ export async function downloadMaatwerkadviesReportHTML(project: IProject): Promi
   if (!project.maatwerkadvies) throw new Error('Geen maatwerkadvies gedefinieerd.');
   const assessment = await assessMaatwerkadviesWithRust(project, project.maatwerkadvies);
   const html = generateMaatwerkadviesReportHTML(project, project.maatwerkadvies, assessment);
-  await savePdf(`Maatwerkadvies-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html));
+  await savePdf(`Maatwerkadvies-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html, 'NTA 8800:2025+C1:2026'));
 }
 
 /** Export the NTA input and evidence inventory even when BENG is unavailable. */
 export async function downloadNtaInputDossierHTML(project: IProject): Promise<void> {
   const html = generateNtaInputDossierHTML(project);
-  await savePdf(`NTA8800-Invoer-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html));
+  await savePdf(`NTA8800-Invoer-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html, 'NTA 8800:2025+C1:2026'));
 }
 
 /** The kernel's interpretation lists for the report appendix; empty when unavailable. */
@@ -41,7 +41,7 @@ async function interpretationsOrEmpty() {
 export async function downloadNtaCalculationReportHTML(project: IProject): Promise<void> {
   const assessment = await calculateProjectPerformanceWithRust(project);
   const html = generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty());
-  await savePdf(`NTA8800-Rekenrapport-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html));
+  await savePdf(`NTA8800-Rekenrapport-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html, 'NTA 8800:2025+C1:2026'));
 }
 
 /**
@@ -95,7 +95,7 @@ export async function buildEnergyPerformanceReport(project: IProject, options: R
 /** Saves the "Rapportage Energieprestatie (NTA 8800)" as a printable HTML file. */
 export async function downloadEnergyPerformanceReportHTML(project: IProject, options: ReportOptions): Promise<void> {
   const html = await buildEnergyPerformanceReport(project, options);
-  await savePdf(`Rapportage-Energieprestatie-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html));
+  await savePdf(`Rapportage-Energieprestatie-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html, 'NTA 8800:2025+C1:2026'));
 }
 
 /** Opens the "Rapportage Energieprestatie (NTA 8800)" in a window and starts printing (or saving as PDF). */
@@ -125,7 +125,7 @@ async function kernelOrNull(project: IProject) {
  */
 export async function downloadReportHTML(project: IProject, result: IBENGResult | null, locale?: string): Promise<void> {
   const html = generateReportHTML(project, result, { kernel: await kernelOrNull(project), locale });
-  await savePdf(`BENG-Rapport-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html));
+  await savePdf(`BENG-Rapport-${fileNamePart(project.name)}.pdf`, await htmlToPdf(html, 'NTA 8800:2025+C1:2026'));
 }
 
 /**
