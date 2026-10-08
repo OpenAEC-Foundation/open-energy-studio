@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { strFromU8, unzipSync } from 'fflate';
 import App from '../App';
 import { clearSessionEvidence } from '../core/nta/Evidence';
 
@@ -229,7 +230,7 @@ describe('workflow end to end, default edition', () => {
     expect(preview()).not.toContain('Bouwkundige uitgangspunten');
   }, 60000);
 
-  it('links an evidence file to a source field and lists it in the checklist', async () => {
+  it('links an evidence file to a source field and lists it in the checklist and the dossier ZIP', async () => {
     const user = userEvent.setup();
     await openExample(user);
     await openStep(user, /^Building/);
@@ -245,6 +246,50 @@ describe('workflow end to end, default edition', () => {
     await openStep(user, /^Report/, 'BRL 9500 checklist');
     expect(main().getByText('gevel-noord.jpg', { exact: false })).toBeInTheDocument();
     expect(main().queryByText('No evidence recorded yet.')).toBeNull();
+
+    // The dossier ZIP (browser download) holds the file and a manifest that says what it supports.
+    let zip: Blob | null = null;
+    vi.stubGlobal('URL', Object.assign(URL, {
+      createObjectURL: (blob: Blob) => { zip = blob; return 'blob:dossier'; },
+      revokeObjectURL: () => undefined,
+    }));
+    await user.click(main().getByRole('button', { name: 'Export project dossier (ZIP)' }));
+    await waitFor(() => expect(zip).not.toBeNull(), { timeout: 10000 });
+    const archive = unzipSync(new Uint8Array(await zip!.arrayBuffer()));
+    const manifest = JSON.parse(strFromU8(archive['manifest.json'])) as { evidence: Array<{ fileName: string; archivePath: string; supports: string[] }> };
+    const entry = manifest.evidence.find((item) => item.fileName === 'gevel-noord.jpg');
+    expect(entry).toBeDefined();
+    expect(entry!.supports.join(' ')).toMatch(/windowSolar/);
+    expect(strFromU8(archive[entry!.archivePath])).toBe('gevelfoto');
+  }, 60000);
+});
+
+describe('inspector', () => {
+  it('attaches a photo to a selected window and keeps the link by id when an earlier surface is removed', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('oes.inspector.open', '1');
+    await openExample(user);
+    window.localStorage.setItem('oes.inspector.open', '1');
+    await openStep(user, /^Building/);
+    const table = within(main().getByRole('table', { name: 'Envelope & windows' }));
+    await user.click(table.getByText('Raam S'));
+    const inspector = within(screen.getByRole('complementary', { name: 'Context' }));
+    // Selecting shows the properties of the element, although the preview tab was open.
+    expect(inspector.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
+    const evidence = within(inspector.getByRole('group', { name: /Source & evidence/ }));
+    const input = evidence.getByLabelText(/Add file/) as HTMLInputElement;
+    const photo = new File([new TextEncoder().encode('raam')], 'raam-zuid.jpg', { type: 'image/jpeg' });
+    await act(async () => { fireEvent.change(input, { target: { files: [photo] } }); });
+    await waitFor(() => expect(inspector.getByText('raam-zuid.jpg', { exact: false })).toBeInTheDocument());
+
+    // Removing the first surface (with Raam N) moves Raam S up in the list; the link follows its id.
+    await user.click(main().getByRole('button', { name: 'Delete: Gevel N' }));
+    await user.click(main().getByRole('button', { name: 'Yes, delete' }));
+    await waitFor(() => expect(within(main().getByRole('table', { name: 'Envelope & windows' })).queryByText('Raam N')).toBeNull());
+    await openStep(user, /^Report/, 'BRL 9500 checklist');
+    const register = main().getByText('raam-zuid.jpg', { exact: false }).closest('tr')!;
+    expect(register).toHaveTextContent(/win-S/);
+    expect(register).not.toHaveTextContent(/not in the project|no longer/i);
   }, 60000);
 });
 
