@@ -33,11 +33,26 @@ export function emptyResidentialSurvey(): Record<string, unknown> {
   };
 }
 
-/** The start of a new survey: empty for a dwelling, the office example for a utility building. */
+/** An empty utility survey: only what the kernel needs to read it before the questions are answered. */
+export function emptyUtilitySurvey(): Record<string, unknown> {
+  return {
+    id: '',
+    areaSourceReference: '',
+    functions: [],
+    envelope: { surfaces: [], windows: [], doors: [] },
+    heating: { control: 'unknown', sourceReference: '' },
+    heatingInstallation: { collective: false },
+    ventilation: { sourceReference: '' },
+    hotWater: { showerHeatRecovery: 'unknown', sourceReference: '' },
+    lighting: [],
+    pv: [],
+    sourceReference: '',
+  };
+}
+
+/** The start of a new survey: empty, for a dwelling and for a utility building. */
 export function surveyTemplate(kind: SurveyKind): StoredSurvey {
-  return kind === 'residential'
-    ? { kind, survey: emptyResidentialSurvey() }
-    : { kind, survey: structuredClone(utilityExample) as Record<string, unknown> };
+  return { kind, survey: kind === 'residential' ? emptyResidentialSurvey() : emptyUtilitySurvey() };
 }
 
 /** The synthetic example survey of a kind (kernel test fixture), e.g. for demos and tests. */
@@ -52,12 +67,20 @@ export function surveyExample(kind: SurveyKind): StoredSurvey {
  * names them instead (the question flow leads to each).
  */
 export function missingSurveyAnswers(stored: StoredSurvey): string[] {
-  if (stored.kind !== 'residential') return [];
   const survey = stored.survey as Record<string, unknown>;
   const at = (path: string): unknown => path.split('.').reduce<unknown>(
     (value, key) => (value != null && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined), survey);
   const blank = (value: unknown) => value == null || value === '' || (typeof value === 'number' && !Number.isFinite(value));
   const missing: string[] = [];
+  if (stored.kind === 'utility') {
+    if (!(at('buildingType') as { kind?: string } | undefined)?.kind) missing.push('buildingType');
+    if (!Array.isArray(at('functions')) || (at('functions') as unknown[]).length === 0) missing.push('functions');
+    for (const path of ['constructionYear', 'buildingHeightM', 'construction.floor', 'construction.wall',
+      'heating.generator', 'heating.emitters', 'hotWater.generator', 'ventilation.principle']) {
+      if (blank(at(path))) missing.push(path);
+    }
+    return missing;
+  }
   const dwelling = at('dwelling') as Record<string, unknown> | undefined;
   if (!dwelling?.kind) missing.push('dwelling');
   else if (dwelling.kind === 'single_family') {

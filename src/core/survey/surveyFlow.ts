@@ -177,6 +177,7 @@ export function questionForPath(path: string, stored: StoredSurvey): { step: Sur
       return { step: 'warm-water', question: generator ? 'details' : 'overig' };
     }
     case 'ventilation': return { step: 'ventilatie', question: bare === 'ventilation.principle' ? 'systeem' : 'details' };
+    case 'heatingInstallation': return { step: 'verwarming', question: 'afgifte' };
     case 'cooling': case 'coolingPresent': case 'coolingCollective': return { step: 'koeling' };
     case 'pv': case 'storage': return { step: 'zonnepanelen' };
     case 'derivedInput': case 'inklapRedenen': case '': return { step: 'controle' };

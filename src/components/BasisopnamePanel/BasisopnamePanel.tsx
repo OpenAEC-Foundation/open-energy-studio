@@ -395,6 +395,36 @@ export function removeZone(draft: Draft, index: number): Draft {
   return write(cleared, ['zones'], zones.filter((_, item) => item !== index));
 }
 
+/** ISSO 75.1 p. 55–56: building type and position, for the infiltration value. */
+const UTILITY_BUILDING_TYPES: Record<string, Draft> = {
+  single_layer: { kind: 'single_layer', position: 'detached', roof: 'flat' },
+  multi_layer_whole: { kind: 'multi_layer_whole' },
+  multi_layer_part: { kind: 'multi_layer_part', level: 'intermediate', position: 'middle' },
+};
+
+export function UtilityBuildingTypeFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+  const kind = read(draft, ['buildingType', 'kind']) as string | undefined;
+  const select = (path: Path, label: string, prefix: string, keys: string[]) => <label>{label}
+    <select value={String(read(draft, path) ?? '')} onChange={(event) => change(path, event.target.value)}>
+      {keys.map((key) => <option key={key} value={key}>{t(`${prefix}.${key}`)}</option>)}
+    </select></label>;
+  return <>
+    <label>{t('survey.buildingType')}
+      <select value={kind ?? ''} onChange={(event) => change(['buildingType'], event.target.value ? { ...UTILITY_BUILDING_TYPES[event.target.value] } : undefined)}>
+        <option value="">{t('survey.choose')}</option>
+        {Object.keys(UTILITY_BUILDING_TYPES).map((key) => <option key={key} value={key}>{t(`survey.buildingType.${key}`)}</option>)}
+      </select></label>
+    {kind === 'single_layer' && <>
+      {select(['buildingType', 'position'], t('survey.buildingType.position'), 'survey.buildingType.singlePosition', ['detached', 'end_or_corner', 'terraced'])}
+      {select(['buildingType', 'roof'], t('survey.buildingType.roof'), 'survey.buildingType.roofKind', ['pitched', 'partly_flat', 'flat'])}
+    </>}
+    {kind === 'multi_layer_part' && <>
+      {select(['buildingType', 'level'], t('survey.buildingType.level'), 'survey.buildingType.levelKind', ['bottom', 'intermediate', 'top'])}
+      {select(['buildingType', 'position'], t('survey.buildingType.position'), 'survey.buildingType.partPosition', ['end_or_corner', 'middle', 'whole_storey'])}
+    </>}
+  </>;
+}
+
 /** ISSO 75.1 §7.2.1 (p. 63–64) and p. 39–40: the building's EP-liable use functions with A_g (NEN 2580). */
 export function BuildingFunctionFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
   const { locale } = useI18n();
@@ -898,6 +928,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       {kind === 'residential' && read(draft, ['dwelling', 'kind']) === 'apartment' &&
         <SelectField {...field} path={['dwelling', 'floor']} label={t('opname.dwelling.floor')}
           options={opts(t, 'opname.dwelling.floorKind', ['ground_or_intermediate', 'top', 'roof_and_floor'])} />}
+      {kind === 'utility' && <UtilityBuildingTypeFields draft={draft} change={change} t={t} />}
       {kind === 'utility' && <BuildingFunctionFields draft={draft} change={change} t={t} />}
       {kind === 'utility' && <>
         <NumberField {...field} path={['toiletStacks']} label={t('opname.toiletStacks')} step="1" />
@@ -1035,6 +1066,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           const insulation = read(draft, [...base, 'insulation', 'kind']);
           const thickness = read(draft, [...base, 'insulation', 'thicknessMm']);
           const orientation = read(draft, [...base, 'orientation']);
+          // A roof up to 5° is flat: no orientation (the kernel asks one only above 5°).
+          const oriented = element === 'facade' || (element === 'roof' && Number(read(draft, [...base, 'tiltDeg']) ?? 0) > 5);
           const ownWindows = windows.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
           const ownDoors = doors.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
           const ownRooflights = rooflights.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
@@ -1043,7 +1076,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           return <details key={index} className="opname-card" open>
             <summary className="opname-card-head">
               <strong>{names.get(id) ?? id}</strong>
-              {element !== 'floor' && typeof orientation === 'string' &&
+              {oriented && typeof orientation === 'string' &&
                 <span className="opname-tag">{t(`opname.orientationKind.${orientation}`)}</span>}
               {element === 'roof' && <span className="opname-tag">{formatNumber(Number(read(draft, [...base, 'tiltDeg']) ?? 0), locale, 0)}°</span>}
               {typeof insulation === 'string' && <span className="opname-tag">{insulation === 'thickness' && typeof thickness === 'number'
@@ -1056,9 +1089,10 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             <div className="nta-form-grid opname-card-body">
               {!embedded && <SelectField {...field} path={[...base, 'element']} label={t('opname.surface.element')}
                 options={opts(t, 'opname.surface.elementKind', ['facade', 'roof', 'floor'])} />}
-              {element !== 'floor' && <SelectField {...field} path={[...base, 'orientation']} label={t('opname.orientation')}
-                options={opts(t, 'opname.orientationKind', ORIENTATIONS)} />}
               {element === 'roof' && <NumberField {...field} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />}
+              {oriented && <SelectField {...field} path={[...base, 'orientation']} label={t('opname.orientation')}
+                options={opts(t, 'opname.orientationKind', ORIENTATIONS)} />}
+              {element === 'roof' && !oriented && <p className="nta-form-note nta-form-hint">{t('survey.flatRoofNoOrientation')}</p>}
               {element === 'floor' && <NumberField {...field} path={[...base, 'exposedPerimeterM']} label={t('opname.surface.perimeter')} />}
               <label>{t('opname.surface.boundary')}
                 <select value={String(read(draft, [...base, 'boundary', 'kind']) ?? '')}
@@ -1148,6 +1182,10 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       </>}
       {heatingRest && <>
       <EmitterFields draft={draft} change={change} t={t} />
+      {kind === 'utility' && <>
+        <CheckField {...field} path={['heatingInstallation', 'collective']} label={t('survey.heatingInstallation.collective')} />
+        <NumberField {...field} path={['heatingInstallation', 'capacityKw']} label={t('survey.heatingInstallation.capacity')} optional />
+      </>}
       <SelectField {...field} path={['heating', 'designClass']} label={t('opname.heating.designClass')}
         options={opts(t, 'opname.heating.designClassKind', DESIGN_CLASSES)} />
       {DESIGN_CLASSES_ABOVE_70.includes(String(read(draft, ['heating', 'designClass']))) &&

@@ -187,6 +187,7 @@ const MISSING_LABEL: Record<string, string> = {
   'construction.floor': 'survey.construction.floor', 'construction.wall': 'survey.construction.wall',
   'heating.generator': 'survey.q.verwarming.toestel', 'heating.emitters': 'opname.heating.emitters',
   'hotWater.generator': 'survey.q.warm-water.toestel', 'ventilation.principle': 'survey.ventilation.principle',
+  buildingType: 'survey.buildingType', functions: 'survey.functionsRequired',
 };
 
 /** What a notice is about: the field of a missing answer, or the surface, window, door or panel by its name. */

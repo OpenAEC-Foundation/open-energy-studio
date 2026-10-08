@@ -3,11 +3,20 @@ import { act, screen, waitFor } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { BasisopnamePanel } from '../components/BasisopnamePanel/BasisopnamePanel';
 import { renderWithProviders, userEvent } from './test-utils';
+import { useEffect } from 'react';
+import { surveyExample } from '../core/nta/SurveyTemplates';
 
 function Editor() {
   const { state } = useEnergy();
   return <><BasisopnamePanel />
     <output data-testid="survey">{JSON.stringify(state.project.basisopname ?? null)}</output></>;
+}
+
+/** The panel on the office example (the empty utility template has no surfaces). */
+function UtilityExampleEditor() {
+  const { dispatch } = useEnergy();
+  useEffect(() => { dispatch({ type: 'SET_BASISOPNAME', payload: surveyExample('utility') }); }, [dispatch]);
+  return <Editor />;
 }
 
 function stored() {
@@ -221,8 +230,8 @@ describe('basisopname panel', () => {
 
   it('adds a utility hot-water system with served areas and AHU coils', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Editor />);
-    await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
+    renderWithProviders(<UtilityExampleEditor />);
+    await screen.findByRole('button', { name: 'Add hot-water system' });
     await user.click(screen.getByRole('button', { name: 'Add hot-water system' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Served function' }), 'assembly_without_day_care');
     await user.click(screen.getByRole('checkbox', { name: 'Heating connected (reheating coil)' }));
@@ -337,8 +346,8 @@ describe('basisopname panel', () => {
 
   it('edits calculation zones and assigns surfaces and lighting zones (ISSO 75.1 §6.5)', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Editor />);
-    await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
+    renderWithProviders(<UtilityExampleEditor />);
+    await screen.findByRole('button', { name: 'Add hot-water system' });
     // No zone selector on surfaces while the building is one zone.
     expect(screen.queryAllByRole('combobox', { name: 'Calculation zone' })).toHaveLength(0);
 
