@@ -59,9 +59,17 @@ describe('NTA 8800 editions', () => {
     renderWithProviders(<NtaCalculationForm project={project} initial={{ normVersion: '2024' }}
       onSave={() => undefined} onCancel={() => undefined} />);
     const select = screen.getByLabelText('NTA 8800 edition') as HTMLSelectElement;
-    expect([...select.options].map((option) => option.value)).toEqual(['', '2025+C1', '2024', '2023', '2022', '2020+A1']);
+    // No empty choice: a block without an edition is calculated in the designated one.
+    expect([...select.options].map((option) => option.value)).toEqual(['2025+C1', '2024', '2023', '2022', '2020+A1']);
     expect(select.value).toBe('2024');
     expect(screen.getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
+  });
+
+  it('shows the designated edition for a block without an edition', () => {
+    renderWithProviders(<NtaCalculationForm project={createDefaultProject()} initial={{}}
+      onSave={() => undefined} onCancel={() => undefined} />);
+    expect((screen.getByLabelText('NTA 8800 edition') as HTMLSelectElement).value).toBe('2025+C1');
+    expect(screen.queryByText('Older edition: the result is for comparison only and cannot be registered.')).toBeNull();
   });
 
   it('shows the table 13.2 kitchen pipe diameter only for the 2023 edition', () => {

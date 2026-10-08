@@ -126,6 +126,18 @@ export function evidenceReference(id: string): string {
   return `${EVIDENCE_REFERENCE_PREFIX}${id}`;
 }
 
+/**
+ * A source text with the evidence id added: an empty text becomes the reference, a text that
+ * already names the id stays as it is, and any other text keeps its description with the
+ * reference after it (`tekening A-101; evidence:ev-2`), so attaching a file does not erase it.
+ */
+export function withEvidenceReference(value: unknown, id: string): string {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return evidenceReference(id);
+  if (evidenceIdsIn(text).includes(id)) return text;
+  return `${text}; ${evidenceReference(id)}`;
+}
+
 /** Every `…Reference` in the project that names an evidence id, as [pointer, id]. */
 export function referencesInProject(project: IProject): Array<{ pointer: string; id: string }> {
   const found: Array<{ pointer: string; id: string }> = [];

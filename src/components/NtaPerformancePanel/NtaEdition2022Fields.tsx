@@ -27,6 +27,19 @@ function Only2022({ draft, change, path, label, children }:
   </p>;
 }
 
+/**
+ * Table 7.10 of NTA 8800:2022 (p. 181): the mass class from the mass per m² usable floor area.
+ * Like the other 2022-only inputs it shows only under 2022 and 2020+A1; a value left behind
+ * under a later edition is offered for removal.
+ */
+export function ThermalMassPerM22022Field({ draft, change, path }: { draft: Draft; change: Change; path: Path }) {
+  const { t } = useI18n();
+  const label = t('ntaStep.massKgPerM2');
+  return <Only2022 draft={draft} change={change} path={path} label={label}>
+    <NumberField draft={draft} onChange={change} path={path} label={label} />
+  </Only2022>;
+}
+
 /** (8.47) of NTA 8800:2022 (p. 236): the real wall height h above ground level; required under 2022. */
 export function WallHeightAboveGround2022Field({ draft, change, path }: { draft: Draft; change: Change; path: Path }) {
   const { t } = useI18n();

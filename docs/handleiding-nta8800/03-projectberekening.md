@@ -2,8 +2,8 @@
 
 Een projectberekening (detailopname of nieuwbouw) bestaat uit twee lagen:
 
-1. **Het projectmodel**: zones, vlakken, ramen, constructies, koudebruggen, onverwarmde ruimten en installaties. Je bouwt het op in de projectboom en de envelopweergave.
-2. **Het NTA-invoerblok** (`ntaCalculation`): de NTA 8800-gegevens die het projectmodel nog niet heeft. Je vult het in met het formulier **NTA-invoer starten** / **NTA-invoer bewerken** in het paneel *NTA 8800-berekening (Rust-kern)*.
+1. **Het projectmodel**: zones, vlakken, ramen, constructies, koudebruggen, onverwarmde ruimten en installaties. Je bouwt het op onder de werkstappen *Gebouw* (tabel *Schil & ramen*, rekenzones, constructies, koudebruggen, luchtdichtheid, onverwarmde ruimten) en *Installaties*.
+2. **Het NTA-invoerblok** (`ntaCalculation`): de NTA 8800-gegevens die het projectmodel nog niet heeft. Je begint het met **NTA-invoer starten** op de stap Project. De secties staan daarna onder de werkstappen waar ze horen, in het blok *NTA 8800-invoer* onder aan elke pagina.
 
 Elke opgegeven waarde vraagt een bron, zoals een tekening, productblad, normtabel of opnamerapport. Een leeg veld wordt nooit stilzwijgend aangevuld. Het blijft een invoergat (zie [hoofdstuk 5](05-validatie.md)).
 
@@ -52,27 +52,27 @@ Het formulier vraagt alleen wat het projectmodel nog niet heeft. De secties staa
 | Algemeen | rekenscope (woningbouw of utiliteit), bouwjaar, bron A_g, gebruiksfunctie en woningtype, Bbl-functie, actieve koeling (systeem, capaciteitsbewijs of bijlage AA, zie [hieronder](#koelvermogen-volgens-bijlage-aa)), vergunningaanvraag na 29 mei 2026, fossiele toestellen buiten de berekening | tabellen 7.13–7.15, §5.7.1, bijlage AA |
 | Gebruiksfuncties met oppervlakte | functies voor gemengde rekenzones, Bbl-toets en labelklasse | §6.5.3, Bbl art. 4.149 lid 2 |
 | Setpoints (tabel 7.13) | verwarmings- en koelsetpoint; het formulier toetst per zone aan tabel 7.13 (gewogen bij meerdere functies), knop "Tabelwaarden gebruiken" | tabel 7.13 |
-| Thermische massa (tabel 7.10) | klasse vloer en wand, plafondkolom | tabellen 7.10–7.12 |
+| Thermische massa (tabel 7.10) | klasse vloer en wand, plafondkolom; alleen onder 2022 en 2020+A1 ook de massa per m² gebruiksoppervlakte (kg/m²) | tabellen 7.10–7.12 |
 | Interne warmtewinst | aantal woningen; bij utiliteit de tabelmethode of een opgegeven W/m² | 7.21–7.29, tabellen 7.2/7.3 |
 | Ramen (zonwinst) | kozijnfractie, belemmering, beweegbare zonwering (F_c, bediening) | §7.6, §17.3, 7.42/7.43 |
-| Belemmering per raam | per buitenraam "Zoals project" of een eigen situatie a–g of opgegeven factoren, met bron | 7.13, §17.3.2 |
+| Belemmering per raam (Gebouw › Schil & ramen) | per buitenraam "Zoals project" of een eigen situatie a–g of opgegeven factoren, met bron; een raam dat niet meer in het project staat, wordt gemeld met **Verwijderen** | 7.13, §17.3.2 |
 | Dynamische ramen (bijlage A) | per buitenraam methode A (toestanden met gewichten) of B, correctie stap 2 | bijlage A (p. 766–771) |
 | Aangrenzende onverwarmde serres (7.30b) | serre en de vlakken ervan | 7.30b |
 | Dakhellingen | helling per hellend dakvlak | tabel 17.2 |
-| Vloeren op grond (§8.3) | blootgestelde omtrek, R_si + R_c, vloerrand (ψ of forfait), kruipruimte of onverwarmde kelder, verwarmde kelder, randisolatie | §8.3, bijlage D |
+| Vloeren op grond (§8.3) | blootgestelde omtrek, R_si + R_c, vloerrand (ψ of forfait), kruipruimte of onverwarmde kelder, verwarmde kelder, randisolatie; onder 2022 en 2020+A1 bij een kruipruimte of kelder ook de wandhoogte h boven maaiveld (8.47) | §8.3, bijlage D |
 | Verticale leidingen (7.3.3) | "geen", een lijst, of onbekend (geeft een gat) | §7.3.3 |
 | Ventilatie | hoofdstuk 11 (systeem, WTW, kanalen, LBK, infiltratie, regelingen, passieve koeling), of "H_ve zelf opgeven" | hoofdstuk 11 |
 | Afgifte en distributie (§9.3/9.4) | afgiftesysteem, inregeling, regeling, ventilatoren in de afgifte, distributie berekend of forfaitair, luchtverwarmers | §9.3, §9.4, 9.21/9.22, 9.26–9.51 |
 | Opwekker | zie hieronder | §9.6 |
 | BCRG-verklaringstabel | losse controle van een BCRG-tabel; telt niet mee in de projectberekening | — |
 | Extra verwarmingssystemen (§9.2) | bij meerdere zones: systemen per zone | §9.2 |
-| Warm tapwater (§13) | functie en oppervlakte of aantal woningen, tappunten, leidingen, circulatie, voorraadvaten, toestel | hoofdstuk 13 |
+| Warm tapwater (§13) | functie en oppervlakte of aantal woningen, tappunten, leidingen, circulatie, voorraadvaten, toestel; onder 2022 en 2020+A1 ook "elektrische boiler met geïsoleerde leidingen" (f_sto;dis;ls) | hoofdstuk 13 |
 | Extra tapwatersystemen (§13.2.4) | meerdere systemen per gebouw | §13.2.4 |
 | Zonneboilers (§13.7) | berekend of getest systeem, PVT | §13.7 |
 | Zonneverwarming zonder tapwatersysteem | zonnecombi voor ruimteverwarming | §13.7 |
 | Koeling (§10.5) | opwekker (methode 1, 2 of 3), afgifte, distributie; bij meerdere zones meerdere koelsystemen | hoofdstuk 10 |
 | Bevochtiging (hoofdstuk 12) | per zone verneveling of stoom, eventueel bediend oppervlak | hoofdstuk 12 |
-| Verlichting (hoofdstuk 14), alleen utiliteit | per verlichtingszone vermogen (forfait of armaturen), schakeling, daglicht, parasitair vermogen | hoofdstuk 14 |
+| Verlichting (hoofdstuk 14), alleen utiliteit | per verlichtingszone vermogen (forfait of armaturen), schakeling, daglicht, parasitair vermogen; onder 2022 en 2020+A1 ook constante-lichtregeling (tabel 14.4) | hoofdstuk 14 |
 | PV (§16) | piekvermogen, belemmering per systeem | hoofdstuk 16, §17.3 |
 | Bevestigingen | f_BACS met bron, BACS-blok, externe levering (bijlage P), alle posten en opwekking opgenomen, opgegeven stromen, C1-ventilatie, opslag | §5.5, §5.8, 5.14a, bijlage P |
 
@@ -95,6 +95,10 @@ Het formulier kent deze opwekkers:
 - **Meerdere opwekkers** (9.6.1), met voorkeursvolgorde en geschatte β.
 
 Een warmtepomp volgens bijlage Q in een set bepaalt boven 55 °C zelf zijn aandeel (§9.6.3).
+
+Onder de uitgave 2020+A1 vraagt de forfaitaire (of hybride) warmtepomp ook het **installatiejaar** met bron. Formule 9.85 van die uitgave neemt A = 13,0 kWh voor een toestel vanaf 2015 en 87,6 kWh voor een ouder of onbekend toestel. Onder de latere uitgaven heeft het jaar geen invloed en is het veld verborgen.
+
+**Invoer die alleen in een uitgave bestaat.** Velden die een andere uitgave niet kent, staan alleen onder die uitgave in het formulier. Kies je een andere uitgave terwijl zo'n veld een waarde heeft, dan toont het formulier een melding met **Verwijderen**; de rekenkern weigert de waarde anders met `route_not_in_edition`. Zie [Normversies](10-normversies.md).
 
 ### Externe levering (bijlage P)
 

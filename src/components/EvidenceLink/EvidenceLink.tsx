@@ -15,7 +15,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import type { NtaEvidenceItem } from '../../core/nta/KernelClient';
 import { createEvidenceItem, loadEvidenceBytes } from '../../core/nta/Evidence';
 import {
-  evidenceForPointer, evidenceIdsIn, evidenceReference, isImageFile, linkEvidence, stablePointer, unlinkEvidence,
+  evidenceForPointer, evidenceIdsIn, isImageFile, linkEvidence, stablePointer, unlinkEvidence, withEvidenceReference,
 } from '../../core/nta/EvidenceLinks';
 import { FileButton } from '../ui';
 import './EvidenceLink.css';
@@ -173,7 +173,7 @@ export function EvidenceReferencePicker({ path, value, onChange }: {
     try {
       const added = await addFiles(files, evidence, false);
       setEvidence([...evidence, ...added]);
-      if (added[0]) onChange(evidenceReference(added[0].id));
+      if (added[0]) onChange(withEvidenceReference(value, added[0].id));
     } finally {
       setBusy(false);
     }
@@ -188,7 +188,7 @@ export function EvidenceReferencePicker({ path, value, onChange }: {
         </span>;
       })}
       <LinkExisting options={evidence.filter((item) => !ids.includes(item.id))} label={label}
-        onLink={(id) => onChange(evidenceReference(id))} />
+        onLink={(id) => onChange(withEvidenceReference(value, id))} />
       <FileButton label={t('evidenceLink.add')} status={busy ? t('evidenceLink.busy') : ''} accept="application/pdf,image/*"
         disabled={busy} aria-label={`${t('evidenceLink.add')}: ${path}`}
         onChange={(event) => {

@@ -3,7 +3,7 @@
 ## Versie en reproduceerbaarheid
 
 Elke berekening draagt drie gegevens:
-- **Normversie** (`targetNormVersion`): NTA 8800:2025+C1:2026.
+- **Normversie** (`targetNormVersion`): de uitgave waarin is gerekend. Standaard is dat NTA 8800:2025+C1:2026; een project kan ook in 2024, 2023, 2022 of 2020+A1 rekenen (zie [Normversies](10-normversies.md)). Een uitkomst in een oudere uitgave heeft de status `calculated_legacy_edition` en is niet registreerbaar.
 - **Kernversie** (`kernelVersion`): de versie van de rekenkern (`KERNEL_VERSION`, gelijk aan de crateversie van `nta8800-core`).
 - **Invoervingerafdruk** (`inputFingerprint`): een hash van de projectinvoer. Het maatwerkadvies en de bewaarde basisopname tellen niet mee, omdat ze de energieprestatie van het project niet veranderen.
 
@@ -30,6 +30,8 @@ Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, st
 | [nta8800-attestdossier.md](../nta8800-attestdossier.md) | eisen uit BRL 9501, BRL 9500, het Bbl en de Omgevingsregeling en de status per eis |
 | [nta8800-versiebeheer.md](../nta8800-versiebeheer.md) | versiebeleid volgens BRL 9501 §4.3: versienummers, uitwisselbaarheid, RVO-registratie en bewaartermijnen |
 | [nta8800-releasenotes.md](../nta8800-releasenotes.md) | wijzigingen per datum |
+| [nta8800-normversies.md](../nta8800-normversies.md) | de uitgaven van NTA 8800 in de kern, met elk schakelpunt en zijn paginaverwijzing |
+| [nta8800-vergelijking-openbare-rapporten.md](../nta8800-vergelijking-openbare-rapporten.md) | vergelijking met openbare BENG-rapporten per uitgave |
 | [nta8800-werkinstructie.md](../nta8800-werkinstructie.md) | korte werkinstructie voor de projectberekening |
 | [nta8800-energieprestatie-keten.md](../nta8800-energieprestatie-keten.md) | de rekenketen van hoofdstuk 5, 9, 10, 13, 14 en 16 |
 | [nta8800-maandbehoefte.md](../nta8800-maandbehoefte.md) | hoofdstuk 7 en de maandbehoefte |
@@ -43,7 +45,7 @@ Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, st
 ## Bronnen
 
 De rekenkern is gebouwd op gelicentieerde bronnen:
-- NTA 8800:2025+C1:2026;
+- NTA 8800:2025+C1:2026, en voor de oudere uitgaven NTA 8800:2024, 2023, 2022 en 2020+A1;
 - ISSO 82.1 (7e druk, met erratum), ISSO 75.1 (7e druk), ISSO 82.2 en ISSO 75.2 (3e druk);
 - BRL 9500-W en BRL 9500-U van 29 mei 2026 (aangewezen; tekst en paginering gelijk aan de versie van 14 oktober 2025), BRL 9500-MWA-W/U van 24 maart 2026 (in werking per 29 mei 2026) en BRL 9501 van 29 mei 2026; paginaverwijzingen gelden voor deze versies;
 - het Besluit bouwwerken leefomgeving (art. 4.149 en 6.29) en de Omgevingsregeling (art. 5.11–5.14, bijlagen IX–Xa); het Besluit en de Regeling energieprestatie gebouwen zijn per 1 januari 2024 ingetrokken;

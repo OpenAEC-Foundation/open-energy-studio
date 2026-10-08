@@ -8,7 +8,7 @@ import type { IProject } from '../core/energy/types';
 import type { BuildingPerformanceInput, NtaEvidenceItem, OpnameAssessment } from '../core/nta/KernelClient';
 import { clearSessionEvidence, rememberEvidenceBytes, sha256Hex } from '../core/nta/Evidence';
 import {
-  danglingEvidenceReferences, evidenceIdsIn, evidenceUsage, jsonPointer, linkEvidence, pointerToPath, unlinkEvidence,
+  danglingEvidenceReferences, evidenceIdsIn, evidenceUsage, jsonPointer, linkEvidence, pointerToPath, unlinkEvidence, withEvidenceReference,
 } from '../core/nta/EvidenceLinks';
 import { canTakeOver, surveyTakeover } from '../core/nta/SurveyTakeover';
 import { buildProjectDossier } from '../core/report/ProjectDossier';
@@ -74,6 +74,14 @@ describe('evidence links', () => {
     expect(usage.get('ev-1')).toEqual(['/ntaCalculation/generator/sourceReference', '/zones/0/surfaces/2']);
     expect(usage.get('ev-2')).toBeUndefined();
     expect(danglingEvidenceReferences(p)).toEqual([{ pointer: '/ntaCalculation/bacsSourceReference', id: 'ev-9' }]);
+  });
+
+  it('adds an evidence reference to a source text without erasing its description', () => {
+    expect(withEvidenceReference('', 'ev-1')).toBe('evidence:ev-1');
+    expect(withEvidenceReference(undefined, 'ev-1')).toBe('evidence:ev-1');
+    expect(withEvidenceReference('tekening A-101, gevel noord ', 'ev-2')).toBe('tekening A-101, gevel noord; evidence:ev-2');
+    expect(withEvidenceReference('tekening A-101; evidence:ev-2', 'ev-2')).toBe('tekening A-101; evidence:ev-2');
+    expect(evidenceIdsIn(withEvidenceReference('evidence:ev-1', 'ev-3'))).toEqual(['ev-1', 'ev-3']);
   });
 
   it('links and unlinks a pointer without duplicates', () => {

@@ -7,7 +7,7 @@
  * order; the step pages render the entries of their own page. Fields and paths
  * are unchanged.
  */
-import { hasEdition2022Routes } from './NtaEdition2022Fields';
+import { ThermalMassPerM22022Field } from './NtaEdition2022Fields';
 import type { ComponentType } from 'react';
 import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS } from '../../core/nta/KernelClient';
 import type { IProject } from '../../core/energy/types';
@@ -279,7 +279,7 @@ function GeneralSection(props: NtaSectionProps) {
   const { draft } = props;
   const f = fieldOf(props);
   return <>
-    <SelectField {...f} path={['normVersion']} label={t('nta.form.normVersion')}
+    <SelectField {...f} path={['normVersion']} label={t('nta.form.normVersion')} fallback={DEFAULT_NORM_VERSION}
       options={IMPLEMENTED_NORM_VERSIONS.map((edition) => [edition, t(`nta.edition.${edition}`)])} />
     {read(draft, ['normVersion']) != null && read(draft, ['normVersion']) !== DEFAULT_NORM_VERSION
       && <p className="nta-form-note" role="note">{t('nta.form.normVersionLegacy')}</p>}
@@ -419,9 +419,7 @@ function MassSection(props: NtaSectionProps) {
       label={t(`nta.form.mass.${part}`)} options={[['light', t('nta.form.mass.light')], ['heavy', t('nta.form.mass.heavy')], ['very_heavy', t('nta.form.mass.veryHeavy')]]} />)}
     <SelectField {...f} path={['thermalMass', 'ceiling']} label={t('nta.form.mass.ceiling')}
       options={[['open_or_none', t('nta.form.mass.open')], ['closed_or_suspended', t('nta.form.mass.closed')]]} />
-    {hasEdition2022Routes(props.draft) || read(props.draft, ['thermalMass', 'massKgPerM2']) != null
-      ? <NumberField {...f} path={['thermalMass', 'massKgPerM2']} label={t('ntaStep.massKgPerM2')} />
-      : null}
+    <ThermalMassPerM22022Field draft={props.draft} change={props.change} path={['thermalMass', 'massKgPerM2']} />
     <TextField {...f} path={['thermalMass', 'sourceReference']} label={t('nta.form.source')} />
   </>;
 }

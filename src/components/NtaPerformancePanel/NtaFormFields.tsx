@@ -74,9 +74,15 @@ export function TextField({ draft, path, label, onChange }: FieldProps) {
   </label>;
 }
 
-export function SelectField({ draft, path, label, onChange, options, disabled = false }:
-  FieldProps & { options: Array<[string, string]>; disabled?: boolean }) {
-  const value = read(draft, path);
+/**
+ * A choice from `options`. With `fallback`, an absent value shows the option the kernel applies
+ * when the field is left out (for example the designated edition) instead of "—", and there is
+ * no empty option.
+ */
+export function SelectField({ draft, path, label, onChange, options, disabled = false, fallback }:
+  FieldProps & { options: Array<[string, string]>; disabled?: boolean; fallback?: string }) {
+  const stored = read(draft, path);
+  const value = stored ?? fallback;
   const kernelPath = useFieldPath(path);
   const selected = options.find(([key]) => key === String(value))?.[1];
   // Long option texts get two grid columns, and the full text as tooltip, so they are not cut off.
@@ -84,7 +90,7 @@ export function SelectField({ draft, path, label, onChange, options, disabled = 
   return <label className={wide ? 'nta-form-wide' : undefined} data-path={kernelPath ?? undefined}>{label}
     <select value={value == null ? '' : String(value)} title={selected} disabled={disabled}
       onChange={(event) => onChange(path, event.target.value || null)}>
-      <option value="">—</option>
+      {fallback == null && <option value="">—</option>}
       {options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}
     </select>
   </label>;
