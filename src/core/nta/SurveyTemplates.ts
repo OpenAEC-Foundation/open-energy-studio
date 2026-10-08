@@ -15,6 +15,8 @@ export interface StoredSurvey {
   survey: Record<string, unknown>;
   /** Question-flow progress (src/core/survey/surveyFlow.ts); never sent to the kernel. */
   progress?: { done?: string[]; skipped?: string[] };
+  /** Date of the site visit (yyyy-mm-dd); app data beside the survey, not sent to the kernel. */
+  surveyDate?: string;
 }
 
 /** An empty dwelling survey: only the answers that are "unknown" by default (ISSO 82.1 defaults apply). */

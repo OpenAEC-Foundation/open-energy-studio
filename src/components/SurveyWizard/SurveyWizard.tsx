@@ -574,17 +574,37 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
       {step.special === 'label' && <>
         <h1>{t('survey.label.title')}</h1>
         <p className="survey-lead">{t('survey.label.lead')}</p>
-        <section className="survey-card survey-outcome">
-          {result?.performance?.indicativeLabelClass
-            ? <span className="survey-label survey-label--big" style={{ background: labelColor(result.performance.indicativeLabelClass) }}>
-              {result.performance.indicativeLabelClass}</span>
-            : <span className="survey-muted">{t('survey.result.none')}</span>}
-          <p>{t('survey.label.status')}</p>
+        <section className="survey-card survey-final">
+          <div className="survey-final-top">
+            {result?.performance?.indicativeLabelClass
+              ? <span className="survey-label survey-label--big" style={{ background: labelColor(result.performance.indicativeLabelClass) }}>
+                {result.performance.indicativeLabelClass}</span>
+              : <span className="survey-muted">{t('survey.result.none')}</span>}
+            <dl className="survey-indicators survey-indicators--units">
+              <div><dt>{t('survey.result.ep2')}</dt><dd>{formatNumber(result?.performance?.primaryFossilIndicatorKwhPerM2Year, locale, 1)} <small>kWh/m²</small></dd></div>
+              <div><dt>{t('survey.final.beng1')}</dt><dd>{formatNumber(result?.performance?.needIndicatorKwhPerM2Year, locale, 1)} <small>kWh/m²</small></dd></div>
+              <div><dt>{t('survey.final.beng3')}</dt><dd>{formatNumber(result?.performance?.renewableSharePercent, locale, 1)} <small>%</small></dd></div>
+              <div><dt>TOjuli</dt><dd>{formatNumber(result?.performance?.tojuliMaxK, locale, 2)} <small>K</small></dd></div>
+            </dl>
+          </div>
+          <p className="survey-final-status">{t('survey.final.status')}</p>
         </section>
-        <div className="survey-next-actions">
-          <button type="button" className="btn" onClick={() => navigate({ step: 'advice' })}>{t('survey.label.advice')}</button>
-          <button type="button" className="btn" onClick={() => navigate({ step: 'report' })}>{t('survey.label.report')}</button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate({ step: 'registration' })}>{t('survey.label.registration')}</button>
+        <div className="survey-final-actions">
+          <section className="survey-card">
+            <h2>{t('survey.label.report')}</h2>
+            <p className="survey-muted">{t('survey.final.reportHint')}</p>
+            <button type="button" className="btn btn-primary" onClick={() => navigate({ step: 'report' })}>{t('survey.final.report')}</button>
+          </section>
+          <section className="survey-card">
+            <h2>{t('survey.label.advice')}</h2>
+            <p className="survey-muted">{t('survey.final.adviceHint')}</p>
+            <button type="button" className="btn" onClick={() => navigate({ step: 'advice' })}>{t('survey.final.advice')}</button>
+          </section>
+          <section className="survey-card">
+            <h2>{t('survey.label.registration')}</h2>
+            <p className="survey-muted">{t('survey.final.registrationHint')}</p>
+            <button type="button" className="btn" onClick={() => navigate({ step: 'registration' })}>{t('survey.final.registration')}</button>
+          </section>
         </div>
       </>}
 
@@ -608,6 +628,24 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
     </div>
 
     <aside className="survey-aside" aria-label={t('survey.aside')}>
+      {step.special === 'label' ? <>
+        <div className="survey-card">
+          <span className="survey-overline">{t('survey.final.survey')}</span>
+          <p className="survey-final-facts">{[
+            typeof draft.id === 'string' && draft.id.trim() ? draft.id : null,
+            stored.surveyDate ? t('survey.final.date', { date: new Date(stored.surveyDate).toLocaleDateString(locale) }) : t('survey.final.noDate'),
+            typeof draft.sourceReference === 'string' && draft.sourceReference.trim() ? t('survey.final.source', { source: draft.sourceReference }) : null,
+          ].filter(Boolean).map((line, index) => <span key={index}>{line}<br /></span>)}</p>
+        </div>
+        <div className="survey-card">
+          <span className="survey-overline">{t('survey.final.dossier')}</span>
+          <p className="survey-final-facts">
+            {open.length === 0 ? <span className="survey-done">✓ {t('survey.final.allAnswered')}</span> : t('survey.final.openSteps', { count: open.length })}<br />
+            {t('survey.check.stepDefaults', { count: result?.appliedDefaults.length ?? 0 })}<br />
+            {result && result.issues.length > 0 ? t('survey.result.issues', { count: result.issues.length }) : t('survey.final.noIssues')}
+          </p>
+        </div>
+      </> : <>
       <ResultCard result={result} busy={assessment.busy} error={assessment.error} t={t} locale={locale}
         onIssues={step.special === 'check' ? undefined : () => goToStep('controle')} />
       <div className="survey-card">
@@ -625,6 +663,7 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
         </ul>}
       </div>
       <p className="survey-defaults-note">{t('survey.defaultsNote')}</p>
+      </>}
     </aside>
   </div>;
 }

@@ -186,3 +186,12 @@
 .survey-step-defaults[open] summary { color: var(--fg-1); }
 .survey-step-defaults ul { margin: 6px 0 0; padding-left: 18px; color: var(--fg-2); line-height: 1.6; }
 .survey-defaults-none { margin: 0; border-top: 1px solid var(--line-subtle); padding-top: 6px; font-size: var(--fs-sm); color: #6EE7A0; }
+
+.survey-final { display: flex; flex-direction: column; gap: var(--space-3); }
+.survey-final-top { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+.survey-final-top .survey-indicators { flex: 1 1 380px; }
+.survey-indicators--units dd small { font-family: var(--font-ui); font-size: var(--fs-xs); color: var(--fg-3); }
+.survey-final-status { margin: 0; padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-selected); border: 1px solid rgba(245, 158, 11, .35); color: #FCD9A0; font-size: var(--fs-sm); }
+.survey-final-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.survey-final-actions .survey-card .btn { margin-top: auto; align-self: flex-start; }
+.survey-final-facts { margin: 0; font-size: var(--fs-sm); line-height: 1.7; color: var(--fg-1); }

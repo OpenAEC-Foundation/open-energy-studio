@@ -772,8 +772,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
 
   const save = (next: StoredSurvey | undefined, keepResult = false) => {
     // The question-flow progress lives beside the survey; an edit here must not drop it.
-    const progress = (stored as { progress?: unknown } | undefined)?.progress;
-    dispatch({ type: 'SET_BASISOPNAME', payload: next && progress && !('progress' in next) ? { ...next, progress } as StoredSurvey : next });
+    dispatch({ type: 'SET_BASISOPNAME', payload: next && stored ? { ...stored, ...next } : next });
     if (!keepResult) {
       requestId.current += 1;
       setResult(null);
@@ -885,6 +884,10 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     <div className="nta-form">
     {show('general') && <><Section title={t('opname.general')}>
       <TextField {...field} path={['id']} label={t('opname.id')} />
+      <label>{t('survey.surveyDate')}
+        <input type="date" value={stored.surveyDate ?? ''}
+          onChange={(event) => dispatch({ type: 'SET_BASISOPNAME', payload: { ...stored, surveyDate: event.target.value || undefined } })} />
+      </label>
       <NumberField {...field} path={['constructionYear']} label={t('opname.constructionYear')} step="1" />
       <TextField {...field} path={['sourceReference']} label={t('survey.sourceReference')} />
       <p className="nta-form-note nta-form-hint">{t('survey.sourceReference.hint')}</p>

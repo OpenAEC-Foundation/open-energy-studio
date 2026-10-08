@@ -366,6 +366,8 @@ export interface IProject {
     survey: Record<string, unknown>;
     /** Question-flow progress (answered and skipped questions); never sent to the kernel. */
     progress?: { done?: string[]; skipped?: string[] };
+    /** Date of the site visit (yyyy-mm-dd); not sent to the kernel. */
+    surveyDate?: string;
   };
 }
 
