@@ -1663,6 +1663,118 @@ CASES += [
 ]
 
 
+# --- EP-W406d/e/f/m/n/u/v: further hot-water generators (p. 37-40) ---
+# Exhaust-air heat pumps: system C1, no maximum use of the ventilation
+# capacity, Luka C, forfait DC fans of 2021 (the reference fans), 2 kW.
+EXHAUST_C1 = [unit("c1", "luka_a_b_c"), NO_PASSIVE]
+# 13.144a f_combi: 1 in October-March when the heat pump also heats.
+HEATING_MONTHS = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+
+
+def exhaust_hot_water(also_heating):
+    body = {"kind": "heat_pump", "exhaustAirSource": True}
+    patch = [hw_generator(body), setp(f"{HW}/nominalPowerKw", 2.0)]
+    exhaust = {"ventilationSuitable": True}
+    if also_heating:
+        exhaust["heatingTimeFraction"] = HEATING_MONTHS
+    patch.append(setp(f"{HW}/exhaustAir", exhaust))
+    return patch
+
+
+def bathroom_emission(length):
+    return {"method": "residential", "served": "bathroom_only", "bathroomLengthM": length, "sourceReference": f"uittapleiding badkamer {length} m volgens de deeltest"}
+
+
+CASES += [
+    ("EPW406d", 37, EXHAUST_C1 + exhaust_hot_water(False)),
+    # EP-W406e: solid-biomass combi appliance with a vessel meeting annex R, at
+    # least 10 mm insulation, outside the heated zone; heating by an automatic
+    # biomass boiler outside the zone, 5 kW (p. 37; table 13.22).
+    (
+        "EPW406e",
+        37,
+        [
+            hw_generator({"kind": "biomass_combi", "insulation": "at_least10_mm", "insideBoundary": False}),
+            biomass("EP-W406e", "central_boiler", "outside_thermal_boundary", True, automatic=True, power=5.0),
+            CALCULATED_PUMP,
+        ],
+    ),
+    # EP-W406f: external heat for hot water, one delivery set (p. 37).
+    (
+        "EPW406f",
+        37,
+        [
+            hw_generator({"kind": "external_heat"}),
+            setp(f"{HW}/deliverySets", {"count": 1, "sourceReference": "ISSO 54 v2.0 EP-W406f p. 37: 1 afleverset"}),
+        ],
+    ),
+    # EP-W406m: kitchen electric boiler 20 l label D, uninsulated hot pipe
+    # (f_sto;dis;ls 2, 2022 p. 550), 0-2 m (2 m), > 10 mm; bathroom HR combi
+    # CW4 at 5 m (p. 38; 13.19a).
+    (
+        "EPW406m",
+        38,
+        [
+            setp(f"{HW}/emission", bathroom_emission(5.0)),
+            setp(f"{HW}/connectedTaps", {"bathrooms": 1, "kitchens": 0}),
+            setp(
+                f"{NTA}/additionalHotWaterSystems",
+                [
+                    {
+                        "need": {"method": "residential", "dwellingCount": 1, "sourceReference": "een woning"},
+                        "emission": {"method": "residential", "served": "kitchen_only", "kitchenLengthM": 2.0, "kitchenPipeDiameter": "other", "sourceReference": "ISSO 54 v2.0 EP-W406m p. 38: keuken 0-2 m, > 10 mm"},
+                        "storage": [vessel(20.0, {"method": "label", "label": "d"}, 2, True)],
+                        "generator": {"kind": "electric_boiler"},
+                        "connectedTaps": {"bathrooms": 0, "kitchens": 1},
+                        "equipmentReference": "ISSO 54 v2.0 EP-W406m p. 38: elektroboiler 20 l, label D, warmwaterleiding niet geisoleerd",
+                    }
+                ],
+            ),
+        ],
+    ),
+    # EP-W406n: a second installation for a second bathroom: a closed gas
+    # water heater with Gaskeur and CW4 at 3 m (p. 38). Installation 1 is
+    # the reference (kitchen and bathroom 1).
+    (
+        "EPW406n",
+        38,
+        [
+            setp(f"{HW}/connectedTaps", {"bathrooms": 1, "kitchens": 1}),
+            setp(
+                f"{NTA}/additionalHotWaterSystems",
+                [
+                    {
+                        "need": {"method": "residential", "dwellingCount": 1, "sourceReference": "een woning"},
+                        "emission": bathroom_emission(3.0),
+                        "generator": {"kind": "gas_appliance", "appliance": "water_heater_gaskeur_cw", "measuredClass": "class4"},
+                        "connectedTaps": {"bathrooms": 1, "kitchens": 0},
+                        "equipmentReference": "ISSO 54 v2.0 EP-W406n p. 38: gesloten gastoestel met Gaskeur, CW4",
+                    }
+                ],
+            ),
+        ],
+    ),
+    # EP-W406u: as EP-W406d with construction year 1900 (infiltration); the
+    # heating pipes stay insulated after 1995, the fans stay of 2021 (p. 39).
+    (
+        "EPW406u",
+        39,
+        EXHAUST_C1
+        + exhaust_hot_water(False)
+        + [setp(f"{NTA}/constructionYear", 1900), setp(f"{VENT}/constructionYear", 1900)],
+    ),
+    # EP-W406v: exhaust-air heat pump for heating (not table 9.28) and hot
+    # water, 2 kW (p. 39). The heating supply stays 45 C (45/40).
+    (
+        "EPW406v",
+        39,
+        EXHAUST_C1
+        + exhaust_hot_water(True)
+        + [heat_pump("EP-W406v", "exhaust_air", 45.0), renewable("EP-W406v", True, exhaust=True)],
+    ),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
