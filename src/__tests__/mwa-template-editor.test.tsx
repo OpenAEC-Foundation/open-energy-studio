@@ -27,13 +27,13 @@ describe('maatwerkadvies measure templates in the panel', () => {
     await user.click(await screen.findByRole('button', { name: 'Start tailored advice' }));
     await user.click(screen.getByRole('button', { name: 'Add measure' }));
     // A new measure starts as insulation and says what it still needs.
-    expect(screen.getByRole('combobox', { name: 'Measure type' })).toHaveValue('insulation');
+    expect(screen.getByLabelText('Measure type')).toHaveValue('insulation');
     expect(screen.getByTestId('mwa-template-problems-m1')).toHaveTextContent('Enter the new value.');
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Building part' }), 'facade');
-    await user.type(screen.getByRole('textbox', { name: 'New Rc, m²·K/W' }), '6');
-    await user.click(screen.getByRole('checkbox', { name: 'Woning — Gevel N' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Woning — Gevel S' }));
+    await user.selectOptions(screen.getByLabelText('Building part'), 'facade');
+    await user.type(screen.getByLabelText('New Rc, m²·K/W'), '6');
+    await user.click(screen.getByLabelText('Woning — Gevel N'));
+    await user.click(screen.getByLabelText('Woning — Gevel S'));
     expect(screen.queryByTestId('mwa-template-problems-m1')).toBeNull();
     let measure = stored().measures[0];
     expect(measure.category).toBe('insulation');
@@ -46,20 +46,20 @@ describe('maatwerkadvies measure templates in the panel', () => {
     expect(screen.getByTestId('mwa-template-preview-m1')).toHaveTextContent('/zones/0/surfaces/1/constructionId');
 
     // Another template replaces the patch; "manual" keeps it as editable rows.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Measure type' }), 'airtightness');
+    await user.selectOptions(screen.getByLabelText('Measure type'), 'airtightness');
     measure = stored().measures[0];
     expect(measure.category).toBe('airtightness');
     expect(measure.patch).toEqual([]);
-    await user.type(screen.getByRole('textbox', { name: 'Target qv10, dm³/(s·m²)' }), '0,25');
-    await user.type(screen.getAllByRole('textbox', { name: 'Source / justification' }).slice(-1)[0], 'blowerdoortest');
+    await user.type(screen.getByLabelText('Target qv10, dm³/(s·m²)'), '0,25');
+    await user.type(screen.getAllByLabelText('Source / justification').slice(-1)[0], 'blowerdoortest');
     measure = stored().measures[0];
     expect(measure.patch[0]).toEqual({ op: 'replace', path: '/ntaCalculation/ventilation/infiltration',
       value: { method: 'measured', qv10DmPerSM2: 0.25, sourceReference: 'blowerdoortest' } });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Measure type' }), 'manual');
+    await user.selectOptions(screen.getByLabelText('Measure type'), 'manual');
     measure = stored().measures[0];
     expect(measure.template).toBeNull();
     expect(measure.patch).toHaveLength(2);
-    expect(screen.getAllByRole('textbox', { name: 'Path (JSON pointer)' })[0]).toHaveValue('/ntaCalculation/ventilation/infiltration');
+    expect(screen.getAllByLabelText('Path (JSON pointer)')[0]).toHaveValue('/ntaCalculation/ventilation/infiltration');
   }, 60000);
 
   it('renders every template with the NTA form fields', async () => {
@@ -67,12 +67,12 @@ describe('maatwerkadvies measure templates in the panel', () => {
     renderWithProviders(<Editor />);
     await user.click(await screen.findByRole('button', { name: 'Start tailored advice' }));
     await user.click(screen.getByRole('button', { name: 'Add measure' }));
-    const kind = () => screen.getByRole('combobox', { name: 'Measure type' });
+    const kind = () => screen.getByLabelText('Measure type');
     await user.selectOptions(kind(), 'ventilation');
-    expect(screen.getByRole('combobox', { name: /variant/i })).toHaveValue('d2');
+    expect(screen.getByLabelText(/variant/i)).toHaveValue('d2');
     expect(stored().measures[0].patch.map((operation: { path: string }) => operation.path)).toEqual(['/ntaCalculation/ventilation/system']);
     await user.selectOptions(kind(), 'heat_pump');
-    expect(screen.getByRole('combobox', { name: 'Source' })).toHaveValue('outdoor_air');
+    expect(screen.getByLabelText('Source')).toHaveValue('outdoor_air');
     expect(screen.getByTestId('mwa-template-problems-m1')).toHaveTextContent('Enter the source.');
     await user.selectOptions(kind(), 'hot_water');
     expect(stored().measures[0].patch).toEqual([{ op: 'replace', path: '/ntaCalculation/hotWater/generator',

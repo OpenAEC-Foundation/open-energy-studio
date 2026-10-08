@@ -113,27 +113,27 @@ describe('annex AA form', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add annex AA calculation' }));
     const form = within(screen.getByTestId('nta-annex-aa'));
-    await user.clear(form.getByRole('spinbutton', { name: /Construction year/ }));
-    await user.type(form.getByRole('spinbutton', { name: /Construction year/ }), '2008');
+    await user.clear(form.getByLabelText(/Construction year/));
+    await user.type(form.getByLabelText(/Construction year/), '2008');
     await user.click(form.getByLabelText('More than 50 % of A_in demonstrably post-insulated'));
 
     const living = within(form.getByRole('group', { name: 'Room woonkamer' }));
-    await user.type(living.getByRole('spinbutton', { name: /Floor area/ }), '32,5');
-    await user.type(living.getByRole('spinbutton', { name: /Opaque outer area/ }), '14');
-    await user.type(living.getByRole('spinbutton', { name: /Installed cooling capacity/ }), '3');
+    await user.type(living.getByLabelText(/Floor area/), '32,5');
+    await user.type(living.getByLabelText(/Opaque outer area/), '14');
+    await user.type(living.getByLabelText(/Installed cooling capacity/), '3');
     await user.click(living.getByRole('button', { name: 'Add window' }));
-    await user.type(living.getByRole('spinbutton', { name: /U_w\+shut/ }), '1,2');
+    await user.type(living.getByLabelText(/U_w\+shut/), '1,2');
 
     // A second room: duplicate the first (windows are not copied), rename it, give it the west window.
     await user.click(living.getByRole('button', { name: 'Duplicate' }));
     const copy = within(form.getByRole('group', { name: 'Room woonkamer-2' }));
-    expect(copy.queryByRole('combobox', { name: 'Window' })).toBeNull();
-    await user.clear(copy.getByRole('textbox', { name: 'Name / id' }));
-    await user.type(copy.getByRole('textbox', { name: 'Name / id' }), 'slaapkamer');
+    expect(copy.queryByLabelText('Window')).toBeNull();
+    await user.clear(copy.getByLabelText('Name / id'));
+    await user.type(copy.getByLabelText('Name / id'), 'slaapkamer');
     const bedroom = within(form.getByRole('group', { name: 'Room slaapkamer' }));
     await user.click(bedroom.getByLabelText('Living room, kitchen or dining room (double internal load)'));
     await user.click(bedroom.getByRole('button', { name: 'Add window' }));
-    expect(bedroom.getByRole('combobox', { name: 'Window' })).toHaveValue('w-west');
+    expect(bedroom.getByLabelText('Window')).toHaveValue('w-west');
     // Both windows are assigned now.
     expect(bedroom.getByText('Every project window is already assigned to a room.')).toBeInTheDocument();
 
@@ -167,7 +167,7 @@ describe('annex AA form', () => {
     const form = within(screen.getByTestId('nta-annex-aa'));
     const alerts = form.getAllByRole('alert').map((alert) => alert.getAttribute('data-code'));
     expect(alerts).toEqual(['annex_aa_area_invalid', 'annex_aa_window_unknown']);
-    expect(form.getByRole('combobox', { name: 'Window' })).toHaveDisplayValue('oud-raam (not in the project)');
+    expect(form.getByLabelText('Window')).toHaveDisplayValue('oud-raam (not in the project)');
   });
 
   it('applies edited JSON and refuses invalid JSON', async () => {
@@ -177,7 +177,7 @@ describe('annex AA form', () => {
       onSave={(next) => { saved = next; }} onCancel={() => undefined} />);
     const form = within(screen.getByTestId('nta-annex-aa'));
     await user.click(form.getByRole('button', { name: 'View JSON' }));
-    const area = form.getByRole('textbox', { name: 'Annex AA as JSON (advanced)' });
+    const area = form.getByLabelText('Annex AA as JSON (advanced)');
     await user.clear(area);
     await user.click(area);
     await user.paste('{ "constructionYear": 1960');

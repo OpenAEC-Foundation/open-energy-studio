@@ -54,30 +54,28 @@ describe('NTA project input forms', () => {
   it('edits a calculated annex P heat supply with two generators', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}} body={(draft, change) => <ExternalSupplyFields draft={draft} change={change} />} />);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'External heat for space heating (dh)' }), 'calculated');
-    await user.type(screen.getByRole('spinbutton', { name: 'Delivered energy Q_XD;out;tot, kWh/year' }), '120000');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Distribution' }), 'small_system_forfait');
-    await user.type(screen.getByRole('spinbutton', { name: 'Number of connections' }), '40');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Boiler type' }), 'hr107');
+    await user.selectOptions(screen.getByLabelText('External heat for space heating (dh)'), 'calculated');
+    await user.type(screen.getByLabelText('Delivered energy Q_XD;out;tot, kWh/year'), '120000');
+    await user.selectOptions(screen.getByLabelText('Distribution'), 'small_system_forfait');
+    await user.type(screen.getByLabelText('Number of connections'), '40');
+    await user.selectOptions(screen.getByLabelText('Boiler type'), 'hr107');
     await user.click(screen.getByRole('button', { name: 'Add generator' }));
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Generator kind' })[1], 'heat_pump');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source (table P.5)' }), 'electric_ground');
-    await user.type(screen.getByRole('spinbutton', { name: 'Network design supply temperature, °C' }), '55');
-    await user.type(screen.getAllByRole('spinbutton', { name: 'Priority (1 first)' })[1], '1');
-    await user.click(screen.getByRole('checkbox', { name: 'Calculate the auxiliary energy (P.56–P.70)' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Network' }), 'secondary');
+    await user.selectOptions(screen.getAllByLabelText('Generator kind')[1], 'heat_pump');
+    await user.selectOptions(screen.getByLabelText('Source (table P.5)'), 'electric_ground');
+    await user.type(screen.getByLabelText('Network design supply temperature, °C'), '55');
+    await user.type(screen.getAllByLabelText('Priority (1 first)')[1], '1');
+    await user.click(screen.getByLabelText('Calculate the auxiliary energy (P.56–P.70)'));
+    await user.selectOptions(screen.getByLabelText('Network'), 'secondary');
     // P.6.8.4.3: a declared efficiency that includes the source pump.
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Heat-pump efficiency' })[0], 'declared');
-    await user.type(screen.getByRole('spinbutton', { name: 'Efficiency' }), '4.2');
-    await user.click(screen.getByRole('checkbox', {
-      name: 'Source pump or fan included in the declared efficiency (P.6.8.4.3: 0 W/kW)',
-    }));
+    await user.selectOptions(screen.getAllByLabelText('Heat-pump efficiency')[0], 'declared');
+    await user.type(screen.getByLabelText('Efficiency'), '4.2');
+    await user.click(screen.getByLabelText('Source pump or fan included in the declared efficiency (P.6.8.4.3: 0 W/kW)'));
     expect(withoutNulls(current().externalSupply.heating.generators[1].kind.efficiency)).toEqual({
       method: 'declared', value: 4.2, sourceReference: '', sourcePumpIncluded: true,
     });
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Heat-pump efficiency' })[0], 'table_p5');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source (table P.5)' }), 'electric_ground');
-    await user.type(screen.getByRole('spinbutton', { name: 'Network design supply temperature, °C' }), '55');
+    await user.selectOptions(screen.getAllByLabelText('Heat-pump efficiency')[0], 'table_p5');
+    await user.selectOptions(screen.getByLabelText('Source (table P.5)'), 'electric_ground');
+    await user.type(screen.getByLabelText('Network design supply temperature, °C'), '55');
     expect(withoutNulls(current().externalSupply.heating)).toEqual({
       method: 'calculated', function: 'heating', deliveredKwh: 120000,
       distribution: { method: 'small_system_forfait', connections: 40, connectionType: 'ground_bound' },
@@ -95,20 +93,20 @@ describe('NTA project input forms', () => {
   it('edits measured cold, a collective source and area electricity', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}} body={(draft, change) => <ExternalSupplyFields draft={draft} change={change} />} />);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'External cold (dc)' }), 'measured');
-    await user.type(screen.getByRole('spinbutton', { name: 'Delivered energy Q_XD;out;tot, kWh/year' }), '5000');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Energy carrier' }), 'electricity');
-    await user.type(screen.getByRole('spinbutton', { name: 'Input, kWh/year' }), '1200');
-    await user.type(screen.getByRole('spinbutton', { name: 'Renewable factor f_Pren' }), '0');
+    await user.selectOptions(screen.getByLabelText('External cold (dc)'), 'measured');
+    await user.type(screen.getByLabelText('Delivered energy Q_XD;out;tot, kWh/year'), '5000');
+    await user.selectOptions(screen.getByLabelText('Energy carrier'), 'electricity');
+    await user.type(screen.getByLabelText('Input, kWh/year'), '1200');
+    await user.type(screen.getByLabelText('Renewable factor f_Pren'), '0');
     expect(withoutNulls(current().externalSupply.cooling)).toEqual({
       method: 'measured', function: 'cooling', deliveredKwh: 5000, inputs: [{ carrier: { kind: 'electricity' }, kwh: 1200 }],
       exportedElectricityKwh: 0, renewableFactor: 0, sourceReference: '',
     });
-    await user.click(screen.getByRole('checkbox', { name: 'Collective heat-pump source (9.6.8.1.1.2.3)' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source temperature class' }), 'below20_c');
-    await user.type(screen.getByRole('textbox', { name: 'Invoices or design data (reference)' }), 'factuur 12');
+    await user.click(screen.getByLabelText('Collective heat-pump source (9.6.8.1.1.2.3)'));
+    await user.selectOptions(screen.getByLabelText('Source temperature class'), 'below20_c');
+    await user.type(screen.getByLabelText('Invoices or design data (reference)'), 'factuur 12');
     await user.click(screen.getByRole('button', { name: 'Add area producer (wind, hydro, other)' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Annual production, kWh' }), '800');
+    await user.type(screen.getByLabelText('Annual production, kWh'), '800');
     expect(withoutNulls(current().externalSupply)).toMatchObject({
       collectiveHeatPumpSource: { temperatureClass: 'below20_c', supplierReference: 'factuur 12' },
       areaElectricity: [{ kind: 'declared', id: 'gebied-1', annualKwh: 800, sourceReference: '' }],
@@ -122,16 +120,14 @@ describe('NTA project input forms', () => {
       <HumidifiersFields draft={draft} change={change} project={project} />
     </>} />);
     await user.click(screen.getByRole('button', { name: 'Add sunroom' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'g_gl;ue heating' }), '0.6');
-    await user.type(screen.getByRole('spinbutton', { name: 'Reduction factor b_U' }), '0.8');
-    await user.type(screen.getByRole('spinbutton', { name: 'Surface area, m²' }), '12');
+    await user.type(screen.getByLabelText('g_gl;ue heating'), '0.6');
+    await user.type(screen.getByLabelText('Reduction factor b_U'), '0.8');
+    await user.type(screen.getByLabelText('Surface area, m²'), '12');
     await user.click(screen.getByRole('button', { name: 'Add humidifier' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Calculation zone' }), 'zone-b');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Humidifier type' }), 'steam');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Steam generator' }), 'gas_or_oil');
-    await user.type(screen.getByRole('spinbutton', {
-      name: 'Area served by the steam humidifier, m² (12.2.1; empty: heating-system area)',
-    }), '650');
+    await user.selectOptions(screen.getByLabelText('Calculation zone'), 'zone-b');
+    await user.selectOptions(screen.getByLabelText('Humidifier type'), 'steam');
+    await user.selectOptions(screen.getByLabelText('Steam generator'), 'gas_or_oil');
+    await user.type(screen.getByLabelText('Area served by the steam humidifier, m² (12.2.1; empty: heating-system area)'), '650');
     const draft = withoutNulls(current());
     expect(draft.sunrooms).toEqual([{
       id: 'serre-1', glazingGHeating: 0.6, reductionFactor: 0.8, distributionFactor: 1, surfaces: [{ areaM2: 12 }], sourceReference: '',
@@ -146,20 +142,20 @@ describe('NTA project input forms', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{ cooling: coolingSystemTemplate('compression') }}
       body={(draft, change) => <CoolingSystemsFields draft={draft} change={change} project={project} />} />);
-    await user.click(screen.getByRole('checkbox', { name: 'Several cooling systems, each for its own zones (§10.2)' }));
+    await user.click(screen.getByLabelText('Several cooling systems, each for its own zones (§10.2)'));
     expect(current().cooling).toBeNull();
     expect(current().coolingSystems).toHaveLength(1);
     expect(current().coolingSystems[0].zoneIds).toEqual(['zone-a', 'zone-b']);
     const first = screen.getAllByRole('group').find((group) => within(group).queryByText('Cooling system 1'))!;
-    await user.click(within(first).getByRole('checkbox', { name: 'Sporthal' }));
+    await user.click(within(first).getByLabelText('Sporthal'));
     await user.click(screen.getByRole('button', { name: 'Add cooling system' }));
     const second = screen.getAllByRole('group').find((group) => within(group).queryByText('Cooling system 2'))!;
-    expect(within(second).getByRole('checkbox', { name: 'Kantoor' })).toBeDisabled();
-    await user.click(within(second).getByRole('checkbox', { name: 'Sporthal' }));
-    await user.selectOptions(within(second).getByRole('combobox', { name: 'Cold generator' }), 'room_air_conditioner');
+    expect(within(second).getByLabelText('Kantoor')).toBeDisabled();
+    await user.click(within(second).getByLabelText('Sporthal'));
+    await user.selectOptions(within(second).getByLabelText('Cold generator'), 'room_air_conditioner');
     expect(current().coolingSystems.map((item: Draft) => item.zoneIds)).toEqual([['zone-a'], ['zone-b']]);
     expect(current().coolingSystems[1].system.generators[0].generator.kind).toBe('room_air_conditioner');
-    await user.click(screen.getByRole('checkbox', { name: 'Several cooling systems, each for its own zones (§10.2)' }));
+    await user.click(screen.getByLabelText('Several cooling systems, each for its own zones (§10.2)'));
     expect(current().coolingSystems).toEqual([]);
     expect(current().cooling.generators[0].generator.kind).toBe('compression');
   }, 60000);
@@ -179,18 +175,18 @@ describe('NTA project input forms', () => {
       <CoolingSystemsFields draft={draft} change={change} project={project} />
       <CollectiveAndRenewableFields draft={draft} change={change} />
     </>} />);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Cold generator' }), 'absorption_chp');
+    await user.selectOptions(screen.getByLabelText('Cold generator'), 'absorption_chp');
     let draft = current();
     expect(draft.cooling.generators).toHaveLength(2);
     expect(draft.cooling.generators[0].generator).toEqual({
       kind: 'absorption_chp', chp: { powerKw: null, builtAfter2006: true, hreDeclared: false, lowTemperature: false },
     });
     expect(draft.cooling.generators[1].id).toBe('cold-2');
-    await user.type(screen.getByRole('spinbutton', { name: 'Electric power P_el, kW' }), '50');
+    await user.type(screen.getByLabelText('Electric power P_el, kW'), '50');
     expect(current().cooling.generators[0].generator.chp.powerKw).toBe(50);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Cold generator' }), 'gas_engine_compression');
+    await user.selectOptions(screen.getByLabelText('Cold generator'), 'gas_engine_compression');
     expect(current().cooling.generators[0].generator).toMatchObject({ kind: 'gas_engine_compression', gasEngine: { powerKw: null } });
-    await user.click(screen.getByRole('checkbox', { name: 'Outdoor air and exhaust air combined' }));
+    await user.click(screen.getByLabelText('Outdoor air and exhaust air combined'));
     draft = current();
     expect(draft.heatPumpRenewable.combinedOutdoorAndExhaustAir).toBe(false);
     expect(withoutNulls(draft.heatPumpRenewable)).toEqual({
@@ -207,13 +203,13 @@ describe('NTA project input forms', () => {
     </>} />);
     await user.click(screen.getByRole('button', { name: /Add solar/ }));
     expect(current().spaceHeatingSolar[0]).toMatchObject({ id: 'solar-1', solarUse: 'space_heating' });
-    await user.click(screen.getByRole('checkbox', { name: 'Building on a collective installation (9.6.1)' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'A_g of the whole building on the installation, m²' }), '2400');
-    await user.click(screen.getByRole('checkbox', { name: 'Renewable share of the heat pump (5.31/5.32)' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Source temperature below 20 °C' }));
+    await user.click(screen.getByLabelText('Building on a collective installation (9.6.1)'));
+    await user.type(screen.getByLabelText('A_g of the whole building on the installation, m²'), '2400');
+    await user.click(screen.getByLabelText('Renewable share of the heat pump (5.31/5.32)'));
+    await user.click(screen.getByLabelText('Source temperature below 20 °C'));
     await user.click(screen.getByRole('button', { name: 'Add declared use (§5.5)' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Service' }), 'lighting');
-    await user.type(screen.getByRole('spinbutton', { name: 'kWh per month 1' }), '40');
+    await user.selectOptions(screen.getByLabelText('Service'), 'lighting');
+    await user.type(screen.getByLabelText('kWh per month 1'), '40');
     await user.click(screen.getByRole('button', { name: 'Add on-site production (chapter 16)' }));
     const draft = current();
     expect(draft.collectiveConnection).toEqual({ connectedUsableAreaM2: 2400, sourceReference: '' });

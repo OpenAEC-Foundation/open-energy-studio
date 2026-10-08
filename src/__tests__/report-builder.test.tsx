@@ -29,7 +29,7 @@ describe('report builder', () => {
     // Default: standard level with building data, no calculation chapters.
     expect(preview()).toContain('Bouwkundige uitgangspunten');
     expect(preview()).not.toContain('Berekening: Warmte- en koudebalans');
-    const balance = screen.getByRole('checkbox', { name: /Heat and cold balance|Warmte- en koudebalans/ });
+    const balance = screen.getByLabelText(/Heat and cold balance|Warmte- en koudebalans/);
     expect(balance).toBeDisabled();
 
     await user.click(screen.getByRole('radio', { name: /Detailed|Gedetailleerd/ }));

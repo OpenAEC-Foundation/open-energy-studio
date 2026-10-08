@@ -139,7 +139,7 @@ describe('workflow end to end, default edition', () => {
     await waitFor(() => expect(main().queryByText(/BENG 1 51/)).toBeNull());
 
     await user.click(main().getByRole('button', { name: 'Start NTA input' }));
-    const edition = await main().findByRole('combobox', { name: 'NTA 8800 edition' });
+    const edition = await main().findByLabelText('NTA 8800 edition');
     expect(edition).toHaveValue('2025+C1');
   }, 60000);
 
@@ -196,9 +196,9 @@ describe('workflow end to end, default edition', () => {
     const form = within(page.getByTestId('nta-annex-aa'));
     const rooms = form.getAllByRole('group', { name: /^Room / });
     const room = within(rooms[0]);
-    await user.type(room.getByRole('spinbutton', { name: /Floor area/ }), '28');
+    await user.type(room.getByLabelText(/Floor area/), '28');
     await user.click(room.getByRole('button', { name: 'Add window' }));
-    const window = room.getByRole('combobox', { name: 'Window' }) as HTMLSelectElement;
+    const window = room.getByLabelText('Window') as HTMLSelectElement;
     // Only the project's outdoor windows are offered.
     expect(Array.from(window.options).map((option) => option.value).filter(Boolean).sort()).toEqual(['win-N', 'win-S']);
     await applyDraft(user, /change/);
@@ -219,7 +219,7 @@ describe('workflow end to end, default edition', () => {
     await openStep(user, /^Report/);
     const preview = () => (main().getByTestId('report-builder-preview') as HTMLIFrameElement).getAttribute('srcdoc') ?? '';
     await waitFor(() => expect(preview()).toContain('Bouwkundige uitgangspunten'));
-    const balance = main().getByRole('checkbox', { name: /Heat and cold balance/ });
+    const balance = main().getByLabelText(/Heat and cold balance/);
     expect(balance).toBeDisabled();
     expect(preview()).not.toContain('Berekening: Warmte- en koudebalans');
     await user.click(main().getByRole('radio', { name: /^Detailed/ }));
@@ -297,7 +297,7 @@ describe('workflow end to end, NTA 8800:2022', () => {
   it('switches the edition, shows the 2022-only fields and the legacy status, and offers to remove them again', async () => {
     const user = userEvent.setup();
     await openExample(user);
-    const edition = await main().findByRole('combobox', { name: 'NTA 8800 edition' });
+    const edition = await main().findByLabelText('NTA 8800 edition');
     await user.selectOptions(edition, '2022');
     expect(main().getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
     await applyDraft(user, /change/);
@@ -326,7 +326,7 @@ describe('workflow end to end, NTA 8800:2022', () => {
 
     // Back to the default edition: the 2022 values are flagged with a remove action.
     await openStep(user, /^Project/);
-    await user.selectOptions(await main().findByRole('combobox', { name: 'NTA 8800 edition' }), '2025+C1');
+    await user.selectOptions(await main().findByLabelText('NTA 8800 edition'), '2025+C1');
     await openStep(user, /^Building/, 'Calculation zones');
     expect(main().queryByLabelText(/Mass per m² usable floor area/)).toBeNull();
     const stale = main().getAllByRole('alert').find((alert) => /2022/.test(alert.textContent ?? ''));

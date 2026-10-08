@@ -183,12 +183,12 @@ describe('project information dialog', () => {
     const user = userEvent.setup();
     renderWithProviders(<ProjectInfoDialog onClose={() => undefined} />);
     expect(screen.getByRole('dialog', { name: 'Project Information' })).toHaveAttribute('aria-modal', 'true');
-    expect(screen.getByRole('textbox', { name: 'Project Name' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Project Name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     renderWithProviders(<RegistrationForm />);
-    expect(screen.queryByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Message type (BRL 9500 §4.2.5)' }), 'relabel');
-    expect(screen.getByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Kernel version of original survey (relabel)')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Message type (BRL 9500 §4.2.5)'), 'relabel');
+    expect(screen.getByLabelText('Kernel version of original survey (relabel)')).toBeInTheDocument();
   }, 60000);
 });
 
