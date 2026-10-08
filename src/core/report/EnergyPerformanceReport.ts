@@ -217,9 +217,9 @@ function results(doc: ReportDocument, project: IProject, assessment: ProjectPerf
     <tr><th>Primair fossiel (label)</th><td class="n">${n(performance.labelPrimaryFossilIndicatorKwhPerM2Year ?? performance.primaryFossilIndicatorKwhPerM2Year, 2)} kWh/m²·jr</td>
       <th>Hernieuwbaar aandeel (label)</th><td class="n">${n(performance.labelPrimaryFossilIndicatorKwhPerM2Year != null ? performance.labelRenewableSharePercent : performance.renewableSharePercent, 1)} %</td></tr>
     <tr><th>CO<sub>2</sub>-emissie</th><td class="n">${n(performance.co2KgPerM2, 1)} kg/m²·jr</td><th>Warmtebehoefte (5.3a)</th><td class="n">${n(performance.chapter5?.heatingNeedKwhPerM2, 2)} kWh/m²·jr</td></tr>
-    ${elements ? Object.entries(elements).filter(([, value]) => value != null && typeof value !== 'object').map(([key, value]) =>
+    ${elements ? Object.entries(elements).filter(([key, value]) => value != null && typeof value !== 'object' && !STATEMENT_ELEMENTS.has(key)).map(([key, value]) =>
       `<tr><th colspan="2">${escapeHtml(LABEL_ELEMENT[key] ?? key)}</th><td colspan="2">${escapeHtml(typeof value === 'number' ? n(value, 1) : value)}</td></tr>`).join('') : ''}
-    ${project.registration ? labelStatementRows(project.registration.labelStatements) : ''}`;
+    ${project.registration ? labelStatementRows(assessment.labelData?.indicators?.elements, project.registration.labelStatements) : ''}`;
   const labelTable = doc.table('Indicatieve labelklasse en labelgegevens (Omgevingsregeling art. 5.11–5.13a)', '', labelRows);
   const warnings: Array<{ code: string; path: string; detail?: string | null }> = [...(assessment.warnings ?? []), ...(performance.warnings ?? [])];
   const warningTable = warnings.length
@@ -235,11 +235,23 @@ function results(doc: ReportDocument, project: IProject, assessment: ProjectPerf
     + (project.registration ? registrationSection(project.registration, assessment.registration, assessment.labelData?.general.constructionYear).replace(/<h2>Registratie<\/h2>/, '<h3>Registratie</h3>') : ''));
 }
 
-/** Omgevingsregeling art. 5.13a lid 1 onder k en l: the adviser's yes/no statements from the registration. */
-function labelStatementRows(statements: NtaLabelStatements | undefined): string {
-  const answer = (value: boolean | undefined) => (value === undefined ? 'niet beantwoord' : value ? 'ja' : 'nee');
-  return `<tr><th colspan="2">k. Reageert op externe signalen (verklaring adviseur)</th><td colspan="2">${answer(statements?.respondsToExternalSignals)}</td></tr>
-    <tr><th colspan="2">l. Afgiftesysteem ontworpen voor lage temperatuur (verklaring adviseur)</th><td colspan="2">${answer(statements?.lowTemperatureHeating)}</td></tr>`;
+/** Label elements k and l are statements, shown by `labelStatementRows`, not in the generic element rows. */
+const STATEMENT_ELEMENTS = new Set(['respondsToExternalSignals', 'lowTemperatureHeating']);
+
+/**
+ * Omgevingsregeling art. 5.13a lid 1 onder k en l: the adviser's yes/no statements. The kernel's
+ * label elements carry them from the registration; the registration itself is the fallback when
+ * the kernel gave no label data (no calculated result).
+ */
+function labelStatementRows(
+  kernel: { respondsToExternalSignals: boolean | null; lowTemperatureHeating: boolean | null } | null | undefined,
+  statements: NtaLabelStatements | undefined,
+): string {
+  const answer = (value: boolean | null | undefined) => (value == null ? 'niet beantwoord' : value ? 'ja' : 'nee');
+  const k = kernel?.respondsToExternalSignals ?? statements?.respondsToExternalSignals;
+  const l = kernel?.lowTemperatureHeating ?? statements?.lowTemperatureHeating;
+  return `<tr><th colspan="2">k. Reageert op externe signalen (verklaring adviseur)</th><td colspan="2">${answer(k)}</td></tr>
+    <tr><th colspan="2">l. Afgiftesysteem ontworpen voor lage temperatuur (verklaring adviseur)</th><td colspan="2">${answer(l)}</td></tr>`;
 }
 
 /**

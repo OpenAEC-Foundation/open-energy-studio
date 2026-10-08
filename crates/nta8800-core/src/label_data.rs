@@ -103,9 +103,9 @@ pub struct LabelIndicators {
 
 /// Omgevingsregeling art. 5.13a lid 1 (in force 29 May 2026). Elements a
 /// (class), b (EP2), c (renewable share) and j (energy need) are the
-/// indicators above. Element e (WLC-GWP) comes from the registration, k and
-/// l are statements of the adviser and m is filled in by the issuer, so
-/// those are `None` here unless supplied.
+/// indicators above. Element e (WLC-GWP) and the adviser's statements k and
+/// l come from the registration (`wlcGwp`, `labelStatements`); m is filled
+/// in by the issuer. They are `None` here unless supplied.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelElements {

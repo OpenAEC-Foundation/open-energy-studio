@@ -461,6 +461,10 @@ pub enum AirHeatingAnswer {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AdditionalHeatingGenerator {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: HeatingGenerator,
     #[serde(default)]
     pub nominal_power_kw: Option<f64>,

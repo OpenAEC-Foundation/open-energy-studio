@@ -10,7 +10,7 @@ Het bestand bevat het volledige project, inclusief de NTA-invoer, de basisopname
 
 **Openen.** Met **Openen** (Ctrl+O, menu Bestand of welkomstscherm) kies je een `.oes.json`- of `.json`-bestand; in de desktopapp met een bestandsvenster, in de browser met de bestandskiezer van de browser. Het project opent in een nieuw tabblad. Bij het openen:
 - vergelijkt de app de opgeslagen stempel met de huidige rekenkern. Is de kern of de normversie anders, dan meldt ze dat; reken dan opnieuw en controleer de verschillen voordat je registreert. Verschilt alleen de invoervingerafdruk, dan is het bestand buiten de app gewijzigd en meldt ze dat ook.
-- zet ze koppelingen van bewijs en foto's die nog op positie staan om naar koppelingen op id (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md));
+- geeft ze extra opwekkers en extra tapwatersystemen in de opname een id en zet ze koppelingen van bewijs en foto's die nog op positie staan om naar koppelingen op id (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md));
 - zet ze oude herlabelprojecten om naar de huidige vorm (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)). Facturen zonder herlabelrol krijgen de rol "Te beoordelen", die nog niet als bewijs telt; de app meldt welke velden nog ontbreken.
 
 ## Voorbeeldprojecten

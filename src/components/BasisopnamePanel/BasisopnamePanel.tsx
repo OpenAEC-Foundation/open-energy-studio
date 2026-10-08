@@ -16,7 +16,7 @@ import {
 import { KernelCode } from '../KernelCode/KernelCode';
 import { EvidenceAttach } from '../EvidenceLink/EvidenceLink';
 import { SurveyTakeoverAction } from './SurveyTakeoverAction';
-import { jsonPointer, linksAfterRemoval } from '../../core/nta/EvidenceLinks';
+import { freshItemId, jsonPointer, linksAfterRemoval } from '../../core/nta/EvidenceLinks';
 import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
@@ -948,7 +948,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['heating', 'additionalGenerators'], index)} />
       </div>)}
       <ListControls label={t('opname.addGenerator')}
-        onAdd={() => change(['heating', 'additionalGenerators'], [...heatingExtras, { generator: heatingGeneratorTemplate('boiler'), nominalPowerKw: 20 }])} />
+        onAdd={() => change(['heating', 'additionalGenerators'], [...heatingExtras, { id: freshItemId(heatingExtras, 'opwekker'), generator: heatingGeneratorTemplate('boiler'), nominalPowerKw: 20 }])} />
     </Section></>}
 
     {show('hotWater') && <><Section title={t('opname.hotWater')}>
@@ -977,7 +977,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
         <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['hotWater', 'additionalGenerators'], index)} />
       </div>)}
       <ListControls label={t('opname.addGenerator')}
-        onAdd={() => change(['hotWater', 'additionalGenerators'], [...hotWaterExtras, { generator: hotWaterGeneratorTemplate('electric_instantaneous'), nominalPowerKw: 10 }])} />
+        onAdd={() => change(['hotWater', 'additionalGenerators'], [...hotWaterExtras, { id: freshItemId(hotWaterExtras, 'tapwateropwekker'), generator: hotWaterGeneratorTemplate('electric_instantaneous'), nominalPowerKw: 10 }])} />
       {solar.map((_, index) => {
         const base: Path = ['hotWater', 'solar', index];
         return <div key={`s${index}`} className="opname-item">
@@ -1022,6 +1022,7 @@ export function BasisopnamePanel({ section: requested, onSection }: BasisopnameP
       })}
       {kind === 'utility' && <ListControls label={t('opname.hotWater.addSystem')}
         onAdd={() => change(['additionalHotWaterSystems'], [...hotWaterSystems, {
+          id: freshItemId(hotWaterSystems, 'tapwatersysteem'),
           generator: hotWaterGeneratorTemplate('electric_instantaneous'), showerHeatRecovery: 'none',
           servedAreas: [{ function: String(read(draft, ['functions', 0, 'function']) ?? 'office'), areaM2: 0 }], sourceReference: '',
         }])} />}

@@ -2737,7 +2737,7 @@ export interface ResidentialSurvey {
     /** Table 9.7 nominal power of the main generator, kW; required with additionalGenerators. */
     nominalPowerKw?: number | null;
     /** §9.3.2: further unequal generators (kernel `multiple`, preference per p. 112). */
-    additionalGenerators?: Array<{ generator: OpnameHeatingGenerator; nominalPowerKw?: number | null }>;
+    additionalGenerators?: Array<{ /** Stable id for evidence and photo links; not used in the calculation. */ id?: string; generator: OpnameHeatingGenerator; nominalPowerKw?: number | null }>;
     /** §9.3.6: a preferred generator added after delivery. */
     addedPreferredGenerator?: boolean;
     /** Collective installation (p. 106, 121–122). */
@@ -2756,6 +2756,8 @@ export interface ResidentialSurvey {
     sourceReference: string;
   };
   hotWater: {
+    /** Stable id of a further hot-water system (evidence and photo links); not used in the calculation. */
+    id?: string;
     generator: OpnameHotWaterGenerator;
     served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
     kitchenLengthM?: number;
@@ -2773,7 +2775,7 @@ export interface ResidentialSurvey {
     /** 13.141 nominal power of the main generator, kW. */
     nominalPowerKw?: number | null;
     /** NTA 13.8.2 further generators. */
-    additionalGenerators?: Array<{ generator: OpnameHotWaterGenerator; nominalPowerKw?: number | null }>;
+    additionalGenerators?: Array<{ /** Stable id for evidence and photo links; not used in the calculation. */ id?: string; generator: OpnameHotWaterGenerator; nominalPowerKw?: number | null }>;
     /** Collective hot-water system (p. 164, 176). */
     collective?: { buildingUsableAreaM2?: number | null; connectedDwellings?: number | null } | null;
     /** Solar water heaters (§15.3–15.4). */
@@ -2990,6 +2992,8 @@ export interface UtilitySurvey {
     sourceReference: string;
   } | null;
   hotWater: {
+    /** Stable id of a further hot-water system (evidence and photo links); not used in the calculation. */
+    id?: string;
     generator:
       | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' | 'collective_unknown' }
       | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number }
@@ -3013,7 +3017,7 @@ export interface UtilitySurvey {
     /** 13.141 nominal power of the main generator, kW. */
     nominalPowerKw?: number | null;
     /** NTA 13.8.2 further generators with the utility generator types. */
-    additionalGenerators?: Array<{ generator: UtilitySurvey['hotWater']['generator']; nominalPowerKw?: number | null }>;
+    additionalGenerators?: Array<{ /** Stable id for evidence and photo links; not used in the calculation. */ id?: string; generator: UtilitySurvey['hotWater']['generator']; nominalPowerKw?: number | null }>;
     /** Areas served by an additional system (13.20a); ignored on the main system. */
     servedAreas?: UtilitySurvey['functions'];
     sourceReference: string;

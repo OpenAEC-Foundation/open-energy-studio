@@ -87,7 +87,7 @@ Elk opname-onderdeel heeft een blok **Foto's**:
 
 De foto's gaan mee in de dossier-ZIP (BRL 9500 bijlage 3: leesbare foto's van typeaanduiding en maatvoering). In de browser blijven de bestanden alleen in deze sessie bewaard. Exporteer daarom het dossier voordat je het venster sluit. De desktopapp bewaart ze in de app-map.
 
-Een koppeling verwijst naar het id van het onderdeel, zoals de id van een vlak, raam, lichtkoepel, PV-veld of zonneboiler. Verwijder of verplaats je een ander onderdeel, dan blijft de foto bij zijn eigen onderdeel. Extra opwekkers en extra tapwatersystemen hebben geen id; daar verwijst de koppeling naar de positie in de lijst. Verwijder je zo'n onderdeel met de knop in de opname, dan schuiven de koppelingen van de onderdelen erna mee. De koppelingen naar het verwijderde onderdeel vervallen; de foto's blijven in het register als "niet gekoppeld".
+Een koppeling verwijst naar het id van het onderdeel, zoals de id van een vlak, raam, lichtkoepel, PV-veld, zonneboiler, extra opwekker of extra tapwatersysteem. Verwijder of verplaats je een ander onderdeel, dan blijft de foto bij zijn eigen onderdeel. Een extra opwekker of extra tapwatersysteem krijgt bij het toevoegen een id (`opwekker-1`, `tapwateropwekker-1`, `tapwatersysteem-1`); een opname uit een eerdere versie krijgt die ids bij het openen, en de koppelingen gaan dan mee. De rekenkern gebruikt de ids niet in de berekening; twee gelijke ids in één lijst of een lege id geeft een melding. Verwijder je een onderdeel, dan vervallen de koppelingen naar dat onderdeel; de foto's blijven in het register als "niet gekoppeld".
 
 ## Overnemen in projectmodel
 

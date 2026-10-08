@@ -31,6 +31,13 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 - **Gatecontrole.** `scripts/nta-manual.mjs check` faalt als de stempel in `index.md` niet de huidige `KERNEL_VERSION` noemt.
 - De Markdown wordt door één eigen, kleine parser gelezen (`scripts/nta-manual-markdown.mjs`), zonder nieuwe afhankelijkheid. Alle tekst wordt als tekst getoond; onveilige links (`javascript:` en dergelijke) worden niet gevolgd.
 
+### 9 oktober 2026 — labelelementen k en l in de labelgegevens van de kern; ids voor extra opwekkers in de opname
+
+Rekenkern 0.3.0. Berekende getallen veranderen niet; de labelgegevens en de controle van de opname wel.
+
+- **Labelelementen k en l** (Omgevingsregeling art. 5.13a lid 1 onder k en l). De kern neemt de verklaringen van de adviseur uit `registration.labelStatements` over in `labelData.indicators.elements` (`respondsToExternalSignals`, `lowTemperatureHeating`). Tot nu toe bleven die `null`. Een onbeantwoorde verklaring blijft `null`. Het rapport en het EP-Online-overzicht nemen de waarden van de kern; zonder labelgegevens (geen berekend resultaat) vallen ze terug op de registratie. De algemene rijen met labelelementen in het rapport tonen k en l niet nog eens.
+- **Ids in de opname.** Extra verwarmingsopwekkers (`heating.additionalGenerators`), extra tapwateropwekkers (`hotWater.additionalGenerators`, ook binnen een extra tapwatersysteem) en extra tapwatersystemen (`additionalHotWaterSystems`) kunnen een `id` hebben, in de woning- en de utiliteitsopname. De kern gebruikt hem niet in de berekening; een lege id geeft `survey_item_id_blank`, dezelfde id twee keer in één lijst `survey_item_id_duplicate`. De opname geeft een nieuw onderdeel een id (`opwekker-1`, `tapwateropwekker-1`, `tapwatersysteem-1`). Een project uit een eerdere versie krijgt de ontbrekende ids bij het openen; koppelingen van bewijs en foto's op positie gaan dan mee naar de id.
+
 ## Rekenkern 0.2.0 — 8 oktober 2026
 <!-- kernel-version: 0.2.0 -->
 
