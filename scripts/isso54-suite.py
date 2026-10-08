@@ -274,6 +274,63 @@ CASES = [
 ]
 
 
+# --- EP-W003a/c: window U from 8.15 and 8.22/8.23 (p. 7) ---
+# The project takes the window U as a value; it is computed here with the
+# kernel's window_u formulas and rounded per 8.2.2.1 (one decimal above 1,0).
+# EP-W003a: 8.15 simplified, max(0,7.2,0+0,3.3,4; 0,8.2,0+0,2.3,4) + 2,5.0,11
+#   = 2,695 -> 2,7.
+# EP-W003c: U_W+shut = 1/(1/1,8 + 0,2) = 1,324 (8.23); effective
+#   0,5.1,8 + 0,5.1,324 = 1,562 -> 1,6 (8.22, f_shut;with 0,5). Only the extra
+#   resistance is varied; the roller shutter is not entered as sun shading.
+CASES += [
+    ("EPW003a", 7, windows("uValue", 2.7)),
+    ("EPW003c", 7, windows("uValue", 1.6)),
+]
+
+
+# --- EP-W015a/b: vertical pipes through the thermal envelope (p. 18; 7.3.3) ---
+# EP-W015a: no penetrations, no pipe. EP-W015b: one insulated pipe running
+# through both storeys (table 7.1 footnote a).
+CASES += [
+    ("EPW015a", 18, [setp(f"{NTA}/verticalPipes", [])]),
+    (
+        "EPW015b",
+        18,
+        [setp(f"{NTA}/verticalPipes", [{"id": "leiding-1", "storeys": 2, "insulated": True, "sourceReference": "ISSO 54 v2.0 EP-W015b p. 18: 1 geisoleerde verticale leiding per bouwlaag"}])],
+    ),
+]
+
+
+# --- EP-W016: a door in the north facade, 2 m2 incl. frame (p. 18) ---
+# A door is a window element of the north facade (gross 43,2 m2, net 41,2).
+# Opaque: U 3,4 (8.20), g 0. With glass (U_gl 2,8, g_gl 0,7): U area-weighted
+# over glass and opaque door, no edge psi given; the frame fraction is
+# project-wide (0,25), so the glass share enters as an equivalent g:
+# g_gl . share / (1 - 0,25).
+def door(u_value, g_value):
+    return setp(
+        "/zones/0/surfaces/3/windows",
+        [
+            {
+                "id": "deur-noord",
+                "name": "Deur noord",
+                "area": 2.0,
+                "uValue": u_value,
+                "gValue": g_value,
+                "orientation": "N",
+                "surfaceId": "gevel-noord",
+            }
+        ],
+    )
+
+
+CASES += [
+    ("EPW016a", 18, [door(3.4, 0.0)]),
+    ("EPW016b", 18, [door(3.1, round(0.7 * 0.5 / 0.75, 4))]),
+    ("EPW016c", 18, [door(2.9, round(0.7 * 0.8 / 0.75, 4))]),
+]
+
+
 # --- EP-W012: movable shading with the building turned (p. 15) ---
 # Table 7.5/7.6 devices, operated from inside: manual residential control.
 def residential_screen(device):
