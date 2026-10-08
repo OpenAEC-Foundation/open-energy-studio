@@ -97,7 +97,7 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 - De testgeometrie van EPW001 staat als historische invoerregressie in `training-data/edr-2022-epw001-*.json`, zonder verwachte uitkomsten.
 - **Versie 2.0 is als voorbereiding gecodeerd** (9 oktober 2026, [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md)):
   - de referentiewoning EP-W001 en het referentiekantoor EP-U001 rekenen volledig in NTA 8800:2022;
-  - 199 van de 266 deeltesten (149 woning, 50 utiliteit) staan als patch op de referentie in `training-data/reference-suites/isso54-v2.json`;
+  - 227 van de 266 deeltesten (172 woning, 55 utiliteit) staan als patch op de referentie in `training-data/reference-suites/isso54-v2.json`;
   - de gate rekent ze allemaal door en legt BENG 1–3 en TOjuli vast zonder oordeel (status `pending_expectation`); een deeltest die niet rekent, laat de gate falen;
   - de open deeltesten en de route die ze nodig hebben, staan in een tabel in dat document.
 

@@ -13,6 +13,14 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — boosterwarmtepomp forfaitair (13.162/13.163); ISSO 54: 227 deeltesten gecodeerd
+
+- **Boosterwarmtepomp zonder meetgegevens.** §13.8.4.4 laat de warmte uit het verwarmingssysteem (13.162) en het elektriciteitsgebruik (13.163) van een boosterwarmtepomp ook forfaitair bepalen (2025+C1 p. 631–633, 2022 p. 607–609); de kern kende alleen bijlage W met metingen. Nieuwe opwekker `booster_heat_pump_forfait` met de ontwerpaanvoertemperatuur van het voedende verwarmingssysteem: η_gen;hj 1,15 bij 24 °C en 1,05 bij 40 °C, COP 3 en 4, geïnterpoleerd en tussen 20 en 44 °C geëxtrapoleerd, daarbuiten de waarde bij 20 of 44 °C; onbekend 1,15 en 3. c_W;gen volgt klasse 4 van tabel 13.27 op de bruto warmtebehoefte, f_prac;gi is 1,0 en er zijn geen terugwinbare verliezen (13.164). Een invoer die eerder geen route had, rekent nu. Nieuwe meldcode `booster_supply_temperature_invalid`.
+- **28 deeltesten erbij,** nu 227 van de 266 (172 woning, 55 utiliteit). Alle rekenen in de gate, zonder verwachting.
+  - Woning: isolatie (EP-W002a–c), kruipruimte en dijkwoning (W006a–e/g), gebruiksoppervlak (W013a–e), lessenaarsdak (W014a), dubbelzijdige zomernachtventilatie (W103c), twee rekenzones met hybride warmtepomp (W203l–n), vrije koeling met opslag (W303c/d) en de boosterwarmtepomp in een woongebouw (W406i/k).
+  - Utiliteit: luchtbehandelingskast in een kantoor van 8 bouwlagen (EP-U202a–c), sportgebouw van 1536 m² (U502c) en bevochtiging met warmtewiel (U701d).
+- **Niet te coderen:** EP-W006f (vloer onder maaiveld boven een kruipruimte), EP-W006h (AOR bij forfaitaire bruggen) en EP-W406j (booster met één COP). Zie de [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md).
+
 ### 9 oktober 2026 — ISSO 54: 199 deeltesten gecodeerd (geen rekenwijziging)
 
 - **84 deeltesten erbij,** nu 199 van de 266 (149 woning, 50 utiliteit). Alle rekenen in de gate, zonder verwachting.
