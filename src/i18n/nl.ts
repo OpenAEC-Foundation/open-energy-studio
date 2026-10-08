@@ -2539,7 +2539,7 @@ export const nl: Record<string, string> = {
   'opname.zones.combinedDecentral': "Oppervlak geventileerd door de decentrale units in deze zone, m²",
   'opname.zones.combinedTotal': "Totaal verblijfsgebied van deze zone, m²",
   'opname.surface.zone': "Rekenzone",
-  'opname.verticalPipes': "Verticale leidingen (§7.2.4)",
+  'opname.verticalPipes': "Verticale leidingen",
   'opname.verticalPipes.default': "Standaard: één per bouwlaag",
   'opname.verticalPipes.none': "Geen",
   'opname.verticalPipes.count': "Opgegeven aantal",

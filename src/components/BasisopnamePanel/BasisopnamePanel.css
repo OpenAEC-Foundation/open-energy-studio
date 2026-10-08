@@ -106,3 +106,5 @@
 /* F10: headings one level up for a correct outline; same look as before. */
 .opname-panel > h2 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
 .opname-panel h3.opname-result-heading { font-weight: 500; letter-spacing: -0.01em; }
+
+.opname-panel .opname-item--plain > strong { display: none; }

@@ -887,6 +887,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       <TextField {...field} path={['id']} label={t('opname.id')} />
       <NumberField {...field} path={['constructionYear']} label={t('opname.constructionYear')} step="1" />
       <TextField {...field} path={['sourceReference']} label={t('survey.sourceReference')} />
+      <p className="nta-form-note nta-form-hint">{t('survey.sourceReference.hint')}</p>
+      <p className="nta-form-subhead">{t('survey.group.size')}</p>
       {kind === 'residential' && <NumberField {...field} path={['usableFloorAreaM2']} label={t('opname.usableFloorArea')} />}
       <NumberField {...field} path={['buildingHeightM']} label={t('opname.buildingHeight')} />
       <NumberField {...field} path={['storeys']} label={t('opname.storeys')} step="1" />
@@ -901,12 +903,14 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
         <NumberField {...field} path={['swimmingPoolAreaM2']} label={t('opname.swimmingPoolArea')} />
         <CheckField {...field} path={['openlyConnectedResidenceAreas']} label={t('opname.openlyConnected')} />
       </>}
+      <p className="nta-form-subhead">{t('survey.group.construction')}</p>
       <SelectField {...field} path={['construction', 'floor']} label={t('survey.construction.floor')}
         options={opts(t, 'survey.construction.floorKind', ['light', 'heavy', 'very_heavy'])} />
       <SelectField {...field} path={['construction', 'wall']} label={t('survey.construction.wall')}
         options={opts(t, 'survey.construction.wallKind', ['light', 'heavy', 'very_heavy'])} />
       <CheckField {...field} path={['construction', 'lighterCeiling']} label={t('survey.construction.lighterCeiling')} />
       <CheckField {...field} path={['construction', 'closedOrSuspendedCeiling']} label={t('survey.construction.closedCeiling')} />
+      <p className="nta-form-subhead">{t('survey.group.pipes')}</p>
       <label>{t('opname.verticalPipes')}
         <select value={verticalPipes == null ? 'default' : Array.isArray(verticalPipes) && verticalPipes.length === 0 ? 'none' : 'count'}
           onChange={(event) => change(['verticalPipes'], event.target.value === 'default' ? null
@@ -921,7 +925,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           onChange={(event) => change(['verticalPipes'], Array.from({ length: Math.max(1, Number(event.target.value) || 1) },
             (_, index) => (verticalPipes as unknown[])[index] ?? { insulated: null }))} />
       </label>}
-      {Array.isArray(verticalPipes) && verticalPipes.map((_, index) => <div key={`vp${index}`} className="opname-item">
+      {Array.isArray(verticalPipes) && verticalPipes.map((_, index) => <div key={`vp${index}`} className="opname-item opname-item--plain">
         <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['verticalPipes', index, 'insulated']}
           label={t('survey.verticalPipe.insulated', { n: index + 1 })} />
         <NumberField {...field} path={['verticalPipes', index, 'sharedZones']} label={t('survey.verticalPipe.sharedZones', { n: index + 1 })}
