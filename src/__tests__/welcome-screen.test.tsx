@@ -1,6 +1,7 @@
 /**
- * WelcomeScreen — functional tests (UI redesign F9: new dwelling or utility,
- * open, import, recent projects and the examples)
+ * WelcomeScreen — the start screen is the project library (8 Oct 2026): the
+ * ways to start (new, open, import, examples) in the toolbar, the recent
+ * project files of the desktop app, and the empty state.
  */
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
@@ -11,66 +12,60 @@ import {
 } from '../core/io/recentProjects';
 
 const noop = () => ({ onNewProject: vi.fn(), onOpenProject: vi.fn(), onOpenExample: vi.fn() });
+const newMenu = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole('button', { name: 'New project', expanded: false }));
+  return within(screen.getByRole('menu'));
+};
 
-afterEach(() => localStorage.removeItem(RECENT_PROJECTS_KEY));
+afterEach(() => localStorage.clear());
 
 describe('WelcomeScreen', () => {
-  it('renders the app title', () => {
+  it('renders the library title and subtitle', () => {
     renderWithProviders(<WelcomeScreen {...noop()} />);
-    expect(screen.getByRole('heading', { level: 1, name: /Open Energy Studio/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Projects' })).toBeInTheDocument();
+    expect(screen.getByText(/All projects on this computer/)).toBeInTheDocument();
   });
 
-  it('renders the subtitle', () => {
-    renderWithProviders(<WelcomeScreen {...noop()} />);
-    expect(screen.getByText(/Create or open a project/i)).toBeInTheDocument();
-  });
-
-  it('renders New and Open buttons', () => {
-    renderWithProviders(<WelcomeScreen {...noop()} />);
-    expect(screen.getByRole('button', { name: /New dwelling/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New utility building/ })).toBeInTheDocument();
-    expect(screen.getByText(/^Open$/, { selector: '.welcome-btn' })).toBeInTheDocument();
-  });
-
-  it('calls onNewProject with the building kind', async () => {
+  it('starts a new dwelling or utility project from the New project menu', async () => {
     const user = userEvent.setup();
     const props = noop();
     renderWithProviders(<WelcomeScreen {...props} />);
-    await user.click(screen.getByRole('button', { name: /New dwelling/ }));
-    await user.click(screen.getByRole('button', { name: /New utility building/ }));
+    await user.click((await newMenu(user)).getByRole('menuitem', { name: /New dwelling/ }));
+    await user.click((await newMenu(user)).getByRole('menuitem', { name: /New utility building/ }));
     expect(props.onNewProject.mock.calls).toEqual([['residential'], ['utility']]);
   });
 
-  it('calls onOpenProject when Open button is clicked', async () => {
+  it('calls onOpenProject when Open is clicked', async () => {
     const user = userEvent.setup();
     const props = noop();
     renderWithProviders(<WelcomeScreen {...props} />);
-    await user.click(screen.getByText(/^Open$/i));
+    await user.click(screen.getByRole('button', { name: /^Open$/ }));
     expect(props.onOpenProject).toHaveBeenCalledOnce();
   });
 
-  it('imports UNIEC3 and VABI from the start screen', async () => {
+  it('imports UNIEC3 and VABI from the Import menu', async () => {
     const user = userEvent.setup();
     const onImportUNIEC3 = vi.fn();
     const onImportVABI = vi.fn();
     renderWithProviders(<WelcomeScreen {...noop()} onImportUNIEC3={onImportUNIEC3} onImportVABI={onImportVABI} />);
-    await user.click(screen.getByRole('button', { name: 'UNIEC3 Import' }));
-    await user.click(screen.getByRole('button', { name: 'VABI Import' }));
+    await user.click(screen.getByRole('button', { name: 'Import', expanded: false }));
+    await user.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'UNIEC3 Import' }));
+    await user.click(screen.getByRole('button', { name: 'Import', expanded: false }));
+    await user.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'VABI Import' }));
     expect(onImportUNIEC3).toHaveBeenCalledOnce();
     expect(onImportVABI).toHaveBeenCalledOnce();
   });
 
-  it('opens an example project from the start screen', async () => {
+  it('opens an example project from the New project menu', async () => {
     const user = userEvent.setup();
     const props = noop();
     renderWithProviders(<WelcomeScreen {...props} />);
-    await user.click(screen.getByText(/Example: terraced dwelling/i));
-    await user.click(screen.getByText(/Example: small office/i));
+    await user.click((await newMenu(user)).getByRole('menuitem', { name: /Example: terraced dwelling/i }));
+    await user.click((await newMenu(user)).getByRole('menuitem', { name: /Example: small office/i }));
     expect(props.onOpenExample.mock.calls).toEqual([['terraced_dwelling'], ['small_office']]);
-    expect(screen.getByText(/Fictional practice projects/)).toHaveTextContent('no registered energy label');
   });
 
-  it('lists recent projects, opens one and forgets one', async () => {
+  it('lists recent project files, opens one and forgets one', async () => {
     const user = userEvent.setup();
     const onOpenRecent = vi.fn();
     const onForgetRecent = vi.fn();
@@ -79,18 +74,19 @@ describe('WelcomeScreen', () => {
       { path: '/home/a/Kantoor.oes.json', name: 'Kantoor', at: '2026-10-04T10:00:00Z' },
     ];
     renderWithProviders(<WelcomeScreen {...noop()} recent={recent} onOpenRecent={onOpenRecent} onForgetRecent={onForgetRecent} />);
-    const list = screen.getByRole('list');
-    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
-    expect(within(list).getByText('/home/a/Woning.oes.json')).toBeInTheDocument();
-    await user.click(within(list).getByRole('button', { name: /^Woning/ }));
+    expect(screen.getByRole('heading', { name: /^Files/ })).toBeInTheDocument();
+    const items = screen.getAllByRole('listitem').filter((item) => item.classList.contains('welcome-recent__item'));
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByText('/home/a/Woning.oes.json')).toBeInTheDocument();
+    await user.click(within(items[0]).getByRole('button', { name: /^Woning/ }));
     expect(onOpenRecent).toHaveBeenCalledWith('/home/a/Woning.oes.json');
-    await user.click(within(list).getByRole('button', { name: 'Remove Kantoor from the list' }));
+    await user.click(within(items[1]).getByRole('button', { name: 'Remove Kantoor from the list' }));
     expect(onForgetRecent).toHaveBeenCalledWith('/home/a/Kantoor.oes.json');
   });
 
-  it('says where recent projects come from when there are none', () => {
+  it('says how to start when the library is empty', () => {
     renderWithProviders(<WelcomeScreen {...noop()} />);
-    expect(screen.getByText('Projects you open or save appear here.')).toBeInTheDocument();
+    expect(screen.getByText(/No projects yet\. Start with "New project"/)).toBeInTheDocument();
   });
 });
 

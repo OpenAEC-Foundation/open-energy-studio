@@ -53,6 +53,8 @@ import { isTauri } from '@tauri-apps/api/core';
 import { ConfirmProvider, Dialog, ToastProvider, useConfirm, useToast } from './components/ui';
 import { stampProject } from './core/io/KernelStampClient';
 import { forgetRecentProject, readRecentProjects, recordRecentProject } from './core/io/recentProjects';
+import { browserStore, readLibraryProject, removeFromLibrary, updateLibraryEntry } from './core/io/projectLibrary';
+import { LibraryOutcomeRecorder } from './components/WelcomeScreen/LibraryOutcomeRecorder';
 import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
 import type { DialogType, IProject } from './core/energy/types';
 import './components/shell/shell.css';
@@ -379,6 +381,7 @@ function ActiveDocumentContent({ onReport, ...props }: {
     <KernelProvider project={state.project}>
       <NtaDraftProvider>
         <DocumentReporter onReport={onReport} />
+        <LibraryOutcomeRecorder />
         <ActiveDocumentShell {...props} />
       </NtaDraftProvider>
     </KernelProvider>
@@ -517,6 +520,46 @@ function AppContent() {
     setRecentProjects(recordRecentProject({
       path: filePath, name: project.name, buildingFunction: project.buildingFunction, labelClass: report?.labelClass ?? undefined,
     }));
+  }, []);
+
+  // Project library (start screen): open, duplicate, move, archive and delete a card.
+  const openLibraryEntry = useCallback((id: string) => {
+    const open = docState.documents.find((doc) => doc.state.project.id === id);
+    if (open) { docDispatch({ type: 'DOC_SET_ACTIVE', payload: open.id }); return; }
+    const store = browserStore();
+    const snapshot = store ? readLibraryProject(store, id) : null;
+    if (!snapshot) { toast.show({ tone: 'error', title: t('library.menu.open'), message: t('library.noMatch') }); return; }
+    try {
+      docDispatch({ type: 'DOC_OPEN', payload: { id, project: normalizeProject(snapshot), filePath: null } });
+    } catch (err) {
+      toast.show({ tone: 'error', title: t('library.menu.open'), message: (err as Error).message });
+    }
+  }, [docState.documents, docDispatch, toast, t]);
+  const duplicateLibraryEntry = useCallback((id: string) => {
+    const store = browserStore();
+    const open = docState.documents.find((doc) => doc.state.project.id === id)?.state.project;
+    const source = open ?? (store ? readLibraryProject(store, id) : null);
+    if (!source) return;
+    const copy: IProject = { ...structuredClone(source), id: crypto.randomUUID(), name: `${source.name} (kopie)` };
+    delete copy.importLog;
+    docDispatch({ type: 'DOC_NEW', payload: { id: copy.id, project: copy } });
+  }, [docState.documents, docDispatch]);
+  const deleteLibraryEntry = useCallback((id: string) => {
+    const store = browserStore();
+    if (!store) return;
+    const name = docState.documents.find((doc) => doc.state.project.id === id)?.state.project.name ?? readLibraryProject(store, id)?.name ?? '';
+    if (!window.confirm(t('library.deleteConfirm', { name }))) return;
+    const open = docState.documents.find((doc) => doc.state.project.id === id);
+    if (open) docDispatch({ type: 'DOC_CLOSE', payload: open.id });
+    removeFromLibrary(store, id);
+  }, [docState.documents, docDispatch, t]);
+  const moveLibraryEntry = useCallback((id: string, folder: string | null) => {
+    const store = browserStore();
+    if (store) updateLibraryEntry(store, id, { folder: folder ?? undefined });
+  }, []);
+  const archiveLibraryEntry = useCallback((id: string, archived: boolean) => {
+    const store = browserStore();
+    if (store) updateLibraryEntry(store, id, { archived });
   }, []);
 
   const handleOpenExample = useCallback((kind: ExampleKind) => {
@@ -812,6 +855,11 @@ function AppContent() {
               recent={recentProjects}
               onOpenRecent={handleOpenRecent}
               onForgetRecent={(path) => setRecentProjects(forgetRecentProject(path))}
+              onOpenEntry={openLibraryEntry}
+              onDuplicateEntry={duplicateLibraryEntry}
+              onDeleteEntry={deleteLibraryEntry}
+              onMoveEntry={moveLibraryEntry}
+              onArchiveEntry={archiveLibraryEntry}
             />
           </main>
           <EmptyStatusBar />

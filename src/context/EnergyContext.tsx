@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback, ReactNode } from 'react';
 import { normalizeProject } from '../core/energy/normalizeProject';
 import { applyWindowTypes, detachWindowType } from '../core/energy/windowTypes';
+import { saveDocumentsToLibrary } from '../core/io/projectLibrary';
 import type { NormVersion } from '../core/nta/KernelClient';
 import {
   IProject,
@@ -1205,11 +1206,14 @@ function useAutosave(docState: DocumentManagerState) {
   // document this tab never changes is not written over a newer copy of another tab.
   const saved = useRef<Map<string, DocumentEntry> | null>(null);
   if (saved.current === null) saved.current = new Map(docState.documents.map((doc) => [doc.id, doc]));
+  // The project library keeps a card and a snapshot per project, also after the document closes.
+  const inLibrary = useRef(new Map<string, IProject>());
   useEffect(() => {
     if (!autosaveEnabled()) return undefined;
     const timer = window.setTimeout(() => {
       const store = storage();
       if (store && saved.current) saved.current = saveTo(store, docState, saved.current);
+      if (store) inLibrary.current = saveDocumentsToLibrary(store, docState.documents.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current);
     }, 500);
     return () => window.clearTimeout(timer);
   }, [docState]);

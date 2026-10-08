@@ -11,6 +11,7 @@ import { manualLabelsNl } from './manualLabels';
 import { existingLabelsNl } from './existingLabels';
 import { surveyLabelsNl } from './surveyLabels';
 import { buildFlowLabelsNl } from './buildFlowLabels';
+import { libraryLabelsNl } from './libraryLabels';
 
 export const nl: Record<string, string> = {
   // Generated kernel and survey code labels; specific keys below take precedence.
@@ -27,6 +28,7 @@ export const nl: Record<string, string> = {
   ...existingLabelsNl,
   ...surveyLabelsNl,
   ...buildFlowLabelsNl,
+  ...libraryLabelsNl,
   // App
   'app.title': 'Open Energy Studio',
   'app.untitledProject': 'Naamloos Project',
