@@ -39,6 +39,8 @@ Elke wijziging staat in de [releasenotes](nta8800-releasenotes.md), gegroepeerd 
 - staat er onder "Onuitgebracht" een item dat uitkomsten verandert (elk item, tenzij de titel "(geen rekenwijziging)" vermeldt), dan moet `KERNEL_VERSION` minstens een MINOR-stap boven de laatste uitgave staan;
 - een verhoogde `KERNEL_VERSION` vraagt minstens één onuitgebracht item.
 
+Daarna controleert `scripts/nta-manual.mjs check` de handleiding: de stempel `<!-- handleiding: rekenkern X.Y.Z -->` in `docs/handleiding-nta8800/index.md` moet gelijk zijn aan `KERNEL_VERSION`. Wie de rekenkernversie ophoogt, loopt de handleiding na voor die versie en past de stempel (en de zichtbare regel eronder) aan; zo gaat een nieuwe kern nooit uit met een handleiding die er niet voor is nagelopen (BRL 9501 §4.4).
+
 Eén ophoging per uitgaveronde volstaat: latere uitkomstwijzigingen vóór de vrijgave vallen onder dezelfde nieuwe versie. Een nieuwe normversie, een wijzigingsblad of een bindende interpretatie vraagt een MAJOR-stap. De gate kan dat onderscheid niet zelf maken; dat blijft een beoordeling bij het ophogen.
 
 **Waarom 0.2.0.** `KERNEL_VERSION` stond van 30 september tot 8 oktober 2026 op 0.1.0, terwijl in die periode veel wijzigingen uitkomsten veranderden (onder meer de oudere uitgaven en herstelde routes). Achteraf is niet meer per commit vast te stellen welke stand een "0.1.0"-stempel had. Daarom bundelt 0.2.0 alle wijzigingen van die periode, en begint het afgedwongen beleid daar. Een project met een 0.1.0-stempel van na 30 september moet bij twijfel opnieuw worden berekend.
@@ -49,8 +51,9 @@ Eén ophoging per uitgaveronde volstaat: latere uitkomstwijzigingen vóór de vr
 1. de onuitgebrachte items gaan onder "Rekenkern `KERNEL_VERSION`" in de releasenotes, in één commit (alleen als de rekenkernversie nieuw is);
 2. de volledige gate draait; het log en het rapport van de referentiesuites komen in het archief;
 3. de desktoppakketten worden offline gebouwd;
-4. het [leveringsdocument](templates/nta8800-leveringsdocument.md) wordt gevuld uit `src/core/nta/attest.json`, de versienummers en de SHA-256 van de pakketten; daarnaast een `manifest.json` en `SHA256SUMS`;
-5. er komt een lokale, geannoteerde git-tag `oes-v<programmaversie>-kernel-v<rekenkernversie>`.
+4. de handleiding gaat mee als één HTML-bestand (`handleiding/handleiding-nta8800-<programmaversie>.html`, afbeeldingen ingebed) met de programma- en rekenkernversie erin, en als PDF wanneer chromium of wkhtmltopdf op de buildmachine staat;
+5. het [leveringsdocument](templates/nta8800-leveringsdocument.md) wordt gevuld uit `src/core/nta/attest.json`, de versienummers en de SHA-256 van de pakketten en de handleiding; daarnaast een `manifest.json` en `SHA256SUMS`;
+6. er komt een lokale, geannoteerde git-tag `oes-v<programmaversie>-kernel-v<rekenkernversie>`.
 
 Het archief staat in `release/<tag>/` (niet in git). Pushen van de tag en publiceren van het archief zijn een aparte, handmatige stap. `--dry-run` doet alles zonder commit en tag, en schrijft naar `release/dry-run-<tag>/`.
 

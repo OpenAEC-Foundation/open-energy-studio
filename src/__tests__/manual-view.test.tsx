@@ -56,7 +56,7 @@ describe('in-app manual (BRL 9501 §4.4)', () => {
     const links = screen.getAllByRole('link').filter((link) => link.getAttribute('data-chapter') === '00-werken-met-het-programma');
     expect(links.length).toBeGreaterThan(0);
     await user.click(links.find((link) => link.getAttribute('href')?.includes('#manual-')) ?? links[0]);
-    expect(onOpen.mock.calls.at(-1)?.[0]).toMatch(/^00-werken-met-het-programma/);
+    expect(onOpen.mock.lastCall?.[0]).toMatch(/^00-werken-met-het-programma/);
   });
 
   it('classifies links: chapters, anchors, outside pages and project documents', () => {

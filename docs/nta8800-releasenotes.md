@@ -13,7 +13,13 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
-Nog geen items.
+### 9 oktober 2026 — handleiding in de app en bij elke vrijgave (geen rekenwijziging)
+
+- **Handleiding in de app** (BRL 9501 §4.4, taak B7). *Gereedschap › Handleiding* toont de gebruikershandleiding uit `docs/handleiding-nta8800/`. De hoofdstukken en afbeeldingen zitten in de build, dus de desktop-app toont ze ook offline. Links tussen hoofdstukken blijven in de viewer; verwijzingen naar andere documenten tonen hun pad. Naast de inhoud staan de programmaversie, de rekenkernversie waarvoor de handleiding is nagelopen en de rekenkern van deze installatie; verschillen die, dan meldt de viewer dat.
+- **Contextgevoelig.** Elke werkstap heeft een knop *Handleiding* naar het hoofdstuk over die stap. *Instellingen › Over* toont de handleidingversie en opent de handleiding, ook zonder open project.
+- **Bij de vrijgave.** `scripts/release-nta.sh` zet de handleiding als één HTML-bestand in het archief, met beide versies erin en de SHA-256 in het leveringsdocument, `manifest.json` en `SHA256SUMS`. Een PDF volgt alleen als chromium of wkhtmltopdf aanwezig is.
+- **Gatecontrole.** `scripts/nta-manual.mjs check` faalt als de stempel in `index.md` niet de huidige `KERNEL_VERSION` noemt.
+- De Markdown wordt door één eigen, kleine parser gelezen (`scripts/nta-manual-markdown.mjs`), zonder nieuwe afhankelijkheid. Alle tekst wordt als tekst getoond; onveilige links (`javascript:` en dergelijke) worden niet gevolgd.
 
 ## Rekenkern 0.2.0 — 8 oktober 2026
 <!-- kernel-version: 0.2.0 -->
