@@ -1571,6 +1571,98 @@ CASES += [
 ]
 
 
+# --- EP-W203g, EP-W204b/f/g/i: further heating generators (p. 25-28) ---
+def external_heat(test_id, measured_only):
+    """Heat supply with an annex P quality declaration (§5.8.0): f_P 0,5,
+    f_Pren 0,3, K_CO2 0,1 kg/kWh. The distribution pump is outside 9.85."""
+    basis = "uitsluitend op basis van metingen" if measured_only else "op basis van berekeningen"
+    return [
+        setp(
+            GEN,
+            {
+                "kind": "external_heat",
+                "supplierReference": f"ISSO 54 v2.0 {test_id}: warmtelevering met kwaliteitsverklaring",
+                "qualityDeclarationPresent": True,
+                "auxiliary": {"electricallyConnectedDevices": 1, "sourceReference": f"ISSO 54 v2.0 {test_id}: afleverset met distributiepomp"},
+            },
+        ),
+        setp(
+            f"{NTA}/externalSupply",
+            {
+                "heating": {
+                    "method": "declared",
+                    "primaryFactor": 0.5,
+                    "renewableFactor": 0.3,
+                    "co2KgPerKwh": 0.1,
+                    "declarationReference": f"ISSO 54 v2.0 {test_id}: kwaliteitsverklaring, factoren {basis}",
+                    "measuredOnly": measured_only,
+                }
+            },
+        ),
+        CALCULATED_PUMP,
+    ]
+
+
+def micro_chp(test_id, hre, low_temperature, why):
+    """A micro-CHP below 2 kW electric (table 9.31; 2 kW taken as the class
+    value, every power up to 2 kW is the same row), installed 2021."""
+    return [
+        setp(
+            GEN,
+            {
+                "kind": "chp",
+                "chp": {"powerKw": 1.0, "builtAfter2006": True, "hreDeclared": hre, "lowTemperature": low_temperature},
+                "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": 6.0, "sourceReference": f"ISSO 54 v2.0 {test_id}: micro-WKK; thermisch vermogen niet gegeven, 6 kW aangenomen (fictief) voor 9.91"},
+                "equipmentReference": why,
+            },
+        ),
+        CALCULATED_PUMP,
+    ]
+
+
+CASES += [
+    ("EPW204b", 27, external_heat("EP-W204b", True)),
+    ("EPW204i", 28, external_heat("EP-W204i", False)),
+    (
+        "EPW204f",
+        28,
+        micro_chp("EP-W204f", True, False, "ISSO 54 v2.0 EP-W204f p. 28: micro-WKK < 2 kW met HRe-label, HT")
+        + [temperature_class("75_65")],
+    ),
+    (
+        "EPW204g",
+        28,
+        micro_chp("EP-W204g", False, True, "ISSO 54 v2.0 EP-W204g p. 28: micro-WKK < 2 kW zonder HRe-label, LT")
+        + [temperature_class("45_40")],
+    ),
+    # EP-W203g: air-to-air heat pump on outdoor air with air heating (p. 25):
+    # no water-borne distribution.
+    (
+        "EPW203g",
+        25,
+        [
+            heat_pump("EP-W203g", "outdoor_air", None, sink="indoor_air"),
+            renewable("EP-W203g", True),
+            setp(
+                f"{NTA}/emission",
+                {
+                    "system": "air_heating",
+                    "balancing": "not_applicable",
+                    "control": "individual_room_thermostats",
+                    "sourceReference": "ISSO 54 v2.0 EP-W203g p. 25: luchtverwarming, regeling als EP-W001",
+                    "edition2023": {"kind": {"type": "dwelling_air", "control": "room"}, "roomAutomation": "individual_per_room", "pipeSystem": "not_hydronic", "balancing": "none_or_unknown"},
+                },
+            ),
+            remove(f"{NTA}/distributionSystem"),
+            setp(
+                f"{NTA}/distribution",
+                {"method": "declared", "monthlyLossKwh": [0.0] * 12, "sourceReference": "luchtverwarming zonder watergedragen distributie: geen distributieverlies"},
+            ),
+        ],
+    ),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
