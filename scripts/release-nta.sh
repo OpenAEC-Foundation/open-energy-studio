@@ -9,8 +9,10 @@
 #  2. runs the full gate (scripts/verify-nta.sh), keeping its log and the
 #     reference-suite report;
 #  3. builds the desktop packages (Tauri, .deb) offline;
-#  4. writes the leveringsdocument, a manifest and SHA256SUMS;
-#  5. creates the annotated git tag oes-v<program>-kernel-v<kernel>.
+#  4. exports the user manual as one HTML file (and a PDF when chromium or
+#     wkhtmltopdf is installed), stamped with both versions (BRL 9501 §4.4);
+#  5. writes the leveringsdocument, a manifest and SHA256SUMS;
+#  6. creates the annotated git tag oes-v<program>-kernel-v<kernel>.
 # Everything lands in release/<tag>/ (ignored by git). Nothing is pushed:
 # publishing the tag and the archive is a separate, manual step.
 #
@@ -137,13 +139,36 @@ else
   fi
 fi
 
+step "handleiding (BRL 9501 §4.4)"
+node scripts/nta-manual.mjs check
+mkdir -p "$archive/handleiding"
+manual_html="$archive/handleiding/handleiding-nta8800-${program_version}.html"
+node scripts/nta-manual.mjs html --out "$manual_html" --program "$program_version" --date "$release_date"
+manual_files=("$manual_html")
+manual_pdf="${manual_html%.html}.pdf"
+pdf_tool=""
+for candidate in chromium chromium-browser google-chrome wkhtmltopdf; do
+  if command -v "$candidate" >/dev/null 2>&1; then pdf_tool="$candidate"; break; fi
+done
+if [[ "$pdf_tool" == wkhtmltopdf ]]; then
+  wkhtmltopdf --quiet "$manual_html" "$manual_pdf" && manual_files+=("$manual_pdf")
+elif [[ -n "$pdf_tool" ]]; then
+  "$pdf_tool" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="$PWD/$manual_pdf" "file://$PWD/$manual_html" >/dev/null 2>&1 \
+    && manual_files+=("$manual_pdf")
+fi
+if [[ ${#manual_files[@]} -eq 1 ]]; then
+  printf 'Geen PDF-omzetter (chromium of wkhtmltopdf) gevonden: de handleiding gaat mee als HTML.\n'
+fi
+manual_args=()
+for file in "${manual_files[@]}"; do manual_args+=(--manual "$file"); done
+
 step "leveringsdocument"
 node scripts/nta-leveringsdocument.mjs --out "$archive/leveringsdocument.md" \
-  --commit "$commit" --tag "$tag" --date "$release_date" "${packages[@]}"
+  --commit "$commit" --tag "$tag" --date "$release_date" "${manual_args[@]}" "${packages[@]}"
 
 step "manifest en SHA256SUMS"
 node --input-type=module -e "
-  import { readIdentity } from './scripts/nta-leveringsdocument.mjs';
+  import { readIdentity, sha256File } from './scripts/nta-leveringsdocument.mjs';
   import { writeFileSync } from 'node:fs';
   const manifest = {
     ...readIdentity('.'),
@@ -153,6 +178,9 @@ node --input-type=module -e "
     dryRun: $dry_run === 1,
     gate: '$gate_status',
     packagesBuilt: $skip_build === 0,
+    manual: '${manual_files[*]}'.split(' ').filter(Boolean).map((path) => ({
+      file: path.slice('$archive/'.length), sha256: sha256File(path),
+    })),
   };
   writeFileSync('$archive/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 "

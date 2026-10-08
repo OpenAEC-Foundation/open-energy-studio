@@ -24,7 +24,9 @@ export function manualLinkTarget(href: string, current: string):
   | { kind: 'chapter'; target: LinkTarget }
   | { kind: 'external'; href: string }
   | { kind: 'document'; path: string } {
-  const safe = safeHref(href) ?? '';
+  const safe = safeHref(href);
+  // An unsafe scheme (javascript:, data:, …) is shown as text, never followed.
+  if (safe === null) return { kind: 'document', path: href };
   if (/^(https?:|mailto:)/i.test(safe)) return { kind: 'external', href: safe };
   const [path, anchor] = safe.split('#');
   if (!path) return { kind: 'chapter', target: { chapter: current, ...(anchor ? { anchor } : {}) } };

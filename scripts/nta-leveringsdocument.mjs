@@ -5,7 +5,7 @@
 // package, filled into docs/templates/nta8800-leveringsdocument.md.
 //
 //   node scripts/nta-leveringsdocument.mjs --out <file.md> [--commit <sha>]
-//        [--tag <tag>] [--date <yyyy-mm-dd>] [package ...]
+//        [--tag <tag>] [--date <yyyy-mm-dd>] [--manual <file>]... [package ...]
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -40,6 +40,9 @@ export function renderLeveringsdocument(template, values) {
   const packages = values.packages.length
     ? values.packages.map((item) => `| \`${item.name}\` | \`${item.sha256}\` |`).join('\n')
     : '| (geen pakketten gebouwd) | – |';
+  const manual = values.manual?.length
+    ? values.manual.map((item) => `| \`${item.name}\` | \`${item.sha256}\` |`).join('\n')
+    : '| (geen handleiding meegeleverd) | – |';
   const attested = Boolean(values.attestNumber);
   const fields = {
     ...values,
@@ -49,6 +52,7 @@ export function renderLeveringsdocument(template, values) {
     commit: values.commit || 'onbekend',
     tag: values.tag || 'geen',
     packages,
+    manual,
     attestStatement: attested
       ? `Dit programma is geattesteerd volgens BRL 9501 onder attestnummer ${values.attestNumber}.`
       : 'Dit programma is niet geattesteerd volgens BRL 9501. Het attestnummer en de identificatiecode worden ingevuld zodra het attest is verleend.',
@@ -61,10 +65,15 @@ export function renderLeveringsdocument(template, values) {
 
 function main(argv) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const options = { packages: [] };
+  const options = { packages: [], manual: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
-    if (['--out', '--commit', '--tag', '--date'].includes(flag)) {
+    if (flag === '--manual') {
+      const value = argv[i + 1];
+      if (value === undefined) throw new Error('--manual vraagt een bestand');
+      options.manual.push(value);
+      i += 1;
+    } else if (['--out', '--commit', '--tag', '--date'].includes(flag)) {
       const value = argv[i + 1];
       if (value === undefined) throw new Error(`${flag} vraagt een waarde`);
       options[flag.slice(2)] = value;
@@ -82,6 +91,7 @@ function main(argv) {
     tag: options.tag,
     releaseDate: dutchDate(date),
     packages: options.packages.map((path) => ({ name: basename(path), sha256: sha256File(path) })),
+    manual: options.manual.map((path) => ({ name: basename(path), sha256: sha256File(path) })),
   });
   writeFileSync(options.out, text);
   console.log(`Leveringsdocument geschreven: ${options.out}`);

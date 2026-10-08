@@ -21,6 +21,14 @@ Dit leveringsdocument hoort bij de levering van het NTA 8800-rekenprogramma (BRL
 | --- | --- |
 {{packages}}
 
+## Handleiding
+
+De gebruikershandleiding van deze versie (BRL 9501 §4.4), uit `docs/handleiding-nta8800/`, met de programma- en rekenkernversie erin gestempeld. Dezelfde handleiding zit in het programma (Gereedschap › Handleiding).
+
+| Bestand | SHA-256 |
+| --- | --- |
+{{manual}}
+
 ## Bijgeleverde verificatie
 
 - De testrapporten van deze vrijgave (gate en referentieberekeningen) staan naast dit document in het vrijgavearchief, met hun eigen SHA-256 in `SHA256SUMS`.
