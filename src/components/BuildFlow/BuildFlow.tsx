@@ -16,6 +16,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import { useKernel } from '../../context/KernelProvider';
 import { useNtaDraft } from '../../context/NtaDraftProvider';
 import { useShellActions } from '../shell/ShellActions';
+import { ProjectDataFields } from '../shared/ProjectDataFields';
 import { useInvalidFields } from '../SurveyWizard/SurveyWizard';
 import { IssueList } from '../ui';
 import { routeForPath } from '../../core/nta/gapRoutes';
@@ -230,16 +231,8 @@ export function ProjectInfoQuestion() {
   const set = (payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city'>>) =>
     dispatch({ type: 'UPDATE_PROJECT_INFO', payload });
   return <div className="build-project">
+    <ProjectDataFields />
     <div className="build-fields">
-      <label className="build-field build-field--wide">{t('dialog.projectInfo.name')}
-        <input type="text" value={project.name} onChange={(event) => set({ name: event.target.value })} />
-      </label>
-      <label className="build-field">{t('dialog.projectInfo.address')}
-        <input type="text" value={project.address} onChange={(event) => set({ address: event.target.value })} />
-      </label>
-      <label className="build-field">{t('dialog.projectInfo.city')}
-        <input type="text" value={project.city} onChange={(event) => set({ city: event.target.value })} />
-      </label>
       <label className="build-field build-field--wide">{t('dialog.projectInfo.description')}
         <textarea rows={2} value={project.description} onChange={(event) => set({ description: event.target.value })} />
       </label>

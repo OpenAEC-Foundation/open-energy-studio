@@ -5,7 +5,7 @@
  */
 import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from './test-utils';
 import { createDefaultProject, useEnergy } from '../context/EnergyContext';
 import { RegistrationPage } from '../components/shell/pages/RegistrationPage';
@@ -14,6 +14,8 @@ import {
   parseHouseNumber, registrationChecklist, surveyRegistration, takeoversPending, validUntil,
 } from '../core/survey/surveyRegistration';
 import type { IProject } from '../core/energy/types';
+import { ProjectDataFields } from '../components/shared/ProjectDataFields';
+import { projectAddress } from '../components/SurveyWizard/SurveyWizard';
 
 function surveyProject(): IProject {
   const basisopname = { ...surveyTemplate('residential'), progress: {}, surveyDate: '2021-04-24' };
@@ -24,6 +26,25 @@ function surveyProject(): IProject {
     registration: { postcode: '2800 AA', surveyingAdvisor: { name: 'A. Adviseur', competenceNumber: '123' } },
   } as IProject;
 }
+
+describe('project data on one place', () => {
+  it('stores the house number, BAG id and client with the address, and the address text includes the number', async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const { state } = useEnergy();
+      return <><ProjectDataFields /><output data-testid="registration">{JSON.stringify(state.project.registration ?? null)}</output></>;
+    }
+    renderWithProviders(<Harness />);
+    await user.type(screen.getByRole('textbox', { name: 'House number' }), '12');
+    await user.type(screen.getByRole('textbox', { name: 'Addition' }), 'a');
+    await user.type(screen.getByRole('textbox', { name: 'BAG id of the object' }), '0513010000000001');
+    await user.type(screen.getByRole('textbox', { name: 'Client' }), 'Eigenaar');
+    expect(JSON.parse(screen.getByTestId('registration').textContent ?? 'null'))
+      .toMatchObject({ houseNumber: '12', houseNumberAddition: 'a', bagObjectId: '0513010000000001', client: 'Eigenaar' });
+    expect(projectAddress({ address: 'Straat', city: 'Delft', registration: { postcode: '1234 AB', houseNumber: '12', houseNumberAddition: 'a' } })).toBe('Straat 12a, 1234 AB Delft');
+    expect(projectAddress({ address: 'Straat 12', city: 'Delft', registration: { houseNumber: '12' } })).toBe('Straat 12, Delft');
+  }, 60000);
+});
 
 describe('survey registration', () => {
   it('takes the survey answers over and parses the house number', () => {
@@ -71,10 +92,11 @@ describe('survey registration', () => {
     await waitFor(() => expect(JSON.parse(screen.getByTestId('registration').textContent ?? 'null'))
       .toMatchObject({ purpose: 'existing_building', surveyType: 'basic', surveyDate: '2021-04-24' }));
     expect(screen.queryByRole('textbox', { name: /WLC-GWP/ })).not.toBeInTheDocument();
-    await user.type(screen.getByRole('textbox', { name: 'BAG id of the object' }), '0513010000000001');
-    expect(JSON.parse(screen.getByTestId('registration').textContent ?? 'null')).toMatchObject({ bagObjectId: '0513010000000001' });
-    await user.click(screen.getAllByRole('button', { name: 'Go to' })[0]);
-    expect(navigate).toHaveBeenCalled();
+    // The BAG id is project data, entered on the survey's first question; the checklist leads there.
+    expect(screen.queryByRole('textbox', { name: 'BAG id of the object' })).not.toBeInTheDocument();
+    const bagRow = screen.getByText('BAG identification of the object').closest('li')!;
+    await user.click(within(bagRow).getByRole('button', { name: 'Go to' }));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ step: 'survey', question: 'adres' }));
     expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   }, 60000);
 });

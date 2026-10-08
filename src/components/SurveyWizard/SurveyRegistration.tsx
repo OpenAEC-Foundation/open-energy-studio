@@ -20,7 +20,7 @@ import type { Route } from '../../core/navigation/routes';
 import { EvidenceRegister } from '../dialogs/ProjectInfoDialog/EvidenceRegister';
 import type { ShellActions } from '../shell/ShellActions';
 
-type FieldKey = 'bagObjectId' | 'houseNumber' | 'houseNumberAddition' | 'client' | 'registrationDate' | 'replacedEpOnlineNumber';
+type FieldKey = 'registrationDate' | 'replacedEpOnlineNumber';
 
 const ICON = { done: CheckCircle2, open: CircleX, waiting: Clock };
 
@@ -65,8 +65,8 @@ export function SurveyRegistration({ actions }: { actions: Pick<ShellActions, 'n
     adviser: () => actions.navigate({ step: 'survey', sub: surveyStep, question: 'adres' } as Route),
     certificate: () => actions.navigate({ step: 'survey', sub: surveyStep, question: 'adres' } as Route),
     surveyDate: () => actions.navigate({ step: 'survey', sub: surveyStep, question: 'adres' } as Route),
-    bag: () => focus('bagObjectId'),
-    client: () => focus('client'),
+    bag: () => actions.navigate({ step: 'survey', sub: surveyStep, question: 'adres' } as Route),
+    client: () => actions.navigate({ step: 'survey', sub: surveyStep, question: 'adres' } as Route),
     registrationDate: () => focus('registrationDate'),
     reasons: () => actions.navigate({ step: 'survey', sub: 'controle' } as Route),
     evidence: () => {
@@ -119,7 +119,7 @@ export function SurveyRegistration({ actions }: { actions: Pick<ShellActions, 'n
               <span className="survey-reg-text">{t(`surveyReg.item.${item.id}`)}{text && <small>{text}</small>}</span>
               <span className="sr-only">{t(`surveyReg.state.${item.state}`)}</span>
               {item.state !== 'done' && action && <button type="button" className="btn" onClick={action}>
-                {t(item.id === 'bag' || item.id === 'client' || item.id === 'registrationDate' ? 'surveyReg.fill' : 'surveyReg.goTo')}</button>}
+                {t(item.id === 'registrationDate' ? 'surveyReg.fill' : 'surveyReg.goTo')}</button>}
             </li>;
           })}
         </ul>
@@ -128,10 +128,6 @@ export function SurveyRegistration({ actions }: { actions: Pick<ShellActions, 'n
       <section className="survey-card" aria-labelledby="sreg-fields">
         <h2 id="sreg-fields" className="survey-overline">{t('surveyReg.fields')}</h2>
         <div className="nta-form"><div className="nta-form-grid">
-          {field('bagObjectId')}
-          {field('houseNumber')}
-          {field('houseNumberAddition')}
-          {field('client')}
           <label>{t('surveyReg.field.representation')}
             <select value={registration.representation ?? ''}
               onChange={(event) => set({ representation: (event.target.value || undefined) as NtaRegistration['representation'] })}>

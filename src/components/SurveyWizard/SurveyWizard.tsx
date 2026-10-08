@@ -25,6 +25,7 @@ import {
 import { assessSurvey, currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
 import { labelColor } from '../shell/pages/results/resultsData';
 import { KernelCode } from '../KernelCode/KernelCode';
+import { ProjectDataFields } from '../shared/ProjectDataFields';
 import type { Route } from '../../core/navigation/routes';
 import type { OpnameAssessment } from '../../core/nta/KernelClient';
 import './SurveyWizard.css';
@@ -78,40 +79,9 @@ function ChoiceCards({ options, selected, onPick, label }: {
 }
 
 /** The fields of one question: choice cards, or the matching part of the survey form. */
-/** The project and address of the survey, as on the ISSO opnameformulier (paragraph 1). */
-function AddressFields({ t }: { t: T }) {
-  const { state, dispatch } = useEnergy();
-  const project = state.project;
-  const registration = (project.registration ?? {}) as NonNullable<typeof project.registration>;
-  const stored = project.basisopname as (Stored & { surveyDate?: string }) | undefined;
-  const set = (payload: Record<string, unknown>) => dispatch({ type: 'UPDATE_PROJECT_INFO', payload });
-  // The registering adviser taken over from the surveying one follows its changes (Registratie).
-  const setAdvisor = (surveyingAdvisor: { name: string; competenceNumber: string }) => {
-    const follows = JSON.stringify(registration.registeringAdvisor) === JSON.stringify(registration.surveyingAdvisor);
-    set({ registration: { ...registration, surveyingAdvisor, ...(follows ? { registeringAdvisor: { ...surveyingAdvisor } } : {}) } });
-  };
-  const text = (label: string, value: string | undefined, onChange: (value: string) => void, wide = false) =>
-    <label className={wide ? 'survey-address-wide' : undefined}>{label}
-      <input type="text" value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
-    </label>;
-  return <div className="nta-form survey-address"><div className="nta-form-grid">
-    {text(t('survey.address.name'), project.name, (name) => set({ name }), true)}
-    {text(t('survey.address.street'), project.address, (address) => set({ address }), true)}
-    {text(t('survey.address.postcode'), (registration as { postcode?: string }).postcode,
-      (postcode) => set({ registration: { ...registration, postcode: postcode || undefined } }))}
-    {text(t('survey.address.city'), project.city, (city) => set({ city }))}
-    <p className="nta-form-subhead">{t('survey.address.adviser')}</p>
-    {text(t('survey.address.adviserName'), registration.surveyingAdvisor?.name,
-      (name) => setAdvisor({ name, competenceNumber: registration.surveyingAdvisor?.competenceNumber ?? '' }))}
-    {text(t('survey.address.adviserNumber'), registration.surveyingAdvisor?.competenceNumber,
-      (competenceNumber) => setAdvisor({ name: registration.surveyingAdvisor?.name ?? '', competenceNumber }))}
-    {text(t('survey.address.certificate'), registration.certificateNumber,
-      (certificateNumber) => set({ registration: { ...registration, certificateNumber: certificateNumber || undefined } }))}
-    {stored && <label>{t('survey.surveyDate')}
-      <input type="date" value={stored.surveyDate ?? ''}
-        onChange={(event) => dispatch({ type: 'SET_BASISOPNAME', payload: { ...stored, surveyDate: event.target.value || undefined } })} />
-    </label>}
-  </div></div>;
+/** The project and address of the survey, as on the ISSO opnameformulier (paragraph 1): the shared project data block. */
+function AddressFields() {
+  return <ProjectDataFields />;
 }
 
 function QuestionBody({ part, stored, draft, change, t }: {
@@ -119,7 +89,7 @@ function QuestionBody({ part, stored, draft, change, t }: {
 }) {
   const field = { draft, onChange: change };
   switch (part) {
-    case 'address': return <AddressFields t={t} />;
+    case 'address': return <AddressFields />;
     case 'dwellingType': {
       const choice = dwellingChoice(draft);
       const pick = (id: string) => {
@@ -445,9 +415,13 @@ function ResultCard({ result, busy, error, t, locale, onIssues }: {
 
 /** Everything on one page: the outcome, a card per step, the kernel notices and the defaults. */
 /** "EDR-straat 25, 3013 AL Rotterdam" from the project data; null when empty. */
-export function projectAddress(project: { address?: string; city?: string; registration?: { postcode?: string } }): string | null {
+export function projectAddress(project: { address?: string; city?: string; registration?: { postcode?: string; houseNumber?: string; houseNumberAddition?: string } }): string | null {
+  const street = project.address?.trim() ?? '';
+  const number = [project.registration?.houseNumber, project.registration?.houseNumberAddition].filter((part) => part && part.trim()).join('');
+  // The house number is its own field; an older project may still have it in the street.
+  const line = number && !street.endsWith(number) ? `${street} ${number}`.trim() : street;
   const place = [project.registration?.postcode, project.city].filter((part) => part && part.trim()).join(' ');
-  const text = [project.address?.trim(), place].filter(Boolean).join(', ');
+  const text = [line, place].filter(Boolean).join(', ');
   return text || null;
 }
 
