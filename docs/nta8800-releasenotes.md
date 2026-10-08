@@ -2,6 +2,18 @@
 
 Wijzigingen die de uitkomst of de status van bestaande, opgeslagen projecten veranderen. Normverwijzingen gaan naar NTA 8800:2025+C1:2026, met paragraaf-, formule- en paginanummers.
 
+## 8 oktober 2026 — verklaringen k en l bij het label; attestnummer en NL-EPBD-merk
+
+- **Verklaringen k en l (Omgevingsregeling art. 5.13a lid 1).** De registratie heeft nu `labelStatements` met twee ja/nee-verklaringen van de adviseur:
+  - `respondsToExternalSignals` (k): kan het gebouw reageren op externe signalen en zijn energiegebruik aanpassen;
+  - `lowTemperatureHeating` (l): is het verwarmingsdistributiesysteem ontworpen voor lage temperatuur.
+
+  Voor een registratie vanaf 29 mei 2026 meldt de kern `label_statement_external_signals_required` en `label_statement_low_temperature_required` (ernst `missing`). De registratiedatum beslist, anders de opnamedatum; zonder datum worden ze gevraagd. **Gevolg voor opgeslagen projecten:** een registratie vanaf 29 mei 2026 zonder deze verklaringen is niet meer volledig (`dossierComplete: false`) tot ze zijn ingevuld. Uitkomsten veranderen niet.
+
+  Het rapport toont de verklaringen bij de labelgegevens. Het EP-Online-gegevensoverzicht zet ze in een apart blok `labelStatements`, omdat het openbare exportschema er geen velden voor heeft.
+- **Attestnummer en NL-EPBD-merk (BRL 9501 §8.2 en §8.4).** Het attestnummer wordt op één plaats gelezen (`src/core/nta/Attest.ts`). Alleen met een attestnummer tonen het venster "Over" en het rapport het nummer en het vak voor het NL-EPBD-merk. Het officiële beeldmerk staat niet in de repository. Zonder attestnummer verandert er niets: "niet geattesteerd" en geen merk.
+- **Programmabeschrijving.** Nieuw: [globale beschrijving van het rekenprogramma](nta8800-programmabeschrijving.md) voor de attesteringsinstelling (BRL 9501 §3.0).
+
 ## 8 oktober 2026 — kelder met diepte per wanddeel rekent weer; dekking van alle opties
 
 - Een verwarmde kelder met de diepte per wanddeel (`groundFloors[].heatedBasement.wallDepths`, 8.42/D.12) zonder `depthM` gaf status `invalid` met `non_finite_result`. De lege `depthM` kwam als NaN in de afgeleide invoer. Hij blijft nu weg, net als de lege `reductionFactor` van 7 oktober.

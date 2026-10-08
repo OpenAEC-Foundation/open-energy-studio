@@ -1822,7 +1822,10 @@ mod tests {
             responds_to_external_signals: Some(false),
             low_temperature_heating: None,
         });
-        assert_eq!(codes(&late), vec!["label_statement_low_temperature_required"]);
+        assert_eq!(
+            codes(&late),
+            vec!["label_statement_low_temperature_required"]
+        );
         late.label_statements = Some(LabelStatements {
             responds_to_external_signals: Some(false),
             low_temperature_heating: Some(true),
