@@ -320,6 +320,11 @@ pub struct Circulation {
     /// Declared Ψ (13.27–13.29) instead of table 13.4.
     #[serde(default)]
     pub declared_psi_w_per_mk: Option<f64>,
+    /// Ψ calculated from the pipe geometry with 13.27–13.29 (2025+C1
+    /// p. 551), e.g. a pipe embedded in the construction (13.28); exclusive
+    /// with `declaredPsiWPerMK`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calculated_psi: Option<crate::heating_distribution::PipeGeometry>,
     pub fittings_insulated: bool,
     /// Actual length; omitted means 13.31.
     #[serde(default)]
@@ -2106,6 +2111,20 @@ pub fn validate_hot_water(
                 push(
                     "hot_water_circulation_value_invalid",
                     &format!("circulation.{field}"),
+                );
+            }
+        }
+        if let Some(geometry) = &circulation.calculated_psi {
+            if geometry.psi().is_none() {
+                push(
+                    "hot_water_pipe_geometry_invalid",
+                    "circulation.calculatedPsi",
+                );
+            }
+            if circulation.declared_psi_w_per_mk.is_some() {
+                push(
+                    "hot_water_psi_declared_and_calculated",
+                    "circulation.calculatedPsi",
                 );
             }
         }
@@ -4082,7 +4101,11 @@ pub fn assess_hot_water_with(
                 80.0
             }
         });
-        let psi = circulation.declared_psi_w_per_mk.unwrap_or_else(|| {
+        let calculated = circulation
+            .calculated_psi
+            .as_ref()
+            .and_then(crate::heating_distribution::PipeGeometry::psi);
+        let psi = circulation.declared_psi_w_per_mk.or(calculated).unwrap_or_else(|| {
             match circulation.outer_diameter_mm {
                 // NTA 8800:2023 (p. 542) has no table 13.29 nor the 35/80 mm
                 // rule (2024 p. 537–538) but rows "klein"/"overig" for an
@@ -5251,6 +5274,77 @@ mod tests {
         assert!((shower_recovery_efficiency(&at_80, false) - 0.32).abs() < 1e-12);
     }
 
+    /// 13.28 (2025+C1 p. 551) for the ISSO 54 EP-W402f pipe embedded in
+    /// the construction: d_i 0,02, d_a 0,04, z 0,03, λ_D 0,04, λ_em 2.
+    #[test]
+    fn calculated_psi_of_an_embedded_circulation_pipe() {
+        let geometry = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+            pipe_outer_diameter_m: 0.02,
+            insulated_diameter_m: 0.04,
+            insulation_lambda: 0.04,
+            embedding_lambda: 2.0,
+            depth_m: 0.03,
+        };
+        let psi = geometry.psi().unwrap();
+        let expected =
+            std::f64::consts::PI / (0.5 * ((2.0_f64).ln() / 0.04 + (3.0_f64).ln() / 2.0));
+        assert!((psi - expected).abs() < 1e-12);
+        let mut input = system(HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: None,
+            pilot_flame: false,
+        });
+        let circulation = |declared: Option<f64>, calculated| Circulation {
+            outer_diameter_mm: Some(15.0),
+            insulation: PipeInsulation::Mm15,
+            declared_psi_w_per_mk: declared,
+            calculated_psi: calculated,
+            fittings_insulated: true,
+            length_m: None,
+            unheated_length_m: Some(0.0),
+            unheated_ambient_c: None,
+            floor_count: 2,
+            sport_hall_area_m2: 0.0,
+            connected_dwellings: None,
+            pump: CirculationPump {
+                control: PumpControl::UncontrolledOrUnknown,
+                label_power_kw: None,
+                energy_efficiency_index: None,
+            },
+            source_reference: "design".into(),
+        };
+        input.circulation = Some(circulation(None, Some(geometry)));
+        let calculated = assess_hot_water(&input, context()).unwrap();
+        input.circulation = Some(circulation(Some(psi), None));
+        let declared = assess_hot_water(&input, context()).unwrap();
+        for (a, b) in calculated.months.iter().zip(&declared.months) {
+            assert!((a.circulation_loss_kwh - b.circulation_loss_kwh).abs() < 1e-12);
+        }
+        // Not both, and no Ψ for impossible geometry (4·z ≤ d_a).
+        input.circulation = Some(circulation(Some(psi), Some(geometry)));
+        let codes: Vec<&str> = validate_hot_water(&input, context(), "w")
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert!(codes.contains(&"hot_water_psi_declared_and_calculated"), "{codes:?}");
+        let shallow = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+            pipe_outer_diameter_m: 0.02,
+            insulated_diameter_m: 0.04,
+            insulation_lambda: 0.04,
+            embedding_lambda: 2.0,
+            depth_m: 0.005,
+        };
+        input.circulation = Some(circulation(None, Some(shallow)));
+        let codes: Vec<&str> = validate_hot_water(&input, context(), "w")
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert!(codes.contains(&"hot_water_pipe_geometry_invalid"), "{codes:?}");
+    }
+
     #[test]
     fn unheated_pipes_use_theta_ztu_from_b_u() {
         let mut input = system(HotWaterGenerator::IndirectBoiler {
@@ -5265,6 +5359,7 @@ mod tests {
             outer_diameter_mm: Some(15.0),
             insulation: PipeInsulation::Mm15,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: true,
             length_m: None,
             unheated_length_m: None,
@@ -5351,6 +5446,7 @@ mod tests {
             outer_diameter_mm: Some(28.0),
             insulation: PipeInsulation::Mm15,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: true,
             length_m: None,
             unheated_length_m: Some(0.0),
@@ -5415,6 +5511,7 @@ mod tests {
             outer_diameter_mm: Some(15.0),
             insulation: PipeInsulation::Mm15,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: true,
             length_m: None,
             unheated_length_m: None,

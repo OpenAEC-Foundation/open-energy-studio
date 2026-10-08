@@ -5566,6 +5566,7 @@ mod tests {
         sample.on_site_production.clear();
         let base = assess_building_performance(&sample);
         sample.space_heating.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
@@ -5897,6 +5898,7 @@ mod tests {
             .declared_uses
             .retain(|item| item.service != Service::DomesticHotWater);
         sample.space_heating.generator = Generator::Chp(crate::space_heating_chain::ChpGenerator {
+            declared_efficiencies: None,
             chp: None,
             method1: Some(product.clone()),
             auxiliary: None,
@@ -6017,6 +6019,7 @@ mod tests {
             outer_diameter_mm: None,
             insulation: PipeInsulation::None,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: false,
             length_m: None,
             unheated_length_m: None,
@@ -7155,6 +7158,7 @@ mod tests {
             insulation: PipeInsulation::None,
             fittings_insulated: false,
             declared_psi_w_per_mk: Some(0.3),
+            calculated_psi: None,
             connected_dwellings: Some(1),
             floor_count: 1,
             sport_hall_area_m2: 0.0,

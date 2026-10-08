@@ -421,6 +421,13 @@ pub enum CoolingPipe {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+    /// 10.24–10.26 (2025+C1 p. 384–385): Ψ from the pipe geometry, e.g. a
+    /// pipe embedded in the construction (10.25).
+    Calculated {
+        geometry: crate::heating_distribution::PipeGeometry,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
 }
 
 impl CoolingPipe {
@@ -433,6 +440,8 @@ impl CoolingPipe {
             Self::Uninsulated if building_area_m2 <= 500.0 => 2.0,
             Self::Uninsulated => 3.0,
             Self::Declared { psi_w_per_mk, .. } => *psi_w_per_mk,
+            // Validation refuses geometry without a Ψ.
+            Self::Calculated { geometry, .. } => geometry.psi().unwrap_or(f64::NAN),
         }
     }
 }
@@ -1135,6 +1144,24 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                 push(
                     "cooling_pipe_psi_invalid",
                     "distribution.pipe.psiWPerMK".into(),
+                );
+            }
+            if source_missing(source_reference) {
+                push(
+                    "source_reference_required",
+                    "distribution.pipe.sourceReference".into(),
+                );
+            }
+        }
+        if let CoolingPipe::Calculated {
+            geometry,
+            source_reference,
+        } = &distribution.pipe
+        {
+            if geometry.psi().is_none() {
+                push(
+                    "cooling_pipe_geometry_invalid",
+                    "distribution.pipe.geometry".into(),
                 );
             }
             if source_missing(source_reference) {
@@ -2955,6 +2982,73 @@ mod tests {
         assert!((july.pump_recovered_kwh - 0.9 * pump).abs() < 1e-12);
         // Months without load have no pump energy.
         assert_eq!(result.months[0].pump_recovered_kwh, 0.0);
+    }
+
+    /// 10.25 (2025+C1 p. 385) for the ISSO 54 EP-W302e pipe embedded in
+    /// the construction: the calculated Ψ replaces table 10.9 and gives the
+    /// same result as declaring that Ψ.
+    #[test]
+    fn calculated_psi_of_an_embedded_cooling_pipe() {
+        let geometry = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+            pipe_outer_diameter_m: 0.02,
+            insulated_diameter_m: 0.04,
+            insulation_lambda: 0.04,
+            embedding_lambda: 2.0,
+            depth_m: 0.03,
+        };
+        let psi = geometry.psi().unwrap();
+        let expected =
+            std::f64::consts::PI / (0.5 * ((2.0_f64).ln() / 0.04 + (3.0_f64).ln() / 2.0));
+        assert!((psi - expected).abs() < 1e-12);
+        let run = |pipe: CoolingPipe| {
+            let mut input = system(vec![generator(compression(), None)]);
+            input.distribution = Some(CoolingDistribution {
+                design_temperature: CoolingDesignTemperature::T6To12OrUnknown,
+                pipe,
+                fittings_insulated: true,
+                pipe_length_m: None,
+                unconditioned_pipe_length_m: None,
+                unconditioned_ambient_c: None,
+                pump: None,
+                source_reference: "design".into(),
+            });
+            let issues = validate_cooling(&input, "cooling");
+            let zones = [CoolingZoneNeed {
+                usable_floor_area_m2: 100.0,
+                need_kwh: summer_need(),
+                ahu_load_kwh: [0.0; 12],
+                limit_need_kwh: None,
+            }];
+            let losses: Vec<f64> = assess_cooling(&input, context(&zones))
+                .months
+                .iter()
+                .map(|month| month.distribution_loss_kwh)
+                .collect();
+            (issues, losses)
+        };
+        let (issues, calculated) = run(CoolingPipe::Calculated {
+            geometry,
+            source_reference: "ISSO 54 EP-W302e".into(),
+        });
+        assert!(issues.is_empty(), "{issues:?}");
+        let (_, declared) = run(CoolingPipe::Declared {
+            psi_w_per_mk: psi,
+            source_reference: "same Ψ".into(),
+        });
+        assert_eq!(calculated, declared);
+        let (issues, _) = run(CoolingPipe::Calculated {
+            geometry: crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+                pipe_outer_diameter_m: 0.02,
+                insulated_diameter_m: 0.04,
+                insulation_lambda: 0.04,
+                embedding_lambda: 2.0,
+                depth_m: 0.005,
+            },
+            source_reference: " ".into(),
+        });
+        let codes: Vec<&str> = issues.iter().map(|issue| issue.code).collect();
+        assert!(codes.contains(&"cooling_pipe_geometry_invalid"), "{codes:?}");
+        assert!(codes.contains(&"source_reference_required"), "{codes:?}");
     }
 
     #[test]

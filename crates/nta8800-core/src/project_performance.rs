@@ -73,6 +73,12 @@ pub struct NtaCalculationInput {
     /// listed keeps `windowSolar.movableShading`.
     #[serde(default)]
     pub window_shadings: Vec<ProjectWindowShading>,
+    /// Glazing details per project window (7.6.6.1.2/7.6.6.1.3: table 7.4
+    /// type, fixed louvres of 7.41a/7.41b or the ISO 15099 values of 7.41
+    /// for raam wi, 2025+C1 p. 189–193). A window not listed uses its
+    /// `gValue` as g_gl;n.
+    #[serde(default)]
+    pub window_glazings: Vec<ProjectWindowGlazing>,
     /// Humidifiers per zone (chapter 12).
     #[serde(default)]
     pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
@@ -248,6 +254,15 @@ pub struct ProjectWindowShading {
     /// `None`: this window has no movable shading, whatever the default.
     #[serde(default)]
     pub movable_shading: Option<MovableShading>,
+    pub source_reference: String,
+}
+
+/// Glazing details of one project window (§7.6.6.1.2/7.6.6.1.3).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectWindowGlazing {
+    pub window_id: String,
+    pub glazing: crate::solar_shading::GlazingSolar,
     pub source_reference: String,
 }
 
@@ -1759,6 +1774,10 @@ fn window_source_path(
             Some(index) => format!("ntaCalculation.windowShadings[{index}].movableShading{rest}"),
             None => format!("ntaCalculation.windowSolar.movableShading{rest}"),
         },
+        "glazing" => match listed("windowGlazings") {
+            Some(index) => format!("ntaCalculation.windowGlazings[{index}].glazing{rest}"),
+            None => "ntaCalculation.windowGlazings".to_string(),
+        },
         "frameFraction" => format!("ntaCalculation.windowSolar.{field}{rest}"),
         // The window's own data in the project model.
         "areaM2" | "uValueWPerM2k" | "gPerpendicular" | "" => {
@@ -3261,6 +3280,23 @@ fn derive_input(
         }
     }
     let mut used_shading = HashSet::new();
+    let mut window_glazings: HashMap<&str, (usize, &ProjectWindowGlazing)> = HashMap::new();
+    for (index, item) in nta.window_glazings.iter().enumerate() {
+        let path = format!("ntaCalculation.windowGlazings[{index}]");
+        if window_glazings
+            .insert(item.window_id.as_str(), (index, item))
+            .is_some()
+        {
+            gaps.push(gap("window_glazing_duplicate", format!("{path}.windowId")));
+        }
+        if item.source_reference.trim().is_empty() {
+            gaps.push(gap(
+                "window_glazing_reference_required",
+                format!("{path}.sourceReference"),
+            ));
+        }
+    }
+    let mut used_glazing = HashSet::new();
     let mut dynamic_windows: HashMap<&str, &crate::annex_a::DynamicTransparent> = HashMap::new();
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
         let path = format!("ntaCalculation.dynamicWindows[{index}]");
@@ -3560,6 +3596,14 @@ fn derive_input(
                 if let Some((_, item)) = window_shadings.get(window_id) {
                     source_reference.push_str(&format!("; shading: {}", item.source_reference));
                 }
+                // Glazing details replace the window's gValue route; the
+                // demand validates them (7.41 values, louvres) and its
+                // issues map back to this entry.
+                let glazing = window_glazings.get(window_id).map(|(_, item)| {
+                    used_glazing.insert(window_id.to_owned());
+                    source_reference.push_str(&format!("; glazing: {}", item.source_reference));
+                    item.glazing.clone()
+                });
                 windows.push(Window {
                     id: format!("window:{window_id}"),
                     area_m2: area,
@@ -3572,7 +3616,7 @@ fn derive_input(
                     obstruction,
                     movable_shading: shading,
                     dynamic,
-                    glazing: None,
+                    glazing,
                     source_reference,
                 });
             }
@@ -3771,6 +3815,20 @@ fn derive_input(
         gaps.push(gap(
             code,
             format!("ntaCalculation.windowShadings[{index}].windowId"),
+        ));
+    }
+    for (index, item) in nta.window_glazings.iter().enumerate() {
+        if used_glazing.contains(&item.window_id) {
+            continue;
+        }
+        let code = match project_windows.get(item.window_id.as_str()) {
+            None => "window_glazing_without_window",
+            Some(false) => "window_glazing_not_outdoor",
+            Some(true) => continue,
+        };
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowGlazings[{index}].windowId"),
         ));
     }
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
@@ -4380,6 +4438,120 @@ mod tests {
             assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
         }
         assert_ne!(result.status, "calculated_unverified");
+    }
+
+    /// 7.41 (2025+C1 p. 191) per window: the ISSO 54 EP-W011a values
+    /// g_gl,alt 0,045 and g_gl,dif 0,2 give 0,75·0,045 + 0,25·0,2 = 0,08375
+    /// for that window only.
+    #[test]
+    fn window_glazing_replaces_the_g_value_route_for_that_window_only() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([{
+            "windowId": "win-S",
+            "glazing": {"diffusing": {
+                "gAltitude45": 0.045, "gDiffuse": 0.2, "sourceReference": "ISO 15099 calculation"
+            }},
+            "sourceReference": "closed horizontal louvres"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        let south = find("window:win-S");
+        assert!((south.g_gl(0, 0.0) - 0.08375).abs() < 1e-12);
+        assert!(south.source_reference.contains("closed horizontal louvres"));
+        assert!(find("window:win-N").glazing.is_none());
+        let gains = |item: &ProjectPerformanceAssessment| {
+            item.performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|month| month.cooling.gains_kwh)
+                .sum::<f64>()
+        };
+        assert!(gains(&result) < gains(&base));
+    }
+
+    /// Projects without `windowGlazings`, and entries without glazing
+    /// details, give identical numbers.
+    #[test]
+    fn window_glazing_without_details_changes_nothing() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([
+            {"windowId": "win-S", "glazing": {}, "sourceReference": "survey"},
+            {"windowId": "win-N", "glazing": {}, "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, base.status);
+        let numbers = |item: &ProjectPerformanceAssessment| {
+            let mut json = serde_json::to_value(item.performance.as_ref().unwrap()).unwrap();
+            fn strip(value: &mut Value) {
+                match value {
+                    Value::String(_) => *value = Value::Null,
+                    Value::Array(items) => items.iter_mut().for_each(strip),
+                    Value::Object(map) => map.values_mut().for_each(strip),
+                    _ => {}
+                }
+            }
+            strip(&mut json);
+            json
+        };
+        assert_eq!(numbers(&result), numbers(&base));
+    }
+
+    #[test]
+    fn window_glazing_input_errors_are_gaps() {
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([
+            {"windowId": "win-S", "glazing": {}, "sourceReference": "a"},
+            {"windowId": "win-S", "glazing": {}, "sourceReference": "b"},
+            {"windowId": "missing", "glazing": {}, "sourceReference": "c"},
+            {"windowId": "win-N", "glazing": {"diffusing": {
+                "gAltitude45": 1.5, "gDiffuse": 0.2, "sourceReference": "x"
+            }}, "sourceReference": " "}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        for expected in [
+            (
+                "window_glazing_duplicate",
+                "ntaCalculation.windowGlazings[1].windowId",
+            ),
+            (
+                "window_glazing_without_window",
+                "ntaCalculation.windowGlazings[2].windowId",
+            ),
+            (
+                "window_glazing_reference_required",
+                "ntaCalculation.windowGlazings[3].sourceReference",
+            ),
+        ] {
+            assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
+        }
+        assert_ne!(result.status, "calculated_unverified");
+        // The demand's own check of the 7.41 values points at the entry.
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([
+            {"windowId": "win-N", "glazing": {"diffusing": {
+                "gAltitude45": 1.5, "gDiffuse": 0.2, "sourceReference": "x"
+            }}, "sourceReference": "y"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert!(
+            result.gaps.iter().any(|gap| gap.code == "window_g_invalid"
+                && gap.path == "ntaCalculation.windowGlazings[0].glazing.diffusing"),
+            "{:?}",
+            result.gaps
+        );
     }
 
     #[test]
