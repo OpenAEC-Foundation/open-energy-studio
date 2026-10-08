@@ -1194,6 +1194,163 @@ UTILITY_CASES += [
 ]
 
 
+# --- EP-U2xx: ventilation of the office (p. 45-46) ---
+def installed(dm3_per_s, why):
+    return setp(f"{VENT}/installedCapacity", {"totalDm3PerS": dm3_per_s, "sourceReference": why})
+
+
+def flow_reduction(recirculation, why=None):
+    body = {"collective": True, "recirculationPercent": recirculation}
+    if why is not None:
+        body["evidenceReference"] = why
+    return setp(f"{VENT}/flowReduction", body)
+
+
+def declared_fans(power, why):
+    # Recirculation lowers the outdoor air, not the fan speed: table 11.22
+    # "other" (f_regfan 1).
+    return setp(
+        f"{VENT}/fans",
+        {"method": "declared", "fans": [{"id": "ventilatoren", "power": power}], "control": {"method": "flow_control", "control": "other"}, "sourceReference": why},
+    )
+
+
+# --- EP-U5xx: hot water of the office (p. 49) ---
+# EP-U502a is the base of the further hot-water deeltests (p. 49): care with
+# beds, a circulation loop (forfait length, none in unheated spaces, 25 mm
+# insulation, 35/32 mm, fittings insulated, pump power unknown and
+# uncontrolled), an indirectly fired 200 l vessel on the HR107 combi outside
+# the thermal envelope, label C, straight parts of at most 4 connections
+# insulated (f_sto;dis;ls 3, 2022 p. 550). The 2 delivery sets of the test
+# belong to external heat (§13.4.2) and are not entered with a boiler.
+U502A = function("d") + [
+    setp(
+        f"{HW}/circulation",
+        {
+            "outerDiameterMm": 35.0,
+            "insulation": "mm25",
+            "fittingsInsulated": True,
+            "unheatedLengthM": 0.0,
+            "floorCount": 2,
+            "pump": {"control": "uncontrolled_or_unknown"},
+            "sourceReference": "ISSO 54 v2.0 EP-U502a p. 49: circulatie, forfaitaire lengte, 35/32 mm, 25 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling",
+        },
+    ),
+    setp(f"{HW}/storage", [vessel(200.0, {"method": "label", "label": "c"}, 3, False)]),
+    indirect_hr107(False),
+    setp(f"{BOILER}/location", "outside_thermal_boundary"),
+]
+
+UTILITY_CASES += [
+    ("EPU201a", 45, [installed(120.0, "ISSO 54 v2.0 EP-U201a p. 45: geinstalleerde ventilatiecapaciteit 120 dm3/s")]),
+    (
+        "EPU201c",
+        45,
+        [
+            installed(200.0, "ISSO 54 v2.0 EP-U201c p. 45: ontwerpdebiet 200 dm3/s"),
+            flow_reduction(30, "ISSO 54 v2.0 EP-U201c p. 45: recirculatie 30 % van de retourlucht"),
+        ],
+    ),
+    (
+        "EPU203a",
+        46,
+        [
+            installed(200.0, "ISSO 54 v2.0 EP-U203a p. 46: ontwerpdebiet 200 dm3/s"),
+            flow_reduction(20),
+            declared_fans({"method": "nominal", "nominalPowerW": 100.0}, "ISSO 54 v2.0 EP-U203a p. 46: nominaal vermogen 100 W"),
+        ],
+    ),
+    # EP-U203b: 80 W motor, measured U.I.e = 220 V x 0,6 A x 1 = 132 W (11.136).
+    (
+        "EPU203b",
+        46,
+        [
+            installed(200.0, "ISSO 54 v2.0 EP-U203b p. 46: ontwerpdebiet 200 dm3/s"),
+            flow_reduction(30, "ISSO 54 v2.0 EP-U203b p. 46: recirculatie 30 %"),
+            declared_fans({"method": "motor", "motorPowerW": 80.0, "electricalInputW": 132.0}, "ISSO 54 v2.0 EP-U203b p. 46: 80 W, 220 V, 0,6 A, gelijkstroom e = 1"),
+        ],
+    ),
+    (
+        "EPU203c",
+        46,
+        [
+            unit("c1", "luka_a_b_c"),
+            NO_PASSIVE,
+            declared_fans({"method": "nominal", "nominalPowerW": 100.0}, "ISSO 54 v2.0 EP-U203c p. 46: systeem C1, nominaal vermogen 100 W"),
+        ],
+    ),
+    # EP-U501a: some draw-off points further than 3 m (p. 49; table 13.3).
+    (
+        "EPU501a",
+        49,
+        [setp(f"{HW}/emission", {"method": "utility", "meanLengthM": 5.0, "sourceReference": "ISSO 54 v2.0 EP-U501a p. 49: sommige tappunten verder dan 3 m (tabel 13.3, rij > 3 m)"})],
+    ),
+    ("EPU502a", 49, U502A),
+    # EP-U502b: 80 m circulation, L_max 40 m (p. 49); L_max has no input for
+    # the circulation pump (13.39).
+    ("EPU502b", 49, U502A + [setp(f"{HW}/circulation/lengthM", 80.0)]),
+    # EP-U503a: 10 showers, 2 vertical and 4 horizontal units, collective
+    # arrangement (p. 49; table 13.8 "gedeelde units"; p. 564 assignment unknown).
+    (
+        "EPU503a",
+        49,
+        U502A
+        + [
+            setp(
+                f"{HW}/showerHeatRecovery",
+                {
+                    "showers": [{"unit": "vertical"}] * 2 + [{"unit": "horizontal"}] * 4 + [{"unit": "none"}] * 4,
+                    "assignmentUnknown": True,
+                    "connection": "shared_units",
+                    "sourceReference": "ISSO 54 v2.0 EP-U503a p. 49: 10 douches, 2 verticale en 4 horizontale douche-WTW, collectieve opstelling",
+                },
+            )
+        ],
+    ),
+    # EP-U504a: HR100 indirect, inside the heated zone, also for heating, a
+    # 2000 l vessel with insulated T-pieces (f_sto;dis;ls 2, p. 550) (p. 49).
+    # The vessel keeps label C (the test does not change it).
+    (
+        "EPU504a",
+        49,
+        U502A
+        + [
+            setp(f"{HW}/storage", [vessel(2000.0, {"method": "label", "label": "c"}, 2, True)]),
+            hw_generator({"kind": "indirect_boiler", "boiler": "hr100_or104", "oil": False, "insideBoundary": True, "alsoSpaceHeating": True}),
+            setp(f"{BOILER}/location", "inside_thermal_boundary"),
+        ],
+    ),
+    # EP-U701a-c: humidification (p. 51; chapter 12).
+    (
+        "EPU701a",
+        51,
+        [setp(f"{NTA}/humidifiers", [{"zoneId": "epw001-zone", "humidification": {"humidifier": {"kind": "atomising"}, "rotaryWheel": False, "equipmentReference": "ISSO 54 v2.0 EP-U701a p. 51: verneveling"}}])],
+    ),
+    (
+        "EPU701b",
+        51,
+        function("d")
+        + [
+            setp(
+                f"{NTA}/humidifiers",
+                [{"zoneId": "epw001-zone", "humidification": {"humidifier": {"kind": "steam", "carrier": "electricity"}, "rotaryWheel": False, "equipmentReference": "ISSO 54 v2.0 EP-U701b p. 51: elektrische stoombevochtiger"}}],
+            )
+        ],
+    ),
+    (
+        "EPU701c",
+        51,
+        function("g")
+        + [
+            setp(
+                f"{NTA}/humidifiers",
+                [{"zoneId": "epw001-zone", "humidification": {"humidifier": {"kind": "steam", "carrier": "gas_or_oil"}, "rotaryWheel": False, "equipmentReference": "ISSO 54 v2.0 EP-U701c p. 51: stoombevochtiger met centrale gasgestookte opwekker"}}],
+            )
+        ],
+    ),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS

@@ -9359,6 +9359,1252 @@
           }
         ]
       }
+    },
+    {
+      "caseId": "isso54-v2-EPU201a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/installedCapacity",
+          "value": {
+            "totalDm3PerS": 120.0,
+            "sourceReference": "ISSO 54 v2.0 EP-U201a p. 45: geinstalleerde ventilatiecapaciteit 120 dm3/s"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-201a, p. 45",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU201c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/installedCapacity",
+          "value": {
+            "totalDm3PerS": 200.0,
+            "sourceReference": "ISSO 54 v2.0 EP-U201c p. 45: ontwerpdebiet 200 dm3/s"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/flowReduction",
+          "value": {
+            "collective": true,
+            "recirculationPercent": 30,
+            "evidenceReference": "ISSO 54 v2.0 EP-U201c p. 45: recirculatie 30 % van de retourlucht"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-201c, p. 45",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU203a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/installedCapacity",
+          "value": {
+            "totalDm3PerS": 200.0,
+            "sourceReference": "ISSO 54 v2.0 EP-U203a p. 46: ontwerpdebiet 200 dm3/s"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/flowReduction",
+          "value": {
+            "collective": true,
+            "recirculationPercent": 20
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans",
+          "value": {
+            "method": "declared",
+            "fans": [
+              {
+                "id": "ventilatoren",
+                "power": {
+                  "method": "nominal",
+                  "nominalPowerW": 100.0
+                }
+              }
+            ],
+            "control": {
+              "method": "flow_control",
+              "control": "other"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U203a p. 46: nominaal vermogen 100 W"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-203a, p. 46",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU203b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/installedCapacity",
+          "value": {
+            "totalDm3PerS": 200.0,
+            "sourceReference": "ISSO 54 v2.0 EP-U203b p. 46: ontwerpdebiet 200 dm3/s"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/flowReduction",
+          "value": {
+            "collective": true,
+            "recirculationPercent": 30,
+            "evidenceReference": "ISSO 54 v2.0 EP-U203b p. 46: recirculatie 30 %"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans",
+          "value": {
+            "method": "declared",
+            "fans": [
+              {
+                "id": "ventilatoren",
+                "power": {
+                  "method": "motor",
+                  "motorPowerW": 80.0,
+                  "electricalInputW": 132.0
+                }
+              }
+            ],
+            "control": {
+              "method": "flow_control",
+              "control": "other"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U203b p. 46: 80 W, 220 V, 0,6 A, gelijkstroom e = 1"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-203b, p. 46",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU203c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit",
+          "value": {
+            "variant": "c1",
+            "ducts": "luka_a_b_c",
+            "equipmentReference": "systeem C1"
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/ventilation/maximumCapacityForCooling"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans",
+          "value": {
+            "method": "declared",
+            "fans": [
+              {
+                "id": "ventilatoren",
+                "power": {
+                  "method": "nominal",
+                  "nominalPowerW": 100.0
+                }
+              }
+            ],
+            "control": {
+              "method": "flow_control",
+              "control": "other"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U203c p. 46: systeem C1, nominaal vermogen 100 W"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-203c, p. 46",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU501a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/emission",
+          "value": {
+            "method": "utility",
+            "meanLengthM": 5.0,
+            "sourceReference": "ISSO 54 v2.0 EP-U501a p. 49: sommige tappunten verder dan 3 m (tabel 13.3, rij > 3 m)"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-501a, p. 49",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU502a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "healthcare_bed_area",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation",
+          "value": {
+            "outerDiameterMm": 35.0,
+            "insulation": "mm25",
+            "fittingsInsulated": true,
+            "unheatedLengthM": 0.0,
+            "floorCount": 2,
+            "pump": {
+              "control": "uncontrolled_or_unknown"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U502a p. 49: circulatie, forfaitaire lengte, 35/32 mm, 25 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/storage",
+          "value": [
+            {
+              "id": "vat-1",
+              "volumeL": 200.0,
+              "loss": {
+                "method": "label",
+                "label": "c"
+              },
+              "connectionFactor": 3,
+              "inHeatedZone": false,
+              "sourceReference": "voorraadvat volgens de deeltest"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "indirect_boiler",
+            "boiler": "hr107",
+            "oil": false,
+            "insideBoundary": false,
+            "alsoSpaceHeating": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/location",
+          "value": "outside_thermal_boundary"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-502a, p. 49",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU502b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "healthcare_bed_area",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation",
+          "value": {
+            "outerDiameterMm": 35.0,
+            "insulation": "mm25",
+            "fittingsInsulated": true,
+            "unheatedLengthM": 0.0,
+            "floorCount": 2,
+            "pump": {
+              "control": "uncontrolled_or_unknown"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U502a p. 49: circulatie, forfaitaire lengte, 35/32 mm, 25 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/storage",
+          "value": [
+            {
+              "id": "vat-1",
+              "volumeL": 200.0,
+              "loss": {
+                "method": "label",
+                "label": "c"
+              },
+              "connectionFactor": 3,
+              "inHeatedZone": false,
+              "sourceReference": "voorraadvat volgens de deeltest"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "indirect_boiler",
+            "boiler": "hr107",
+            "oil": false,
+            "insideBoundary": false,
+            "alsoSpaceHeating": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/location",
+          "value": "outside_thermal_boundary"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation/lengthM",
+          "value": 80.0
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-502b, p. 49",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU503a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "healthcare_bed_area",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation",
+          "value": {
+            "outerDiameterMm": 35.0,
+            "insulation": "mm25",
+            "fittingsInsulated": true,
+            "unheatedLengthM": 0.0,
+            "floorCount": 2,
+            "pump": {
+              "control": "uncontrolled_or_unknown"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U502a p. 49: circulatie, forfaitaire lengte, 35/32 mm, 25 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/storage",
+          "value": [
+            {
+              "id": "vat-1",
+              "volumeL": 200.0,
+              "loss": {
+                "method": "label",
+                "label": "c"
+              },
+              "connectionFactor": 3,
+              "inHeatedZone": false,
+              "sourceReference": "voorraadvat volgens de deeltest"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "indirect_boiler",
+            "boiler": "hr107",
+            "oil": false,
+            "insideBoundary": false,
+            "alsoSpaceHeating": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/location",
+          "value": "outside_thermal_boundary"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/showerHeatRecovery",
+          "value": {
+            "showers": [
+              {
+                "unit": "vertical"
+              },
+              {
+                "unit": "vertical"
+              },
+              {
+                "unit": "horizontal"
+              },
+              {
+                "unit": "horizontal"
+              },
+              {
+                "unit": "horizontal"
+              },
+              {
+                "unit": "horizontal"
+              },
+              {
+                "unit": "none"
+              },
+              {
+                "unit": "none"
+              },
+              {
+                "unit": "none"
+              },
+              {
+                "unit": "none"
+              }
+            ],
+            "assignmentUnknown": true,
+            "connection": "shared_units",
+            "sourceReference": "ISSO 54 v2.0 EP-U503a p. 49: 10 douches, 2 verticale en 4 horizontale douche-WTW, collectieve opstelling"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-503a, p. 49",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU504a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "healthcare_bed_area",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation",
+          "value": {
+            "outerDiameterMm": 35.0,
+            "insulation": "mm25",
+            "fittingsInsulated": true,
+            "unheatedLengthM": 0.0,
+            "floorCount": 2,
+            "pump": {
+              "control": "uncontrolled_or_unknown"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U502a p. 49: circulatie, forfaitaire lengte, 35/32 mm, 25 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/storage",
+          "value": [
+            {
+              "id": "vat-1",
+              "volumeL": 200.0,
+              "loss": {
+                "method": "label",
+                "label": "c"
+              },
+              "connectionFactor": 3,
+              "inHeatedZone": false,
+              "sourceReference": "voorraadvat volgens de deeltest"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "indirect_boiler",
+            "boiler": "hr107",
+            "oil": false,
+            "insideBoundary": false,
+            "alsoSpaceHeating": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/location",
+          "value": "outside_thermal_boundary"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/storage",
+          "value": [
+            {
+              "id": "vat-1",
+              "volumeL": 2000.0,
+              "loss": {
+                "method": "label",
+                "label": "c"
+              },
+              "connectionFactor": 2,
+              "inHeatedZone": true,
+              "sourceReference": "voorraadvat volgens de deeltest"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "indirect_boiler",
+            "boiler": "hr100_or104",
+            "oil": false,
+            "insideBoundary": true,
+            "alsoSpaceHeating": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/location",
+          "value": "inside_thermal_boundary"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-504a, p. 49",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU701a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/humidifiers",
+          "value": [
+            {
+              "zoneId": "epw001-zone",
+              "humidification": {
+                "humidifier": {
+                  "kind": "atomising"
+                },
+                "rotaryWheel": false,
+                "equipmentReference": "ISSO 54 v2.0 EP-U701a p. 51: verneveling"
+              }
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-701a, p. 51",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU701b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "healthcare_bed_area",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/humidifiers",
+          "value": [
+            {
+              "zoneId": "epw001-zone",
+              "humidification": {
+                "humidifier": {
+                  "kind": "steam",
+                  "carrier": "electricity"
+                },
+                "rotaryWheel": false,
+                "equipmentReference": "ISSO 54 v2.0 EP-U701b p. 51: elektrische stoombevochtiger"
+              }
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-701b, p. 51",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU701c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "education"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "education"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 21.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 21.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "education",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "education",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "education",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/humidifiers",
+          "value": [
+            {
+              "zoneId": "epw001-zone",
+              "humidification": {
+                "humidifier": {
+                  "kind": "steam",
+                  "carrier": "gas_or_oil"
+                },
+                "rotaryWheel": false,
+                "equipmentReference": "ISSO 54 v2.0 EP-U701c p. 51: stoombevochtiger met centrale gasgestookte opwekker"
+              }
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-701c, p. 51",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
     }
   ]
 }
