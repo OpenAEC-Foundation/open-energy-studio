@@ -275,3 +275,12 @@
 .mwa-advice .survey-choice-title { display: flex; align-items: center; gap: 8px; }
 .mwa-advice .survey-label { font-size: 14px; padding: 1px 8px; min-width: 0; }
 .mwa-advice .survey-choice[aria-checked='true'] { border: 2px solid var(--amber-600); background: var(--surface-selected); }
+
+.mwa-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mwa-issues li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
+
+.mwa-package { display: flex; flex-direction: column; }
+.mwa-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.mwa-check { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-sunken); font-size: var(--fs-sm); color: var(--fg-1); cursor: pointer; }
+.mwa-check:has(input:checked) { border-color: var(--amber-600); background: var(--surface-selected); }
+.mwa-check input { accent-color: var(--amber-600); }

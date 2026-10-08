@@ -138,6 +138,10 @@ export interface SurveyMwaRun {
   patches: Record<string, MwaPatchOperation[]>;
 }
 
+function withProfileSource<U extends { profile: string; sourceReference?: string }>(use: U): U {
+  return use.sourceReference?.trim() ? use : { ...use, sourceReference: `ISSO 82.2 §2.5.2, standaardprofiel ${use.profile}` };
+}
+
 /** Runs the maatwerkadvies of a survey project: the survey's derived input is the base. */
 export async function assessSurveyMaatwerkadvies(stored: StoredSurvey, definition: NtaMaatwerkadvies): Promise<SurveyMwaRun> {
   const base = await deriveInput(stored, stored.survey);
@@ -157,8 +161,9 @@ export async function assessSurveyMaatwerkadvies(stored: StoredSurvey, definitio
   const known = new Set(measures.map((measure) => measure.id));
   const input = {
     base: { kind: 'building', input: base.input },
-    ...(definition.currentUse ? { currentUse: definition.currentUse } : {}),
-    ...(definition.futureUse ? { futureUse: definition.futureUse } : {}),
+    // A standard user profile is its own source (ISSO 82.2 §2.5.2).
+    ...(definition.currentUse ? { currentUse: withProfileSource(definition.currentUse) } : {}),
+    ...(definition.futureUse ? { futureUse: withProfileSource(definition.futureUse) } : {}),
     measures,
     packages: definition.packages.map((pack) => ({ ...pack, measureIds: pack.measureIds.filter((id) => known.has(id)) })),
     tariffs: definition.tariffs,

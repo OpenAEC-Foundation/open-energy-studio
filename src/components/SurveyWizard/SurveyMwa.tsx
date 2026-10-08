@@ -128,7 +128,19 @@ export function SurveyMwa({ route, navigate }: { route: Route; navigate: (route:
       {error && <p className="survey-issues-note" role="alert">{t('mwaSurvey.error', { error })}</p>}
       {assessment && assessment.issues.length > 0 && <section className="survey-card" role="alert">
         <span className="survey-overline">{t('mwaSurvey.issues')}</span>
-        <ul className="mwa-todo">{assessment.issues.map((issue, at) => <li key={at}><KernelCode code={issue.code} prefixes={['mwa.issue.', 'kernel.issue.', 'nta.gap.']} hideCode /> <span className="survey-muted">{issue.path}</span></li>)}</ul>
+        <ul className="mwa-issues">{assessment.issues.map((issue, at) => {
+          // Known fields in words, with the step to fix them; the rest as the kernel says it.
+          const measure = /^measures[(d+)]/.exec(issue.path);
+          const name = measure ? definition.measures[Number(measure[1])]?.name : undefined;
+          const known = issue.path === 'tariffs.sourceReference' ? { text: t('mwaSurvey.issue.tariffsSource'), step: 'use' as MwaStep }
+            : /^(currentUse|futureUse)./.test(issue.path) ? { text: t('mwaSurvey.issue.use'), step: 'use' as MwaStep }
+              : measure && issue.path.endsWith('.costSource') ? { text: t('mwaSurvey.issue.costSource', { name: name ?? '' }), step: 'measures' as MwaStep }
+                : measure ? { text: t('mwaSurvey.issue.measure', { name: name ?? '' }), step: 'measures' as MwaStep } : null;
+          return <li key={at}>
+            {known ? <span>{known.text}</span> : <KernelCode code={issue.code} prefixes={['mwa.issue.', 'kernel.issue.', 'nta.gap.']} hideCode />}
+            {known && known.step !== step && <button type="button" className="btn btn-sm" onClick={() => go(known.step)}>{t('survey.check.goTo', { step: t(`mwaSurvey.step.${known.step}`) })}</button>}
+          </li>;
+        })}</ul>
       </section>}
 
       {step === 'measures' && <Measures definition={definition} survey={survey} save={save} resultOf={(id) => resultOf(id, 'measure')}
@@ -286,12 +298,14 @@ function Packages({ definition, save, run, resultOf, t, locale }: {
       const result = resultOf(pack.id);
       const overlap = run && pack.measureIds.some((first, at) => pack.measureIds.slice(at + 1)
         .some((second) => patchesOverlap(run.patches[first] ?? [], run.patches[second] ?? [])));
-      return <section key={pack.id} className="survey-card mwa-measure" aria-label={pack.name}>
+      return <section key={pack.id} className="survey-card mwa-measure mwa-package" aria-label={pack.name}>
         <div className="mwa-measure-head">
           <input className="mwa-name" type="text" value={pack.name} aria-label={t('mwaSurvey.name')} onChange={(event) => update(pack.id, { name: event.target.value })} />
           {result && <Label value={result.label.labelClass} />}
         </div>
-        <div className="mwa-checks">{definition.measures.map((measure) => <label key={measure.id} className="nta-form-check">
+        <p className="nta-form-subhead">{t('mwaSurvey.inPackage')}</p>
+        {pack.measureIds.length === 0 && <p className="survey-muted">{t('mwaSurvey.emptyPackage')}</p>}
+        <div className="mwa-checks">{definition.measures.map((measure) => <label key={measure.id} className="mwa-check">
           <input type="checkbox" checked={pack.measureIds.includes(measure.id)} onChange={(event) => update(pack.id, {
             measureIds: event.target.checked ? [...pack.measureIds, measure.id] : pack.measureIds.filter((item) => item !== measure.id),
           })} />{measure.name}</label>)}</div>
@@ -308,7 +322,7 @@ function Packages({ definition, save, run, resultOf, t, locale }: {
         </div>
       </section>;
     })}
-    <button type="button" className="btn" onClick={add}>{t('mwaSurvey.addPackage')}</button>
+    <div><button type="button" className="btn" onClick={add}>+ {t('mwaSurvey.addPackage')}</button></div>
     <p className="survey-muted">{t('mwaSurvey.packagesNote')}</p>
   </>;
 }
