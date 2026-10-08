@@ -2535,6 +2535,156 @@ UTILITY_CASES += [
     ),
 ]
 
+
+# --- EP-W203l-n: two calculation zones with a hybrid heat pump (p. 26) ---
+# The dwelling as two zones, the ground floor (epw001-zone) and the upper
+# floor (epw001-boven), 48 m2 each: the floor and the lower half of the
+# facades with windows 1-2 below, the roof and the upper half with windows
+# 3-4 above; the intermediate floor lies inside the envelope. Each zone takes
+# half the dwelling (6.2b dwellingShare 0,5) and its own ventilation input
+# for its 48 m2. The hybrid: an outdoor-air heat pump of 10 kW not meeting
+# table 9.28 (table 9.27 COP 2,3 at 45 degrees C in 2022) and an HR107 with
+# CW4 of 35 kW (table 9.25 eta 0,95), inside the envelope; the priority
+# efficiencies of table 9.1 are these table values. Hot water stays the
+# HR107 combi (kitchen below, bathroom above).
+UPPER = "epw001-boven"
+HP_COP_2022 = 2.3
+HR107_ETA_2022 = 0.95
+
+
+def two_zones(project):
+    zone = project["zones"][0]
+    upper = copy.deepcopy(zone)
+    for item, area in ((zone, 48.0), (upper, 48.0)):
+        item["floorArea"] = area
+        item["volume"] = 129.6
+        item["height"] = 2.7
+    upper["id"] = UPPER
+    upper["name"] = "Bovenverdieping"
+    halves = {"gevel-zuid": 21.6, "gevel-noord": 21.6, "gevel-oost": 16.2, "gevel-west": 16.2}
+    lower_surfaces, upper_surfaces = [], []
+    for item in zone["surfaces"]:
+        if item["id"] == "dak":
+            upper_surfaces.append(dict(item, zoneId=UPPER))
+            continue
+        if item["id"] == "bg-vloer":
+            lower_surfaces.append(item)
+            continue
+        below = dict(item, area=halves[item["id"]])
+        above = dict(item, id=f"{item['id']}-boven", area=halves[item["id"]], zoneId=UPPER)
+        if item["id"] == "gevel-zuid":
+            below["windows"] = [w for w in item["windows"] if w["id"] in ("raam-zuid-1", "raam-zuid-2")]
+            above["windows"] = [dict(w, surfaceId="gevel-zuid-boven") for w in item["windows"] if w["id"] in ("raam-zuid-3", "raam-zuid-4")]
+        lower_surfaces.append(below)
+        upper_surfaces.append(above)
+    zone["surfaces"] = lower_surfaces
+    upper["surfaces"] = upper_surfaces
+    project["zones"].append(upper)
+    nta = project["ntaCalculation"]
+    ventilation = nta.pop("ventilation")
+    entries = []
+    for zone_id in (zone["id"], UPPER):
+        zone_ventilation = copy.deepcopy(ventilation)
+        zone_ventilation["zoneId"] = zone_id
+        zone_ventilation["usableFloorAreaM2"] = 48.0
+        zone_ventilation["functions"] = [{"function": "residential", "areaM2": 48.0}]
+        gains = dict(nta["internalGains"], dwellingShare=0.5, sourceReference="een woning over twee rekenzones (6.2b, aandeel 0,5)")
+        entries.append(
+            {
+                "zoneId": zone_id,
+                "verticalPipes": [{"id": f"{zone_id}-leiding", "storeys": 2, "insulated": False, "sourceReference": "ISSO 54 v2.0 EP-W001 p. 5: leidingdoorvoeren forfaitair (7.3.3), 2 aangrenzende rekenzones"}],
+                "ventilationFlows": [],
+                "ventilation": zone_ventilation,
+                "internalGains": gains,
+            }
+        )
+    nta["zoneData"] = entries
+    del nta["verticalPipes"]
+
+
+def hybrid(test_id, declaration=None, suffix=""):
+    pump = {
+        "generatorId": f"wp{suffix}",
+        "classificationSourceReference": f"ISSO 54 v2.0 {test_id}: elektrische lucht/waterwarmtepomp op buitenlucht",
+        "scope": "residential_at_most25_kw",
+        "source": "outdoor_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 45.0,
+        "thermalCapacityKw": 10.0,
+        "capacitySourceReference": f"ISSO 54 v2.0 {test_id}: vermogen warmtepomp 10 kW",
+        "collectiveBuildingInstallation": False,
+    }
+    cop = HP_COP_2022
+    if declaration is not None:
+        pump["qualityDeclaration"] = declaration
+        cop = declaration["generationEfficiency"]
+    boiler = copy.deepcopy(REFERENCE["ntaCalculation"]["generator"]["boiler"])
+    boiler["generatorId"] = f"ketel{suffix}"
+    boiler["role"] = "individual_supplementary"
+    boiler["equipmentReference"] = f"ISSO 54 v2.0 {test_id}: HR107-ketel CW4, 35 kW, bijstook"
+    return {
+        "kind": "hybrid_heat_pump",
+        "designContext": "new_build",
+        "generators": [
+            {"id": f"wp{suffix}", "class": "heat_pump", "classificationReference": f"ISSO 54 v2.0 {test_id}: warmtepomp", "nominalThermalPowerKw": 10.0, "powerReference": f"ISSO 54 v2.0 {test_id}: 10 kW", "priorityEfficiency": cop, "efficiencyReference": "tabel 9.27 (2022) of de kwaliteitsverklaring"},
+            {"id": f"ketel{suffix}", "class": "other_boiler", "classificationReference": f"ISSO 54 v2.0 {test_id}: HR107-ketel", "nominalThermalPowerKw": 35.0, "powerReference": f"ISSO 54 v2.0 {test_id}: 35 kW", "priorityEfficiency": HR107_ETA_2022, "efficiencyReference": "tabel 9.25 (2022)"},
+        ],
+        "forfait": pump,
+        "boiler": boiler,
+        "sourceSystem": "individual",
+        "sourceSystemReference": f"ISSO 54 v2.0 {test_id}: individuele installatie binnen de thermische schil",
+    }
+
+
+def hybrid_two_zones(test_id, declaration=None):
+    def change(project):
+        two_zones(project)
+        nta = project["ntaCalculation"]
+        nta["generator"] = hybrid(test_id, declaration)
+        nta["heatPumpRenewable"] = {"sourceBelow20C": True, "exhaustAirSource": False, "sourceReference": f"ISSO 54 v2.0 {test_id}: buitenlucht"}
+
+    return change
+
+
+# EP-W203m: every zone has its own installation for heating, hot water and
+# ventilation (p. 26): a second hybrid for the upper zone, and two combis,
+# the kitchen below and the bathroom above (13.19a connectedTaps).
+def own_installations(project):
+    hybrid_two_zones("EP-W203m")(project)
+    nta = project["ntaCalculation"]
+    nta["additionalHeatingSystems"] = [
+        {
+            "zoneIds": [UPPER],
+            "generator": hybrid("EP-W203m", suffix="-boven"),
+            "distributionSystem": copy.deepcopy(nta["distributionSystem"]),
+        }
+    ]
+    kitchen = copy.deepcopy(nta["hotWater"])
+    kitchen["emission"] = {"method": "residential", "served": "kitchen_only", "kitchenLengthM": 8.5, "kitchenPipeDiameter": "other", "sourceReference": "ISSO 54 v2.0 EP-W203m p. 26: keuken in de onderste rekenzone, uittapleiding 8,5 m"}
+    kitchen["connectedTaps"] = {"bathrooms": 0, "kitchens": 1}
+    bathroom = copy.deepcopy(nta["hotWater"])
+    bathroom["emission"] = {"method": "residential", "served": "bathroom_only", "bathroomLengthM": 5.0, "sourceReference": "ISSO 54 v2.0 EP-W203m p. 26: badkamer in de bovenste rekenzone, douche 5 m"}
+    bathroom["connectedTaps"] = {"bathrooms": 1, "kitchens": 0}
+    bathroom["equipmentReference"] = "ISSO 54 v2.0 EP-W203m p. 26: eigen HR107-combi voor de bovenste rekenzone"
+    nta["hotWater"] = kitchen
+    nta["additionalHotWaterSystems"] = [bathroom]
+
+
+CASES += [
+    ("EPW203l", 26, variant(hybrid_two_zones("EP-W203l"))),
+    ("EPW203m", 26, variant(own_installations)),
+    (
+        "EPW203n",
+        26,
+        variant(
+            hybrid_two_zones(
+                "EP-W203n",
+                {"declarationReference": "ISSO 54 v2.0 EP-W203n p. 26: kwaliteitsverklaring COP 4,3, fractie 0,72", "generationEfficiency": 4.3, "energyFraction": 0.72},
+            )
+        ),
+    ),
+]
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
